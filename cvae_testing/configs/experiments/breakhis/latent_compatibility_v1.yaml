@@ -39,6 +39,9 @@ routing:
 latent_compatibility:
   metrics: [centroid, wasserstein, gaussian_kl]
   similarity_transform: exp_neg
+  persist_raw_and_transformed_scores: true
+  compute_oracle_alignment: true
+  include_metadata_oracle_proxy_table: true
   splits: [test]
   min_samples_per_domain: 50
   covariance_regularization_lambda: 1.0e-4
@@ -64,6 +67,25 @@ latent_compatibility:
 
   empirical_utility:
     enabled: true
+
+  learned_comparison:
+    strict_context_match: true
+
+  coverage_gates:
+    require_complete_loqdo_folds: true
+    require_all_query_domains_present: true
+    exclude_partial_metric_rows: true
+
+  acceptance_thresholds:
+    enabled: true
+    strong:
+      spearman_uplift_gt: 0.10
+      top1_uplift_gte: 0.25
+      oracle_gap_reduction_gt_pct: 10.0
+      min_backbone_fraction: 0.67
+      disallow_any_backbone_guardrail_breach: true
+    non_inferiority:
+      max_oracle_gap_worsening_pct: 5.0
 
 output:
   root: outputs

@@ -158,4 +158,66 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         if max_points <= 0:
             raise ValueError("latent_compatibility.umap.max_points must be > 0")
 
+        for bool_key in [
+            "persist_raw_and_transformed_scores",
+            "compute_oracle_alignment",
+            "include_metadata_oracle_proxy_table",
+        ]:
+            if bool_key in latent_cfg and not isinstance(latent_cfg.get(bool_key), bool):
+                raise ValueError(f"latent_compatibility.{bool_key} must be a boolean when provided")
+
+        learned_cmp = latent_cfg.get("learned_comparison", {})
+        if learned_cmp is not None and not isinstance(learned_cmp, dict):
+            raise ValueError("latent_compatibility.learned_comparison must be a dictionary when provided")
+        strict_context_match = bool((learned_cmp or {}).get("strict_context_match", True))
+        _ = strict_context_match
+
+        coverage_gates = latent_cfg.get("coverage_gates", {})
+        if coverage_gates is not None and not isinstance(coverage_gates, dict):
+            raise ValueError("latent_compatibility.coverage_gates must be a dictionary when provided")
+        for gate_key in [
+            "require_complete_loqdo_folds",
+            "require_all_query_domains_present",
+            "exclude_partial_metric_rows",
+        ]:
+            gate_value = (coverage_gates or {}).get(gate_key, True)
+            if not isinstance(gate_value, bool):
+                raise ValueError(f"latent_compatibility.coverage_gates.{gate_key} must be a boolean")
+
+        thresholds = latent_cfg.get("acceptance_thresholds", {})
+        if thresholds is not None and not isinstance(thresholds, dict):
+            raise ValueError("latent_compatibility.acceptance_thresholds must be a dictionary when provided")
+
+        thresholds_enabled = (thresholds or {}).get("enabled", True)
+        if not isinstance(thresholds_enabled, bool):
+            raise ValueError("latent_compatibility.acceptance_thresholds.enabled must be a boolean")
+
+        strong = (thresholds or {}).get("strong", {})
+        if strong is not None and not isinstance(strong, dict):
+            raise ValueError("latent_compatibility.acceptance_thresholds.strong must be a dictionary when provided")
+        spearman_uplift_gt = float((strong or {}).get("spearman_uplift_gt", 0.10))
+        top1_uplift_gte = float((strong or {}).get("top1_uplift_gte", 0.25))
+        oracle_gap_reduction_gt_pct = float((strong or {}).get("oracle_gap_reduction_gt_pct", 10.0))
+        min_backbone_fraction = float((strong or {}).get("min_backbone_fraction", 0.67))
+        if min_backbone_fraction <= 0:
+            raise ValueError("latent_compatibility.acceptance_thresholds.strong.min_backbone_fraction must be > 0")
+        _ = spearman_uplift_gt, top1_uplift_gte, oracle_gap_reduction_gt_pct
+
+        disallow_guardrail_breach = (strong or {}).get("disallow_any_backbone_guardrail_breach", True)
+        if not isinstance(disallow_guardrail_breach, bool):
+            raise ValueError(
+                "latent_compatibility.acceptance_thresholds.strong.disallow_any_backbone_guardrail_breach must be a boolean"
+            )
+
+        non_inferiority = (thresholds or {}).get("non_inferiority", {})
+        if non_inferiority is not None and not isinstance(non_inferiority, dict):
+            raise ValueError(
+                "latent_compatibility.acceptance_thresholds.non_inferiority must be a dictionary when provided"
+            )
+        max_gap_worsening = float((non_inferiority or {}).get("max_oracle_gap_worsening_pct", 5.0))
+        if max_gap_worsening < 0:
+            raise ValueError(
+                "latent_compatibility.acceptance_thresholds.non_inferiority.max_oracle_gap_worsening_pct must be >= 0"
+            )
+
     return cfg

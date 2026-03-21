@@ -10,10 +10,13 @@ import numpy as np
 from src.engine.contracts import RunContext
 from src.eval.evaluators import compute_expert_domain_matrix
 from src.eval.evaluators.latent_compatibility import (
+    build_metadata_score_matrix,
+    build_metric_payload,
     compute_distance_utility_correlation,
     compute_distance_matrices,
     compute_domain_gaussian_stats,
     compute_metric_utility_correlation,
+    compute_proxy_oracle_alignment,
     distance_to_similarity,
     evaluate_routing_alignment,
     load_embeddings_with_domains,
@@ -53,6 +56,10 @@ def _validate_latent_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
     wasserstein = block.get("wasserstein", {})
     similarity = block.get("similarity", {})
     empirical = block.get("empirical_utility", {})
+    coverage_gates = block.get("coverage_gates", {})
+    thresholds = block.get("acceptance_thresholds", {})
+    strong = thresholds.get("strong", {}) if isinstance(thresholds, dict) else {}
+    non_inferiority = thresholds.get("non_inferiority", {}) if isinstance(thresholds, dict) else {}
 
     out = {
         "metrics": metrics,
@@ -82,6 +89,30 @@ def _validate_latent_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "empirical_utility": {
             "enabled": bool(empirical.get("enabled", True)),
         },
+        "persist_raw_and_transformed_scores": bool(block.get("persist_raw_and_transformed_scores", True)),
+        "compute_oracle_alignment": bool(block.get("compute_oracle_alignment", True)),
+        "include_metadata_oracle_proxy_table": bool(block.get("include_metadata_oracle_proxy_table", True)),
+        "learned_comparison": {
+            "strict_context_match": bool(block.get("learned_comparison", {}).get("strict_context_match", True)),
+        },
+        "coverage_gates": {
+            "require_complete_loqdo_folds": bool(coverage_gates.get("require_complete_loqdo_folds", True)),
+            "require_all_query_domains_present": bool(coverage_gates.get("require_all_query_domains_present", True)),
+            "exclude_partial_metric_rows": bool(coverage_gates.get("exclude_partial_metric_rows", True)),
+        },
+        "acceptance_thresholds": {
+            "enabled": bool(thresholds.get("enabled", True)) if isinstance(thresholds, dict) else True,
+            "strong": {
+                "spearman_uplift_gt": float(strong.get("spearman_uplift_gt", 0.10)),
+                "top1_uplift_gte": float(strong.get("top1_uplift_gte", 0.25)),
+                "oracle_gap_reduction_gt_pct": float(strong.get("oracle_gap_reduction_gt_pct", 10.0)),
+                "min_backbone_fraction": float(strong.get("min_backbone_fraction", 0.67)),
+                "disallow_any_backbone_guardrail_breach": bool(strong.get("disallow_any_backbone_guardrail_breach", True)),
+            },
+            "non_inferiority": {
+                "max_oracle_gap_worsening_pct": float(non_inferiority.get("max_oracle_gap_worsening_pct", 5.0)),
+            },
+        },
     }
 
     if out["similarity"]["scale_policy"] != "median_off_diagonal":
@@ -96,6 +127,8 @@ def _validate_latent_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("latent_compatibility.similarity.scale_floor must be > 0")
     if out["umap"]["max_points"] <= 0:
         raise ValueError("latent_compatibility.umap.max_points must be > 0")
+    if out["acceptance_thresholds"]["strong"]["min_backbone_fraction"] <= 0:
+        raise ValueError("latent_compatibility.acceptance_thresholds.strong.min_backbone_fraction must be > 0")
 
     return out
 
@@ -136,6 +169,147 @@ def _write_metric_correlation_csv(out_path: Path, rows: List[Dict[str, Any]]) ->
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
+
+
+def _write_rows_csv(out_path: Path, fieldnames: List[str], rows: List[Dict[str, Any]]) -> None:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+
+
+def _compute_coverage_status(
+    backbone_type: str,
+    domain_order: List[int],
+    proxy_alignment_by_name: Dict[str, Dict[str, Any]],
+    coverage_cfg: Dict[str, Any],
+) -> Dict[str, Any]:
+    expected = [f"{d}x" for d in domain_order]
+    expected_set = set(expected)
+    all_present = True
+    has_partial = False
+    per_proxy: Dict[str, Any] = {}
+
+    for proxy_name, payload in proxy_alignment_by_name.items():
+        observed = [str(row.get("query_domain", "")) for row in payload.get("per_query", [])]
+        observed_set = set(observed)
+        missing = sorted(expected_set - observed_set)
+        extra = sorted(observed_set - expected_set)
+        partial = bool(missing or extra or len(observed) != len(expected))
+        all_present = all_present and (len(missing) == 0)
+        has_partial = has_partial or partial
+        per_proxy[proxy_name] = {
+            "expected_query_domains": expected,
+            "observed_query_domains": sorted(observed_set),
+            "missing_query_domains": missing,
+            "extra_query_domains": extra,
+            "partial_rows": partial,
+        }
+
+    complete_folds = bool(all_present and not has_partial)
+    valid = True
+    if bool(coverage_cfg.get("require_complete_loqdo_folds", True)) and not complete_folds:
+        valid = False
+    if bool(coverage_cfg.get("require_all_query_domains_present", True)) and not all_present:
+        valid = False
+    if bool(coverage_cfg.get("exclude_partial_metric_rows", True)) and has_partial:
+        valid = False
+
+    return {
+        "backbone_type": str(backbone_type),
+        "status": "valid" if valid else "insufficient_backbone_coverage",
+        "valid_for_tier": bool(valid),
+        "all_loqdo_query_folds_present": bool(complete_folds),
+        "all_expected_query_domains_present": bool(all_present),
+        "has_partial_metric_rows": bool(has_partial),
+        "details_by_proxy": per_proxy,
+    }
+
+
+def _relative_gap_change_pct(baseline_gap: float, candidate_gap: float) -> float:
+    denom = max(abs(float(baseline_gap)), 1e-12)
+    return float(((candidate_gap - baseline_gap) / denom) * 100.0)
+
+
+def _build_acceptance_decision(
+    metric_name: str,
+    metadata_summary: Dict[str, Any],
+    latent_summary: Dict[str, Any],
+    coverage_status: Dict[str, Any],
+    thresholds_cfg: Dict[str, Any],
+) -> Dict[str, Any]:
+    strong_cfg = thresholds_cfg["strong"]
+    guardrail_cfg = thresholds_cfg["non_inferiority"]
+
+    spearman_uplift = float(latent_summary["mean_spearman"] - metadata_summary["mean_spearman"])
+    top1_uplift = float(latent_summary["top1"] - metadata_summary["top1"])
+    baseline_gap = float(metadata_summary["mean_oracle_gap"])
+    latent_gap = float(latent_summary["mean_oracle_gap"])
+    gap_reduction_pct = float((-_relative_gap_change_pct(baseline_gap, latent_gap)))
+    gap_worsening_pct = float(_relative_gap_change_pct(baseline_gap, latent_gap))
+
+    guardrail_breach = bool(
+        spearman_uplift > 0.0
+        and gap_worsening_pct > float(guardrail_cfg["max_oracle_gap_worsening_pct"])
+    )
+
+    valid_backbones = 1 if bool(coverage_status.get("valid_for_tier", False)) else 0
+    improved_backbones = 1 if (spearman_uplift > 0 and top1_uplift > 0 and gap_reduction_pct > 0 and valid_backbones == 1) else 0
+    backbone_fraction = float(improved_backbones / max(valid_backbones, 1))
+
+    strong_checks = {
+        "spearman_uplift_gt": bool(spearman_uplift > float(strong_cfg["spearman_uplift_gt"])),
+        "top1_uplift_gte": bool(top1_uplift >= float(strong_cfg["top1_uplift_gte"])),
+        "oracle_gap_reduction_gt_pct": bool(gap_reduction_pct > float(strong_cfg["oracle_gap_reduction_gt_pct"])),
+        "min_backbone_fraction": bool(backbone_fraction >= float(strong_cfg["min_backbone_fraction"])),
+        "no_backbone_guardrail_breach": bool(not guardrail_breach),
+        "backbone_coverage_valid": bool(coverage_status.get("valid_for_tier", False)),
+    }
+
+    strong_ok = bool(all(strong_checks.values()))
+    if not bool(strong_cfg.get("disallow_any_backbone_guardrail_breach", True)):
+        strong_ok = bool(
+            strong_checks["spearman_uplift_gt"]
+            and strong_checks["top1_uplift_gte"]
+            and strong_checks["oracle_gap_reduction_gt_pct"]
+            and strong_checks["min_backbone_fraction"]
+            and strong_checks["backbone_coverage_valid"]
+        )
+
+    any_primary_positive = bool(spearman_uplift > 0 or top1_uplift > 0 or gap_reduction_pct > 0)
+
+    if not bool(coverage_status.get("valid_for_tier", False)):
+        tier = "insufficient_backbone_coverage"
+    elif strong_ok:
+        tier = "strong_latent_superiority"
+    elif guardrail_breach:
+        tier = "structural_but_not_utility_improvement"
+    elif any_primary_positive:
+        tier = "partial_or_backbone_dependent_improvement"
+    else:
+        tier = "no_latent_superiority"
+
+    return {
+        "metric": str(metric_name),
+        "tier": tier,
+        "uplifts": {
+            "mean_spearman": spearman_uplift,
+            "top1": top1_uplift,
+            "oracle_gap_reduction_pct": gap_reduction_pct,
+            "oracle_gap_worsening_pct": gap_worsening_pct,
+        },
+        "guardrail": {
+            "max_oracle_gap_worsening_pct": float(guardrail_cfg["max_oracle_gap_worsening_pct"]),
+            "breach": guardrail_breach,
+        },
+        "strong_checks": strong_checks,
+        "coverage_status": {
+            "status": str(coverage_status.get("status", "insufficient_backbone_coverage")),
+            "valid_for_tier": bool(coverage_status.get("valid_for_tier", False)),
+        },
+    }
 
 
 class LatentCompatibilityExperiment(BaseExperiment):
@@ -200,6 +374,7 @@ class LatentCompatibilityExperiment(BaseExperiment):
         scale_by_metric: Dict[str, float] = {}
         verification_by_metric: Dict[str, Any] = {}
         routing_by_metric: Dict[str, Any] = {}
+        metric_payloads: Dict[str, Any] = {}
 
         for metric_name in latent_cfg["metrics"]:
             sim, scale = distance_to_similarity(
@@ -209,6 +384,15 @@ class LatentCompatibilityExperiment(BaseExperiment):
             similarity_mats[metric_name] = sim
             scale_by_metric[metric_name] = float(scale)
             np.save(run_ctx.reports_dir / similarity_name_map[metric_name], sim)
+
+            if bool(latent_cfg["persist_raw_and_transformed_scores"]):
+                metric_payloads[metric_name] = build_metric_payload(
+                    metric_name=metric_name,
+                    raw_distance_matrix=distance_mats[metric_name],
+                    score_matrix=sim,
+                    scale=float(scale),
+                    domain_order=domain_order,
+                )
 
             verification_by_metric[metric_name] = verify_similarity_matrix(
                 matrix=sim,
@@ -257,6 +441,9 @@ class LatentCompatibilityExperiment(BaseExperiment):
             progress.advance("empirical utility matrix computed")
 
         metric_corr_rows: List[Dict[str, Any]] = []
+        proxy_alignment_by_name: Dict[str, Dict[str, Any]] = {}
+        acceptance_decisions: Dict[str, Any] = {}
+        coverage_status: Dict[str, Any] | None = None
         for metric_name in latent_cfg["metrics"]:
             corr = 0.0
             corr_dist = 0.0
@@ -277,7 +464,131 @@ class LatentCompatibilityExperiment(BaseExperiment):
                 }
             )
 
+        if utility_matrix is not None and bool(latent_cfg["compute_oracle_alignment"]):
+            metadata_scores = build_metadata_score_matrix(
+                domain_order=domain_order,
+                strategy=str(cfg["routing"]["strategy"]),
+                tau=float(cfg["routing"]["tau"]),
+                similarity_lookup_matrix=cfg.get("routing", {}).get("similarity_matrix"),
+            )
+            proxy_alignment_by_name["metadata"] = compute_proxy_oracle_alignment(
+                proxy_name="metadata",
+                score_matrix=metadata_scores,
+                oracle_utility_matrix=utility_matrix,
+                domain_order=domain_order,
+            )
+            for metric_name in latent_cfg["metrics"]:
+                proxy_alignment_by_name[metric_name] = compute_proxy_oracle_alignment(
+                    proxy_name=metric_name,
+                    score_matrix=similarity_mats[metric_name],
+                    oracle_utility_matrix=utility_matrix,
+                    domain_order=domain_order,
+                )
+
+            coverage_status = _compute_coverage_status(
+                backbone_type=str(cfg.get("features", {}).get("backbone_type", "unknown")),
+                domain_order=domain_order,
+                proxy_alignment_by_name=proxy_alignment_by_name,
+                coverage_cfg=latent_cfg["coverage_gates"],
+            )
+
+            if bool(latent_cfg["acceptance_thresholds"]["enabled"]):
+                metadata_summary = proxy_alignment_by_name["metadata"]
+                for metric_name in latent_cfg["metrics"]:
+                    acceptance_decisions[metric_name] = _build_acceptance_decision(
+                        metric_name=metric_name,
+                        metadata_summary=metadata_summary,
+                        latent_summary=proxy_alignment_by_name[metric_name],
+                        coverage_status=coverage_status,
+                        thresholds_cfg=latent_cfg["acceptance_thresholds"],
+                    )
+
         _write_metric_correlation_csv(run_ctx.reports_dir / "metric_correlation_table.csv", metric_corr_rows)
+
+        if proxy_alignment_by_name:
+            per_query_rows: List[Dict[str, Any]] = []
+            for payload in proxy_alignment_by_name.values():
+                per_query_rows.extend(payload.get("per_query", []))
+            _write_rows_csv(
+                run_ctx.reports_dir / "proxy_oracle_alignment_per_query.csv",
+                fieldnames=[
+                    "proxy",
+                    "query_domain",
+                    "selected_expert",
+                    "oracle_best_expert",
+                    "spearman_with_oracle",
+                    "top1_oracle_hit",
+                    "rank_of_oracle_best_in_proxy",
+                    "selected_utility",
+                    "oracle_best_utility",
+                    "oracle_gap",
+                    "oracle_gap_pct",
+                ],
+                rows=per_query_rows,
+            )
+
+            summary_payload = {
+                k: {
+                    "proxy": v["proxy"],
+                    "n_queries": int(v["n_queries"]),
+                    "mean_spearman": float(v["mean_spearman"]),
+                    "std_spearman": float(v["std_spearman"]),
+                    "top1": float(v["top1"]),
+                    "mean_oracle_gap": float(v["mean_oracle_gap"]),
+                    "mean_oracle_gap_pct": float(v["mean_oracle_gap_pct"]),
+                }
+                for k, v in proxy_alignment_by_name.items()
+            }
+            with (run_ctx.reports_dir / "proxy_oracle_alignment_summary.json").open("w", encoding="utf-8") as f:
+                json.dump(summary_payload, f, indent=2)
+
+            _write_rows_csv(
+                run_ctx.reports_dir / "routing_to_oracle_summary.csv",
+                fieldnames=[
+                    "proxy",
+                    "n_queries",
+                    "mean_spearman",
+                    "std_spearman",
+                    "top1",
+                    "mean_oracle_gap",
+                    "mean_oracle_gap_pct",
+                ],
+                rows=list(summary_payload.values()),
+            )
+
+            if coverage_status is not None:
+                _write_rows_csv(
+                    run_ctx.reports_dir / "backbone_coverage_eligibility.csv",
+                    fieldnames=[
+                        "backbone_type",
+                        "status",
+                        "valid_for_tier",
+                        "all_loqdo_query_folds_present",
+                        "all_expected_query_domains_present",
+                        "has_partial_metric_rows",
+                    ],
+                    rows=[
+                        {
+                            "backbone_type": coverage_status["backbone_type"],
+                            "status": coverage_status["status"],
+                            "valid_for_tier": int(bool(coverage_status["valid_for_tier"])),
+                            "all_loqdo_query_folds_present": int(bool(coverage_status["all_loqdo_query_folds_present"])),
+                            "all_expected_query_domains_present": int(bool(coverage_status["all_expected_query_domains_present"])),
+                            "has_partial_metric_rows": int(bool(coverage_status["has_partial_metric_rows"])),
+                        }
+                    ],
+                )
+
+            with (run_ctx.reports_dir / "acceptance_decision_summary.json").open("w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "backbone_type": str(cfg.get("features", {}).get("backbone_type", "unknown")),
+                        "coverage": coverage_status,
+                        "decisions": acceptance_decisions,
+                    },
+                    f,
+                    indent=2,
+                )
 
         for metric_name in latent_cfg["metrics"]:
             fname = {
@@ -362,6 +673,7 @@ class LatentCompatibilityExperiment(BaseExperiment):
             "verification": verification_by_metric,
             "routing": routing_by_metric,
             "reducer": reducer_info,
+            "metric_payloads": metric_payloads,
             "distance_matrices": {
                 k: matrix_to_domain_dict(domain_order, v) for k, v in distance_mats.items()
             },
@@ -387,6 +699,40 @@ class LatentCompatibilityExperiment(BaseExperiment):
                 f.write(f"spearman_with_utility={float(r.get('spearman_with_utility', 0.0)):.4f}, ")
                 f.write(f"spearman_distance_with_utility={float(r.get('spearman_distance_with_utility', 0.0)):.4f}\n")
 
+            if proxy_alignment_by_name and bool(latent_cfg["include_metadata_oracle_proxy_table"]):
+                f.write("\n## Proxy Quality vs Oracle\n\n")
+                f.write("| proxy | mean_spearman | top1 | mean_oracle_gap | mean_oracle_gap_pct |\n")
+                f.write("|---|---:|---:|---:|---:|\n")
+                for name in ["metadata"] + [m for m in latent_cfg["metrics"] if m in proxy_alignment_by_name]:
+                    p = proxy_alignment_by_name[name]
+                    f.write(
+                        f"| {name} | {float(p['mean_spearman']):.4f} | {float(p['top1']):.4f} | {float(p['mean_oracle_gap']):.6f} | {float(p['mean_oracle_gap_pct']):.2f} |\n"
+                    )
+
+                if acceptance_decisions:
+                    f.write("\n## Acceptance Decisions\n\n")
+                    for metric_name in latent_cfg["metrics"]:
+                        if metric_name not in acceptance_decisions:
+                            continue
+                        d = acceptance_decisions[metric_name]
+                        u = d["uplifts"]
+                        f.write(
+                            f"- {metric_name}: tier={d['tier']}, "
+                            f"spearman_uplift={float(u['mean_spearman']):.4f}, "
+                            f"top1_uplift={float(u['top1']):.4f}, "
+                            f"oracle_gap_reduction_pct={float(u['oracle_gap_reduction_pct']):.2f}, "
+                            f"guardrail_breach={bool(d['guardrail']['breach'])}\n"
+                        )
+
+                if coverage_status is not None:
+                    f.write("\n## Backbone Coverage\n\n")
+                    f.write(
+                        f"- backbone={coverage_status['backbone_type']}, status={coverage_status['status']}, "
+                        f"all_loqdo_query_folds_present={coverage_status['all_loqdo_query_folds_present']}, "
+                        f"all_expected_query_domains_present={coverage_status['all_expected_query_domains_present']}, "
+                        f"has_partial_metric_rows={coverage_status['has_partial_metric_rows']}\n"
+                    )
+
             f.write("\n## Verification\n\n")
             for metric_name in latent_cfg["metrics"]:
                 v = verification_by_metric[metric_name]
@@ -406,6 +752,11 @@ class LatentCompatibilityExperiment(BaseExperiment):
                 "routing_artifact": "routing_agreement.json",
                 "gaussian_stats_artifact": "latent_gaussian_stats.json",
                 "correlation_artifact": "metric_correlation_table.csv",
+                "proxy_alignment_per_query_artifact": "proxy_oracle_alignment_per_query.csv",
+                "proxy_alignment_summary_artifact": "proxy_oracle_alignment_summary.json",
+                "routing_to_oracle_summary_artifact": "routing_to_oracle_summary.csv",
+                "backbone_coverage_artifact": "backbone_coverage_eligibility.csv",
+                "acceptance_decision_artifact": "acceptance_decision_summary.json",
                 "report_artifact": "report.md",
             },
         )
