@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 from pathlib import Path
+import time
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
@@ -327,6 +328,147 @@ def evaluate_routing_alignment(
         "top1_agreement": top1,
         "mean_rank": mean_rank,
         "per_domain": rows,
+    }
+
+
+def _precompute_domain_cholesky_factors(
+    domain_order: List[int],
+    stats: Dict[int, DomainGaussianStats],
+    eigenvalue_floor: float,
+) -> Dict[int, np.ndarray]:
+    factors: Dict[int, np.ndarray] = {}
+    for domain in domain_order:
+        cov = 0.5 * (stats[int(domain)].covariance + stats[int(domain)].covariance.T)
+        cov = cov + (float(eigenvalue_floor) * np.eye(cov.shape[0], dtype=np.float64))
+        try:
+            factors[int(domain)] = np.linalg.cholesky(cov)
+        except np.linalg.LinAlgError:
+            vals, vecs = np.linalg.eigh(cov)
+            vals = np.maximum(vals, float(eigenvalue_floor))
+            cov_stable = (vecs * vals) @ vecs.T
+            factors[int(domain)] = np.linalg.cholesky(cov_stable)
+    return factors
+
+
+def _domain_gaussian_sample_distance_from_cholesky(
+    sample: np.ndarray,
+    mean: np.ndarray,
+    cholesky_factor: np.ndarray,
+) -> float:
+    # Mahalanobis distance via solve(L, delta), where Cov = L L^T.
+    delta = sample - mean
+    solved = np.linalg.solve(cholesky_factor, delta)
+    md2 = float(np.dot(solved, solved))
+    return math.sqrt(max(md2, 0.0))
+
+
+def evaluate_sample_level_routing_alignment(
+    embeddings: np.ndarray,
+    sample_domains: np.ndarray,
+    domain_order: List[int],
+    stats: Dict[int, DomainGaussianStats],
+    strategy: str,
+    tau: float,
+    eigenvalue_floor: float,
+    similarity_lookup_matrix: Optional[Dict[str, Dict[str, float]]] = None,
+    max_samples: Optional[int] = None,
+    timing_every: int = 0,
+) -> Dict[str, Any]:
+    n_domains = len(domain_order)
+    top1_hits = 0
+    ranks: List[float] = []
+    rows: List[Dict[str, Any]] = []
+    per_domain_counts: Dict[int, int] = {int(d): 0 for d in domain_order}
+    per_domain_hits: Dict[int, int] = {int(d): 0 for d in domain_order}
+    n_total_samples = int(embeddings.shape[0])
+    n_evaluated_samples = n_total_samples if max_samples is None else min(int(max_samples), n_total_samples)
+
+    cholesky_by_domain = _precompute_domain_cholesky_factors(
+        domain_order=domain_order,
+        stats=stats,
+        eigenvalue_floor=float(eigenvalue_floor),
+    )
+    metadata_scores_by_query: Dict[int, List[float]] = {}
+    for query_domain in set(int(d) for d in sample_domains[:n_evaluated_samples].tolist()):
+        metadata_scores_by_query[query_domain] = [
+            compute_similarity(
+                {"magnification": int(query_domain)},
+                {"magnification": int(expert_domain)},
+                strategy=str(strategy),
+                tau=float(tau),
+                similarity_matrix=similarity_lookup_matrix,
+            )
+            for expert_domain in domain_order
+        ]
+
+    started = time.perf_counter()
+
+    for idx in range(n_evaluated_samples):
+        query_domain = int(sample_domains[idx])
+        x = embeddings[idx].astype(np.float64, copy=False)
+
+        latent_distances = [
+            _domain_gaussian_sample_distance_from_cholesky(
+                sample=x,
+                mean=stats[int(expert_domain)].mean,
+                cholesky_factor=cholesky_by_domain[int(expert_domain)],
+            )
+            for expert_domain in domain_order
+        ]
+        latent_scores = [float(math.exp(-d)) for d in latent_distances]
+        latent_best_idx = int(np.argmax(np.asarray(latent_scores, dtype=np.float64)))
+
+        metadata_scores = metadata_scores_by_query[query_domain]
+        metadata_best_idx = int(np.argmax(np.asarray(metadata_scores, dtype=np.float64)))
+
+        ordering = sorted(range(n_domains), key=lambda i: (-latent_scores[i], i))
+        rank_by_idx = {i: r + 1 for r, i in enumerate(ordering)}
+        metadata_rank = float(rank_by_idx[metadata_best_idx])
+
+        hit = int(metadata_best_idx == latent_best_idx)
+        top1_hits += hit
+        ranks.append(metadata_rank)
+        if query_domain in per_domain_counts:
+            per_domain_counts[query_domain] += 1
+            per_domain_hits[query_domain] += hit
+
+        rows.append(
+            {
+                "sample_index": int(idx),
+                "query_domain": f"{query_domain}x",
+                "metadata_selected_expert": f"{domain_order[metadata_best_idx]}x",
+                "latent_best_expert": f"{domain_order[latent_best_idx]}x",
+                "top1_match": bool(hit),
+                "metadata_selected_rank_in_latent": metadata_rank,
+            }
+        )
+
+        if timing_every > 0 and (((idx + 1) % int(timing_every)) == 0 or (idx + 1) == n_evaluated_samples):
+            elapsed = time.perf_counter() - started
+            print(
+                f"sample-level routing progress: {idx + 1}/{n_evaluated_samples} "
+                f"samples in {elapsed:.2f}s ({elapsed / max(idx + 1, 1):.4f}s/sample)"
+            )
+
+    n_samples = int(n_evaluated_samples)
+    total_elapsed = time.perf_counter() - started
+    per_domain_summary = [
+        {
+            "query_domain": f"{int(d)}x",
+            "n_samples": int(per_domain_counts[int(d)]),
+            "top1_agreement": float(per_domain_hits[int(d)] / max(per_domain_counts[int(d)], 1)),
+        }
+        for d in domain_order
+    ]
+    return {
+        "granularity": "sample",
+        "n_total_samples": int(n_total_samples),
+        "n_samples": n_samples,
+        "top1_agreement": float(top1_hits / max(n_samples, 1)),
+        "mean_rank": float(sum(ranks) / len(ranks)) if ranks else 0.0,
+        "runtime_seconds": float(total_elapsed),
+        "per_sample": rows,
+        "per_domain_summary": per_domain_summary,
     }
 
 

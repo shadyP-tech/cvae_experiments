@@ -6,6 +6,11 @@ from typing import Any, Dict
 REQUIRED_TOP_LEVEL = ["seed", "data", "features", "model", "training", "routing"]
 
 
+def _ensure_bool(value: object, name: str) -> None:
+    if not isinstance(value, bool):
+        raise ValueError(f"{name} must be a boolean")
+
+
 def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(cfg, dict):
         raise ValueError("Config must be a dictionary.")
@@ -87,6 +92,148 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(tags, list):
             raise ValueError("tracking.tags must be a list when provided")
 
+    learned_cfg = cfg.get("learned_utility")
+    if learned_cfg is not None:
+        if not isinstance(learned_cfg, dict):
+            raise ValueError("learned_utility must be a dictionary when provided")
+
+        split_protocol = str(learned_cfg.get("split_protocol", "loqdo_query_domain")).strip().lower()
+        if split_protocol != "loqdo_query_domain":
+            raise ValueError("learned_utility.split_protocol must be 'loqdo_query_domain'")
+
+        query_domain_field = str(learned_cfg.get("query_domain_field", "magnification")).strip()
+        if query_domain_field != "magnification":
+            raise ValueError("learned_utility.query_domain_field must be 'magnification'")
+
+        splits = learned_cfg.get("splits", ["test"])
+        if not isinstance(splits, list) or not splits:
+            raise ValueError("learned_utility.splits must be a non-empty list")
+        allowed_splits = {"train", "val", "test"}
+        bad_splits = sorted(set(str(s) for s in splits) - allowed_splits)
+        if bad_splits:
+            raise ValueError(
+                f"learned_utility.splits must be subset of {sorted(allowed_splits)}, got unknown {bad_splits}"
+            )
+
+        predictors = learned_cfg.get("predictors", ["linear_regressor", "mlp_regressor"])
+        if not isinstance(predictors, list) or not predictors:
+            raise ValueError("learned_utility.predictors must be a non-empty list")
+        allowed_predictors = {"linear_regressor", "mlp_regressor", "metadata_only_regressor"}
+        bad_predictors = sorted(set(str(p) for p in predictors) - allowed_predictors)
+        if bad_predictors:
+            raise ValueError(
+                "learned_utility.predictors must be subset of "
+                f"{sorted(allowed_predictors)}, got unknown {bad_predictors}"
+            )
+
+        target_cfg = learned_cfg.get("target", {})
+        if target_cfg is not None and not isinstance(target_cfg, dict):
+            raise ValueError("learned_utility.target must be a dictionary when provided")
+        target_name = str((target_cfg or {}).get("name", "nelbo")).strip().lower()
+        if target_name != "nelbo":
+            raise ValueError("learned_utility.target.name must be 'nelbo'")
+        target_norm = str((target_cfg or {}).get("normalization", "per_query_domain_zscore")).strip().lower()
+        if target_norm != "per_query_domain_zscore":
+            raise ValueError("learned_utility.target.normalization must be 'per_query_domain_zscore'")
+        norm_source = str((target_cfg or {}).get("normalization_stats_source", "train_fold_only")).strip().lower()
+        if norm_source != "train_fold_only":
+            raise ValueError("learned_utility.target.normalization_stats_source must be 'train_fold_only'")
+        eval_scale = str((target_cfg or {}).get("eval_scale", "raw_nelbo")).strip().lower()
+        if eval_scale != "raw_nelbo":
+            raise ValueError("learned_utility.target.eval_scale must be 'raw_nelbo'")
+
+        pair_features = learned_cfg.get("pair_features", {})
+        if pair_features is not None and not isinstance(pair_features, dict):
+            raise ValueError("learned_utility.pair_features must be a dictionary when provided")
+        include_sample_embedding = (pair_features or {}).get("include_sample_embedding", True)
+        _ensure_bool(include_sample_embedding, "learned_utility.pair_features.include_sample_embedding")
+        if not include_sample_embedding:
+            raise ValueError("learned_utility.pair_features.include_sample_embedding must be true")
+        expert_id_encoding = str((pair_features or {}).get("expert_id_encoding", "one_hot")).strip().lower()
+        if expert_id_encoding != "one_hot":
+            raise ValueError("learned_utility.pair_features.expert_id_encoding must be 'one_hot'")
+        for key in ["include_metadata_features", "include_domain_stats"]:
+            _ensure_bool((pair_features or {}).get(key, False), f"learned_utility.pair_features.{key}")
+
+        scoring_cfg = learned_cfg.get("scoring", {})
+        if scoring_cfg is not None and not isinstance(scoring_cfg, dict):
+            raise ValueError("learned_utility.scoring must be a dictionary when provided")
+        granularity = str((scoring_cfg or {}).get("granularity", "sample_expert_pair")).strip().lower()
+        if granularity != "sample_expert_pair":
+            raise ValueError("learned_utility.scoring.granularity must be 'sample_expert_pair'")
+        _ensure_bool(
+            (scoring_cfg or {}).get("enforce_full_expert_scoring", True),
+            "learned_utility.scoring.enforce_full_expert_scoring",
+        )
+        pair_batch_size = int((scoring_cfg or {}).get("pair_batch_size", 4096))
+        if pair_batch_size <= 0:
+            raise ValueError("learned_utility.scoring.pair_batch_size must be > 0")
+
+        latent_cmp = learned_cfg.get("latent_comparator", {})
+        if latent_cmp is not None and not isinstance(latent_cmp, dict):
+            raise ValueError("learned_utility.latent_comparator must be a dictionary when provided")
+        primary_cmp = str((latent_cmp or {}).get("primary", "wasserstein")).strip().lower()
+        if primary_cmp != "wasserstein":
+            raise ValueError("learned_utility.latent_comparator.primary must be 'wasserstein'")
+        diagnostics = (latent_cmp or {}).get("diagnostics", ["centroid", "gaussian_kl"])
+        if not isinstance(diagnostics, list):
+            raise ValueError("learned_utility.latent_comparator.diagnostics must be a list")
+        allowed_diag = {"centroid", "gaussian_kl", "wasserstein"}
+        bad_diag = sorted(set(str(v) for v in diagnostics) - allowed_diag)
+        if bad_diag:
+            raise ValueError(
+                "learned_utility.latent_comparator.diagnostics must be subset of "
+                f"{sorted(allowed_diag)}, got unknown {bad_diag}"
+            )
+
+        leakage_cfg = learned_cfg.get("leakage_guards", {})
+        if leakage_cfg is not None and not isinstance(leakage_cfg, dict):
+            raise ValueError("learned_utility.leakage_guards must be a dictionary when provided")
+        _ensure_bool(
+            (leakage_cfg or {}).get("require_zero_query_domain_overlap", True),
+            "learned_utility.leakage_guards.require_zero_query_domain_overlap",
+        )
+        _ensure_bool(
+            (leakage_cfg or {}).get("forbid_heldout_oracle_labels_in_training", True),
+            "learned_utility.leakage_guards.forbid_heldout_oracle_labels_in_training",
+        )
+
+        winner_cfg = learned_cfg.get("winner_rule", {})
+        if winner_cfg is not None and not isinstance(winner_cfg, dict):
+            raise ValueError("learned_utility.winner_rule must be a dictionary when provided")
+        primary_metric = str((winner_cfg or {}).get("primary_metric", "mean_oracle_gap_pct")).strip().lower()
+        if primary_metric != "mean_oracle_gap_pct":
+            raise ValueError("learned_utility.winner_rule.primary_metric must be 'mean_oracle_gap_pct'")
+        tie_breakers = (winner_cfg or {}).get("tie_breakers", ["top1_oracle_hit", "spearman_with_oracle"])
+        if not isinstance(tie_breakers, list) or not tie_breakers:
+            raise ValueError("learned_utility.winner_rule.tie_breakers must be a non-empty list")
+        allowed_tie = {"top1_oracle_hit", "spearman_with_oracle"}
+        bad_ties = sorted(set(str(v) for v in tie_breakers) - allowed_tie)
+        if bad_ties:
+            raise ValueError(
+                "learned_utility.winner_rule.tie_breakers must be subset of "
+                f"{sorted(allowed_tie)}, got unknown {bad_ties}"
+            )
+        if float((winner_cfg or {}).get("mlp_min_improvement_abs_pct", 1.0)) < 0:
+            raise ValueError("learned_utility.winner_rule.mlp_min_improvement_abs_pct must be >= 0")
+        if float((winner_cfg or {}).get("max_allowed_seed_regression_pct", 5.0)) < 0:
+            raise ValueError("learned_utility.winner_rule.max_allowed_seed_regression_pct must be >= 0")
+
+        artifacts_cfg = learned_cfg.get("artifacts", {})
+        if artifacts_cfg is not None and not isinstance(artifacts_cfg, dict):
+            raise ValueError("learned_utility.artifacts must be a dictionary when provided")
+        for key in [
+            "save_pair_predictions_csv",
+            "save_sample_selection_csv",
+            "save_domain_breakdown_csv",
+            "save_training_fold_manifest_json",
+        ]:
+            _ensure_bool((artifacts_cfg or {}).get(key, True), f"learned_utility.artifacts.{key}")
+
+        backbone = str(cfg.get("features", {}).get("backbone_type", "")).strip().lower()
+        if backbone != "resnet50":
+            raise ValueError("features.backbone_type must be 'resnet50' for learned_utility protocol lock")
+
     latent_cfg = cfg.get("latent_compatibility")
     if latent_cfg is not None:
         if not isinstance(latent_cfg, dict):
@@ -105,6 +252,10 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         similarity_transform = str(latent_cfg.get("similarity_transform", "exp_neg")).strip()
         if similarity_transform != "exp_neg":
             raise ValueError("latent_compatibility.similarity_transform must be 'exp_neg'")
+
+        routing_granularity = str(latent_cfg.get("routing_granularity", "sample")).strip().lower()
+        if routing_granularity not in {"domain", "sample"}:
+            raise ValueError("latent_compatibility.routing_granularity must be one of ['domain', 'sample']")
 
         splits = latent_cfg.get("splits", ["test"])
         if not isinstance(splits, list) or not splits:
@@ -172,6 +323,16 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         strict_context_match = bool((learned_cmp or {}).get("strict_context_match", True))
         _ = strict_context_match
 
+        sample_level_cfg = latent_cfg.get("sample_level_routing", {})
+        if sample_level_cfg is not None and not isinstance(sample_level_cfg, dict):
+            raise ValueError("latent_compatibility.sample_level_routing must be a dictionary when provided")
+        max_samples = int((sample_level_cfg or {}).get("max_samples", 0))
+        timing_every = int((sample_level_cfg or {}).get("timing_every", 0))
+        if max_samples < 0:
+            raise ValueError("latent_compatibility.sample_level_routing.max_samples must be >= 0")
+        if timing_every < 0:
+            raise ValueError("latent_compatibility.sample_level_routing.timing_every must be >= 0")
+
         coverage_gates = latent_cfg.get("coverage_gates", {})
         if coverage_gates is not None and not isinstance(coverage_gates, dict):
             raise ValueError("latent_compatibility.coverage_gates must be a dictionary when provided")
@@ -201,6 +362,15 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         min_backbone_fraction = float((strong or {}).get("min_backbone_fraction", 0.67))
         if min_backbone_fraction <= 0:
             raise ValueError("latent_compatibility.acceptance_thresholds.strong.min_backbone_fraction must be > 0")
+        expected_backbones = (strong or {}).get("expected_backbones", [])
+        if expected_backbones is not None:
+            if not isinstance(expected_backbones, list):
+                raise ValueError("latent_compatibility.acceptance_thresholds.strong.expected_backbones must be a list")
+            for backbone in expected_backbones:
+                if not str(backbone).strip():
+                    raise ValueError(
+                        "latent_compatibility.acceptance_thresholds.strong.expected_backbones must contain non-empty backbone names"
+                    )
         _ = spearman_uplift_gt, top1_uplift_gte, oracle_gap_reduction_gt_pct
 
         disallow_guardrail_breach = (strong or {}).get("disallow_any_backbone_guardrail_breach", True)
