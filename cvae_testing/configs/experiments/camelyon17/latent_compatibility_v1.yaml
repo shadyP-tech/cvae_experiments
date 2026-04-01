@@ -1,21 +1,24 @@
 seed: 42
 
 experiment:
-  dataset_name: breakhis
+  dataset_name: camelyon17
   name: latent_compatibility_v1
   mode: latent_compatibility
 
 data:
-  dataset_type: breakhis
-  root: data/BreakHis
+  dataset_type: camelyon17
+  root: data/Camelyon17/data/camelyon17_v1.0
+  metadata_file: metadata.csv
+  domain_field: center
+  use_metadata_split: false
   image_extensions: [".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"]
-  magnifications: [40, 100, 200, 400]
+  magnifications: [0, 1, 2, 3, 4]
   max_samples_per_domain: 500
   split:
     train: 0.70
     val: 0.15
     test: 0.15
-  require_patient_ids: false
+  require_patient_ids: true
 
 features:
   image_size: 64
@@ -40,6 +43,9 @@ routing:
 latent_compatibility:
   metrics: [centroid, wasserstein, gaussian_kl]
   routing_granularity: sample
+  sample_level_routing:
+    max_samples: 10
+    timing_every: 5
   similarity_transform: exp_neg
   persist_raw_and_transformed_scores: true
   compute_oracle_alignment: true

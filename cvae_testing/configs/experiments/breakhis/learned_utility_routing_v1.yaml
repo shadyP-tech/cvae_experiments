@@ -1,0 +1,92 @@
+seed: 42
+
+experiment:
+  dataset_name: breakhis
+  name: learned_utility_routing_v1
+  mode: learned_utility_routing
+
+data:
+  dataset_type: breakhis
+  root: data/BreakHis
+  image_extensions: [".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"]
+  magnifications: [40, 100, 200, 400]
+  max_samples_per_domain: 500
+  split:
+    train: 0.70
+    val: 0.15
+    test: 0.15
+  require_patient_ids: false
+
+features:
+  image_size: 64
+  backbone_type: resnet50
+  embedding_dim: 2048
+
+model:
+  hidden_dim: 256
+  latent_dim: 16
+
+training:
+  batch_size: 128
+  learning_rate: 0.001
+  epochs: 25
+  patience: 5
+
+routing:
+  strategy: categorical_exact
+  tau: 1.0
+  temperature: 1.0
+
+learned_utility:
+  split_protocol: loqdo_query_domain
+  query_domain_field: magnification
+  splits: [test]
+  predictors: [linear_regressor, mlp_regressor]
+
+  predictor_params:
+    mlp:
+      hidden_dim: 128
+      epochs: 40
+      lr: 1.0e-3
+      batch_size: 2048
+      device: auto
+
+  target:
+    name: nelbo
+    normalization: per_query_domain_zscore
+    normalization_stats_source: train_fold_only
+    eval_scale: raw_nelbo
+
+  pair_features:
+    include_sample_embedding: true
+    expert_id_encoding: one_hot
+    include_metadata_features: false
+    include_domain_stats: false
+
+  scoring:
+    granularity: sample_expert_pair
+    enforce_full_expert_scoring: true
+    pair_batch_size: 4096
+
+  latent_comparator:
+    primary: wasserstein
+    diagnostics: [centroid, gaussian_kl]
+
+  leakage_guards:
+    require_zero_query_domain_overlap: true
+    forbid_heldout_oracle_labels_in_training: true
+
+  winner_rule:
+    primary_metric: mean_oracle_gap_pct
+    tie_breakers: [top1_oracle_hit, spearman_with_oracle]
+    mlp_min_improvement_abs_pct: 1.0
+    max_allowed_seed_regression_pct: 5.0
+
+  artifacts:
+    save_pair_predictions_csv: true
+    save_sample_selection_csv: true
+    save_domain_breakdown_csv: true
+    save_training_fold_manifest_json: true
+
+output:
+  root: outputs

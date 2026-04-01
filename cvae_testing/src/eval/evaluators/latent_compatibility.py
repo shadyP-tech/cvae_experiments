@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 from pathlib import Path
+import time
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
@@ -330,6 +331,147 @@ def evaluate_routing_alignment(
     }
 
 
+def _precompute_domain_cholesky_factors(
+    domain_order: List[int],
+    stats: Dict[int, DomainGaussianStats],
+    eigenvalue_floor: float,
+) -> Dict[int, np.ndarray]:
+    factors: Dict[int, np.ndarray] = {}
+    for domain in domain_order:
+        cov = 0.5 * (stats[int(domain)].covariance + stats[int(domain)].covariance.T)
+        cov = cov + (float(eigenvalue_floor) * np.eye(cov.shape[0], dtype=np.float64))
+        try:
+            factors[int(domain)] = np.linalg.cholesky(cov)
+        except np.linalg.LinAlgError:
+            vals, vecs = np.linalg.eigh(cov)
+            vals = np.maximum(vals, float(eigenvalue_floor))
+            cov_stable = (vecs * vals) @ vecs.T
+            factors[int(domain)] = np.linalg.cholesky(cov_stable)
+    return factors
+
+
+def _domain_gaussian_sample_distance_from_cholesky(
+    sample: np.ndarray,
+    mean: np.ndarray,
+    cholesky_factor: np.ndarray,
+) -> float:
+    # Mahalanobis distance via solve(L, delta), where Cov = L L^T.
+    delta = sample - mean
+    solved = np.linalg.solve(cholesky_factor, delta)
+    md2 = float(np.dot(solved, solved))
+    return math.sqrt(max(md2, 0.0))
+
+
+def evaluate_sample_level_routing_alignment(
+    embeddings: np.ndarray,
+    sample_domains: np.ndarray,
+    domain_order: List[int],
+    stats: Dict[int, DomainGaussianStats],
+    strategy: str,
+    tau: float,
+    eigenvalue_floor: float,
+    similarity_lookup_matrix: Optional[Dict[str, Dict[str, float]]] = None,
+    max_samples: Optional[int] = None,
+    timing_every: int = 0,
+) -> Dict[str, Any]:
+    n_domains = len(domain_order)
+    top1_hits = 0
+    ranks: List[float] = []
+    rows: List[Dict[str, Any]] = []
+    per_domain_counts: Dict[int, int] = {int(d): 0 for d in domain_order}
+    per_domain_hits: Dict[int, int] = {int(d): 0 for d in domain_order}
+    n_total_samples = int(embeddings.shape[0])
+    n_evaluated_samples = n_total_samples if max_samples is None else min(int(max_samples), n_total_samples)
+
+    cholesky_by_domain = _precompute_domain_cholesky_factors(
+        domain_order=domain_order,
+        stats=stats,
+        eigenvalue_floor=float(eigenvalue_floor),
+    )
+    metadata_scores_by_query: Dict[int, List[float]] = {}
+    for query_domain in set(int(d) for d in sample_domains[:n_evaluated_samples].tolist()):
+        metadata_scores_by_query[query_domain] = [
+            compute_similarity(
+                {"magnification": int(query_domain)},
+                {"magnification": int(expert_domain)},
+                strategy=str(strategy),
+                tau=float(tau),
+                similarity_matrix=similarity_lookup_matrix,
+            )
+            for expert_domain in domain_order
+        ]
+
+    started = time.perf_counter()
+
+    for idx in range(n_evaluated_samples):
+        query_domain = int(sample_domains[idx])
+        x = embeddings[idx].astype(np.float64, copy=False)
+
+        latent_distances = [
+            _domain_gaussian_sample_distance_from_cholesky(
+                sample=x,
+                mean=stats[int(expert_domain)].mean,
+                cholesky_factor=cholesky_by_domain[int(expert_domain)],
+            )
+            for expert_domain in domain_order
+        ]
+        latent_scores = [float(math.exp(-d)) for d in latent_distances]
+        latent_best_idx = int(np.argmax(np.asarray(latent_scores, dtype=np.float64)))
+
+        metadata_scores = metadata_scores_by_query[query_domain]
+        metadata_best_idx = int(np.argmax(np.asarray(metadata_scores, dtype=np.float64)))
+
+        ordering = sorted(range(n_domains), key=lambda i: (-latent_scores[i], i))
+        rank_by_idx = {i: r + 1 for r, i in enumerate(ordering)}
+        metadata_rank = float(rank_by_idx[metadata_best_idx])
+
+        hit = int(metadata_best_idx == latent_best_idx)
+        top1_hits += hit
+        ranks.append(metadata_rank)
+        if query_domain in per_domain_counts:
+            per_domain_counts[query_domain] += 1
+            per_domain_hits[query_domain] += hit
+
+        rows.append(
+            {
+                "sample_index": int(idx),
+                "query_domain": f"{query_domain}x",
+                "metadata_selected_expert": f"{domain_order[metadata_best_idx]}x",
+                "latent_best_expert": f"{domain_order[latent_best_idx]}x",
+                "top1_match": bool(hit),
+                "metadata_selected_rank_in_latent": metadata_rank,
+            }
+        )
+
+        if timing_every > 0 and (((idx + 1) % int(timing_every)) == 0 or (idx + 1) == n_evaluated_samples):
+            elapsed = time.perf_counter() - started
+            print(
+                f"sample-level routing progress: {idx + 1}/{n_evaluated_samples} "
+                f"samples in {elapsed:.2f}s ({elapsed / max(idx + 1, 1):.4f}s/sample)"
+            )
+
+    n_samples = int(n_evaluated_samples)
+    total_elapsed = time.perf_counter() - started
+    per_domain_summary = [
+        {
+            "query_domain": f"{int(d)}x",
+            "n_samples": int(per_domain_counts[int(d)]),
+            "top1_agreement": float(per_domain_hits[int(d)] / max(per_domain_counts[int(d)], 1)),
+        }
+        for d in domain_order
+    ]
+    return {
+        "granularity": "sample",
+        "n_total_samples": int(n_total_samples),
+        "n_samples": n_samples,
+        "top1_agreement": float(top1_hits / max(n_samples, 1)),
+        "mean_rank": float(sum(ranks) / len(ranks)) if ranks else 0.0,
+        "runtime_seconds": float(total_elapsed),
+        "per_sample": rows,
+        "per_domain_summary": per_domain_summary,
+    }
+
+
 def matrix_to_domain_dict(domain_order: List[int], matrix: np.ndarray) -> Dict[str, Dict[str, float]]:
     out: Dict[str, Dict[str, float]] = {}
     for i, di in enumerate(domain_order):
@@ -395,6 +537,142 @@ def compute_distance_utility_correlation(
         util_vals = utility_matrix.reshape(-1).tolist()
 
     return float(spearman_corr(dist_vals, util_vals))
+
+
+def validate_query_expert_matrix(
+    matrix: np.ndarray,
+    domain_order: List[int],
+    matrix_name: str,
+) -> None:
+    expected_shape = (len(domain_order), len(domain_order))
+    if matrix.shape != expected_shape:
+        raise ValueError(
+            f"{matrix_name} must have shape {expected_shape} with orientation query_domain x expert_domain; got {matrix.shape}"
+        )
+    if not np.isfinite(matrix).all():
+        raise ValueError(f"{matrix_name} contains non-finite values")
+
+
+def build_metadata_score_matrix(
+    domain_order: List[int],
+    strategy: str,
+    tau: float,
+    similarity_lookup_matrix: Optional[Dict[str, Dict[str, float]]] = None,
+) -> np.ndarray:
+    n = len(domain_order)
+    out = np.zeros((n, n), dtype=np.float64)
+    for i, query_domain in enumerate(domain_order):
+        for j, expert_domain in enumerate(domain_order):
+            out[i, j] = float(
+                compute_similarity(
+                    {"magnification": int(query_domain)},
+                    {"magnification": int(expert_domain)},
+                    strategy=str(strategy),
+                    tau=float(tau),
+                    similarity_matrix=similarity_lookup_matrix,
+                )
+            )
+    return out
+
+
+def _rank_desc(scores: List[float]) -> Dict[int, int]:
+    ordering = sorted(range(len(scores)), key=lambda idx: (-scores[idx], idx))
+    return {idx: rank + 1 for rank, idx in enumerate(ordering)}
+
+
+def compute_proxy_oracle_alignment(
+    proxy_name: str,
+    score_matrix: np.ndarray,
+    oracle_utility_matrix: np.ndarray,
+    domain_order: List[int],
+) -> Dict[str, Any]:
+    validate_query_expert_matrix(score_matrix, domain_order, f"{proxy_name}.score_matrix")
+    validate_query_expert_matrix(oracle_utility_matrix, domain_order, "oracle_utility_matrix")
+
+    rows: List[Dict[str, Any]] = []
+    spearmans: List[float] = []
+    top1_hits = 0
+    gaps: List[float] = []
+    rel_gaps_pct: List[float] = []
+
+    for i, query_domain in enumerate(domain_order):
+        score_row = [float(v) for v in score_matrix[i, :].tolist()]
+        utility_row = [float(v) for v in oracle_utility_matrix[i, :].tolist()]
+
+        selected_idx = int(np.argmax(np.asarray(score_row, dtype=np.float64)))
+        oracle_best_idx = int(np.argmax(np.asarray(utility_row, dtype=np.float64)))
+        top1_hit = int(selected_idx == oracle_best_idx)
+
+        selected_utility = float(utility_row[selected_idx])
+        oracle_best_utility = float(utility_row[oracle_best_idx])
+        gap = float(oracle_best_utility - selected_utility)
+        denom = max(abs(oracle_best_utility), 1e-12)
+        rel_gap_pct = float((gap / denom) * 100.0)
+
+        score_rank = _rank_desc(score_row)
+        rank_of_oracle = int(score_rank[oracle_best_idx])
+        rho = float(spearman_corr(score_row, utility_row))
+
+        spearmans.append(rho)
+        top1_hits += top1_hit
+        gaps.append(gap)
+        rel_gaps_pct.append(rel_gap_pct)
+
+        rows.append(
+            {
+                "proxy": str(proxy_name),
+                "query_domain": f"{query_domain}x",
+                "selected_expert": f"{domain_order[selected_idx]}x",
+                "oracle_best_expert": f"{domain_order[oracle_best_idx]}x",
+                "spearman_with_oracle": rho,
+                "top1_oracle_hit": float(top1_hit),
+                "rank_of_oracle_best_in_proxy": float(rank_of_oracle),
+                "selected_utility": selected_utility,
+                "oracle_best_utility": oracle_best_utility,
+                "oracle_gap": gap,
+                "oracle_gap_pct": rel_gap_pct,
+            }
+        )
+
+    n = len(domain_order)
+    return {
+        "proxy": str(proxy_name),
+        "n_queries": n,
+        "mean_spearman": float(np.mean(spearmans)) if spearmans else 0.0,
+        "std_spearman": float(np.std(spearmans)) if spearmans else 0.0,
+        "top1": float(top1_hits / n) if n > 0 else 0.0,
+        "mean_oracle_gap": float(np.mean(gaps)) if gaps else 0.0,
+        "mean_oracle_gap_pct": float(np.mean(rel_gaps_pct)) if rel_gaps_pct else 0.0,
+        "per_query": rows,
+    }
+
+
+def build_metric_payload(
+    metric_name: str,
+    raw_distance_matrix: np.ndarray,
+    score_matrix: np.ndarray,
+    scale: float,
+    domain_order: List[int],
+) -> Dict[str, Any]:
+    validate_query_expert_matrix(raw_distance_matrix, domain_order, f"{metric_name}.raw_score_matrix")
+    validate_query_expert_matrix(score_matrix, domain_order, f"{metric_name}.score_matrix")
+    return {
+        "metric": str(metric_name),
+        "raw_score_matrix": matrix_to_domain_dict(domain_order, raw_distance_matrix),
+        "score_matrix": matrix_to_domain_dict(domain_order, score_matrix),
+        "score_direction": "higher_is_better",
+        "transform": {
+            "name": "exp_neg",
+            "parameters": {
+                "scale": float(scale),
+            },
+        },
+        "provenance": {
+            "raw_represents": "distance",
+            "score_represents": "compatibility",
+            "orientation": "query_domain_x_expert_domain",
+        },
+    }
 
 
 def maybe_project_latent_2d(
