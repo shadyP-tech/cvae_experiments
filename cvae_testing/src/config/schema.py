@@ -118,13 +118,125 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         predictors = learned_cfg.get("predictors", ["linear_regressor", "mlp_regressor"])
         if not isinstance(predictors, list) or not predictors:
             raise ValueError("learned_utility.predictors must be a non-empty list")
-        allowed_predictors = {"linear_regressor", "mlp_regressor", "metadata_only_regressor"}
+        allowed_predictors = {
+            "linear_regressor",
+            "mlp_regressor",
+            "metadata_only_regressor",
+            "pairwise_ranker",
+        }
         bad_predictors = sorted(set(str(p) for p in predictors) - allowed_predictors)
         if bad_predictors:
             raise ValueError(
                 "learned_utility.predictors must be subset of "
                 f"{sorted(allowed_predictors)}, got unknown {bad_predictors}"
             )
+
+        pairwise_params = (learned_cfg.get("predictor_params", {}) or {}).get("pairwise_ranker", {})
+        if pairwise_params is not None and not isinstance(pairwise_params, dict):
+            raise ValueError("learned_utility.predictor_params.pairwise_ranker must be a dictionary when provided")
+        if "pairwise_ranker" in predictors:
+            hidden_dim = int((pairwise_params or {}).get("hidden_dim", 128))
+            if hidden_dim <= 0:
+                raise ValueError("learned_utility.predictor_params.pairwise_ranker.hidden_dim must be > 0")
+            epochs = int((pairwise_params or {}).get("epochs", 40))
+            if epochs <= 0:
+                raise ValueError("learned_utility.predictor_params.pairwise_ranker.epochs must be > 0")
+            lr = float((pairwise_params or {}).get("lr", 1e-3))
+            if lr <= 0:
+                raise ValueError("learned_utility.predictor_params.pairwise_ranker.lr must be > 0")
+            batch_size = int((pairwise_params or {}).get("batch_size", 2048))
+            if batch_size <= 0:
+                raise ValueError("learned_utility.predictor_params.pairwise_ranker.batch_size must be > 0")
+
+            near_tie_delta = float((pairwise_params or {}).get("near_tie_delta", 0.0))
+            if near_tie_delta < 0:
+                raise ValueError("learned_utility.predictor_params.pairwise_ranker.near_tie_delta must be >= 0")
+            hard_frac = float((pairwise_params or {}).get("hard_pair_fraction", 0.5))
+            rand_frac = float((pairwise_params or {}).get("random_pair_fraction", 0.5))
+            if hard_frac < 0 or rand_frac < 0:
+                raise ValueError(
+                    "learned_utility.predictor_params.pairwise_ranker hard/random pair fractions must be >= 0"
+                )
+            if (hard_frac + rand_frac) <= 0:
+                raise ValueError(
+                    "learned_utility.predictor_params.pairwise_ranker hard/random pair fractions must sum to > 0"
+                )
+
+            max_pairs_per_sample = int((pairwise_params or {}).get("max_pairs_per_sample", 12))
+            if max_pairs_per_sample <= 0:
+                raise ValueError(
+                    "learned_utility.predictor_params.pairwise_ranker.max_pairs_per_sample must be > 0"
+                )
+            max_pairs_per_domain = int((pairwise_params or {}).get("max_pairs_per_domain", 5000))
+            if max_pairs_per_domain <= 0:
+                raise ValueError(
+                    "learned_utility.predictor_params.pairwise_ranker.max_pairs_per_domain must be > 0"
+                )
+            loss_type = str((pairwise_params or {}).get("loss_type", "hinge")).strip().lower()
+            if loss_type != "hinge":
+                raise ValueError("learned_utility.predictor_params.pairwise_ranker.loss_type must be 'hinge'")
+            margin = float((pairwise_params or {}).get("margin", 1.0))
+            if margin < 0:
+                raise ValueError("learned_utility.predictor_params.pairwise_ranker.margin must be >= 0")
+            _ensure_bool(
+                (pairwise_params or {}).get("run_ablations", True),
+                "learned_utility.predictor_params.pairwise_ranker.run_ablations",
+            )
+
+        hybrid_scoring = learned_cfg.get("hybrid_scoring", {})
+        if hybrid_scoring is not None and not isinstance(hybrid_scoring, dict):
+            raise ValueError("learned_utility.hybrid_scoring must be a dictionary when provided")
+        _ensure_bool(
+            (hybrid_scoring or {}).get("enabled", False),
+            "learned_utility.hybrid_scoring.enabled",
+        )
+        alphas = (hybrid_scoring or {}).get("alphas", [i / 10.0 for i in range(11)])
+        if not isinstance(alphas, list) or not alphas:
+            raise ValueError("learned_utility.hybrid_scoring.alphas must be a non-empty list")
+        for a in alphas:
+            a_float = float(a)
+            if a_float < 0.0 or a_float > 1.0:
+                raise ValueError(f"learned_utility.hybrid_scoring.alphas must be in [0,1], got: {a}")
+
+        allowed_norm = {"per_query_zscore", "per_query_minmax"}
+        norm_primary = str((hybrid_scoring or {}).get("normalization_primary", "per_query_zscore")).strip().lower()
+        if norm_primary not in allowed_norm:
+            raise ValueError(
+                "learned_utility.hybrid_scoring.normalization_primary must be one of "
+                f"{sorted(allowed_norm)}, got: {norm_primary}"
+            )
+        norm_sensitivity = str((hybrid_scoring or {}).get("normalization_sensitivity", "per_query_minmax")).strip().lower()
+        if norm_sensitivity not in allowed_norm:
+            raise ValueError(
+                "learned_utility.hybrid_scoring.normalization_sensitivity must be one of "
+                f"{sorted(allowed_norm)}, got: {norm_sensitivity}"
+            )
+        _ensure_bool(
+            (hybrid_scoring or {}).get("run_sensitivity", True),
+            "learned_utility.hybrid_scoring.run_sensitivity",
+        )
+        tie_policy = str((hybrid_scoring or {}).get("tie_policy", "stable_expert_index")).strip().lower()
+        if tie_policy != "stable_expert_index":
+            raise ValueError(
+                "learned_utility.hybrid_scoring.tie_policy must be 'stable_expert_index'"
+            )
+        latent_metric = str((hybrid_scoring or {}).get("latent_metric", "wasserstein")).strip().lower()
+        if latent_metric != "wasserstein":
+            raise ValueError("learned_utility.hybrid_scoring.latent_metric must be 'wasserstein'")
+        accept_cfg = (hybrid_scoring or {}).get("acceptance", {})
+        if accept_cfg is not None and not isinstance(accept_cfg, dict):
+            raise ValueError("learned_utility.hybrid_scoring.acceptance must be a dictionary when provided")
+        min_rank_impr = float((accept_cfg or {}).get("min_mean_rank_improvement_abs", 0.05))
+        if min_rank_impr < 0:
+            raise ValueError("learned_utility.hybrid_scoring.acceptance.min_mean_rank_improvement_abs must be >= 0")
+        min_gap_pct_impr = float((accept_cfg or {}).get("min_mean_oracle_gap_pct_improvement_abs", 0.50))
+        if min_gap_pct_impr < 0:
+            raise ValueError(
+                "learned_utility.hybrid_scoring.acceptance.min_mean_oracle_gap_pct_improvement_abs must be >= 0"
+            )
+        max_top1_drop = float((accept_cfg or {}).get("max_top1_drop_abs", 0.0))
+        if max_top1_drop < 0:
+            raise ValueError("learned_utility.hybrid_scoring.acceptance.max_top1_drop_abs must be >= 0")
 
         target_cfg = learned_cfg.get("target", {})
         if target_cfg is not None and not isinstance(target_cfg, dict):
