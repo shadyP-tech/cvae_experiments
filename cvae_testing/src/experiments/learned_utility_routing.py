@@ -82,6 +82,34 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
                     ["centroid", "gaussian_kl"],
                 ),
             },
+            "hybrid_scoring": {
+                "enabled": bool(learned_cfg.get("hybrid_scoring", {}).get("enabled", False)),
+                "alphas": [
+                    float(v) for v in learned_cfg.get("hybrid_scoring", {}).get("alphas", [i / 10.0 for i in range(11)])
+                ],
+                "latent_metric": str(learned_cfg.get("hybrid_scoring", {}).get("latent_metric", "wasserstein")),
+                "normalization_primary": str(
+                    learned_cfg.get("hybrid_scoring", {}).get("normalization_primary", "per_query_zscore")
+                ),
+                "normalization_sensitivity": str(
+                    learned_cfg.get("hybrid_scoring", {}).get("normalization_sensitivity", "per_query_minmax")
+                ),
+                "run_sensitivity": bool(learned_cfg.get("hybrid_scoring", {}).get("run_sensitivity", True)),
+                "tie_policy": str(learned_cfg.get("hybrid_scoring", {}).get("tie_policy", "stable_expert_index")),
+                "acceptance": {
+                    "min_mean_rank_improvement_abs": float(
+                        learned_cfg.get("hybrid_scoring", {}).get("acceptance", {}).get("min_mean_rank_improvement_abs", 0.05)
+                    ),
+                    "min_mean_oracle_gap_pct_improvement_abs": float(
+                        learned_cfg.get("hybrid_scoring", {})
+                        .get("acceptance", {})
+                        .get("min_mean_oracle_gap_pct_improvement_abs", 0.50)
+                    ),
+                    "max_top1_drop_abs": float(
+                        learned_cfg.get("hybrid_scoring", {}).get("acceptance", {}).get("max_top1_drop_abs", 0.0)
+                    ),
+                },
+            },
             "winner_rule": {
                 "primary_metric": str(
                     learned_cfg.get("winner_rule", {}).get("primary_metric", "mean_oracle_gap_pct")
@@ -142,6 +170,7 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
                 "status": "phase2_evaluated",
                 "results_artifact": "learned_utility_results.json",
                 "metrics_by_method": results.get("metrics_by_method", {}),
+                "hybrid_diagnostics": results.get("hybrid_diagnostics", {}),
             },
         )
         progress.advance("learned utility summary written")

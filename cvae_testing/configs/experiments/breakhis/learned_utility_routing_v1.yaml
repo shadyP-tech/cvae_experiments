@@ -41,7 +41,7 @@ learned_utility:
   split_protocol: loqdo_query_domain
   query_domain_field: magnification
   splits: [test]
-  predictors: [linear_regressor, mlp_regressor]
+  predictors: [linear_regressor, mlp_regressor, pairwise_ranker]
 
   predictor_params:
     mlp:
@@ -50,6 +50,20 @@ learned_utility:
       lr: 1.0e-3
       batch_size: 2048
       device: auto
+    pairwise_ranker:
+      hidden_dim: 128
+      epochs: 40
+      lr: 1.0e-3
+      batch_size: 2048
+      device: auto
+      loss_type: hinge
+      margin: 1.0
+      near_tie_delta: 0.01
+      hard_pair_fraction: 0.5
+      random_pair_fraction: 0.5
+      max_pairs_per_sample: 12
+      max_pairs_per_domain: 5000
+      run_ablations: true
 
   target:
     name: nelbo
@@ -60,7 +74,7 @@ learned_utility:
   pair_features:
     include_sample_embedding: true
     expert_id_encoding: one_hot
-    include_metadata_features: false
+    include_metadata_features: true
     include_domain_stats: false
 
   scoring:
@@ -71,6 +85,19 @@ learned_utility:
   latent_comparator:
     primary: wasserstein
     diagnostics: [centroid, gaussian_kl]
+
+  hybrid_scoring:
+    enabled: true
+    alphas: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    latent_metric: wasserstein
+    normalization_primary: per_query_zscore
+    normalization_sensitivity: per_query_minmax
+    run_sensitivity: true
+    tie_policy: stable_expert_index
+    acceptance:
+      min_mean_rank_improvement_abs: 0.05
+      min_mean_oracle_gap_pct_improvement_abs: 0.50
+      max_top1_drop_abs: 0.0
 
   leakage_guards:
     require_zero_query_domain_overlap: true

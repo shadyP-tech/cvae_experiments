@@ -33,3 +33,12 @@ cvae_testing/wandb/
 
 # Local datasets (do not commit raw data)
 cvae_testing/data/
+
+# Local results
+cvae_testing/results/
+
+# Thesis outline
+cvae_testing/thesis_outline.txt
+
+# github agents
+.github/*

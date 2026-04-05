@@ -20,6 +20,10 @@ from src.routing.strategies import compute_similarity
 from src.torch_utils import safe_torch_load
 
 
+_ALLOWED_NORM_POLICIES = {"per_query_zscore", "per_query_minmax"}
+_DEFAULT_ALPHA_GRID = [i / 10.0 for i in range(11)]
+
+
 def _write_csv(path: Path, rows: Sequence[Dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if not rows:
@@ -166,6 +170,80 @@ def _latent_wasserstein_scores(embeddings: np.ndarray, sample_domains: np.ndarra
     return out
 
 
+def _normalize_scores_per_query(scores: np.ndarray, policy: str) -> np.ndarray:
+    policy_norm = str(policy).strip().lower()
+    if policy_norm not in _ALLOWED_NORM_POLICIES:
+        raise ValueError(
+            f"Unknown normalization policy: {policy}. Allowed: {sorted(_ALLOWED_NORM_POLICIES)}"
+        )
+
+    out = np.zeros_like(scores, dtype=np.float64)
+    for i in range(scores.shape[0]):
+        row = scores[i, :].astype(np.float64, copy=False)
+        if not np.isfinite(row).all():
+            raise ValueError("Normalization received non-finite proxy row values")
+
+        if policy_norm == "per_query_zscore":
+            mu = float(np.mean(row))
+            sigma = float(np.std(row))
+            # Explicit zero-variance policy: emit zeros for this row.
+            if sigma < 1e-12:
+                out[i, :] = 0.0
+            else:
+                out[i, :] = (row - mu) / sigma
+        else:
+            lo = float(np.min(row))
+            hi = float(np.max(row))
+            span = hi - lo
+            # Explicit zero-variance policy: emit zeros for this row.
+            if span < 1e-12:
+                out[i, :] = 0.0
+            else:
+                out[i, :] = (row - lo) / span
+
+    return out
+
+
+def _proxy_diagnostic_rows(scores: np.ndarray, sample_domains: np.ndarray, method: str) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for i in range(scores.shape[0]):
+        row = scores[i, :]
+        rows.append(
+            {
+                "method": str(method),
+                "sample_index": int(i),
+                "query_domain": int(sample_domains[i]),
+                "row_min": float(np.min(row)),
+                "row_max": float(np.max(row)),
+                "row_mean": float(np.mean(row)),
+                "row_std": float(np.std(row)),
+            }
+        )
+    return rows
+
+
+def _stable_argmin_indices(matrix: np.ndarray) -> np.ndarray:
+    n_rows, n_cols = matrix.shape
+    tie_break = np.arange(n_cols, dtype=np.int64)
+    out = np.zeros((n_rows,), dtype=np.int64)
+    for i in range(n_rows):
+        order = np.lexsort((tie_break, matrix[i, :]))
+        out[i] = int(order[0])
+    return out
+
+
+def _selected_rank_in_true_matrix(selected_idx: np.ndarray, true_nelbo_matrix: np.ndarray) -> np.ndarray:
+    n_rows, n_cols = true_nelbo_matrix.shape
+    tie_break = np.arange(n_cols, dtype=np.int64)
+    out = np.zeros((n_rows,), dtype=np.float64)
+    for i in range(n_rows):
+        order = np.lexsort((tie_break, true_nelbo_matrix[i, :]))
+        ranks = np.empty((n_cols,), dtype=np.int64)
+        ranks[order] = np.arange(1, n_cols + 1, dtype=np.int64)
+        out[i] = float(ranks[int(selected_idx[i])])
+    return out
+
+
 def _build_pair_features(
     *,
     sample_embeddings: np.ndarray,
@@ -284,6 +362,199 @@ class _MLPRegressor:
         return pred.detach().cpu().numpy().astype(np.float64, copy=False)
 
 
+def _pairwise_auc_single(score_row: np.ndarray, true_row: np.ndarray) -> float:
+    n = int(score_row.shape[0])
+    if n <= 1:
+        return 0.5
+    total = 0.0
+    correct = 0.0
+    for i in range(n):
+        for j in range(i + 1, n):
+            ti = float(true_row[i])
+            tj = float(true_row[j])
+            if abs(ti - tj) < 1e-12:
+                continue
+
+            si = float(score_row[i])
+            sj = float(score_row[j])
+            total += 1.0
+            if abs(si - sj) < 1e-12:
+                correct += 0.5
+                continue
+
+            true_better_i = ti < tj
+            pred_better_i = si < sj
+            if true_better_i == pred_better_i:
+                correct += 1.0
+
+    return float(correct / total) if total > 0.0 else 0.5
+
+
+def _pairwise_auc_matrix(score_matrix: np.ndarray, true_nelbo_matrix: np.ndarray) -> float:
+    vals = [
+        _pairwise_auc_single(score_matrix[i, :], true_nelbo_matrix[i, :])
+        for i in range(score_matrix.shape[0])
+    ]
+    return float(np.mean(vals)) if vals else 0.5
+
+
+def _build_pairwise_training_pairs(
+    *,
+    y_train: np.ndarray,
+    q_train: np.ndarray,
+    s_train: np.ndarray,
+    experts_per_sample: int,
+    near_tie_delta: float,
+    hard_pair_fraction: float,
+    random_pair_fraction: float,
+    max_pairs_per_sample: int,
+    max_pairs_per_domain: int,
+    seed: int,
+) -> Tuple[List[Tuple[int, int]], List[Dict[str, Any]]]:
+    rng = np.random.default_rng(int(seed))
+    pairs: List[Tuple[int, int]] = []
+    diagnostics: List[Dict[str, Any]] = []
+    domain_pair_counts: Dict[int, int] = {}
+
+    frac_sum = max(float(hard_pair_fraction) + float(random_pair_fraction), 1e-12)
+    hard_ratio = float(hard_pair_fraction) / frac_sum
+
+    for sample_index in sorted(set(int(v) for v in s_train.tolist())):
+        idxs = np.where(s_train == int(sample_index))[0]
+        if int(idxs.size) != int(experts_per_sample):
+            continue
+
+        query_domain = int(q_train[idxs[0]])
+        candidates: List[Tuple[int, int, float]] = []
+        for i in range(int(idxs.size)):
+            for j in range(i + 1, int(idxs.size)):
+                ii = int(idxs[i])
+                jj = int(idxs[j])
+                yi = float(y_train[ii])
+                yj = float(y_train[jj])
+                diff = abs(yi - yj)
+                if diff <= float(near_tie_delta):
+                    continue
+                if yi < yj:
+                    candidates.append((ii, jj, diff))
+                else:
+                    candidates.append((jj, ii, diff))
+
+        if not candidates:
+            diagnostics.append(
+                {
+                    "sample_index": int(sample_index),
+                    "query_domain": int(query_domain),
+                    "n_candidates": 0,
+                    "n_selected": 0,
+                    "n_hard_selected": 0,
+                    "n_random_selected": 0,
+                    "dropped_by_domain_cap": 0,
+                }
+            )
+            continue
+
+        candidates_sorted = sorted(candidates, key=lambda x: float(x[2]))
+        target = min(int(max_pairs_per_sample), len(candidates_sorted))
+        n_hard = min(int(round(target * hard_ratio)), target)
+        hard_selected = candidates_sorted[:n_hard]
+
+        remaining = candidates_sorted[n_hard:]
+        n_random_target = min(target - n_hard, len(remaining))
+        random_selected: List[Tuple[int, int, float]] = []
+        if n_random_target > 0:
+            rand_idxs = rng.choice(len(remaining), size=n_random_target, replace=False)
+            random_selected = [remaining[int(k)] for k in np.asarray(rand_idxs).tolist()]
+
+        selected = hard_selected + random_selected
+        dropped_by_cap = 0
+        added = 0
+        for better_idx, worse_idx, _diff in selected:
+            cur = int(domain_pair_counts.get(query_domain, 0))
+            if cur >= int(max_pairs_per_domain):
+                dropped_by_cap += 1
+                continue
+            pairs.append((int(better_idx), int(worse_idx)))
+            domain_pair_counts[query_domain] = cur + 1
+            added += 1
+
+        diagnostics.append(
+            {
+                "sample_index": int(sample_index),
+                "query_domain": int(query_domain),
+                "n_candidates": int(len(candidates_sorted)),
+                "n_selected": int(added),
+                "n_hard_selected": int(min(len(hard_selected), added)),
+                "n_random_selected": int(max(added - min(len(hard_selected), added), 0)),
+                "dropped_by_domain_cap": int(dropped_by_cap),
+            }
+        )
+
+    return pairs, diagnostics
+
+
+@dataclass
+class _PairwiseRanker:
+    seed: int
+    hidden_dim: int = 128
+    epochs: int = 40
+    lr: float = 1e-3
+    batch_size: int = 2048
+    margin: float = 1.0
+    device: str = "auto"
+    model: torch.nn.Module | None = None
+
+    def fit(self, x: np.ndarray, pairs: List[Tuple[int, int]]) -> None:
+        if not pairs:
+            raise RuntimeError("Pairwise ranker received zero training pairs")
+
+        torch.manual_seed(int(self.seed))
+        if self.device == "auto":
+            run_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            run_device = torch.device(self.device)
+
+        net = torch.nn.Sequential(
+            torch.nn.Linear(x.shape[1], int(self.hidden_dim)),
+            torch.nn.ReLU(),
+            torch.nn.Linear(int(self.hidden_dim), 1),
+        ).to(run_device)
+        opt = torch.optim.Adam(net.parameters(), lr=float(self.lr))
+
+        x_t = torch.from_numpy(x.astype(np.float32, copy=False)).to(run_device)
+        pair_t = torch.tensor(pairs, dtype=torch.long, device=run_device)
+
+        n_pairs = int(pair_t.shape[0])
+        for _ in range(int(self.epochs)):
+            perm = torch.randperm(n_pairs, device=run_device)
+            for i in range(0, n_pairs, int(self.batch_size)):
+                idx = perm[i : i + int(self.batch_size)]
+                pair_batch = pair_t[idx]
+
+                better_x = x_t[pair_batch[:, 0]]
+                worse_x = x_t[pair_batch[:, 1]]
+                pred_better = net(better_x).view(-1)
+                pred_worse = net(worse_x).view(-1)
+
+                # Lower score means better expert; enforce pred_worse - pred_better >= margin.
+                loss = torch.relu(float(self.margin) - (pred_worse - pred_better)).mean()
+
+                opt.zero_grad(set_to_none=True)
+                loss.backward()
+                opt.step()
+
+        self.model = net.eval()
+
+    def predict(self, x: np.ndarray) -> np.ndarray:
+        if self.model is None:
+            raise RuntimeError("Pairwise ranker is not fitted")
+        model_device = next(self.model.parameters()).device
+        with torch.no_grad():
+            x_t = torch.from_numpy(x.astype(np.float32, copy=False)).to(model_device)
+            pred = self.model(x_t).view(-1)
+        return pred.detach().cpu().numpy().astype(np.float64, copy=False)
+
+
 def _selection_metrics(
     *,
     method: str,
@@ -291,20 +562,30 @@ def _selection_metrics(
     expert_domains: Sequence[int],
     score_matrix: np.ndarray,
     true_nelbo_matrix: np.ndarray,
+    tie_policy: str = "stable_expert_index",
 ) -> Tuple[Dict[str, float], List[Dict[str, Any]]]:
-    selected_idx = np.argmin(score_matrix, axis=1)
-    oracle_idx = np.argmin(true_nelbo_matrix, axis=1)
+    if str(tie_policy).strip().lower() != "stable_expert_index":
+        raise ValueError("Only tie_policy='stable_expert_index' is currently supported")
+
+    selected_idx = _stable_argmin_indices(score_matrix)
+    oracle_idx = _stable_argmin_indices(true_nelbo_matrix)
 
     selected_nelbo = true_nelbo_matrix[np.arange(true_nelbo_matrix.shape[0]), selected_idx]
     oracle_nelbo = true_nelbo_matrix[np.arange(true_nelbo_matrix.shape[0]), oracle_idx]
+    selected_rank = _selected_rank_in_true_matrix(selected_idx, true_nelbo_matrix)
 
     top1 = float(np.mean(selected_idx == oracle_idx)) if selected_idx.size else 0.0
+    mean_rank = float(np.mean(selected_rank)) if selected_rank.size else 0.0
     gap = selected_nelbo - oracle_nelbo
     denom = np.maximum(np.abs(oracle_nelbo), 1e-12)
     gap_pct = (gap / denom) * 100.0
 
     rho_vals: List[float] = []
+    pair_auc_vals: List[float] = []
     for i in range(score_matrix.shape[0]):
+        pair_auc_vals.append(
+            float(_pairwise_auc_single(score_matrix[i, :], true_nelbo_matrix[i, :]))
+        )
         rho_vals.append(
             float(
                 spearman_corr(
@@ -328,14 +609,18 @@ def _selection_metrics(
                 "oracle_gap": float(gap[i]),
                 "oracle_gap_pct": float(gap_pct[i]),
                 "top1_oracle_hit": int(selected_idx[i] == oracle_idx[i]),
+                "selected_rank": float(selected_rank[i]),
+                "pairwise_auc": float(pair_auc_vals[i]),
                 "spearman": float(rho_vals[i]),
             }
         )
 
     metrics = {
         "top1_oracle_hit": float(top1),
+        "mean_rank": float(mean_rank),
         "mean_oracle_gap": float(np.mean(gap)) if gap.size else 0.0,
         "mean_oracle_gap_pct": float(np.mean(gap_pct)) if gap_pct.size else 0.0,
+        "pairwise_auc": float(np.mean(pair_auc_vals)) if pair_auc_vals else 0.5,
         "spearman": float(np.mean(rho_vals)) if rho_vals else 0.0,
         "selected_nelbo": float(np.mean(selected_nelbo)) if selected_nelbo.size else 0.0,
         "oracle_nelbo": float(np.mean(oracle_nelbo)) if oracle_nelbo.size else 0.0,
@@ -360,6 +645,20 @@ def evaluate_learned_utility_loqdo(
     predictors = [str(v) for v in learned_cfg.get("predictors", ["linear_regressor", "mlp_regressor"])]
     predictor_params = learned_cfg.get("predictor_params", {})
     mlp_cfg = predictor_params.get("mlp", {}) if isinstance(predictor_params, dict) else {}
+    pairwise_cfg = predictor_params.get("pairwise_ranker", {}) if isinstance(predictor_params, dict) else {}
+    hybrid_cfg = learned_cfg.get("hybrid_scoring", {}) if isinstance(learned_cfg, dict) else {}
+    hybrid_enabled = bool((hybrid_cfg or {}).get("enabled", False))
+    hybrid_alphas = [float(v) for v in (hybrid_cfg or {}).get("alphas", _DEFAULT_ALPHA_GRID)]
+    primary_norm_policy = str((hybrid_cfg or {}).get("normalization_primary", "per_query_zscore")).strip().lower()
+    sensitivity_norm_policy = str((hybrid_cfg or {}).get("normalization_sensitivity", "per_query_minmax")).strip().lower()
+    run_sensitivity = bool((hybrid_cfg or {}).get("run_sensitivity", True))
+    tie_policy = str((hybrid_cfg or {}).get("tie_policy", "stable_expert_index")).strip().lower()
+    hybrid_accept_cfg = (hybrid_cfg or {}).get("acceptance", {}) if isinstance(hybrid_cfg, dict) else {}
+    min_rank_improvement_abs = float((hybrid_accept_cfg or {}).get("min_mean_rank_improvement_abs", 0.05))
+    min_gap_pct_improvement_abs = float(
+        (hybrid_accept_cfg or {}).get("min_mean_oracle_gap_pct_improvement_abs", 0.50)
+    )
+    max_top1_drop_abs = float((hybrid_accept_cfg or {}).get("max_top1_drop_abs", 0.0))
 
     print("[learned_utility] scoring expert NELBO matrix...")
     embeddings, sample_domains, true_nelbo, expert_domains, metadata = _score_experts_batched(
@@ -376,31 +675,102 @@ def evaluate_learned_utility_loqdo(
 
     domain_to_idx = _domain_to_expert_index(expert_domains)
 
-    metadata_proxy = -_metadata_scores(sample_domains, expert_domains, strategy=strategy, tau=float(tau))
-    latent_proxy = -_latent_wasserstein_scores(embeddings=embeddings, sample_domains=sample_domains, expert_domains=expert_domains)
+    metadata_similarity = _metadata_scores(sample_domains, expert_domains, strategy=strategy, tau=float(tau))
+    latent_similarity = _latent_wasserstein_scores(
+        embeddings=embeddings,
+        sample_domains=sample_domains,
+        expert_domains=expert_domains,
+    )
+    if not np.isfinite(metadata_similarity).all() or not np.isfinite(latent_similarity).all():
+        raise ValueError("Metadata/latent proxy similarity matrices must be finite")
+
+    metadata_proxy = -metadata_similarity
+    latent_proxy = -latent_similarity
 
     oracle_proxy = true_nelbo.copy()
 
     method_metrics: Dict[str, Dict[str, float]] = {}
     sample_rows: List[Dict[str, Any]] = []
     pair_rows: List[Dict[str, Any]] = []
+    pair_training_rows: List[Dict[str, Any]] = []
+    proxy_diag_rows: List[Dict[str, Any]] = []
+    proxy_diag_rows.extend(_proxy_diagnostic_rows(metadata_similarity, sample_domains, method="metadata_similarity_raw"))
+    proxy_diag_rows.extend(_proxy_diagnostic_rows(latent_similarity, sample_domains, method="latent_similarity_raw"))
 
-    for name, proxy in [
+    proxy_methods: List[Tuple[str, np.ndarray]] = [
         ("metadata_routing", metadata_proxy),
         ("latent_wasserstein_routing", latent_proxy),
         ("oracle_routing", oracle_proxy),
-    ]:
+    ]
+    hybrid_method_meta: Dict[str, Dict[str, Any]] = {}
+
+    if hybrid_enabled:
+        norm_policies = [primary_norm_policy]
+        if run_sensitivity and sensitivity_norm_policy != primary_norm_policy:
+            norm_policies.append(sensitivity_norm_policy)
+
+        hybrid_alphas = sorted(set(float(a) for a in hybrid_alphas))
+        for alpha in hybrid_alphas:
+            if alpha < 0.0 or alpha > 1.0:
+                raise ValueError(f"hybrid alpha must be in [0,1], got {alpha}")
+
+        for norm_policy in norm_policies:
+            metadata_norm = _normalize_scores_per_query(metadata_similarity, policy=norm_policy)
+            latent_norm = _normalize_scores_per_query(latent_similarity, policy=norm_policy)
+            proxy_diag_rows.extend(
+                _proxy_diagnostic_rows(metadata_norm, sample_domains, method=f"metadata_similarity_{norm_policy}")
+            )
+            proxy_diag_rows.extend(
+                _proxy_diagnostic_rows(latent_norm, sample_domains, method=f"latent_similarity_{norm_policy}")
+            )
+
+            for alpha in hybrid_alphas:
+                mixed_similarity = (float(alpha) * metadata_norm) + ((1.0 - float(alpha)) * latent_norm)
+                method_name = f"hybrid_alpha_{alpha:.1f}"
+                if norm_policy != primary_norm_policy:
+                    method_name = f"{method_name}_{norm_policy.replace('per_query_', '')}"
+                proxy_methods.append((method_name, -mixed_similarity))
+                hybrid_method_meta[method_name] = {
+                    "alpha": float(alpha),
+                    "normalization_policy": str(norm_policy),
+                }
+
+            alpha_one = (1.0 * metadata_norm) + (0.0 * latent_norm)
+            alpha_zero = (0.0 * metadata_norm) + (1.0 * latent_norm)
+            if not np.allclose(alpha_one, metadata_norm, atol=1e-12, rtol=1e-9):
+                raise RuntimeError("Hybrid endpoint invariant failed for alpha=1.0")
+            if not np.allclose(alpha_zero, latent_norm, atol=1e-12, rtol=1e-9):
+                raise RuntimeError("Hybrid endpoint invariant failed for alpha=0.0")
+
+    hybrid_summary_rows: List[Dict[str, Any]] = []
+    for name, proxy in proxy_methods:
         metrics, rows = _selection_metrics(
             method=name,
             query_domains=sample_domains,
             expert_domains=expert_domains,
             score_matrix=proxy,
             true_nelbo_matrix=true_nelbo,
+            tie_policy=tie_policy,
         )
         method_metrics[name] = metrics
         sample_rows.extend(rows)
+        if name in hybrid_method_meta:
+            hybrid_summary_rows.append(
+                {
+                    "method": str(name),
+                    "alpha": float(hybrid_method_meta[name]["alpha"]),
+                    "normalization_policy": str(hybrid_method_meta[name]["normalization_policy"]),
+                    "top1_oracle_hit": float(metrics.get("top1_oracle_hit", 0.0)),
+                    "mean_rank": float(metrics.get("mean_rank", 0.0)),
+                    "mean_oracle_gap": float(metrics.get("mean_oracle_gap", 0.0)),
+                    "mean_oracle_gap_pct": float(metrics.get("mean_oracle_gap_pct", 0.0)),
+                    "pairwise_auc": float(metrics.get("pairwise_auc", 0.5)),
+                    "spearman": float(metrics.get("spearman", 0.0)),
+                }
+            )
 
     unique_query_domains = sorted(set(int(v) for v in sample_domains.tolist()))
+    embedding_feature_dim = int(embeddings.shape[1])
     learned_sample_rows: List[Dict[str, Any]] = []
     learned_method_metrics: Dict[str, List[Dict[str, float]]] = {p: [] for p in predictors}
 
@@ -465,8 +835,85 @@ def evaluate_learned_utility_loqdo(
             meta_reg.fit(x_train_meta, y_train_norm)
             models["metadata_only_regressor"] = (meta_reg, x_test_meta)
 
+        if "pairwise_ranker" in predictors:
+            near_tie_delta = float(pairwise_cfg.get("near_tie_delta", 0.0))
+            hard_pair_fraction = float(pairwise_cfg.get("hard_pair_fraction", 0.5))
+            random_pair_fraction = float(pairwise_cfg.get("random_pair_fraction", 0.5))
+            max_pairs_per_sample = int(pairwise_cfg.get("max_pairs_per_sample", 12))
+            max_pairs_per_domain = int(pairwise_cfg.get("max_pairs_per_domain", 5000))
+            run_ablations = bool(pairwise_cfg.get("run_ablations", True))
+
+            train_pairs, pair_diags = _build_pairwise_training_pairs(
+                y_train=y_train,
+                q_train=q_train,
+                s_train=s_train,
+                experts_per_sample=e_n,
+                near_tie_delta=near_tie_delta,
+                hard_pair_fraction=hard_pair_fraction,
+                random_pair_fraction=random_pair_fraction,
+                max_pairs_per_sample=max_pairs_per_sample,
+                max_pairs_per_domain=max_pairs_per_domain,
+                seed=int(seed) + int(heldout_domain),
+            )
+            for d in pair_diags:
+                pair_training_rows.append(
+                    {
+                        "fold_query_domain": int(heldout_domain),
+                        **d,
+                    }
+                )
+
+            if train_pairs:
+                span = max(float(np.max(sample_domains) - np.min(sample_domains)), 1.0)
+                train_abs_diff = np.abs(q_train.astype(np.float64) - e_train.astype(np.float64)) / span
+                test_abs_diff = np.abs(q_test.astype(np.float64) - e_test.astype(np.float64)) / span
+                train_exact = (q_train == e_train).astype(np.float64)
+                test_exact = (q_test == e_test).astype(np.float64)
+                train_meta = np.stack([train_abs_diff, train_exact], axis=1)
+                test_meta = np.stack([test_abs_diff, test_exact], axis=1)
+
+                expert_oh_train = x_train[:, embedding_feature_dim : embedding_feature_dim + e_n]
+                expert_oh_test = x_test[:, embedding_feature_dim : embedding_feature_dim + e_n]
+
+                latent_train = np.concatenate([x_train[:, :embedding_feature_dim], expert_oh_train], axis=1)
+                latent_test = np.concatenate([x_test[:, :embedding_feature_dim], expert_oh_test], axis=1)
+                latent_train_z, latent_test_z = _zscore_features(latent_train, latent_test)
+
+                metadata_train = np.concatenate([expert_oh_train, train_meta], axis=1)
+                metadata_test = np.concatenate([expert_oh_test, test_meta], axis=1)
+                metadata_train_z, metadata_test_z = _zscore_features(metadata_train, metadata_test)
+
+                combined_train = np.concatenate([latent_train, train_meta], axis=1)
+                combined_test = np.concatenate([latent_test, test_meta], axis=1)
+                combined_train_z, combined_test_z = _zscore_features(combined_train, combined_test)
+
+                pair_variants: List[Tuple[str, np.ndarray, np.ndarray]]
+                if run_ablations:
+                    pair_variants = [
+                        ("pairwise_ranker_metadata_only", metadata_train_z, metadata_test_z),
+                        ("pairwise_ranker_latent_only", latent_train_z, latent_test_z),
+                        ("pairwise_ranker_combined", combined_train_z, combined_test_z),
+                    ]
+                else:
+                    pair_variants = [
+                        ("pairwise_ranker", combined_train_z, combined_test_z),
+                    ]
+
+                for method_name, x_tr_variant, x_te_variant in pair_variants:
+                    ranker = _PairwiseRanker(
+                        seed=int(seed),
+                        hidden_dim=int(pairwise_cfg.get("hidden_dim", 128)),
+                        epochs=int(pairwise_cfg.get("epochs", 40)),
+                        lr=float(pairwise_cfg.get("lr", 1e-3)),
+                        batch_size=int(pairwise_cfg.get("batch_size", 2048)),
+                        margin=float(pairwise_cfg.get("margin", 1.0)),
+                        device=str(pairwise_cfg.get("device", "auto")),
+                    )
+                    ranker.fit(x_tr_variant, train_pairs)
+                    models[method_name] = (ranker, x_te_variant)
+
         for method, model in models.items():
-            if method == "metadata_only_regressor":
+            if isinstance(model, tuple):
                 reg, x_m = model
                 pred = reg.predict(x_m)
             else:
@@ -481,8 +928,9 @@ def evaluate_learned_utility_loqdo(
                 expert_domains=expert_domains,
                 score_matrix=pred_matrix,
                 true_nelbo_matrix=true_matrix,
+                tie_policy=tie_policy,
             )
-            learned_method_metrics[method].append(metrics)
+            learned_method_metrics.setdefault(method, []).append(metrics)
 
             for row in rows:
                 row["sample_index"] = int(test_idx[int(row["sample_index"])])
@@ -515,8 +963,10 @@ def evaluate_learned_utility_loqdo(
             continue
         method_metrics[method] = {
             "top1_oracle_hit": float(np.mean([m["top1_oracle_hit"] for m in fold_metrics])),
+            "mean_rank": float(np.mean([m.get("mean_rank", 0.0) for m in fold_metrics])),
             "mean_oracle_gap": float(np.mean([m["mean_oracle_gap"] for m in fold_metrics])),
             "mean_oracle_gap_pct": float(np.mean([m["mean_oracle_gap_pct"] for m in fold_metrics])),
+            "pairwise_auc": float(np.mean([m.get("pairwise_auc", 0.5) for m in fold_metrics])),
             "spearman": float(np.mean([m["spearman"] for m in fold_metrics])),
             "selected_nelbo": float(np.mean([m["selected_nelbo"] for m in fold_metrics])),
             "oracle_nelbo": float(np.mean([m["oracle_nelbo"] for m in fold_metrics])),
@@ -534,6 +984,8 @@ def evaluate_learned_utility_loqdo(
                 "top1_oracle_hit": 0.0,
                 "oracle_gap": 0.0,
                 "oracle_gap_pct": 0.0,
+                "selected_rank": 0.0,
+                "pairwise_auc": 0.0,
                 "spearman": 0.0,
             },
         )
@@ -541,6 +993,8 @@ def evaluate_learned_utility_loqdo(
         acc["top1_oracle_hit"] += float(row["top1_oracle_hit"])
         acc["oracle_gap"] += float(row["oracle_gap"])
         acc["oracle_gap_pct"] += float(row["oracle_gap_pct"])
+        acc["selected_rank"] += float(row.get("selected_rank", 0.0))
+        acc["pairwise_auc"] += float(row.get("pairwise_auc", 0.5))
         acc["spearman"] += float(row["spearman"])
 
     domain_rows: List[Dict[str, Any]] = []
@@ -552,8 +1006,10 @@ def evaluate_learned_utility_loqdo(
                 "query_domain": int(q),
                 "n_samples": int(acc["n_samples"]),
                 "top1_oracle_hit": float(acc["top1_oracle_hit"] / n_samples),
+                "mean_rank": float(acc["selected_rank"] / n_samples),
                 "mean_oracle_gap": float(acc["oracle_gap"] / n_samples),
                 "mean_oracle_gap_pct": float(acc["oracle_gap_pct"] / n_samples),
+                "pairwise_auc": float(acc["pairwise_auc"] / n_samples),
                 "spearman": float(acc["spearman"] / n_samples),
             }
         )
@@ -561,6 +1017,92 @@ def evaluate_learned_utility_loqdo(
     _write_csv(reports_dir / "learned_utility_pair_predictions.csv", pair_rows)
     _write_csv(reports_dir / "learned_utility_sample_selections.csv", sample_rows)
     _write_csv(reports_dir / "learned_utility_domain_breakdown.csv", domain_rows)
+    _write_csv(reports_dir / "learned_utility_pair_training_diagnostics.csv", pair_training_rows)
+    _write_csv(reports_dir / "learned_utility_proxy_diagnostics.csv", proxy_diag_rows)
+
+    hybrid_best_by_policy: Dict[str, Dict[str, Any]] = {}
+    hybrid_acceptance: Dict[str, Any] = {}
+    if hybrid_summary_rows:
+        _write_csv(reports_dir / "learned_utility_hybrid_alpha_summary.csv", hybrid_summary_rows)
+        by_policy: Dict[str, List[Dict[str, Any]]] = {}
+        for row in hybrid_summary_rows:
+            by_policy.setdefault(str(row["normalization_policy"]), []).append(row)
+        for policy, rows in by_policy.items():
+            ordered = sorted(
+                rows,
+                key=lambda r: (
+                    float(r["mean_oracle_gap_pct"]),
+                    float(r["mean_rank"]),
+                    -float(r["top1_oracle_hit"]),
+                ),
+            )
+            hybrid_best_by_policy[policy] = {
+                "best_method": str(ordered[0]["method"]),
+                "best_alpha": float(ordered[0]["alpha"]),
+                "ranking": ordered,
+            }
+
+        metadata_metrics = method_metrics.get("metadata_routing", {})
+        baseline_top1 = float(metadata_metrics.get("top1_oracle_hit", 0.0))
+        baseline_rank = float(metadata_metrics.get("mean_rank", 0.0))
+        baseline_gap_pct = float(metadata_metrics.get("mean_oracle_gap_pct", 0.0))
+
+        def _with_deltas(row: Dict[str, Any]) -> Dict[str, Any]:
+            cand_top1 = float(row.get("top1_oracle_hit", 0.0))
+            cand_rank = float(row.get("mean_rank", 0.0))
+            cand_gap_pct = float(row.get("mean_oracle_gap_pct", 0.0))
+            top1_delta = cand_top1 - baseline_top1
+            rank_improvement = baseline_rank - cand_rank
+            gap_pct_improvement = baseline_gap_pct - cand_gap_pct
+            non_inferior_top1 = top1_delta >= -float(max_top1_drop_abs)
+            efficacy_ok = (
+                (rank_improvement >= float(min_rank_improvement_abs))
+                or (gap_pct_improvement >= float(min_gap_pct_improvement_abs))
+            )
+            return {
+                **row,
+                "delta_vs_metadata_top1": float(top1_delta),
+                "improvement_vs_metadata_mean_rank": float(rank_improvement),
+                "improvement_vs_metadata_mean_oracle_gap_pct": float(gap_pct_improvement),
+                "non_inferior_top1": bool(non_inferior_top1),
+                "meets_effect_size_gate": bool(efficacy_ok),
+                "passes_acceptance_gate": bool(non_inferior_top1 and efficacy_ok),
+            }
+
+        ranked_primary = hybrid_best_by_policy.get(primary_norm_policy, {}).get("ranking", [])
+        ranked_sensitivity = hybrid_best_by_policy.get(sensitivity_norm_policy, {}).get("ranking", [])
+        ranked_primary_delta = [_with_deltas(r) for r in ranked_primary]
+
+        sensitivity_by_alpha: Dict[float, Dict[str, Any]] = {
+            float(r.get("alpha", -1.0)): r for r in ranked_sensitivity
+        }
+        primary_best = ranked_primary_delta[0] if ranked_primary_delta else None
+        sensitivity_match = None
+        sensitivity_consistent = False
+        if primary_best is not None and run_sensitivity:
+            sensitivity_match = sensitivity_by_alpha.get(float(primary_best.get("alpha", -1.0)))
+            if sensitivity_match is not None:
+                sensitivity_consistent = bool(
+                    _with_deltas(sensitivity_match).get("passes_acceptance_gate", False)
+                )
+
+        hybrid_acceptance = {
+            "thresholds": {
+                "min_mean_rank_improvement_abs": float(min_rank_improvement_abs),
+                "min_mean_oracle_gap_pct_improvement_abs": float(min_gap_pct_improvement_abs),
+                "max_top1_drop_abs": float(max_top1_drop_abs),
+            },
+            "baseline_metadata": {
+                "top1_oracle_hit": baseline_top1,
+                "mean_rank": baseline_rank,
+                "mean_oracle_gap_pct": baseline_gap_pct,
+            },
+            "primary_normalization_policy": str(primary_norm_policy),
+            "best_primary": primary_best,
+            "best_primary_sensitivity_match": sensitivity_match,
+            "best_primary_passes_sensitivity_gate": bool(sensitivity_consistent),
+            "primary_policy_ranking_with_deltas": ranked_primary_delta,
+        }
 
     return {
         "metrics_by_method": method_metrics,
@@ -568,6 +1110,15 @@ def evaluate_learned_utility_loqdo(
             "pair_predictions": "learned_utility_pair_predictions.csv",
             "sample_selections": "learned_utility_sample_selections.csv",
             "domain_breakdown": "learned_utility_domain_breakdown.csv",
+            "pair_training_diagnostics": "learned_utility_pair_training_diagnostics.csv",
+            "proxy_diagnostics": "learned_utility_proxy_diagnostics.csv",
+            "hybrid_alpha_summary": "learned_utility_hybrid_alpha_summary.csv" if hybrid_summary_rows else "",
+        },
+        "hybrid_diagnostics": {
+            "enabled": bool(hybrid_enabled),
+            "tie_policy": str(tie_policy),
+            "best_by_normalization_policy": hybrid_best_by_policy,
+            "acceptance": hybrid_acceptance,
         },
         "n_samples": int(sample_domains.shape[0]),
         "n_experts": int(len(expert_domains)),
