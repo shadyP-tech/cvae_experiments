@@ -2,7 +2,7 @@ seed: 42
 
 experiment:
   dataset_name: breakhis
-  name: hybrid_ablation_extractor_resnet50_v1
+  name: hybrid_ablation_extractor_resnet50_v1_top1_hard
   mode: hybrid_ablation
 
 data:
@@ -33,7 +33,6 @@ training:
   patience: 5
 
 routing:
-  # Primary benchmark policy: exact metadata routing by magnification ID.
   strategy: categorical_exact
   tau: 1.0
   temperature: 1.0

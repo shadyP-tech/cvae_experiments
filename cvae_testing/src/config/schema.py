@@ -92,6 +92,31 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(tags, list):
             raise ValueError("tracking.tags must be a list when provided")
 
+    hybrid_cfg = cfg.get("hybrid")
+    if hybrid_cfg is not None:
+        if not isinstance(hybrid_cfg, dict):
+            raise ValueError("hybrid must be a dictionary when provided")
+
+        aggregation_mode = str(hybrid_cfg.get("aggregation_mode", "top1_hard")).strip().lower()
+        allowed_modes = {"top1_hard", "topk2_uniform", "topk3_uniform", "soft_all_softmax"}
+        if aggregation_mode not in allowed_modes:
+            raise ValueError(
+                f"hybrid.aggregation_mode must be one of {sorted(allowed_modes)}, got: {aggregation_mode}"
+            )
+
+        topk = int(hybrid_cfg.get("topk_k", 2))
+        if topk <= 0:
+            raise ValueError("hybrid.topk_k must be > 0")
+
+        aggregation_temperature = float(hybrid_cfg.get("aggregation_temperature", 1.0))
+        if aggregation_temperature <= 0:
+            raise ValueError("hybrid.aggregation_temperature must be > 0")
+
+        if aggregation_mode == "topk2_uniform" and topk != 2:
+            raise ValueError("hybrid.topk_k must be 2 when hybrid.aggregation_mode is 'topk2_uniform'")
+        if aggregation_mode == "topk3_uniform" and topk != 3:
+            raise ValueError("hybrid.topk_k must be 3 when hybrid.aggregation_mode is 'topk3_uniform'")
+
     learned_cfg = cfg.get("learned_utility")
     if learned_cfg is not None:
         if not isinstance(learned_cfg, dict):

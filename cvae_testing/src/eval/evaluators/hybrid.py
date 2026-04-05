@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import random
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -15,11 +15,99 @@ from src.routing.strategies import compute_similarity
 from src.torch_utils import safe_torch_load
 
 
+AGGREGATION_TOP1_HARD = "top1_hard"
+AGGREGATION_TOPK2_UNIFORM = "topk2_uniform"
+AGGREGATION_TOPK3_UNIFORM = "topk3_uniform"
+AGGREGATION_SOFT_ALL_SOFTMAX = "soft_all_softmax"
+ALLOWED_AGGREGATION_MODES = {
+    AGGREGATION_TOP1_HARD,
+    AGGREGATION_TOPK2_UNIFORM,
+    AGGREGATION_TOPK3_UNIFORM,
+    AGGREGATION_SOFT_ALL_SOFTMAX,
+}
+
+
 @dataclass
 class RoutingStats:
     spearman_similarity_vs_neg_nelbo: float
     top1_agreement_with_best_expert: float
     mean_rank_of_metadata_selected_expert: float
+
+
+def _safe_normalize_weights(weights: List[float]) -> List[float]:
+    if not weights:
+        return []
+    total = float(sum(float(w) for w in weights))
+    if total <= 0.0:
+        uniform = 1.0 / float(len(weights))
+        return [uniform for _ in weights]
+    return [float(w) / total for w in weights]
+
+
+def _resolve_topk(mode: str, configured_topk: int, n_experts: int) -> int:
+    if mode == AGGREGATION_TOPK2_UNIFORM:
+        return min(2, max(n_experts, 1))
+    if mode == AGGREGATION_TOPK3_UNIFORM:
+        return min(3, max(n_experts, 1))
+    return min(max(int(configured_topk), 1), max(n_experts, 1))
+
+
+def _select_indices_and_weights(
+    similarities: List[float],
+    mode: str,
+    topk: int,
+    temperature: float,
+) -> Tuple[List[int], List[float]]:
+    n = len(similarities)
+    if n == 0:
+        return [], []
+    if mode not in ALLOWED_AGGREGATION_MODES:
+        raise ValueError(f"Unsupported aggregation_mode '{mode}'. Allowed: {sorted(ALLOWED_AGGREGATION_MODES)}")
+
+    order_desc = sorted(range(n), key=lambda idx: (-float(similarities[idx]), idx))
+
+    if mode == AGGREGATION_TOP1_HARD:
+        return [order_desc[0]], [1.0]
+
+    if mode in {AGGREGATION_TOPK2_UNIFORM, AGGREGATION_TOPK3_UNIFORM}:
+        k = _resolve_topk(mode=mode, configured_topk=topk, n_experts=n)
+        selected = sorted(order_desc[:k])
+        uniform = 1.0 / float(len(selected))
+        return selected, [uniform for _ in selected]
+
+    # soft_all_softmax
+    temp = max(float(temperature), 1e-8)
+    scaled = [float(s) / temp for s in similarities]
+    m = max(scaled)
+    exps = [float(np.exp(v - m)) for v in scaled]
+    weights = _safe_normalize_weights(exps)
+    selected = list(range(n))
+    return selected, [weights[idx] for idx in selected]
+
+
+def _allocate_counts_deterministic(
+    total: int,
+    weights: List[float],
+    tie_break_ids: List[int],
+) -> Tuple[List[int], List[float]]:
+    if total <= 0 or not weights:
+        return [0 for _ in weights], [0.0 for _ in weights]
+
+    if len(weights) != len(tie_break_ids):
+        raise ValueError("weights and tie_break_ids must have equal length")
+
+    norm_w = _safe_normalize_weights(weights)
+    ideals = [float(total) * float(w) for w in norm_w]
+    base = [int(np.floor(v)) for v in ideals]
+    remaining = int(total - sum(base))
+
+    if remaining > 0:
+        remainders = [ideals[i] - float(base[i]) for i in range(len(base))]
+        order = sorted(range(len(base)), key=lambda i: (-float(remainders[i]), int(tie_break_ids[i])))
+        for pos in order[:remaining]:
+            base[pos] += 1
+
+    return base, ideals
 
 
 class HybridExpertBank:
@@ -391,6 +479,15 @@ def compute_hybrid_matrices_and_routing(
             ),
         }
 
+    metadata_routing_nelbo = float(torch.tensor(metadata_scores).mean().item()) if metadata_scores else 0.0
+    oracle_routing_nelbo = float(torch.tensor(oracle_scores).mean().item()) if oracle_scores else 0.0
+    metadata_to_oracle_gap = metadata_routing_nelbo - oracle_routing_nelbo
+    metadata_to_oracle_gap_pct = (
+        (100.0 * metadata_to_oracle_gap / max(abs(oracle_routing_nelbo), 1e-8))
+        if metadata_scores and oracle_scores
+        else 0.0
+    )
+
     return {
         "compatibility_matrix": {
             "nelbo": compatibility_nelbo,
@@ -399,15 +496,12 @@ def compute_hybrid_matrices_and_routing(
         "routing_matrix": routing_matrix,
         "routing_statistics": stats,
         "routing_metrics": {
-            "metadata_routing_nelbo": float(torch.tensor(metadata_scores).mean().item()) if metadata_scores else 0.0,
-            "oracle_routing_nelbo": float(torch.tensor(oracle_scores).mean().item()) if oracle_scores else 0.0,
+            "metadata_routing_nelbo": metadata_routing_nelbo,
+            "oracle_routing_nelbo": oracle_routing_nelbo,
             "random_routing_nelbo": float(torch.tensor(random_scores).mean().item()) if random_scores else 0.0,
             "uniform_routing_nelbo": float(torch.tensor(uniform_scores).mean().item()) if uniform_scores else 0.0,
-            "metadata_to_oracle_gap": (
-                float(torch.tensor(metadata_scores).mean().item() - torch.tensor(oracle_scores).mean().item())
-                if metadata_scores and oracle_scores
-                else 0.0
-            ),
+            "metadata_to_oracle_gap": metadata_to_oracle_gap,
+            "metadata_to_oracle_gap_pct": metadata_to_oracle_gap_pct,
         },
         "routing_assignments": {
             "true_domains": true_domains,
@@ -488,8 +582,18 @@ def evaluate_downstream_utility(
     temperature: float,
     seed: int,
     budget_multipliers: List[float],
+    aggregation_mode: str = AGGREGATION_TOP1_HARD,
+    aggregation_topk: int = 2,
+    aggregation_temperature: float = 1.0,
 ) -> Dict[str, object]:
     _ = temperature
+    if aggregation_mode not in ALLOWED_AGGREGATION_MODES:
+        raise ValueError(f"Unsupported aggregation_mode '{aggregation_mode}'. Allowed: {sorted(ALLOWED_AGGREGATION_MODES)}")
+    if int(aggregation_topk) <= 0:
+        raise ValueError("aggregation_topk must be > 0")
+    if float(aggregation_temperature) <= 0.0:
+        raise ValueError("aggregation_temperature must be > 0")
+
     train_payload = safe_torch_load(train_cache, map_location="cpu")
     test_payload = safe_torch_load(test_cache, map_location="cpu")
     train_by_domain = _payload_by_domain(train_payload)
@@ -503,6 +607,9 @@ def evaluate_downstream_utility(
 
     x_train_cpu = train_payload["embeddings"]
     x_test_cpu = test_payload["embeddings"]
+    expert_domains = [ed for ed in routed_bank.domains if ed in domains]
+    if not expert_domains:
+        raise RuntimeError("No overlapping expert domains found for downstream utility evaluation.")
 
     out: Dict[str, object] = {}
 
@@ -517,15 +624,22 @@ def evaluate_downstream_utility(
             if not train_idxs or not test_idxs:
                 continue
 
-            # Domain-level top-1 routing.
-            expert_domains = [ed for ed in routed_bank.domains if ed in domains]
-            hard_idx, _ = _hard_domain_route(
+            # Domain-level compatibility scores are fixed across modes; only aggregation policy changes.
+            hard_idx, sims = _hard_domain_route(
                 target_domain=d,
                 expert_domains=expert_domains,
                 strategy=strategy,
                 tau=tau,
                 similarity_matrix=None,
             )
+            selected_indices, selected_weights = _select_indices_and_weights(
+                similarities=sims,
+                mode=str(aggregation_mode),
+                topk=int(aggregation_topk),
+                temperature=float(aggregation_temperature),
+            )
+            selected_domains = [int(expert_domains[idx]) for idx in selected_indices]
+
             routed_domain = expert_domains[hard_idx]
             random_domain = expert_domains[rng.randrange(len(expert_domains))]
 
@@ -560,7 +674,100 @@ def evaluate_downstream_utility(
                     return torch.empty((0, xtr_real_proj.shape[1]), device=device), torch.empty((0,), dtype=torch.long, device=device)
                 return torch.cat(synth_chunks, dim=0), torch.cat(label_chunks, dim=0)
 
-            x_syn_routed, y_syn_routed = _make_condition(routed_bank, routed_domain, seed + 11)
+            def _make_condition_aggregated(
+                bank: HybridExpertBank,
+                gen_domains: List[int],
+                gen_weights: List[float],
+                cond_seed: int,
+                mode: str,
+            ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, object]]:
+                if not gen_domains:
+                    empty_x = torch.empty((0, xtr_real_proj.shape[1]), device=device)
+                    empty_y = torch.empty((0,), dtype=torch.long, device=device)
+                    return empty_x, empty_y, {"per_class": {}, "allocation_checksum": 0}
+
+                # Preserve legacy top1 behavior exactly.
+                if len(gen_domains) == 1 and mode == AGGREGATION_TOP1_HARD:
+                    x_single, y_single = _make_condition(bank, int(gen_domains[0]), int(cond_seed))
+                    per_class = {
+                        str(cls): {
+                            "experts": [
+                                {
+                                    "expert_domain": int(gen_domains[0]),
+                                    "weight": 1.0,
+                                    "ideal_count": float(n_cls),
+                                    "allocated_count": int(n_cls),
+                                }
+                            ]
+                        }
+                        for cls, n_cls in class_targets.items()
+                    }
+                    return x_single, y_single, {
+                        "per_class": per_class,
+                        "allocation_checksum": int(sum(int(v) for v in class_targets.values())),
+                    }
+
+                synth_chunks: List[torch.Tensor] = []
+                label_chunks: List[torch.Tensor] = []
+                allocation_meta: Dict[str, Any] = {"per_class": {}}
+                total_allocated = 0
+
+                for cls, n_cls in class_targets.items():
+                    if int(n_cls) <= 0:
+                        continue
+                    class_mask = ytr_local == int(cls)
+                    if not torch.any(class_mask):
+                        continue
+
+                    ref = xtr_local[class_mask]
+                    counts, ideals = _allocate_counts_deterministic(
+                        total=int(n_cls),
+                        weights=gen_weights,
+                        tie_break_ids=[int(v) for v in gen_domains],
+                    )
+
+                    experts_meta: List[Dict[str, Any]] = []
+                    for pos, gen_domain in enumerate(gen_domains):
+                        n_gen = int(counts[pos])
+                        experts_meta.append(
+                            {
+                                "expert_domain": int(gen_domain),
+                                "weight": float(gen_weights[pos]),
+                                "ideal_count": float(ideals[pos]),
+                                "allocated_count": int(n_gen),
+                            }
+                        )
+                        if n_gen <= 0:
+                            continue
+                        x_syn = bank.generate_from_reference(
+                            int(gen_domain),
+                            ref,
+                            n_gen,
+                            seed=int(cond_seed + (1000 * int(cls)) + int(gen_domain)),
+                        )
+                        y_syn = torch.full((int(x_syn.shape[0]),), int(cls), dtype=torch.long, device=device)
+                        synth_chunks.append(x_syn)
+                        label_chunks.append(y_syn)
+                        total_allocated += int(x_syn.shape[0])
+
+                    allocation_meta["per_class"][str(cls)] = {"experts": experts_meta}
+
+                if not synth_chunks:
+                    empty_x = torch.empty((0, xtr_real_proj.shape[1]), device=device)
+                    empty_y = torch.empty((0,), dtype=torch.long, device=device)
+                    allocation_meta["allocation_checksum"] = int(total_allocated)
+                    return empty_x, empty_y, allocation_meta
+
+                allocation_meta["allocation_checksum"] = int(total_allocated)
+                return torch.cat(synth_chunks, dim=0), torch.cat(label_chunks, dim=0), allocation_meta
+
+            x_syn_routed, y_syn_routed, routed_allocation = _make_condition_aggregated(
+                routed_bank,
+                gen_domains=selected_domains,
+                gen_weights=selected_weights,
+                cond_seed=seed + 11,
+                mode=str(aggregation_mode),
+            )
             x_syn_random, y_syn_random = _make_condition(routed_bank, random_domain, seed + 23)
             x_syn_pooled, y_syn_pooled = _make_condition(pooled_bank, d, seed + 37)
 
@@ -585,6 +792,14 @@ def evaluate_downstream_utility(
                 "class_targets": {str(k): int(v) for k, v in class_targets.items()},
                 "routed_domain": f"{routed_domain}x",
                 "random_domain": f"{random_domain}x",
+                "aggregation": {
+                    "mode": str(aggregation_mode),
+                    "topk": int(aggregation_topk),
+                    "temperature": float(aggregation_temperature),
+                    "selected_domains": [f"{int(v)}x" for v in selected_domains],
+                    "selected_weights": [float(v) for v in selected_weights],
+                    "allocation": routed_allocation,
+                },
                 "metrics": {},
             }
             for name, (xtr_c, ytr_c) in conditions.items():

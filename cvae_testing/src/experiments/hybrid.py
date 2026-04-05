@@ -33,12 +33,35 @@ def _validate_hybrid_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             "hybrid.synthetic_budgets must include the locked protocol budgets 1.0 and 0.5"
         )
 
+    aggregation_mode = str(hybrid_cfg.get("aggregation_mode", "top1_hard")).strip().lower()
+    allowed_modes = {"top1_hard", "topk2_uniform", "topk3_uniform", "soft_all_softmax"}
+    if aggregation_mode not in allowed_modes:
+        raise ValueError(
+            f"hybrid.aggregation_mode must be one of {sorted(allowed_modes)}, got: {aggregation_mode}"
+        )
+
+    topk = int(hybrid_cfg.get("topk_k", 2))
+    if topk <= 0:
+        raise ValueError("hybrid.topk_k must be > 0")
+
+    aggregation_temperature = float(hybrid_cfg.get("aggregation_temperature", 1.0))
+    if aggregation_temperature <= 0:
+        raise ValueError("hybrid.aggregation_temperature must be > 0")
+
+    if aggregation_mode == "topk2_uniform" and topk != 2:
+        raise ValueError("hybrid.topk_k must be 2 when hybrid.aggregation_mode is 'topk2_uniform'")
+    if aggregation_mode == "topk3_uniform" and topk != 3:
+        raise ValueError("hybrid.topk_k must be 3 when hybrid.aggregation_mode is 'topk3_uniform'")
+
     return {
         "variants": variants,
         "budgets": budgets,
         "projection_dim": int(hybrid_cfg.get("projection_dim", cfg["features"]["embedding_dim"])),
         "head_hidden_dim": int(hybrid_cfg.get("head_hidden_dim", 256)),
         "cvae_hidden_dim": int(hybrid_cfg.get("cvae_hidden_dim", cfg["model"]["hidden_dim"])),
+        "aggregation_mode": aggregation_mode,
+        "topk_k": topk,
+        "aggregation_temperature": aggregation_temperature,
     }
 
 
@@ -65,6 +88,9 @@ class HybridAblationExperiment(BaseExperiment):
         cvae_hidden_dim = hybrid_validated["cvae_hidden_dim"]
         variants = hybrid_validated["variants"]
         budgets = hybrid_validated["budgets"]
+        aggregation_mode = hybrid_validated["aggregation_mode"]
+        aggregation_topk = hybrid_validated["topk_k"]
+        aggregation_temperature = hybrid_validated["aggregation_temperature"]
 
         pooled_info = train_hybrid_pooled_baseline(
             train_cache=cache_paths["train"],
@@ -150,6 +176,9 @@ class HybridAblationExperiment(BaseExperiment):
                 temperature=float(cfg["routing"]["temperature"]),
                 seed=int(cfg["seed"]),
                 budget_multipliers=budgets,
+                aggregation_mode=str(aggregation_mode),
+                aggregation_topk=int(aggregation_topk),
+                aggregation_temperature=float(aggregation_temperature),
             )
             progress.advance(f"variant {variant} downstream utility evaluated")
 
@@ -160,6 +189,11 @@ class HybridAblationExperiment(BaseExperiment):
                 "routing_matrix": matrix_and_routing["routing_matrix"],
                 "routing_statistics": matrix_and_routing["routing_statistics"],
                 "routing_metrics": matrix_and_routing["routing_metrics"],
+                "aggregation_policy": {
+                    "mode": str(aggregation_mode),
+                    "topk_k": int(aggregation_topk),
+                    "temperature": float(aggregation_temperature),
+                },
                 "downstream_utility": downstream,
                 "global_baselines": baseline_metrics,
             }
