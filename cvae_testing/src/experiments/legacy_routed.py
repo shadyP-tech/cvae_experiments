@@ -38,6 +38,8 @@ class LegacyRoutedExperiment(BaseExperiment):
             patience=int(cfg["training"]["patience"]),
             batch_size=int(cfg["training"]["batch_size"]),
             resume_from_dir=resume_checkpoints_dir,
+            conditioning_cfg=cfg.get("model", {}).get("conditioning", {}),
+            configured_domains=cfg.get("data", {}).get("magnifications", []),
         )
         progress.advance("domain experts trained")
 
@@ -46,6 +48,8 @@ class LegacyRoutedExperiment(BaseExperiment):
             expert_checkpoints=experts,
             hidden_dim=int(cfg["model"]["hidden_dim"]),
             latent_dim=int(cfg["model"]["latent_dim"]),
+            conditioning_cfg=cfg.get("model", {}).get("conditioning", {}),
+            configured_domains=cfg.get("data", {}).get("magnifications", []),
         )
         with (run_ctx.reports_dir / "expert_matrix.json").open("w", encoding="utf-8") as f:
             json.dump(matrix, f, indent=2)
@@ -66,6 +70,8 @@ class LegacyRoutedExperiment(BaseExperiment):
             temperature=float(cfg["routing"]["temperature"]),
             seed=int(cfg["seed"]),
             similarity_matrix=cfg.get("routing", {}).get("similarity_matrix"),
+            conditioning_cfg=cfg.get("model", {}).get("conditioning", {}),
+            configured_domains=cfg.get("data", {}).get("magnifications", []),
         )
         with (run_ctx.reports_dir / "routing_results.json").open("w", encoding="utf-8") as f:
             json.dump(routing_results, f, indent=2)

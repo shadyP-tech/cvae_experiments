@@ -39,6 +39,81 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
     if int(cfg["training"]["epochs"]) <= 0:
         raise ValueError("training.epochs must be > 0")
 
+    model_cfg = cfg.get("model", {})
+    if not isinstance(model_cfg, dict):
+        raise ValueError("model must be a dictionary")
+    if int(model_cfg.get("hidden_dim", 0)) <= 0:
+        raise ValueError("model.hidden_dim must be > 0")
+    if int(model_cfg.get("latent_dim", 0)) <= 0:
+        raise ValueError("model.latent_dim must be > 0")
+
+    conditioning_cfg = model_cfg.get("conditioning", {})
+    if conditioning_cfg is not None and not isinstance(conditioning_cfg, dict):
+        raise ValueError("model.conditioning must be a dictionary when provided")
+
+    conditioning_enabled = bool((conditioning_cfg or {}).get("enabled", False))
+    _ensure_bool((conditioning_cfg or {}).get("enabled", False), "model.conditioning.enabled")
+
+    metadata_mode = str((conditioning_cfg or {}).get("metadata_mode", "domain_id")).strip().lower()
+    if metadata_mode != "domain_id":
+        raise ValueError("model.conditioning.metadata_mode must be 'domain_id' in v1")
+
+    encoding = str((conditioning_cfg or {}).get("encoding", "one_hot")).strip().lower()
+    if encoding != "one_hot":
+        raise ValueError("model.conditioning.encoding must be 'one_hot' in v1")
+
+    _ensure_bool((conditioning_cfg or {}).get("inject_encoder", True), "model.conditioning.inject_encoder")
+    _ensure_bool((conditioning_cfg or {}).get("inject_decoder", True), "model.conditioning.inject_decoder")
+    inject_encoder = bool((conditioning_cfg or {}).get("inject_encoder", True))
+    inject_decoder = bool((conditioning_cfg or {}).get("inject_decoder", True))
+    if conditioning_enabled and not inject_encoder:
+        raise ValueError("model.conditioning.inject_encoder must be true when conditioning is enabled")
+    if conditioning_enabled and not inject_decoder:
+        raise ValueError("model.conditioning.inject_decoder must be true when conditioning is enabled")
+
+    metadata_fields = (conditioning_cfg or {}).get("metadata_fields", ["domain_id"])
+    if metadata_fields is not None:
+        if not isinstance(metadata_fields, list):
+            raise ValueError("model.conditioning.metadata_fields must be a list when provided")
+        invalid_fields = [str(x) for x in metadata_fields if str(x).strip().lower() != "domain_id"]
+        if invalid_fields:
+            raise ValueError("model.conditioning.metadata_fields supports only ['domain_id'] in v1")
+
+    protocol_cfg = cfg.get("legacy_protocol")
+    if protocol_cfg is not None:
+        if not isinstance(protocol_cfg, dict):
+            raise ValueError("legacy_protocol must be a dictionary when provided")
+        seeds = protocol_cfg.get("seeds", [11, 42, 73])
+        if not isinstance(seeds, list) or not seeds:
+            raise ValueError("legacy_protocol.seeds must be a non-empty list")
+        if any(int(s) < 0 for s in seeds):
+            raise ValueError("legacy_protocol.seeds must contain non-negative integers")
+
+        gates = protocol_cfg.get("gates", {})
+        if gates is not None and not isinstance(gates, dict):
+            raise ValueError("legacy_protocol.gates must be a dictionary when provided")
+        e1_cfg = (gates or {}).get("e1", {})
+        e2_cfg = (gates or {}).get("e2", {})
+        e3_cfg = (gates or {}).get("e3", {})
+        if e1_cfg is not None and not isinstance(e1_cfg, dict):
+            raise ValueError("legacy_protocol.gates.e1 must be a dictionary when provided")
+        if e2_cfg is not None and not isinstance(e2_cfg, dict):
+            raise ValueError("legacy_protocol.gates.e2 must be a dictionary when provided")
+        if e3_cfg is not None and not isinstance(e3_cfg, dict):
+            raise ValueError("legacy_protocol.gates.e3 must be a dictionary when provided")
+
+        e1_median_rel_delta_max = float((e1_cfg or {}).get("median_relative_delta_max", -0.03))
+        _ = e1_median_rel_delta_max
+        e2_top1_min = float((e2_cfg or {}).get("top1_uplift_min", 0.05))
+        e2_spearman_min = float((e2_cfg or {}).get("spearman_uplift_min", 0.05))
+        _ = e2_top1_min, e2_spearman_min
+        e3_rel_gap_reduction_min = float((e3_cfg or {}).get("relative_gap_reduction_min", 0.30))
+        e3_abs_norm_gap_max = float((e3_cfg or {}).get("abs_normalized_gap_median_max", 0.05))
+        if e3_rel_gap_reduction_min < 0:
+            raise ValueError("legacy_protocol.gates.e3.relative_gap_reduction_min must be >= 0")
+        if e3_abs_norm_gap_max < 0:
+            raise ValueError("legacy_protocol.gates.e3.abs_normalized_gap_median_max must be >= 0")
+
     features_cfg = cfg.get("features", {})
     if not isinstance(features_cfg, dict):
         raise ValueError("features must be a dictionary")
@@ -366,6 +441,99 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             "save_training_fold_manifest_json",
         ]:
             _ensure_bool((artifacts_cfg or {}).get(key, True), f"learned_utility.artifacts.{key}")
+
+        compatibility_cfg = learned_cfg.get("compatibility_research", {})
+        if compatibility_cfg is not None and not isinstance(compatibility_cfg, dict):
+            raise ValueError("learned_utility.compatibility_research must be a dictionary when provided")
+
+        floors_cfg = (compatibility_cfg or {}).get("floors", {})
+        if floors_cfg is not None and not isinstance(floors_cfg, dict):
+            raise ValueError("learned_utility.compatibility_research.floors must be a dictionary when provided")
+        _ensure_bool(
+            (floors_cfg or {}).get("random_rank_floor", True),
+            "learned_utility.compatibility_research.floors.random_rank_floor",
+        )
+        _ensure_bool(
+            (floors_cfg or {}).get("random_score_floor", True),
+            "learned_utility.compatibility_research.floors.random_score_floor",
+        )
+
+        perm_cfg = (compatibility_cfg or {}).get("permutation_tests", {})
+        if perm_cfg is not None and not isinstance(perm_cfg, dict):
+            raise ValueError(
+                "learned_utility.compatibility_research.permutation_tests must be a dictionary when provided"
+            )
+        _ensure_bool(
+            (perm_cfg or {}).get("expert_label_permutation", True),
+            "learned_utility.compatibility_research.permutation_tests.expert_label_permutation",
+        )
+        _ensure_bool(
+            (perm_cfg or {}).get("metadata_permutation", True),
+            "learned_utility.compatibility_research.permutation_tests.metadata_permutation",
+        )
+        repeats = int((perm_cfg or {}).get("repeats", 200))
+        if repeats <= 0:
+            raise ValueError("learned_utility.compatibility_research.permutation_tests.repeats must be > 0")
+
+        diagnostics_cfg = (compatibility_cfg or {}).get("diagnostics", {})
+        if diagnostics_cfg is not None and not isinstance(diagnostics_cfg, dict):
+            raise ValueError(
+                "learned_utility.compatibility_research.diagnostics must be a dictionary when provided"
+            )
+        _ensure_bool(
+            (diagnostics_cfg or {}).get("save_distribution_plots", True),
+            "learned_utility.compatibility_research.diagnostics.save_distribution_plots",
+        )
+
+        gate_cfg = (compatibility_cfg or {}).get("gate", {})
+        if gate_cfg is not None and not isinstance(gate_cfg, dict):
+            raise ValueError("learned_utility.compatibility_research.gate must be a dictionary when provided")
+
+        uplift_ref = str((gate_cfg or {}).get("uplift_reference_method", "metadata_routing")).strip()
+        if uplift_ref != "metadata_routing":
+            raise ValueError(
+                "learned_utility.compatibility_research.gate.uplift_reference_method must be 'metadata_routing'"
+            )
+
+        min_improving_seeds = int((gate_cfg or {}).get("min_improving_seeds", 2))
+        if min_improving_seeds <= 0:
+            raise ValueError("learned_utility.compatibility_research.gate.min_improving_seeds must be > 0")
+
+        strong_gate = (gate_cfg or {}).get("strong", {})
+        weak_gate = (gate_cfg or {}).get("weak", {})
+        if strong_gate is not None and not isinstance(strong_gate, dict):
+            raise ValueError("learned_utility.compatibility_research.gate.strong must be a dictionary when provided")
+        if weak_gate is not None and not isinstance(weak_gate, dict):
+            raise ValueError("learned_utility.compatibility_research.gate.weak must be a dictionary when provided")
+
+        for block_name, block in [("strong", strong_gate or {}), ("weak", weak_gate or {})]:
+            if float(block.get("spearman_uplift_min", 0.0)) < 0.0:
+                raise ValueError(
+                    f"learned_utility.compatibility_research.gate.{block_name}.spearman_uplift_min must be >= 0"
+                )
+            if float(block.get("top1_uplift_min", 0.0)) < 0.0:
+                raise ValueError(
+                    f"learned_utility.compatibility_research.gate.{block_name}.top1_uplift_min must be >= 0"
+                )
+            if float(block.get("oracle_gap_pct_reduction_min", 0.0)) < 0.0:
+                raise ValueError(
+                    "learned_utility.compatibility_research.gate."
+                    f"{block_name}.oracle_gap_pct_reduction_min must be >= 0"
+                )
+
+        instability_cfg = (gate_cfg or {}).get("instability", {})
+        if instability_cfg is not None and not isinstance(instability_cfg, dict):
+            raise ValueError(
+                "learned_utility.compatibility_research.gate.instability must be a dictionary when provided"
+            )
+        if float((instability_cfg or {}).get("std_threshold", 0.05)) < 0.0:
+            raise ValueError(
+                "learned_utility.compatibility_research.gate.instability.std_threshold must be >= 0"
+            )
+        if int((instability_cfg or {}).get("sign_inconsistency_min_count", 2)) < 1:
+            raise ValueError(
+                "learned_utility.compatibility_research.gate.instability.sign_inconsistency_min_count must be >= 1"
+            )
 
         backbone = str(cfg.get("features", {}).get("backbone_type", "")).strip().lower()
         if backbone != "resnet50":

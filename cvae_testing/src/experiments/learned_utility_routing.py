@@ -122,6 +122,103 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
                     learned_cfg.get("winner_rule", {}).get("max_allowed_seed_regression_pct", 5.0)
                 ),
             },
+            "compatibility_research": {
+                "floors": {
+                    "random_rank_floor": bool(
+                        learned_cfg.get("compatibility_research", {})
+                        .get("floors", {})
+                        .get("random_rank_floor", True)
+                    ),
+                    "random_score_floor": bool(
+                        learned_cfg.get("compatibility_research", {})
+                        .get("floors", {})
+                        .get("random_score_floor", True)
+                    ),
+                },
+                "permutation_tests": {
+                    "expert_label_permutation": bool(
+                        learned_cfg.get("compatibility_research", {})
+                        .get("permutation_tests", {})
+                        .get("expert_label_permutation", True)
+                    ),
+                    "metadata_permutation": bool(
+                        learned_cfg.get("compatibility_research", {})
+                        .get("permutation_tests", {})
+                        .get("metadata_permutation", True)
+                    ),
+                    "repeats": int(
+                        learned_cfg.get("compatibility_research", {})
+                        .get("permutation_tests", {})
+                        .get("repeats", 200)
+                    ),
+                },
+                "gate": {
+                    "uplift_reference_method": str(
+                        learned_cfg.get("compatibility_research", {})
+                        .get("gate", {})
+                        .get("uplift_reference_method", "metadata_routing")
+                    ),
+                    "min_improving_seeds": int(
+                        learned_cfg.get("compatibility_research", {})
+                        .get("gate", {})
+                        .get("min_improving_seeds", 2)
+                    ),
+                    "strong": {
+                        "spearman_uplift_min": float(
+                            learned_cfg.get("compatibility_research", {})
+                            .get("gate", {})
+                            .get("strong", {})
+                            .get("spearman_uplift_min", 0.05)
+                        ),
+                        "top1_uplift_min": float(
+                            learned_cfg.get("compatibility_research", {})
+                            .get("gate", {})
+                            .get("strong", {})
+                            .get("top1_uplift_min", 0.10)
+                        ),
+                        "oracle_gap_pct_reduction_min": float(
+                            learned_cfg.get("compatibility_research", {})
+                            .get("gate", {})
+                            .get("strong", {})
+                            .get("oracle_gap_pct_reduction_min", 5.0)
+                        ),
+                    },
+                    "weak": {
+                        "spearman_uplift_min": float(
+                            learned_cfg.get("compatibility_research", {})
+                            .get("gate", {})
+                            .get("weak", {})
+                            .get("spearman_uplift_min", 0.025)
+                        ),
+                        "top1_uplift_min": float(
+                            learned_cfg.get("compatibility_research", {})
+                            .get("gate", {})
+                            .get("weak", {})
+                            .get("top1_uplift_min", 0.05)
+                        ),
+                        "oracle_gap_pct_reduction_min": float(
+                            learned_cfg.get("compatibility_research", {})
+                            .get("gate", {})
+                            .get("weak", {})
+                            .get("oracle_gap_pct_reduction_min", 2.5)
+                        ),
+                    },
+                    "instability": {
+                        "std_threshold": float(
+                            learned_cfg.get("compatibility_research", {})
+                            .get("gate", {})
+                            .get("instability", {})
+                            .get("std_threshold", 0.05)
+                        ),
+                        "sign_inconsistency_min_count": int(
+                            learned_cfg.get("compatibility_research", {})
+                            .get("gate", {})
+                            .get("instability", {})
+                            .get("sign_inconsistency_min_count", 2)
+                        ),
+                    },
+                },
+            },
             "backbone_type": str(cfg.get("features", {}).get("backbone_type", "resnet50")),
             "status": "implementation_active",
         }
@@ -170,6 +267,7 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
                 "status": "phase2_evaluated",
                 "results_artifact": "learned_utility_results.json",
                 "metrics_by_method": results.get("metrics_by_method", {}),
+                "compatibility_protocol": results.get("compatibility_protocol", {}),
                 "hybrid_diagnostics": results.get("hybrid_diagnostics", {}),
             },
         )
