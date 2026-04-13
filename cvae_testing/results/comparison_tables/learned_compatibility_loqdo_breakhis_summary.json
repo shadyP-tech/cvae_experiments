@@ -3,9 +3,62 @@
     "constant_mean",
     "expert_prior",
     "linear_regression",
-    "mlp_regression"
+    "mlp_regression",
+    "utility_probe_v1_no_expert_stats",
+    "utility_probe_v1_with_expert_stats",
+    "semi_oracle_support_mean",
+    "semi_oracle_support_riskaware",
+    "oracle_eval_mean_cheat",
+    "oracle_pairwise_rank_cheat"
   ],
+  "probe_config": {
+    "enabled": true,
+    "hidden_dim": 32,
+    "dropout": 0.2,
+    "learning_rate": 0.001,
+    "epochs": 300,
+    "alpha": 1.0,
+    "beta": 0.3,
+    "support_fraction": 0.5,
+    "query_batch_size": 64,
+    "support_split_seed": 17,
+    "clip_target_percentile": 99.0
+  },
+  "oracle_probe_config": {
+    "enabled": true,
+    "semi_oracle_risk_lambda": 0.5
+  },
   "runs": [
+    {
+      "run_dir": "/home/stud/spark/cvae_metadata_routing/cvae_testing/outputs/breakhis/hybrid_ablation_extractor_resnet18_v1/2026-03-18_1522_seed42",
+      "dataset_name": "breakhis",
+      "seed": 42,
+      "backbone_type": "resnet18",
+      "variant": "B",
+      "n_pair_rows": 16,
+      "n_fold_rows": 60,
+      "expert_domains": [
+        40,
+        100,
+        200,
+        400
+      ]
+    },
+    {
+      "run_dir": "/home/stud/spark/cvae_metadata_routing/cvae_testing/outputs/breakhis/hybrid_ablation_extractor_resnet18_v1/2026-03-18_1523_seed43",
+      "dataset_name": "breakhis",
+      "seed": 43,
+      "backbone_type": "resnet18",
+      "variant": "B",
+      "n_pair_rows": 16,
+      "n_fold_rows": 60,
+      "expert_domains": [
+        40,
+        100,
+        200,
+        400
+      ]
+    },
     {
       "run_dir": "/home/stud/spark/cvae_metadata_routing/cvae_testing/outputs/breakhis/hybrid_ablation_extractor_resnet18_v1/2026-03-18_1524_seed44",
       "dataset_name": "breakhis",
@@ -13,7 +66,37 @@
       "backbone_type": "resnet18",
       "variant": "B",
       "n_pair_rows": 16,
-      "n_fold_rows": 36,
+      "n_fold_rows": 60,
+      "expert_domains": [
+        40,
+        100,
+        200,
+        400
+      ]
+    },
+    {
+      "run_dir": "/home/stud/spark/cvae_metadata_routing/cvae_testing/outputs/breakhis/hybrid_ablation_extractor_resnet50_v1/2026-03-18_1525_seed42",
+      "dataset_name": "breakhis",
+      "seed": 42,
+      "backbone_type": "resnet50",
+      "variant": "B",
+      "n_pair_rows": 16,
+      "n_fold_rows": 60,
+      "expert_domains": [
+        40,
+        100,
+        200,
+        400
+      ]
+    },
+    {
+      "run_dir": "/home/stud/spark/cvae_metadata_routing/cvae_testing/outputs/breakhis/hybrid_ablation_extractor_resnet50_v1/2026-03-18_1527_seed43",
+      "dataset_name": "breakhis",
+      "seed": 43,
+      "backbone_type": "resnet50",
+      "variant": "B",
+      "n_pair_rows": 16,
+      "n_fold_rows": 60,
       "expert_domains": [
         40,
         100,
@@ -28,7 +111,37 @@
       "backbone_type": "resnet50",
       "variant": "B",
       "n_pair_rows": 16,
-      "n_fold_rows": 36,
+      "n_fold_rows": 60,
+      "expert_domains": [
+        40,
+        100,
+        200,
+        400
+      ]
+    },
+    {
+      "run_dir": "/home/stud/spark/cvae_metadata_routing/cvae_testing/outputs/breakhis/hybrid_ablation_extractor_dinov2_vitb14_v1/2026-03-18_1538_seed42",
+      "dataset_name": "breakhis",
+      "seed": 42,
+      "backbone_type": "dinov2_vitb14",
+      "variant": "B",
+      "n_pair_rows": 16,
+      "n_fold_rows": 60,
+      "expert_domains": [
+        40,
+        100,
+        200,
+        400
+      ]
+    },
+    {
+      "run_dir": "/home/stud/spark/cvae_metadata_routing/cvae_testing/outputs/breakhis/hybrid_ablation_extractor_dinov2_vitb14_v1/2026-03-18_1540_seed43",
+      "dataset_name": "breakhis",
+      "seed": 43,
+      "backbone_type": "dinov2_vitb14",
+      "variant": "B",
+      "n_pair_rows": 16,
+      "n_fold_rows": 60,
       "expert_domains": [
         40,
         100,
@@ -43,7 +156,7 @@
       "backbone_type": "dinov2_vitb14",
       "variant": "B",
       "n_pair_rows": 16,
-      "n_fold_rows": 36,
+      "n_fold_rows": 60,
       "expert_domains": [
         40,
         100,
@@ -54,6 +167,6 @@
   ],
   "raw_csv": "/home/stud/spark/cvae_metadata_routing/cvae_testing/results/comparison_tables/learned_compatibility_loqdo_breakhis_raw.csv",
   "stats_csv": "/home/stud/spark/cvae_metadata_routing/cvae_testing/results/comparison_tables/learned_compatibility_loqdo_breakhis_stats.csv",
-  "n_raw_rows": 108,
-  "n_stats_rows": 27
+  "n_raw_rows": 540,
+  "n_stats_rows": 45
 }
