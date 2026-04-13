@@ -24,6 +24,122 @@ _ALLOWED_NORM_POLICIES = {"per_query_zscore", "per_query_minmax"}
 _DEFAULT_ALPHA_GRID = [i / 10.0 for i in range(11)]
 
 
+def _mean(values: Sequence[float]) -> float:
+    vals = [float(v) for v in values]
+    return float(np.mean(vals)) if vals else 0.0
+
+
+def _std(values: Sequence[float]) -> float:
+    vals = [float(v) for v in values]
+    return float(np.std(vals)) if vals else 0.0
+
+
+def _empirical_p_value(observed: float, null_values: Sequence[float], higher_is_better: bool) -> float:
+    vals = [float(v) for v in null_values]
+    if not vals:
+        return 1.0
+    if higher_is_better:
+        count = sum(1 for v in vals if v >= float(observed))
+    else:
+        count = sum(1 for v in vals if v <= float(observed))
+    return float((count + 1.0) / (len(vals) + 1.0))
+
+
+def _build_random_rank_floor_proxy(sample_domains: np.ndarray, n_experts: int, seed: int) -> np.ndarray:
+    out = np.zeros((int(sample_domains.shape[0]), int(n_experts)), dtype=np.float64)
+    if int(n_experts) <= 0:
+        return out
+
+    rank_by_query: Dict[int, np.ndarray] = {}
+    for i in range(out.shape[0]):
+        q = int(sample_domains[i])
+        if q not in rank_by_query:
+            rng = np.random.default_rng(int(seed) + (1009 * int(q)))
+            perm = np.asarray(rng.permutation(int(n_experts)), dtype=np.int64)
+            rank = np.zeros((int(n_experts),), dtype=np.float64)
+            for pos, idx in enumerate(perm.tolist()):
+                rank[int(idx)] = float(pos)
+            rank_by_query[q] = rank
+        out[i, :] = rank_by_query[q]
+    return out
+
+
+def _build_random_score_floor_proxy(n_samples: int, n_experts: int, seed: int) -> np.ndarray:
+    rng = np.random.default_rng(int(seed))
+    return rng.random((int(n_samples), int(n_experts)), dtype=np.float64)
+
+
+def _permute_expert_labels_proxy(proxy: np.ndarray, seed: int) -> np.ndarray:
+    rng = np.random.default_rng(int(seed))
+    perm = np.asarray(rng.permutation(proxy.shape[1]), dtype=np.int64)
+    return proxy[:, perm]
+
+
+def _maybe_plot_hist_with_observed(
+    *,
+    out_path: Path,
+    values: Sequence[float],
+    observed: float,
+    title: str,
+    xlabel: str,
+) -> bool:
+    try:
+        import matplotlib.pyplot as plt  # type: ignore
+    except Exception:
+        return False
+
+    vals = np.asarray([float(v) for v in values], dtype=np.float64)
+    if vals.size == 0:
+        return False
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.figure(figsize=(7, 4))
+    plt.hist(vals, bins=30, alpha=0.7, color="#4C78A8", edgecolor="black")
+    plt.axvline(float(observed), color="#D62728", linestyle="--", linewidth=2.0, label="observed")
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel("count")
+    plt.legend(loc="best")
+    plt.tight_layout()
+    plt.savefig(out_path)
+    plt.close()
+    return True
+
+
+def _maybe_plot_overlay(
+    *,
+    out_path: Path,
+    values_a: Sequence[float],
+    label_a: str,
+    values_b: Sequence[float],
+    label_b: str,
+    title: str,
+    xlabel: str,
+) -> bool:
+    try:
+        import matplotlib.pyplot as plt  # type: ignore
+    except Exception:
+        return False
+
+    a = np.asarray([float(v) for v in values_a], dtype=np.float64)
+    b = np.asarray([float(v) for v in values_b], dtype=np.float64)
+    if a.size == 0 or b.size == 0:
+        return False
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.figure(figsize=(7, 4))
+    plt.hist(a, bins=40, alpha=0.55, density=True, label=str(label_a), color="#4C78A8")
+    plt.hist(b, bins=40, alpha=0.55, density=True, label=str(label_b), color="#F58518")
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel("density")
+    plt.legend(loc="best")
+    plt.tight_layout()
+    plt.savefig(out_path)
+    plt.close()
+    return True
+
+
 def _write_csv(path: Path, rows: Sequence[Dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if not rows:
@@ -660,6 +776,38 @@ def evaluate_learned_utility_loqdo(
     )
     max_top1_drop_abs = float((hybrid_accept_cfg or {}).get("max_top1_drop_abs", 0.0))
 
+    compatibility_cfg = learned_cfg.get("compatibility_research", {}) if isinstance(learned_cfg, dict) else {}
+    if compatibility_cfg is None:
+        compatibility_cfg = {}
+    floors_cfg = compatibility_cfg.get("floors", {}) if isinstance(compatibility_cfg, dict) else {}
+    permutation_cfg = compatibility_cfg.get("permutation_tests", {}) if isinstance(compatibility_cfg, dict) else {}
+    diagnostics_cfg = compatibility_cfg.get("diagnostics", {}) if isinstance(compatibility_cfg, dict) else {}
+    gate_cfg = compatibility_cfg.get("gate", {}) if isinstance(compatibility_cfg, dict) else {}
+    strong_gate = gate_cfg.get("strong", {}) if isinstance(gate_cfg, dict) else {}
+    weak_gate = gate_cfg.get("weak", {}) if isinstance(gate_cfg, dict) else {}
+    instability_gate = gate_cfg.get("instability", {}) if isinstance(gate_cfg, dict) else {}
+
+    enable_random_rank_floor = bool((floors_cfg or {}).get("random_rank_floor", True))
+    enable_random_score_floor = bool((floors_cfg or {}).get("random_score_floor", True))
+    run_expert_label_permutation = bool((permutation_cfg or {}).get("expert_label_permutation", True))
+    run_metadata_permutation = bool((permutation_cfg or {}).get("metadata_permutation", True))
+    permutation_repeats = int((permutation_cfg or {}).get("repeats", 200))
+    save_distribution_plots = bool((diagnostics_cfg or {}).get("save_distribution_plots", True))
+    uplift_reference_method = str((gate_cfg or {}).get("uplift_reference_method", "metadata_routing"))
+
+    strong_spearman_uplift = float((strong_gate or {}).get("spearman_uplift_min", 0.05))
+    strong_top1_uplift = float((strong_gate or {}).get("top1_uplift_min", 0.10))
+    strong_gap_reduction = float((strong_gate or {}).get("oracle_gap_pct_reduction_min", 5.0))
+
+    weak_spearman_uplift = float((weak_gate or {}).get("spearman_uplift_min", 0.025))
+    weak_top1_uplift = float((weak_gate or {}).get("top1_uplift_min", 0.05))
+    weak_gap_reduction = float((weak_gate or {}).get("oracle_gap_pct_reduction_min", 2.5))
+
+    instability_std_threshold = float((instability_gate or {}).get("std_threshold", 0.05))
+    instability_sign_inconsistency_min_count = int(
+        (instability_gate or {}).get("sign_inconsistency_min_count", 2)
+    )
+
     print("[learned_utility] scoring expert NELBO matrix...")
     embeddings, sample_domains, true_nelbo, expert_domains, metadata = _score_experts_batched(
         test_cache=test_cache,
@@ -702,6 +850,29 @@ def evaluate_learned_utility_loqdo(
         ("latent_wasserstein_routing", latent_proxy),
         ("oracle_routing", oracle_proxy),
     ]
+
+    if enable_random_rank_floor:
+        proxy_methods.append(
+            (
+                "random_rank_floor",
+                _build_random_rank_floor_proxy(
+                    sample_domains=sample_domains,
+                    n_experts=len(expert_domains),
+                    seed=int(seed) + 131,
+                ),
+            )
+        )
+    if enable_random_score_floor:
+        proxy_methods.append(
+            (
+                "random_score_floor",
+                _build_random_score_floor_proxy(
+                    n_samples=int(sample_domains.shape[0]),
+                    n_experts=len(expert_domains),
+                    seed=int(seed) + 241,
+                ),
+            )
+        )
     hybrid_method_meta: Dict[str, Dict[str, Any]] = {}
 
     if hybrid_enabled:
@@ -768,6 +939,104 @@ def evaluate_learned_utility_loqdo(
                     "spearman": float(metrics.get("spearman", 0.0)),
                 }
             )
+
+    permutation_rows: List[Dict[str, Any]] = []
+    permutation_summary: Dict[str, Dict[str, Any]] = {}
+
+    baseline_for_nulls = method_metrics.get("metadata_routing", {})
+    baseline_top1 = float(baseline_for_nulls.get("top1_oracle_hit", 0.0))
+    baseline_spearman = float(baseline_for_nulls.get("spearman", 0.0))
+    baseline_gap_pct = float(baseline_for_nulls.get("mean_oracle_gap_pct", 0.0))
+    random_rank_gap = float(method_metrics.get("random_rank_floor", {}).get("mean_oracle_gap_pct", 0.0))
+    random_score_gap = float(method_metrics.get("random_score_floor", {}).get("mean_oracle_gap_pct", 0.0))
+
+    if int(permutation_repeats) > 0 and (run_expert_label_permutation or run_metadata_permutation):
+        for rep in range(int(permutation_repeats)):
+            if run_expert_label_permutation:
+                perm_proxy = _permute_expert_labels_proxy(
+                    metadata_proxy,
+                    seed=int(seed) + 10000 + int(rep),
+                )
+                metrics_perm, _ = _selection_metrics(
+                    method="expert_label_permutation",
+                    query_domains=sample_domains,
+                    expert_domains=expert_domains,
+                    score_matrix=perm_proxy,
+                    true_nelbo_matrix=true_nelbo,
+                    tie_policy=tie_policy,
+                )
+                permutation_rows.append(
+                    {
+                        "null_type": "expert_label_permutation",
+                        "repeat": int(rep),
+                        "top1_oracle_hit": float(metrics_perm.get("top1_oracle_hit", 0.0)),
+                        "spearman": float(metrics_perm.get("spearman", 0.0)),
+                        "mean_oracle_gap_pct": float(metrics_perm.get("mean_oracle_gap_pct", 0.0)),
+                    }
+                )
+
+            if run_metadata_permutation:
+                rng = np.random.default_rng(int(seed) + 20000 + int(rep))
+                shuffled_domains = np.asarray(rng.permutation(sample_domains), dtype=np.int64)
+                shuffled_similarity = _metadata_scores(
+                    shuffled_domains,
+                    expert_domains,
+                    strategy=strategy,
+                    tau=float(tau),
+                )
+                shuffled_proxy = -shuffled_similarity
+                metrics_perm, _ = _selection_metrics(
+                    method="metadata_permutation",
+                    query_domains=sample_domains,
+                    expert_domains=expert_domains,
+                    score_matrix=shuffled_proxy,
+                    true_nelbo_matrix=true_nelbo,
+                    tie_policy=tie_policy,
+                )
+                permutation_rows.append(
+                    {
+                        "null_type": "metadata_permutation",
+                        "repeat": int(rep),
+                        "top1_oracle_hit": float(metrics_perm.get("top1_oracle_hit", 0.0)),
+                        "spearman": float(metrics_perm.get("spearman", 0.0)),
+                        "mean_oracle_gap_pct": float(metrics_perm.get("mean_oracle_gap_pct", 0.0)),
+                    }
+                )
+
+        for null_type in sorted(set(str(r["null_type"]) for r in permutation_rows)):
+            rows = [r for r in permutation_rows if str(r["null_type"]) == null_type]
+            top1_vals = [float(r["top1_oracle_hit"]) for r in rows]
+            spearman_vals = [float(r["spearman"]) for r in rows]
+            gap_vals = [float(r["mean_oracle_gap_pct"]) for r in rows]
+            permutation_summary[null_type] = {
+                "n_repeats": int(len(rows)),
+                "top1_mean": _mean(top1_vals),
+                "top1_std": _std(top1_vals),
+                "spearman_mean": _mean(spearman_vals),
+                "spearman_std": _std(spearman_vals),
+                "mean_oracle_gap_pct_mean": _mean(gap_vals),
+                "mean_oracle_gap_pct_std": _std(gap_vals),
+                "p_value_vs_metadata_top1": _empirical_p_value(
+                    observed=baseline_top1,
+                    null_values=top1_vals,
+                    higher_is_better=True,
+                ),
+                "p_value_vs_metadata_spearman": _empirical_p_value(
+                    observed=baseline_spearman,
+                    null_values=spearman_vals,
+                    higher_is_better=True,
+                ),
+                "p_value_vs_metadata_gap_pct": _empirical_p_value(
+                    observed=baseline_gap_pct,
+                    null_values=gap_vals,
+                    higher_is_better=False,
+                ),
+                "delta_vs_metadata_top1": float(baseline_top1 - _mean(top1_vals)),
+                "delta_vs_metadata_spearman": float(baseline_spearman - _mean(spearman_vals)),
+                "gap_reduction_vs_null_pct": float(_mean(gap_vals) - baseline_gap_pct),
+                "delta_vs_random_rank_floor_gap_pct": float(random_rank_gap - _mean(gap_vals)),
+                "delta_vs_random_score_floor_gap_pct": float(random_score_gap - _mean(gap_vals)),
+            }
 
     unique_query_domains = sorted(set(int(v) for v in sample_domains.tolist()))
     embedding_feature_dim = int(embeddings.shape[1])
@@ -1019,6 +1288,111 @@ def evaluate_learned_utility_loqdo(
     _write_csv(reports_dir / "learned_utility_domain_breakdown.csv", domain_rows)
     _write_csv(reports_dir / "learned_utility_pair_training_diagnostics.csv", pair_training_rows)
     _write_csv(reports_dir / "learned_utility_proxy_diagnostics.csv", proxy_diag_rows)
+    if permutation_rows:
+        _write_csv(reports_dir / "learned_utility_permutation_nulls.csv", permutation_rows)
+
+    diagnostic_plot_artifacts: List[str] = []
+    if save_distribution_plots and permutation_rows:
+        for null_type in sorted(set(str(r["null_type"]) for r in permutation_rows)):
+            rows = [r for r in permutation_rows if str(r["null_type"]) == null_type]
+            for metric_name, observed_value, xlabel in [
+                ("top1_oracle_hit", baseline_top1, "top1 oracle hit"),
+                ("spearman", baseline_spearman, "spearman"),
+                ("mean_oracle_gap_pct", baseline_gap_pct, "mean oracle gap percent"),
+            ]:
+                out_name = f"learned_utility_dist_{null_type}_{metric_name}.png"
+                ok = _maybe_plot_hist_with_observed(
+                    out_path=reports_dir / out_name,
+                    values=[float(r[metric_name]) for r in rows],
+                    observed=float(observed_value),
+                    title=f"{null_type} distribution: {metric_name}",
+                    xlabel=xlabel,
+                )
+                if ok:
+                    diagnostic_plot_artifacts.append(out_name)
+
+    candidate_methods = sorted(set(str(m) for m in learned_method_metrics.keys()))
+
+    baseline_metrics = method_metrics.get(uplift_reference_method, method_metrics.get("metadata_routing", {}))
+    baseline_top1_gate = float(baseline_metrics.get("top1_oracle_hit", 0.0))
+    baseline_spearman_gate = float(baseline_metrics.get("spearman", 0.0))
+    baseline_gap_pct_gate = float(baseline_metrics.get("mean_oracle_gap_pct", 0.0))
+
+    seed_gate_by_method: Dict[str, Dict[str, Any]] = {}
+    for method in sorted(candidate_methods):
+        mm = method_metrics.get(method, {})
+        top1_uplift = float(mm.get("top1_oracle_hit", 0.0)) - baseline_top1_gate
+        spearman_uplift = float(mm.get("spearman", 0.0)) - baseline_spearman_gate
+        gap_pct_reduction = baseline_gap_pct_gate - float(mm.get("mean_oracle_gap_pct", 0.0))
+
+        strong_pass = bool(
+            spearman_uplift >= strong_spearman_uplift
+            and top1_uplift >= strong_top1_uplift
+            and gap_pct_reduction >= strong_gap_reduction
+        )
+        weak_pass = bool(
+            spearman_uplift >= weak_spearman_uplift
+            and top1_uplift >= weak_top1_uplift
+            and gap_pct_reduction >= weak_gap_reduction
+        )
+
+        if strong_pass:
+            tier = "strong_pass_seed"
+        elif weak_pass:
+            tier = "weak_pass_seed"
+        else:
+            tier = "fail_seed"
+
+        seed_gate_by_method[method] = {
+            "tier": str(tier),
+            "uplift_reference_method": str(uplift_reference_method),
+            "spearman_uplift": float(spearman_uplift),
+            "top1_uplift": float(top1_uplift),
+            "oracle_gap_pct_reduction": float(gap_pct_reduction),
+            "strong_thresholds": {
+                "spearman_uplift_min": float(strong_spearman_uplift),
+                "top1_uplift_min": float(strong_top1_uplift),
+                "oracle_gap_pct_reduction_min": float(strong_gap_reduction),
+            },
+            "weak_thresholds": {
+                "spearman_uplift_min": float(weak_spearman_uplift),
+                "top1_uplift_min": float(weak_top1_uplift),
+                "oracle_gap_pct_reduction_min": float(weak_gap_reduction),
+            },
+        }
+
+    best_candidate_method = ""
+    if candidate_methods:
+        best_candidate_method = str(
+            min(
+                candidate_methods,
+                key=lambda m: float(method_metrics.get(m, {}).get("mean_oracle_gap_pct", 1e12)),
+            )
+        )
+
+    if save_distribution_plots and best_candidate_method:
+        baseline_vals = [
+            float(r["oracle_gap_pct"])
+            for r in sample_rows
+            if str(r.get("method", "")) == str(uplift_reference_method)
+        ]
+        best_vals = [
+            float(r["oracle_gap_pct"])
+            for r in sample_rows
+            if str(r.get("method", "")) == str(best_candidate_method)
+        ]
+        overlay_name = "learned_utility_overlay_gap_pct_baseline_vs_best.png"
+        ok_overlay = _maybe_plot_overlay(
+            out_path=reports_dir / overlay_name,
+            values_a=baseline_vals,
+            label_a=str(uplift_reference_method),
+            values_b=best_vals,
+            label_b=str(best_candidate_method),
+            title="Oracle gap percent: baseline vs best learned",
+            xlabel="oracle gap percent",
+        )
+        if ok_overlay:
+            diagnostic_plot_artifacts.append(overlay_name)
 
     hybrid_best_by_policy: Dict[str, Dict[str, Any]] = {}
     hybrid_acceptance: Dict[str, Any] = {}
@@ -1112,7 +1486,41 @@ def evaluate_learned_utility_loqdo(
             "domain_breakdown": "learned_utility_domain_breakdown.csv",
             "pair_training_diagnostics": "learned_utility_pair_training_diagnostics.csv",
             "proxy_diagnostics": "learned_utility_proxy_diagnostics.csv",
+            "permutation_nulls": "learned_utility_permutation_nulls.csv" if permutation_rows else "",
+            "diagnostic_plots": diagnostic_plot_artifacts,
             "hybrid_alpha_summary": "learned_utility_hybrid_alpha_summary.csv" if hybrid_summary_rows else "",
+        },
+        "compatibility_protocol": {
+            "uplift_reference_method": str(uplift_reference_method),
+            "floors": {
+                "random_rank_floor_enabled": bool(enable_random_rank_floor),
+                "random_score_floor_enabled": bool(enable_random_score_floor),
+            },
+            "permutation_tests": {
+                "expert_label_permutation": bool(run_expert_label_permutation),
+                "metadata_permutation": bool(run_metadata_permutation),
+                "repeats": int(permutation_repeats),
+                "summary": permutation_summary,
+            },
+            "gate": {
+                "seed_level": seed_gate_by_method,
+                "strong": {
+                    "spearman_uplift_min": float(strong_spearman_uplift),
+                    "top1_uplift_min": float(strong_top1_uplift),
+                    "oracle_gap_pct_reduction_min": float(strong_gap_reduction),
+                },
+                "weak": {
+                    "spearman_uplift_min": float(weak_spearman_uplift),
+                    "top1_uplift_min": float(weak_top1_uplift),
+                    "oracle_gap_pct_reduction_min": float(weak_gap_reduction),
+                },
+                "instability": {
+                    "std_threshold": float(instability_std_threshold),
+                    "sign_inconsistency_min_count": int(instability_sign_inconsistency_min_count),
+                    "note": "Instability is evaluated across seeds in aggregated decision-table stage.",
+                },
+            },
+            "best_candidate_method_by_gap_pct": str(best_candidate_method),
         },
         "hybrid_diagnostics": {
             "enabled": bool(hybrid_enabled),

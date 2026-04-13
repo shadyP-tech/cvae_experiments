@@ -115,5 +115,30 @@ learned_utility:
     save_domain_breakdown_csv: true
     save_training_fold_manifest_json: true
 
+  compatibility_research:
+    floors:
+      random_rank_floor: true
+      random_score_floor: true
+    permutation_tests:
+      expert_label_permutation: true
+      metadata_permutation: true
+      repeats: 200
+    diagnostics:
+      save_distribution_plots: true
+    gate:
+      uplift_reference_method: metadata_routing
+      min_improving_seeds: 2
+      strong:
+        spearman_uplift_min: 0.05
+        top1_uplift_min: 0.10
+        oracle_gap_pct_reduction_min: 5.0
+      weak:
+        spearman_uplift_min: 0.025
+        top1_uplift_min: 0.05
+        oracle_gap_pct_reduction_min: 2.5
+      instability:
+        std_threshold: 0.05
+        sign_inconsistency_min_count: 2
+
 output:
   root: outputs

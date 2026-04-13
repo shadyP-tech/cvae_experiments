@@ -1,0 +1,71 @@
+seed: 42
+
+experiment:
+  dataset_name: breakhis
+  name: routed_cvae_metadata_cond_v1
+  mode: legacy_routed_cvae
+
+data:
+  root: data/BreakHis
+  image_extensions: [".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"]
+  magnifications: [40, 100, 200, 400]
+  max_samples_per_domain: 500
+  split:
+    train: 0.70
+    val: 0.15
+    test: 0.15
+  require_patient_ids: false
+
+features:
+  image_size: 64
+  embedding_dim: 512
+
+model:
+  hidden_dim: 256
+  latent_dim: 16
+  conditioning:
+    enabled: true
+    metadata_mode: domain_id
+    encoding: one_hot
+    inject_encoder: true
+    inject_decoder: true
+    metadata_fields: [domain_id]
+
+training:
+  batch_size: 128
+  learning_rate: 0.001
+  epochs: 25
+  patience: 5
+
+routing:
+  strategy: ordinal_magnification
+  tau: 100.0
+  temperature: 1.0
+
+legacy_protocol:
+  seeds: [11, 42, 73]
+  gates:
+    e1:
+      metric: best_expert_mean_nelbo
+      median_relative_delta_max: -0.03
+      per_seed_relative_delta_max: -0.01
+      min_passing_seeds: 2
+      sign_convention: negative_delta_improves_nelbo
+    e2:
+      metric_top1: top1_oracle_hit_true_utility
+      metric_spearman: spearman_with_true_utility
+      top1_uplift_min: 0.05
+      spearman_uplift_min: 0.05
+      min_passing_seeds: 2
+      backup_partial_ranking_gain:
+        top1_uplift_min: 0.08
+        spearman_uplift_min: 0.03
+        spearman_uplift_max_exclusive: 0.05
+    e3:
+      metric_gap: routed_to_global_gap
+      relative_gap_reduction_min: 0.30
+      abs_normalized_gap_median_max: 0.05
+      normalization_eps: 0.001
+
+output:
+  root: outputs

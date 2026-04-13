@@ -175,6 +175,8 @@ def main() -> None:
             patience=int(cfg["training"]["patience"]),
             batch_size=int(cfg["training"]["batch_size"]),
             resume_from=(resume_checkpoints_dir / "global_cvae.pt") if resume_checkpoints_dir is not None else None,
+            conditioning_cfg=cfg.get("model", {}).get("conditioning", {}),
+            configured_domains=cfg.get("data", {}).get("magnifications", []),
         )
         progress.advance("legacy global baseline trained")
         tracker.log_artifact(Path(global_ckpt), artifact_name="global_cvae", artifact_type="checkpoint")

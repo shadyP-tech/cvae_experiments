@@ -24,8 +24,13 @@ class TrainResult:
     history: Dict[str, List[float]]
 
 
-def _make_loader(embeddings: torch.Tensor, batch_size: int, shuffle: bool) -> DataLoader:
-    dataset = TensorDataset(embeddings)
+def _make_loader(
+    embeddings: torch.Tensor,
+    batch_size: int,
+    shuffle: bool,
+    metadata_vectors: torch.Tensor | None = None,
+) -> DataLoader:
+    dataset = TensorDataset(embeddings) if metadata_vectors is None else TensorDataset(embeddings, metadata_vectors)
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
 
@@ -42,17 +47,40 @@ def run_training(
     patience: int,
     batch_size: int,
     resume_from: Path | None = None,
+    train_metadata_vectors: torch.Tensor | None = None,
+    val_metadata_vectors: torch.Tensor | None = None,
+    metadata_dim: int = 0,
 ) -> TrainResult:
     out_dir.mkdir(parents=True, exist_ok=True)
     ckpt = out_dir / f"{model_name}.pt"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
-    model = CVAEExpert(input_dim=input_dim, hidden_dim=hidden_dim, latent_dim=latent_dim).to(device)
+    model = CVAEExpert(
+        input_dim=input_dim,
+        hidden_dim=hidden_dim,
+        latent_dim=latent_dim,
+        metadata_dim=int(metadata_dim),
+    ).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     state_ckpt = training_state_path(ckpt)
 
-    train_loader = _make_loader(train_embeddings, batch_size=batch_size, shuffle=True)
-    val_loader = _make_loader(val_embeddings, batch_size=batch_size, shuffle=False)
+    if train_metadata_vectors is not None and int(train_metadata_vectors.shape[0]) != int(train_embeddings.shape[0]):
+        raise ValueError("train_metadata_vectors must have the same number of rows as train_embeddings")
+    if val_metadata_vectors is not None and int(val_metadata_vectors.shape[0]) != int(val_embeddings.shape[0]):
+        raise ValueError("val_metadata_vectors must have the same number of rows as val_embeddings")
+
+    train_loader = _make_loader(
+        train_embeddings,
+        batch_size=batch_size,
+        shuffle=True,
+        metadata_vectors=train_metadata_vectors,
+    )
+    val_loader = _make_loader(
+        val_embeddings,
+        batch_size=batch_size,
+        shuffle=False,
+        metadata_vectors=val_metadata_vectors,
+    )
 
     best_val = float("inf")
     bad_epochs = 0
@@ -83,9 +111,15 @@ def run_training(
     for epoch in epoch_iter:
         model.train()
         train_loss = 0.0
-        for (x,) in train_loader:
+        for batch in train_loader:
+            if len(batch) == 1:
+                (x,) = batch
+                m = None
+            else:
+                x, m = batch
+                m = m.to(device)
             x = x.to(device)
-            recon, mu, logvar = model(x)
+            recon, mu, logvar = model(x, m=m)
             loss = negative_elbo(recon, x, mu, logvar)
             optimizer.zero_grad()
             loss.backward()
@@ -95,9 +129,15 @@ def run_training(
         model.eval()
         val_loss = 0.0
         with torch.no_grad():
-            for (x,) in val_loader:
+            for batch in val_loader:
+                if len(batch) == 1:
+                    (x,) = batch
+                    m = None
+                else:
+                    x, m = batch
+                    m = m.to(device)
                 x = x.to(device)
-                recon, mu, logvar = model(x)
+                recon, mu, logvar = model(x, m=m)
                 loss = negative_elbo(recon, x, mu, logvar)
                 val_loss += loss.item() * x.size(0)
 
