@@ -108,6 +108,7 @@ class HybridAblationExperiment(BaseExperiment):
             seed=int(cfg["seed"]),
             model_name="hybrid_pooled_baseline",
             resume_from=(resume_checkpoints_dir / "hybrid_pooled_baseline.pt") if resume_checkpoints_dir is not None else None,
+            metadata_constraint_cfg=cfg.get("model", {}).get("metadata_constraint", {}),
         )
         progress.advance("hybrid pooled baseline trained")
 
@@ -152,6 +153,7 @@ class HybridAblationExperiment(BaseExperiment):
                 variant=variant,
                 model_name=model_name,
                 resume_from=(resume_checkpoints_dir / f"{model_name}.pt") if resume_checkpoints_dir is not None else None,
+                metadata_constraint_cfg=cfg.get("model", {}).get("metadata_constraint", {}),
             )
             progress.advance(f"variant {variant} trained")
 

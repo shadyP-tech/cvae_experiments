@@ -120,6 +120,8 @@ class HybridExpertBank:
         self.head_hidden_dim = int(payload["head_hidden_dim"])
         self.cvae_hidden_dim = int(payload["cvae_hidden_dim"])
         self.latent_dim = int(payload["latent_dim"])
+        self.metadata_constraint_cfg = dict(payload.get("metadata_constraint_cfg", {}))
+        self.aux_metadata_dim = int(payload.get("aux_metadata_dim", len(self.domains)))
         self.device = device
 
         self.shared_head: ProjectionHead | None = None
@@ -133,7 +135,13 @@ class HybridExpertBank:
             self.shared_head.eval()
 
         if payload.get("shared_cvae") is not None:
-            self.shared_cvae = CVAEExpert(self.projection_dim, self.cvae_hidden_dim, self.latent_dim).to(device)
+            self.shared_cvae = CVAEExpert(
+                self.projection_dim,
+                self.cvae_hidden_dim,
+                self.latent_dim,
+                metadata_constraint_cfg=self.metadata_constraint_cfg,
+                aux_metadata_dim=self.aux_metadata_dim,
+            ).to(device)
             self.shared_cvae.load_state_dict(payload["shared_cvae"])
             self.shared_cvae.eval()
 
@@ -146,7 +154,13 @@ class HybridExpertBank:
 
         for k, state in payload.get("cvaes", {}).items():
             d = int(k)
-            m = CVAEExpert(self.projection_dim, self.cvae_hidden_dim, self.latent_dim).to(device)
+            m = CVAEExpert(
+                self.projection_dim,
+                self.cvae_hidden_dim,
+                self.latent_dim,
+                metadata_constraint_cfg=self.metadata_constraint_cfg,
+                aux_metadata_dim=self.aux_metadata_dim,
+            ).to(device)
             m.load_state_dict(state)
             m.eval()
             self.cvaes[d] = m

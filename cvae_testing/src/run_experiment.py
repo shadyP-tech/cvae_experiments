@@ -177,6 +177,7 @@ def main() -> None:
             resume_from=(resume_checkpoints_dir / "global_cvae.pt") if resume_checkpoints_dir is not None else None,
             conditioning_cfg=cfg.get("model", {}).get("conditioning", {}),
             configured_domains=cfg.get("data", {}).get("magnifications", []),
+            metadata_constraint_cfg=cfg.get("model", {}).get("metadata_constraint", {}),
         )
         progress.advance("legacy global baseline trained")
         tracker.log_artifact(Path(global_ckpt), artifact_name="global_cvae", artifact_type="checkpoint")

@@ -3,11 +3,12 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Sequence
 
 import numpy as np
 import torch
 
+from src.data.metadata_conditioning import build_domain_one_hot, resolve_domain_order
 from src.engine.contracts import RunContext
 from src.eval.evaluators import compute_expert_domain_matrix
 from src.eval.evaluators.latent_compatibility import (
@@ -531,8 +532,17 @@ def _load_expert_model(
     hidden_dim: int,
     latent_dim: int,
     device: torch.device,
+    metadata_dim: int = 0,
+    metadata_constraint_cfg: Dict[str, Any] | None = None,
 ) -> CVAEExpert:
-    model = CVAEExpert(input_dim=input_dim, hidden_dim=hidden_dim, latent_dim=latent_dim).to(device)
+    model = CVAEExpert(
+        input_dim=input_dim,
+        hidden_dim=hidden_dim,
+        latent_dim=latent_dim,
+        metadata_dim=int(metadata_dim),
+        metadata_constraint_cfg=metadata_constraint_cfg,
+        aux_metadata_dim=int(metadata_dim),
+    ).to(device)
     model.load_state_dict(safe_torch_load(checkpoint_path, map_location=device))
     model.eval()
     return model
@@ -540,10 +550,14 @@ def _load_expert_model(
 
 def _compute_sample_expert_nelbo_matrix(
     embeddings: np.ndarray,
+    sample_domains: np.ndarray,
     expert_checkpoints: Dict[str, str],
     domain_order: List[int],
     hidden_dim: int,
     latent_dim: int,
+    conditioning_cfg: Dict[str, Any] | None = None,
+    configured_domains: Sequence[int] | None = None,
+    metadata_constraint_cfg: Dict[str, Any] | None = None,
     batch_size: int = 2048,
 ) -> np.ndarray:
     if embeddings.ndim != 2:
@@ -554,6 +568,16 @@ def _compute_sample_expert_nelbo_matrix(
     input_dim = int(embeddings.shape[1])
     x_cpu = torch.from_numpy(embeddings.astype(np.float32, copy=False))
     device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+
+    cond_cfg = conditioning_cfg or {}
+    conditioning_enabled = bool(cond_cfg.get("enabled", False))
+    metadata_vectors = None
+    metadata_dim = 0
+    if conditioning_enabled:
+        configured_order = resolve_domain_order(configured_domains or domain_order)
+        metadata_items = [{"magnification": int(v)} for v in sample_domains.tolist()]
+        metadata_vectors = build_domain_one_hot(metadata_items, configured_order)
+        metadata_dim = int(len(configured_order))
 
     rows: List[np.ndarray] = []
     with torch.no_grad():
@@ -569,12 +593,24 @@ def _compute_sample_expert_nelbo_matrix(
                 hidden_dim=int(hidden_dim),
                 latent_dim=int(latent_dim),
                 device=device,
+                metadata_dim=metadata_dim,
+                metadata_constraint_cfg=metadata_constraint_cfg,
             )
             parts: List[torch.Tensor] = []
             for i in range(0, int(x_cpu.shape[0]), int(batch_size)):
                 xb = x_cpu[i : i + int(batch_size)].to(device)
-                recon, mu, logvar = model(xb)
-                rec, kl = elbo_components(recon, xb, mu, logvar)
+                mb = metadata_vectors[i : i + int(batch_size)].to(device) if metadata_vectors is not None else None
+                recon, mu, logvar = model(xb, m=mb)
+                prior_mu, prior_logvar, kl_weight = model.metadata_constraint_prior(metadata_targets=mb)
+                rec, kl = elbo_components(
+                    recon,
+                    xb,
+                    mu,
+                    logvar,
+                    prior_mu=prior_mu,
+                    prior_logvar=prior_logvar,
+                    kl_weight=kl_weight,
+                )
                 parts.append((rec + kl).detach().cpu())
 
             if not parts:
@@ -891,6 +927,9 @@ class LatentCompatibilityExperiment(BaseExperiment):
                 patience=int(cfg["training"]["patience"]),
                 batch_size=int(cfg["training"]["batch_size"]),
                 resume_from_dir=resume_checkpoints_dir,
+                conditioning_cfg=cfg.get("model", {}).get("conditioning", {}),
+                configured_domains=cfg.get("data", {}).get("magnifications", []),
+                metadata_constraint_cfg=cfg.get("model", {}).get("metadata_constraint", {}),
             )
             expert_checkpoints = dict(experts)
             progress.advance("empirical utility experts trained")
@@ -900,6 +939,9 @@ class LatentCompatibilityExperiment(BaseExperiment):
                 expert_checkpoints=experts,
                 hidden_dim=int(cfg["model"]["hidden_dim"]),
                 latent_dim=int(cfg["model"]["latent_dim"]),
+                conditioning_cfg=cfg.get("model", {}).get("conditioning", {}),
+                configured_domains=cfg.get("data", {}).get("magnifications", []),
+                metadata_constraint_cfg=cfg.get("model", {}).get("metadata_constraint", {}),
             )
             utility_matrix = _utility_matrix_from_expert_matrix(domain_order, utility_report)
             with (run_ctx.reports_dir / "expert_utility_matrix.json").open("w", encoding="utf-8") as f:
@@ -984,10 +1026,14 @@ class LatentCompatibilityExperiment(BaseExperiment):
                 if nelbo_by_expert_sample is None:
                     nelbo_by_expert_sample = _compute_sample_expert_nelbo_matrix(
                         embeddings=embeddings,
+                        sample_domains=sample_domains,
                         expert_checkpoints=expert_checkpoints,
                         domain_order=domain_order,
                         hidden_dim=int(cfg["model"]["hidden_dim"]),
                         latent_dim=int(cfg["model"]["latent_dim"]),
+                        conditioning_cfg=cfg.get("model", {}).get("conditioning", {}),
+                        configured_domains=cfg.get("data", {}).get("magnifications", []),
+                        metadata_constraint_cfg=cfg.get("model", {}).get("metadata_constraint", {}),
                         batch_size=int(cfg["training"].get("batch_size", 2048)),
                     )
                 metadata_sample_oracle_summary = _compute_sample_level_metadata_oracle_gap(
@@ -1017,10 +1063,14 @@ class LatentCompatibilityExperiment(BaseExperiment):
                 if nelbo_by_expert_sample is None:
                     nelbo_by_expert_sample = _compute_sample_expert_nelbo_matrix(
                         embeddings=embeddings,
+                        sample_domains=sample_domains,
                         expert_checkpoints=expert_checkpoints,
                         domain_order=domain_order,
                         hidden_dim=int(cfg["model"]["hidden_dim"]),
                         latent_dim=int(cfg["model"]["latent_dim"]),
+                        conditioning_cfg=cfg.get("model", {}).get("conditioning", {}),
+                        configured_domains=cfg.get("data", {}).get("magnifications", []),
+                        metadata_constraint_cfg=cfg.get("model", {}).get("metadata_constraint", {}),
                         batch_size=int(cfg["training"].get("batch_size", 2048)),
                     )
 

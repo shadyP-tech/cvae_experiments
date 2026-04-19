@@ -23,6 +23,7 @@ def train_global_model(
     resume_from: Path | None = None,
     conditioning_cfg: Dict[str, Any] | None = None,
     configured_domains: Sequence[int] | None = None,
+    metadata_constraint_cfg: Dict[str, Any] | None = None,
 ) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     train_payload = safe_torch_load(train_cache, map_location="cpu")
@@ -56,5 +57,6 @@ def train_global_model(
         train_metadata_vectors=train_meta_vectors,
         val_metadata_vectors=val_meta_vectors,
         metadata_dim=metadata_dim,
+        metadata_constraint_cfg=metadata_constraint_cfg,
     )
     return result.checkpoint_path

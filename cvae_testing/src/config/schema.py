@@ -79,6 +79,49 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         if invalid_fields:
             raise ValueError("model.conditioning.metadata_fields supports only ['domain_id'] in v1")
 
+    metadata_constraint_cfg = model_cfg.get("metadata_constraint", {})
+    if metadata_constraint_cfg is not None and not isinstance(metadata_constraint_cfg, dict):
+        raise ValueError("model.metadata_constraint must be a dictionary when provided")
+
+    _ensure_bool(
+        (metadata_constraint_cfg or {}).get("enabled", False),
+        "model.metadata_constraint.enabled",
+    )
+    metadata_constraint_enabled = bool((metadata_constraint_cfg or {}).get("enabled", False))
+
+    metadata_constraint_variant = str((metadata_constraint_cfg or {}).get("variant", "aux_head")).strip().lower()
+    allowed_constraint_variants = {"aux_head", "conditional_prior"}
+    if metadata_constraint_variant not in allowed_constraint_variants:
+        raise ValueError(
+            "model.metadata_constraint.variant must be one of "
+            f"{sorted(allowed_constraint_variants)}, got: {metadata_constraint_variant}"
+        )
+
+    metadata_constraint_aux_weight = float((metadata_constraint_cfg or {}).get("aux_weight", 0.0))
+    if metadata_constraint_aux_weight < 0:
+        raise ValueError("model.metadata_constraint.aux_weight must be >= 0")
+
+    _ensure_bool(
+        (metadata_constraint_cfg or {}).get("use_mu", True),
+        "model.metadata_constraint.use_mu",
+    )
+
+    aux_head_hidden_dim = int((metadata_constraint_cfg or {}).get("head_hidden_dim", 0))
+    if aux_head_hidden_dim < 0:
+        raise ValueError("model.metadata_constraint.head_hidden_dim must be >= 0")
+
+    prior_hidden_dim = int((metadata_constraint_cfg or {}).get("prior_hidden_dim", 0))
+    if prior_hidden_dim < 0:
+        raise ValueError("model.metadata_constraint.prior_hidden_dim must be >= 0")
+
+    prior_logvar_min = float((metadata_constraint_cfg or {}).get("prior_logvar_min", -6.0))
+    prior_logvar_max = float((metadata_constraint_cfg or {}).get("prior_logvar_max", 2.0))
+    if prior_logvar_min > prior_logvar_max:
+        raise ValueError("model.metadata_constraint.prior_logvar_min must be <= prior_logvar_max")
+
+    if metadata_constraint_enabled and not conditioning_enabled:
+        raise ValueError("model.metadata_constraint.enabled requires model.conditioning.enabled=true in v1")
+
     protocol_cfg = cfg.get("legacy_protocol")
     if protocol_cfg is not None:
         if not isinstance(protocol_cfg, dict):

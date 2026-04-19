@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import torch
 
@@ -28,6 +28,7 @@ def train_hybrid_variant(
     variant: str,
     model_name: str,
     resume_from: Path | None = None,
+    metadata_constraint_cfg: Dict[str, Any] | None = None,
 ) -> Dict[str, object]:
     train_payload = safe_torch_load(train_cache, map_location="cpu")
     val_payload = safe_torch_load(val_cache, map_location="cpu")
@@ -46,6 +47,7 @@ def train_hybrid_variant(
         batch_size=batch_size,
         seed=seed,
         variant=variant,
+        metadata_constraint_cfg=metadata_constraint_cfg,
     )
 
     ckpt_path, history = trainer.train(out_dir=out_dir, model_name=model_name, resume_from=resume_from)
@@ -75,6 +77,7 @@ def train_hybrid_pooled_baseline(
     seed: int,
     model_name: str = "hybrid_pooled_baseline",
     resume_from: Path | None = None,
+    metadata_constraint_cfg: Dict[str, Any] | None = None,
 ) -> Dict[str, object]:
     return train_hybrid_variant(
         train_cache=train_cache,
@@ -93,4 +96,5 @@ def train_hybrid_pooled_baseline(
         variant=VARIANT_POOLED,
         model_name=model_name,
         resume_from=resume_from,
+        metadata_constraint_cfg=metadata_constraint_cfg,
     )

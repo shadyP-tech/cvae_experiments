@@ -17,6 +17,8 @@ def build_hybrid_checkpoint_payload(
     head_hidden_dim: int,
     cvae_hidden_dim: int,
     latent_dim: int,
+    metadata_constraint_cfg: dict | None,
+    aux_metadata_dim: int,
     bundle: HybridModuleBundle,
 ) -> dict:
     return {
@@ -27,6 +29,8 @@ def build_hybrid_checkpoint_payload(
         "head_hidden_dim": head_hidden_dim,
         "cvae_hidden_dim": cvae_hidden_dim,
         "latent_dim": latent_dim,
+        "metadata_constraint_cfg": dict(metadata_constraint_cfg or {}),
+        "aux_metadata_dim": int(aux_metadata_dim),
         "shared_head": bundle.shared_head.state_dict() if bundle.shared_head is not None else None,
         "heads": {str(d): m.state_dict() for d, m in bundle.heads.items()},
         "shared_cvae": bundle.shared_cvae.state_dict() if bundle.shared_cvae is not None else None,
@@ -43,6 +47,8 @@ def save_hybrid_checkpoint(
     head_hidden_dim: int,
     cvae_hidden_dim: int,
     latent_dim: int,
+    metadata_constraint_cfg: dict | None,
+    aux_metadata_dim: int,
     bundle: HybridModuleBundle,
 ) -> None:
     payload = build_hybrid_checkpoint_payload(
@@ -53,6 +59,8 @@ def save_hybrid_checkpoint(
         head_hidden_dim=head_hidden_dim,
         cvae_hidden_dim=cvae_hidden_dim,
         latent_dim=latent_dim,
+        metadata_constraint_cfg=metadata_constraint_cfg,
+        aux_metadata_dim=aux_metadata_dim,
         bundle=bundle,
     )
     torch.save(payload, path)
