@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 import json
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from PIL import Image
 import torch
@@ -46,6 +46,77 @@ def _build_resnet18() -> torch.nn.Module:
     return feature_extractor
 
 
+def _feature_protocol(feature_config: Dict[str, Any] | None) -> Dict[str, Any]:
+    cfg = feature_config or {}
+    name = str(
+        cfg.get("feature_extractor_name")
+        or cfg.get("extractor")
+        or cfg.get("backbone")
+        or "resnet18"
+    )
+    if name in {"dinov2", "dinov2_base", "dinov2_vitb14"}:
+        return {
+            "feature_extractor_name": "dinov2_vitb14",
+            "feature_extractor_checkpoint": str(
+                cfg.get("feature_extractor_checkpoint", "facebook/dinov2-base")
+            ),
+            "feature_extractor_layer": str(cfg.get("feature_extractor_layer", "final_norm_cls")),
+            "embedding_pooling": str(cfg.get("embedding_pooling", "cls_token")),
+            "embedding_dim": int(cfg.get("embedding_dim", 768)),
+        }
+
+    return {
+        "feature_extractor_name": "resnet18",
+        "feature_extractor_checkpoint": str(
+            cfg.get("feature_extractor_checkpoint", "torchvision/resnet18_default")
+        ),
+        "feature_extractor_layer": str(cfg.get("feature_extractor_layer", "avgpool")),
+        "embedding_pooling": str(cfg.get("embedding_pooling", "global_avg_pool")),
+        "embedding_dim": int(cfg.get("embedding_dim", 512)),
+    }
+
+
+class _DinoV2Wrapper(torch.nn.Module):
+    def __init__(self, model: torch.nn.Module) -> None:
+        super().__init__()
+        self.model = model
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out = self.model(x)
+        if isinstance(out, dict):
+            if "x_norm_clstoken" in out:
+                return out["x_norm_clstoken"]
+            if "last_hidden_state" in out:
+                return out["last_hidden_state"][:, 0]
+        if isinstance(out, (tuple, list)):
+            out = out[0]
+        if out.ndim == 3:
+            return out[:, 0]
+        return out
+
+
+def _build_dinov2_base() -> torch.nn.Module:
+    try:
+        model = torch.hub.load("facebookresearch/dinov2", "dinov2_vitb14", trust_repo=True)
+    except Exception as exc:
+        raise RuntimeError(
+            "Could not load DINOv2 Base via torch.hub. Ensure facebookresearch/dinov2 "
+            "is available in the torch hub cache or allow the run environment to download it."
+        ) from exc
+    model.eval()
+    return _DinoV2Wrapper(model)
+
+
+def _build_feature_extractor(feature_config: Dict[str, Any] | None) -> tuple[torch.nn.Module, Dict[str, Any]]:
+    protocol = _feature_protocol(feature_config)
+    name = str(protocol["feature_extractor_name"])
+    if name == "dinov2_vitb14":
+        return _build_dinov2_base(), protocol
+    if name == "resnet18":
+        return _build_resnet18(), protocol
+    raise ValueError(f"Unsupported feature extractor: {name}")
+
+
 def _collate(batch):
     imgs = torch.stack([b[0] for b in batch], dim=0)
     records = [b[1] for b in batch]
@@ -57,11 +128,13 @@ def extract_and_cache_embeddings(
     cache_dir: Path,
     image_size: int,
     batch_size: int,
+    feature_config: Dict[str, Any] | None = None,
 ) -> Dict[str, Path]:
     cache_dir.mkdir(parents=True, exist_ok=True)
     paths = {
         split: cache_dir / f"{split}.pt" for split in ["train", "val", "test"]
     }
+    requested_protocol = _feature_protocol(feature_config)
     if all(p.exists() for p in paths.values()):
         # Do not silently reuse stale empty caches.
         reusable = True
@@ -74,6 +147,9 @@ def extract_and_cache_embeddings(
             if int(payload["embeddings"].shape[0]) <= 0:
                 reusable = False
                 break
+            if payload.get("feature_extractor") != requested_protocol:
+                reusable = False
+                break
             cached_paths = sorted([m["image_path"] for m in payload["metadata"]])
             if cached_paths != expected_by_split[split]:
                 reusable = False
@@ -82,7 +158,8 @@ def extract_and_cache_embeddings(
             return paths
 
     device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
-    model = _build_resnet18().to(device)
+    model, feature_protocol = _build_feature_extractor(feature_config)
+    model = model.to(device)
 
     by_split = {
         split: [r for r in records if r.split == split] for split in ["train", "val", "test"]
@@ -97,12 +174,20 @@ def extract_and_cache_embeddings(
         with torch.no_grad():
             for x, batch_records in dl:
                 x = x.to(device)
-                feats = model(x).squeeze(-1).squeeze(-1).cpu()
+                feats = model(x)
+                if feats.ndim == 4:
+                    feats = feats.squeeze(-1).squeeze(-1)
+                feats = feats.cpu()
                 all_embeddings.append(feats)
                 all_meta.extend([asdict(r) for r in batch_records])
 
-        embeddings = torch.cat(all_embeddings, dim=0) if all_embeddings else torch.empty((0, 512))
-        payload = {"embeddings": embeddings, "metadata": all_meta}
+        expected_dim = int(feature_protocol["embedding_dim"])
+        embeddings = torch.cat(all_embeddings, dim=0) if all_embeddings else torch.empty((0, expected_dim))
+        payload = {
+            "embeddings": embeddings,
+            "metadata": all_meta,
+            "feature_extractor": feature_protocol,
+        }
         torch.save(payload, paths[split])
 
         with (cache_dir / f"{split}_metadata.json").open("w", encoding="utf-8") as f:

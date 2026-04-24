@@ -1,0 +1,98 @@
+seed: 42
+
+experiment:
+  dataset_name: breakhis
+  name: learned_utility_response_routing_v1
+  mode: learned_utility_response_routing
+
+data:
+  dataset_type: breakhis
+  root: data/BreakHis
+  image_extensions: [".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"]
+  magnifications: [40, 100, 200, 400]
+  max_samples_per_domain: 2500
+  split:
+    train: 0.70
+    val: 0.15
+    test: 0.15
+  require_patient_ids: false
+
+features:
+  image_size: 224
+  embedding_dim: 768
+  feature_extractor_name: dinov2_vitb14
+  feature_extractor_checkpoint: facebook/dinov2-base
+  feature_extractor_layer: final_norm_cls
+  embedding_pooling: cls_token
+
+model:
+  hidden_dim: 256
+  latent_dim: 16
+
+training:
+  batch_size: 64
+  learning_rate: 0.001
+  epochs: 25
+  patience: 5
+
+routing:
+  strategy: ordinal_magnification
+  tau: 100.0
+  temperature: 1.0
+
+protocol:
+  dataset_scope: development
+  query_sampling_seed: 42
+  class_balance: true
+  dataset_scopes:
+    development:
+      train_per_domain: 250
+      val_per_domain: 100
+      test_per_domain: 200
+    final_benchmark:
+      train_per_domain: 1000
+      val_per_domain: 250
+      test_per_domain: 1000
+
+response_features:
+  enabled: true
+  repeat_budget: medium
+  target_repeat_budget: medium
+  repeat_budgets:
+    low: 3
+    medium: 10
+    high: 20
+
+learned_compatibility:
+  feature_modes:
+    - static_metadata
+    - static_embedding
+    - static_combined
+    - response_indirect
+    - static_response_indirect
+    - response_indirect_shuffled
+    - response_target_adjacent_diagnostic
+    - response_oracle_diagnostic
+  objectives:
+    - linear_regression
+    - compact_mlp
+    - listwise_ranker
+  batch_size: 256
+  learning_rate: 0.001
+  epochs: 120
+  listwise_epochs: 120
+  patience: 20
+  ridge: 0.0001
+  variance_floor: 0.0000000001
+  listwise_target_temperature: 5.0
+
+evaluation:
+  metrics:
+    - top1
+    - spearman
+    - oracle_gap
+    - normalized_oracle_gap
+    - calibration_error
+
+output:
+  root: outputs

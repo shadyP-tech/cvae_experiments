@@ -139,6 +139,7 @@ def main() -> None:
             cache_dir=run_ctx.embeddings_dir,
             image_size=int(cfg["features"]["image_size"]),
             batch_size=int(cfg["training"]["batch_size"]),
+            feature_config=cfg.get("features", {}),
         )
         cache_report = validate_embedding_cache(cache_paths, expected_dim=int(cfg["features"]["embedding_dim"]))
         with (run_ctx.reports_dir / "cache_report.json").open("w", encoding="utf-8") as f:
