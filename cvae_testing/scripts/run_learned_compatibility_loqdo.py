@@ -2,1233 +2,1205 @@ from __future__ import annotations
 
 import argparse
 import csv
-import hashlib
-import json
+from dataclasses import dataclass
 import math
+import json
 from pathlib import Path
-import random
 import sys
-from typing import Any, Dict, Iterable, List, Sequence, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
+import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import yaml
 
-
+# Allow running as either:
+# - python -m scripts.run_learned_compatibility_loqdo
+# - python scripts/run_learned_compatibility_loqdo.py
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.app.bootstrap import (  # noqa: E402
-    build_run_context,
-    set_global_determinism,
-    write_run_metadata,
-    write_split_manifest,
-)
-from src.config.load_config import load_config  # noqa: E402
-from src.data.datasets.breakhis import BreakHisRecord, write_manifest  # noqa: E402
-from src.data.registry import prepare_dataset_records  # noqa: E402
-from src.eval.metrics import pearson_corr, spearman_corr  # noqa: E402
-from src.features.extract_embeddings import extract_and_cache_embeddings, validate_embedding_cache  # noqa: E402
-from src.models.cvae_expert import CVAEExpert, elbo_components  # noqa: E402
-from src.routing.strategies import compute_similarity  # noqa: E402
-from src.train.train_experts import train_domain_experts  # noqa: E402
+from src.eval.evaluators.hybrid import HybridExpertBank
+from src.eval.metrics import spearman_corr
+from src.routing.strategies import compute_similarity
+from src.torch_utils import safe_torch_load
 
 
-STATIC_MODES = {"static_metadata", "static_embedding", "static_combined"}
-RESPONSE_INDIRECT_COLUMNS = [
-    "posterior_mu_norm",
-    "posterior_mu_mean",
-    "posterior_mu_std",
-    "posterior_logvar_mean",
-    "posterior_logvar_std",
-    "posterior_entropy_proxy",
-    "decode_repeat_var_mean",
-    "decode_repeat_var_max",
-    "decode_repeat_var_q75",
-    "recon_repeat_var",
-    "recon_repeat_var_q75",
-    "kl_repeat_var",
-]
-TARGET_ADJACENT_COLUMNS = [
-    "recon_mean",
-    "kl_mean",
-    "recon_plus_kl_mean",
-]
-ORACLE_DIAGNOSTIC_COLUMNS = [
-    "nelbo_mean",
-    "nelbo_var",
-    "nelbo_std",
-    "nelbo_q25",
-    "nelbo_q50",
-    "nelbo_q75",
-]
-PROHIBITED_ADOPTION_MARKERS = {
-    "target_adjacent",
-    "oracle_diagnostic",
-    "nelbo",
-    "recon_mean",
-    "kl_mean",
-}
+@dataclass
+class RunContext:
+    run_dir: Path
+    dataset_name: str
+    seed: int
+    backbone_type: str
+    routing_strategy: str
+    routing_tau: float
+    variant: str
+    test_cache: Path
+    variant_checkpoint: Path
 
 
-def _stable_seed(*parts: object) -> int:
-    raw = "::".join(str(p) for p in parts)
-    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
-    return int(digest[:16], 16) % (2**31 - 1)
+@dataclass
+class ProbeConfig:
+    enabled: bool
+    hidden_dim: int
+    dropout: float
+    learning_rate: float
+    epochs: int
+    alpha: float
+    beta: float
+    support_fraction: float
+    query_batch_size: int
+    support_split_seed: int
+    clip_target_percentile: float
 
 
-def _write_csv(path: Path, rows: Sequence[Dict[str, Any]], fieldnames: Sequence[str] | None = None) -> None:
+@dataclass
+class OracleProbeConfig:
+    enabled: bool
+    semi_oracle_risk_lambda: float
+
+
+def _deterministic_query_split(
+    idxs: Sequence[int],
+    *,
+    query_batch_size: int,
+    support_fraction: float,
+    split_seed: int,
+) -> Tuple[List[int], List[int]]:
+    if not idxs:
+        return [], []
+    rng = np.random.default_rng(int(split_seed))
+    idxs_arr = np.asarray(list(idxs), dtype=np.int64)
+    if int(query_batch_size) > 0 and int(idxs_arr.size) > int(query_batch_size):
+        idxs_arr = rng.choice(idxs_arr, size=int(query_batch_size), replace=False)
+
+    perm = rng.permutation(idxs_arr)
+    n_total = int(perm.size)
+    if n_total < 2:
+        return perm.tolist(), []
+
+    n_support = int(round(float(n_total) * float(support_fraction)))
+    n_support = max(1, min(n_support, n_total - 1))
+    support = perm[:n_support].tolist()
+    evaluate = perm[n_support:].tolist()
+    return support, evaluate
+
+
+def _summary_stats(values: np.ndarray) -> Tuple[float, float, float]:
+    if values.size == 0:
+        return 0.0, 0.0, 0.0
+    return float(values.mean()), float(values.std()), float(np.percentile(values, 90))
+
+
+def _fit_standardizer(x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    mean = np.mean(x, axis=0)
+    std = np.std(x, axis=0)
+    std = np.where(std < 1e-8, 1.0, std)
+    return mean, std
+
+
+def _apply_standardizer(x: np.ndarray, mean: np.ndarray, std: np.ndarray) -> np.ndarray:
+    return (x - mean) / std
+
+
+def _calibration_metrics(y_pred: np.ndarray, y_true: np.ndarray, n_bins: int = 10) -> Tuple[float, float, float]:
+    if y_pred.size == 0 or y_true.size == 0:
+        return 0.0, 0.0, 0.0
+    if y_pred.size == 1 or np.std(y_pred) < 1e-12:
+        slope = 0.0
+        intercept = float(np.mean(y_true))
+    else:
+        x_mean = float(np.mean(y_pred))
+        y_mean = float(np.mean(y_true))
+        cov = float(np.mean((y_pred - x_mean) * (y_true - y_mean)))
+        var = float(np.var(y_pred))
+        slope = cov / var if var > 1e-12 else 0.0
+        intercept = y_mean - slope * x_mean
+
+    order = np.argsort(y_pred)
+    sorted_pred = y_pred[order]
+    sorted_true = y_true[order]
+    k = int(max(1, min(n_bins, y_pred.size)))
+    # Equal-frequency bins for low-sample folds.
+    bin_edges = np.linspace(0, y_pred.size, num=k + 1, dtype=int)
+    gaps: List[float] = []
+    for i in range(k):
+        s = int(bin_edges[i])
+        e = int(bin_edges[i + 1])
+        if e <= s:
+            continue
+        gaps.append(abs(float(sorted_pred[s:e].mean()) - float(sorted_true[s:e].mean())))
+    cal_err = float(np.mean(gaps)) if gaps else 0.0
+    return float(slope), float(intercept), float(cal_err)
+
+
+def _top1_margin(scores: np.ndarray) -> float:
+    if scores.size < 2:
+        return 0.0
+    order = np.sort(scores)
+    return float(order[-1] - order[-2])
+
+
+def _oracle_pairwise_rank_scores(test_rows: Sequence[dict]) -> np.ndarray:
+    utilities = np.asarray([float(r["oracle_utility"]) for r in test_rows], dtype=np.float64)
+    experts = np.asarray([int(r["expert_domain"]) for r in test_rows], dtype=np.int64)
+    n = int(utilities.size)
+    if n == 0:
+        return np.zeros((0,), dtype=np.float64)
+    if n == 1:
+        return np.ones((1,), dtype=np.float64)
+
+    scores = np.zeros((n,), dtype=np.float64)
+    for i in range(n):
+        wins = 0.0
+        for j in range(n):
+            if i == j:
+                continue
+            if utilities[i] > utilities[j] + 1e-12:
+                wins += 1.0
+            elif utilities[i] < utilities[j] - 1e-12:
+                wins += 0.0
+            else:
+                wins += 0.5
+        scores[i] = wins / float(max(n - 1, 1))
+
+    # Deterministic tie-break: smaller expert_domain gets slightly higher score.
+    max_domain = float(np.max(experts)) if experts.size else 0.0
+    tie_break = (max_domain - experts.astype(np.float64)) * 1e-9
+    return scores + tie_break
+
+
+def _pairwise_inconsistency_rate(values: np.ndarray) -> float:
+    n = int(values.size)
+    if n < 3:
+        return 0.0
+
+    def _cmp(a: float, b: float) -> int:
+        if a > b + 1e-12:
+            return 1
+        if a < b - 1e-12:
+            return -1
+        return 0
+
+    cycles = 0
+    total = 0
+    for i in range(n - 2):
+        for j in range(i + 1, n - 1):
+            for k in range(j + 1, n):
+                ij = _cmp(float(values[i]), float(values[j]))
+                jk = _cmp(float(values[j]), float(values[k]))
+                ki = _cmp(float(values[k]), float(values[i]))
+                if ij == 0 or jk == 0 or ki == 0:
+                    continue
+                total += 1
+                if (ij == 1 and jk == 1 and ki == 1) or (ij == -1 and jk == -1 and ki == -1):
+                    cycles += 1
+    return float(cycles / total) if total > 0 else 0.0
+
+
+def _pairwise_logistic_loss(scores: torch.Tensor, targets: torch.Tensor, query_ids: np.ndarray) -> torch.Tensor:
+    q_arr = np.asarray(query_ids, dtype=np.int64)
+    unique_q = sorted(set(int(v) for v in q_arr.tolist()))
+    losses: List[torch.Tensor] = []
+    for q in unique_q:
+        idxs = np.where(q_arr == int(q))[0]
+        if idxs.size < 2:
+            continue
+        for i_pos in range(int(idxs.size)):
+            for j_pos in range(i_pos + 1, int(idxs.size)):
+                i = int(idxs[i_pos])
+                j = int(idxs[j_pos])
+                y_i = float(targets[i].item())
+                y_j = float(targets[j].item())
+                if abs(y_i - y_j) < 1e-12:
+                    continue
+                sign = 1.0 if y_i > y_j else -1.0
+                diff = scores[i] - scores[j]
+                losses.append(torch.nn.functional.softplus(torch.tensor(-sign, device=diff.device) * diff))
+    if not losses:
+        return torch.tensor(0.0, dtype=scores.dtype, device=scores.device)
+    return torch.stack(losses).mean()
+
+
+def _train_utility_probe(
+    *,
+    x_train: np.ndarray,
+    y_train: np.ndarray,
+    query_ids: np.ndarray,
+    x_test: np.ndarray,
+    cfg: ProbeConfig,
+) -> np.ndarray:
+    if x_train.size == 0 or y_train.size == 0:
+        return np.zeros((x_test.shape[0],), dtype=np.float64)
+
+    dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    x_train_t = torch.tensor(x_train, dtype=torch.float32, device=dev)
+    y_train_t = torch.tensor(y_train, dtype=torch.float32, device=dev)
+    x_test_t = torch.tensor(x_test, dtype=torch.float32, device=dev)
+
+    model = torch.nn.Sequential(
+        torch.nn.Linear(x_train.shape[1], int(cfg.hidden_dim)),
+        torch.nn.ReLU(),
+        torch.nn.Dropout(float(cfg.dropout)),
+        torch.nn.Linear(int(cfg.hidden_dim), 1),
+    ).to(dev)
+
+    opt = torch.optim.Adam(model.parameters(), lr=float(cfg.learning_rate))
+    best_state: Optional[Dict[str, torch.Tensor]] = None
+    best_loss = math.inf
+    patience = 25
+    since_improve = 0
+    for _ in range(int(cfg.epochs)):
+        model.train()
+        opt.zero_grad(set_to_none=True)
+        pred = model(x_train_t).squeeze(-1)
+        reg_loss = torch.nn.functional.mse_loss(pred, y_train_t)
+        rank_loss = _pairwise_logistic_loss(pred, y_train_t, query_ids=query_ids)
+        loss = float(cfg.alpha) * reg_loss + float(cfg.beta) * rank_loss
+        loss.backward()
+        opt.step()
+
+        loss_val = float(loss.detach().cpu().item())
+        if loss_val + 1e-8 < best_loss:
+            best_loss = loss_val
+            best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
+            since_improve = 0
+        else:
+            since_improve += 1
+            if since_improve >= patience:
+                break
+
+    if best_state is not None:
+        model.load_state_dict(best_state)
+    model.eval()
+    with torch.no_grad():
+        pred_test = model(x_test_t).squeeze(-1).cpu().numpy().astype(np.float64, copy=False)
+    return pred_test
+
+
+def _as_int_domain(value: object) -> int:
+    return int(str(value).replace("x", ""))
+
+
+def _load_run_context(run_dir: Path, variant: str) -> RunContext:
+    config_path = run_dir / "config_resolved.yaml"
+    if not config_path.exists():
+        raise FileNotFoundError(f"Missing config file: {config_path}")
+
+    with config_path.open("r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+
+    dataset_name = str(cfg.get("experiment", {}).get("dataset_name", "unknown"))
+    seed = int(cfg.get("seed", 0))
+    backbone_type = str(cfg.get("features", {}).get("backbone_type", "unknown"))
+    routing_strategy = str(cfg.get("routing", {}).get("strategy", "categorical_exact"))
+    routing_tau = float(cfg.get("routing", {}).get("tau", 1.0))
+
+    variant_name = str(variant).upper()
+    test_cache = run_dir / "embeddings" / "test.pt"
+    variant_checkpoint = run_dir / "checkpoints" / f"hybrid_variant_{variant_name}.pt"
+    if not test_cache.exists():
+        raise FileNotFoundError(f"Missing test cache: {test_cache}")
+    if not variant_checkpoint.exists():
+        raise FileNotFoundError(f"Missing variant checkpoint: {variant_checkpoint}")
+
+    return RunContext(
+        run_dir=run_dir,
+        dataset_name=dataset_name,
+        seed=seed,
+        backbone_type=backbone_type,
+        routing_strategy=routing_strategy,
+        routing_tau=routing_tau,
+        variant=variant_name,
+        test_cache=test_cache,
+        variant_checkpoint=variant_checkpoint,
+    )
+
+
+def _resolve_run_dir(path: Path) -> Path:
+    if path.is_dir() and (path / "config_resolved.yaml").exists():
+        return path
+
+    latest = path / "latest.txt"
+    if path.is_dir() and latest.exists():
+        run_id = latest.read_text(encoding="utf-8").strip()
+        resolved = path / run_id
+        if resolved.exists():
+            return resolved
+        raise FileNotFoundError(f"latest.txt points to missing run: {resolved}")
+
+    raise FileNotFoundError(
+        f"Cannot resolve run directory from path: {path}. Expected run dir with config_resolved.yaml "
+        "or experiment dir with latest.txt."
+    )
+
+
+def _score_domains_batched(
+    bank: HybridExpertBank,
+    expert_domains: Sequence[int],
+    x_cpu: torch.Tensor,
+    device: torch.device,
+    batch_size: int,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    scores: List[torch.Tensor] = []
+    recons: List[torch.Tensor] = []
+    with torch.no_grad():
+        for ed in expert_domains:
+            nelbo_chunks: List[torch.Tensor] = []
+            recon_chunks: List[torch.Tensor] = []
+            for i in range(0, int(x_cpu.shape[0]), int(batch_size)):
+                xb = x_cpu[i : i + int(batch_size)].to(device)
+                nelbo_chunks.append(bank.score_domain_nelbo(int(ed), xb).cpu())
+                recon_chunks.append(bank.score_domain_recon(int(ed), xb).cpu())
+            scores.append(torch.cat(nelbo_chunks, dim=0) if nelbo_chunks else torch.empty((0,), dtype=torch.float32))
+            recons.append(torch.cat(recon_chunks, dim=0) if recon_chunks else torch.empty((0,), dtype=torch.float32))
+    return torch.stack(scores, dim=0), torch.stack(recons, dim=0)
+
+
+def _domain_mean_embeddings(embeddings: np.ndarray, metadata: Sequence[dict], domains: Sequence[int]) -> Dict[int, np.ndarray]:
+    by_domain: Dict[int, List[int]] = {int(d): [] for d in domains}
+    for idx, item in enumerate(metadata):
+        d = _as_int_domain(item["magnification"])
+        if d in by_domain:
+            by_domain[d].append(idx)
+
+    means: Dict[int, np.ndarray] = {}
+    for d, idxs in by_domain.items():
+        if not idxs:
+            continue
+        means[d] = embeddings[idxs].mean(axis=0)
+    return means
+
+
+def _row_rank_desc(values: Sequence[float], selected_idx: int) -> int:
+    order = sorted(range(len(values)), key=lambda i: float(values[i]), reverse=True)
+    for r, idx in enumerate(order, start=1):
+        if idx == selected_idx:
+            return int(r)
+    return len(values)
+
+
+def _build_pair_rows(
+    ctx: RunContext,
+    *,
+    batch_size: int,
+    probe_cfg: ProbeConfig,
+) -> Tuple[List[dict], List[int], Dict[int, Dict[int, float]], Dict[int, Dict[int, float]]]:
+    payload = safe_torch_load(ctx.test_cache, map_location="cpu")
+    x_cpu: torch.Tensor = payload["embeddings"]
+    metadata: List[dict] = payload["metadata"]
+    if int(x_cpu.shape[0]) != len(metadata):
+        raise RuntimeError("Embeddings/metadata length mismatch in test cache.")
+
+    all_domains = sorted(set(_as_int_domain(m["magnification"]) for m in metadata))
+    device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+    bank = HybridExpertBank(ctx.variant_checkpoint, device=device)
+    expert_domains = [d for d in all_domains if d in bank.domains]
+    if not expert_domains:
+        raise RuntimeError("No overlapping expert domains found between data and checkpoint.")
+
+    score_tensor, recon_tensor = _score_domains_batched(
+        bank=bank,
+        expert_domains=expert_domains,
+        x_cpu=x_cpu,
+        device=device,
+        batch_size=batch_size,
+    )
+
+    by_query: Dict[int, List[int]] = {d: [] for d in all_domains}
+    for idx, item in enumerate(metadata):
+        by_query[_as_int_domain(item["magnification"])].append(idx)
+
+    np_x = x_cpu.detach().cpu().numpy().astype(np.float64, copy=False)
+    mean_by_domain = _domain_mean_embeddings(np_x, metadata, domains=all_domains)
+
+    min_d = float(min(all_domains))
+    max_d = float(max(all_domains))
+    domain_span = max(max_d - min_d, 1.0)
+
+    rows: List[dict] = []
+    utility_lookup: Dict[int, Dict[int, float]] = {}
+    nelbo_lookup: Dict[int, Dict[int, float]] = {}
+
+    # Query-domain metadata route for query-side difficulty stats.
+    meta_best_by_query: Dict[int, int] = {}
+    for q in all_domains:
+        sims = [
+            compute_similarity(
+                {"magnification": int(q)},
+                {"magnification": int(e)},
+                strategy=ctx.routing_strategy,
+                tau=float(ctx.routing_tau),
+                similarity_matrix=None,
+            )
+            for e in expert_domains
+        ]
+        meta_best_by_query[q] = int(expert_domains[int(np.argmax(np.asarray(sims, dtype=np.float64)))])
+
+    for q in all_domains:
+        idxs = by_query.get(q, [])
+        if not idxs:
+            continue
+
+        split_seed = int(ctx.seed) * 1009 + int(q) * 131 + int(probe_cfg.support_split_seed)
+        support_idxs, eval_idxs = _deterministic_query_split(
+            idxs,
+            query_batch_size=int(probe_cfg.query_batch_size),
+            support_fraction=float(probe_cfg.support_fraction),
+            split_seed=int(split_seed),
+        )
+        if not support_idxs or not eval_idxs:
+            continue
+        if set(support_idxs).intersection(set(eval_idxs)):
+            raise RuntimeError(f"Support/eval overlap detected for query_domain={q}")
+
+        utility_lookup[q] = {}
+        nelbo_lookup[q] = {}
+        query_mean = mean_by_domain.get(q)
+        if query_mean is None:
+            continue
+
+        q_best_e = int(meta_best_by_query[q])
+        q_best_idx = int(expert_domains.index(q_best_e))
+        q_support_nelbo = score_tensor[q_best_idx, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
+        q_support_recon = recon_tensor[q_best_idx, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
+        q_support_kl = q_support_nelbo - q_support_recon
+        q_nelbo_mean, q_nelbo_std, q_nelbo_p90 = _summary_stats(q_support_nelbo)
+        q_recon_mean, q_recon_std, _ = _summary_stats(q_support_recon)
+        q_kl_mean, q_kl_std, _ = _summary_stats(q_support_kl)
+
+        split_id = f"seed{ctx.seed}_q{q}_sup{len(support_idxs)}_eval{len(eval_idxs)}"
+
+        for e_i, e in enumerate(expert_domains):
+            support_nelbo = score_tensor[e_i, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
+            eval_nelbo = score_tensor[e_i, eval_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
+            if eval_nelbo.size == 0:
+                continue
+            mean_nelbo = float(eval_nelbo.mean())
+            utility = -mean_nelbo
+            utility_lookup[q][e] = utility
+            nelbo_lookup[q][e] = mean_nelbo
+
+            exp_sup_mean, exp_sup_std, exp_sup_p90 = _summary_stats(support_nelbo)
+
+            meta_similarity = compute_similarity(
+                {"magnification": int(q)},
+                {"magnification": int(e)},
+                strategy=ctx.routing_strategy,
+                tau=float(ctx.routing_tau),
+                similarity_matrix=None,
+            )
+            meta_distance = 1.0 - float(meta_similarity)
+
+            expert_mean = mean_by_domain.get(e)
+            if expert_mean is None:
+                continue
+            embedding_distance = float(np.linalg.norm(query_mean - expert_mean, ord=2))
+
+            rows.append(
+                {
+                    "dataset_name": ctx.dataset_name,
+                    "seed": int(ctx.seed),
+                    "backbone_type": ctx.backbone_type,
+                    "run_dir": str(ctx.run_dir),
+                    "variant": ctx.variant,
+                    "query_domain": int(q),
+                    "expert_domain": int(e),
+                    "oracle_utility": utility,
+                    "oracle_nelbo": mean_nelbo,
+                    "metadata_similarity": float(meta_similarity),
+                    "metadata_distance": meta_distance,
+                    "embedding_distance": embedding_distance,
+                    "query_domain_value": (float(q) - min_d) / domain_span,
+                    "expert_domain_value": (float(e) - min_d) / domain_span,
+                    "abs_domain_diff": abs(float(q) - float(e)) / domain_span,
+                    "is_exact_domain_match": 1.0 if int(q) == int(e) else 0.0,
+                    "query_nelbo_mean": q_nelbo_mean,
+                    "query_nelbo_std": q_nelbo_std,
+                    "query_nelbo_p90": q_nelbo_p90,
+                    "query_recon_mean": q_recon_mean,
+                    "query_recon_std": q_recon_std,
+                    "query_kl_mean": q_kl_mean,
+                    "query_kl_std": q_kl_std,
+                    "expert_support_nelbo_mean": exp_sup_mean,
+                    "expert_support_nelbo_std": exp_sup_std,
+                    "expert_support_nelbo_p90": exp_sup_p90,
+                    "support_size": int(len(support_idxs)),
+                    "eval_size": int(len(eval_idxs)),
+                    "support_eval_split_id": split_id,
+                }
+            )
+
+    return rows, expert_domains, utility_lookup, nelbo_lookup
+
+
+def _normalize_targets_per_query(train_rows: Sequence[dict]) -> Dict[int, Tuple[float, float]]:
+    by_q: Dict[int, List[float]] = {}
+    for row in train_rows:
+        by_q.setdefault(int(row["query_domain"]), []).append(float(row["oracle_utility"]))
+
+    stats: Dict[int, Tuple[float, float]] = {}
+    for q, vals in by_q.items():
+        arr = np.asarray(vals, dtype=np.float64)
+        mu = float(arr.mean())
+        sigma = float(arr.std())
+        if sigma < 1e-8:
+            sigma = 1.0
+        stats[q] = (mu, sigma)
+    return stats
+
+
+def _with_normalized_targets(rows: Sequence[dict], stats: Dict[int, Tuple[float, float]]) -> np.ndarray:
+    ys: List[float] = []
+    for row in rows:
+        q = int(row["query_domain"])
+        if q not in stats:
+            raise RuntimeError(f"Missing normalization stats for query_domain={q}")
+        mu, sigma = stats[q]
+        y = (float(row["oracle_utility"]) - mu) / sigma
+        ys.append(float(y))
+    return np.asarray(ys, dtype=np.float64)
+
+
+def _feature_matrix(
+    rows: Sequence[dict],
+    *,
+    feature_set: str,
+    expert_domains: Sequence[int],
+    include_probe_features: bool,
+    include_expert_stats: bool,
+) -> np.ndarray:
+    features: List[List[float]] = []
+    for row in rows:
+        base = [float(row["metadata_distance"])]
+        if feature_set == "A":
+            features.append(base)
+            continue
+
+        ext = [
+            float(row["embedding_distance"]),
+            float(row["query_domain_value"]),
+            float(row["expert_domain_value"]),
+            float(row["abs_domain_diff"]),
+            float(row["is_exact_domain_match"]),
+        ]
+        # Safe under LOQDO: expert identity one-hot is allowed, query one-hot is intentionally excluded.
+        e = int(row["expert_domain"])
+        one_hot = [1.0 if e == int(d) else 0.0 for d in expert_domains]
+        probe_feats: List[float] = []
+        if include_probe_features:
+            probe_feats.extend(
+                [
+                    float(row.get("query_nelbo_mean", 0.0)),
+                    float(row.get("query_nelbo_std", 0.0)),
+                    float(row.get("query_nelbo_p90", 0.0)),
+                    float(row.get("query_recon_mean", 0.0)),
+                    float(row.get("query_recon_std", 0.0)),
+                    float(row.get("query_kl_mean", 0.0)),
+                    float(row.get("query_kl_std", 0.0)),
+                ]
+            )
+            if include_expert_stats:
+                probe_feats.extend(
+                    [
+                        float(row.get("expert_support_nelbo_mean", 0.0)),
+                        float(row.get("expert_support_nelbo_std", 0.0)),
+                        float(row.get("expert_support_nelbo_p90", 0.0)),
+                    ]
+                )
+        features.append(base + ext + one_hot + probe_feats)
+
+    return np.asarray(features, dtype=np.float64)
+
+
+def _method_scores(
+    method: str,
+    x_train: np.ndarray,
+    y_train_norm: np.ndarray,
+    x_test: np.ndarray,
+    test_rows: Sequence[dict],
+    train_rows: Sequence[dict],
+    probe_cfg: ProbeConfig,
+    oracle_cfg: OracleProbeConfig,
+) -> np.ndarray:
+    if method == "constant_mean":
+        return np.full((x_test.shape[0],), float(y_train_norm.mean()) if y_train_norm.size else 0.0, dtype=np.float64)
+
+    if method == "expert_prior":
+        expert_means: Dict[int, float] = {}
+        for row in train_rows:
+            e = int(row["expert_domain"])
+            expert_means.setdefault(e, 0.0)
+        for e in list(expert_means.keys()):
+            vals = [float(r["oracle_utility"]) for r in train_rows if int(r["expert_domain"]) == e]
+            expert_means[e] = float(np.mean(vals)) if vals else 0.0
+        return np.asarray([expert_means.get(int(r["expert_domain"]), 0.0) for r in test_rows], dtype=np.float64)
+
+    if method == "linear_regression":
+        try:
+            import importlib
+
+            linear_model = importlib.import_module("sklearn.linear_model")
+            LinearRegression = getattr(linear_model, "LinearRegression")
+        except Exception as exc:  # pragma: no cover - environment dependent
+            raise RuntimeError("linear_regression requires scikit-learn.") from exc
+        model = LinearRegression()
+        model.fit(x_train, y_train_norm)
+        return model.predict(x_test)
+
+    if method == "mlp_regression":
+        try:
+            import importlib
+
+            neural_network = importlib.import_module("sklearn.neural_network")
+            MLPRegressor = getattr(neural_network, "MLPRegressor")
+        except Exception as exc:  # pragma: no cover - environment dependent
+            raise RuntimeError("mlp_regression requires scikit-learn.") from exc
+        model = MLPRegressor(
+            hidden_layer_sizes=(32,),
+            activation="relu",
+            solver="adam",
+            alpha=1e-4,
+            learning_rate_init=1e-3,
+            max_iter=2000,
+            random_state=0,
+        )
+        model.fit(x_train, y_train_norm)
+        return model.predict(x_test)
+
+    if method in {"utility_probe_v1_no_expert_stats", "utility_probe_v1_with_expert_stats"}:
+        if not probe_cfg.enabled:
+            raise RuntimeError(f"Method {method} requested but utility probe is disabled.")
+
+        y_train = np.asarray([float(r["oracle_utility"]) for r in train_rows], dtype=np.float64)
+        if y_train.size == 0:
+            return np.zeros((x_test.shape[0],), dtype=np.float64)
+        clip_pct = float(probe_cfg.clip_target_percentile)
+        if 0.0 < clip_pct < 100.0:
+            lo = np.percentile(y_train, 100.0 - clip_pct)
+            hi = np.percentile(y_train, clip_pct)
+            y_train = np.clip(y_train, lo, hi)
+
+        x_mu, x_sigma = _fit_standardizer(x_train)
+        x_train_std = _apply_standardizer(x_train, x_mu, x_sigma)
+        x_test_std = _apply_standardizer(x_test, x_mu, x_sigma)
+        train_q = np.asarray([int(r["query_domain"]) for r in train_rows], dtype=np.int64)
+
+        return _train_utility_probe(
+            x_train=x_train_std,
+            y_train=y_train,
+            query_ids=train_q,
+            x_test=x_test_std,
+            cfg=probe_cfg,
+        )
+
+    if method == "semi_oracle_support_mean":
+        return np.asarray(
+            [-float(r.get("expert_support_nelbo_mean", 0.0)) for r in test_rows],
+            dtype=np.float64,
+        )
+
+    if method == "semi_oracle_support_riskaware":
+        lam = float(oracle_cfg.semi_oracle_risk_lambda)
+        return np.asarray(
+            [
+                -(float(r.get("expert_support_nelbo_mean", 0.0)) + lam * float(r.get("expert_support_nelbo_std", 0.0)))
+                for r in test_rows
+            ],
+            dtype=np.float64,
+        )
+
+    if method == "oracle_eval_mean_cheat":
+        return np.asarray([float(r["oracle_utility"]) for r in test_rows], dtype=np.float64)
+
+    if method == "oracle_pairwise_rank_cheat":
+        return _oracle_pairwise_rank_scores(test_rows)
+
+    raise ValueError(f"Unknown method: {method}")
+
+
+def _evaluate_holdout(
+    *,
+    ctx: RunContext,
+    heldout_domain: int,
+    feature_set: str,
+    method: str,
+    train_rows: Sequence[dict],
+    test_rows: Sequence[dict],
+    expert_domains: Sequence[int],
+    utility_lookup: Dict[int, Dict[int, float]],
+    nelbo_lookup: Dict[int, Dict[int, float]],
+    probe_cfg: ProbeConfig,
+    oracle_cfg: OracleProbeConfig,
+) -> dict:
+    norm_stats = _normalize_targets_per_query(train_rows)
+    include_probe_features = method.startswith("utility_probe_v1")
+    include_expert_stats = method.endswith("with_expert_stats")
+    x_train = _feature_matrix(
+        train_rows,
+        feature_set=feature_set,
+        expert_domains=expert_domains,
+        include_probe_features=include_probe_features,
+        include_expert_stats=include_expert_stats,
+    )
+    x_test = _feature_matrix(
+        test_rows,
+        feature_set=feature_set,
+        expert_domains=expert_domains,
+        include_probe_features=include_probe_features,
+        include_expert_stats=include_expert_stats,
+    )
+    y_train_norm = _with_normalized_targets(train_rows, norm_stats)
+
+    y_true = np.asarray([float(r["oracle_utility"]) for r in test_rows], dtype=np.float64)
+    scores = _method_scores(
+        method=method,
+        x_train=x_train,
+        y_train_norm=y_train_norm,
+        x_test=x_test,
+        test_rows=test_rows,
+        train_rows=train_rows,
+        probe_cfg=probe_cfg,
+        oracle_cfg=oracle_cfg,
+    )
+
+    slope, intercept, cal_err = _calibration_metrics(scores, y_true, n_bins=10)
+    top1_margin = _top1_margin(scores)
+    split_id = str(test_rows[0].get("support_eval_split_id", "na")) if test_rows else "na"
+
+    pred_best_idx = int(np.argmax(scores))
+    true_best_idx = int(np.argmax(y_true))
+    selected_e = int(test_rows[pred_best_idx]["expert_domain"])
+    oracle_e = int(test_rows[true_best_idx]["expert_domain"])
+
+    util_vec = [utility_lookup[heldout_domain][int(e)] for e in expert_domains]
+    selected_rank = _row_rank_desc(util_vec, selected_idx=expert_domains.index(selected_e))
+
+    selected_nelbo = float(nelbo_lookup[heldout_domain][selected_e])
+    oracle_nelbo = float(nelbo_lookup[heldout_domain][oracle_e])
+
+    return {
+        "dataset_name": ctx.dataset_name,
+        "seed": int(ctx.seed),
+        "backbone_type": ctx.backbone_type,
+        "run_id": ctx.run_dir.name,
+        "variant": ctx.variant,
+        "feature_set": feature_set,
+        "method": method,
+        "heldout_query_domain": int(heldout_domain),
+        "n_train_rows": int(len(train_rows)),
+        "n_test_rows": int(len(test_rows)),
+        "n_experts": int(len(expert_domains)),
+        "selected_expert": int(selected_e),
+        "oracle_expert": int(oracle_e),
+        "top1_agreement_with_best_expert": 1.0 if selected_e == oracle_e else 0.0,
+        "spearman_similarity_vs_neg_nelbo": float(spearman_corr(scores.tolist(), y_true.tolist())),
+        "metadata_to_oracle_gap": float(selected_nelbo - oracle_nelbo),
+        "mean_rank_metadata_selected": float(selected_rank),
+        "selected_routing_nelbo": selected_nelbo,
+        "oracle_routing_nelbo": oracle_nelbo,
+        "fold_id": f"{ctx.run_dir.name}:{int(heldout_domain)}",
+        "support_eval_split_id": split_id,
+        "calibration_slope": slope,
+        "calibration_intercept": intercept,
+        "calibration_error_bin10": cal_err,
+        "top1_margin": top1_margin,
+        "target_variance": float(np.var(y_true)) if y_true.size else 0.0,
+        "oracle_pairwise_inconsistency_rate": _pairwise_inconsistency_rate(y_true),
+    }
+
+
+def _evaluate_metadata_baseline(
+    *,
+    ctx: RunContext,
+    heldout_domain: int,
+    test_rows: Sequence[dict],
+    expert_domains: Sequence[int],
+    utility_lookup: Dict[int, Dict[int, float]],
+    nelbo_lookup: Dict[int, Dict[int, float]],
+) -> dict:
+    sims = [
+        compute_similarity(
+            {"magnification": int(heldout_domain)},
+            {"magnification": int(e)},
+            strategy=ctx.routing_strategy,
+            tau=float(ctx.routing_tau),
+            similarity_matrix=None,
+        )
+        for e in expert_domains
+    ]
+    pred_best_idx = int(np.argmax(np.asarray(sims, dtype=np.float64)))
+    util_vec = [utility_lookup[heldout_domain][int(e)] for e in expert_domains]
+    true_best_idx = int(np.argmax(np.asarray(util_vec, dtype=np.float64)))
+    selected_e = int(expert_domains[pred_best_idx])
+    oracle_e = int(expert_domains[true_best_idx])
+    selected_rank = _row_rank_desc(util_vec, selected_idx=pred_best_idx)
+    selected_nelbo = float(nelbo_lookup[heldout_domain][selected_e])
+    oracle_nelbo = float(nelbo_lookup[heldout_domain][oracle_e])
+    y_true = np.asarray(util_vec, dtype=np.float64)
+    y_pred = np.asarray(sims, dtype=np.float64)
+    slope, intercept, cal_err = _calibration_metrics(y_pred, y_true, n_bins=10)
+
+    return {
+        "dataset_name": ctx.dataset_name,
+        "seed": int(ctx.seed),
+        "backbone_type": ctx.backbone_type,
+        "run_id": ctx.run_dir.name,
+        "variant": ctx.variant,
+        "feature_set": "baseline",
+        "method": "metadata_routing",
+        "heldout_query_domain": int(heldout_domain),
+        "n_train_rows": 0,
+        "n_test_rows": int(len(test_rows)),
+        "n_experts": int(len(expert_domains)),
+        "selected_expert": int(selected_e),
+        "oracle_expert": int(oracle_e),
+        "top1_agreement_with_best_expert": 1.0 if selected_e == oracle_e else 0.0,
+        "spearman_similarity_vs_neg_nelbo": float(spearman_corr(sims, util_vec)),
+        "metadata_to_oracle_gap": float(selected_nelbo - oracle_nelbo),
+        "mean_rank_metadata_selected": float(selected_rank),
+        "selected_routing_nelbo": selected_nelbo,
+        "oracle_routing_nelbo": oracle_nelbo,
+        "fold_id": f"{ctx.run_dir.name}:{int(heldout_domain)}",
+        "support_eval_split_id": str(test_rows[0].get("support_eval_split_id", "na")) if test_rows else "na",
+        "calibration_slope": slope,
+        "calibration_intercept": intercept,
+        "calibration_error_bin10": cal_err,
+        "top1_margin": _top1_margin(y_pred),
+        "target_variance": float(np.var(y_true)) if y_true.size else 0.0,
+        "oracle_pairwise_inconsistency_rate": _pairwise_inconsistency_rate(y_true),
+    }
+
+
+def _write_csv(rows: Sequence[dict], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    if fieldnames is None:
-        keys: List[str] = []
-        seen = set()
-        for row in rows:
-            for key in row.keys():
-                if key not in seen:
-                    keys.append(key)
-                    seen.add(key)
-        fieldnames = keys
-    with path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=list(fieldnames), extrasaction="ignore")
+    if not rows:
+        path.write_text("", encoding="utf-8")
+        return
+    fieldnames = list(rows[0].keys())
+    with path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
 
 
-def _mean(xs: Iterable[float]) -> float:
-    vals = [float(x) for x in xs if math.isfinite(float(x))]
-    return sum(vals) / len(vals) if vals else 0.0
-
-
-def _std(xs: Iterable[float]) -> float:
-    vals = [float(x) for x in xs if math.isfinite(float(x))]
-    if len(vals) < 2:
-        return 0.0
-    m = _mean(vals)
-    return math.sqrt(sum((x - m) ** 2 for x in vals) / len(vals))
-
-
-def _q(values: torch.Tensor, q: float) -> float:
-    if values.numel() == 0:
-        return 0.0
-    return float(torch.quantile(values.float().flatten(), float(q)).item())
-
-
-def _domain(rec_or_meta: Any) -> int:
-    if isinstance(rec_or_meta, dict):
-        return int(rec_or_meta["magnification"])
-    return int(getattr(rec_or_meta, "magnification"))
-
-
-def _label(rec: BreakHisRecord) -> int:
-    return int(getattr(rec, "label"))
-
-
-def _record_key(rec: BreakHisRecord) -> str:
-    return f"{rec.split}:{rec.sample_id}:{rec.image_path}"
-
-
-def _cap_records(
-    records: List[BreakHisRecord],
-    caps: Dict[str, int],
-    seed: int,
-    class_balance: bool,
-) -> Tuple[List[BreakHisRecord], Dict[str, Any]]:
-    rng = random.Random(seed)
-    selected: List[BreakHisRecord] = []
-    report: Dict[str, Any] = {
-        "query_sampling_seed": seed,
-        "class_balance": bool(class_balance),
-        "caps": caps,
-        "actual_counts": {},
-    }
-
-    by_split_domain: Dict[Tuple[str, int], List[BreakHisRecord]] = {}
-    for rec in records:
-        by_split_domain.setdefault((str(rec.split), _domain(rec)), []).append(rec)
-
-    for split in ["train", "val", "test"]:
-        cap = int(caps.get(f"{split}_per_domain", 0))
-        for domain in sorted({d for s, d in by_split_domain if s == split}):
-            group = list(by_split_domain.get((split, domain), []))
-            if cap <= 0 or len(group) <= cap:
-                chosen = group
-            elif class_balance:
-                by_label: Dict[int, List[BreakHisRecord]] = {}
-                for rec in group:
-                    by_label.setdefault(_label(rec), []).append(rec)
-                labels = sorted(by_label)
-                per_label = max(cap // max(len(labels), 1), 1)
-                chosen = []
-                leftovers: List[BreakHisRecord] = []
-                for lbl in labels:
-                    candidates = list(by_label[lbl])
-                    rng.shuffle(candidates)
-                    chosen.extend(candidates[: min(per_label, len(candidates))])
-                    leftovers.extend(candidates[min(per_label, len(candidates)) :])
-                if len(chosen) < cap:
-                    rng.shuffle(leftovers)
-                    chosen.extend(leftovers[: cap - len(chosen)])
-                chosen = chosen[:cap]
-            else:
-                rng.shuffle(group)
-                chosen = group[:cap]
-
-            selected.extend(chosen)
-            report["actual_counts"][f"{split}:{domain}"] = len(chosen)
-
-    selected = sorted(selected, key=_record_key)
-    return selected, report
-
-
-def _scope_caps(cfg: Dict[str, Any]) -> Tuple[str, Dict[str, int], int, bool]:
-    protocol = cfg.get("protocol", {})
-    scope = str(protocol.get("dataset_scope", "development"))
-    scopes = protocol.get("dataset_scopes", {})
-    if scope not in scopes:
-        raise ValueError(f"Unknown protocol.dataset_scope={scope!r}; available={sorted(scopes)}")
-    raw_caps = scopes[scope]
-    caps = {
-        "train_per_domain": int(raw_caps.get("train_per_domain", 250)),
-        "val_per_domain": int(raw_caps.get("val_per_domain", 100)),
-        "test_per_domain": int(raw_caps.get("test_per_domain", 200)),
-    }
-    sampling_seed = int(protocol.get("query_sampling_seed", cfg.get("seed", 42)))
-    class_balance = bool(protocol.get("class_balance", True))
-    return scope, caps, sampling_seed, class_balance
-
-
-class DomainExpertBank:
-    def __init__(
-        self,
-        expert_checkpoints: Dict[str, str],
-        input_dim: int,
-        hidden_dim: int,
-        latent_dim: int,
-        device: torch.device,
-    ) -> None:
-        self.device = device
-        self.models: Dict[int, CVAEExpert] = {}
-        for name, ckpt in expert_checkpoints.items():
-            domain = int(str(name).replace("expert_", "").replace("x", ""))
-            model = CVAEExpert(input_dim=input_dim, hidden_dim=hidden_dim, latent_dim=latent_dim).to(device)
-            model.load_state_dict(torch.load(ckpt, map_location=device))
-            model.eval()
-            self.models[domain] = model
-
-    @property
-    def domains(self) -> List[int]:
-        return sorted(self.models)
-
-    def model(self, domain: int) -> CVAEExpert:
-        return self.models[int(domain)]
-
-
-def _set_torch_seed(seed: int) -> None:
-    torch.manual_seed(int(seed))
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(int(seed))
-
-
-def _score_response_stream(
-    model: CVAEExpert,
-    x: torch.Tensor,
-    repeats: int,
-    seed_parts: Tuple[object, ...],
-    device: torch.device,
-) -> Dict[str, Any]:
-    xb = x.to(device).float().unsqueeze(0)
-    recons: List[torch.Tensor] = []
-    rec_values: List[float] = []
-    kl_values: List[float] = []
-    nelbo_values: List[float] = []
-
-    with torch.no_grad():
-        mu0, logvar0 = model.encode(xb)
-        for repeat_id in range(max(int(repeats), 1)):
-            _set_torch_seed(_stable_seed(*seed_parts, repeat_id))
-            recon, mu, logvar = model(xb)
-            rec, kl = elbo_components(recon, xb, mu, logvar)
-            nelbo = rec + kl
-            recons.append(recon.detach().cpu().squeeze(0))
-            rec_values.append(float(rec.item()))
-            kl_values.append(float(kl.item()))
-            nelbo_values.append(float(nelbo.item()))
-
-    rec_t = torch.tensor(rec_values, dtype=torch.float32)
-    kl_t = torch.tensor(kl_values, dtype=torch.float32)
-    nelbo_t = torch.tensor(nelbo_values, dtype=torch.float32)
-    recon_t = torch.stack(recons, dim=0) if recons else torch.empty((0, int(x.shape[0])))
-    decode_var = recon_t.var(dim=0, unbiased=False) if recon_t.shape[0] > 1 else torch.zeros_like(x.cpu())
-    rec_centered_abs = torch.abs(rec_t - rec_t.mean()) if rec_t.numel() else torch.empty((0,))
-
-    mu_cpu = mu0.detach().cpu().squeeze(0)
-    logvar_cpu = logvar0.detach().cpu().squeeze(0)
-    entropy_proxy = 0.5 * torch.sum(1.0 + math.log(2.0 * math.pi) + logvar_cpu)
-
-    return {
-        "posterior_mu_norm": float(torch.linalg.vector_norm(mu_cpu).item()),
-        "posterior_mu_mean": float(mu_cpu.mean().item()),
-        "posterior_mu_std": float(mu_cpu.std(unbiased=False).item()),
-        "posterior_logvar_mean": float(logvar_cpu.mean().item()),
-        "posterior_logvar_std": float(logvar_cpu.std(unbiased=False).item()),
-        "posterior_entropy_proxy": float(entropy_proxy.item()),
-        "decode_repeat_var_mean": float(decode_var.mean().item()),
-        "decode_repeat_var_max": float(decode_var.max().item()),
-        "decode_repeat_var_q75": _q(decode_var, 0.75),
-        "recon_repeat_var": float(rec_t.var(unbiased=False).item()) if rec_t.numel() > 1 else 0.0,
-        "recon_repeat_var_q75": _q(rec_centered_abs, 0.75),
-        "kl_repeat_var": float(kl_t.var(unbiased=False).item()) if kl_t.numel() > 1 else 0.0,
-        "recon_mean": float(rec_t.mean().item()) if rec_t.numel() else 0.0,
-        "recon_var": float(rec_t.var(unbiased=False).item()) if rec_t.numel() > 1 else 0.0,
-        "kl_mean": float(kl_t.mean().item()) if kl_t.numel() else 0.0,
-        "kl_var": float(kl_t.var(unbiased=False).item()) if kl_t.numel() > 1 else 0.0,
-        "recon_plus_kl_mean": float((rec_t + kl_t).mean().item()) if rec_t.numel() else 0.0,
-        "nelbo_mean": float(nelbo_t.mean().item()) if nelbo_t.numel() else 0.0,
-        "nelbo_var": float(nelbo_t.var(unbiased=False).item()) if nelbo_t.numel() > 1 else 0.0,
-        "nelbo_std": float(nelbo_t.std(unbiased=False).item()) if nelbo_t.numel() > 1 else 0.0,
-        "nelbo_q25": _q(nelbo_t, 0.25),
-        "nelbo_q50": _q(nelbo_t, 0.50),
-        "nelbo_q75": _q(nelbo_t, 0.75),
-        "_nelbo_repeats": nelbo_values,
-    }
-
-
-def _load_payloads(cache_paths: Dict[str, Path]) -> Dict[str, Dict[str, Any]]:
-    return {split: torch.load(path, map_location="cpu") for split, path in cache_paths.items()}
-
-
-def _domain_centroids(train_payload: Dict[str, Any], expert_domains: Sequence[int]) -> Dict[int, torch.Tensor]:
-    embeddings = train_payload["embeddings"].float()
-    metadata = train_payload["metadata"]
-    centroids: Dict[int, torch.Tensor] = {}
-    global_centroid = embeddings.mean(dim=0) if embeddings.numel() else torch.zeros((embeddings.shape[1],))
-    for domain in expert_domains:
-        idxs = [i for i, meta in enumerate(metadata) if _domain(meta) == int(domain)]
-        centroids[int(domain)] = embeddings[idxs].mean(dim=0) if idxs else global_centroid
-    return centroids
-
-
-def _metadata_features(
-    query_domain: int,
-    expert_domain: int,
-    routing_cfg: Dict[str, Any],
-) -> Dict[str, float]:
-    similarity = compute_similarity(
-        {"magnification": int(query_domain)},
-        {"magnification": int(expert_domain)},
-        strategy=str(routing_cfg.get("strategy", "categorical_exact")),
-        tau=float(routing_cfg.get("tau", 1.0)),
-        similarity_matrix=routing_cfg.get("similarity_matrix"),
-    )
-    return {
-        "query_domain_value": float(query_domain),
-        "expert_domain_value": float(expert_domain),
-        "metadata_exact_match": 1.0 if int(query_domain) == int(expert_domain) else 0.0,
-        "metadata_abs_distance": float(abs(int(query_domain) - int(expert_domain))),
-        "metadata_similarity": float(similarity),
-    }
-
-
-def _build_pair_rows(
-    cfg: Dict[str, Any],
-    payloads: Dict[str, Dict[str, Any]],
-    bank: DomainExpertBank,
-    response_repeats: int,
-    target_repeats: int,
-    dataset_scope: str,
-    sampling_seed: int,
-) -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
-    dataset = str(cfg["experiment"]["dataset_name"])
-    seed = int(cfg["seed"])
-    device = bank.device
-    feature_protocol = cfg.get("features", {})
-
-    for split in ["train", "val", "test"]:
-        payload = payloads[split]
-        embeddings = payload["embeddings"].float()
-        metadata = payload["metadata"]
-        for query_index, meta in enumerate(metadata):
-            query_id = f"{split}:{meta.get('sample_id', 'sample')}:{query_index}"
-            query_domain = _domain(meta)
-            x = embeddings[query_index]
-            for expert_domain in bank.domains:
-                feature_stats = _score_response_stream(
-                    model=bank.model(expert_domain),
-                    x=x,
-                    repeats=response_repeats,
-                    seed_parts=(dataset, seed, query_id, expert_domain, "feature"),
-                    device=device,
-                )
-                target_stats = _score_response_stream(
-                    model=bank.model(expert_domain),
-                    x=x,
-                    repeats=target_repeats,
-                    seed_parts=(dataset, seed, query_id, expert_domain, "target"),
-                    device=device,
-                )
-                utility = -float(target_stats["nelbo_mean"])
-                utility_var = float(target_stats["nelbo_var"])
-                row: Dict[str, Any] = {
-                    "dataset": dataset,
-                    "seed": seed,
-                    "split": split,
-                    "query_index": query_index,
-                    "query_id": query_id,
-                    "query_domain": query_domain,
-                    "heldout_domain": query_domain,
-                    "expert_domain": expert_domain,
-                    "method_key": "",
-                    "split_policy": "loqdo_query_domain",
-                    "normalization_policy": "within_query_minmax_utility",
-                    "target_noise_mode": "deterministic_repeated_target_stream",
-                    "feature_family": "",
-                    "response_feature_mode": "",
-                    "probe_mode": "expert_conditioned_cvae_response",
-                    "interaction_mode": "none",
-                    "feature_extractor_name": str(feature_protocol.get("feature_extractor_name", "dinov2_vitb14")),
-                    "feature_extractor_checkpoint": str(
-                        feature_protocol.get("feature_extractor_checkpoint", "facebook/dinov2-base")
-                    ),
-                    "feature_extractor_layer": str(feature_protocol.get("feature_extractor_layer", "final_norm_cls")),
-                    "embedding_pooling": str(feature_protocol.get("embedding_pooling", "cls_token")),
-                    "dataset_scope": dataset_scope,
-                    "query_sampling_policy": "split_domain_class_stratified_cap",
-                    "query_sampling_seed": sampling_seed,
-                    "num_queries_per_domain": "",
-                    "utility_mean": utility,
-                    "utility_var": utility_var,
-                    "utility_confidence_weight": 1.0 / max(utility_var, 1e-8),
-                    "utility_normalized": 0.0,
-                    "oracle_expert": "",
-                    "oracle_utility": 0.0,
-                    "selected_utility": "",
-                    "oracle_gap": "",
-                    "normalized_oracle_gap": "",
-                }
-                for key in RESPONSE_INDIRECT_COLUMNS + TARGET_ADJACENT_COLUMNS:
-                    row[key] = float(feature_stats.get(key, 0.0))
-                for key in ORACLE_DIAGNOSTIC_COLUMNS:
-                    row[key] = float(target_stats.get(key, 0.0))
-                row["_target_recon_plus_kl_mean"] = float(target_stats.get("recon_plus_kl_mean", 0.0))
-                row["_target_nelbo_repeats"] = target_stats.get("_nelbo_repeats", [])
-                rows.append(row)
-
-    _annotate_query_oracles(rows)
-    return rows
-
-
-def _annotate_query_oracles(rows: List[Dict[str, Any]]) -> None:
-    by_query: Dict[str, List[Dict[str, Any]]] = {}
-    for row in rows:
-        by_query.setdefault(str(row["query_id"]), []).append(row)
-
-    for group in by_query.values():
-        utilities = [float(row["utility_mean"]) for row in group]
-        min_u = min(utilities)
-        max_u = max(utilities)
-        denom = max(max_u - min_u, 1e-12)
-        oracle_row = max(group, key=lambda r: float(r["utility_mean"]))
-        for row in group:
-            row["utility_normalized"] = (float(row["utility_mean"]) - min_u) / denom
-            row["oracle_expert"] = int(oracle_row["expert_domain"])
-            row["oracle_utility"] = float(oracle_row["utility_mean"])
-
-
-def _row_csv_projection(row: Dict[str, Any]) -> Dict[str, Any]:
-    exclude = {"_target_nelbo_repeats", "_target_recon_plus_kl_mean"}
-    return {k: v for k, v in row.items() if k not in exclude}
-
-
-def _embedding_features(
-    row: Dict[str, Any],
-    payloads: Dict[str, Dict[str, Any]],
-    centroids: Dict[int, torch.Tensor],
-) -> torch.Tensor:
-    q = payloads[str(row["split"])]["embeddings"][int(row["query_index"])].float()
-    c = centroids[int(row["expert_domain"])].float()
-    diff = q - c
-    abs_diff = torch.abs(diff)
-    denom = max(float(torch.linalg.vector_norm(q).item() * torch.linalg.vector_norm(c).item()), 1e-12)
-    dot = float(torch.dot(q, c).item())
-    cos = dot / denom
-    l2 = float(torch.linalg.vector_norm(diff).item())
-    return torch.cat([q, c, diff, abs_diff, torch.tensor([cos, l2, dot], dtype=torch.float32)])
-
-
-def _response_vector(row: Dict[str, Any], columns: Sequence[str]) -> torch.Tensor:
-    return torch.tensor([float(row.get(col, 0.0)) for col in columns], dtype=torch.float32)
-
-
-def _make_shuffled_response_maps(rows: List[Dict[str, Any]], seed: int) -> Dict[int, Dict[str, float]]:
-    rng = random.Random(seed)
-    by_query: Dict[str, List[Dict[str, Any]]] = {}
-    for row in rows:
-        by_query.setdefault(str(row["query_id"]), []).append(row)
-
-    shuffled: Dict[int, Dict[str, float]] = {}
-    fallback_values = [
-        {col: float(row.get(col, 0.0)) for col in RESPONSE_INDIRECT_COLUMNS}
-        for row in rows
-    ]
-    for group in by_query.values():
-        values = [{col: float(row.get(col, 0.0)) for col in RESPONSE_INDIRECT_COLUMNS} for row in group]
-        if len(values) > 1:
-            offset = rng.randrange(1, len(values))
-            values = values[offset:] + values[:offset]
-        elif fallback_values:
-            values = [rng.choice(fallback_values)]
-        for row, value in zip(group, values):
-            shuffled[id(row)] = value
-    return shuffled
-
-
-def _feature_mode_kind(mode: str) -> Tuple[str, bool]:
-    adoption_eligible = not any(marker in mode for marker in PROHIBITED_ADOPTION_MARKERS)
-    if mode.startswith("static_response"):
-        return "static_response", adoption_eligible
-    if mode.startswith("response_indirect_shuffled"):
-        return "response_control", adoption_eligible
-    if mode.startswith("response_indirect"):
-        return "response", adoption_eligible
-    if mode.startswith("response_target_adjacent"):
-        return "target_adjacent_diagnostic", False
-    if mode.startswith("response_oracle"):
-        return "oracle_diagnostic", False
-    return "static", adoption_eligible
-
-
-def _build_feature_matrix(
-    rows: List[Dict[str, Any]],
-    mode: str,
-    payloads: Dict[str, Dict[str, Any]],
-    centroids: Dict[int, torch.Tensor],
-    routing_cfg: Dict[str, Any],
-    shuffled_map: Dict[int, Dict[str, float]] | None,
-) -> torch.Tensor:
-    vectors: List[torch.Tensor] = []
-    for row in rows:
-        parts: List[torch.Tensor] = []
-        if mode in {"static_metadata", "static_combined", "static_response_indirect"}:
-            meta = _metadata_features(int(row["query_domain"]), int(row["expert_domain"]), routing_cfg)
-            parts.append(torch.tensor(list(meta.values()), dtype=torch.float32))
-        if mode in {"static_embedding", "static_combined", "static_response_indirect"}:
-            parts.append(_embedding_features(row, payloads, centroids))
-        if mode in {"response_indirect", "static_response_indirect"}:
-            parts.append(_response_vector(row, RESPONSE_INDIRECT_COLUMNS))
-        if mode == "response_indirect_shuffled":
-            source = shuffled_map.get(id(row), {}) if shuffled_map is not None else {}
-            parts.append(torch.tensor([float(source.get(col, 0.0)) for col in RESPONSE_INDIRECT_COLUMNS]))
-        if mode == "response_target_adjacent_diagnostic":
-            parts.append(_response_vector(row, TARGET_ADJACENT_COLUMNS))
-        if mode == "response_oracle_diagnostic":
-            parts.append(_response_vector(row, ORACLE_DIAGNOSTIC_COLUMNS))
-        if not parts:
-            raise ValueError(f"Unsupported feature mode: {mode}")
-        vectors.append(torch.cat(parts).float())
-    return torch.stack(vectors, dim=0) if vectors else torch.empty((0, 0), dtype=torch.float32)
-
-
-def _standardize(
-    x_train: torch.Tensor,
-    others: Sequence[torch.Tensor],
-    variance_floor: float,
-) -> Tuple[torch.Tensor, List[torch.Tensor], torch.Tensor]:
-    if x_train.numel() == 0:
-        return x_train, list(others), torch.ones((x_train.shape[1],), dtype=torch.bool)
-    mean = x_train.mean(dim=0)
-    std = x_train.std(dim=0, unbiased=False)
-    keep = std > float(variance_floor)
-    if not bool(keep.any()):
-        keep = torch.ones_like(std, dtype=torch.bool)
-    std = torch.where(std > float(variance_floor), std, torch.ones_like(std))
-    x_train_s = (x_train[:, keep] - mean[keep]) / std[keep]
-    out = [((x[:, keep] - mean[keep]) / std[keep]) if x.numel() else x[:, keep] for x in others]
-    return x_train_s.float(), [x.float() for x in out], keep
-
-
-def _fit_linear(x_train: torch.Tensor, y_train: torch.Tensor, ridge: float) -> Dict[str, torch.Tensor]:
-    x = torch.cat([x_train.double(), torch.ones((x_train.shape[0], 1), dtype=torch.float64)], dim=1)
-    y = y_train.double().unsqueeze(1)
-    eye = torch.eye(x.shape[1], dtype=torch.float64)
-    eye[-1, -1] = 0.0
-    lhs = x.T @ x + float(ridge) * eye
-    rhs = x.T @ y
+def _write_parquet(rows: Sequence[dict], path: Path, required: bool = False) -> bool:
     try:
-        weights = torch.linalg.solve(lhs, rhs).squeeze(1)
-    except RuntimeError:
-        weights = torch.linalg.lstsq(lhs, rhs).solution.squeeze(1)
-    return {"weights": weights.float()}
+        import pandas as pd
+    except Exception as exc:  # pragma: no cover - environment dependent
+        msg = "Parquet output requires pandas and pyarrow or fastparquet."
+        if required:
+            raise RuntimeError(msg) from exc
+        print(f"[warn] {msg} Skipping parquet output for {path}.")
+        return False
 
-
-def _predict_linear(model: Dict[str, torch.Tensor], x: torch.Tensor) -> torch.Tensor:
-    weights = model["weights"]
-    xb = torch.cat([x.float(), torch.ones((x.shape[0], 1), dtype=torch.float32)], dim=1)
-    return xb @ weights
-
-
-class CompactRegressor(nn.Module):
-    def __init__(self, input_dim: int) -> None:
-        super().__init__()
-        hidden = min(max(16, input_dim // 2), 128)
-        self.net = nn.Sequential(
-            nn.Linear(input_dim, hidden),
-            nn.ReLU(),
-            nn.Linear(hidden, 1),
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.net(x).squeeze(-1)
-
-
-def _fit_mlp(
-    x_train: torch.Tensor,
-    y_train: torch.Tensor,
-    x_val: torch.Tensor,
-    y_val: torch.Tensor,
-    cfg: Dict[str, Any],
-    objective: str,
-) -> CompactRegressor:
-    seed = int(cfg.get("seed", 42))
-    _set_torch_seed(_stable_seed(seed, objective, "compat_mlp"))
-    learned_cfg = cfg.get("learned_compatibility", {})
-    epochs = int(learned_cfg.get("epochs", 120))
-    lr = float(learned_cfg.get("learning_rate", 1e-3))
-    patience = int(learned_cfg.get("patience", 20))
-    batch_size = int(learned_cfg.get("batch_size", 256))
-    model = CompactRegressor(input_dim=x_train.shape[1])
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
-    best_val = float("inf")
-    bad = 0
-    n = x_train.shape[0]
-
-    for _ in range(epochs):
-        model.train()
-        order = torch.randperm(n)
-        for start in range(0, n, batch_size):
-            idx = order[start : start + batch_size]
-            pred = model(x_train[idx])
-            loss = F.smooth_l1_loss(pred, y_train[idx])
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-        model.eval()
-        with torch.no_grad():
-            if x_val.numel():
-                val_loss = float(F.mse_loss(model(x_val), y_val).item())
-            else:
-                val_loss = float(F.mse_loss(model(x_train), y_train).item())
-        if val_loss < best_val:
-            best_val = val_loss
-            bad = 0
-            best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
-        else:
-            bad += 1
-            if bad >= patience:
-                break
-
-    model.load_state_dict(best_state)
-    model.eval()
-    return model
-
-
-def _query_groups(rows: List[Dict[str, Any]]) -> List[List[int]]:
-    by_query: Dict[str, List[int]] = {}
-    for idx, row in enumerate(rows):
-        by_query.setdefault(str(row["query_id"]), []).append(idx)
-    return list(by_query.values())
-
-
-def _fit_listwise(
-    x_train: torch.Tensor,
-    y_train: torch.Tensor,
-    train_rows: List[Dict[str, Any]],
-    x_val: torch.Tensor,
-    y_val: torch.Tensor,
-    val_rows: List[Dict[str, Any]],
-    cfg: Dict[str, Any],
-) -> CompactRegressor:
-    _ = y_val
-    seed = int(cfg.get("seed", 42))
-    _set_torch_seed(_stable_seed(seed, "listwise_ranker"))
-    learned_cfg = cfg.get("learned_compatibility", {})
-    epochs = int(learned_cfg.get("listwise_epochs", learned_cfg.get("epochs", 120)))
-    lr = float(learned_cfg.get("learning_rate", 1e-3))
-    patience = int(learned_cfg.get("patience", 20))
-    utility_temperature = float(learned_cfg.get("listwise_target_temperature", 5.0))
-    model = CompactRegressor(input_dim=x_train.shape[1])
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    train_groups = _query_groups(train_rows)
-    val_groups = _query_groups(val_rows)
-    best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
-    best_val = float("inf")
-    bad = 0
-
-    for _ in range(epochs):
-        model.train()
-        random.shuffle(train_groups)
-        for group in train_groups:
-            idx = torch.tensor(group, dtype=torch.long)
-            scores = model(x_train[idx])
-            target = torch.softmax(y_train[idx] * utility_temperature, dim=0)
-            loss = -(target * F.log_softmax(scores, dim=0)).sum()
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-        model.eval()
-        with torch.no_grad():
-            losses = []
-            eval_groups = val_groups or train_groups
-            eval_x = x_val if val_groups else x_train
-            eval_y = y_val if val_groups else y_train
-            for group in eval_groups:
-                idx = torch.tensor(group, dtype=torch.long)
-                scores = model(eval_x[idx])
-                target = torch.softmax(eval_y[idx] * utility_temperature, dim=0)
-                losses.append(float((-(target * F.log_softmax(scores, dim=0)).sum()).item()))
-            val_loss = _mean(losses)
-        if val_loss < best_val:
-            best_val = val_loss
-            bad = 0
-            best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
-        else:
-            bad += 1
-            if bad >= patience:
-                break
-
-    model.load_state_dict(best_state)
-    model.eval()
-    return model
-
-
-def _fit_calibration(pred: torch.Tensor, y: torch.Tensor) -> Tuple[float, float]:
-    if pred.numel() < 2:
-        return 1.0, 0.0
-    x = torch.cat([pred.double().unsqueeze(1), torch.ones((pred.numel(), 1), dtype=torch.float64)], dim=1)
-    target = y.double().unsqueeze(1)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame(rows)
     try:
-        coef = torch.linalg.lstsq(x, target).solution.squeeze(1)
-        return float(coef[0].item()), float(coef[1].item())
-    except RuntimeError:
-        return 1.0, 0.0
+        df.to_parquet(path, index=False)
+    except Exception as exc:  # pragma: no cover - environment dependent
+        msg = "Failed to write parquet. Install pyarrow or fastparquet."
+        if required:
+            raise RuntimeError(msg) from exc
+        print(f"[warn] {msg} Skipping parquet output for {path}.")
+        return False
+
+    return True
 
 
-def _pairwise_accuracy(preds: List[float], utils: List[float], tie_eps: float = 1e-8) -> float:
-    total = 0
-    correct = 0
-    for i in range(len(preds)):
-        for j in range(i + 1, len(preds)):
-            diff_u = utils[i] - utils[j]
-            if abs(diff_u) <= tie_eps:
-                continue
-            diff_p = preds[i] - preds[j]
-            if diff_p == 0:
-                continue
-            total += 1
-            if diff_u * diff_p > 0:
-                correct += 1
-    return correct / total if total else 0.0
-
-
-def _evaluate_predictions(
-    rows: List[Dict[str, Any]],
-    pred: torch.Tensor,
-    pred_calibrated: torch.Tensor,
-) -> Dict[str, float]:
-    by_query: Dict[str, List[int]] = {}
-    for idx, row in enumerate(rows):
-        by_query.setdefault(str(row["query_id"]), []).append(idx)
-
-    top1 = []
-    spearman = []
-    gaps = []
-    norm_gaps = []
-    ranks = []
-    top2 = []
-    pairwise = []
-    selected_utils = []
-    oracle_utils = []
-
-    for group in by_query.values():
-        utils = [float(rows[i]["utility_mean"]) for i in group]
-        preds = [float(pred[i].item()) for i in group]
-        oracle_local = max(range(len(group)), key=lambda j: utils[j])
-        selected_local = max(range(len(group)), key=lambda j: preds[j])
-        sorted_pred = sorted(range(len(group)), key=lambda j: preds[j], reverse=True)
-        rank_oracle = sorted_pred.index(oracle_local) + 1
-        oracle_u = utils[oracle_local]
-        selected_u = utils[selected_local]
-        denom = max(max(utils) - min(utils), 1e-12)
-
-        top1.append(1.0 if oracle_local == selected_local else 0.0)
-        spearman.append(spearman_corr(preds, utils))
-        gaps.append(oracle_u - selected_u)
-        norm_gaps.append((oracle_u - selected_u) / denom)
-        ranks.append(float(rank_oracle))
-        top2.append(1.0 if oracle_local in sorted_pred[: min(2, len(sorted_pred))] else 0.0)
-        pairwise.append(_pairwise_accuracy(preds, utils))
-        selected_utils.append(selected_u)
-        oracle_utils.append(oracle_u)
-
-    y = torch.tensor([float(row["utility_mean"]) for row in rows], dtype=torch.float32)
-    calibration_error = float(torch.mean(torch.abs(pred_calibrated.float() - y)).item()) if y.numel() else 0.0
-
-    return {
-        "top1": _mean(top1),
-        "spearman": _mean(spearman),
-        "oracle_gap": _mean(gaps),
-        "normalized_oracle_gap": _mean(norm_gaps),
-        "calibration_error": calibration_error,
-        "pairwise_accuracy": _mean(pairwise),
-        "rank_of_oracle_expert": _mean(ranks),
-        "top_k_contains_oracle": _mean(top2),
-        "selected_utility": _mean(selected_utils),
-        "oracle_utility": _mean(oracle_utils),
-        "num_queries": float(len(by_query)),
-        "num_pairs": float(len(rows)),
-    }
-
-
-def _train_and_eval_fold(
-    cfg: Dict[str, Any],
-    all_rows: List[Dict[str, Any]],
-    heldout_domain: int,
-    mode: str,
-    objective: str,
-    payloads: Dict[str, Dict[str, Any]],
-    centroids: Dict[int, torch.Tensor],
-    shuffled_map: Dict[int, Dict[str, float]],
-) -> Dict[str, Any] | None:
-    train_rows = [
-        row for row in all_rows if row["split"] == "train" and int(row["query_domain"]) != int(heldout_domain)
+def _aggregate(rows: Sequence[dict]) -> List[dict]:
+    metrics = [
+        "metadata_to_oracle_gap",
+        "top1_agreement_with_best_expert",
+        "spearman_similarity_vs_neg_nelbo",
+        "mean_rank_metadata_selected",
+        "calibration_slope",
+        "calibration_intercept",
+        "calibration_error_bin10",
+        "top1_margin",
+        "target_variance",
+        "oracle_pairwise_inconsistency_rate",
     ]
-    val_rows = [row for row in all_rows if row["split"] == "val" and int(row["query_domain"]) != int(heldout_domain)]
-    test_rows = [row for row in all_rows if row["split"] == "test" and int(row["query_domain"]) == int(heldout_domain)]
-    if not train_rows or not test_rows:
-        return None
-
-    routing_cfg = cfg.get("routing", {})
-    variance_floor = float(cfg.get("learned_compatibility", {}).get("variance_floor", 1e-10))
-    x_train = _build_feature_matrix(train_rows, mode, payloads, centroids, routing_cfg, shuffled_map)
-    x_val = _build_feature_matrix(val_rows, mode, payloads, centroids, routing_cfg, shuffled_map) if val_rows else torch.empty((0, x_train.shape[1]))
-    x_test = _build_feature_matrix(test_rows, mode, payloads, centroids, routing_cfg, shuffled_map)
-    y_train = torch.tensor([float(row["utility_mean"]) for row in train_rows], dtype=torch.float32)
-    y_val = torch.tensor([float(row["utility_mean"]) for row in val_rows], dtype=torch.float32)
-    y_test = torch.tensor([float(row["utility_mean"]) for row in test_rows], dtype=torch.float32)
-
-    x_train, (x_val, x_test), keep = _standardize(x_train, [x_val, x_test], variance_floor=variance_floor)
-
-    if objective == "linear_regression":
-        model = _fit_linear(x_train, y_train, ridge=float(cfg.get("learned_compatibility", {}).get("ridge", 1e-4)))
-        pred_train = _predict_linear(model, x_train)
-        pred_val = _predict_linear(model, x_val) if x_val.numel() else torch.empty((0,))
-        pred_test = _predict_linear(model, x_test)
-    elif objective == "compact_mlp":
-        model_mlp = _fit_mlp(x_train, y_train, x_val, y_val, cfg, objective=f"{objective}:{mode}:{heldout_domain}")
-        with torch.no_grad():
-            pred_train = model_mlp(x_train)
-            pred_val = model_mlp(x_val) if x_val.numel() else torch.empty((0,))
-            pred_test = model_mlp(x_test)
-    elif objective == "listwise_ranker":
-        model_rank = _fit_listwise(x_train, y_train, train_rows, x_val, y_val, val_rows, cfg)
-        with torch.no_grad():
-            pred_train = model_rank(x_train)
-            pred_val = model_rank(x_val) if x_val.numel() else torch.empty((0,))
-            pred_test = model_rank(x_test)
-    else:
-        raise ValueError(f"Unsupported learned objective: {objective}")
-
-    cal_source_pred = pred_val if pred_val.numel() else pred_train
-    cal_source_y = y_val if y_val.numel() else y_train
-    cal_a, cal_b = _fit_calibration(cal_source_pred, cal_source_y)
-    pred_test_cal = pred_test * cal_a + cal_b
-    metrics = _evaluate_predictions(test_rows, pred_test, pred_test_cal)
-    feature_family, adoption_eligible = _feature_mode_kind(mode)
-    method_key = f"{objective}__{mode}"
-
-    return {
-        "dataset": str(cfg["experiment"]["dataset_name"]),
-        "seed": int(cfg["seed"]),
-        "heldout_domain": int(heldout_domain),
-        "method_key": method_key,
-        "objective": objective,
-        "feature_family": feature_family,
-        "feature_mode": mode,
-        "response_feature_mode": mode if mode.startswith("response") or "response" in mode else "none",
-        "adoption_eligible": adoption_eligible,
-        "n_features_raw": int(keep.numel()),
-        "n_features_retained": int(keep.sum().item()),
-        **metrics,
-    }
-
-
-def _run_learned_compatibility(
-    cfg: Dict[str, Any],
-    rows: List[Dict[str, Any]],
-    payloads: Dict[str, Dict[str, Any]],
-    centroids: Dict[int, torch.Tensor],
-) -> List[Dict[str, Any]]:
-    learned_cfg = cfg.get("learned_compatibility", {})
-    feature_modes = [str(x) for x in learned_cfg.get("feature_modes", ["static_combined", "response_indirect", "static_response_indirect", "response_indirect_shuffled"])]
-    objectives = [str(x) for x in learned_cfg.get("objectives", ["linear_regression", "compact_mlp", "listwise_ranker"])]
-    heldout_domains = sorted({int(row["query_domain"]) for row in rows})
-    shuffled_map = _make_shuffled_response_maps(rows, seed=_stable_seed(cfg.get("seed", 42), "response_indirect_shuffled"))
-    decision_rows: List[Dict[str, Any]] = []
-
-    for heldout_domain in heldout_domains:
-        for mode in feature_modes:
-            for objective in objectives:
-                result = _train_and_eval_fold(
-                    cfg=cfg,
-                    all_rows=rows,
-                    heldout_domain=heldout_domain,
-                    mode=mode,
-                    objective=objective,
-                    payloads=payloads,
-                    centroids=centroids,
-                    shuffled_map=shuffled_map,
-                )
-                if result is not None:
-                    decision_rows.append(result)
-    return decision_rows
-
-
-def _target_adjacency_audit(rows: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    utility = [float(row["utility_mean"]) for row in rows]
-    columns = RESPONSE_INDIRECT_COLUMNS + TARGET_ADJACENT_COLUMNS + ORACLE_DIAGNOSTIC_COLUMNS
-    audit_rows = []
-    for col in columns:
-        vals = [float(row.get(col, 0.0)) for row in rows]
-        corr = pearson_corr(vals, utility)
-        audit_rows.append(
-            {
-                "feature": col,
-                "corr_with_utility": corr,
-                "abs_corr_with_utility": abs(corr),
-                "near_perfect_target_adjacency": abs(corr) >= 0.98,
-                "adoption_allowed": col in RESPONSE_INDIRECT_COLUMNS and abs(corr) < 0.98,
-            }
-        )
-
-    algebraic_errors = [
-        abs(float(row["nelbo_mean"]) - float(row.get("_target_recon_plus_kl_mean", 0.0)))
-        for row in rows
-        if math.isfinite(float(row.get("nelbo_mean", 0.0)))
-    ]
-    leakage = {
-        "nelbo_equals_recon_plus_kl_mean_abs_error": _mean(algebraic_errors),
-        "nelbo_equals_recon_plus_kl_max_abs_error": max(algebraic_errors) if algebraic_errors else 0.0,
-        "algebraic_components_target_adjacent": (_mean(algebraic_errors) < 1e-4 if algebraic_errors else False),
-    }
-    return audit_rows, leakage
-
-
-def _budget_reliability(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    by_domain: Dict[int, List[Dict[str, Any]]] = {}
+    groups: Dict[Tuple[str, str, str, str, str], List[dict]] = {}
     for row in rows:
-        by_domain.setdefault(int(row["query_domain"]), []).append(row)
-
-    out = []
-    for domain, domain_rows in sorted(by_domain.items()):
-        first_half = []
-        second_half = []
-        for row in domain_rows:
-            repeats = [float(v) for v in row.get("_target_nelbo_repeats", [])]
-            if len(repeats) >= 2:
-                mid = len(repeats) // 2
-                first_half.append(-_mean(repeats[:mid]))
-                second_half.append(-_mean(repeats[mid:]))
-        out.append(
-            {
-                "dataset": domain_rows[0]["dataset"] if domain_rows else "",
-                "seed": domain_rows[0]["seed"] if domain_rows else "",
-                "query_domain": domain,
-                "repeat_consistency_spearman": spearman_corr(first_half, second_half),
-                "response_feature_variance": _mean(
-                    [
-                        _std([float(row.get(col, 0.0)) for row in domain_rows])
-                        for col in RESPONSE_INDIRECT_COLUMNS
-                    ]
-                ),
-                "num_pairs": len(domain_rows),
-            }
+        key = (
+            str(row["dataset_name"]),
+            str(row["backbone_type"]),
+            str(row["variant"]),
+            str(row["feature_set"]),
+            str(row["method"]),
         )
+        groups.setdefault(key, []).append(row)
+
+    out: List[dict] = []
+    for key, vals in groups.items():
+        dataset_name, backbone_type, variant, feature_set, method = key
+        row = {
+            "dataset_name": dataset_name,
+            "backbone_type": backbone_type,
+            "variant": variant,
+            "feature_set": feature_set,
+            "method": method,
+            "n_folds": int(len(vals)),
+        }
+        for m in metrics:
+            arr = np.asarray([float(v[m]) for v in vals], dtype=np.float64)
+            row[f"{m}_mean"] = float(arr.mean()) if arr.size else 0.0
+            row[f"{m}_std"] = float(arr.std()) if arr.size else 0.0
+        out.append(row)
+
+    out.sort(key=lambda r: (r["dataset_name"], r["backbone_type"], r["feature_set"], r["method"]))
     return out
 
 
-def _aggregate_by_method(decision_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    by_method: Dict[str, List[Dict[str, Any]]] = {}
-    for row in decision_rows:
-        by_method.setdefault(str(row["method_key"]), []).append(row)
-
-    out = []
-    for method, rows in sorted(by_method.items()):
-        out.append(
-            {
-                "method_key": method,
-                "feature_mode": rows[0]["feature_mode"],
-                "feature_family": rows[0]["feature_family"],
-                "adoption_eligible": bool(rows[0]["adoption_eligible"]),
-                "top1": _mean(row["top1"] for row in rows),
-                "spearman": _mean(row["spearman"] for row in rows),
-                "oracle_gap": _mean(row["oracle_gap"] for row in rows),
-                "normalized_oracle_gap": _mean(row["normalized_oracle_gap"] for row in rows),
-                "calibration_error": _mean(row["calibration_error"] for row in rows),
-                "domain_group_std_normalized_oracle_gap": _std(row["normalized_oracle_gap"] for row in rows),
-                "num_folds": len(rows),
-            }
-        )
-    return out
-
-
-def _decision_summary(decision_rows: List[Dict[str, Any]], leakage: Dict[str, Any]) -> Dict[str, Any]:
-    aggregates = _aggregate_by_method(decision_rows)
-    eligible = [row for row in aggregates if row["adoption_eligible"]]
-    best = None
-    if eligible:
-        best = sorted(
-            eligible,
-            key=lambda row: (
-                -float(row["top1"]),
-                float(row["normalized_oracle_gap"]),
-                -float(row["spearman"]),
-            ),
-        )[0]
-
-    by_mode_best: Dict[str, Dict[str, Any]] = {}
-    for row in eligible:
-        mode = str(row["feature_mode"])
-        current = by_mode_best.get(mode)
-        if current is None or (
-            float(row["top1"]),
-            -float(row["normalized_oracle_gap"]),
-            float(row["spearman"]),
-        ) > (
-            float(current["top1"]),
-            -float(current["normalized_oracle_gap"]),
-            float(current["spearman"]),
-        ):
-            by_mode_best[mode] = row
-
-    static = by_mode_best.get("static_combined")
-    response = by_mode_best.get("response_indirect")
-    static_response = by_mode_best.get("static_response_indirect")
-    shuffled = by_mode_best.get("response_indirect_shuffled")
-
-    def beats(a: Dict[str, Any] | None, b: Dict[str, Any] | None) -> bool:
-        if a is None or b is None:
-            return False
-        return (
-            float(a["top1"]) >= float(b["top1"])
-            and float(a["spearman"]) >= float(b["spearman"])
-            and float(a["normalized_oracle_gap"]) < float(b["normalized_oracle_gap"])
-        )
-
-    return {
-        "best_adoption_eligible_method": best,
-        "static_response_indirect_beats_static_combined": beats(static_response, static),
-        "response_indirect_beats_shuffled_control": beats(response, shuffled),
-        "target_algebraic_leakage": leakage,
-        "adoption_guardrails": {
-            "excluded_markers": sorted(PROHIBITED_ADOPTION_MARKERS),
-            "diagnostic_modes_excluded_from_claims": True,
-        },
-        "method_aggregates": aggregates,
-    }
-
-
-def _failure_mode_summary(summary: Dict[str, Any]) -> str:
-    sr_beats_static = bool(summary.get("static_response_indirect_beats_static_combined", False))
-    response_beats_shuffled = bool(summary.get("response_indirect_beats_shuffled_control", False))
-    if sr_beats_static and response_beats_shuffled:
-        verdict = "response_signal_recoverable"
-        explanation = "Indirect expert response statistics improve routing and beat the shuffled response control."
-    elif sr_beats_static:
-        verdict = "response_signal_ambiguous"
-        explanation = "Static+response improves over static, but aligned response-only does not clearly beat shuffled control."
-    else:
-        verdict = "response_signal_not_recoverable"
-        explanation = "Indirect response features do not improve over the DINOv2 static baseline under the adoption gate."
-
-    return (
-        "# Failure Mode Summary\n\n"
-        f"- verdict: {verdict}\n"
-        f"- interpretation: {explanation}\n"
-        "- diagnostic modes containing NELBO, reconstruction means, or KL means are excluded from adoption claims.\n"
-    )
-
-
-def _write_artifacts(
-    reports_dir: Path,
-    rows: List[Dict[str, Any]],
-    decision_rows: List[Dict[str, Any]],
-    audit_rows: List[Dict[str, Any]],
-    leakage: Dict[str, Any],
-) -> None:
-    response_fields = [
-        "dataset",
-        "seed",
-        "split",
-        "query_id",
-        "query_domain",
-        "heldout_domain",
-        "expert_domain",
-        "utility_mean",
-        "utility_var",
-        "utility_confidence_weight",
-        "utility_normalized",
-        "oracle_expert",
-        "oracle_utility",
-        *RESPONSE_INDIRECT_COLUMNS,
-        *TARGET_ADJACENT_COLUMNS,
-        *ORACLE_DIAGNOSTIC_COLUMNS,
-        "feature_extractor_name",
-        "feature_extractor_checkpoint",
-        "feature_extractor_layer",
-        "embedding_pooling",
-        "dataset_scope",
-        "query_sampling_policy",
-        "query_sampling_seed",
+def _default_experiment_dirs(root: Path) -> List[Path]:
+    return [
+        root / "outputs" / "breakhis" / "hybrid_ablation_extractor_resnet18_v1",
+        root / "outputs" / "breakhis" / "hybrid_ablation_extractor_resnet50_v1",
+        root / "outputs" / "breakhis" / "hybrid_ablation_extractor_dinov2_vitb14_v1",
     ]
-    _write_csv(reports_dir / "loqdo_response_feature_table.csv", [_row_csv_projection(r) for r in rows], response_fields)
-    _write_csv(reports_dir / "target_adjacency_audit.csv", audit_rows)
-    _write_csv(reports_dir / "response_budget_reliability_table.csv", _budget_reliability(rows))
-
-    _write_csv(
-        reports_dir / "baseline_static_dinov2_reproduction.csv",
-        [r for r in decision_rows if r["feature_mode"] in STATIC_MODES],
-    )
-    _write_csv(
-        reports_dir / "response_indirect_decision_table.csv",
-        [r for r in decision_rows if r["feature_mode"] in {"response_indirect", "static_response_indirect"}],
-    )
-    _write_csv(
-        reports_dir / "response_indirect_shuffled_control_table.csv",
-        [r for r in decision_rows if r["feature_mode"] == "response_indirect_shuffled"],
-    )
-    _write_csv(
-        reports_dir / "response_target_adjacent_diagnostic_table.csv",
-        [r for r in decision_rows if r["feature_mode"] == "response_target_adjacent_diagnostic"],
-    )
-    _write_csv(
-        reports_dir / "response_oracle_diagnostic_table.csv",
-        [r for r in decision_rows if r["feature_mode"] == "response_oracle_diagnostic"],
-    )
-
-    summary = _decision_summary(decision_rows, leakage)
-    with (reports_dir / "decision_summary.json").open("w", encoding="utf-8") as f:
-        json.dump(summary, f, indent=2)
-    (reports_dir / "failure_mode_summary.md").write_text(_failure_mode_summary(summary), encoding="utf-8")
-
-    cross_dataset_row = {
-        "dataset": rows[0]["dataset"] if rows else "",
-        "seed": rows[0]["seed"] if rows else "",
-        "response_signal_recoverable": bool(summary.get("static_response_indirect_beats_static_combined", False))
-        and bool(summary.get("response_indirect_beats_shuffled_control", False)),
-        "response_signal_not_recoverable": not bool(summary.get("static_response_indirect_beats_static_combined", False)),
-        "response_signal_dataset_specific": "requires_multi_dataset_aggregation",
-    }
-    _write_csv(reports_dir / "cross_dataset_response_assessment.csv", [cross_dataset_row])
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run learned compatibility LOQDO response-statistics experiment.")
-    parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--run-id", type=str, default=None)
-    parser.add_argument("--dataset-scope", type=str, default=None)
-    parser.add_argument("--skip-training", action="store_true", help="Reuse existing checkpoints in the run directory.")
+    parser = argparse.ArgumentParser(description="Run leakage-safe LOQDO learned compatibility routing analysis.")
+    parser.add_argument(
+        "--experiment-dirs",
+        nargs="+",
+        default=None,
+        help="Run directories or experiment directories (with latest.txt). Defaults to BreakHis backbone trio.",
+    )
+    parser.add_argument("--variant", default="B", help="Hybrid variant checkpoint to score (default: B).")
+    parser.add_argument("--batch-size", type=int, default=2048)
+    parser.add_argument("--skip-mlp", action="store_true", help="Skip the optional MLP regression method.")
+    parser.add_argument("--skip-utility-probe", action="store_true", help="Skip utility_probe_v1 methods.")
+    parser.add_argument("--skip-oracle-probes", action="store_true", help="Skip semi-oracle and oracle diagnostic methods.")
+    parser.add_argument("--semi-oracle-risk-lambda", type=float, default=0.5)
+    parser.add_argument("--utility-probe-hidden-dim", type=int, default=32)
+    parser.add_argument("--utility-probe-dropout", type=float, default=0.2)
+    parser.add_argument("--utility-probe-lr", type=float, default=1.0e-3)
+    parser.add_argument("--utility-probe-epochs", type=int, default=300)
+    parser.add_argument("--utility-probe-alpha", type=float, default=1.0)
+    parser.add_argument("--utility-probe-beta", type=float, default=0.3)
+    parser.add_argument("--support-fraction", type=float, default=0.5)
+    parser.add_argument("--query-batch-size", type=int, default=64)
+    parser.add_argument("--support-split-seed", type=int, default=17)
+    parser.add_argument(
+        "--clip-target-percentile",
+        type=float,
+        default=99.0,
+        help="Symmetric percentile clipping for utility-probe training targets (0-100).",
+    )
+    parser.add_argument(
+        "--pair-table-dirname",
+        default="learned_compatibility_loqdo",
+        help="Directory name under each run's reports/ where pair tables are saved.",
+    )
+    parser.add_argument(
+        "--raw-out",
+        default="results/comparison_tables/learned_compatibility_loqdo_breakhis_raw.csv",
+        help="Workspace-relative CSV path for fold-level metrics.",
+    )
+    parser.add_argument(
+        "--stats-out",
+        default="results/comparison_tables/learned_compatibility_loqdo_breakhis_stats.csv",
+        help="Workspace-relative CSV path for aggregated metrics.",
+    )
+    parser.add_argument(
+        "--summary-json-out",
+        default="results/comparison_tables/learned_compatibility_loqdo_breakhis_summary.json",
+        help="Workspace-relative JSON path for run metadata and outputs.",
+    )
+    parser.add_argument(
+        "--require-parquet",
+        action="store_true",
+        help="Fail if parquet cannot be written (default: false, warn and continue with CSV).",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    config_path = args.config if args.config.is_absolute() else PROJECT_ROOT / args.config
-    cfg = load_config(config_path)
-    if args.dataset_scope:
-        cfg.setdefault("protocol", {})["dataset_scope"] = args.dataset_scope
+    workspace_root = PROJECT_ROOT
 
-    set_global_determinism(seed=int(cfg["seed"]))
-    run_ctx = build_run_context(PROJECT_ROOT, cfg, run_id_override=args.run_id)
-    write_run_metadata(cfg, run_ctx)
+    experiment_dirs = [Path(p) for p in args.experiment_dirs] if args.experiment_dirs else _default_experiment_dirs(workspace_root)
+    resolved_runs = [_resolve_run_dir(p if p.is_absolute() else (workspace_root / p)) for p in experiment_dirs]
 
-    records, leakage_report = prepare_dataset_records(PROJECT_ROOT, cfg)
-    dataset_scope, caps, sampling_seed, class_balance = _scope_caps(cfg)
-    capped_records, sampling_report = _cap_records(records, caps=caps, seed=sampling_seed, class_balance=class_balance)
-    write_manifest(capped_records, run_ctx.manifests_dir / "samples.csv")
-    write_split_manifest(capped_records, run_ctx.reports_dir / "split_manifest.json")
-    with (run_ctx.reports_dir / "leakage_report.json").open("w", encoding="utf-8") as f:
-        json.dump(leakage_report, f, indent=2)
-    with (run_ctx.reports_dir / "query_sampling_report.json").open("w", encoding="utf-8") as f:
-        json.dump(sampling_report, f, indent=2)
-
-    cache_paths = extract_and_cache_embeddings(
-        records=capped_records,
-        cache_dir=run_ctx.embeddings_dir,
-        image_size=int(cfg["features"]["image_size"]),
-        batch_size=int(cfg["training"]["batch_size"]),
-        feature_config=cfg.get("features", {}),
+    probe_cfg = ProbeConfig(
+        enabled=not bool(args.skip_utility_probe),
+        hidden_dim=int(args.utility_probe_hidden_dim),
+        dropout=float(args.utility_probe_dropout),
+        learning_rate=float(args.utility_probe_lr),
+        epochs=int(args.utility_probe_epochs),
+        alpha=float(args.utility_probe_alpha),
+        beta=float(args.utility_probe_beta),
+        support_fraction=float(args.support_fraction),
+        query_batch_size=int(args.query_batch_size),
+        support_split_seed=int(args.support_split_seed),
+        clip_target_percentile=float(args.clip_target_percentile),
     )
-    cache_report = validate_embedding_cache(cache_paths, expected_dim=int(cfg["features"]["embedding_dim"]))
-    with (run_ctx.reports_dir / "cache_report.json").open("w", encoding="utf-8") as f:
-        json.dump(cache_report, f, indent=2)
+    oracle_cfg = OracleProbeConfig(
+        enabled=not bool(args.skip_oracle_probes),
+        semi_oracle_risk_lambda=float(args.semi_oracle_risk_lambda),
+    )
 
-    checkpoint_json = run_ctx.checkpoints_dir / "expert_checkpoints.json"
-    if args.skip_training and checkpoint_json.exists():
-        expert_checkpoints = json.loads(checkpoint_json.read_text(encoding="utf-8"))
-    else:
-        expert_checkpoints = train_domain_experts(
-            train_cache=cache_paths["train"],
-            val_cache=cache_paths["val"],
-            out_dir=run_ctx.checkpoints_dir,
-            domains=[int(d) for d in cfg["data"]["magnifications"]],
-            hidden_dim=int(cfg["model"]["hidden_dim"]),
-            latent_dim=int(cfg["model"]["latent_dim"]),
-            lr=float(cfg["training"]["learning_rate"]),
-            epochs=int(cfg["training"]["epochs"]),
-            patience=int(cfg["training"]["patience"]),
-            batch_size=int(cfg["training"]["batch_size"]),
-            resume_from_dir=None,
+    methods = ["constant_mean", "expert_prior", "linear_regression"]
+    if not bool(args.skip_mlp):
+        methods.append("mlp_regression")
+    if probe_cfg.enabled:
+        methods.extend(["utility_probe_v1_no_expert_stats", "utility_probe_v1_with_expert_stats"])
+    if oracle_cfg.enabled:
+        methods.extend(
+            [
+                "semi_oracle_support_mean",
+                "semi_oracle_support_riskaware",
+                "oracle_eval_mean_cheat",
+                "oracle_pairwise_rank_cheat",
+            ]
         )
 
-    payloads = _load_payloads(cache_paths)
-    input_dim = int(payloads["train"]["embeddings"].shape[1])
-    device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
-    bank = DomainExpertBank(
-        expert_checkpoints=expert_checkpoints,
-        input_dim=input_dim,
-        hidden_dim=int(cfg["model"]["hidden_dim"]),
-        latent_dim=int(cfg["model"]["latent_dim"]),
-        device=device,
+    all_fold_rows: List[dict] = []
+    run_summaries: List[dict] = []
+
+    for run_dir in resolved_runs:
+        ctx = _load_run_context(run_dir, variant=args.variant)
+        pair_rows, expert_domains, utility_lookup, nelbo_lookup = _build_pair_rows(
+            ctx,
+            batch_size=int(args.batch_size),
+            probe_cfg=probe_cfg,
+        )
+
+        pair_rows = sorted(pair_rows, key=lambda r: (int(r["query_domain"]), int(r["expert_domain"])))
+        pair_dir = ctx.run_dir / "reports" / str(args.pair_table_dirname)
+        pair_dir.mkdir(parents=True, exist_ok=True)
+
+        rows_a = [
+            {
+                **r,
+                "feature_set": "A",
+                "held_out_query_domain": None,
+            }
+            for r in pair_rows
+        ]
+        rows_b = [
+            {
+                **r,
+                "feature_set": "B",
+                "held_out_query_domain": None,
+            }
+            for r in pair_rows
+        ]
+        _write_csv(rows_a, pair_dir / "pair_table_A.csv")
+        _write_csv(rows_b, pair_dir / "pair_table_B.csv")
+        _write_parquet(rows_a, pair_dir / "pair_table_A.parquet", required=bool(args.require_parquet))
+        _write_parquet(rows_b, pair_dir / "pair_table_B.parquet", required=bool(args.require_parquet))
+
+        query_domains = sorted(set(int(r["query_domain"]) for r in pair_rows))
+        run_rows: List[dict] = []
+
+        for heldout in query_domains:
+            train_rows = [r for r in pair_rows if int(r["query_domain"]) != int(heldout)]
+            test_rows = [r for r in pair_rows if int(r["query_domain"]) == int(heldout)]
+            if not train_rows or not test_rows:
+                continue
+
+            baseline_row = _evaluate_metadata_baseline(
+                ctx=ctx,
+                heldout_domain=heldout,
+                test_rows=test_rows,
+                expert_domains=expert_domains,
+                utility_lookup=utility_lookup,
+                nelbo_lookup=nelbo_lookup,
+            )
+            run_rows.append(baseline_row)
+
+            for feature_set in ["A", "B"]:
+                for method in methods:
+                    if method.startswith("utility_probe_v1") and feature_set != "B":
+                        continue
+                    if (method.startswith("semi_oracle_") or method.startswith("oracle_")) and feature_set != "B":
+                        continue
+                    row = _evaluate_holdout(
+                        ctx=ctx,
+                        heldout_domain=heldout,
+                        feature_set=feature_set,
+                        method=method,
+                        train_rows=train_rows,
+                        test_rows=test_rows,
+                        expert_domains=expert_domains,
+                        utility_lookup=utility_lookup,
+                        nelbo_lookup=nelbo_lookup,
+                        probe_cfg=probe_cfg,
+                        oracle_cfg=oracle_cfg,
+                    )
+                    run_rows.append(row)
+
+        all_fold_rows.extend(run_rows)
+        run_summaries.append(
+            {
+                "run_dir": str(ctx.run_dir),
+                "dataset_name": ctx.dataset_name,
+                "seed": int(ctx.seed),
+                "backbone_type": ctx.backbone_type,
+                "variant": ctx.variant,
+                "n_pair_rows": int(len(pair_rows)),
+                "n_fold_rows": int(len(run_rows)),
+                "expert_domains": [int(d) for d in expert_domains],
+            }
+        )
+
+        with (pair_dir / "summary.json").open("w", encoding="utf-8") as f:
+            json.dump(run_summaries[-1], f, indent=2)
+
+    raw_rows_sorted = sorted(
+        all_fold_rows,
+        key=lambda r: (
+            str(r["dataset_name"]),
+            str(r["backbone_type"]),
+            str(r["run_id"]),
+            str(r["feature_set"]),
+            str(r["method"]),
+            int(r["heldout_query_domain"]),
+        ),
     )
-    centroids = _domain_centroids(payloads["train"], expert_domains=bank.domains)
+    stats_rows = _aggregate(raw_rows_sorted)
 
-    response_cfg = cfg.get("response_features", {})
-    repeat_budgets = response_cfg.get("repeat_budgets", {"medium": 10})
-    budget_name = str(response_cfg.get("repeat_budget", "medium"))
-    target_budget_name = str(response_cfg.get("target_repeat_budget", budget_name))
-    response_repeats = int(repeat_budgets.get(budget_name, budget_name if str(budget_name).isdigit() else 10))
-    target_repeats = int(repeat_budgets.get(target_budget_name, target_budget_name if str(target_budget_name).isdigit() else response_repeats))
+    raw_out = workspace_root / str(args.raw_out)
+    stats_out = workspace_root / str(args.stats_out)
+    summary_out = workspace_root / str(args.summary_json_out)
 
-    rows = _build_pair_rows(
-        cfg=cfg,
-        payloads=payloads,
-        bank=bank,
-        response_repeats=response_repeats,
-        target_repeats=target_repeats,
-        dataset_scope=dataset_scope,
-        sampling_seed=sampling_seed,
-    )
-    audit_rows, leakage = _target_adjacency_audit(rows)
-    decision_rows = _run_learned_compatibility(cfg, rows, payloads, centroids)
-    _write_artifacts(run_ctx.reports_dir, rows, decision_rows, audit_rows, leakage)
-
-    print("Learned compatibility LOQDO experiment complete.")
-    print("Run directory:", run_ctx.run_root)
-    print("Reports:", run_ctx.reports_dir)
+    _write_csv(raw_rows_sorted, raw_out)
+    _write_csv(stats_rows, stats_out)
+    summary_out.parent.mkdir(parents=True, exist_ok=True)
+    with summary_out.open("w", encoding="utf-8") as f:
+        json.dump(
+            {
+                "methods": methods,
+                "probe_config": {
+                    "enabled": probe_cfg.enabled,
+                    "hidden_dim": probe_cfg.hidden_dim,
+                    "dropout": probe_cfg.dropout,
+                    "learning_rate": probe_cfg.learning_rate,
+                    "epochs": probe_cfg.epochs,
+                    "alpha": probe_cfg.alpha,
+                    "beta": probe_cfg.beta,
+                    "support_fraction": probe_cfg.support_fraction,
+                    "query_batch_size": probe_cfg.query_batch_size,
+                    "support_split_seed": probe_cfg.support_split_seed,
+                    "clip_target_percentile": probe_cfg.clip_target_percentile,
+                },
+                "oracle_probe_config": {
+                    "enabled": oracle_cfg.enabled,
+                    "semi_oracle_risk_lambda": oracle_cfg.semi_oracle_risk_lambda,
+                },
+                "runs": run_summaries,
+                "raw_csv": str(raw_out),
+                "stats_csv": str(stats_out),
+                "n_raw_rows": int(len(raw_rows_sorted)),
+                "n_stats_rows": int(len(stats_rows)),
+            },
+            f,
+            indent=2,
+        )
 
 
 if __name__ == "__main__":

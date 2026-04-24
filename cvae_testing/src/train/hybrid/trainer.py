@@ -9,6 +9,7 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 
 from src.models.cvae_expert import negative_elbo
+from src.torch_utils import safe_torch_load
 from src.train.checkpoint_utils import load_resume_state, save_resume_state, training_state_path
 from src.train.hybrid.checkpointing import save_hybrid_checkpoint
 from src.train.hybrid.checkpointing import build_hybrid_checkpoint_payload
@@ -248,7 +249,7 @@ class HybridAblationTrainer:
             best_val = float(state.get("best_metric", best_val))
             bad_epochs = int(state.get("bad_epochs", bad_epochs))
         elif ckpt_path.exists():
-            self._load_checkpoint_payload(torch.load(ckpt_path, map_location="cpu"))
+            self._load_checkpoint_payload(safe_torch_load(ckpt_path, map_location="cpu"))
 
         epoch_iter = range(start_epoch, self.epochs)
         epoch_bar = tqdm(epoch_iter, desc=f"train:{model_name}", unit="epoch") if tqdm is not None else None

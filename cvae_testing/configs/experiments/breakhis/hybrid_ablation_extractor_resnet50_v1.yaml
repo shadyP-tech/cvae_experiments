@@ -1,0 +1,52 @@
+seed: 42
+
+experiment:
+  dataset_name: breakhis
+  name: hybrid_ablation_extractor_resnet50_v1
+  mode: hybrid_ablation
+
+data:
+  dataset_type: breakhis
+  root: data/BreakHis
+  image_extensions: [".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"]
+  magnifications: [40, 100, 200, 400]
+  max_samples_per_domain: 500
+  split:
+    train: 0.70
+    val: 0.15
+    test: 0.15
+  require_patient_ids: false
+
+features:
+  image_size: 64
+  backbone_type: resnet50
+  embedding_dim: 2048
+
+model:
+  hidden_dim: 256
+  latent_dim: 16
+
+training:
+  batch_size: 128
+  learning_rate: 0.001
+  epochs: 25
+  patience: 5
+
+routing:
+  # Primary benchmark policy: exact metadata routing by magnification ID.
+  strategy: categorical_exact
+  tau: 1.0
+  temperature: 1.0
+
+hybrid:
+  projection_dim: 256
+  head_hidden_dim: 256
+  cvae_hidden_dim: 256
+  variants: ["A", "B", "C"]
+  synthetic_budgets: [1.0, 0.5]
+  aggregation_mode: top1_hard
+  topk_k: 2
+  aggregation_temperature: 1.0
+
+output:
+  root: outputs

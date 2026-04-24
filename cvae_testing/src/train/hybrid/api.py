@@ -6,6 +6,7 @@ from typing import Dict, List
 
 import torch
 
+from src.torch_utils import safe_torch_load
 from src.train.hybrid.trainer import HybridAblationTrainer
 from src.train.hybrid.variants import VARIANT_POOLED
 
@@ -28,8 +29,8 @@ def train_hybrid_variant(
     model_name: str,
     resume_from: Path | None = None,
 ) -> Dict[str, object]:
-    train_payload = torch.load(train_cache, map_location="cpu")
-    val_payload = torch.load(val_cache, map_location="cpu")
+    train_payload = safe_torch_load(train_cache, map_location="cpu")
+    val_payload = safe_torch_load(val_cache, map_location="cpu")
 
     trainer = HybridAblationTrainer(
         train_payload=train_payload,

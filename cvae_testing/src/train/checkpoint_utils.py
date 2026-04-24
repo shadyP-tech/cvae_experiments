@@ -5,6 +5,8 @@ from typing import Any, Dict
 
 import torch
 
+from src.torch_utils import safe_torch_load
+
 
 def training_state_path(model_checkpoint_path: Path) -> Path:
     stem = model_checkpoint_path.stem
@@ -35,4 +37,4 @@ def save_resume_state(
 
 
 def load_resume_state(state_path: Path) -> Dict[str, Any]:
-    return torch.load(state_path, map_location="cpu")
+    return safe_torch_load(state_path, map_location="cpu")

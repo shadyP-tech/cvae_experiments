@@ -1,0 +1,110 @@
+seed: 42
+
+experiment:
+  dataset_name: camelyon17
+  name: latent_compatibility_v1
+  mode: latent_compatibility
+
+data:
+  dataset_type: camelyon17
+  root: data/Camelyon17/data/camelyon17_v1.0
+  metadata_file: metadata.csv
+  domain_field: center
+  use_metadata_split: false
+  image_extensions: [".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"]
+  magnifications: [0, 1, 2, 3, 4]
+  max_samples_per_domain: 500
+  split:
+    train: 0.70
+    val: 0.15
+    test: 0.15
+  require_patient_ids: true
+
+features:
+  image_size: 64
+  backbone_type: resnet18
+  embedding_dim: 512
+
+model:
+  hidden_dim: 256
+  latent_dim: 16
+
+training:
+  batch_size: 128
+  learning_rate: 0.001
+  epochs: 25
+  patience: 5
+
+routing:
+  strategy: categorical_exact
+  tau: 1.0
+  temperature: 1.0
+
+latent_compatibility:
+  metrics: [centroid, wasserstein, gaussian_kl]
+  routing_granularity: sample
+  sample_level_routing:
+    max_samples: 10
+    timing_every: 5
+  similarity_transform: exp_neg
+  persist_raw_and_transformed_scores: true
+  compute_oracle_alignment: true
+  include_metadata_oracle_proxy_table: true
+  splits: [test]
+  min_samples_per_domain: 50
+  covariance_regularization_lambda: 1.0e-4
+  covariance_fallback: diagonal_if_small_n
+  scale_policy: median_off_diagonal
+  evaluation_metrics: [top1_agreement, mean_rank, spearman_with_utility]
+  composite_metric: wasserstein
+
+  verification:
+    symmetry_atol: 1.0e-6
+    symmetry_rtol: 1.0e-5
+    diag_opt_tol: 1.0e-6
+
+  wasserstein:
+    eigenvalue_floor: 1.0e-10
+
+  similarity:
+    scale_floor: 1.0e-8
+    scale_policy: median_off_diagonal
+
+  umap:
+    max_points: 5000
+
+  empirical_utility:
+    enabled: true
+
+  learned_comparison:
+    strict_context_match: true
+
+  coverage_gates:
+    require_complete_loqdo_folds: true
+    require_all_query_domains_present: true
+    exclude_partial_metric_rows: true
+
+  acceptance_thresholds:
+    enabled: true
+    strong:
+      spearman_uplift_gt: 0.10
+      top1_uplift_gte: 0.25
+      oracle_gap_reduction_gt_pct: 10.0
+      min_backbone_fraction: 0.67
+      expected_backbones: [resnet18, resnet50, dinov2_vitb14]
+      disallow_any_backbone_guardrail_breach: true
+    non_inferiority:
+      max_oracle_gap_worsening_pct: 5.0
+
+  step1_failure_gates:
+    enabled: true
+    overall_top1_lt: 0.50
+    mean_oracle_gap_pct_gt: 10.0
+    per_domain_top1_lt: 0.50
+    min_failing_query_domains: 2
+
+  step2_oracle_benchmark:
+    enabled: true
+
+output:
+  root: outputs

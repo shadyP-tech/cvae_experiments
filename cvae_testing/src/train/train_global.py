@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, Dict, Sequence
 
 import torch
 
+from src.data.metadata_conditioning import build_domain_one_hot, resolve_domain_order
+from src.torch_utils import safe_torch_load
 from src.train.train_utils import run_training
 
 
@@ -18,12 +21,25 @@ def train_global_model(
     patience: int,
     batch_size: int,
     resume_from: Path | None = None,
+    conditioning_cfg: Dict[str, Any] | None = None,
+    configured_domains: Sequence[int] | None = None,
 ) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
-    train_payload = torch.load(train_cache, map_location="cpu")
-    val_payload = torch.load(val_cache, map_location="cpu")
+    train_payload = safe_torch_load(train_cache, map_location="cpu")
+    val_payload = safe_torch_load(val_cache, map_location="cpu")
 
     input_dim = int(train_payload["embeddings"].shape[1])
+    cond_cfg = conditioning_cfg or {}
+    conditioning_enabled = bool(cond_cfg.get("enabled", False))
+    metadata_dim = 0
+    train_meta_vectors = None
+    val_meta_vectors = None
+    if conditioning_enabled:
+        domains = resolve_domain_order(configured_domains or [])
+        train_meta_vectors = build_domain_one_hot(train_payload["metadata"], domains)
+        val_meta_vectors = build_domain_one_hot(val_payload["metadata"], domains)
+        metadata_dim = int(len(domains))
+
     result = run_training(
         train_embeddings=train_payload["embeddings"],
         val_embeddings=val_payload["embeddings"],
@@ -37,5 +53,8 @@ def train_global_model(
         patience=patience,
         batch_size=batch_size,
         resume_from=resume_from,
+        train_metadata_vectors=train_meta_vectors,
+        val_metadata_vectors=val_meta_vectors,
+        metadata_dim=metadata_dim,
     )
     return result.checkpoint_path

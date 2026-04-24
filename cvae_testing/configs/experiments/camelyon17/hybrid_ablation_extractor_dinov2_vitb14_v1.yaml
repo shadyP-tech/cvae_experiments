@@ -1,0 +1,52 @@
+seed: 42
+
+experiment:
+  dataset_name: camelyon17
+  name: hybrid_ablation_extractor_dinov2_vitb14_v1
+  mode: hybrid_ablation
+
+data:
+  dataset_type: camelyon17
+  root: data/Camelyon17/data/camelyon17_v1.0
+  metadata_file: metadata.csv
+  domain_field: center
+  use_metadata_split: false
+  image_extensions: [".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"]
+  magnifications: [0, 1, 2, 3, 4]
+  max_samples_per_domain: 2000
+  split:
+    train: 0.70
+    val: 0.15
+    test: 0.15
+  require_patient_ids: true
+
+features:
+  image_size: 518
+  extraction_batch_size: 8
+  backbone_type: dinov2_vitb14
+  embedding_dim: 768
+
+model:
+  hidden_dim: 256
+  latent_dim: 16
+
+training:
+  batch_size: 128
+  learning_rate: 0.001
+  epochs: 25
+  patience: 5
+
+routing:
+  strategy: categorical_exact
+  tau: 1.0
+  temperature: 1.0
+
+hybrid:
+  projection_dim: 256
+  head_hidden_dim: 256
+  cvae_hidden_dim: 256
+  variants: ["A", "B", "C"]
+  synthetic_budgets: [1.0, 0.5]
+
+output:
+  root: outputs

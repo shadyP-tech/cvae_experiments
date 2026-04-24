@@ -134,19 +134,34 @@ def main() -> None:
         complete_stage("manifests_written", stage_started)
 
         stage_started = time.perf_counter()
-        cache_paths = extract_and_cache_embeddings(
+        expected_dim = cfg.get("features", {}).get("embedding_dim")
+        cache_paths, extraction_info = extract_and_cache_embeddings(
             records=records,
             cache_dir=run_ctx.embeddings_dir,
             image_size=int(cfg["features"]["image_size"]),
-            batch_size=int(cfg["training"]["batch_size"]),
-            feature_config=cfg.get("features", {}),
+            batch_size=int(cfg.get("features", {}).get("extraction_batch_size", cfg["training"]["batch_size"])),
+            backbone_type=str(cfg.get("features", {}).get("backbone_type", "resnet18")),
+            expected_dim=int(expected_dim) if expected_dim is not None else None,
         )
-        cache_report = validate_embedding_cache(cache_paths, expected_dim=int(cfg["features"]["embedding_dim"]))
+        resolved_dim = int(extraction_info["resolved_embedding_dim"])
+        cfg.setdefault("features", {})["embedding_dim"] = resolved_dim
+        cache_report = validate_embedding_cache(
+            cache_paths,
+            expected_dim=resolved_dim,
+            expected_backbone_type=str(extraction_info["backbone_type"]),
+        )
+        cache_report["feature_extractor"] = extraction_info
         with (run_ctx.reports_dir / "cache_report.json").open("w", encoding="utf-8") as f:
             json.dump(cache_report, f, indent=2)
         tracker.log_artifact(run_ctx.reports_dir / "cache_report.json", artifact_name="cache_report", artifact_type="report")
         progress.advance("embeddings extracted and validated")
-        complete_stage("embeddings_cached", stage_started, train_cache=str(cache_paths.get("train", "")))
+        complete_stage(
+            "embeddings_cached",
+            stage_started,
+            train_cache=str(cache_paths.get("train", "")),
+            backbone_type=str(extraction_info["backbone_type"]),
+            embedding_dim=resolved_dim,
+        )
 
         stage_started = time.perf_counter()
         global_ckpt = train_global_model(
@@ -160,6 +175,8 @@ def main() -> None:
             patience=int(cfg["training"]["patience"]),
             batch_size=int(cfg["training"]["batch_size"]),
             resume_from=(resume_checkpoints_dir / "global_cvae.pt") if resume_checkpoints_dir is not None else None,
+            conditioning_cfg=cfg.get("model", {}).get("conditioning", {}),
+            configured_domains=cfg.get("data", {}).get("magnifications", []),
         )
         progress.advance("legacy global baseline trained")
         tracker.log_artifact(Path(global_ckpt), artifact_name="global_cvae", artifact_type="checkpoint")
