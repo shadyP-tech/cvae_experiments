@@ -141,6 +141,11 @@ def _top1_margin(scores: np.ndarray) -> float:
     return float(order[-1] - order[-2])
 
 
+def _normalized_utility_gap(selected_nelbo: float, oracle_nelbo: float, worst_nelbo: float, eps: float = 1e-12) -> float:
+    denom = float(max(worst_nelbo - oracle_nelbo, float(eps)))
+    return float(max(selected_nelbo - oracle_nelbo, 0.0) / denom)
+
+
 def _oracle_pairwise_rank_scores(test_rows: Sequence[dict]) -> np.ndarray:
     utilities = np.asarray([float(r["oracle_utility"]) for r in test_rows], dtype=np.float64)
     experts = np.asarray([int(r["expert_domain"]) for r in test_rows], dtype=np.int64)
@@ -341,20 +346,42 @@ def _score_domains_batched(
     x_cpu: torch.Tensor,
     device: torch.device,
     batch_size: int,
-) -> Tuple[torch.Tensor, torch.Tensor]:
-    scores: List[torch.Tensor] = []
-    recons: List[torch.Tensor] = []
+    n_repeats: int,
+    repeat_seed_base: int,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    rep_count = max(1, int(n_repeats))
+    score_repeats: List[torch.Tensor] = []
+    recon_repeats: List[torch.Tensor] = []
+
     with torch.no_grad():
-        for ed in expert_domains:
-            nelbo_chunks: List[torch.Tensor] = []
-            recon_chunks: List[torch.Tensor] = []
-            for i in range(0, int(x_cpu.shape[0]), int(batch_size)):
-                xb = x_cpu[i : i + int(batch_size)].to(device)
-                nelbo_chunks.append(bank.score_domain_nelbo(int(ed), xb).cpu())
-                recon_chunks.append(bank.score_domain_recon(int(ed), xb).cpu())
-            scores.append(torch.cat(nelbo_chunks, dim=0) if nelbo_chunks else torch.empty((0,), dtype=torch.float32))
-            recons.append(torch.cat(recon_chunks, dim=0) if recon_chunks else torch.empty((0,), dtype=torch.float32))
-    return torch.stack(scores, dim=0), torch.stack(recons, dim=0)
+        for rep in range(rep_count):
+            rep_seed = int(repeat_seed_base) + int(rep) * 10007
+            torch.manual_seed(rep_seed)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed_all(rep_seed)
+
+            scores: List[torch.Tensor] = []
+            recons: List[torch.Tensor] = []
+            for ed in expert_domains:
+                nelbo_chunks: List[torch.Tensor] = []
+                recon_chunks: List[torch.Tensor] = []
+                for i in range(0, int(x_cpu.shape[0]), int(batch_size)):
+                    xb = x_cpu[i : i + int(batch_size)].to(device)
+                    nelbo_chunks.append(bank.score_domain_nelbo(int(ed), xb).cpu())
+                    recon_chunks.append(bank.score_domain_recon(int(ed), xb).cpu())
+                scores.append(torch.cat(nelbo_chunks, dim=0) if nelbo_chunks else torch.empty((0,), dtype=torch.float32))
+                recons.append(torch.cat(recon_chunks, dim=0) if recon_chunks else torch.empty((0,), dtype=torch.float32))
+            score_repeats.append(torch.stack(scores, dim=0))
+            recon_repeats.append(torch.stack(recons, dim=0))
+
+    score_stack = torch.stack(score_repeats, dim=0)
+    recon_stack = torch.stack(recon_repeats, dim=0)
+    return (
+        score_stack.mean(dim=0),
+        score_stack.std(dim=0, unbiased=False),
+        recon_stack.mean(dim=0),
+        recon_stack.std(dim=0, unbiased=False),
+    )
 
 
 def _domain_mean_embeddings(embeddings: np.ndarray, metadata: Sequence[dict], domains: Sequence[int]) -> Dict[int, np.ndarray]:
@@ -385,7 +412,8 @@ def _build_pair_rows(
     *,
     batch_size: int,
     probe_cfg: ProbeConfig,
-) -> Tuple[List[dict], List[int], Dict[int, Dict[int, float]], Dict[int, Dict[int, float]]]:
+    uncertainty_repeats: int,
+) -> Tuple[List[dict], List[int], Dict[int, Dict[int, float]], Dict[int, Dict[int, float]], Dict[int, Dict[int, float]]]:
     payload = safe_torch_load(ctx.test_cache, map_location="cpu")
     x_cpu: torch.Tensor = payload["embeddings"]
     metadata: List[dict] = payload["metadata"]
@@ -399,12 +427,14 @@ def _build_pair_rows(
     if not expert_domains:
         raise RuntimeError("No overlapping expert domains found between data and checkpoint.")
 
-    score_tensor, recon_tensor = _score_domains_batched(
+    score_mean_tensor, score_std_tensor, recon_mean_tensor, recon_std_tensor = _score_domains_batched(
         bank=bank,
         expert_domains=expert_domains,
         x_cpu=x_cpu,
         device=device,
         batch_size=batch_size,
+        n_repeats=int(uncertainty_repeats),
+        repeat_seed_base=int(ctx.seed) * 7919 + int(probe_cfg.support_split_seed) * 101,
     )
 
     by_query: Dict[int, List[int]] = {d: [] for d in all_domains}
@@ -421,6 +451,7 @@ def _build_pair_rows(
     rows: List[dict] = []
     utility_lookup: Dict[int, Dict[int, float]] = {}
     nelbo_lookup: Dict[int, Dict[int, float]] = {}
+    nelbo_std_lookup: Dict[int, Dict[int, float]] = {}
 
     # Query-domain metadata route for query-side difficulty stats.
     meta_best_by_query: Dict[int, int] = {}
@@ -456,32 +487,40 @@ def _build_pair_rows(
 
         utility_lookup[q] = {}
         nelbo_lookup[q] = {}
+        nelbo_std_lookup[q] = {}
         query_mean = mean_by_domain.get(q)
         if query_mean is None:
             continue
 
         q_best_e = int(meta_best_by_query[q])
         q_best_idx = int(expert_domains.index(q_best_e))
-        q_support_nelbo = score_tensor[q_best_idx, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
-        q_support_recon = recon_tensor[q_best_idx, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
+        q_support_nelbo = score_mean_tensor[q_best_idx, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
+        q_support_nelbo_unc = score_std_tensor[q_best_idx, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
+        q_support_recon = recon_mean_tensor[q_best_idx, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
         q_support_kl = q_support_nelbo - q_support_recon
         q_nelbo_mean, q_nelbo_std, q_nelbo_p90 = _summary_stats(q_support_nelbo)
         q_recon_mean, q_recon_std, _ = _summary_stats(q_support_recon)
         q_kl_mean, q_kl_std, _ = _summary_stats(q_support_kl)
+        q_unc_mean, q_unc_std, _ = _summary_stats(q_support_nelbo_unc)
 
         split_id = f"seed{ctx.seed}_q{q}_sup{len(support_idxs)}_eval{len(eval_idxs)}"
 
         for e_i, e in enumerate(expert_domains):
-            support_nelbo = score_tensor[e_i, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
-            eval_nelbo = score_tensor[e_i, eval_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
+            support_nelbo = score_mean_tensor[e_i, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
+            support_nelbo_unc = score_std_tensor[e_i, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
+            eval_nelbo = score_mean_tensor[e_i, eval_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
+            eval_nelbo_unc = score_std_tensor[e_i, eval_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
             if eval_nelbo.size == 0:
                 continue
             mean_nelbo = float(eval_nelbo.mean())
+            std_nelbo = float(eval_nelbo_unc.mean()) if eval_nelbo_unc.size else 0.0
             utility = -mean_nelbo
             utility_lookup[q][e] = utility
             nelbo_lookup[q][e] = mean_nelbo
+            nelbo_std_lookup[q][e] = std_nelbo
 
             exp_sup_mean, exp_sup_std, exp_sup_p90 = _summary_stats(support_nelbo)
+            exp_sup_unc_mean, exp_sup_unc_std, _ = _summary_stats(support_nelbo_unc)
 
             meta_similarity = compute_similarity(
                 {"magnification": int(q)},
@@ -507,7 +546,9 @@ def _build_pair_rows(
                     "query_domain": int(q),
                     "expert_domain": int(e),
                     "oracle_utility": utility,
+                    "oracle_utility_std": std_nelbo,
                     "oracle_nelbo": mean_nelbo,
+                    "oracle_nelbo_std": std_nelbo,
                     "metadata_similarity": float(meta_similarity),
                     "metadata_distance": meta_distance,
                     "embedding_distance": embedding_distance,
@@ -517,6 +558,8 @@ def _build_pair_rows(
                     "is_exact_domain_match": 1.0 if int(q) == int(e) else 0.0,
                     "query_nelbo_mean": q_nelbo_mean,
                     "query_nelbo_std": q_nelbo_std,
+                    "query_nelbo_uncertainty_mean": q_unc_mean,
+                    "query_nelbo_uncertainty_std": q_unc_std,
                     "query_nelbo_p90": q_nelbo_p90,
                     "query_recon_mean": q_recon_mean,
                     "query_recon_std": q_recon_std,
@@ -524,14 +567,17 @@ def _build_pair_rows(
                     "query_kl_std": q_kl_std,
                     "expert_support_nelbo_mean": exp_sup_mean,
                     "expert_support_nelbo_std": exp_sup_std,
+                    "expert_support_nelbo_uncertainty_mean": exp_sup_unc_mean,
+                    "expert_support_nelbo_uncertainty_std": exp_sup_unc_std,
                     "expert_support_nelbo_p90": exp_sup_p90,
+                    "expert_eval_nelbo_uncertainty_mean": std_nelbo,
                     "support_size": int(len(support_idxs)),
                     "eval_size": int(len(eval_idxs)),
                     "support_eval_split_id": split_id,
                 }
             )
 
-    return rows, expert_domains, utility_lookup, nelbo_lookup
+    return rows, expert_domains, utility_lookup, nelbo_lookup, nelbo_std_lookup
 
 
 def _normalize_targets_per_query(train_rows: Sequence[dict]) -> Dict[int, Tuple[float, float]]:
@@ -569,6 +615,7 @@ def _feature_matrix(
     expert_domains: Sequence[int],
     include_probe_features: bool,
     include_expert_stats: bool,
+    include_interaction_features: bool,
 ) -> np.ndarray:
     features: List[List[float]] = []
     for row in rows:
@@ -608,7 +655,37 @@ def _feature_matrix(
                         float(row.get("expert_support_nelbo_p90", 0.0)),
                     ]
                 )
-        features.append(base + ext + one_hot + probe_feats)
+        interaction_feats: List[float] = []
+        if include_interaction_features:
+            md = float(row["metadata_distance"])
+            ed = float(row["embedding_distance"])
+            qv = float(row["query_domain_value"])
+            ev = float(row["expert_domain_value"])
+            dd = float(row["abs_domain_diff"])
+            interaction_feats.extend(
+                [
+                    md * ed,
+                    qv * ev,
+                    md * dd,
+                    ed * dd,
+                    float(row["is_exact_domain_match"]) * ed,
+                ]
+            )
+            if include_probe_features:
+                qnm = float(row.get("query_nelbo_mean", 0.0))
+                qns = float(row.get("query_nelbo_std", 0.0))
+                esn = float(row.get("expert_support_nelbo_mean", 0.0))
+                ess = float(row.get("expert_support_nelbo_std", 0.0))
+                interaction_feats.extend(
+                    [
+                        md * qnm,
+                        ed * qnm,
+                        md * qns,
+                        qnm * esn,
+                        qns * ess,
+                    ]
+                )
+        features.append(base + ext + one_hot + probe_feats + interaction_feats)
 
     return np.asarray(features, dtype=np.float64)
 
@@ -730,11 +807,17 @@ def _evaluate_holdout(
     expert_domains: Sequence[int],
     utility_lookup: Dict[int, Dict[int, float]],
     nelbo_lookup: Dict[int, Dict[int, float]],
+    nelbo_std_lookup: Dict[int, Dict[int, float]],
     probe_cfg: ProbeConfig,
     oracle_cfg: OracleProbeConfig,
+    include_probe_features_override: Optional[bool] = None,
+    include_interaction_features: bool = False,
+    disentanglement_arm: str = "default",
 ) -> dict:
     norm_stats = _normalize_targets_per_query(train_rows)
     include_probe_features = method.startswith("utility_probe_v1")
+    if include_probe_features_override is not None:
+        include_probe_features = bool(include_probe_features_override)
     include_expert_stats = method.endswith("with_expert_stats")
     x_train = _feature_matrix(
         train_rows,
@@ -742,6 +825,7 @@ def _evaluate_holdout(
         expert_domains=expert_domains,
         include_probe_features=include_probe_features,
         include_expert_stats=include_expert_stats,
+        include_interaction_features=bool(include_interaction_features),
     )
     x_test = _feature_matrix(
         test_rows,
@@ -749,6 +833,7 @@ def _evaluate_holdout(
         expert_domains=expert_domains,
         include_probe_features=include_probe_features,
         include_expert_stats=include_expert_stats,
+        include_interaction_features=bool(include_interaction_features),
     )
     y_train_norm = _with_normalized_targets(train_rows, norm_stats)
 
@@ -778,6 +863,10 @@ def _evaluate_holdout(
 
     selected_nelbo = float(nelbo_lookup[heldout_domain][selected_e])
     oracle_nelbo = float(nelbo_lookup[heldout_domain][oracle_e])
+    selected_nelbo_std = float(nelbo_std_lookup[heldout_domain][selected_e])
+    oracle_nelbo_std = float(nelbo_std_lookup[heldout_domain][oracle_e])
+    worst_nelbo = float(max(float(v) for v in nelbo_lookup[heldout_domain].values()))
+    normalized_gap = _normalized_utility_gap(selected_nelbo, oracle_nelbo, worst_nelbo)
 
     return {
         "dataset_name": ctx.dataset_name,
@@ -787,6 +876,9 @@ def _evaluate_holdout(
         "variant": ctx.variant,
         "feature_set": feature_set,
         "method": method,
+        "probe_feature_mode": "on" if include_probe_features else "off",
+        "interaction_feature_mode": "on" if bool(include_interaction_features) else "off",
+        "disentanglement_arm": str(disentanglement_arm),
         "heldout_query_domain": int(heldout_domain),
         "n_train_rows": int(len(train_rows)),
         "n_test_rows": int(len(test_rows)),
@@ -796,11 +888,19 @@ def _evaluate_holdout(
         "top1_agreement_with_best_expert": 1.0 if selected_e == oracle_e else 0.0,
         "spearman_similarity_vs_neg_nelbo": float(spearman_corr(scores.tolist(), y_true.tolist())),
         "metadata_to_oracle_gap": float(selected_nelbo - oracle_nelbo),
+        "normalized_metadata_to_oracle_gap": normalized_gap,
         "mean_rank_metadata_selected": float(selected_rank),
         "selected_routing_nelbo": selected_nelbo,
+        "selected_routing_nelbo_std": selected_nelbo_std,
         "oracle_routing_nelbo": oracle_nelbo,
+        "oracle_routing_nelbo_std": oracle_nelbo_std,
+        "metadata_to_oracle_gap_std_approx": float(math.sqrt(max(selected_nelbo_std**2 + oracle_nelbo_std**2, 0.0))),
+        "worst_routing_nelbo": worst_nelbo,
         "fold_id": f"{ctx.run_dir.name}:{int(heldout_domain)}",
         "support_eval_split_id": split_id,
+        "split_policy": "loqdo_query_domain",
+        "uncertainty_mode": "point_estimate",
+        "model_capacity_profile": "default",
         "calibration_slope": slope,
         "calibration_intercept": intercept,
         "calibration_error_bin10": cal_err,
@@ -818,6 +918,7 @@ def _evaluate_metadata_baseline(
     expert_domains: Sequence[int],
     utility_lookup: Dict[int, Dict[int, float]],
     nelbo_lookup: Dict[int, Dict[int, float]],
+    nelbo_std_lookup: Dict[int, Dict[int, float]],
 ) -> dict:
     sims = [
         compute_similarity(
@@ -837,6 +938,10 @@ def _evaluate_metadata_baseline(
     selected_rank = _row_rank_desc(util_vec, selected_idx=pred_best_idx)
     selected_nelbo = float(nelbo_lookup[heldout_domain][selected_e])
     oracle_nelbo = float(nelbo_lookup[heldout_domain][oracle_e])
+    selected_nelbo_std = float(nelbo_std_lookup[heldout_domain][selected_e])
+    oracle_nelbo_std = float(nelbo_std_lookup[heldout_domain][oracle_e])
+    worst_nelbo = float(max(float(v) for v in nelbo_lookup[heldout_domain].values()))
+    normalized_gap = _normalized_utility_gap(selected_nelbo, oracle_nelbo, worst_nelbo)
     y_true = np.asarray(util_vec, dtype=np.float64)
     y_pred = np.asarray(sims, dtype=np.float64)
     slope, intercept, cal_err = _calibration_metrics(y_pred, y_true, n_bins=10)
@@ -849,6 +954,9 @@ def _evaluate_metadata_baseline(
         "variant": ctx.variant,
         "feature_set": "baseline",
         "method": "metadata_routing",
+        "probe_feature_mode": "off",
+        "interaction_feature_mode": "off",
+        "disentanglement_arm": "baseline",
         "heldout_query_domain": int(heldout_domain),
         "n_train_rows": 0,
         "n_test_rows": int(len(test_rows)),
@@ -858,11 +966,19 @@ def _evaluate_metadata_baseline(
         "top1_agreement_with_best_expert": 1.0 if selected_e == oracle_e else 0.0,
         "spearman_similarity_vs_neg_nelbo": float(spearman_corr(sims, util_vec)),
         "metadata_to_oracle_gap": float(selected_nelbo - oracle_nelbo),
+        "normalized_metadata_to_oracle_gap": normalized_gap,
         "mean_rank_metadata_selected": float(selected_rank),
         "selected_routing_nelbo": selected_nelbo,
+        "selected_routing_nelbo_std": selected_nelbo_std,
         "oracle_routing_nelbo": oracle_nelbo,
+        "oracle_routing_nelbo_std": oracle_nelbo_std,
+        "metadata_to_oracle_gap_std_approx": float(math.sqrt(max(selected_nelbo_std**2 + oracle_nelbo_std**2, 0.0))),
+        "worst_routing_nelbo": worst_nelbo,
         "fold_id": f"{ctx.run_dir.name}:{int(heldout_domain)}",
         "support_eval_split_id": str(test_rows[0].get("support_eval_split_id", "na")) if test_rows else "na",
+        "split_policy": "loqdo_query_domain",
+        "uncertainty_mode": "point_estimate",
+        "model_capacity_profile": "default",
         "calibration_slope": slope,
         "calibration_intercept": intercept,
         "calibration_error_bin10": cal_err,
@@ -911,6 +1027,8 @@ def _write_parquet(rows: Sequence[dict], path: Path, required: bool = False) -> 
 def _aggregate(rows: Sequence[dict]) -> List[dict]:
     metrics = [
         "metadata_to_oracle_gap",
+        "metadata_to_oracle_gap_std_approx",
+        "normalized_metadata_to_oracle_gap",
         "top1_agreement_with_best_expert",
         "spearman_similarity_vs_neg_nelbo",
         "mean_rank_metadata_selected",
@@ -921,7 +1039,7 @@ def _aggregate(rows: Sequence[dict]) -> List[dict]:
         "target_variance",
         "oracle_pairwise_inconsistency_rate",
     ]
-    groups: Dict[Tuple[str, str, str, str, str], List[dict]] = {}
+    groups: Dict[Tuple[str, str, str, str, str, str, str], List[dict]] = {}
     for row in rows:
         key = (
             str(row["dataset_name"]),
@@ -929,18 +1047,22 @@ def _aggregate(rows: Sequence[dict]) -> List[dict]:
             str(row["variant"]),
             str(row["feature_set"]),
             str(row["method"]),
+            str(row.get("probe_feature_mode", "off")),
+            str(row.get("interaction_feature_mode", "off")),
         )
         groups.setdefault(key, []).append(row)
 
     out: List[dict] = []
     for key, vals in groups.items():
-        dataset_name, backbone_type, variant, feature_set, method = key
+        dataset_name, backbone_type, variant, feature_set, method, probe_mode, interaction_mode = key
         row = {
             "dataset_name": dataset_name,
             "backbone_type": backbone_type,
             "variant": variant,
             "feature_set": feature_set,
             "method": method,
+            "probe_feature_mode": probe_mode,
+            "interaction_feature_mode": interaction_mode,
             "n_folds": int(len(vals)),
         }
         for m in metrics:
@@ -1015,12 +1137,49 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Fail if parquet cannot be written (default: false, warn and continue with CSV).",
     )
+    parser.add_argument(
+        "--split-policy",
+        type=str,
+        default="loqdo_query_domain",
+        help="Protocol identifier emitted in raw rows for provenance.",
+    )
+    parser.add_argument(
+        "--uncertainty-mode",
+        type=str,
+        default="point_estimate",
+        help="Uncertainty mode label emitted in raw rows for provenance.",
+    )
+    parser.add_argument(
+        "--model-capacity-profile",
+        type=str,
+        default="default",
+        help="Model-capacity profile label emitted in raw rows for provenance.",
+    )
+    parser.add_argument(
+        "--uncertainty-repeats",
+        type=int,
+        default=1,
+        help="Number of repeated expert scoring passes used to estimate per-pair NELBO uncertainty.",
+    )
+    parser.add_argument(
+        "--enable-interaction-features",
+        action="store_true",
+        help="Enable interaction feature terms for non-baseline methods.",
+    )
+    parser.add_argument(
+        "--probe-interaction-disentanglement",
+        action="store_true",
+        help="Evaluate four probe/interaction arms for utility probe methods: neither, interaction_only, probe_only, probe_plus_interaction.",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     workspace_root = PROJECT_ROOT
+    effective_uncertainty_mode = str(args.uncertainty_mode)
+    if int(args.uncertainty_repeats) > 1 and effective_uncertainty_mode == "point_estimate":
+        effective_uncertainty_mode = "repeated_nelbo_meanstd"
 
     experiment_dirs = [Path(p) for p in args.experiment_dirs] if args.experiment_dirs else _default_experiment_dirs(workspace_root)
     resolved_runs = [_resolve_run_dir(p if p.is_absolute() else (workspace_root / p)) for p in experiment_dirs]
@@ -1063,10 +1222,11 @@ def main() -> None:
 
     for run_dir in resolved_runs:
         ctx = _load_run_context(run_dir, variant=args.variant)
-        pair_rows, expert_domains, utility_lookup, nelbo_lookup = _build_pair_rows(
+        pair_rows, expert_domains, utility_lookup, nelbo_lookup, nelbo_std_lookup = _build_pair_rows(
             ctx,
             batch_size=int(args.batch_size),
             probe_cfg=probe_cfg,
+            uncertainty_repeats=int(args.uncertainty_repeats),
         )
 
         pair_rows = sorted(pair_rows, key=lambda r: (int(r["query_domain"]), int(r["expert_domain"])))
@@ -1110,7 +1270,11 @@ def main() -> None:
                 expert_domains=expert_domains,
                 utility_lookup=utility_lookup,
                 nelbo_lookup=nelbo_lookup,
+                nelbo_std_lookup=nelbo_std_lookup,
             )
+            baseline_row["split_policy"] = str(args.split_policy)
+            baseline_row["uncertainty_mode"] = effective_uncertainty_mode
+            baseline_row["model_capacity_profile"] = str(args.model_capacity_profile)
             run_rows.append(baseline_row)
 
             for feature_set in ["A", "B"]:
@@ -1119,20 +1283,37 @@ def main() -> None:
                         continue
                     if (method.startswith("semi_oracle_") or method.startswith("oracle_")) and feature_set != "B":
                         continue
-                    row = _evaluate_holdout(
-                        ctx=ctx,
-                        heldout_domain=heldout,
-                        feature_set=feature_set,
-                        method=method,
-                        train_rows=train_rows,
-                        test_rows=test_rows,
-                        expert_domains=expert_domains,
-                        utility_lookup=utility_lookup,
-                        nelbo_lookup=nelbo_lookup,
-                        probe_cfg=probe_cfg,
-                        oracle_cfg=oracle_cfg,
-                    )
-                    run_rows.append(row)
+                    arm_specs: List[Tuple[str, Optional[bool], bool]] = [("default", None, bool(args.enable_interaction_features))]
+                    if bool(args.probe_interaction_disentanglement) and method.startswith("utility_probe_v1") and feature_set == "B":
+                        arm_specs = [
+                            ("neither", False, False),
+                            ("interaction_only", False, True),
+                            ("probe_only", True, False),
+                            ("probe_plus_interaction", True, True),
+                        ]
+
+                    for arm_name, probe_override, interaction_on in arm_specs:
+                        row = _evaluate_holdout(
+                            ctx=ctx,
+                            heldout_domain=heldout,
+                            feature_set=feature_set,
+                            method=method,
+                            train_rows=train_rows,
+                            test_rows=test_rows,
+                            expert_domains=expert_domains,
+                            utility_lookup=utility_lookup,
+                            nelbo_lookup=nelbo_lookup,
+                            nelbo_std_lookup=nelbo_std_lookup,
+                            probe_cfg=probe_cfg,
+                            oracle_cfg=oracle_cfg,
+                            include_probe_features_override=probe_override,
+                            include_interaction_features=interaction_on,
+                            disentanglement_arm=arm_name,
+                        )
+                        row["split_policy"] = str(args.split_policy)
+                        row["uncertainty_mode"] = effective_uncertainty_mode
+                        row["model_capacity_profile"] = str(args.model_capacity_profile)
+                        run_rows.append(row)
 
         all_fold_rows.extend(run_rows)
         run_summaries.append(
@@ -1145,6 +1326,12 @@ def main() -> None:
                 "n_pair_rows": int(len(pair_rows)),
                 "n_fold_rows": int(len(run_rows)),
                 "expert_domains": [int(d) for d in expert_domains],
+                "split_policy": str(args.split_policy),
+                "uncertainty_mode": effective_uncertainty_mode,
+                "uncertainty_repeats": int(args.uncertainty_repeats),
+                "model_capacity_profile": str(args.model_capacity_profile),
+                "enable_interaction_features": bool(args.enable_interaction_features),
+                "probe_interaction_disentanglement": bool(args.probe_interaction_disentanglement),
             }
         )
 
@@ -1191,6 +1378,14 @@ def main() -> None:
                 "oracle_probe_config": {
                     "enabled": oracle_cfg.enabled,
                     "semi_oracle_risk_lambda": oracle_cfg.semi_oracle_risk_lambda,
+                },
+                "protocol": {
+                    "split_policy": str(args.split_policy),
+                    "uncertainty_mode": effective_uncertainty_mode,
+                    "uncertainty_repeats": int(args.uncertainty_repeats),
+                    "model_capacity_profile": str(args.model_capacity_profile),
+                    "enable_interaction_features": bool(args.enable_interaction_features),
+                    "probe_interaction_disentanglement": bool(args.probe_interaction_disentanglement),
                 },
                 "runs": run_summaries,
                 "raw_csv": str(raw_out),
