@@ -139,13 +139,64 @@ def _assign_split_groupwise(
 
 def cap_samples_per_domain(
     records: List[BreakHisRecord],
-    cap_per_domain: int,
+    cap_per_domain: int | None,
     seed: int,
-) -> List[BreakHisRecord]:
+    split_domain_caps: Dict[str, int] | None = None,
+) -> Tuple[List[BreakHisRecord], Dict[str, object]]:
     rng = random.Random(seed)
     by_domain: Dict[int, List[BreakHisRecord]] = {}
     for rec in records:
         by_domain.setdefault(rec.magnification, []).append(rec)
+
+    if split_domain_caps is not None:
+        required_keys = {"train", "val", "test"}
+        actual_keys = set(str(k) for k in split_domain_caps.keys())
+        if actual_keys != required_keys:
+            raise ValueError("split_domain_caps must define exactly train/val/test keys")
+
+        normalized_split_caps = {
+            "train": max(int(split_domain_caps["train"]), 0),
+            "val": max(int(split_domain_caps["val"]), 0),
+            "test": max(int(split_domain_caps["test"]), 0),
+        }
+
+        capped_fixed: List[BreakHisRecord] = []
+        cap_rows: List[Dict[str, object]] = []
+        for domain, domain_records in by_domain.items():
+            by_split: Dict[str, List[BreakHisRecord]] = {"train": [], "val": [], "test": []}
+            for rec in domain_records:
+                by_split[rec.split].append(rec)
+
+            for split_name in ["train", "val", "test"]:
+                split_records = list(by_split[split_name])
+                rng.shuffle(split_records)
+
+                requested = int(normalized_split_caps[split_name])
+                available = int(len(split_records))
+                selected = int(min(requested, available))
+                shortfall = int(max(requested - selected, 0))
+
+                capped_fixed.extend(split_records[:selected])
+                cap_rows.append(
+                    {
+                        "domain": int(domain),
+                        "split": split_name,
+                        "requested_count": requested,
+                        "available_count": available,
+                        "actual_count": selected,
+                        "shortfall": shortfall,
+                        "shortfall_flag": int(shortfall > 0),
+                    }
+                )
+
+        return capped_fixed, {
+            "mode": "fixed_split_caps",
+            "split_caps": normalized_split_caps,
+            "rows": cap_rows,
+        }
+
+    if cap_per_domain is None:
+        raise ValueError("cap_per_domain is required when split_domain_caps is not provided")
 
     capped: List[BreakHisRecord] = []
     for _, domain_records in by_domain.items():
@@ -166,7 +217,11 @@ def cap_samples_per_domain(
             domain_capped.extend(remaining[: cap_per_domain - len(domain_capped)])
 
         capped.extend(domain_capped[:cap_per_domain])
-    return capped
+    return capped, {
+        "mode": "legacy_cap_per_domain",
+        "cap_per_domain": int(cap_per_domain),
+        "rows": [],
+    }
 
 
 def leakage_report(records: List[BreakHisRecord]) -> Dict[str, object]:
@@ -208,9 +263,10 @@ def prepare_breakhis_records(
     root: Path,
     extensions: Iterable[str],
     split: Dict[str, float],
-    cap_per_domain: int,
+    cap_per_domain: int | None,
     seed: int,
     require_patient_ids: bool,
+    split_domain_caps: Dict[str, int] | None = None,
 ) -> Tuple[List[BreakHisRecord], Dict[str, object]]:
     records = build_records(root, extensions)
     split_records, limitations = _assign_split_groupwise(
@@ -219,7 +275,13 @@ def prepare_breakhis_records(
         seed=seed,
         require_patient_ids=require_patient_ids,
     )
-    capped = cap_samples_per_domain(split_records, cap_per_domain=cap_per_domain, seed=seed)
+    capped, cap_report = cap_samples_per_domain(
+        split_records,
+        cap_per_domain=cap_per_domain,
+        seed=seed,
+        split_domain_caps=split_domain_caps,
+    )
     report = leakage_report(capped)
     report["limitations"] = limitations
+    report["split_cap_accounting"] = cap_report
     return capped, report

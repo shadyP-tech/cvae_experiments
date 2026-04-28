@@ -39,6 +39,7 @@ def train_domain_experts(
     resume_from_dir: Path | None = None,
     conditioning_cfg: Dict[str, Any] | None = None,
     configured_domains: Sequence[int] | None = None,
+    metadata_constraint_cfg: Dict[str, Any] | None = None,
 ) -> Dict[str, str]:
     out_dir.mkdir(parents=True, exist_ok=True)
     train_payload = safe_torch_load(train_cache, map_location="cpu")
@@ -83,6 +84,7 @@ def train_domain_experts(
             train_metadata_vectors=train_m,
             val_metadata_vectors=val_m,
             metadata_dim=metadata_dim,
+            metadata_constraint_cfg=metadata_constraint_cfg,
         )
         output[f"{domain}x"] = str(result.checkpoint_path)
 

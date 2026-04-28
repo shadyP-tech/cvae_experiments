@@ -19,6 +19,10 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
     if missing:
         raise ValueError(f"Missing required config sections: {missing}")
 
+    experiment_cfg = cfg.get("experiment", {})
+    experiment_name = str((experiment_cfg or {}).get("name", "")).strip().lower()
+    is_response_routing_protocol = experiment_name == "learned_utility_response_routing_v1"
+
     split = cfg.get("data", {}).get("split")
     if not isinstance(split, dict):
         raise ValueError("data.split must be a dictionary containing train/val/test ratios.")
@@ -33,6 +37,50 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
     total = train + val + test
     if abs(total - 1.0) > 1e-6:
         raise ValueError(f"data.split ratios must sum to 1.0, got {total:.6f}")
+
+    data_cfg = cfg.get("data", {})
+    split_cap_profile = str(data_cfg.get("split_cap_profile", "legacy")).strip().lower()
+    allowed_split_cap_profiles = {"legacy", "development", "final", "custom"}
+    if split_cap_profile not in allowed_split_cap_profiles:
+        raise ValueError(
+            "data.split_cap_profile must be one of "
+            f"{sorted(allowed_split_cap_profiles)}, got: {split_cap_profile}"
+        )
+
+    split_caps_cfg = data_cfg.get("split_domain_caps")
+    fixed_split_caps_cfg = data_cfg.get("fixed_split_caps")
+    if split_caps_cfg is not None and fixed_split_caps_cfg is not None:
+        raise ValueError("Use only one of data.split_domain_caps or data.fixed_split_caps, not both")
+    resolved_split_caps_cfg = split_caps_cfg if split_caps_cfg is not None else fixed_split_caps_cfg
+
+    if resolved_split_caps_cfg is not None:
+        if not isinstance(resolved_split_caps_cfg, dict):
+            raise ValueError("data.split_domain_caps/data.fixed_split_caps must be a dictionary when provided")
+        expected_keys = {"train", "val", "test"}
+        actual_keys = set(str(k) for k in resolved_split_caps_cfg.keys())
+        if actual_keys != expected_keys:
+            raise ValueError(
+                "data.split_domain_caps/data.fixed_split_caps must define exactly train/val/test keys"
+            )
+        for key in sorted(expected_keys):
+            value = int(resolved_split_caps_cfg[key])
+            if value < 0:
+                raise ValueError(
+                    f"data.split_domain_caps.{key} must be >= 0 (got {value})"
+                )
+
+    if split_cap_profile in {"development", "final"} and resolved_split_caps_cfg is not None:
+        profile_caps = {
+            "development": {"train": 250, "val": 100, "test": 200},
+            "final": {"train": 1000, "val": 250, "test": 1000},
+        }[split_cap_profile]
+        for split_name, expected_cap in profile_caps.items():
+            configured = int(resolved_split_caps_cfg[split_name])
+            if configured != expected_cap:
+                raise ValueError(
+                    f"data.split_cap_profile='{split_cap_profile}' requires "
+                    f"{split_name}={expected_cap}, got {configured}"
+                )
 
     if int(cfg["training"]["batch_size"]) <= 0:
         raise ValueError("training.batch_size must be > 0")
@@ -78,6 +126,49 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         invalid_fields = [str(x) for x in metadata_fields if str(x).strip().lower() != "domain_id"]
         if invalid_fields:
             raise ValueError("model.conditioning.metadata_fields supports only ['domain_id'] in v1")
+
+    metadata_constraint_cfg = model_cfg.get("metadata_constraint", {})
+    if metadata_constraint_cfg is not None and not isinstance(metadata_constraint_cfg, dict):
+        raise ValueError("model.metadata_constraint must be a dictionary when provided")
+
+    _ensure_bool(
+        (metadata_constraint_cfg or {}).get("enabled", False),
+        "model.metadata_constraint.enabled",
+    )
+    metadata_constraint_enabled = bool((metadata_constraint_cfg or {}).get("enabled", False))
+
+    metadata_constraint_variant = str((metadata_constraint_cfg or {}).get("variant", "aux_head")).strip().lower()
+    allowed_constraint_variants = {"aux_head", "conditional_prior"}
+    if metadata_constraint_variant not in allowed_constraint_variants:
+        raise ValueError(
+            "model.metadata_constraint.variant must be one of "
+            f"{sorted(allowed_constraint_variants)}, got: {metadata_constraint_variant}"
+        )
+
+    metadata_constraint_aux_weight = float((metadata_constraint_cfg or {}).get("aux_weight", 0.0))
+    if metadata_constraint_aux_weight < 0:
+        raise ValueError("model.metadata_constraint.aux_weight must be >= 0")
+
+    _ensure_bool(
+        (metadata_constraint_cfg or {}).get("use_mu", True),
+        "model.metadata_constraint.use_mu",
+    )
+
+    aux_head_hidden_dim = int((metadata_constraint_cfg or {}).get("head_hidden_dim", 0))
+    if aux_head_hidden_dim < 0:
+        raise ValueError("model.metadata_constraint.head_hidden_dim must be >= 0")
+
+    prior_hidden_dim = int((metadata_constraint_cfg or {}).get("prior_hidden_dim", 0))
+    if prior_hidden_dim < 0:
+        raise ValueError("model.metadata_constraint.prior_hidden_dim must be >= 0")
+
+    prior_logvar_min = float((metadata_constraint_cfg or {}).get("prior_logvar_min", -6.0))
+    prior_logvar_max = float((metadata_constraint_cfg or {}).get("prior_logvar_max", 2.0))
+    if prior_logvar_min > prior_logvar_max:
+        raise ValueError("model.metadata_constraint.prior_logvar_min must be <= prior_logvar_max")
+
+    if metadata_constraint_enabled and not conditioning_enabled:
+        raise ValueError("model.metadata_constraint.enabled requires model.conditioning.enabled=true in v1")
 
     protocol_cfg = cfg.get("legacy_protocol")
     if protocol_cfg is not None:
@@ -136,6 +227,43 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError(
             f"features.backbone_type must be one of {sorted(allowed_backbones)}, got: {backbone_type}"
         )
+
+    feature_extractor_name = features_cfg.get("feature_extractor_name")
+    if feature_extractor_name is not None:
+        feature_extractor_name_norm = str(feature_extractor_name).strip().lower()
+        if not feature_extractor_name_norm:
+            raise ValueError("features.feature_extractor_name must be non-empty when provided")
+        if feature_extractor_name_norm not in allowed_backbones:
+            raise ValueError(
+                "features.feature_extractor_name must be one of "
+                f"{sorted(allowed_backbones)}, got: {feature_extractor_name_norm}"
+            )
+
+    feature_extractor_checkpoint = features_cfg.get("feature_extractor_checkpoint")
+    if feature_extractor_checkpoint is not None:
+        checkpoint_norm = str(feature_extractor_checkpoint).strip()
+        if not checkpoint_norm:
+            raise ValueError("features.feature_extractor_checkpoint must be non-empty when provided")
+
+    feature_extractor_layer = features_cfg.get("feature_extractor_layer")
+    if feature_extractor_layer is not None:
+        feature_extractor_layer_norm = str(feature_extractor_layer).strip().lower()
+        allowed_layers = {"final_norm_cls", "final_norm_patch_mean", "prenorm_cls"}
+        if feature_extractor_layer_norm not in allowed_layers:
+            raise ValueError(
+                "features.feature_extractor_layer must be one of "
+                f"{sorted(allowed_layers)}, got: {feature_extractor_layer_norm}"
+            )
+
+    embedding_pooling = features_cfg.get("embedding_pooling")
+    if embedding_pooling is not None:
+        embedding_pooling_norm = str(embedding_pooling).strip().lower()
+        allowed_pooling = {"cls_token", "patch_mean"}
+        if embedding_pooling_norm not in allowed_pooling:
+            raise ValueError(
+                "features.embedding_pooling must be one of "
+                f"{sorted(allowed_pooling)}, got: {embedding_pooling_norm}"
+            )
 
     magnifications = cfg.get("data", {}).get("magnifications", [])
     if not isinstance(magnifications, list) or not magnifications:
@@ -536,8 +664,105 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             )
 
         backbone = str(cfg.get("features", {}).get("backbone_type", "")).strip().lower()
-        if backbone != "resnet50":
-            raise ValueError("features.backbone_type must be 'resnet50' for learned_utility protocol lock")
+        if is_response_routing_protocol:
+            if backbone != "dinov2_vitb14":
+                raise ValueError(
+                    "features.backbone_type must be 'dinov2_vitb14' for learned_utility_response_routing_v1"
+                )
+
+            if int(features_cfg.get("image_size", 0)) != 224:
+                raise ValueError("features.image_size must be 224 for learned_utility_response_routing_v1")
+
+            if int(features_cfg.get("embedding_dim", 0)) != 768:
+                raise ValueError("features.embedding_dim must be 768 for learned_utility_response_routing_v1")
+
+            locked_name = str(features_cfg.get("feature_extractor_name", "")).strip().lower()
+            if locked_name != "dinov2_vitb14":
+                raise ValueError(
+                    "features.feature_extractor_name must be 'dinov2_vitb14' for learned_utility_response_routing_v1"
+                )
+
+            locked_checkpoint = str(features_cfg.get("feature_extractor_checkpoint", "")).strip().lower()
+            if locked_checkpoint != "facebook/dinov2-base":
+                raise ValueError(
+                    "features.feature_extractor_checkpoint must be 'facebook/dinov2-base' "
+                    "for learned_utility_response_routing_v1"
+                )
+
+            locked_layer = str(features_cfg.get("feature_extractor_layer", "")).strip().lower()
+            if locked_layer != "final_norm_cls":
+                raise ValueError(
+                    "features.feature_extractor_layer must be 'final_norm_cls' "
+                    "for learned_utility_response_routing_v1"
+                )
+
+            locked_pooling = str(features_cfg.get("embedding_pooling", "")).strip().lower()
+            if locked_pooling != "cls_token":
+                raise ValueError(
+                    "features.embedding_pooling must be 'cls_token' for learned_utility_response_routing_v1"
+                )
+
+            response_repeat_mode = str(learned_cfg.get("response_repeat_mode", "posterior_sampling")).strip().lower()
+            if response_repeat_mode != "posterior_sampling":
+                raise ValueError(
+                    "learned_utility.response_repeat_mode must be 'posterior_sampling' "
+                    "for learned_utility_response_routing_v1"
+                )
+
+            _ensure_bool(
+                learned_cfg.get("posterior_sampling_enabled", True),
+                "learned_utility.posterior_sampling_enabled",
+            )
+            _ensure_bool(
+                learned_cfg.get("dropout_enabled", False),
+                "learned_utility.dropout_enabled",
+            )
+            _ensure_bool(
+                learned_cfg.get("decoder_sampling_enabled", False),
+                "learned_utility.decoder_sampling_enabled",
+            )
+
+            if not bool(learned_cfg.get("posterior_sampling_enabled", True)):
+                raise ValueError(
+                    "learned_utility.posterior_sampling_enabled must be true "
+                    "for learned_utility_response_routing_v1"
+                )
+            if bool(learned_cfg.get("dropout_enabled", False)):
+                raise ValueError(
+                    "learned_utility.dropout_enabled must be false "
+                    "for learned_utility_response_routing_v1"
+                )
+
+            num_response_repeats = int(learned_cfg.get("num_response_repeats", 0))
+            if num_response_repeats <= 0:
+                raise ValueError(
+                    "learned_utility.num_response_repeats must be > 0 for learned_utility_response_routing_v1"
+                )
+
+            response_norm = str(
+                learned_cfg.get("response_feature_normalization", "train_fold_standardize")
+            ).strip().lower()
+            if response_norm != "train_fold_standardize":
+                raise ValueError(
+                    "learned_utility.response_feature_normalization must be 'train_fold_standardize' "
+                    "for learned_utility_response_routing_v1"
+                )
+
+            calibration_definition = str(
+                learned_cfg.get("calibration_error_definition", "bin10_mean_abs_gap")
+            ).strip().lower()
+            if calibration_definition != "bin10_mean_abs_gap":
+                raise ValueError(
+                    "learned_utility.calibration_error_definition must be 'bin10_mean_abs_gap' "
+                    "for learned_utility_response_routing_v1"
+                )
+
+            near_tie_eps = float(learned_cfg.get("near_tie_epsilon_norm", 0.02))
+            if near_tie_eps < 0:
+                raise ValueError("learned_utility.near_tie_epsilon_norm must be >= 0")
+        else:
+            if backbone != "resnet50":
+                raise ValueError("features.backbone_type must be 'resnet50' for learned_utility protocol lock")
 
     latent_cfg = cfg.get("latent_compatibility")
     if latent_cfg is not None:

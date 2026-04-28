@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import importlib
 import random
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import torch
 from torch.utils.data import DataLoader, TensorDataset
@@ -44,6 +44,7 @@ class HybridAblationTrainer:
         batch_size: int,
         seed: int,
         variant: str,
+        metadata_constraint_cfg: Dict[str, Any] | None = None,
     ) -> None:
         self.train_x = train_payload["embeddings"]
         self.val_x = val_payload["embeddings"]
@@ -62,6 +63,9 @@ class HybridAblationTrainer:
         self.batch_size = int(batch_size)
         self.seed = int(seed)
         self.variant = str(variant)
+        self.metadata_constraint_cfg: Dict[str, Any] = dict(metadata_constraint_cfg or {})
+        self.metadata_constraint_enabled = bool(self.metadata_constraint_cfg.get("enabled", False))
+        self.domain_to_index = {int(d): i for i, d in enumerate(self.domains)}
 
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
@@ -75,7 +79,13 @@ class HybridAblationTrainer:
             cvae_hidden_dim=self.cvae_hidden_dim,
             latent_dim=self.latent_dim,
             domains=self.domains,
+            metadata_constraint_cfg=self.metadata_constraint_cfg,
+            aux_metadata_dim=int(len(self.domains)),
         )
+
+    def _metadata_targets_for_domain(self, domain: int, n_rows: int, device: torch.device) -> torch.Tensor:
+        cls = int(self.domain_to_index[int(domain)])
+        return torch.full((int(n_rows),), cls, dtype=torch.long, device=device)
 
     def _domains_tensor(self, metadata: List[dict]) -> torch.Tensor:
         return torch.tensor([int(m["magnification"]) for m in metadata], dtype=torch.long)
@@ -97,8 +107,9 @@ class HybridAblationTrainer:
             params.extend(list(m.parameters()))
         return params
 
-    def _forward_variant(self, xb: torch.Tensor, db: torch.Tensor) -> torch.Tensor:
+    def _forward_variant(self, xb: torch.Tensor, db: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         total_loss = torch.tensor(0.0, device=self.device)
+        total_aux = torch.tensor(0.0, device=self.device)
         total_count = 0
 
         for d in self.domains:
@@ -106,34 +117,55 @@ class HybridAblationTrainer:
             if not torch.any(mask):
                 continue
             x_d = xb[mask]
+            cvae = None
 
             if self.variant == VARIANT_A:
                 assert self.bundle.shared_head is not None
                 proj = self.bundle.shared_head(x_d)
-                recon, mu, logvar = self.bundle.cvaes[d](proj)
+                cvae = self.bundle.cvaes[d]
+                recon, mu, logvar, aux_logits = cvae(proj, return_aux=True)
             elif self.variant == VARIANT_POOLED:
                 assert self.bundle.shared_head is not None
                 assert self.bundle.shared_cvae is not None
                 proj = self.bundle.shared_head(x_d)
-                recon, mu, logvar = self.bundle.shared_cvae(proj)
+                cvae = self.bundle.shared_cvae
+                recon, mu, logvar, aux_logits = cvae(proj, return_aux=True)
             elif self.variant == VARIANT_B:
                 assert self.bundle.shared_cvae is not None
                 proj = self.bundle.heads[d](x_d)
-                recon, mu, logvar = self.bundle.shared_cvae(proj)
+                cvae = self.bundle.shared_cvae
+                recon, mu, logvar, aux_logits = cvae(proj, return_aux=True)
             elif self.variant == VARIANT_C:
                 proj = self.bundle.heads[d](x_d)
-                recon, mu, logvar = self.bundle.cvaes[d](proj)
+                cvae = self.bundle.cvaes[d]
+                recon, mu, logvar, aux_logits = cvae(proj, return_aux=True)
             else:
                 raise ValueError(f"Unsupported hybrid variant: {self.variant}")
 
-            loss = negative_elbo(recon, proj, mu, logvar)
             count = int(x_d.shape[0])
+            targets = self._metadata_targets_for_domain(domain=d, n_rows=count, device=xb.device)
+            prior_mu, prior_logvar, kl_weight = cvae.metadata_constraint_prior(metadata_targets=targets)
+            loss = negative_elbo(
+                recon,
+                proj,
+                mu,
+                logvar,
+                prior_mu=prior_mu,
+                prior_logvar=prior_logvar,
+                kl_weight=kl_weight,
+            )
+
+            if cvae is not None and cvae.metadata_constraint_enabled and cvae.metadata_constraint_variant == "aux_head":
+                aux_loss = cvae.metadata_constraint_loss(aux_logits=aux_logits, metadata_targets=targets)
+                loss = loss + (cvae.metadata_constraint_weight * aux_loss)
+                total_aux = total_aux + (aux_loss * count)
+
             total_loss = total_loss + loss * count
             total_count += count
 
         if total_count == 0:
-            return torch.tensor(0.0, device=self.device)
-        return total_loss / total_count
+            return torch.tensor(0.0, device=self.device), torch.tensor(0.0, device=self.device)
+        return total_loss / total_count, total_aux / total_count
 
     def _set_train(self, train_mode: bool) -> None:
         modules = []
@@ -156,6 +188,8 @@ class HybridAblationTrainer:
             head_hidden_dim=self.head_hidden_dim,
             cvae_hidden_dim=self.cvae_hidden_dim,
             latent_dim=self.latent_dim,
+            metadata_constraint_cfg=self.metadata_constraint_cfg,
+            aux_metadata_dim=int(len(self.domains)),
             bundle=self.bundle,
         )
 
@@ -217,6 +251,14 @@ class HybridAblationTrainer:
             if shared_head is None or shared_cvae is None:
                 raise ValueError("Resume checkpoint missing shared modules for pooled variant.")
 
+        payload_constraint_cfg = payload.get("metadata_constraint_cfg") or {}
+        payload_constraint_enabled = bool(payload_constraint_cfg.get("enabled", False))
+        if payload_constraint_enabled != self.metadata_constraint_enabled:
+            raise ValueError(
+                "Resume checkpoint metadata constraint mismatch: "
+                f"expected enabled={self.metadata_constraint_enabled}, got enabled={payload_constraint_enabled}."
+            )
+
     def train(self, out_dir: Path, model_name: str, resume_from: Path | None = None) -> Tuple[Path, Dict[str, List[float]]]:
         random.seed(self.seed)
         torch.manual_seed(self.seed)
@@ -257,42 +299,52 @@ class HybridAblationTrainer:
         for epoch in epoch_iter:
             self._set_train(True)
             train_loss_sum = 0.0
+            train_aux_sum = 0.0
             train_count = 0
             for xb, db in train_loader:
                 xb = xb.to(self.device)
                 db = db.to(self.device)
-                loss = self._forward_variant(xb, db)
+                loss, aux_loss = self._forward_variant(xb, db)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
                 batch_n = int(xb.shape[0])
                 train_loss_sum += float(loss.item()) * batch_n
+                train_aux_sum += float(aux_loss.item()) * batch_n
                 train_count += batch_n
 
             self._set_train(False)
             val_loss_sum = 0.0
+            val_aux_sum = 0.0
             val_count = 0
             with torch.no_grad():
                 for xb, db in val_loader:
                     xb = xb.to(self.device)
                     db = db.to(self.device)
-                    loss = self._forward_variant(xb, db)
+                    loss, aux_loss = self._forward_variant(xb, db)
                     batch_n = int(xb.shape[0])
                     val_loss_sum += float(loss.item()) * batch_n
+                    val_aux_sum += float(aux_loss.item()) * batch_n
                     val_count += batch_n
 
             train_epoch = train_loss_sum / max(train_count, 1)
             val_epoch = val_loss_sum / max(val_count, 1)
             history["train"].append(train_epoch)
             history["val"].append(val_epoch)
+            if self.metadata_constraint_enabled and self.metadata_constraint_cfg.get("variant", "aux_head") == "aux_head":
+                history.setdefault("train_aux", []).append(train_aux_sum / max(train_count, 1))
+                history.setdefault("val_aux", []).append(val_aux_sum / max(val_count, 1))
 
             if epoch_bar is not None:
-                epoch_bar.set_postfix(
-                    train=f"{train_epoch:.4f}",
-                    val=f"{val_epoch:.4f}",
-                    best=f"{best_val:.4f}",
-                    bad=f"{bad_epochs}/{self.patience}",
-                )
+                postfix = {
+                    "train": f"{train_epoch:.4f}",
+                    "val": f"{val_epoch:.4f}",
+                    "best": f"{best_val:.4f}",
+                    "bad": f"{bad_epochs}/{self.patience}",
+                }
+                if self.metadata_constraint_enabled and self.metadata_constraint_cfg.get("variant", "aux_head") == "aux_head":
+                    postfix["aux"] = f"{history['val_aux'][-1]:.4f}"
+                epoch_bar.set_postfix(**postfix)
                 epoch_bar.update(1)
 
             if val_epoch < best_val:
@@ -312,6 +364,8 @@ class HybridAblationTrainer:
                             head_hidden_dim=self.head_hidden_dim,
                             cvae_hidden_dim=self.cvae_hidden_dim,
                             latent_dim=self.latent_dim,
+                            metadata_constraint_cfg=self.metadata_constraint_cfg,
+                            aux_metadata_dim=int(len(self.domains)),
                             bundle=self.bundle,
                         ),
                         optimizer_state=optimizer.state_dict(),
@@ -333,6 +387,8 @@ class HybridAblationTrainer:
                     head_hidden_dim=self.head_hidden_dim,
                     cvae_hidden_dim=self.cvae_hidden_dim,
                     latent_dim=self.latent_dim,
+                    metadata_constraint_cfg=self.metadata_constraint_cfg,
+                    aux_metadata_dim=int(len(self.domains)),
                     bundle=self.bundle,
                 ),
                 optimizer_state=optimizer.state_dict(),

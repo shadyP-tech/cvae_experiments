@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any
 from dataclasses import dataclass
 import importlib
 from pathlib import Path
@@ -50,6 +51,7 @@ def run_training(
     train_metadata_vectors: torch.Tensor | None = None,
     val_metadata_vectors: torch.Tensor | None = None,
     metadata_dim: int = 0,
+    metadata_constraint_cfg: Dict[str, Any] | None = None,
 ) -> TrainResult:
     out_dir.mkdir(parents=True, exist_ok=True)
     ckpt = out_dir / f"{model_name}.pt"
@@ -60,6 +62,8 @@ def run_training(
         hidden_dim=hidden_dim,
         latent_dim=latent_dim,
         metadata_dim=int(metadata_dim),
+        metadata_constraint_cfg=metadata_constraint_cfg,
+        aux_metadata_dim=int(metadata_dim),
     ).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     state_ckpt = training_state_path(ckpt)
@@ -111,6 +115,7 @@ def run_training(
     for epoch in epoch_iter:
         model.train()
         train_loss = 0.0
+        train_aux_loss = 0.0
         for batch in train_loader:
             if len(batch) == 1:
                 (x,) = batch
@@ -119,8 +124,22 @@ def run_training(
                 x, m = batch
                 m = m.to(device)
             x = x.to(device)
-            recon, mu, logvar = model(x, m=m)
-            loss = negative_elbo(recon, x, mu, logvar)
+            recon, mu, logvar, aux_logits = model(x, m=m, return_aux=True)
+            prior_mu, prior_logvar, kl_weight = model.metadata_constraint_prior(metadata_targets=m)
+            nelbo = negative_elbo(
+                recon,
+                x,
+                mu,
+                logvar,
+                prior_mu=prior_mu,
+                prior_logvar=prior_logvar,
+                kl_weight=kl_weight,
+            )
+            loss = nelbo
+            if model.metadata_constraint_enabled and model.metadata_constraint_variant == "aux_head":
+                aux_loss = model.metadata_constraint_loss(aux_logits=aux_logits, metadata_targets=m)
+                loss = nelbo + (model.metadata_constraint_weight * aux_loss)
+                train_aux_loss += aux_loss.item() * x.size(0)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -128,6 +147,7 @@ def run_training(
 
         model.eval()
         val_loss = 0.0
+        val_aux_loss = 0.0
         with torch.no_grad():
             for batch in val_loader:
                 if len(batch) == 1:
@@ -137,22 +157,44 @@ def run_training(
                     x, m = batch
                     m = m.to(device)
                 x = x.to(device)
-                recon, mu, logvar = model(x, m=m)
-                loss = negative_elbo(recon, x, mu, logvar)
+                recon, mu, logvar, aux_logits = model(x, m=m, return_aux=True)
+                prior_mu, prior_logvar, kl_weight = model.metadata_constraint_prior(metadata_targets=m)
+                nelbo = negative_elbo(
+                    recon,
+                    x,
+                    mu,
+                    logvar,
+                    prior_mu=prior_mu,
+                    prior_logvar=prior_logvar,
+                    kl_weight=kl_weight,
+                )
+                loss = nelbo
+                if model.metadata_constraint_enabled and model.metadata_constraint_variant == "aux_head":
+                    aux_loss = model.metadata_constraint_loss(aux_logits=aux_logits, metadata_targets=m)
+                    loss = nelbo + (model.metadata_constraint_weight * aux_loss)
+                    val_aux_loss += aux_loss.item() * x.size(0)
                 val_loss += loss.item() * x.size(0)
 
         train_epoch = train_loss / max(len(train_embeddings), 1)
         val_epoch = val_loss / max(len(val_embeddings), 1)
         history["train"].append(train_epoch)
         history["val"].append(val_epoch)
+        if model.metadata_constraint_enabled and model.metadata_constraint_variant == "aux_head":
+            train_aux_epoch = train_aux_loss / max(len(train_embeddings), 1)
+            val_aux_epoch = val_aux_loss / max(len(val_embeddings), 1)
+            history.setdefault("train_aux", []).append(train_aux_epoch)
+            history.setdefault("val_aux", []).append(val_aux_epoch)
 
         if epoch_bar is not None:
-            epoch_bar.set_postfix(
-                train=f"{train_epoch:.4f}",
-                val=f"{val_epoch:.4f}",
-                best=f"{best_val:.4f}",
-                bad=f"{bad_epochs}/{patience}",
-            )
+            postfix = {
+                "train": f"{train_epoch:.4f}",
+                "val": f"{val_epoch:.4f}",
+                "best": f"{best_val:.4f}",
+                "bad": f"{bad_epochs}/{patience}",
+            }
+            if model.metadata_constraint_enabled and model.metadata_constraint_variant == "aux_head":
+                postfix["aux"] = f"{history['val_aux'][-1]:.4f}"
+            epoch_bar.set_postfix(**postfix)
             epoch_bar.update(1)
 
         if val_epoch < best_val:

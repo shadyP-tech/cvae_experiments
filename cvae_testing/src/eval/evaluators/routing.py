@@ -27,12 +27,16 @@ def _load_model(
     latent_dim: int,
     device: torch.device,
     metadata_dim: int = 0,
+    metadata_constraint_cfg: Dict[str, Any] | None = None,
+    aux_metadata_dim: int | None = None,
 ):
     model = CVAEExpert(
         input_dim=input_dim,
         hidden_dim=hidden_dim,
         latent_dim=latent_dim,
         metadata_dim=metadata_dim,
+        metadata_constraint_cfg=metadata_constraint_cfg,
+        aux_metadata_dim=aux_metadata_dim,
     ).to(device)
     model.load_state_dict(safe_torch_load(checkpoint, map_location=device))
     model.eval()
@@ -41,7 +45,16 @@ def _load_model(
 
 def _score_model(model: CVAEExpert, x: torch.Tensor, m: torch.Tensor | None = None) -> torch.Tensor:
     recon, mu, logvar = model(x, m=m)
-    rec, kl = elbo_components(recon, x, mu, logvar)
+    prior_mu, prior_logvar, kl_weight = model.metadata_constraint_prior(metadata_targets=m)
+    rec, kl = elbo_components(
+        recon,
+        x,
+        mu,
+        logvar,
+        prior_mu=prior_mu,
+        prior_logvar=prior_logvar,
+        kl_weight=kl_weight,
+    )
     return rec + kl
 
 
@@ -150,6 +163,7 @@ def evaluate_routing(
     similarity_matrix: Optional[Dict[str, Dict[str, float]]] = None,
     conditioning_cfg: Dict[str, Any] | None = None,
     configured_domains: Sequence[int] | None = None,
+    metadata_constraint_cfg: Dict[str, Any] | None = None,
 ) -> Dict[str, object]:
     rng = random.Random(seed)
     payload = safe_torch_load(test_cache, map_location="cpu")
@@ -169,6 +183,7 @@ def evaluate_routing(
         metadata_vectors_cpu = build_domain_one_hot(meta, domain_order)
         metadata_dim = int(len(domain_order))
     m = metadata_vectors_cpu.to(device) if metadata_vectors_cpu is not None else None
+    constraint_cfg = metadata_constraint_cfg or {}
 
     expert_names = sorted(expert_checkpoints.keys())
     expert_mags = [
@@ -177,10 +192,28 @@ def evaluate_routing(
     ]
 
     expert_models = [
-        _load_model(Path(expert_checkpoints[name]), input_dim, hidden_dim, latent_dim, device, metadata_dim=metadata_dim)
+        _load_model(
+            Path(expert_checkpoints[name]),
+            input_dim,
+            hidden_dim,
+            latent_dim,
+            device,
+            metadata_dim=metadata_dim,
+            metadata_constraint_cfg=constraint_cfg,
+            aux_metadata_dim=metadata_dim,
+        )
         for name in expert_names
     ]
-    global_model = _load_model(global_checkpoint, input_dim, hidden_dim, latent_dim, device, metadata_dim=metadata_dim)
+    global_model = _load_model(
+        global_checkpoint,
+        input_dim,
+        hidden_dim,
+        latent_dim,
+        device,
+        metadata_dim=metadata_dim,
+        metadata_constraint_cfg=constraint_cfg,
+        aux_metadata_dim=metadata_dim,
+    )
 
     with torch.no_grad():
         all_scores = []

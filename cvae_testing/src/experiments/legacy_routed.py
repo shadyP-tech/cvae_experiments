@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from src.engine.contracts import RunContext
-from src.eval.evaluators import compute_expert_domain_matrix, evaluate_routing
+from src.eval.evaluators import compute_expert_domain_matrix, evaluate_expert_latent_usage, evaluate_routing
 from src.eval.make_plots import generate_plots_from_reports
 from src.eval.plots import plot_reconstruction_vs_magnification
 from src.eval.reporting.run_summary import write_run_summary
@@ -15,7 +15,7 @@ from src.train.train_experts import train_domain_experts
 
 class LegacyRoutedExperiment(BaseExperiment):
     def estimate_total_steps(self, cfg: Dict[str, Any]) -> int:
-        return 9
+        return 10
 
     def run(
         self,
@@ -40,6 +40,7 @@ class LegacyRoutedExperiment(BaseExperiment):
             resume_from_dir=resume_checkpoints_dir,
             conditioning_cfg=cfg.get("model", {}).get("conditioning", {}),
             configured_domains=cfg.get("data", {}).get("magnifications", []),
+            metadata_constraint_cfg=cfg.get("model", {}).get("metadata_constraint", {}),
         )
         progress.advance("domain experts trained")
 
@@ -50,6 +51,7 @@ class LegacyRoutedExperiment(BaseExperiment):
             latent_dim=int(cfg["model"]["latent_dim"]),
             conditioning_cfg=cfg.get("model", {}).get("conditioning", {}),
             configured_domains=cfg.get("data", {}).get("magnifications", []),
+            metadata_constraint_cfg=cfg.get("model", {}).get("metadata_constraint", {}),
         )
         with (run_ctx.reports_dir / "expert_matrix.json").open("w", encoding="utf-8") as f:
             json.dump(matrix, f, indent=2)
@@ -72,10 +74,24 @@ class LegacyRoutedExperiment(BaseExperiment):
             similarity_matrix=cfg.get("routing", {}).get("similarity_matrix"),
             conditioning_cfg=cfg.get("model", {}).get("conditioning", {}),
             configured_domains=cfg.get("data", {}).get("magnifications", []),
+            metadata_constraint_cfg=cfg.get("model", {}).get("metadata_constraint", {}),
         )
         with (run_ctx.reports_dir / "routing_results.json").open("w", encoding="utf-8") as f:
             json.dump(routing_results, f, indent=2)
         progress.advance("routing evaluation complete")
+
+        latent_usage = evaluate_expert_latent_usage(
+            test_cache=cache_paths["test"],
+            expert_checkpoints=experts,
+            hidden_dim=int(cfg["model"]["hidden_dim"]),
+            latent_dim=int(cfg["model"]["latent_dim"]),
+            conditioning_cfg=cfg.get("model", {}).get("conditioning", {}),
+            configured_domains=cfg.get("data", {}).get("magnifications", []),
+            metadata_constraint_cfg=cfg.get("model", {}).get("metadata_constraint", {}),
+        )
+        with (run_ctx.reports_dir / "latent_usage_report.json").open("w", encoding="utf-8") as f:
+            json.dump(latent_usage, f, indent=2)
+        progress.advance("latent usage probes computed")
 
         write_run_summary(
             reports_dir=run_ctx.reports_dir,
@@ -84,6 +100,10 @@ class LegacyRoutedExperiment(BaseExperiment):
                 "routing_metrics": routing_results.get("metrics", {}),
                 "routing_artifact": "routing_results.json",
                 "expert_matrix_artifact": "expert_matrix.json",
+                "latent_usage_artifact": "latent_usage_report.json",
+                "latent_usage_probe_accuracy_mean": float(
+                    latent_usage.get("aggregate", {}).get("probe_accuracy_mean", 0.0)
+                ),
             },
         )
 
