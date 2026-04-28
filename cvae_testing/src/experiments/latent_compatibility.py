@@ -36,6 +36,7 @@ from src.experiments.base import BaseExperiment
 from src.models.cvae_expert import CVAEExpert, elbo_components
 from src.routing.strategies import compute_similarity
 from src.torch_utils import safe_torch_load
+from src.train.checkpoint_provenance import load_model_checkpoint
 from src.train.train_experts import train_domain_experts
 
 
@@ -543,7 +544,7 @@ def _load_expert_model(
         metadata_constraint_cfg=metadata_constraint_cfg,
         aux_metadata_dim=int(metadata_dim),
     ).to(device)
-    model.load_state_dict(safe_torch_load(checkpoint_path, map_location=device))
+    model.load_state_dict(load_model_checkpoint(checkpoint_path, map_location=device).model_state_dict)
     model.eval()
     return model
 

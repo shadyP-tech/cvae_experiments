@@ -7,6 +7,7 @@ import torch
 
 from src.data.metadata_conditioning import build_domain_one_hot, resolve_domain_order
 from src.torch_utils import safe_torch_load
+from src.train.checkpoint_provenance import build_checkpoint_metadata_from_cache
 from src.train.train_utils import run_training
 
 
@@ -24,6 +25,7 @@ def train_global_model(
     conditioning_cfg: Dict[str, Any] | None = None,
     configured_domains: Sequence[int] | None = None,
     metadata_constraint_cfg: Dict[str, Any] | None = None,
+    checkpoint_metadata: Dict[str, Any] | None = None,
 ) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     train_payload = safe_torch_load(train_cache, map_location="cpu")
@@ -58,5 +60,7 @@ def train_global_model(
         val_metadata_vectors=val_meta_vectors,
         metadata_dim=metadata_dim,
         metadata_constraint_cfg=metadata_constraint_cfg,
+        checkpoint_metadata=checkpoint_metadata
+        or build_checkpoint_metadata_from_cache(train_payload, extra={"model_name": "global_cvae"}),
     )
     return result.checkpoint_path

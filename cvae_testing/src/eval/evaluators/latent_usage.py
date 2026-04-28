@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from src.data.metadata_conditioning import build_domain_one_hot, resolve_domain_order
 from src.models.cvae_expert import CVAEExpert
 from src.torch_utils import safe_torch_load
+from src.train.checkpoint_provenance import load_model_checkpoint
 
 
 def _parse_expert_domain(name: str) -> int:
@@ -36,7 +37,7 @@ def _load_model(
         metadata_constraint_cfg=metadata_constraint_cfg,
         aux_metadata_dim=int(metadata_dim),
     ).to(device)
-    model.load_state_dict(safe_torch_load(checkpoint, map_location=device))
+    model.load_state_dict(load_model_checkpoint(checkpoint, map_location=device).model_state_dict)
     model.eval()
     return model
 

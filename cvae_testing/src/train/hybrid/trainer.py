@@ -9,8 +9,8 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 
 from src.models.cvae_expert import negative_elbo
-from src.torch_utils import safe_torch_load
 from src.train.checkpoint_utils import load_resume_state, save_resume_state, training_state_path
+from src.train.checkpoint_provenance import load_hybrid_checkpoint, unwrap_hybrid_checkpoint_payload
 from src.train.hybrid.checkpointing import save_hybrid_checkpoint
 from src.train.hybrid.checkpointing import build_hybrid_checkpoint_payload
 from src.train.hybrid.variants import (
@@ -45,6 +45,7 @@ class HybridAblationTrainer:
         seed: int,
         variant: str,
         metadata_constraint_cfg: Dict[str, Any] | None = None,
+        checkpoint_metadata: Dict[str, Any] | None = None,
     ) -> None:
         self.train_x = train_payload["embeddings"]
         self.val_x = val_payload["embeddings"]
@@ -64,6 +65,7 @@ class HybridAblationTrainer:
         self.seed = int(seed)
         self.variant = str(variant)
         self.metadata_constraint_cfg: Dict[str, Any] = dict(metadata_constraint_cfg or {})
+        self.checkpoint_metadata: Dict[str, Any] = dict(checkpoint_metadata or {})
         self.metadata_constraint_enabled = bool(self.metadata_constraint_cfg.get("enabled", False))
         self.domain_to_index = {int(d): i for i, d in enumerate(self.domains)}
 
@@ -191,6 +193,7 @@ class HybridAblationTrainer:
             metadata_constraint_cfg=self.metadata_constraint_cfg,
             aux_metadata_dim=int(len(self.domains)),
             bundle=self.bundle,
+            checkpoint_metadata=self.checkpoint_metadata,
         )
 
     def _load_checkpoint_payload(self, payload: Dict[str, object]) -> None:
@@ -284,14 +287,14 @@ class HybridAblationTrainer:
 
         if resume_state_path is not None and resume_state_path.exists():
             state = load_resume_state(resume_state_path)
-            self._load_checkpoint_payload(state["model_payload"])
+            self._load_checkpoint_payload(unwrap_hybrid_checkpoint_payload(state["model_payload"]).model_state_dict)
             optimizer.load_state_dict(state["optimizer_state"])
             history = state.get("history", history)
             start_epoch = int(state.get("epoch", -1)) + 1
             best_val = float(state.get("best_metric", best_val))
             bad_epochs = int(state.get("bad_epochs", bad_epochs))
         elif ckpt_path.exists():
-            self._load_checkpoint_payload(safe_torch_load(ckpt_path, map_location="cpu"))
+            self._load_checkpoint_payload(load_hybrid_checkpoint(ckpt_path, map_location="cpu").model_state_dict)
 
         epoch_iter = range(start_epoch, self.epochs)
         epoch_bar = tqdm(epoch_iter, desc=f"train:{model_name}", unit="epoch") if tqdm is not None else None
@@ -367,6 +370,7 @@ class HybridAblationTrainer:
                             metadata_constraint_cfg=self.metadata_constraint_cfg,
                             aux_metadata_dim=int(len(self.domains)),
                             bundle=self.bundle,
+                            checkpoint_metadata=self.checkpoint_metadata,
                         ),
                         optimizer_state=optimizer.state_dict(),
                         history=history,
@@ -387,10 +391,11 @@ class HybridAblationTrainer:
                     head_hidden_dim=self.head_hidden_dim,
                     cvae_hidden_dim=self.cvae_hidden_dim,
                     latent_dim=self.latent_dim,
-                    metadata_constraint_cfg=self.metadata_constraint_cfg,
-                    aux_metadata_dim=int(len(self.domains)),
-                    bundle=self.bundle,
-                ),
+                        metadata_constraint_cfg=self.metadata_constraint_cfg,
+                        aux_metadata_dim=int(len(self.domains)),
+                        bundle=self.bundle,
+                        checkpoint_metadata=self.checkpoint_metadata,
+                    ),
                 optimizer_state=optimizer.state_dict(),
                 history=history,
                 epoch=epoch,

@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 import torch
 
 from src.torch_utils import safe_torch_load
+from src.train.checkpoint_provenance import build_checkpoint_metadata_from_cache
 from src.train.hybrid.trainer import HybridAblationTrainer
 from src.train.hybrid.variants import VARIANT_POOLED
 
@@ -29,6 +30,7 @@ def train_hybrid_variant(
     model_name: str,
     resume_from: Path | None = None,
     metadata_constraint_cfg: Dict[str, Any] | None = None,
+    checkpoint_metadata: Dict[str, Any] | None = None,
 ) -> Dict[str, object]:
     train_payload = safe_torch_load(train_cache, map_location="cpu")
     val_payload = safe_torch_load(val_cache, map_location="cpu")
@@ -48,6 +50,8 @@ def train_hybrid_variant(
         seed=seed,
         variant=variant,
         metadata_constraint_cfg=metadata_constraint_cfg,
+        checkpoint_metadata=checkpoint_metadata
+        or build_checkpoint_metadata_from_cache(train_payload, extra={"model_name": model_name, "hybrid_variant": variant}),
     )
 
     ckpt_path, history = trainer.train(out_dir=out_dir, model_name=model_name, resume_from=resume_from)
@@ -78,6 +82,7 @@ def train_hybrid_pooled_baseline(
     model_name: str = "hybrid_pooled_baseline",
     resume_from: Path | None = None,
     metadata_constraint_cfg: Dict[str, Any] | None = None,
+    checkpoint_metadata: Dict[str, Any] | None = None,
 ) -> Dict[str, object]:
     return train_hybrid_variant(
         train_cache=train_cache,
@@ -97,4 +102,5 @@ def train_hybrid_pooled_baseline(
         model_name=model_name,
         resume_from=resume_from,
         metadata_constraint_cfg=metadata_constraint_cfg,
+        checkpoint_metadata=checkpoint_metadata,
     )

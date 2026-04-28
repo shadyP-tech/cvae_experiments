@@ -22,6 +22,16 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.eval.evaluators.hybrid import HybridExpertBank
 from src.eval.evaluators.response_indirect import compute_response_features
+from src.eval.feature_regimes import (
+    FEATURE_REGISTRY,
+    FeatureMatrixResult,
+    FeatureRegime,
+    build_feature_matrix,
+    get_feature_regime,
+    response_feature_names,
+    serialize_feature_list,
+    shuffle_response_feature_rows,
+)
 from src.eval.metrics import spearman_corr
 from src.routing.strategies import compute_similarity
 from src.app.determinism import RESPONSE_SEED_SCHEME_VERSION, stable_response_seed
@@ -105,25 +115,9 @@ def _apply_standardizer(x: np.ndarray, mean: np.ndarray, std: np.ndarray) -> np.
     return (x - mean) / std
 
 
-RESPONSE_FEATURE_KEYS = [
-    "response_posterior_mu_norm",
-    "response_posterior_mu_mean",
-    "response_posterior_mu_std",
-    "response_posterior_logvar_mean",
-    "response_posterior_logvar_std",
-    "response_posterior_entropy_proxy",
-    "response_decode_repeat_var_mean",
-    "response_decode_repeat_var_std",
-    "response_recon_repeat_var_mean",
-    "response_recon_repeat_var_std",
-    "response_kl_repeat_var_mean",
-    "response_kl_repeat_var_std",
-]
-
-
 def _fit_response_feature_standardizer(rows: Sequence[dict]) -> Dict[str, Tuple[float, float]]:
     stats: Dict[str, Tuple[float, float]] = {}
-    for key in RESPONSE_FEATURE_KEYS:
+    for key in response_feature_names(rows):
         values = np.asarray([float(r.get(key, 0.0)) for r in rows], dtype=np.float64)
         values = values[np.isfinite(values)]
         if values.size == 0:
@@ -489,6 +483,7 @@ def _build_pair_rows(
     batch_size: int,
     probe_cfg: ProbeConfig,
     uncertainty_repeats: int,
+    include_residual_shape_features: bool,
 ) -> Tuple[List[dict], List[int], Dict[int, Dict[int, float]], Dict[int, Dict[int, float]], Dict[int, Dict[int, float]]]:
     payload = safe_torch_load(ctx.test_cache, map_location="cpu")
     x_cpu: torch.Tensor = payload["embeddings"]
@@ -653,6 +648,7 @@ def _build_pair_rows(
                 device=device,
                 n_repeats=int(uncertainty_repeats),
                 repeat_seed_base=int(response_feature_repeat_seed_base),
+                include_residual_shape_features=bool(include_residual_shape_features),
             )
 
             meta_similarity = compute_similarity(
@@ -749,105 +745,21 @@ def _with_normalized_targets(rows: Sequence[dict], stats: Dict[int, Tuple[float,
     return np.asarray(ys, dtype=np.float64)
 
 
-def _feature_matrix(
+def _feature_matrix_for_regime(
     rows: Sequence[dict],
     *,
-    feature_set: str,
+    regime: FeatureRegime,
     expert_domains: Sequence[int],
-    include_probe_features: bool,
-    include_response_features: bool,
-    include_expert_stats: bool,
-    include_interaction_features: bool,
-) -> np.ndarray:
-    features: List[List[float]] = []
-    for row in rows:
-        base = [float(row["metadata_distance"])]
-        if feature_set == "A":
-            features.append(base)
-            continue
-
-        ext = [
-            float(row["embedding_distance"]),
-            float(row["query_domain_value"]),
-            float(row["expert_domain_value"]),
-            float(row["abs_domain_diff"]),
-            float(row["is_exact_domain_match"]),
-        ]
-        # Safe under LOQDO: expert identity one-hot is allowed, query one-hot is intentionally excluded.
-        e = int(row["expert_domain"])
-        one_hot = [1.0 if e == int(d) else 0.0 for d in expert_domains]
-        probe_feats: List[float] = []
-        if include_probe_features:
-            probe_feats.extend(
-                [
-                    float(row.get("query_nelbo_mean", 0.0)),
-                    float(row.get("query_nelbo_std", 0.0)),
-                    float(row.get("query_nelbo_p90", 0.0)),
-                    float(row.get("query_recon_mean", 0.0)),
-                    float(row.get("query_recon_std", 0.0)),
-                    float(row.get("query_kl_mean", 0.0)),
-                    float(row.get("query_kl_std", 0.0)),
-                ]
-            )
-            if include_expert_stats:
-                probe_feats.extend(
-                    [
-                        float(row.get("expert_support_nelbo_mean", 0.0)),
-                        float(row.get("expert_support_nelbo_std", 0.0)),
-                        float(row.get("expert_support_nelbo_p90", 0.0)),
-                    ]
-                )
-        response_feats: List[float] = []
-        if include_response_features:
-            response_feats.extend(
-                [
-                    float(row.get("response_posterior_mu_norm", 0.0)),
-                    float(row.get("response_posterior_mu_mean", 0.0)),
-                    float(row.get("response_posterior_mu_std", 0.0)),
-                    float(row.get("response_posterior_logvar_mean", 0.0)),
-                    float(row.get("response_posterior_logvar_std", 0.0)),
-                    float(row.get("response_posterior_entropy_proxy", 0.0)),
-                    float(row.get("response_decode_repeat_var_mean", 0.0)),
-                    float(row.get("response_decode_repeat_var_std", 0.0)),
-                    float(row.get("response_recon_repeat_var_mean", 0.0)),
-                    float(row.get("response_recon_repeat_var_std", 0.0)),
-                    float(row.get("response_kl_repeat_var_mean", 0.0)),
-                    float(row.get("response_kl_repeat_var_std", 0.0)),
-                ]
-            )
-        interaction_feats: List[float] = []
-        if include_interaction_features:
-            md = float(row["metadata_distance"])
-            ed = float(row["embedding_distance"])
-            qv = float(row["query_domain_value"])
-            ev = float(row["expert_domain_value"])
-            dd = float(row["abs_domain_diff"])
-            interaction_feats.extend(
-                [
-                    md * ed,
-                    qv * ev,
-                    md * dd,
-                    ed * dd,
-                    float(row["is_exact_domain_match"]) * ed,
-                ]
-            )
-            if include_probe_features:
-                qnm = float(row.get("query_nelbo_mean", 0.0))
-                qns = float(row.get("query_nelbo_std", 0.0))
-                esn = float(row.get("expert_support_nelbo_mean", 0.0))
-                ess = float(row.get("expert_support_nelbo_std", 0.0))
-                interaction_feats.extend(
-                    [
-                        md * qnm,
-                        ed * qnm,
-                        md * qns,
-                        qnm * esn,
-                        qns * ess,
-                    ]
-                )
-        features.append(base + ext + one_hot + probe_feats + response_feats + interaction_feats)
-
-    return np.asarray(features, dtype=np.float64)
+    feature_names: Sequence[str] | None = None,
+    drop_zero_variance: bool = True,
+) -> FeatureMatrixResult:
+    return build_feature_matrix(
+        rows,
+        regime=regime,
+        expert_domains=expert_domains,
+        feature_names=feature_names,
+        drop_zero_variance=bool(drop_zero_variance),
+    )
 
 
 def _method_scores(
@@ -872,6 +784,14 @@ def _method_scores(
             vals = [float(r["oracle_utility"]) for r in train_rows if int(r["expert_domain"]) == e]
             expert_means[e] = float(np.mean(vals)) if vals else 0.0
         return np.asarray([expert_means.get(int(r["expert_domain"]), 0.0) for r in test_rows], dtype=np.float64)
+
+    if x_train.shape[1] == 0 and method in {
+        "linear_regression",
+        "mlp_regression",
+        "utility_probe_v1_no_expert_stats",
+        "utility_probe_v1_with_expert_stats",
+    }:
+        return np.full((x_test.shape[0],), float(y_train_norm.mean()) if y_train_norm.size else 0.0, dtype=np.float64)
 
     if method == "linear_regression":
         try:
@@ -960,7 +880,7 @@ def _evaluate_holdout(
     *,
     ctx: RunContext,
     heldout_domain: int,
-    feature_set: str,
+    regime: FeatureRegime,
     method: str,
     train_rows: Sequence[dict],
     test_rows: Sequence[dict],
@@ -970,34 +890,24 @@ def _evaluate_holdout(
     nelbo_std_lookup: Dict[int, Dict[int, float]],
     probe_cfg: ProbeConfig,
     oracle_cfg: OracleProbeConfig,
-    include_probe_features_override: Optional[bool] = None,
-    include_response_features: bool = False,
-    include_interaction_features: bool = False,
     disentanglement_arm: str = "default",
 ) -> dict:
     norm_stats = _normalize_targets_per_query(train_rows)
-    include_probe_features = method.startswith("utility_probe_v1")
-    if include_probe_features_override is not None:
-        include_probe_features = bool(include_probe_features_override)
-    include_expert_stats = method.endswith("with_expert_stats")
-    x_train = _feature_matrix(
+    train_matrix = _feature_matrix_for_regime(
         train_rows,
-        feature_set=feature_set,
+        regime=regime,
         expert_domains=expert_domains,
-        include_probe_features=include_probe_features,
-        include_response_features=bool(include_response_features),
-        include_expert_stats=include_expert_stats,
-        include_interaction_features=bool(include_interaction_features),
+        drop_zero_variance=True,
     )
-    x_test = _feature_matrix(
+    test_matrix = _feature_matrix_for_regime(
         test_rows,
-        feature_set=feature_set,
+        regime=regime,
         expert_domains=expert_domains,
-        include_probe_features=include_probe_features,
-        include_response_features=bool(include_response_features),
-        include_expert_stats=include_expert_stats,
-        include_interaction_features=bool(include_interaction_features),
+        feature_names=train_matrix.feature_names,
+        drop_zero_variance=False,
     )
+    x_train = train_matrix.matrix
+    x_test = test_matrix.matrix
     y_train_norm = _with_normalized_targets(train_rows, norm_stats)
 
     y_true = np.asarray([float(r["oracle_utility"]) for r in test_rows], dtype=np.float64)
@@ -1037,15 +947,27 @@ def _evaluate_holdout(
         "backbone_type": ctx.backbone_type,
         "run_id": ctx.run_dir.name,
         "variant": ctx.variant,
-        "feature_set": feature_set,
+        "feature_set": regime.name,
+        "feature_regime": regime.name,
+        "adoption_eligible": int(regime.adoption_eligible),
+        "diagnostic_only": int(regime.diagnostic_only),
+        "control_only": int(regime.control_only),
         "method": method,
-        "probe_feature_mode": "on" if include_probe_features else "off",
-        "response_feature_mode": "on" if bool(include_response_features) else "off",
+        "probe_feature_mode": "off",
+        "response_feature_mode": "on" if bool(regime.include_response_indirect) else "off",
         "response_feature_normalization": "train_fold_standardize"
-        if bool(include_response_features)
+        if bool(regime.include_response_indirect)
         else "none",
-        "interaction_feature_mode": "on" if bool(include_interaction_features) else "off",
+        "interaction_feature_mode": "off",
         "disentanglement_arm": str(disentanglement_arm),
+        "feature_names": serialize_feature_list(train_matrix.feature_names),
+        "feature_schema_hash": train_matrix.feature_schema_hash,
+        "included_features": serialize_feature_list(train_matrix.included_features),
+        "dropped_zero_variance": serialize_feature_list(train_matrix.dropped_zero_variance),
+        "blocked_features": serialize_feature_list(train_matrix.blocked_features),
+        "missing_features": serialize_feature_list(train_matrix.missing_features),
+        "blocked_feature_terms": serialize_feature_list(train_matrix.blocked_feature_terms),
+        "feature_no_data_reason": train_matrix.no_data_reason or "",
         "heldout_query_domain": int(heldout_domain),
         "n_train_rows": int(len(train_rows)),
         "n_test_rows": int(len(test_rows)),
@@ -1119,13 +1041,25 @@ def _evaluate_metadata_baseline(
         "backbone_type": ctx.backbone_type,
         "run_id": ctx.run_dir.name,
         "variant": ctx.variant,
-        "feature_set": "baseline",
+        "feature_set": "static_metadata",
+        "feature_regime": "static_metadata",
+        "adoption_eligible": 1,
+        "diagnostic_only": 0,
+        "control_only": 0,
         "method": "metadata_routing",
         "probe_feature_mode": "off",
         "response_feature_mode": "off",
         "response_feature_normalization": "none",
         "interaction_feature_mode": "off",
         "disentanglement_arm": "baseline",
+        "feature_names": "metadata_distance",
+        "feature_schema_hash": "",
+        "included_features": "metadata_distance",
+        "dropped_zero_variance": "",
+        "blocked_features": "",
+        "missing_features": "",
+        "blocked_feature_terms": "",
+        "feature_no_data_reason": "",
         "heldout_query_domain": int(heldout_domain),
         "n_train_rows": 0,
         "n_test_rows": int(len(test_rows)),
@@ -1162,7 +1096,13 @@ def _write_csv(rows: Sequence[dict], path: Path) -> None:
     if not rows:
         path.write_text("", encoding="utf-8")
         return
-    fieldnames = list(rows[0].keys())
+    fieldnames: List[str] = []
+    seen = set()
+    for row in rows:
+        for key in row.keys():
+            if key not in seen:
+                fieldnames.append(key)
+                seen.add(key)
     with path.open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -1208,12 +1148,13 @@ def _aggregate(rows: Sequence[dict]) -> List[dict]:
         "target_variance",
         "oracle_pairwise_inconsistency_rate",
     ]
-    groups: Dict[Tuple[str, str, str, str, str, str, str, str], List[dict]] = {}
+    groups: Dict[Tuple[str, str, str, str, str, str, str, str, str], List[dict]] = {}
     for row in rows:
         key = (
             str(row["dataset_name"]),
             str(row["backbone_type"]),
             str(row["variant"]),
+            str(row.get("feature_regime", row["feature_set"])),
             str(row["feature_set"]),
             str(row["method"]),
             str(row.get("probe_feature_mode", "off")),
@@ -1224,16 +1165,26 @@ def _aggregate(rows: Sequence[dict]) -> List[dict]:
 
     out: List[dict] = []
     for key, vals in groups.items():
-        dataset_name, backbone_type, variant, feature_set, method, probe_mode, response_mode, interaction_mode = key
+        dataset_name, backbone_type, variant, feature_regime, feature_set, method, probe_mode, response_mode, interaction_mode = key
         row = {
             "dataset_name": dataset_name,
             "backbone_type": backbone_type,
             "variant": variant,
+            "feature_regime": feature_regime,
             "feature_set": feature_set,
             "method": method,
             "probe_feature_mode": probe_mode,
             "response_feature_mode": response_mode,
             "interaction_feature_mode": interaction_mode,
+            "adoption_eligible": int(max(int(v.get("adoption_eligible", 0)) for v in vals)),
+            "diagnostic_only": int(max(int(v.get("diagnostic_only", 0)) for v in vals)),
+            "control_only": int(max(int(v.get("control_only", 0)) for v in vals)),
+            "feature_schema_hash": serialize_feature_list(
+                sorted(set(str(v.get("feature_schema_hash", "")) for v in vals if str(v.get("feature_schema_hash", ""))))
+            ),
+            "blocked_feature_terms": serialize_feature_list(
+                sorted(set(str(v.get("blocked_feature_terms", "")) for v in vals if str(v.get("blocked_feature_terms", ""))))
+            ),
             "n_folds": int(len(vals)),
         }
         for m in metrics:
@@ -1242,7 +1193,7 @@ def _aggregate(rows: Sequence[dict]) -> List[dict]:
             row[f"{m}_std"] = float(arr.std()) if arr.size else 0.0
         out.append(row)
 
-    out.sort(key=lambda r: (r["dataset_name"], r["backbone_type"], r["feature_set"], r["method"]))
+    out.sort(key=lambda r: (r["dataset_name"], r["backbone_type"], r["feature_regime"], r["method"]))
     return out
 
 
@@ -1343,10 +1294,15 @@ def parse_args() -> argparse.Namespace:
         help="Evaluate four probe/interaction arms for utility probe methods: neither, interaction_only, probe_only, probe_plus_interaction.",
     )
     parser.add_argument(
+        "--include-residual-shape-features",
+        action="store_true",
+        help="Include optional response_residual_* shape features in response-indirect regimes.",
+    )
+    parser.add_argument(
         "--regime",
         type=str,
         default="all",
-        help="Feature/method regime to run: all, metadata_only, static_A, static_B, response_indirect",
+        help=f"Feature regime to run: all or one of {sorted(FEATURE_REGISTRY)}",
     )
     return parser.parse_args()
 
@@ -1394,28 +1350,26 @@ def main() -> None:
             ]
         )
 
-    # Regime selection controls which feature sets / methods are executed.
-    regime = str(args.regime).lower()
-    if regime == "all":
-        allowed_feature_sets = ["A", "B"]
-        allowed_methods = methods
-    elif regime == "metadata_only":
-        allowed_feature_sets = ["A"]
-        allowed_methods = [m for m in methods if m in {"constant_mean", "expert_prior", "linear_regression"}]
-    elif regime == "static_a":
-        allowed_feature_sets = ["A"]
-        allowed_methods = methods
-    elif regime == "static_b":
-        allowed_feature_sets = ["B"]
-        allowed_methods = methods
-    elif regime == "response_indirect":
-        allowed_feature_sets = ["B"]
-        # Response-indirect regime focuses on utility-probe methods only.
-        allowed_methods = [m for m in methods if m.startswith("utility_probe_v1")]
+    requested_regime = str(args.regime).strip().lower()
+    if requested_regime == "all":
+        allowed_regimes = [FEATURE_REGISTRY[name] for name in sorted(FEATURE_REGISTRY)]
     else:
-        print(f"[warn] Unknown regime '{args.regime}', falling back to 'all'.")
-        allowed_feature_sets = ["A", "B"]
-        allowed_methods = methods
+        allowed_regimes = [get_feature_regime(requested_regime)]
+
+    deployable_methods = [
+        m for m in methods if not (m.startswith("semi_oracle_") or m.startswith("oracle_"))
+    ]
+    target_adjacent_methods = [m for m in methods if m.startswith("semi_oracle_")]
+    oracle_methods = [m for m in methods if m.startswith("oracle_")]
+
+    def _methods_for_regime(regime: FeatureRegime) -> List[str]:
+        if regime.name == "response_target_adjacent_diagnostic":
+            return target_adjacent_methods or ["semi_oracle_support_mean"]
+        if regime.name == "response_oracle_diagnostic":
+            return oracle_methods or ["oracle_eval_mean_cheat"]
+        if regime.name in {"response_indirect", "response_indirect_shuffled"}:
+            return [m for m in deployable_methods if m in {"linear_regression", "mlp_regression"} or m.startswith("utility_probe_v1")]
+        return deployable_methods
 
     all_fold_rows: List[dict] = []
     run_summaries: List[dict] = []
@@ -1427,32 +1381,31 @@ def main() -> None:
             batch_size=int(args.batch_size),
             probe_cfg=probe_cfg,
             uncertainty_repeats=int(args.uncertainty_repeats),
+            include_residual_shape_features=bool(args.include_residual_shape_features),
         )
 
         pair_rows = sorted(pair_rows, key=lambda r: (int(r["query_domain"]), int(r["expert_domain"])))
         pair_dir = ctx.run_dir / "reports" / str(args.pair_table_dirname)
         pair_dir.mkdir(parents=True, exist_ok=True)
 
-        rows_a = [
-            {
-                **r,
-                "feature_set": "A",
-                "held_out_query_domain": None,
-            }
-            for r in pair_rows
-        ]
-        rows_b = [
-            {
-                **r,
-                "feature_set": "B",
-                "held_out_query_domain": None,
-            }
-            for r in pair_rows
-        ]
-        _write_csv(rows_a, pair_dir / "pair_table_A.csv")
-        _write_csv(rows_b, pair_dir / "pair_table_B.csv")
-        _write_parquet(rows_a, pair_dir / "pair_table_A.parquet", required=bool(args.require_parquet))
-        _write_parquet(rows_b, pair_dir / "pair_table_B.parquet", required=bool(args.require_parquet))
+        for regime_obj in allowed_regimes:
+            regime_pair_rows = [
+                {
+                    **r,
+                    "feature_regime": regime_obj.name,
+                    "adoption_eligible": int(regime_obj.adoption_eligible),
+                    "diagnostic_only": int(regime_obj.diagnostic_only),
+                    "control_only": int(regime_obj.control_only),
+                    "held_out_query_domain": None,
+                }
+                for r in pair_rows
+            ]
+            _write_csv(regime_pair_rows, pair_dir / f"pair_table_{regime_obj.name}.csv")
+            _write_parquet(
+                regime_pair_rows,
+                pair_dir / f"pair_table_{regime_obj.name}.parquet",
+                required=bool(args.require_parquet),
+            )
 
         query_domains = sorted(set(int(r["query_domain"]) for r in pair_rows))
         run_rows: List[dict] = []
@@ -1463,23 +1416,6 @@ def main() -> None:
             test_rows = [r for r in pair_rows if int(r["query_domain"]) == int(heldout)]
             if not train_rows or not test_rows:
                 continue
-
-            norm_train_rows = train_rows
-            norm_test_rows = test_rows
-            if regime == "response_indirect":
-                norm_stats = _fit_response_feature_standardizer(train_rows)
-                norm_train_rows = _apply_response_feature_standardizer(train_rows, norm_stats)
-                norm_test_rows = _apply_response_feature_standardizer(test_rows, norm_stats)
-                split_id = str(test_rows[0].get("support_eval_split_id", "na")) if test_rows else "na"
-                response_norm_reports.extend(
-                    _response_feature_norm_report_rows(
-                        ctx=ctx,
-                        heldout_domain=heldout,
-                        split_id=split_id,
-                        stats=norm_stats,
-                        n_train_rows=len(train_rows),
-                    )
-                )
 
             baseline_row = _evaluate_metadata_baseline(
                 ctx=ctx,
@@ -1495,51 +1431,62 @@ def main() -> None:
             baseline_row["model_capacity_profile"] = str(args.model_capacity_profile)
             run_rows.append(baseline_row)
 
-            for feature_set in allowed_feature_sets:
-                for method in allowed_methods:
-                    if method.startswith("utility_probe_v1") and feature_set != "B":
-                        continue
-                    if (method.startswith("semi_oracle_") or method.startswith("oracle_")) and feature_set != "B":
-                        continue
-                    arm_specs: List[Tuple[str, Optional[bool], bool]] = [("default", None, bool(args.enable_interaction_features))]
-                    if bool(args.probe_interaction_disentanglement) and method.startswith("utility_probe_v1") and feature_set == "B":
-                        arm_specs = [
-                            ("neither", False, False),
-                            ("interaction_only", False, True),
-                            ("probe_only", True, False),
-                            ("probe_plus_interaction", True, True),
-                        ]
-
-                    include_response_features = False
-                    if regime == "response_indirect":
-                        include_response_features = True
-                        arm_specs = [("response_only", False, bool(args.enable_interaction_features))]
-
-                    for arm_name, probe_override, interaction_on in arm_specs:
-                        eval_train_rows = norm_train_rows if include_response_features else train_rows
-                        eval_test_rows = norm_test_rows if include_response_features else test_rows
-                        row = _evaluate_holdout(
+            for regime_obj in allowed_regimes:
+                eval_train_base = train_rows
+                eval_test_base = test_rows
+                if regime_obj.include_response_indirect:
+                    norm_stats = _fit_response_feature_standardizer(train_rows)
+                    eval_train_base = _apply_response_feature_standardizer(train_rows, norm_stats)
+                    eval_test_base = _apply_response_feature_standardizer(test_rows, norm_stats)
+                    split_id = str(test_rows[0].get("support_eval_split_id", "na")) if test_rows else "na"
+                    response_norm_reports.extend(
+                        _response_feature_norm_report_rows(
                             ctx=ctx,
                             heldout_domain=heldout,
-                            feature_set=feature_set,
-                            method=method,
-                            train_rows=eval_train_rows,
-                            test_rows=eval_test_rows,
-                            expert_domains=expert_domains,
-                            utility_lookup=utility_lookup,
-                            nelbo_lookup=nelbo_lookup,
-                            nelbo_std_lookup=nelbo_std_lookup,
-                            probe_cfg=probe_cfg,
-                            oracle_cfg=oracle_cfg,
-                            include_probe_features_override=probe_override,
-                            include_response_features=include_response_features,
-                            include_interaction_features=interaction_on,
-                            disentanglement_arm=arm_name,
+                            split_id=split_id,
+                            stats=norm_stats,
+                            n_train_rows=len(train_rows),
                         )
-                        row["split_policy"] = str(args.split_policy)
-                        row["uncertainty_mode"] = effective_uncertainty_mode
-                        row["model_capacity_profile"] = str(args.model_capacity_profile)
-                        run_rows.append(row)
+                    )
+                if regime_obj.name == "response_indirect_shuffled":
+                    fold_id = f"{ctx.run_dir.name}:{int(heldout)}"
+                    eval_train_base = shuffle_response_feature_rows(
+                        eval_train_base,
+                        dataset=ctx.dataset_name,
+                        seed=int(ctx.seed),
+                        fold_id=fold_id,
+                        split_id="train",
+                        regime_name=regime_obj.name,
+                    )
+                    eval_test_base = shuffle_response_feature_rows(
+                        eval_test_base,
+                        dataset=ctx.dataset_name,
+                        seed=int(ctx.seed),
+                        fold_id=fold_id,
+                        split_id="test",
+                        regime_name=regime_obj.name,
+                    )
+
+                for method in _methods_for_regime(regime_obj):
+                    row = _evaluate_holdout(
+                        ctx=ctx,
+                        heldout_domain=heldout,
+                        regime=regime_obj,
+                        method=method,
+                        train_rows=eval_train_base,
+                        test_rows=eval_test_base,
+                        expert_domains=expert_domains,
+                        utility_lookup=utility_lookup,
+                        nelbo_lookup=nelbo_lookup,
+                        nelbo_std_lookup=nelbo_std_lookup,
+                        probe_cfg=probe_cfg,
+                        oracle_cfg=oracle_cfg,
+                        disentanglement_arm=regime_obj.name,
+                    )
+                    row["split_policy"] = str(args.split_policy)
+                    row["uncertainty_mode"] = effective_uncertainty_mode
+                    row["model_capacity_profile"] = str(args.model_capacity_profile)
+                    run_rows.append(row)
 
         all_fold_rows.extend(run_rows)
         run_summaries.append(
@@ -1557,8 +1504,10 @@ def main() -> None:
                 "uncertainty_repeats": int(args.uncertainty_repeats),
                 "model_capacity_profile": str(args.model_capacity_profile),
                 "enable_interaction_features": bool(args.enable_interaction_features),
+                "include_residual_shape_features": bool(args.include_residual_shape_features),
                 "probe_interaction_disentanglement": bool(args.probe_interaction_disentanglement),
                 "regime": str(args.regime),
+                "feature_regimes": [r.name for r in allowed_regimes],
             }
         )
 
@@ -1574,7 +1523,7 @@ def main() -> None:
             str(r["dataset_name"]),
             str(r["backbone_type"]),
             str(r["run_id"]),
-            str(r["feature_set"]),
+            str(r.get("feature_regime", r["feature_set"])),
             str(r["method"]),
             int(r["heldout_query_domain"]),
         ),
@@ -1615,8 +1564,10 @@ def main() -> None:
                     "uncertainty_repeats": int(args.uncertainty_repeats),
                     "model_capacity_profile": str(args.model_capacity_profile),
                     "enable_interaction_features": bool(args.enable_interaction_features),
+                    "include_residual_shape_features": bool(args.include_residual_shape_features),
                     "probe_interaction_disentanglement": bool(args.probe_interaction_disentanglement),
                     "regime": str(args.regime),
+                    "feature_regimes": [r.name for r in allowed_regimes],
                 },
                 "runs": run_summaries,
                 "raw_csv": str(raw_out),

@@ -10,8 +10,11 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 
 from src.models.cvae_expert import CVAEExpert, negative_elbo
-from src.torch_utils import safe_torch_load
 from src.train.checkpoint_utils import load_resume_state, save_resume_state, training_state_path
+from src.train.checkpoint_provenance import (
+    load_model_checkpoint,
+    wrap_model_state_dict,
+)
 
 try:
     tqdm = getattr(importlib.import_module("tqdm"), "tqdm")
@@ -52,6 +55,7 @@ def run_training(
     val_metadata_vectors: torch.Tensor | None = None,
     metadata_dim: int = 0,
     metadata_constraint_cfg: Dict[str, Any] | None = None,
+    checkpoint_metadata: Dict[str, Any] | None = None,
 ) -> TrainResult:
     out_dir.mkdir(parents=True, exist_ok=True)
     ckpt = out_dir / f"{model_name}.pt"
@@ -67,6 +71,7 @@ def run_training(
     ).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     state_ckpt = training_state_path(ckpt)
+    effective_checkpoint_metadata = dict(checkpoint_metadata or {})
 
     if train_metadata_vectors is not None and int(train_metadata_vectors.shape[0]) != int(train_embeddings.shape[0]):
         raise ValueError("train_metadata_vectors must have the same number of rows as train_embeddings")
@@ -107,7 +112,7 @@ def run_training(
         bad_epochs = int(state.get("bad_epochs", bad_epochs))
     elif ckpt.exists():
         # Backward compatibility: plain model checkpoint without optimizer state.
-        model.load_state_dict(safe_torch_load(ckpt, map_location=device))
+        model.load_state_dict(load_model_checkpoint(ckpt, map_location=device).model_state_dict)
 
     epoch_iter = range(start_epoch, epochs)
     epoch_bar = tqdm(epoch_iter, desc=f"train:{model_name}", unit="epoch") if tqdm is not None else None
@@ -200,7 +205,7 @@ def run_training(
         if val_epoch < best_val:
             best_val = val_epoch
             bad_epochs = 0
-            torch.save(model.state_dict(), ckpt)
+            torch.save(wrap_model_state_dict(model.state_dict(), effective_checkpoint_metadata), ckpt)
         else:
             bad_epochs += 1
             if bad_epochs >= patience:

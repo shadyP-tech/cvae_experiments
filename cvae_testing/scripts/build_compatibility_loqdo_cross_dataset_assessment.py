@@ -46,6 +46,13 @@ def _find_best_nonbaseline(rows: List[dict]) -> Optional[dict]:
 def _is_deployable_method_key(method_key: str) -> bool:
     mk = str(method_key)
     blocked_tokens = [
+        "response_indirect_shuffled",
+        "response_target_adjacent_diagnostic",
+        "response_oracle_diagnostic",
+        "control_only",
+        "diagnostic",
+        "target_adjacent",
+        "oracle_diagnostic",
         "oracle_eval_mean_cheat",
         "oracle_pairwise_rank_cheat",
         "semi_oracle_support_mean",

@@ -13,6 +13,7 @@ from src.models.cvae_expert import CVAEExpert, elbo_components
 from src.models.projection_head import ProjectionHead
 from src.routing.strategies import compute_similarity
 from src.torch_utils import safe_torch_load
+from src.train.checkpoint_provenance import load_hybrid_checkpoint, load_model_checkpoint
 
 
 AGGREGATION_TOP1_HARD = "top1_hard"
@@ -112,7 +113,10 @@ def _allocate_counts_deterministic(
 
 class HybridExpertBank:
     def __init__(self, checkpoint: Path, device: torch.device) -> None:
-        payload = safe_torch_load(checkpoint, map_location=device)
+        loaded = load_hybrid_checkpoint(checkpoint, map_location=device)
+        payload = loaded.model_state_dict
+        self.checkpoint_metadata = dict(loaded.checkpoint_metadata)
+        self.legacy_checkpoint_format = bool(loaded.legacy_format)
         self.variant = str(payload["variant"])
         self.domains = [int(d) for d in payload["domains"]]
         self.input_dim = int(payload["input_dim"])
@@ -851,7 +855,7 @@ def evaluate_global_baselines(
         hidden_dim=int(legacy_hidden_dim),
         latent_dim=int(legacy_latent_dim),
     ).to(device)
-    legacy.load_state_dict(safe_torch_load(legacy_global_checkpoint, map_location=device))
+    legacy.load_state_dict(load_model_checkpoint(legacy_global_checkpoint, map_location=device).model_state_dict)
     legacy.eval()
 
     with torch.no_grad():

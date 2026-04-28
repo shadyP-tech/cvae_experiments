@@ -19,6 +19,7 @@ from src.eval.metrics import spearman_corr
 from src.models.cvae_expert import CVAEExpert, elbo_components
 from src.routing.strategies import compute_similarity
 from src.torch_utils import safe_torch_load
+from src.train.checkpoint_provenance import load_model_checkpoint
 
 
 _ALLOWED_NORM_POLICIES = {"per_query_zscore", "per_query_minmax"}
@@ -182,7 +183,7 @@ def _load_model(
         metadata_constraint_cfg=metadata_constraint_cfg,
         aux_metadata_dim=int(metadata_dim),
     ).to(device)
-    model.load_state_dict(safe_torch_load(checkpoint, map_location=device))
+    model.load_state_dict(load_model_checkpoint(checkpoint, map_location=device).model_state_dict)
     model.eval()
     return model
 

@@ -5,8 +5,16 @@ import argparse
 import csv
 import math
 from pathlib import Path
+import sys
 from statistics import mean
 from typing import Dict, List, Sequence, Tuple
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.eval.feature_regimes import blocked_terms_for_feature, get_feature_regime, serialize_feature_list
 
 
 def _to_float(value: object, default: float = 0.0) -> float:
@@ -94,12 +102,97 @@ def _run_key(r: dict) -> Tuple[str, str, str, str]:
 def _method_key(r: dict) -> str:
     method = str(r.get("method", ""))
     feature_set = str(r.get("feature_set", ""))
+    feature_regime = str(r.get("feature_regime", "") or feature_set)
     probe_mode = str(r.get("probe_feature_mode", "off"))
     interaction_mode = str(r.get("interaction_feature_mode", "off"))
     arm = str(r.get("disentanglement_arm", "default"))
     if method == "metadata_routing":
         return "metadata_routing"
-    return f"{method}__{feature_set}__probe_{probe_mode}__interact_{interaction_mode}__arm_{arm}"
+    return f"{feature_regime}::{method}__{feature_set}__probe_{probe_mode}__interact_{interaction_mode}__arm_{arm}"
+
+
+def _row_feature_regime(row: dict) -> str:
+    raw = str(row.get("feature_regime", "")).strip()
+    if raw:
+        return raw
+    method = str(row.get("method", ""))
+    feature_set = str(row.get("feature_set", ""))
+    response_mode = str(row.get("response_feature_mode", "off"))
+    if method == "metadata_routing":
+        return "static_metadata"
+    if response_mode == "on":
+        return "response_indirect"
+    if feature_set == "A":
+        return "static_metadata"
+    if feature_set == "B":
+        return "static_combined"
+    return feature_set or "unknown"
+
+
+def _split_feature_names(raw: object) -> List[str]:
+    text = str(raw or "").strip()
+    if not text:
+        return []
+    return [item for item in text.split("|") if item]
+
+
+def _veto_for_method(method_key: str, vals: Sequence[dict]) -> Tuple[bool, str, List[str], List[str], str]:
+    regimes = sorted(set(_row_feature_regime(v) for v in vals))
+    diagnostic = False
+    control = False
+    adoption_eligible = False
+    reasons: List[str] = []
+    blocked_features: List[str] = []
+    blocked_terms: List[str] = []
+
+    for regime_name in regimes:
+        try:
+            regime = get_feature_regime(regime_name)
+        except Exception:
+            reasons.append("unknown_feature_regime")
+            continue
+        diagnostic = diagnostic or bool(regime.diagnostic_only)
+        control = control or bool(regime.control_only)
+        adoption_eligible = adoption_eligible or bool(regime.adoption_eligible)
+
+    if diagnostic:
+        reasons.append("diagnostic_or_target_derived_features")
+    if control:
+        reasons.append("control_only")
+    if not adoption_eligible and method_key != "metadata_routing":
+        reasons.append("not_adoption_eligible")
+
+    for row in vals:
+        for field in _split_feature_names(row.get("feature_names", "")):
+            terms = blocked_terms_for_feature(field)
+            if terms:
+                blocked_features.append(field)
+                blocked_terms.extend(terms)
+        for field in _split_feature_names(row.get("blocked_features", "")):
+            blocked_features.append(field)
+        for term in _split_feature_names(row.get("blocked_feature_terms", "")):
+            blocked_terms.append(term)
+
+    for token_source in [method_key] + regimes:
+        lowered = str(token_source).lower()
+        for token in ["diagnostic", "target_adjacent", "oracle"]:
+            if token in lowered:
+                reasons.append("diagnostic_or_target_derived_features")
+        for term in ["nelbo", "recon_mean", "kl_mean"]:
+            if term in lowered:
+                blocked_terms.append(term)
+
+    if blocked_features or blocked_terms:
+        reasons.append("blocked_features")
+
+    vetoed = bool(reasons)
+    return (
+        vetoed,
+        "|".join(sorted(set(reasons))) if reasons else "",
+        sorted(set(blocked_features)),
+        sorted(set(blocked_terms)),
+        "|".join(regimes),
+    )
 
 
 def _aggregate_per_run(rows: Sequence[dict]) -> Dict[Tuple[str, str, str, str, str], dict]:
@@ -117,6 +210,11 @@ def _aggregate_per_run(rows: Sequence[dict]) -> Dict[Tuple[str, str, str, str, s
         norm_gap = [_to_float(v.get("normalized_metadata_to_oracle_gap", 0.0)) for v in vals]
         cal = [_to_float(v.get("calibration_error_bin10", 0.0)) for v in vals]
         margin = [_to_float(v.get("top1_margin", 0.0)) for v in vals]
+        feature_names = "|".join(str(v.get("feature_names", "")) for v in vals if str(v.get("feature_names", "")))
+        blocked_features = "|".join(str(v.get("blocked_features", "")) for v in vals if str(v.get("blocked_features", "")))
+        blocked_terms = "|".join(
+            str(v.get("blocked_feature_terms", "")) for v in vals if str(v.get("blocked_feature_terms", ""))
+        )
 
         out[key] = {
             "dataset_name": dataset_name,
@@ -124,6 +222,10 @@ def _aggregate_per_run(rows: Sequence[dict]) -> Dict[Tuple[str, str, str, str, s
             "run_id": run_id,
             "variant": variant,
             "method_key": method_key,
+            "feature_regime": _row_feature_regime(vals[0]),
+            "feature_names": "|".join(sorted(set(feature_names.split("|")))) if feature_names else "",
+            "blocked_features": "|".join(sorted(set(blocked_features.split("|")))) if blocked_features else "",
+            "blocked_feature_terms": "|".join(sorted(set(blocked_terms.split("|")))) if blocked_terms else "",
             "n_folds": int(len(vals)),
             "top1": float(mean(top1)) if top1 else 0.0,
             "spearman": float(mean(spearman)) if spearman else 0.0,
@@ -216,6 +318,7 @@ def _aggregate_methods(
         gap_reduction_mean, gap_reduction_std = _mean_std(gap_reductions)
         norm_gap_reduction_mean, norm_gap_reduction_std = _mean_std(norm_gap_reductions)
         cal_reduction_mean, cal_reduction_std = _mean_std(cal_reductions)
+        vetoed, veto_reason, blocked_features, blocked_terms, feature_regimes = _veto_for_method(method_key, vals)
 
         improving_run_count = sum(
             1
@@ -271,11 +374,19 @@ def _aggregate_methods(
             and joint_top1_gap_guardrail_pass
             and uncertainty_calibration_gate_pass
             and spearman_uplift_mean > 0.0
+            and not vetoed
         )
 
         out_rows.append(
             {
                 "method_key": method_key,
+                "feature_regime": feature_regimes,
+                "adoption_eligible": int(not vetoed and method_key != str(uplift_reference_method)),
+                "diagnostic_only": int("diagnostic_or_target_derived_features" in veto_reason),
+                "control_only": int("control_only" in veto_reason),
+                "veto_reason": veto_reason,
+                "blocked_features": serialize_feature_list(blocked_features),
+                "blocked_feature_terms": serialize_feature_list(blocked_terms),
                 "n_runs": n_runs,
                 "top1_mean": top1_mean,
                 "top1_std": top1_std,
@@ -344,13 +455,15 @@ def _write_md(path: Path, rows: Sequence[dict], summary: Dict[str, object]) -> N
     lines.append(f"- Weak pass: {int(summary['weak_pass_count'])}")
     lines.append(f"- Fail: {int(summary['fail_count'])}")
     lines.append("")
-    lines.append("| Method | Tier | Runs | Top1 mean+-std | Spearman mean+-std | Gap mean+-std | NormGap mean+-std | CalErr mean+-std | Top1 uplift | Spearman uplift | Gap reduction | NormGap reduction | CalErr reduction | Joint guardrail | Cal gate | Adoption gate |")
-    lines.append("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
+    lines.append("| Method | Regime | Tier | Veto | Runs | Top1 mean+-std | Spearman mean+-std | Gap mean+-std | NormGap mean+-std | CalErr mean+-std | Top1 uplift | Spearman uplift | Gap reduction | NormGap reduction | CalErr reduction | Joint guardrail | Cal gate | Adoption gate |")
+    lines.append("|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
     for r in rows:
         lines.append(
-            "| {} | {} | {} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {} | {} | {} |".format(
+            "| {} | {} | {} | {} | {} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {} | {} | {} |".format(
                 r["method_key"],
+                r.get("feature_regime", ""),
                 r["tier"],
+                r.get("veto_reason", ""),
                 int(r["n_runs"]),
                 float(r["top1_mean"]),
                 float(r["top1_std"]),

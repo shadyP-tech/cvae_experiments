@@ -214,6 +214,7 @@ def extract_and_cache_embeddings(
         "backbone_type": resolved_backbone,
         "resolved_embedding_dim": int(resolved_dim),
         "expected_embedding_dim": int(expected_dim) if expected_dim is not None else None,
+        "image_size": int(image_size),
         "feature_extractor_name": str(resolved_extractor_cfg["feature_extractor_name"]),
         "feature_extractor_checkpoint": str(resolved_extractor_cfg["feature_extractor_checkpoint"]),
         "feature_extractor_layer": str(resolved_extractor_cfg["feature_extractor_layer"]),
@@ -297,6 +298,7 @@ def extract_and_cache_embeddings(
             "feature_extractor": {
                 "backbone_type": resolved_backbone,
                 "embedding_dim": int(resolved_dim),
+                "image_size": int(image_size),
                 "feature_extractor_name": str(resolved_extractor_cfg["feature_extractor_name"]),
                 "feature_extractor_checkpoint": str(resolved_extractor_cfg["feature_extractor_checkpoint"]),
                 "feature_extractor_layer": str(resolved_extractor_cfg["feature_extractor_layer"]),
@@ -372,6 +374,7 @@ def validate_embedding_cache(
             "shape": tuple(embeddings.shape),
             "backbone_type": cache_backbone,
             "embedding_dim": cache_dim,
+            "image_size": int(extractor_meta.get("image_size", 0) or 0),
             "feature_extractor_name": str(extractor_meta.get("feature_extractor_name", "")),
             "feature_extractor_checkpoint": str(extractor_meta.get("feature_extractor_checkpoint", "")),
             "feature_extractor_layer": str(extractor_meta.get("feature_extractor_layer", "")),
