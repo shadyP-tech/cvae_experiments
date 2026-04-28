@@ -21,8 +21,10 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.eval.evaluators.hybrid import HybridExpertBank
+from src.eval.evaluators.response_indirect import compute_response_features
 from src.eval.metrics import spearman_corr
 from src.routing.strategies import compute_similarity
+from src.app.determinism import RESPONSE_SEED_SCHEME_VERSION, stable_response_seed
 from src.torch_utils import safe_torch_load
 
 
@@ -101,6 +103,80 @@ def _fit_standardizer(x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
 
 def _apply_standardizer(x: np.ndarray, mean: np.ndarray, std: np.ndarray) -> np.ndarray:
     return (x - mean) / std
+
+
+RESPONSE_FEATURE_KEYS = [
+    "response_posterior_mu_norm",
+    "response_posterior_mu_mean",
+    "response_posterior_mu_std",
+    "response_posterior_logvar_mean",
+    "response_posterior_logvar_std",
+    "response_posterior_entropy_proxy",
+    "response_decode_repeat_var_mean",
+    "response_decode_repeat_var_std",
+    "response_recon_repeat_var_mean",
+    "response_recon_repeat_var_std",
+    "response_kl_repeat_var_mean",
+    "response_kl_repeat_var_std",
+]
+
+
+def _fit_response_feature_standardizer(rows: Sequence[dict]) -> Dict[str, Tuple[float, float]]:
+    stats: Dict[str, Tuple[float, float]] = {}
+    for key in RESPONSE_FEATURE_KEYS:
+        values = np.asarray([float(r.get(key, 0.0)) for r in rows], dtype=np.float64)
+        values = values[np.isfinite(values)]
+        if values.size == 0:
+            stats[key] = (0.0, 1.0)
+            continue
+        mean = float(values.mean())
+        std = float(values.std())
+        if std < 1e-8:
+            std = 1.0
+        stats[key] = (mean, std)
+    return stats
+
+
+def _apply_response_feature_standardizer(rows: Sequence[dict], stats: Dict[str, Tuple[float, float]]) -> List[dict]:
+    out: List[dict] = []
+    for row in rows:
+        updated = dict(row)
+        for key, (mean, std) in stats.items():
+            value = float(updated.get(key, 0.0))
+            if not math.isfinite(value):
+                value = 0.0
+            updated[key] = (value - float(mean)) / float(std)
+        out.append(updated)
+    return out
+
+
+def _response_feature_norm_report_rows(
+    *,
+    ctx: RunContext,
+    heldout_domain: int,
+    split_id: str,
+    stats: Dict[str, Tuple[float, float]],
+    n_train_rows: int,
+) -> List[dict]:
+    rows: List[dict] = []
+    for key, (mean, std) in stats.items():
+        rows.append(
+            {
+                "dataset_name": ctx.dataset_name,
+                "seed": int(ctx.seed),
+                "backbone_type": ctx.backbone_type,
+                "run_id": ctx.run_dir.name,
+                "variant": ctx.variant,
+                "heldout_query_domain": int(heldout_domain),
+                "support_eval_split_id": str(split_id),
+                "feature_key": str(key),
+                "mean": float(mean),
+                "std": float(std),
+                "n_train_rows": int(n_train_rows),
+                "normalization_policy": "train_fold_standardize",
+            }
+        )
+    return rows
 
 
 def _calibration_metrics(y_pred: np.ndarray, y_true: np.ndarray, n_bins: int = 10) -> Tuple[float, float, float]:
@@ -427,6 +503,23 @@ def _build_pair_rows(
     if not expert_domains:
         raise RuntimeError("No overlapping expert domains found between data and checkpoint.")
 
+    response_target_seed_base = stable_response_seed(
+        dataset=ctx.dataset_name,
+        seed=int(ctx.seed),
+        query_id="all",
+        expert_domain="all",
+        repeat_id=0,
+        stream_name="target_oracle",
+    )
+    response_feature_seed_base = stable_response_seed(
+        dataset=ctx.dataset_name,
+        seed=int(ctx.seed),
+        query_id="all",
+        expert_domain="all",
+        repeat_id=0,
+        stream_name="response_feature",
+    )
+
     score_mean_tensor, score_std_tensor, recon_mean_tensor, recon_std_tensor = _score_domains_batched(
         bank=bank,
         expert_domains=expert_domains,
@@ -434,8 +527,19 @@ def _build_pair_rows(
         device=device,
         batch_size=batch_size,
         n_repeats=int(uncertainty_repeats),
-        repeat_seed_base=int(ctx.seed) * 7919 + int(probe_cfg.support_split_seed) * 101,
+        repeat_seed_base=int(response_target_seed_base) + int(probe_cfg.support_split_seed) * 101,
     )
+
+    feature_score_mean_tensor, feature_score_std_tensor, feature_recon_mean_tensor, feature_recon_std_tensor = _score_domains_batched(
+        bank=bank,
+        expert_domains=expert_domains,
+        x_cpu=x_cpu,
+        device=device,
+        batch_size=batch_size,
+        n_repeats=int(uncertainty_repeats),
+        repeat_seed_base=int(response_feature_seed_base) + int(probe_cfg.support_split_seed) * 101,
+    )
+    _ = recon_std_tensor, feature_recon_std_tensor
 
     by_query: Dict[int, List[int]] = {d: [] for d in all_domains}
     for idx, item in enumerate(metadata):
@@ -494,9 +598,15 @@ def _build_pair_rows(
 
         q_best_e = int(meta_best_by_query[q])
         q_best_idx = int(expert_domains.index(q_best_e))
-        q_support_nelbo = score_mean_tensor[q_best_idx, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
-        q_support_nelbo_unc = score_std_tensor[q_best_idx, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
-        q_support_recon = recon_mean_tensor[q_best_idx, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
+        q_support_nelbo = (
+            feature_score_mean_tensor[q_best_idx, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
+        )
+        q_support_nelbo_unc = (
+            feature_score_std_tensor[q_best_idx, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
+        )
+        q_support_recon = (
+            feature_recon_mean_tensor[q_best_idx, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
+        )
         q_support_kl = q_support_nelbo - q_support_recon
         q_nelbo_mean, q_nelbo_std, q_nelbo_p90 = _summary_stats(q_support_nelbo)
         q_recon_mean, q_recon_std, _ = _summary_stats(q_support_recon)
@@ -506,8 +616,12 @@ def _build_pair_rows(
         split_id = f"seed{ctx.seed}_q{q}_sup{len(support_idxs)}_eval{len(eval_idxs)}"
 
         for e_i, e in enumerate(expert_domains):
-            support_nelbo = score_mean_tensor[e_i, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
-            support_nelbo_unc = score_std_tensor[e_i, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
+            support_nelbo = (
+                feature_score_mean_tensor[e_i, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
+            )
+            support_nelbo_unc = (
+                feature_score_std_tensor[e_i, support_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
+            )
             eval_nelbo = score_mean_tensor[e_i, eval_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
             eval_nelbo_unc = score_std_tensor[e_i, eval_idxs].detach().cpu().numpy().astype(np.float64, copy=False)
             if eval_nelbo.size == 0:
@@ -521,6 +635,25 @@ def _build_pair_rows(
 
             exp_sup_mean, exp_sup_std, exp_sup_p90 = _summary_stats(support_nelbo)
             exp_sup_unc_mean, exp_sup_unc_std, _ = _summary_stats(support_nelbo_unc)
+
+            response_feature_seed = stable_response_seed(
+                dataset=ctx.dataset_name,
+                seed=int(ctx.seed),
+                query_id=int(q),
+                expert_domain=int(e),
+                repeat_id=0,
+                stream_name="response_feature",
+            )
+            response_feature_repeat_seed_base = int(response_feature_seed) + int(probe_cfg.support_split_seed) * 101
+            response_features = compute_response_features(
+                bank=bank,
+                expert_domain=int(e),
+                x_cpu=x_cpu,
+                support_idxs=support_idxs,
+                device=device,
+                n_repeats=int(uncertainty_repeats),
+                repeat_seed_base=int(response_feature_repeat_seed_base),
+            )
 
             meta_similarity = compute_similarity(
                 {"magnification": int(q)},
@@ -574,6 +707,14 @@ def _build_pair_rows(
                     "support_size": int(len(support_idxs)),
                     "eval_size": int(len(eval_idxs)),
                     "support_eval_split_id": split_id,
+                    "response_seed_scheme_version": str(RESPONSE_SEED_SCHEME_VERSION),
+                    "response_feature_stream_name": "response_feature",
+                    "response_target_stream_name": "target_oracle",
+                    "response_feature_seed_base": int(response_feature_seed_base),
+                    "response_target_seed_base": int(response_target_seed_base),
+                    "response_feature_seed": int(response_feature_repeat_seed_base),
+                    "num_response_repeats": int(uncertainty_repeats),
+                    **response_features,
                 }
             )
 
@@ -614,6 +755,7 @@ def _feature_matrix(
     feature_set: str,
     expert_domains: Sequence[int],
     include_probe_features: bool,
+    include_response_features: bool,
     include_expert_stats: bool,
     include_interaction_features: bool,
 ) -> np.ndarray:
@@ -655,6 +797,24 @@ def _feature_matrix(
                         float(row.get("expert_support_nelbo_p90", 0.0)),
                     ]
                 )
+        response_feats: List[float] = []
+        if include_response_features:
+            response_feats.extend(
+                [
+                    float(row.get("response_posterior_mu_norm", 0.0)),
+                    float(row.get("response_posterior_mu_mean", 0.0)),
+                    float(row.get("response_posterior_mu_std", 0.0)),
+                    float(row.get("response_posterior_logvar_mean", 0.0)),
+                    float(row.get("response_posterior_logvar_std", 0.0)),
+                    float(row.get("response_posterior_entropy_proxy", 0.0)),
+                    float(row.get("response_decode_repeat_var_mean", 0.0)),
+                    float(row.get("response_decode_repeat_var_std", 0.0)),
+                    float(row.get("response_recon_repeat_var_mean", 0.0)),
+                    float(row.get("response_recon_repeat_var_std", 0.0)),
+                    float(row.get("response_kl_repeat_var_mean", 0.0)),
+                    float(row.get("response_kl_repeat_var_std", 0.0)),
+                ]
+            )
         interaction_feats: List[float] = []
         if include_interaction_features:
             md = float(row["metadata_distance"])
@@ -685,7 +845,7 @@ def _feature_matrix(
                         qns * ess,
                     ]
                 )
-        features.append(base + ext + one_hot + probe_feats + interaction_feats)
+        features.append(base + ext + one_hot + probe_feats + response_feats + interaction_feats)
 
     return np.asarray(features, dtype=np.float64)
 
@@ -811,6 +971,7 @@ def _evaluate_holdout(
     probe_cfg: ProbeConfig,
     oracle_cfg: OracleProbeConfig,
     include_probe_features_override: Optional[bool] = None,
+    include_response_features: bool = False,
     include_interaction_features: bool = False,
     disentanglement_arm: str = "default",
 ) -> dict:
@@ -824,6 +985,7 @@ def _evaluate_holdout(
         feature_set=feature_set,
         expert_domains=expert_domains,
         include_probe_features=include_probe_features,
+        include_response_features=bool(include_response_features),
         include_expert_stats=include_expert_stats,
         include_interaction_features=bool(include_interaction_features),
     )
@@ -832,6 +994,7 @@ def _evaluate_holdout(
         feature_set=feature_set,
         expert_domains=expert_domains,
         include_probe_features=include_probe_features,
+        include_response_features=bool(include_response_features),
         include_expert_stats=include_expert_stats,
         include_interaction_features=bool(include_interaction_features),
     )
@@ -877,6 +1040,10 @@ def _evaluate_holdout(
         "feature_set": feature_set,
         "method": method,
         "probe_feature_mode": "on" if include_probe_features else "off",
+        "response_feature_mode": "on" if bool(include_response_features) else "off",
+        "response_feature_normalization": "train_fold_standardize"
+        if bool(include_response_features)
+        else "none",
         "interaction_feature_mode": "on" if bool(include_interaction_features) else "off",
         "disentanglement_arm": str(disentanglement_arm),
         "heldout_query_domain": int(heldout_domain),
@@ -955,6 +1122,8 @@ def _evaluate_metadata_baseline(
         "feature_set": "baseline",
         "method": "metadata_routing",
         "probe_feature_mode": "off",
+        "response_feature_mode": "off",
+        "response_feature_normalization": "none",
         "interaction_feature_mode": "off",
         "disentanglement_arm": "baseline",
         "heldout_query_domain": int(heldout_domain),
@@ -1039,7 +1208,7 @@ def _aggregate(rows: Sequence[dict]) -> List[dict]:
         "target_variance",
         "oracle_pairwise_inconsistency_rate",
     ]
-    groups: Dict[Tuple[str, str, str, str, str, str, str], List[dict]] = {}
+    groups: Dict[Tuple[str, str, str, str, str, str, str, str], List[dict]] = {}
     for row in rows:
         key = (
             str(row["dataset_name"]),
@@ -1048,13 +1217,14 @@ def _aggregate(rows: Sequence[dict]) -> List[dict]:
             str(row["feature_set"]),
             str(row["method"]),
             str(row.get("probe_feature_mode", "off")),
+            str(row.get("response_feature_mode", "off")),
             str(row.get("interaction_feature_mode", "off")),
         )
         groups.setdefault(key, []).append(row)
 
     out: List[dict] = []
     for key, vals in groups.items():
-        dataset_name, backbone_type, variant, feature_set, method, probe_mode, interaction_mode = key
+        dataset_name, backbone_type, variant, feature_set, method, probe_mode, response_mode, interaction_mode = key
         row = {
             "dataset_name": dataset_name,
             "backbone_type": backbone_type,
@@ -1062,6 +1232,7 @@ def _aggregate(rows: Sequence[dict]) -> List[dict]:
             "feature_set": feature_set,
             "method": method,
             "probe_feature_mode": probe_mode,
+            "response_feature_mode": response_mode,
             "interaction_feature_mode": interaction_mode,
             "n_folds": int(len(vals)),
         }
@@ -1171,6 +1342,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Evaluate four probe/interaction arms for utility probe methods: neither, interaction_only, probe_only, probe_plus_interaction.",
     )
+    parser.add_argument(
+        "--regime",
+        type=str,
+        default="all",
+        help="Feature/method regime to run: all, metadata_only, static_A, static_B, response_indirect",
+    )
     return parser.parse_args()
 
 
@@ -1217,6 +1394,29 @@ def main() -> None:
             ]
         )
 
+    # Regime selection controls which feature sets / methods are executed.
+    regime = str(args.regime).lower()
+    if regime == "all":
+        allowed_feature_sets = ["A", "B"]
+        allowed_methods = methods
+    elif regime == "metadata_only":
+        allowed_feature_sets = ["A"]
+        allowed_methods = [m for m in methods if m in {"constant_mean", "expert_prior", "linear_regression"}]
+    elif regime == "static_a":
+        allowed_feature_sets = ["A"]
+        allowed_methods = methods
+    elif regime == "static_b":
+        allowed_feature_sets = ["B"]
+        allowed_methods = methods
+    elif regime == "response_indirect":
+        allowed_feature_sets = ["B"]
+        # Response-indirect regime focuses on utility-probe methods only.
+        allowed_methods = [m for m in methods if m.startswith("utility_probe_v1")]
+    else:
+        print(f"[warn] Unknown regime '{args.regime}', falling back to 'all'.")
+        allowed_feature_sets = ["A", "B"]
+        allowed_methods = methods
+
     all_fold_rows: List[dict] = []
     run_summaries: List[dict] = []
 
@@ -1256,12 +1456,30 @@ def main() -> None:
 
         query_domains = sorted(set(int(r["query_domain"]) for r in pair_rows))
         run_rows: List[dict] = []
+        response_norm_reports: List[dict] = []
 
         for heldout in query_domains:
             train_rows = [r for r in pair_rows if int(r["query_domain"]) != int(heldout)]
             test_rows = [r for r in pair_rows if int(r["query_domain"]) == int(heldout)]
             if not train_rows or not test_rows:
                 continue
+
+            norm_train_rows = train_rows
+            norm_test_rows = test_rows
+            if regime == "response_indirect":
+                norm_stats = _fit_response_feature_standardizer(train_rows)
+                norm_train_rows = _apply_response_feature_standardizer(train_rows, norm_stats)
+                norm_test_rows = _apply_response_feature_standardizer(test_rows, norm_stats)
+                split_id = str(test_rows[0].get("support_eval_split_id", "na")) if test_rows else "na"
+                response_norm_reports.extend(
+                    _response_feature_norm_report_rows(
+                        ctx=ctx,
+                        heldout_domain=heldout,
+                        split_id=split_id,
+                        stats=norm_stats,
+                        n_train_rows=len(train_rows),
+                    )
+                )
 
             baseline_row = _evaluate_metadata_baseline(
                 ctx=ctx,
@@ -1277,8 +1495,8 @@ def main() -> None:
             baseline_row["model_capacity_profile"] = str(args.model_capacity_profile)
             run_rows.append(baseline_row)
 
-            for feature_set in ["A", "B"]:
-                for method in methods:
+            for feature_set in allowed_feature_sets:
+                for method in allowed_methods:
                     if method.startswith("utility_probe_v1") and feature_set != "B":
                         continue
                     if (method.startswith("semi_oracle_") or method.startswith("oracle_")) and feature_set != "B":
@@ -1292,14 +1510,21 @@ def main() -> None:
                             ("probe_plus_interaction", True, True),
                         ]
 
+                    include_response_features = False
+                    if regime == "response_indirect":
+                        include_response_features = True
+                        arm_specs = [("response_only", False, bool(args.enable_interaction_features))]
+
                     for arm_name, probe_override, interaction_on in arm_specs:
+                        eval_train_rows = norm_train_rows if include_response_features else train_rows
+                        eval_test_rows = norm_test_rows if include_response_features else test_rows
                         row = _evaluate_holdout(
                             ctx=ctx,
                             heldout_domain=heldout,
                             feature_set=feature_set,
                             method=method,
-                            train_rows=train_rows,
-                            test_rows=test_rows,
+                            train_rows=eval_train_rows,
+                            test_rows=eval_test_rows,
                             expert_domains=expert_domains,
                             utility_lookup=utility_lookup,
                             nelbo_lookup=nelbo_lookup,
@@ -1307,6 +1532,7 @@ def main() -> None:
                             probe_cfg=probe_cfg,
                             oracle_cfg=oracle_cfg,
                             include_probe_features_override=probe_override,
+                            include_response_features=include_response_features,
                             include_interaction_features=interaction_on,
                             disentanglement_arm=arm_name,
                         )
@@ -1332,11 +1558,15 @@ def main() -> None:
                 "model_capacity_profile": str(args.model_capacity_profile),
                 "enable_interaction_features": bool(args.enable_interaction_features),
                 "probe_interaction_disentanglement": bool(args.probe_interaction_disentanglement),
+                "regime": str(args.regime),
             }
         )
 
         with (pair_dir / "summary.json").open("w", encoding="utf-8") as f:
             json.dump(run_summaries[-1], f, indent=2)
+
+        if response_norm_reports:
+            _write_csv(response_norm_reports, pair_dir / "response_feature_normalization_report.csv")
 
     raw_rows_sorted = sorted(
         all_fold_rows,
@@ -1386,6 +1616,7 @@ def main() -> None:
                     "model_capacity_profile": str(args.model_capacity_profile),
                     "enable_interaction_features": bool(args.enable_interaction_features),
                     "probe_interaction_disentanglement": bool(args.probe_interaction_disentanglement),
+                    "regime": str(args.regime),
                 },
                 "runs": run_summaries,
                 "raw_csv": str(raw_out),

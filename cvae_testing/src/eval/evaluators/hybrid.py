@@ -175,6 +175,9 @@ class HybridExpertBank:
             return self.shared_cvae
         return self.cvaes[int(domain)]
 
+    def domain_cvae(self, domain: int) -> CVAEExpert:
+        return self._cvae_for_domain(domain)
+
     def score_domain_nelbo(self, expert_domain: int, x: torch.Tensor) -> torch.Tensor:
         head = self._head_for_domain(expert_domain)
         cvae = self._cvae_for_domain(expert_domain)

@@ -135,6 +135,14 @@ def main() -> None:
 
         stage_started = time.perf_counter()
         expected_dim = cfg.get("features", {}).get("embedding_dim")
+        extractor_config = {
+            "feature_extractor_name": cfg.get("features", {}).get(
+                "feature_extractor_name", cfg.get("features", {}).get("backbone_type", "resnet18")
+            ),
+            "feature_extractor_checkpoint": cfg.get("features", {}).get("feature_extractor_checkpoint", ""),
+            "feature_extractor_layer": cfg.get("features", {}).get("feature_extractor_layer", ""),
+            "embedding_pooling": cfg.get("features", {}).get("embedding_pooling", ""),
+        }
         cache_paths, extraction_info = extract_and_cache_embeddings(
             records=records,
             cache_dir=run_ctx.embeddings_dir,
@@ -142,13 +150,26 @@ def main() -> None:
             batch_size=int(cfg.get("features", {}).get("extraction_batch_size", cfg["training"]["batch_size"])),
             backbone_type=str(cfg.get("features", {}).get("backbone_type", "resnet18")),
             expected_dim=int(expected_dim) if expected_dim is not None else None,
+            extractor_config=extractor_config,
         )
         resolved_dim = int(extraction_info["resolved_embedding_dim"])
         cfg.setdefault("features", {})["embedding_dim"] = resolved_dim
+        cfg.setdefault("features", {})["feature_extractor_name"] = str(extraction_info.get("feature_extractor_name", ""))
+        cfg.setdefault("features", {})["feature_extractor_checkpoint"] = str(
+            extraction_info.get("feature_extractor_checkpoint", "")
+        )
+        cfg.setdefault("features", {})["feature_extractor_layer"] = str(extraction_info.get("feature_extractor_layer", ""))
+        cfg.setdefault("features", {})["embedding_pooling"] = str(extraction_info.get("embedding_pooling", ""))
         cache_report = validate_embedding_cache(
             cache_paths,
             expected_dim=resolved_dim,
             expected_backbone_type=str(extraction_info["backbone_type"]),
+            expected_feature_extractor={
+                "feature_extractor_name": extraction_info.get("feature_extractor_name", ""),
+                "feature_extractor_checkpoint": extraction_info.get("feature_extractor_checkpoint", ""),
+                "feature_extractor_layer": extraction_info.get("feature_extractor_layer", ""),
+                "embedding_pooling": extraction_info.get("embedding_pooling", ""),
+            },
         )
         cache_report["feature_extractor"] = extraction_info
         with (run_ctx.reports_dir / "cache_report.json").open("w", encoding="utf-8") as f:

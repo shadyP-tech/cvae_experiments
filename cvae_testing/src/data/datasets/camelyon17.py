@@ -113,12 +113,13 @@ def prepare_camelyon17_records(
     root: Path,
     extensions: Iterable[str],
     split: Dict[str, float],
-    cap_per_domain: int,
+    cap_per_domain: int | None,
     seed: int,
     require_patient_ids: bool,
     domain_field: str = "center",
     metadata_file: str = "metadata.csv",
     use_metadata_split: bool = False,
+    split_domain_caps: Dict[str, int] | None = None,
 ) -> Tuple[List[BreakHisRecord], Dict[str, object]]:
     metadata_path = root / metadata_file
     if not metadata_path.exists():
@@ -197,8 +198,14 @@ def prepare_camelyon17_records(
             require_patient_ids=require_patient_ids,
         )
 
-    capped = cap_samples_per_domain(split_records, cap_per_domain=cap_per_domain, seed=seed)
+    capped, cap_report = cap_samples_per_domain(
+        split_records,
+        cap_per_domain=cap_per_domain,
+        seed=seed,
+        split_domain_caps=split_domain_caps,
+    )
     report = leakage_report(capped)
     report["limitations"] = limitations
     report["metadata_file"] = str(metadata_path)
+    report["split_cap_accounting"] = cap_report
     return capped, report
