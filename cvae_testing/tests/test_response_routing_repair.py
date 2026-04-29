@@ -50,6 +50,9 @@ def _rows() -> list[dict]:
             "response_nelbo_mean": 9.0,
             "response_recon_mean": 8.0,
             "response_kl_mean": 7.0,
+            "response_feature_stream_name": "response_feature",
+            "response_target_stream_name": "target_oracle",
+            "response_feature_seed": 12345,
         },
         {
             "query_id": 2,
@@ -71,6 +74,9 @@ def _rows() -> list[dict]:
             "response_nelbo_mean": 9.1,
             "response_recon_mean": 8.1,
             "response_kl_mean": 7.1,
+            "response_feature_stream_name": "response_feature",
+            "response_target_stream_name": "target_oracle",
+            "response_feature_seed": 67890,
         },
     ]
 
@@ -106,6 +112,9 @@ def test_response_indirect_blocks_utility_and_identity_terms_but_allows_variance
     assert "response_nelbo_mean" not in result.feature_names
     assert "response_recon_mean" not in result.feature_names
     assert "response_kl_mean" not in result.feature_names
+    assert "response_feature_stream_name" not in result.feature_names
+    assert "response_target_stream_name" not in result.feature_names
+    assert "response_feature_seed" not in result.feature_names
     assert set(result.blocked_feature_terms) >= {"nelbo", "recon_mean", "kl_mean"}
 
     forced = build_feature_matrix(
@@ -122,12 +131,12 @@ def test_feature_audit_zero_variance_and_hash_order() -> None:
     regime = get_feature_regime("response_indirect")
     rows = _rows()
     for row in rows:
-        row["response_constant"] = 1.0
+        row["response_posterior_constant"] = 1.0
     first = build_feature_matrix(rows, regime=regime, expert_domains=[100, 200])
     second = build_feature_matrix(rows, regime=regime, expert_domains=[100, 200])
     assert first.feature_names == second.feature_names
     assert first.feature_schema_hash == second.feature_schema_hash
-    assert "response_constant" in first.dropped_zero_variance
+    assert "response_posterior_constant" in first.dropped_zero_variance
     assert feature_schema_hash(regime.name, ["response_a", "response_b"]) != feature_schema_hash(
         regime.name,
         ["response_b", "response_a"],
@@ -136,7 +145,7 @@ def test_feature_audit_zero_variance_and_hash_order() -> None:
 
 def test_fold_local_shuffled_control_is_deterministic_and_preserves_multiset() -> None:
     rows = [
-        {"row": i, "response_a": float(i), "response_b": float(i + 10)}
+        {"row": i, "response_posterior_a": float(i), "response_posterior_b": float(i + 10)}
         for i in range(5)
     ]
     shuffled_a = shuffle_response_feature_rows(
@@ -166,8 +175,8 @@ def test_fold_local_shuffled_control_is_deterministic_and_preserves_multiset() -
     assert shuffled_a == shuffled_b
     assert shuffled_a != rows
     assert shuffled_a != shuffled_c
-    assert sorted((r["response_a"], r["response_b"]) for r in shuffled_a) == sorted(
-        (r["response_a"], r["response_b"]) for r in rows
+    assert sorted((r["response_posterior_a"], r["response_posterior_b"]) for r in shuffled_a) == sorted(
+        (r["response_posterior_a"], r["response_posterior_b"]) for r in rows
     )
     assert [r["row"] for r in shuffled_a] == [r["row"] for r in rows]
 

@@ -41,6 +41,14 @@ BLOCKED_SUBSTRINGS = {
     "kl_mean",
 }
 
+ALLOWED_RESPONSE_FEATURE_PREFIXES = (
+    "response_posterior_",
+    "response_decode_",
+    "response_recon_",
+    "response_kl_repeat_variance_",
+    "response_residual_",
+)
+
 
 @dataclass(frozen=True)
 class FeatureRegime:
@@ -217,8 +225,9 @@ def response_feature_names(rows: Sequence[dict]) -> List[str]:
     names: set[str] = set()
     for row in rows:
         for key in row.keys():
-            if str(key).startswith("response_"):
-                names.add(str(key))
+            name = str(key)
+            if name.startswith(ALLOWED_RESPONSE_FEATURE_PREFIXES) or blocked_terms_for_feature(name):
+                names.add(name)
     return sorted(names)
 
 
