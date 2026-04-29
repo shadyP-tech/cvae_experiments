@@ -226,7 +226,9 @@ def response_feature_names(rows: Sequence[dict]) -> List[str]:
     for row in rows:
         for key in row.keys():
             name = str(key)
-            if name.startswith(ALLOWED_RESPONSE_FEATURE_PREFIXES) or blocked_terms_for_feature(name):
+            if name.startswith(ALLOWED_RESPONSE_FEATURE_PREFIXES) or (
+                name.startswith("response_") and blocked_terms_for_feature(name)
+            ):
                 names.add(name)
     return sorted(names)
 

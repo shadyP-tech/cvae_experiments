@@ -219,6 +219,34 @@ def _raw_decision_rows(method: str, regime: str, *, perfect: bool = False) -> li
     return [base, cand]
 
 
+def test_static_response_indirect_static_features_do_not_trigger_veto() -> None:
+    raw_rows = _raw_decision_rows("linear_regression", "static_response_indirect", perfect=True)
+    raw_rows[1]["feature_names"] = "metadata_distance|embedding_distance|response_posterior_mu_mean"
+    rows, _ = _aggregate_methods(
+        raw_rows,
+        uplift_reference_method="metadata_routing",
+        min_improving_runs=1,
+        strong={
+            "spearman_uplift_min": 0,
+            "top1_uplift_min": 0,
+            "oracle_gap_reduction_min": 0,
+            "normalized_oracle_gap_reduction_min": 0,
+        },
+        weak={
+            "spearman_uplift_min": 0,
+            "top1_uplift_min": 0,
+            "oracle_gap_reduction_min": 0,
+            "normalized_oracle_gap_reduction_min": 0,
+        },
+        instability_std_threshold=999,
+        instability_sign_inconsistency_min_count=99,
+        max_calibration_error_mean=999,
+        calibration_reduction_min=0,
+    )
+    candidate = [r for r in rows if "static_response_indirect" in r["method_key"]][0]
+    assert "blocked_features" not in str(candidate["veto_reason"])
+
+
 def test_decision_vetoes_diagnostic_and_control_even_with_perfect_metrics() -> None:
     rows, _ = _aggregate_methods(
         _raw_decision_rows("oracle_eval_mean_cheat", "response_oracle_diagnostic", perfect=True),

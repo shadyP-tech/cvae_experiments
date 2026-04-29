@@ -14,7 +14,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.eval.feature_regimes import blocked_terms_for_feature, get_feature_regime, serialize_feature_list
+from src.eval.feature_regimes import get_feature_regime, serialize_feature_list
 
 
 def _to_float(value: object, default: float = 0.0) -> float:
@@ -136,6 +136,26 @@ def _split_feature_names(raw: object) -> List[str]:
     return [item for item in text.split("|") if item]
 
 
+def _decision_blocked_terms_for_feature(feature_name: str) -> List[str]:
+    """Return deployability veto terms for feature names.
+
+    The matrix builder owns regime-aware static/response isolation. At decision
+    time, feature-name scanning is a final guard against utility leakage, not a
+    reason to reject deployable static metadata/embedding features.
+    """
+
+    name = str(feature_name)
+    terms = []
+    for term in ["nelbo", "recon_mean", "kl_mean"]:
+        if term in name:
+            terms.append(term)
+    if name in {"query_id", "expert_id", "domain_id", "source_domain", "target_domain", "oracle_utility"}:
+        terms.append(name)
+    if name.startswith("oracle_") or name.startswith("target_"):
+        terms.append(name.split("_", 1)[0] + "_")
+    return terms
+
+
 def _veto_for_method(method_key: str, vals: Sequence[dict]) -> Tuple[bool, str, List[str], List[str], str]:
     regimes = sorted(set(_row_feature_regime(v) for v in vals))
     diagnostic = False
@@ -164,7 +184,7 @@ def _veto_for_method(method_key: str, vals: Sequence[dict]) -> Tuple[bool, str, 
 
     for row in vals:
         for field in _split_feature_names(row.get("feature_names", "")):
-            terms = blocked_terms_for_feature(field)
+            terms = _decision_blocked_terms_for_feature(field)
             if terms:
                 blocked_features.append(field)
                 blocked_terms.extend(terms)
