@@ -33,9 +33,11 @@ from src.eval.feature_regimes import (
     shuffle_response_feature_rows,
 )
 from src.eval.metrics import spearman_corr
+from src.models.cvae_expert import CVAEExpert, elbo_components
 from src.routing.strategies import compute_similarity
 from src.app.determinism import RESPONSE_SEED_SCHEME_VERSION, stable_response_seed
 from src.torch_utils import safe_torch_load
+from src.train.checkpoint_provenance import load_model_checkpoint
 
 
 @dataclass
@@ -44,11 +46,16 @@ class RunContext:
     dataset_name: str
     seed: int
     backbone_type: str
+    embedding_dim: int
+    hidden_dim: int
+    latent_dim: int
+    metadata_constraint_cfg: Dict[str, object]
     routing_strategy: str
     routing_tau: float
     variant: str
     test_cache: Path
-    variant_checkpoint: Path
+    variant_checkpoint: Path | None
+    expert_checkpoints_manifest: Path | None
 
 
 @dataclass
@@ -70,6 +77,79 @@ class ProbeConfig:
 class OracleProbeConfig:
     enabled: bool
     semi_oracle_risk_lambda: float
+
+
+class DirectCVAEExpertBank:
+    """Expert-bank adapter for per-domain CVAE checkpoints.
+
+    The response-routing protocol trains domain CVAE experts directly rather
+    than hybrid projection-head variants. This adapter exposes the small bank
+    interface used by the LOQDO response feature runner without requiring a
+    hybrid_variant_*.pt checkpoint.
+    """
+
+    def __init__(
+        self,
+        *,
+        expert_checkpoints: Dict[int, Path],
+        input_dim: int,
+        hidden_dim: int,
+        latent_dim: int,
+        metadata_constraint_cfg: Dict[str, object],
+        device: torch.device,
+    ) -> None:
+        if not expert_checkpoints:
+            raise RuntimeError("No expert checkpoints were provided for direct CVAE expert bank.")
+        if bool((metadata_constraint_cfg or {}).get("enabled", False)):
+            raise RuntimeError(
+                "Direct CVAE expert-bank fallback does not support metadata-constraint scoring. "
+                "Use a hybrid checkpoint for metadata-constrained expert banks."
+            )
+
+        self.domains = sorted(int(d) for d in expert_checkpoints)
+        self.input_dim = int(input_dim)
+        self.projection_dim = int(input_dim)
+        self.cvae_hidden_dim = int(hidden_dim)
+        self.latent_dim = int(latent_dim)
+        self.metadata_constraint_cfg = dict(metadata_constraint_cfg or {})
+        self.device = device
+        self.variant = "direct_cvae_experts"
+        self.checkpoint_metadata: Dict[str, object] = {}
+        self.legacy_checkpoint_format = False
+        self.cvaes: Dict[int, CVAEExpert] = {}
+
+        for domain in self.domains:
+            loaded = load_model_checkpoint(expert_checkpoints[int(domain)], map_location=device)
+            self.checkpoint_metadata.setdefault(str(domain), dict(loaded.checkpoint_metadata))
+            self.legacy_checkpoint_format = self.legacy_checkpoint_format or bool(loaded.legacy_format)
+            model = CVAEExpert(
+                self.input_dim,
+                self.cvae_hidden_dim,
+                self.latent_dim,
+                metadata_constraint_cfg=self.metadata_constraint_cfg,
+            ).to(device)
+            model.load_state_dict(loaded.model_state_dict)
+            model.eval()
+            self.cvaes[int(domain)] = model
+
+    def domain_cvae(self, domain: int) -> CVAEExpert:
+        return self.cvaes[int(domain)]
+
+    def project(self, domain: int, x: torch.Tensor) -> torch.Tensor:
+        _ = domain
+        return x
+
+    def score_domain_nelbo(self, expert_domain: int, x: torch.Tensor) -> torch.Tensor:
+        cvae = self.domain_cvae(int(expert_domain))
+        recon, mu, logvar = cvae(x)
+        rec, kl = elbo_components(recon, x, mu, logvar)
+        return rec + kl
+
+    def score_domain_recon(self, expert_domain: int, x: torch.Tensor) -> torch.Tensor:
+        cvae = self.domain_cvae(int(expert_domain))
+        recon, mu, logvar = cvae(x)
+        rec, _ = elbo_components(recon, x, mu, logvar)
+        return rec
 
 
 def _deterministic_query_split(
@@ -368,27 +448,42 @@ def _load_run_context(run_dir: Path, variant: str) -> RunContext:
     dataset_name = str(cfg.get("experiment", {}).get("dataset_name", "unknown"))
     seed = int(cfg.get("seed", 0))
     backbone_type = str(cfg.get("features", {}).get("backbone_type", "unknown"))
+    embedding_dim = int(cfg.get("features", {}).get("embedding_dim", 0))
+    hidden_dim = int(cfg.get("model", {}).get("hidden_dim", 0))
+    latent_dim = int(cfg.get("model", {}).get("latent_dim", 0))
+    metadata_constraint_cfg = dict(cfg.get("model", {}).get("metadata_constraint", {}) or {})
     routing_strategy = str(cfg.get("routing", {}).get("strategy", "categorical_exact"))
     routing_tau = float(cfg.get("routing", {}).get("tau", 1.0))
 
     variant_name = str(variant).upper()
     test_cache = run_dir / "embeddings" / "test.pt"
     variant_checkpoint = run_dir / "checkpoints" / f"hybrid_variant_{variant_name}.pt"
+    expert_checkpoints_manifest = run_dir / "checkpoints" / "expert_checkpoints.json"
+    has_variant_checkpoint = variant_checkpoint.exists()
+    has_expert_manifest = expert_checkpoints_manifest.exists()
     if not test_cache.exists():
         raise FileNotFoundError(f"Missing test cache: {test_cache}")
-    if not variant_checkpoint.exists():
-        raise FileNotFoundError(f"Missing variant checkpoint: {variant_checkpoint}")
+    if not has_variant_checkpoint and not has_expert_manifest:
+        raise FileNotFoundError(
+            "Missing expert-bank checkpoint source. Expected either "
+            f"{variant_checkpoint} or {expert_checkpoints_manifest}."
+        )
 
     return RunContext(
         run_dir=run_dir,
         dataset_name=dataset_name,
         seed=seed,
         backbone_type=backbone_type,
+        embedding_dim=embedding_dim,
+        hidden_dim=hidden_dim,
+        latent_dim=latent_dim,
+        metadata_constraint_cfg=metadata_constraint_cfg,
         routing_strategy=routing_strategy,
         routing_tau=routing_tau,
-        variant=variant_name,
+        variant=variant_name if has_variant_checkpoint else "direct_cvae_experts",
         test_cache=test_cache,
-        variant_checkpoint=variant_checkpoint,
+        variant_checkpoint=variant_checkpoint if has_variant_checkpoint else None,
+        expert_checkpoints_manifest=expert_checkpoints_manifest if has_expert_manifest else None,
     )
 
 
@@ -410,8 +505,47 @@ def _resolve_run_dir(path: Path) -> Path:
     )
 
 
+def _parse_domain_key(raw: object) -> int:
+    return int(str(raw).strip().lower().replace("x", ""))
+
+
+def _load_expert_checkpoint_manifest(path: Path) -> Dict[int, Path]:
+    with path.open("r", encoding="utf-8") as f:
+        payload = json.load(f)
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"Expert checkpoint manifest must be a dictionary: {path}")
+    out: Dict[int, Path] = {}
+    for key, value in payload.items():
+        domain = _parse_domain_key(key)
+        ckpt = Path(str(value))
+        if not ckpt.is_absolute():
+            ckpt = path.parent / ckpt
+        if not ckpt.exists():
+            raise FileNotFoundError(f"Expert checkpoint for domain {domain} not found: {ckpt}")
+        out[int(domain)] = ckpt
+    if not out:
+        raise RuntimeError(f"Expert checkpoint manifest contains no usable checkpoints: {path}")
+    return out
+
+
+def _make_expert_bank(ctx: RunContext, device: torch.device):
+    if ctx.variant_checkpoint is not None and ctx.variant_checkpoint.exists():
+        return HybridExpertBank(ctx.variant_checkpoint, device=device)
+    if ctx.expert_checkpoints_manifest is None:
+        raise RuntimeError("Run context has neither a hybrid checkpoint nor an expert checkpoint manifest.")
+    expert_checkpoints = _load_expert_checkpoint_manifest(ctx.expert_checkpoints_manifest)
+    return DirectCVAEExpertBank(
+        expert_checkpoints=expert_checkpoints,
+        input_dim=int(ctx.embedding_dim),
+        hidden_dim=int(ctx.hidden_dim),
+        latent_dim=int(ctx.latent_dim),
+        metadata_constraint_cfg=ctx.metadata_constraint_cfg,
+        device=device,
+    )
+
+
 def _score_domains_batched(
-    bank: HybridExpertBank,
+    bank,
     expert_domains: Sequence[int],
     x_cpu: torch.Tensor,
     device: torch.device,
@@ -493,7 +627,7 @@ def _build_pair_rows(
 
     all_domains = sorted(set(_as_int_domain(m["magnification"]) for m in metadata))
     device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
-    bank = HybridExpertBank(ctx.variant_checkpoint, device=device)
+    bank = _make_expert_bank(ctx, device=device)
     expert_domains = [d for d in all_domains if d in bank.domains]
     if not expert_domains:
         raise RuntimeError("No overlapping expert domains found between data and checkpoint.")
