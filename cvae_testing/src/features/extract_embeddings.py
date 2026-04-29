@@ -115,6 +115,7 @@ class _DinoV2FeatureExtractor(nn.Module):
 def _build_backbone(
     backbone_type: str,
     extractor_config: Dict[str, object] | None = None,
+    image_size: int | None = None,
 ) -> Tuple[nn.Module, int, str, Dict[str, str]]:
     backbone = str(backbone_type).strip().lower()
     resolved_extractor_cfg = _normalize_extractor_config(backbone, extractor_config)
@@ -153,7 +154,10 @@ def _build_backbone(
                 f"for dinov2_vitb14 (got: {ckpt})"
             )
 
-        model = timm.create_model("vit_base_patch14_dinov2.lvd142m", pretrained=True)
+        model_kwargs: Dict[str, object] = {}
+        if image_size is not None:
+            model_kwargs["img_size"] = int(image_size)
+        model = timm.create_model("vit_base_patch14_dinov2.lvd142m", pretrained=True, **model_kwargs)
         feature_extractor = _DinoV2FeatureExtractor(
             model,
             feature_layer=resolved_extractor_cfg["feature_extractor_layer"],
@@ -209,6 +213,7 @@ def extract_and_cache_embeddings(
     model, resolved_dim, resolved_backbone, resolved_extractor_cfg = _build_backbone(
         backbone_type,
         extractor_config=extractor_config,
+        image_size=int(image_size),
     )
     extraction_info: Dict[str, object] = {
         "backbone_type": resolved_backbone,
