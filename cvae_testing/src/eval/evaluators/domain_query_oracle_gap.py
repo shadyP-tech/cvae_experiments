@@ -455,6 +455,16 @@ def evaluate_domain_query_oracle_gap_from_arrays(
                 sample_row["sample_id"] = str(meta["sample_id"])
             if "image_path" in meta:
                 sample_row["image_path"] = str(meta["image_path"])
+            if "label" in meta:
+                sample_row["label"] = int(meta["label"])
+            if "label_name" in meta:
+                sample_row["label_name"] = str(meta["label_name"])
+            if "patient_id" in meta:
+                sample_row["patient_id"] = "" if meta["patient_id"] is None else str(meta["patient_id"])
+            if "domain_name" in meta:
+                sample_row["domain_name"] = str(meta["domain_name"])
+            if "split" in meta:
+                sample_row["split"] = str(meta["split"])
             sample_rows.append(sample_row)
 
     return fold_rows, sample_rows
