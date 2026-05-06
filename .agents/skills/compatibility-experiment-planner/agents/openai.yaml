@@ -1,4 +1,0 @@
-interface:
-  display_name: "Compatibility Experiment Planner"
-  short_description: "Plan safe CVAE routing experiments"
-  default_prompt: "Use $compatibility-experiment-planner to turn this fuzzy routing idea into a protocol-safe experiment plan."
