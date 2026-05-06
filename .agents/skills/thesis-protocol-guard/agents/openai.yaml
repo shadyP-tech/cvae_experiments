@@ -1,0 +1,4 @@
+interface:
+  display_name: "Thesis Protocol Guard"
+  short_description: "Block leakage and protocol violations"
+  default_prompt: "Use $thesis-protocol-guard to review this routing experiment for leakage and protocol violations."
