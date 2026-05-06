@@ -12,6 +12,11 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.eval.evaluators import learned_utility as lu
+from src.eval.evaluators.learned_utility_pairs import _build_fold_training_pair_features
+from src.eval.evaluators.learned_utility_protocol import (
+    ProtocolError,
+    _aggregate_metrics_from_sample_rows,
+)
 
 
 def _read_csv(path: Path) -> list[dict[str, str]]:
@@ -80,7 +85,7 @@ def _learned_cfg() -> dict:
 def test_fold_training_pairs_exclude_outer_target_and_query_self_expert() -> None:
     embeddings = np.arange(5 * 2, dtype=np.float64).reshape(5, 2)
     sample_domains = np.asarray([40, 100, 100, 200, 400], dtype=np.int64)
-    x, q, e, s = lu._build_fold_training_pair_features(
+    x, q, e, s = _build_fold_training_pair_features(
         sample_embeddings=embeddings,
         sample_domains=sample_domains,
         train_indices=np.asarray([1, 2, 3, 4], dtype=np.int64),
@@ -185,12 +190,12 @@ def test_metric_aggregation_hard_fails_on_invalid_candidate_rows() -> None:
     invalid["selected_expert"] = 40
 
     try:
-        lu._aggregate_metrics_from_sample_rows([invalid])
-    except lu.ProtocolError as exc:
+        _aggregate_metrics_from_sample_rows([invalid])
+    except ProtocolError as exc:
         assert "selected_expert" in str(exc)
     else:
         raise AssertionError("Expected ProtocolError for selected expert outside candidate pool")
 
-    metrics = lu._aggregate_metrics_from_sample_rows([valid])
+    metrics = _aggregate_metrics_from_sample_rows([valid])
     assert metrics["metadata_routing"]["n_samples_micro"] == 1.0
     assert metrics["metadata_routing"]["n_query_domains_macro"] == 1.0
