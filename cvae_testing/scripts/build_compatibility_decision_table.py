@@ -11,11 +11,29 @@ from statistics import mean
 from typing import Any, Dict, List, Sequence, Tuple
 
 
+EXPECTED_PROTOCOL_VERSION = "learned_utility_loqdo_candidate_exclusion_v2"
+REQUIRED_METHOD_POLICY_FIELDS = {
+    "protocol_version",
+    "method_role",
+    "adoption_eligible",
+    "diagnostic_only",
+    "routing_uses_eval_nelbo",
+    "routing_uses_eval_domain_statistics",
+}
+
+
 def _to_float(value: object, default: float = 0.0) -> float:
     try:
         return float(value)
     except Exception:
         return float(default)
+
+
+def _to_int(value: object, default: int = 0) -> int:
+    try:
+        return int(float(value))
+    except Exception:
+        return int(default)
 
 
 def _mean_std(values: Sequence[float]) -> Tuple[float, float]:
@@ -60,6 +78,49 @@ def _sign_inconsistency_count(values: Sequence[float]) -> int:
     return 1 if (pos and neg) else 0
 
 
+def _validate_result_protocol(path: Path, payload: Dict[str, Any]) -> str:
+    protocol_version = str(payload.get("protocol_version", "")).strip()
+    contract = payload.get("protocol_contract", {})
+    if not isinstance(contract, dict):
+        raise RuntimeError(f"Result JSON has invalid protocol_contract: {path}")
+
+    contract_version = str(contract.get("protocol_version", "")).strip()
+    if protocol_version != EXPECTED_PROTOCOL_VERSION or contract_version != EXPECTED_PROTOCOL_VERSION:
+        raise RuntimeError(
+            "Decision table requires learned utility LOQDO v2 artifacts. "
+            f"Expected protocol_version={EXPECTED_PROTOCOL_VERSION}; "
+            f"got top_level={protocol_version or '<missing>'} "
+            f"contract={contract_version or '<missing>'} in {path}"
+        )
+    return protocol_version
+
+
+def _validate_method_policy_fields(path: Path, method: str, metrics: Dict[str, Any]) -> None:
+    missing = sorted(field for field in REQUIRED_METHOD_POLICY_FIELDS if field not in metrics)
+    if missing:
+        raise RuntimeError(
+            f"Method '{method}' in {path} is missing required v2 method policy fields: {missing}"
+        )
+
+    method_protocol = str(metrics.get("protocol_version", "")).strip()
+    if method_protocol != EXPECTED_PROTOCOL_VERSION:
+        raise RuntimeError(
+            f"Method '{method}' in {path} has protocol_version={method_protocol or '<missing>'}; "
+            f"expected {EXPECTED_PROTOCOL_VERSION}"
+        )
+
+
+def _is_selectable_method(row: Dict[str, Any], uplift_reference_method: str) -> bool:
+    if str(row.get("method", "")) == str(uplift_reference_method):
+        return False
+    return bool(
+        _to_int(row.get("adoption_eligible", 0)) == 1
+        and _to_int(row.get("diagnostic_only", 0)) == 0
+        and _to_int(row.get("routing_uses_eval_nelbo", 0)) == 0
+        and _to_int(row.get("routing_uses_eval_domain_statistics", 0)) == 0
+    )
+
+
 def _tier(
     *,
     improving_seed_count: int,
@@ -100,11 +161,17 @@ def _read_rows(
     uplift_reference_method: str,
 ) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
+    seen_protocol_versions: set[str] = set()
     for idx, path in enumerate(result_paths):
         payload = json.loads(path.read_text(encoding="utf-8"))
+        seen_protocol_versions.add(_validate_result_protocol(path, payload))
         metrics_by_method = payload.get("metrics_by_method", {})
         if not isinstance(metrics_by_method, dict) or not metrics_by_method:
             continue
+        if str(uplift_reference_method) not in metrics_by_method:
+            raise RuntimeError(
+                f"uplift_reference_method='{uplift_reference_method}' is missing from metrics_by_method in {path}"
+            )
 
         seed = _seed_from_path(path, fallback=idx)
         baseline = metrics_by_method.get(uplift_reference_method, {})
@@ -114,13 +181,24 @@ def _read_rows(
 
         for method, m in metrics_by_method.items():
             mm = m or {}
+            if not isinstance(mm, dict):
+                raise RuntimeError(f"Metrics for method '{method}' in {path} must be a dictionary")
+            _validate_method_policy_fields(path, str(method), mm)
             top1 = _to_float(mm.get("top1_oracle_hit", 0.0))
             spearman = _to_float(mm.get("spearman", 0.0))
             gap_pct = _to_float(mm.get("mean_oracle_gap_pct", 0.0))
             rows.append(
                 {
                     "seed": int(seed),
+                    "protocol_version": str(mm["protocol_version"]),
                     "method": str(method),
+                    "method_role": str(mm["method_role"]),
+                    "adoption_eligible": _to_int(mm["adoption_eligible"]),
+                    "diagnostic_only": _to_int(mm["diagnostic_only"]),
+                    "routing_uses_eval_nelbo": _to_int(mm["routing_uses_eval_nelbo"]),
+                    "routing_uses_eval_domain_statistics": _to_int(
+                        mm["routing_uses_eval_domain_statistics"]
+                    ),
                     "top1_oracle_hit": top1,
                     "spearman": spearman,
                     "mean_oracle_gap_pct": gap_pct,
@@ -130,6 +208,8 @@ def _read_rows(
                     "source_json": str(path),
                 }
             )
+    if len(seen_protocol_versions) > 1:
+        raise RuntimeError(f"Mixed protocol versions in manifest are not allowed: {sorted(seen_protocol_versions)}")
     return rows
 
 
@@ -142,14 +222,6 @@ def _aggregate(
     instability_std_threshold: float,
     instability_sign_inconsistency_min_count: int,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    non_selectable_methods = {
-        str(uplift_reference_method),
-        "oracle_routing",
-        "random_rank_floor",
-        "random_score_floor",
-        "latent_wasserstein_routing",
-    }
-
     by_method: Dict[str, List[Dict[str, Any]]] = {}
     for r in rows:
         by_method.setdefault(str(r["method"]), []).append(r)
@@ -192,12 +264,15 @@ def _aggregate(
             + _sign_inconsistency_count(gap_reductions)
         )
         sign_breach = bool(sign_inconsistency_count >= int(instability_sign_inconsistency_min_count))
-        instability_breach = bool(std_breach or sign_breach)
+        raw_instability_breach = bool(std_breach or sign_breach)
 
-        is_hybrid_method = str(method).startswith("hybrid_alpha_")
+        base = method_rows[0]
+        selectable = _is_selectable_method(base, uplift_reference_method=str(uplift_reference_method))
+        instability_gate_applied = bool(selectable)
+        instability_breach = bool(raw_instability_breach and instability_gate_applied)
         if method == str(uplift_reference_method):
             tier = "baseline"
-        elif method in non_selectable_methods or is_hybrid_method:
+        elif not selectable:
             tier = "reference_only"
         else:
             tier = _tier(
@@ -213,7 +288,16 @@ def _aggregate(
 
         out_rows.append(
             {
+                "protocol_version": str(base.get("protocol_version", "")),
                 "method": method,
+                "method_role": str(base.get("method_role", "")),
+                "adoption_eligible": _to_int(base.get("adoption_eligible", 0)),
+                "diagnostic_only": _to_int(base.get("diagnostic_only", 0)),
+                "routing_uses_eval_nelbo": _to_int(base.get("routing_uses_eval_nelbo", 0)),
+                "routing_uses_eval_domain_statistics": _to_int(
+                    base.get("routing_uses_eval_domain_statistics", 0)
+                ),
+                "selection_eligible": int(selectable),
                 "n_seeds": int(len(seeds)),
                 "seeds": ",".join(str(s) for s in seeds),
                 "top1_oracle_hit_mean": float(top1_mean),
@@ -232,6 +316,8 @@ def _aggregate(
                 "instability_std_threshold": float(instability_std_threshold),
                 "instability_sign_inconsistency_count": int(sign_inconsistency_count),
                 "instability_sign_inconsistency_min_count": int(instability_sign_inconsistency_min_count),
+                "raw_instability_breach": int(raw_instability_breach),
+                "instability_gate_applied": int(instability_gate_applied),
                 "instability_breach": int(instability_breach),
                 "tier": str(tier),
             }
@@ -240,8 +326,7 @@ def _aggregate(
     candidates = [
         r
         for r in out_rows
-        if str(r["method"]) not in non_selectable_methods
-        and not str(r["method"]).startswith("hybrid_alpha_")
+        if int(r["selection_eligible"]) == 1
     ]
     strong_candidates = [r for r in candidates if str(r["tier"]) == "strong_pass"]
     weak_candidates = [r for r in candidates if str(r["tier"]) == "weak_pass"]
@@ -260,10 +345,10 @@ def _aggregate(
         overall_tier = "weak_pass"
 
     for r in out_rows:
-        if str(r["method"]) == selected_method:
-            r["decision"] = "selected"
-        elif str(r["method"]) == str(uplift_reference_method):
+        if str(r["method"]) == str(uplift_reference_method):
             r["decision"] = "baseline_reference"
+        elif str(r["method"]) == selected_method:
+            r["decision"] = "selected"
         else:
             r["decision"] = "not_selected"
 
@@ -309,16 +394,18 @@ def _write_md(path: Path, rows: Sequence[Dict[str, Any]], summary: Dict[str, Any
         )
         f.write("\n")
         f.write(
-            "| method | decision | tier | n_seeds | top1 | spearman | mean_oracle_gap_pct | "
+            "| method | role | eligible | decision | tier | n_seeds | top1 | spearman | mean_oracle_gap_pct | "
             "top1_uplift_vs_metadata | spearman_uplift_vs_metadata | gap_pct_reduction_vs_metadata | "
-            "improving_seed_count | instability_breach |\n"
+            "improving_seed_count | raw_instability_breach | instability_gate_applied | instability_breach |\n"
         )
-        f.write("|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n")
+        f.write("|---|---|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n")
         for r in rows:
             f.write(
-                "| {} | {} | {} | {} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | "
-                "{:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {} | {} |\n".format(
+                "| {} | {} | {} | {} | {} | {} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | "
+                "{:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {} | {} | {} | {} |\n".format(
                     r["method"],
+                    r["method_role"],
+                    int(r["selection_eligible"]),
                     r.get("decision", "not_selected"),
                     r["tier"],
                     r["n_seeds"],
@@ -335,6 +422,8 @@ def _write_md(path: Path, rows: Sequence[Dict[str, Any]], summary: Dict[str, Any
                     float(r["oracle_gap_pct_reduction_vs_metadata_mean"]),
                     float(r["oracle_gap_pct_reduction_vs_metadata_std"]),
                     int(r["improving_seed_count"]),
+                    int(r["raw_instability_breach"]),
+                    int(r["instability_gate_applied"]),
                     int(r["instability_breach"]),
                 )
             )

@@ -228,7 +228,7 @@ def _validate_sample_rows_for_aggregation(rows: Sequence[Mapping[str, Any]]) -> 
             raise ProtocolError(f"fold_query_domain={fold_query_domain} appears in candidate_experts for {method}")
 
 
-def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[str, Dict[str, float]]:
+def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
     _validate_sample_rows_for_aggregation(rows)
     by_method: Dict[str, List[Dict[str, Any]]] = {}
     for row in rows:
@@ -277,8 +277,11 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
             sum(1 for r in vals if np.isfinite(float(r.get("pairwise_auc", float("nan")))))
         )
         method_protocol = _method_protocol(method)
+        metrics["protocol_version"] = _PROTOCOL_VERSION
+        metrics["method_role"] = str(method_protocol.method_role)
         metrics["adoption_eligible"] = float(method_protocol.adoption_eligible)
         metrics["diagnostic_only"] = float(method_protocol.diagnostic_only)
+        metrics["routing_uses_query_features"] = float(method_protocol.routing_uses_query_features)
         metrics["routing_uses_eval_nelbo"] = float(method_protocol.routing_uses_eval_nelbo)
         metrics["routing_uses_eval_domain_statistics"] = float(method_protocol.routing_uses_eval_domain_statistics)
         out[method] = metrics

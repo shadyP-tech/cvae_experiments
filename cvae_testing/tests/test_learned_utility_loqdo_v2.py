@@ -126,12 +126,31 @@ def test_learned_utility_v2_candidate_oracle_and_artifact_invariants(tmp_path, m
     assert results["protocol_contract"]["previous_protocol_invalidated_by_target_candidate_leakage"] is True
     assert "oracle_routing" not in results["metrics_by_method"]
     assert "candidate_oracle_routing" in results["metrics_by_method"]
+    oracle_metrics = results["metrics_by_method"]["candidate_oracle_routing"]
+    assert oracle_metrics["protocol_version"] == "learned_utility_loqdo_candidate_exclusion_v2"
+    assert oracle_metrics["method_role"] == "diagnostic"
+    assert oracle_metrics["adoption_eligible"] == 0.0
+    assert oracle_metrics["diagnostic_only"] == 1.0
     assert results["metrics_by_method"]["latent_wasserstein_routing"]["diagnostic_only"] == 1.0
+    assert results["metrics_by_method"]["latent_wasserstein_routing"]["method_role"] == "diagnostic"
     assert results["metrics_by_method"]["hybrid_alpha_0.0"]["diagnostic_only"] == 1.0
+    assert results["metrics_by_method"]["hybrid_alpha_0.0"]["method_role"] == "diagnostic"
+    assert results["artifacts"]["method_summary"] == "learned_utility_method_summary.csv"
 
     sample_rows = _read_csv(tmp_path / "learned_utility_sample_selections.csv")
     assert sample_rows
     assert all(row["method"] != "oracle_routing" for row in sample_rows)
+
+    method_summary_rows = _read_csv(tmp_path / "learned_utility_method_summary.csv")
+    assert method_summary_rows
+    summary_by_method = {row["method"]: row for row in method_summary_rows}
+    oracle_summary = summary_by_method["candidate_oracle_routing"]
+    assert oracle_summary["protocol_version"] == "learned_utility_loqdo_candidate_exclusion_v2"
+    assert oracle_summary["method_role"] == "diagnostic"
+    assert int(oracle_summary["adoption_eligible"]) == 0
+    assert int(oracle_summary["diagnostic_only"]) == 1
+    assert int(summary_by_method["latent_wasserstein_routing"]["diagnostic_only"]) == 1
+    assert int(summary_by_method["hybrid_alpha_0.0"]["diagnostic_only"]) == 1
 
     row_40 = [
         row

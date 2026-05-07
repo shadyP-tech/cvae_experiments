@@ -67,7 +67,7 @@ def _write_csv(path: Path, rows: Sequence[Dict[str, Any]]) -> None:
 def _build_permutation_rows(
     *,
     permutation_sample_rows: Dict[Tuple[str, int], List[Dict[str, Any]]],
-    aggregate_metrics: Callable[[Sequence[Dict[str, Any]]], Dict[str, Dict[str, float]]],
+    aggregate_metrics: Callable[[Sequence[Dict[str, Any]]], Dict[str, Dict[str, Any]]],
 ) -> List[Dict[str, Any]]:
     permutation_rows: List[Dict[str, Any]] = []
     for (null_type, rep), rows in sorted(permutation_sample_rows.items(), key=lambda kv: (kv[0][0], kv[0][1])):
@@ -265,7 +265,7 @@ def _write_best_gap_overlay(
 
 def _build_seed_gate_by_method(
     *,
-    method_metrics: Dict[str, Dict[str, float]],
+    method_metrics: Dict[str, Dict[str, Any]],
     uplift_reference_method: str,
     strong_spearman_uplift: float,
     strong_top1_uplift: float,
@@ -273,13 +273,15 @@ def _build_seed_gate_by_method(
     weak_spearman_uplift: float,
     weak_top1_uplift: float,
     weak_gap_reduction: float,
-    method_role_lookup: Callable[[str], str],
 ) -> Dict[str, Dict[str, Any]]:
     candidate_methods = sorted(
         method
         for method, metrics in method_metrics.items()
         if int(float(metrics.get("adoption_eligible", 0.0))) == 1
-        and str(method_role_lookup(method)) == "learned"
+        and int(float(metrics.get("diagnostic_only", 0.0))) == 0
+        and int(float(metrics.get("routing_uses_eval_nelbo", 0.0))) == 0
+        and int(float(metrics.get("routing_uses_eval_domain_statistics", 0.0))) == 0
+        and str(metrics.get("method_role", "")) == "learned"
     )
 
     baseline_metrics = method_metrics.get(uplift_reference_method, method_metrics.get("metadata_routing", {}))
@@ -332,12 +334,20 @@ def _build_seed_gate_by_method(
     return seed_gate_by_method
 
 
-def _select_best_methods_by_gap(method_metrics: Dict[str, Dict[str, float]]) -> Tuple[str, str]:
+def _select_best_methods_by_gap(
+    method_metrics: Dict[str, Dict[str, Any]],
+    *,
+    uplift_reference_method: str,
+) -> Tuple[str, str]:
     best_candidate_method = ""
     adoption_methods = sorted(
         method
         for method, metrics in method_metrics.items()
-        if int(float(metrics.get("adoption_eligible", 0.0))) == 1
+        if str(method) != str(uplift_reference_method)
+        and int(float(metrics.get("adoption_eligible", 0.0))) == 1
+        and int(float(metrics.get("diagnostic_only", 0.0))) == 0
+        and int(float(metrics.get("routing_uses_eval_nelbo", 0.0))) == 0
+        and int(float(metrics.get("routing_uses_eval_domain_statistics", 0.0))) == 0
     )
     if adoption_methods:
         best_candidate_method = str(
@@ -366,7 +376,7 @@ def _select_best_methods_by_gap(method_metrics: Dict[str, Dict[str, float]]) -> 
 def _build_hybrid_summary_rows(
     *,
     hybrid_method_meta: Dict[str, Dict[str, Any]],
-    method_metrics: Dict[str, Dict[str, float]],
+    method_metrics: Dict[str, Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
     hybrid_summary_rows: List[Dict[str, Any]] = []
     for method_name, meta in sorted(hybrid_method_meta.items()):
@@ -392,10 +402,42 @@ def _build_hybrid_summary_rows(
     return hybrid_summary_rows
 
 
+def _build_method_summary_rows(method_metrics: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for method, metrics in sorted(method_metrics.items()):
+        rows.append(
+            {
+                "protocol_version": str(metrics.get("protocol_version", _PROTOCOL_VERSION)),
+                "method": str(method),
+                "method_role": str(metrics.get("method_role", _method_protocol(method).method_role)),
+                "adoption_eligible": int(float(metrics.get("adoption_eligible", 0.0))),
+                "diagnostic_only": int(float(metrics.get("diagnostic_only", 0.0))),
+                "routing_uses_query_features": int(float(metrics.get("routing_uses_query_features", 0.0))),
+                "routing_uses_eval_domain_statistics": int(
+                    float(metrics.get("routing_uses_eval_domain_statistics", 0.0))
+                ),
+                "routing_uses_eval_nelbo": int(float(metrics.get("routing_uses_eval_nelbo", 0.0))),
+                "top1_oracle_hit": float(metrics.get("top1_oracle_hit", float("nan"))),
+                "mean_rank": float(metrics.get("mean_rank", float("nan"))),
+                "mean_oracle_gap": float(metrics.get("mean_oracle_gap", float("nan"))),
+                "mean_oracle_gap_pct": float(metrics.get("mean_oracle_gap_pct", float("nan"))),
+                "pairwise_auc": float(metrics.get("pairwise_auc", float("nan"))),
+                "spearman": float(metrics.get("spearman", float("nan"))),
+                "selected_nelbo": float(metrics.get("selected_nelbo", float("nan"))),
+                "candidate_oracle_nelbo": float(metrics.get("candidate_oracle_nelbo", float("nan"))),
+                "n_samples_micro": float(metrics.get("n_samples_micro", 0.0)),
+                "n_query_domains_macro": float(metrics.get("n_query_domains_macro", 0.0)),
+                "n_valid_spearman_samples": float(metrics.get("n_valid_spearman_samples", 0.0)),
+                "n_valid_auc_samples": float(metrics.get("n_valid_auc_samples", 0.0)),
+            }
+        )
+    return rows
+
+
 def _build_hybrid_diagnostics(
     *,
     hybrid_summary_rows: Sequence[Dict[str, Any]],
-    method_metrics: Dict[str, Dict[str, float]],
+    method_metrics: Dict[str, Dict[str, Any]],
     primary_norm_policy: str,
     sensitivity_norm_policy: str,
     run_sensitivity: bool,
@@ -554,12 +596,14 @@ def _finalize_learned_utility_outputs(
         hybrid_method_meta=hybrid_method_meta,
         method_metrics=method_metrics,
     )
+    method_summary_rows = _build_method_summary_rows(method_metrics)
 
     _write_csv(reports_dir / "learned_utility_pair_predictions.csv", pair_rows)
     _write_csv(reports_dir / "learned_utility_sample_selections.csv", sample_rows)
     _write_csv(reports_dir / "learned_utility_domain_breakdown.csv", domain_rows)
     _write_csv(reports_dir / "learned_utility_pair_training_diagnostics.csv", pair_training_rows)
     _write_csv(reports_dir / "learned_utility_proxy_diagnostics.csv", proxy_diag_rows)
+    _write_csv(reports_dir / "learned_utility_method_summary.csv", method_summary_rows)
     if permutation_rows:
         _write_csv(reports_dir / "learned_utility_permutation_nulls.csv", permutation_rows)
 
@@ -584,9 +628,11 @@ def _finalize_learned_utility_outputs(
         weak_spearman_uplift=weak_spearman_uplift,
         weak_top1_uplift=weak_top1_uplift,
         weak_gap_reduction=weak_gap_reduction,
-        method_role_lookup=lambda method: str(_method_protocol(method).method_role),
     )
-    best_candidate_method, best_diagnostic_method = _select_best_methods_by_gap(method_metrics)
+    best_candidate_method, best_diagnostic_method = _select_best_methods_by_gap(
+        method_metrics,
+        uplift_reference_method=str(uplift_reference_method),
+    )
 
     if save_distribution_plots and best_candidate_method:
         diagnostic_plot_artifacts.extend(
@@ -619,6 +665,7 @@ def _finalize_learned_utility_outputs(
             "domain_breakdown": "learned_utility_domain_breakdown.csv",
             "pair_training_diagnostics": "learned_utility_pair_training_diagnostics.csv",
             "proxy_diagnostics": "learned_utility_proxy_diagnostics.csv",
+            "method_summary": "learned_utility_method_summary.csv",
             "permutation_nulls": "learned_utility_permutation_nulls.csv" if permutation_rows else "",
             "diagnostic_plots": diagnostic_plot_artifacts,
             "hybrid_alpha_summary": "learned_utility_hybrid_alpha_summary.csv" if hybrid_summary_rows else "",

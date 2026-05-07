@@ -43,3 +43,4 @@ cvae_testing/thesis_outline.txt
 # github agents
 .github/*
 .cache/
+.agents/
