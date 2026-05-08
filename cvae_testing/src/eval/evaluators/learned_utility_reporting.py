@@ -553,8 +553,17 @@ def _finalize_learned_utility_outputs(
     weak_spearman_uplift: float,
     weak_top1_uplift: float,
     weak_gap_reduction: float,
+    decision_policy_version: str,
     instability_std_threshold: float,
+    top1_uplift_std_threshold: float,
+    spearman_uplift_std_threshold: float,
+    gap_pct_reduction_std_threshold: float,
     instability_sign_inconsistency_min_count: int,
+    min_positive_fraction: float,
+    ci_level: float,
+    ci_bootstrap_reps: int,
+    ci_bootstrap_seed: int,
+    allow_missing_domain_breakdown_as_diagnostic: bool,
     hybrid_enabled: bool,
     tie_policy: str,
     primary_norm_policy: str,
@@ -699,6 +708,7 @@ def _finalize_learned_utility_outputs(
                 "summary": permutation_summary,
             },
             "gate": {
+                "decision_policy_version": str(decision_policy_version),
                 "seed_level": seed_gate_by_method,
                 "strong": {
                     "spearman_uplift_min": float(strong_spearman_uplift),
@@ -712,7 +722,17 @@ def _finalize_learned_utility_outputs(
                 },
                 "instability": {
                     "std_threshold": float(instability_std_threshold),
+                    "top1_uplift_std_threshold": float(top1_uplift_std_threshold),
+                    "spearman_uplift_std_threshold": float(spearman_uplift_std_threshold),
+                    "gap_pct_reduction_std_threshold": float(gap_pct_reduction_std_threshold),
                     "sign_inconsistency_min_count": int(instability_sign_inconsistency_min_count),
+                    "min_positive_fraction": float(min_positive_fraction),
+                    "ci_level": float(ci_level),
+                    "ci_bootstrap_reps": int(ci_bootstrap_reps),
+                    "ci_bootstrap_seed": int(ci_bootstrap_seed),
+                    "allow_missing_domain_breakdown_as_diagnostic": bool(
+                        allow_missing_domain_breakdown_as_diagnostic
+                    ),
                     "note": "Instability is evaluated across seeds in aggregated decision-table stage.",
                 },
             },

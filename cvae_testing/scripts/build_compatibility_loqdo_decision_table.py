@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import math
 from pathlib import Path
 import sys
 from statistics import mean
@@ -15,6 +14,20 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.eval.feature_regimes import get_feature_regime, serialize_feature_list
+from scripts.compatibility_stability import (
+    CATASTROPHIC_GAP_PCT_REDUCTION_MIN,
+    CATASTROPHIC_SPEARMAN_UPLIFT_MIN,
+    CATASTROPHIC_TOP1_UPLIFT_MIN,
+    GAP_PCT_CI_LOWER_TOLERANCE,
+    LEGACY_STD_POLICY,
+    SIGN_CI_POLICY,
+    SPEARMAN_CI_LOWER_TOLERANCE,
+    TOP1_CI_LOWER_TOLERANCE,
+    evaluate_sign_ci_stability,
+    mean_std as _shared_mean_std,
+    sign_inconsistency_count as _shared_sign_inconsistency_count,
+    validate_decision_policy_version,
+)
 
 
 def _to_float(value: object, default: float = 0.0) -> float:
@@ -25,18 +38,11 @@ def _to_float(value: object, default: float = 0.0) -> float:
 
 
 def _mean_std(values: Sequence[float]) -> Tuple[float, float]:
-    clean = [float(v) for v in values if math.isfinite(float(v))]
-    if not clean:
-        return 0.0, 0.0
-    mu = float(mean(clean))
-    var = float(sum((v - mu) ** 2 for v in clean) / len(clean))
-    return mu, math.sqrt(max(var, 0.0))
+    return _shared_mean_std(values)
 
 
 def _sign_inconsistency_count(values: Sequence[float]) -> int:
-    pos = any(float(v) > 1e-12 for v in values)
-    neg = any(float(v) < -1e-12 for v in values)
-    return 1 if (pos and neg) else 0
+    return _shared_sign_inconsistency_count(values)
 
 
 def _tier(
@@ -271,6 +277,86 @@ def _select_rows(rows: Sequence[dict], only_feature_set_b: bool) -> List[dict]:
     return selected
 
 
+def _granular_key(r: dict) -> Tuple[str, str, str, str, str]:
+    fold = str(r.get("heldout_query_domain", "") or r.get("query_domain", "") or r.get("fold_id", ""))
+    return _run_key(r) + (fold,)
+
+
+def _paired_granular_uplifts(
+    rows: Sequence[dict],
+    *,
+    uplift_reference_method: str,
+) -> Dict[str, List[dict]]:
+    by_group: Dict[Tuple[str, str, str, str, str], Dict[str, dict]] = {}
+    for row in rows:
+        by_group.setdefault(_granular_key(row), {})[_method_key(row)] = row
+
+    out: Dict[str, List[dict]] = {}
+    for group_key, methods in by_group.items():
+        baseline = methods.get(str(uplift_reference_method))
+        if baseline is None:
+            continue
+        for method_key, row in methods.items():
+            out.setdefault(method_key, []).append(
+                {
+                    "group_key": "|".join(group_key),
+                    "query_domain": group_key[-1],
+                    "top1_uplift": _to_float(row.get("top1_agreement_with_best_expert", 0.0))
+                    - _to_float(baseline.get("top1_agreement_with_best_expert", 0.0)),
+                    "spearman_uplift": _to_float(row.get("spearman_similarity_vs_neg_nelbo", 0.0))
+                    - _to_float(baseline.get("spearman_similarity_vs_neg_nelbo", 0.0)),
+                    "gap_reduction": _to_float(baseline.get("metadata_to_oracle_gap", 0.0))
+                    - _to_float(row.get("metadata_to_oracle_gap", 0.0)),
+                    "normalized_gap_reduction": _to_float(
+                        baseline.get("normalized_metadata_to_oracle_gap", 0.0)
+                    )
+                    - _to_float(row.get("normalized_metadata_to_oracle_gap", 0.0)),
+                }
+            )
+    return out
+
+
+def _catastrophic_regression_report(granular_uplifts: Sequence[dict]) -> Dict[str, object]:
+    report: Dict[str, object] = {
+        "catastrophic_regression_breach": 0,
+        "catastrophic_regression_metric": "",
+        "catastrophic_regression_query_domain": "",
+        "catastrophic_regression_group_key": "",
+        "worst_domain_top1_uplift": 0.0,
+        "worst_domain_spearman_uplift": 0.0,
+        "worst_domain_gap_reduction": 0.0,
+    }
+    if not granular_uplifts:
+        return report
+    worst_top1 = min(granular_uplifts, key=lambda r: float(r["top1_uplift"]))
+    worst_spearman = min(granular_uplifts, key=lambda r: float(r["spearman_uplift"]))
+    worst_gap = min(granular_uplifts, key=lambda r: float(r["gap_reduction"]))
+    report.update(
+        {
+            "worst_domain_top1_uplift": float(worst_top1["top1_uplift"]),
+            "worst_domain_spearman_uplift": float(worst_spearman["spearman_uplift"]),
+            "worst_domain_gap_reduction": float(worst_gap["gap_reduction"]),
+        }
+    )
+    breaches = [
+        ("top1", worst_top1, CATASTROPHIC_TOP1_UPLIFT_MIN, "top1_uplift"),
+        ("spearman", worst_spearman, CATASTROPHIC_SPEARMAN_UPLIFT_MIN, "spearman_uplift"),
+        ("gap", worst_gap, CATASTROPHIC_GAP_PCT_REDUCTION_MIN, "gap_reduction"),
+    ]
+    for metric, row, threshold, key in breaches:
+        if float(row[key]) < float(threshold):
+            report.update(
+                {
+                    "catastrophic_regression_breach": 1,
+                    "catastrophic_regression_metric": str(metric),
+                    "catastrophic_regression_query_domain": str(row.get("query_domain", "")),
+                    "catastrophic_regression_group_key": str(row.get("group_key", "")),
+                }
+            )
+            break
+    return report
+
+
 def _aggregate_methods(
     rows: Sequence[dict],
     *,
@@ -282,8 +368,22 @@ def _aggregate_methods(
     instability_sign_inconsistency_min_count: int,
     max_calibration_error_mean: float,
     calibration_reduction_min: float,
+    decision_policy_version: str = LEGACY_STD_POLICY,
+    top1_uplift_std_threshold: float = 0.05,
+    spearman_uplift_std_threshold: float = 0.05,
+    gap_reduction_std_threshold: float = 0.005,
+    normalized_gap_reduction_std_threshold: float = 0.01,
+    min_positive_fraction: float = 0.67,
+    ci_level: float = 0.95,
+    ci_bootstrap_reps: int = 10000,
+    ci_bootstrap_seed: int = 1337,
 ) -> Tuple[List[dict], Dict[str, object]]:
+    decision_policy_version = validate_decision_policy_version(decision_policy_version)
     per_run = _aggregate_per_run(rows)
+    granular_uplifts_by_method = _paired_granular_uplifts(
+        rows,
+        uplift_reference_method=str(uplift_reference_method),
+    )
 
     by_run: Dict[Tuple[str, str, str, str], Dict[str, dict]] = {}
     for key, rec in per_run.items():
@@ -351,12 +451,22 @@ def _aggregate_methods(
             )
         )
 
-        std_breach = bool(
-            top1_uplift_std > float(instability_std_threshold)
-            or spearman_uplift_std > float(instability_std_threshold)
-            or gap_reduction_std > float(instability_std_threshold)
-            or norm_gap_reduction_std > float(instability_std_threshold)
-        )
+        if decision_policy_version == LEGACY_STD_POLICY:
+            resolved_top1_std_threshold = float(instability_std_threshold)
+            resolved_spearman_std_threshold = float(instability_std_threshold)
+            resolved_gap_std_threshold = float(instability_std_threshold)
+            resolved_norm_gap_std_threshold = float(instability_std_threshold)
+        else:
+            resolved_top1_std_threshold = float(top1_uplift_std_threshold)
+            resolved_spearman_std_threshold = float(spearman_uplift_std_threshold)
+            resolved_gap_std_threshold = float(gap_reduction_std_threshold)
+            resolved_norm_gap_std_threshold = float(normalized_gap_reduction_std_threshold)
+
+        top1_std_breach = bool(top1_uplift_std > resolved_top1_std_threshold)
+        spearman_std_breach = bool(spearman_uplift_std > resolved_spearman_std_threshold)
+        gap_std_breach = bool(gap_reduction_std > resolved_gap_std_threshold)
+        norm_gap_std_breach = bool(norm_gap_reduction_std > resolved_norm_gap_std_threshold)
+        std_breach = bool(top1_std_breach or spearman_std_breach or gap_std_breach or norm_gap_std_breach)
         sign_inconsistency_count = (
             _sign_inconsistency_count(top1_uplifts)
             + _sign_inconsistency_count(spearman_uplifts)
@@ -364,14 +474,61 @@ def _aggregate_methods(
             + _sign_inconsistency_count(norm_gap_reductions)
         )
         sign_breach = bool(sign_inconsistency_count >= int(instability_sign_inconsistency_min_count))
-        instability_breach = bool(std_breach or sign_breach)
+        legacy_instability_breach = bool(std_breach or sign_breach)
+
+        granular_uplifts = granular_uplifts_by_method.get(method_key, [])
+        granular_top1 = [float(r["top1_uplift"]) for r in granular_uplifts] or top1_uplifts
+        granular_spearman = [float(r["spearman_uplift"]) for r in granular_uplifts] or spearman_uplifts
+        granular_gap = [float(r["gap_reduction"]) for r in granular_uplifts] or gap_reductions
+        granular_norm_gap = [
+            float(r["normalized_gap_reduction"]) for r in granular_uplifts
+        ] or norm_gap_reductions
+        catastrophic_report = _catastrophic_regression_report(granular_uplifts)
+        catastrophic_breach = bool(int(catastrophic_report["catastrophic_regression_breach"]))
+        ci_source = "domain" if granular_uplifts else ("seed_descriptive" if n_runs <= 3 else "seed")
+        sign_ci_report = evaluate_sign_ci_stability(
+            metric_values={
+                "top1": granular_top1,
+                "spearman": granular_spearman,
+                "gap": granular_gap,
+                "normalized_gap": granular_norm_gap,
+            },
+            metric_means={
+                "top1": top1_uplift_mean,
+                "spearman": spearman_uplift_mean,
+                "gap": gap_reduction_mean,
+                "normalized_gap": norm_gap_reduction_mean,
+            },
+            min_improving_runs=int(min_improving_runs),
+            min_positive_fraction=float(min_positive_fraction),
+            ci_level=float(ci_level),
+            ci_bootstrap_reps=int(ci_bootstrap_reps),
+            ci_bootstrap_seed=int(ci_bootstrap_seed),
+            ci_source=str(ci_source),
+            ci_lower_tolerances={
+                "top1": TOP1_CI_LOWER_TOLERANCE,
+                "spearman": SPEARMAN_CI_LOWER_TOLERANCE,
+                "gap": GAP_PCT_CI_LOWER_TOLERANCE,
+                "normalized_gap": 0.0,
+            },
+            catastrophic_regression_breach=catastrophic_breach,
+            regression_check_missing=False,
+        )
+        if decision_policy_version == LEGACY_STD_POLICY:
+            instability_breach = bool(legacy_instability_breach)
+            tier_improving_count = int(improving_run_count)
+            tier_min_improving = int(min_improving_runs)
+        else:
+            instability_breach = not bool(int(sign_ci_report["sign_ci_stability_pass"]))
+            tier_improving_count = int(sign_ci_report["gap_positive_count"])
+            tier_min_improving = int(sign_ci_report["positive_observation_threshold"])
 
         if method_key == str(uplift_reference_method):
             tier = "baseline"
         else:
             tier = _tier(
-                improving_run_count=int(improving_run_count),
-                min_improving_runs=int(min_improving_runs),
+                improving_run_count=int(tier_improving_count),
+                min_improving_runs=int(tier_min_improving),
                 spearman_uplift_mean=float(spearman_uplift_mean),
                 top1_uplift_mean=float(top1_uplift_mean),
                 gap_reduction_mean=float(gap_reduction_mean),
@@ -399,6 +556,7 @@ def _aggregate_methods(
 
         out_rows.append(
             {
+                "decision_policy_version": str(decision_policy_version),
                 "method_key": method_key,
                 "feature_regime": feature_regimes,
                 "adoption_eligible": int(not vetoed and method_key != str(uplift_reference_method)),
@@ -431,9 +589,36 @@ def _aggregate_methods(
                 "calibration_error_reduction_vs_metadata_mean": cal_reduction_mean,
                 "calibration_error_reduction_vs_metadata_std": cal_reduction_std,
                 "improving_run_count": int(improving_run_count),
+                "top1_uplift_std_threshold": float(resolved_top1_std_threshold),
+                "spearman_uplift_std_threshold": float(resolved_spearman_std_threshold),
+                "gap_reduction_std_threshold": float(resolved_gap_std_threshold),
+                "normalized_gap_reduction_std_threshold": float(resolved_norm_gap_std_threshold),
+                "top1_uplift_std_breach": int(top1_std_breach),
+                "spearman_uplift_std_breach": int(spearman_std_breach),
+                "gap_reduction_std_breach": int(gap_std_breach),
+                "normalized_gap_reduction_std_breach": int(norm_gap_std_breach),
                 "instability_std_breach": int(std_breach),
                 "instability_sign_inconsistency_count": int(sign_inconsistency_count),
                 "instability_breach": int(instability_breach),
+                "granular_uplift_rows": int(len(granular_uplifts)),
+                **catastrophic_report,
+                "positive_observation_count": int(sign_ci_report["positive_observation_count"]),
+                "positive_observation_threshold": int(sign_ci_report["positive_observation_threshold"]),
+                "top1_positive_count": int(sign_ci_report["top1_positive_count"]),
+                "spearman_positive_count": int(sign_ci_report["spearman_positive_count"]),
+                "gap_positive_count": int(sign_ci_report["gap_positive_count"]),
+                "normalized_gap_positive_count": int(sign_ci_report["normalized_gap_positive_count"]),
+                "ci_source": str(sign_ci_report["ci_source"]),
+                "ci_hard_gate_applied": int(sign_ci_report["ci_hard_gate_applied"]),
+                "top1_ci_low": float(sign_ci_report["top1_ci_low"]),
+                "top1_ci_high": float(sign_ci_report["top1_ci_high"]),
+                "spearman_ci_low": float(sign_ci_report["spearman_ci_low"]),
+                "spearman_ci_high": float(sign_ci_report["spearman_ci_high"]),
+                "gap_ci_low": float(sign_ci_report["gap_ci_low"]),
+                "gap_ci_high": float(sign_ci_report["gap_ci_high"]),
+                "normalized_gap_ci_low": float(sign_ci_report["normalized_gap_ci_low"]),
+                "normalized_gap_ci_high": float(sign_ci_report["normalized_gap_ci_high"]),
+                "sign_ci_stability_pass": int(sign_ci_report["sign_ci_stability_pass"]),
                 "joint_top1_gap_guardrail_pass": int(joint_top1_gap_guardrail_pass),
                 "uncertainty_calibration_gate_pass": int(uncertainty_calibration_gate_pass),
                 "adoption_gate_pass_proxy": int(adoption_gate_pass_proxy),
@@ -444,6 +629,7 @@ def _aggregate_methods(
     out_rows.sort(key=lambda r: (str(r["tier"]), -float(r["spearman_uplift_vs_metadata_mean"]), str(r["method_key"])))
 
     summary = {
+        "decision_policy_version": str(decision_policy_version),
         "total_methods": int(len(out_rows)),
         "strong_pass_count": int(sum(1 for r in out_rows if str(r["tier"]) == "strong_pass")),
         "weak_pass_count": int(sum(1 for r in out_rows if str(r["tier"]) == "weak_pass")),
@@ -470,16 +656,17 @@ def _write_md(path: Path, rows: Sequence[dict], summary: Dict[str, object]) -> N
     lines: List[str] = []
     lines.append("# LOQDO Compatibility Decision Table")
     lines.append("")
+    lines.append(f"- Decision policy version: {summary['decision_policy_version']}")
     lines.append(f"- Total methods: {int(summary['total_methods'])}")
     lines.append(f"- Strong pass: {int(summary['strong_pass_count'])}")
     lines.append(f"- Weak pass: {int(summary['weak_pass_count'])}")
     lines.append(f"- Fail: {int(summary['fail_count'])}")
     lines.append("")
-    lines.append("| Method | Regime | Tier | Veto | Runs | Top1 mean+-std | Spearman mean+-std | Gap mean+-std | NormGap mean+-std | CalErr mean+-std | Top1 uplift | Spearman uplift | Gap reduction | NormGap reduction | CalErr reduction | Joint guardrail | Cal gate | Adoption gate |")
-    lines.append("|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
+    lines.append("| Method | Regime | Tier | Veto | Runs | Top1 mean+-std | Spearman mean+-std | Gap mean+-std | NormGap mean+-std | CalErr mean+-std | Top1 uplift | Spearman uplift | Gap reduction | NormGap reduction | CalErr reduction | Positive threshold | CI source | Catastrophic | Joint guardrail | Cal gate | Adoption gate |")
+    lines.append("|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|---:|---:|")
     for r in rows:
         lines.append(
-            "| {} | {} | {} | {} | {} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {} | {} | {} |".format(
+            "| {} | {} | {} | {} | {} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {} | {} | {} | {} | {} | {} |".format(
                 r["method_key"],
                 r.get("feature_regime", ""),
                 r["tier"],
@@ -505,6 +692,9 @@ def _write_md(path: Path, rows: Sequence[dict], summary: Dict[str, object]) -> N
                 float(r["normalized_oracle_gap_reduction_vs_metadata_std"]),
                 float(r["calibration_error_reduction_vs_metadata_mean"]),
                 float(r["calibration_error_reduction_vs_metadata_std"]),
+                int(r["positive_observation_threshold"]),
+                str(r["ci_source"]),
+                int(r["catastrophic_regression_breach"]),
                 int(r["joint_top1_gap_guardrail_pass"]),
                 int(r["uncertainty_calibration_gate_pass"]),
                 int(r["adoption_gate_pass_proxy"]),
@@ -534,6 +724,20 @@ def main() -> None:
     p.add_argument("--calibration-reduction-min", type=float, default=0.0)
     p.add_argument("--instability-std-threshold", type=float, default=0.05)
     p.add_argument("--instability-sign-inconsistency-min-count", type=int, default=2)
+    p.add_argument(
+        "--decision-policy-version",
+        type=str,
+        default=SIGN_CI_POLICY,
+        choices=[LEGACY_STD_POLICY, SIGN_CI_POLICY],
+    )
+    p.add_argument("--top1-uplift-std-threshold", type=float, default=0.05)
+    p.add_argument("--spearman-uplift-std-threshold", type=float, default=0.05)
+    p.add_argument("--gap-reduction-std-threshold", type=float, default=0.005)
+    p.add_argument("--normalized-gap-reduction-std-threshold", type=float, default=0.01)
+    p.add_argument("--min-positive-fraction", type=float, default=0.67)
+    p.add_argument("--ci-level", type=float, default=0.95)
+    p.add_argument("--ci-bootstrap-reps", type=int, default=10000)
+    p.add_argument("--ci-bootstrap-seed", type=int, default=1337)
     args = p.parse_args()
 
     raw_rows = _read_raw(args.raw_csv)
@@ -562,6 +766,15 @@ def main() -> None:
         instability_sign_inconsistency_min_count=int(args.instability_sign_inconsistency_min_count),
         max_calibration_error_mean=float(args.max_calibration_error_mean),
         calibration_reduction_min=float(args.calibration_reduction_min),
+        decision_policy_version=str(args.decision_policy_version),
+        top1_uplift_std_threshold=float(args.top1_uplift_std_threshold),
+        spearman_uplift_std_threshold=float(args.spearman_uplift_std_threshold),
+        gap_reduction_std_threshold=float(args.gap_reduction_std_threshold),
+        normalized_gap_reduction_std_threshold=float(args.normalized_gap_reduction_std_threshold),
+        min_positive_fraction=float(args.min_positive_fraction),
+        ci_level=float(args.ci_level),
+        ci_bootstrap_reps=int(args.ci_bootstrap_reps),
+        ci_bootstrap_seed=int(args.ci_bootstrap_seed),
     )
 
     _write_csv(args.output_csv, out_rows)

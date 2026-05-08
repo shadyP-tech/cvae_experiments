@@ -126,6 +126,7 @@ learned_utility:
     diagnostics:
       save_distribution_plots: true
     gate:
+      decision_policy_version: sign_ci_v2
       uplift_reference_method: metadata_routing
       min_improving_seeds: 2
       strong:
@@ -138,7 +139,15 @@ learned_utility:
         oracle_gap_pct_reduction_min: 2.5
       instability:
         std_threshold: 0.05
+        top1_uplift_std_threshold: 0.05
+        spearman_uplift_std_threshold: 0.05
+        gap_pct_reduction_std_threshold: 3.0
         sign_inconsistency_min_count: 2
+        min_positive_fraction: 0.67
+        ci_level: 0.95
+        ci_bootstrap_reps: 10000
+        ci_bootstrap_seed: 1337
+        allow_missing_domain_breakdown_as_diagnostic: false
 
 output:
   root: outputs

@@ -623,6 +623,13 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                 "learned_utility.compatibility_research.gate.uplift_reference_method must be 'metadata_routing'"
             )
 
+        decision_policy_version = str((gate_cfg or {}).get("decision_policy_version", "sign_ci_v2")).strip()
+        if decision_policy_version not in {"legacy_std_v1", "sign_ci_v2"}:
+            raise ValueError(
+                "learned_utility.compatibility_research.gate.decision_policy_version "
+                "must be one of ['legacy_std_v1', 'sign_ci_v2']"
+            )
+
         min_improving_seeds = int((gate_cfg or {}).get("min_improving_seeds", 2))
         if min_improving_seeds <= 0:
             raise ValueError("learned_utility.compatibility_research.gate.min_improving_seeds must be > 0")
@@ -658,9 +665,31 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             raise ValueError(
                 "learned_utility.compatibility_research.gate.instability.std_threshold must be >= 0"
             )
+        for field_name, default in [
+            ("top1_uplift_std_threshold", 0.05),
+            ("spearman_uplift_std_threshold", 0.05),
+            ("gap_pct_reduction_std_threshold", 3.0),
+        ]:
+            if float((instability_cfg or {}).get(field_name, default)) < 0.0:
+                raise ValueError(
+                    "learned_utility.compatibility_research.gate.instability."
+                    f"{field_name} must be >= 0"
+                )
         if int((instability_cfg or {}).get("sign_inconsistency_min_count", 2)) < 1:
             raise ValueError(
                 "learned_utility.compatibility_research.gate.instability.sign_inconsistency_min_count must be >= 1"
+            )
+        min_positive_fraction = float((instability_cfg or {}).get("min_positive_fraction", 0.67))
+        if min_positive_fraction <= 0.0 or min_positive_fraction > 1.0:
+            raise ValueError(
+                "learned_utility.compatibility_research.gate.instability.min_positive_fraction must be in (0, 1]"
+            )
+        ci_level = float((instability_cfg or {}).get("ci_level", 0.95))
+        if ci_level <= 0.0 or ci_level >= 1.0:
+            raise ValueError("learned_utility.compatibility_research.gate.instability.ci_level must be in (0, 1)")
+        if int((instability_cfg or {}).get("ci_bootstrap_reps", 10000)) < 0:
+            raise ValueError(
+                "learned_utility.compatibility_research.gate.instability.ci_bootstrap_reps must be >= 0"
             )
 
         backbone = str(cfg.get("features", {}).get("backbone_type", "")).strip().lower()

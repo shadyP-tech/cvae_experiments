@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 import sys
@@ -12,6 +13,11 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts.build_compatibility_decision_table import _aggregate, _read_rows
+from scripts.compatibility_stability import (
+    LEGACY_STD_POLICY,
+    SIGN_CI_POLICY,
+    effective_positive_threshold,
+)
 
 
 PROTOCOL_VERSION = "learned_utility_loqdo_candidate_exclusion_v2"
@@ -42,18 +48,44 @@ def _metric(
     }
 
 
-def _write_result(path: Path, *, protocol_version: str = PROTOCOL_VERSION, methods: dict) -> Path:
+def _write_result(
+    path: Path,
+    *,
+    protocol_version: str = PROTOCOL_VERSION,
+    methods: dict,
+    domain_rows: list[dict] | None = None,
+) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "protocol_version": protocol_version,
         "protocol_contract": {"protocol_version": protocol_version},
         "metrics_by_method": methods,
+        "artifacts": {"domain_breakdown": "learned_utility_domain_breakdown.csv"},
     }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    if domain_rows is not None:
+        csv_path = path.parent / "learned_utility_domain_breakdown.csv"
+        fieldnames = [
+            "protocol_version",
+            "method",
+            "query_domain",
+            "top1_oracle_hit",
+            "spearman",
+            "mean_oracle_gap_pct",
+        ]
+        with csv_path.open("w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(domain_rows)
     return path
 
 
-def _decision_rows(result_paths: list[Path]) -> list[dict]:
+def _decision_rows(
+    result_paths: list[Path],
+    *,
+    decision_policy_version: str = LEGACY_STD_POLICY,
+    allow_missing_domain_breakdown_as_diagnostic: bool = False,
+) -> list[dict]:
     rows = _read_rows(result_paths, uplift_reference_method="metadata_routing")
     out_rows, _summary = _aggregate(
         rows=rows,
@@ -71,8 +103,47 @@ def _decision_rows(result_paths: list[Path]) -> list[dict]:
         },
         instability_std_threshold=0.05,
         instability_sign_inconsistency_min_count=2,
+        decision_policy_version=decision_policy_version,
+        top1_uplift_std_threshold=0.05,
+        spearman_uplift_std_threshold=0.05,
+        gap_pct_reduction_std_threshold=3.0,
+        ci_bootstrap_reps=200,
+        allow_missing_domain_breakdown_as_diagnostic=allow_missing_domain_breakdown_as_diagnostic,
     )
     return out_rows
+
+
+def _domain_rows(
+    *,
+    query_domain: int,
+    baseline_top1: float,
+    baseline_spearman: float,
+    baseline_gap_pct: float,
+    candidate_method: str,
+    candidate_top1: float,
+    candidate_spearman: float,
+    candidate_gap_pct: float,
+) -> list[dict]:
+    base = {
+        "protocol_version": PROTOCOL_VERSION,
+        "query_domain": int(query_domain),
+    }
+    return [
+        {
+            **base,
+            "method": "metadata_routing",
+            "top1_oracle_hit": float(baseline_top1),
+            "spearman": float(baseline_spearman),
+            "mean_oracle_gap_pct": float(baseline_gap_pct),
+        },
+        {
+            **base,
+            "method": str(candidate_method),
+            "top1_oracle_hit": float(candidate_top1),
+            "spearman": float(candidate_spearman),
+            "mean_oracle_gap_pct": float(candidate_gap_pct),
+        },
+    ]
 
 
 def test_candidate_oracle_is_reference_only_even_with_perfect_metrics(tmp_path: Path) -> None:
@@ -158,6 +229,167 @@ def test_candidate_oracle_is_reference_only_even_with_perfect_metrics(tmp_path: 
     assert learned["selection_eligible"] == 1
     assert learned["decision"] == "selected"
     assert learned["tier"] == "strong_pass"
+
+
+def test_sign_ci_policy_uses_two_of_three_and_does_not_hard_veto_gap_pct_std(tmp_path: Path) -> None:
+    candidate = "pairwise_ranker_combined"
+    seed_specs = [
+        (42, 0.50, 0.30, 4.5),
+        (43, 0.51, 0.30, 1.5),
+        (44, 0.29, 0.10, 8.0),
+    ]
+    result_paths = []
+    for seed, top1, spearman, gap in seed_specs:
+        result_paths.append(
+            _write_result(
+                tmp_path / f"run_seed{seed}" / "learned_utility_results.json",
+                methods={
+                    "metadata_routing": _metric(
+                        method_role="baseline",
+                        adoption_eligible=1,
+                        diagnostic_only=0,
+                        top1=0.30,
+                        spearman=0.0,
+                        gap_pct=10.0,
+                    ),
+                    candidate: _metric(
+                        method_role="learned",
+                        adoption_eligible=1,
+                        diagnostic_only=0,
+                        top1=top1,
+                        spearman=spearman,
+                        gap_pct=gap,
+                    ),
+                },
+                domain_rows=_domain_rows(
+                    query_domain=40,
+                    baseline_top1=0.30,
+                    baseline_spearman=0.0,
+                    baseline_gap_pct=10.0,
+                    candidate_method=candidate,
+                    candidate_top1=top1,
+                    candidate_spearman=spearman,
+                    candidate_gap_pct=gap,
+                ),
+            )
+        )
+
+    sign_ci = {row["method"]: row for row in _decision_rows(result_paths, decision_policy_version=SIGN_CI_POLICY)}
+    learned = sign_ci[candidate]
+    assert learned["positive_observation_threshold"] == 2
+    assert learned["top1_positive_count"] == 2
+    assert learned["oracle_gap_pct_reduction_vs_metadata_std"] > 2.0
+    assert learned["oracle_gap_pct_reduction_vs_metadata_std"] < 3.0
+    assert learned["instability_breach"] == 0
+    assert learned["tier"] == "strong_pass"
+    assert learned["decision"] == "selected"
+
+    legacy = {row["method"]: row for row in _decision_rows(result_paths, decision_policy_version=LEGACY_STD_POLICY)}
+    assert legacy[candidate]["tier"] == "fail"
+    assert legacy[candidate]["instability_breach"] == 1
+
+
+def test_positive_threshold_four_or_more_runs_uses_ceiling_fraction() -> None:
+    assert effective_positive_threshold(3, min_improving_runs=2, min_positive_fraction=0.67) == 2
+    assert effective_positive_threshold(4, min_improving_runs=2, min_positive_fraction=0.67) == 3
+
+
+def test_sign_ci_policy_vetoes_paired_domain_regression(tmp_path: Path) -> None:
+    candidate = "pairwise_ranker_combined"
+    result = _write_result(
+        tmp_path / "run_seed42" / "learned_utility_results.json",
+        methods={
+            "metadata_routing": _metric(
+                method_role="baseline",
+                adoption_eligible=1,
+                diagnostic_only=0,
+                top1=0.30,
+                spearman=0.0,
+                gap_pct=10.0,
+            ),
+            candidate: _metric(
+                method_role="learned",
+                adoption_eligible=1,
+                diagnostic_only=0,
+                top1=0.60,
+                spearman=0.40,
+                gap_pct=3.0,
+            ),
+        },
+        domain_rows=[
+            *_domain_rows(
+                query_domain=40,
+                baseline_top1=0.30,
+                baseline_spearman=0.0,
+                baseline_gap_pct=10.0,
+                candidate_method=candidate,
+                candidate_top1=0.60,
+                candidate_spearman=0.40,
+                candidate_gap_pct=12.5,
+            ),
+            *_domain_rows(
+                query_domain=100,
+                baseline_top1=0.30,
+                baseline_spearman=0.0,
+                baseline_gap_pct=10.0,
+                candidate_method=candidate,
+                candidate_top1=0.90,
+                candidate_spearman=0.80,
+                candidate_gap_pct=1.0,
+            ),
+        ],
+    )
+
+    by_method = {row["method"]: row for row in _decision_rows([result], decision_policy_version=SIGN_CI_POLICY)}
+    learned = by_method[candidate]
+    assert learned["catastrophic_regression_breach"] == 1
+    assert learned["catastrophic_regression_metric"] == "gap_pct"
+    assert learned["catastrophic_regression_query_domain"] == "40"
+    assert learned["tier"] == "fail"
+    assert learned["decision"] == "not_selected"
+
+
+def test_missing_domain_breakdown_override_marks_needs_evidence(tmp_path: Path) -> None:
+    candidate = "pairwise_ranker_combined"
+    result = _write_result(
+        tmp_path / "run_seed42" / "learned_utility_results.json",
+        methods={
+            "metadata_routing": _metric(
+                method_role="baseline",
+                adoption_eligible=1,
+                diagnostic_only=0,
+                top1=0.30,
+                spearman=0.0,
+                gap_pct=10.0,
+            ),
+            candidate: _metric(
+                method_role="learned",
+                adoption_eligible=1,
+                diagnostic_only=0,
+                top1=0.60,
+                spearman=0.40,
+                gap_pct=3.0,
+            ),
+        },
+    )
+
+    closed = {row["method"]: row for row in _decision_rows([result], decision_policy_version=SIGN_CI_POLICY)}
+    assert closed[candidate]["regression_check_missing"] == 1
+    assert closed[candidate]["selection_eligible"] == 1
+    assert closed[candidate]["tier"] == "fail"
+
+    diagnostic = {
+        row["method"]: row
+        for row in _decision_rows(
+            [result],
+            decision_policy_version=SIGN_CI_POLICY,
+            allow_missing_domain_breakdown_as_diagnostic=True,
+        )
+    }
+    assert diagnostic[candidate]["regression_check_missing"] == 1
+    assert diagnostic[candidate]["selection_eligible"] == 0
+    assert diagnostic[candidate]["decision"] == "NEEDS_EVIDENCE"
+    assert diagnostic[candidate]["tier"] == "needs_evidence"
 
 
 def test_v2_protocol_validation_hard_fails_for_mixed_manifest(tmp_path: Path) -> None:

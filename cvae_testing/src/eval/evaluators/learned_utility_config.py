@@ -34,8 +34,17 @@ class CompatibilityResearchConfig:
     weak_spearman_uplift: float
     weak_top1_uplift: float
     weak_gap_reduction: float
+    decision_policy_version: str
     instability_std_threshold: float
+    top1_uplift_std_threshold: float
+    spearman_uplift_std_threshold: float
+    gap_pct_reduction_std_threshold: float
     instability_sign_inconsistency_min_count: int
+    min_positive_fraction: float
+    ci_level: float
+    ci_bootstrap_reps: int
+    ci_bootstrap_seed: int
+    allow_missing_domain_breakdown_as_diagnostic: bool
 
 
 @dataclass(frozen=True)
@@ -105,9 +114,24 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         weak_spearman_uplift=float((weak_gate or {}).get("spearman_uplift_min", 0.025)),
         weak_top1_uplift=float((weak_gate or {}).get("top1_uplift_min", 0.05)),
         weak_gap_reduction=float((weak_gate or {}).get("oracle_gap_pct_reduction_min", 2.5)),
+        decision_policy_version=str((gate_cfg or {}).get("decision_policy_version", "sign_ci_v2")),
         instability_std_threshold=float((instability_gate or {}).get("std_threshold", 0.05)),
+        top1_uplift_std_threshold=float((instability_gate or {}).get("top1_uplift_std_threshold", 0.05)),
+        spearman_uplift_std_threshold=float(
+            (instability_gate or {}).get("spearman_uplift_std_threshold", 0.05)
+        ),
+        gap_pct_reduction_std_threshold=float(
+            (instability_gate or {}).get("gap_pct_reduction_std_threshold", 3.0)
+        ),
         instability_sign_inconsistency_min_count=int(
             (instability_gate or {}).get("sign_inconsistency_min_count", 2)
+        ),
+        min_positive_fraction=float((instability_gate or {}).get("min_positive_fraction", 0.67)),
+        ci_level=float((instability_gate or {}).get("ci_level", 0.95)),
+        ci_bootstrap_reps=int((instability_gate or {}).get("ci_bootstrap_reps", 10000)),
+        ci_bootstrap_seed=int((instability_gate or {}).get("ci_bootstrap_seed", 1337)),
+        allow_missing_domain_breakdown_as_diagnostic=bool(
+            (instability_gate or {}).get("allow_missing_domain_breakdown_as_diagnostic", False)
         ),
     )
 

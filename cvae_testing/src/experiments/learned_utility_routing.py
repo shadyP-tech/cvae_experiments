@@ -153,6 +153,11 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
                     ),
                 },
                 "gate": {
+                    "decision_policy_version": str(
+                        learned_cfg.get("compatibility_research", {})
+                        .get("gate", {})
+                        .get("decision_policy_version", "sign_ci_v2")
+                    ),
                     "uplift_reference_method": str(
                         learned_cfg.get("compatibility_research", {})
                         .get("gate", {})
@@ -210,11 +215,59 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
                             .get("instability", {})
                             .get("std_threshold", 0.05)
                         ),
+                        "top1_uplift_std_threshold": float(
+                            learned_cfg.get("compatibility_research", {})
+                            .get("gate", {})
+                            .get("instability", {})
+                            .get("top1_uplift_std_threshold", 0.05)
+                        ),
+                        "spearman_uplift_std_threshold": float(
+                            learned_cfg.get("compatibility_research", {})
+                            .get("gate", {})
+                            .get("instability", {})
+                            .get("spearman_uplift_std_threshold", 0.05)
+                        ),
+                        "gap_pct_reduction_std_threshold": float(
+                            learned_cfg.get("compatibility_research", {})
+                            .get("gate", {})
+                            .get("instability", {})
+                            .get("gap_pct_reduction_std_threshold", 3.0)
+                        ),
                         "sign_inconsistency_min_count": int(
                             learned_cfg.get("compatibility_research", {})
                             .get("gate", {})
                             .get("instability", {})
                             .get("sign_inconsistency_min_count", 2)
+                        ),
+                        "min_positive_fraction": float(
+                            learned_cfg.get("compatibility_research", {})
+                            .get("gate", {})
+                            .get("instability", {})
+                            .get("min_positive_fraction", 0.67)
+                        ),
+                        "ci_level": float(
+                            learned_cfg.get("compatibility_research", {})
+                            .get("gate", {})
+                            .get("instability", {})
+                            .get("ci_level", 0.95)
+                        ),
+                        "ci_bootstrap_reps": int(
+                            learned_cfg.get("compatibility_research", {})
+                            .get("gate", {})
+                            .get("instability", {})
+                            .get("ci_bootstrap_reps", 10000)
+                        ),
+                        "ci_bootstrap_seed": int(
+                            learned_cfg.get("compatibility_research", {})
+                            .get("gate", {})
+                            .get("instability", {})
+                            .get("ci_bootstrap_seed", 1337)
+                        ),
+                        "allow_missing_domain_breakdown_as_diagnostic": bool(
+                            learned_cfg.get("compatibility_research", {})
+                            .get("gate", {})
+                            .get("instability", {})
+                            .get("allow_missing_domain_breakdown_as_diagnostic", False)
                         ),
                     },
                 },
