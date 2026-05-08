@@ -1,0 +1,266 @@
+{
+  "protocol": {
+    "name": "support_set_utility_calibration_loqdo",
+    "candidate_policy": "exclude_target_domain",
+    "support_sizes": [
+      4,
+      8,
+      16,
+      32,
+      64
+    ],
+    "support_seeds": [
+      17,
+      23,
+      31
+    ],
+    "sampling_policies": [
+      "class_balanced",
+      "random"
+    ],
+    "metadata_tau": 100.0,
+    "topk_values": [],
+    "softmax_temperatures": [],
+    "response_proxy_raw": ""
+  },
+  "runs": [
+    {
+      "run_dir": "/home/stud/spark/cvae_metadata_routing/cvae_testing/outputs/breakhis/hybrid_ablation_extractor_resnet18_v1/2026-03-18_1522_seed42",
+      "dataset_name": "breakhis",
+      "seed": 42,
+      "backbone_type": "resnet18",
+      "variant": "B",
+      "embedding_dim": 512,
+      "support_sizes": [
+        4,
+        8,
+        16,
+        32,
+        64
+      ],
+      "support_seeds": [
+        17,
+        23,
+        31
+      ],
+      "sampling_policies": [
+        "class_balanced",
+        "random"
+      ],
+      "n_rows": 600,
+      "response_proxy_rows_available": 0
+    },
+    {
+      "run_dir": "/home/stud/spark/cvae_metadata_routing/cvae_testing/outputs/breakhis/hybrid_ablation_extractor_resnet18_v1/2026-03-18_1523_seed43",
+      "dataset_name": "breakhis",
+      "seed": 43,
+      "backbone_type": "resnet18",
+      "variant": "B",
+      "embedding_dim": 512,
+      "support_sizes": [
+        4,
+        8,
+        16,
+        32,
+        64
+      ],
+      "support_seeds": [
+        17,
+        23,
+        31
+      ],
+      "sampling_policies": [
+        "class_balanced",
+        "random"
+      ],
+      "n_rows": 600,
+      "response_proxy_rows_available": 0
+    },
+    {
+      "run_dir": "/home/stud/spark/cvae_metadata_routing/cvae_testing/outputs/breakhis/hybrid_ablation_extractor_resnet18_v1/2026-03-18_1524_seed44",
+      "dataset_name": "breakhis",
+      "seed": 44,
+      "backbone_type": "resnet18",
+      "variant": "B",
+      "embedding_dim": 512,
+      "support_sizes": [
+        4,
+        8,
+        16,
+        32,
+        64
+      ],
+      "support_seeds": [
+        17,
+        23,
+        31
+      ],
+      "sampling_policies": [
+        "class_balanced",
+        "random"
+      ],
+      "n_rows": 600,
+      "response_proxy_rows_available": 0
+    },
+    {
+      "run_dir": "/home/stud/spark/cvae_metadata_routing/cvae_testing/outputs/breakhis/hybrid_ablation_extractor_resnet50_v1/2026-03-18_1525_seed42",
+      "dataset_name": "breakhis",
+      "seed": 42,
+      "backbone_type": "resnet50",
+      "variant": "B",
+      "embedding_dim": 2048,
+      "support_sizes": [
+        4,
+        8,
+        16,
+        32,
+        64
+      ],
+      "support_seeds": [
+        17,
+        23,
+        31
+      ],
+      "sampling_policies": [
+        "class_balanced",
+        "random"
+      ],
+      "n_rows": 600,
+      "response_proxy_rows_available": 0
+    },
+    {
+      "run_dir": "/home/stud/spark/cvae_metadata_routing/cvae_testing/outputs/breakhis/hybrid_ablation_extractor_resnet50_v1/2026-03-18_1527_seed43",
+      "dataset_name": "breakhis",
+      "seed": 43,
+      "backbone_type": "resnet50",
+      "variant": "B",
+      "embedding_dim": 2048,
+      "support_sizes": [
+        4,
+        8,
+        16,
+        32,
+        64
+      ],
+      "support_seeds": [
+        17,
+        23,
+        31
+      ],
+      "sampling_policies": [
+        "class_balanced",
+        "random"
+      ],
+      "n_rows": 600,
+      "response_proxy_rows_available": 0
+    },
+    {
+      "run_dir": "/home/stud/spark/cvae_metadata_routing/cvae_testing/outputs/breakhis/hybrid_ablation_extractor_resnet50_v1/2026-03-18_1528_seed44",
+      "dataset_name": "breakhis",
+      "seed": 44,
+      "backbone_type": "resnet50",
+      "variant": "B",
+      "embedding_dim": 2048,
+      "support_sizes": [
+        4,
+        8,
+        16,
+        32,
+        64
+      ],
+      "support_seeds": [
+        17,
+        23,
+        31
+      ],
+      "sampling_policies": [
+        "class_balanced",
+        "random"
+      ],
+      "n_rows": 600,
+      "response_proxy_rows_available": 0
+    },
+    {
+      "run_dir": "/home/stud/spark/cvae_metadata_routing/cvae_testing/outputs/breakhis/hybrid_ablation_extractor_dinov2_vitb14_v1/2026-03-18_1538_seed42",
+      "dataset_name": "breakhis",
+      "seed": 42,
+      "backbone_type": "dinov2_vitb14",
+      "variant": "B",
+      "embedding_dim": 768,
+      "support_sizes": [
+        4,
+        8,
+        16,
+        32,
+        64
+      ],
+      "support_seeds": [
+        17,
+        23,
+        31
+      ],
+      "sampling_policies": [
+        "class_balanced",
+        "random"
+      ],
+      "n_rows": 600,
+      "response_proxy_rows_available": 0
+    },
+    {
+      "run_dir": "/home/stud/spark/cvae_metadata_routing/cvae_testing/outputs/breakhis/hybrid_ablation_extractor_dinov2_vitb14_v1/2026-03-18_1540_seed43",
+      "dataset_name": "breakhis",
+      "seed": 43,
+      "backbone_type": "dinov2_vitb14",
+      "variant": "B",
+      "embedding_dim": 768,
+      "support_sizes": [
+        4,
+        8,
+        16,
+        32,
+        64
+      ],
+      "support_seeds": [
+        17,
+        23,
+        31
+      ],
+      "sampling_policies": [
+        "class_balanced",
+        "random"
+      ],
+      "n_rows": 600,
+      "response_proxy_rows_available": 0
+    },
+    {
+      "run_dir": "/home/stud/spark/cvae_metadata_routing/cvae_testing/outputs/breakhis/hybrid_ablation_extractor_dinov2_vitb14_v1/2026-03-18_1543_seed44",
+      "dataset_name": "breakhis",
+      "seed": 44,
+      "backbone_type": "dinov2_vitb14",
+      "variant": "B",
+      "embedding_dim": 768,
+      "support_sizes": [
+        4,
+        8,
+        16,
+        32,
+        64
+      ],
+      "support_seeds": [
+        17,
+        23,
+        31
+      ],
+      "sampling_policies": [
+        "class_balanced",
+        "random"
+      ],
+      "n_rows": 600,
+      "response_proxy_rows_available": 0
+    }
+  ],
+  "raw_csv": "/home/stud/spark/cvae_metadata_routing/cvae_testing/results/comparison_tables/support_set_calibration_loqdo_breakhis_raw.csv",
+  "stats_csv": "/home/stud/spark/cvae_metadata_routing/cvae_testing/results/comparison_tables/support_set_calibration_loqdo_breakhis_stats.csv",
+  "n_raw_rows": 5400,
+  "n_stats_rows": 15
+}

@@ -1,0 +1,16 @@
+{
+  "primary_metric": "normalized_oracle_gap",
+  "secondary_metric": "top1_oracle_hit",
+  "diagnostic_metric": "spearman_support_vs_eval_utility",
+  "n_input_rows": 5400,
+  "n_valid_rows": 5400,
+  "n_paired_delta_rows": 1080,
+  "thresholds": {
+    "min_gap_reduction": 0.0,
+    "max_top1_regression": 0.0,
+    "min_positive_seed_fraction": 0.6666666666666666,
+    "k_trend_tolerance": 0.02,
+    "min_backbones": 2,
+    "min_model_seeds": 2
+  }
+}

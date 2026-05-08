@@ -1,0 +1,5 @@
+/home/stud/spark/cvae_metadata_routing/cvae_testing/results/comparison_tables/domain_query_oracle_gap_loqdo_breakhis_raw.csv
+/home/stud/spark/cvae_metadata_routing/cvae_testing/results/comparison_tables/domain_query_oracle_gap_loqdo_breakhis_per_sample.csv
+/home/stud/spark/cvae_metadata_routing/cvae_testing/results/comparison_tables/domain_query_oracle_gap_loqdo_breakhis_stats.csv
+/home/stud/spark/cvae_metadata_routing/cvae_testing/results/comparison_tables/domain_query_oracle_gap_loqdo_breakhis_summary.json
+/home/stud/spark/cvae_metadata_routing/cvae_testing/results/summaries/domain_query_oracle_gap_loqdo_breakhis_summary.md

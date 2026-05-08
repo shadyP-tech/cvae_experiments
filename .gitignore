@@ -34,8 +34,13 @@ cvae_testing/wandb/
 # Local datasets (do not commit raw data)
 cvae_testing/data/
 
-# Local results
-cvae_testing/results/
+# Local results (default ignore; allow select findings)
+cvae_testing/results/*
+!cvae_testing/results/comparison_tables/
+!cvae_testing/results/comparison_tables/learned_utility*_decision*.md
+!cvae_testing/results/comparison_tables/learned_utility*_decision*.csv
+!cvae_testing/results/comparison_tables/learned_utility_decision_summary_v2*.md
+!cvae_testing/results/comparison_tables/learned_utility_decision_summary_v2*.csv
 
 # Thesis outline
 cvae_testing/thesis_outline.txt

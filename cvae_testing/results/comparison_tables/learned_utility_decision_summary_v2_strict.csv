@@ -1,0 +1,4 @@
+label,overall_tier,selected_method,selected_tier,n_seeds,top1_mean,top1_std,spearman_mean,spearman_std,gap_pct_mean,gap_pct_std,top1_uplift_mean,spearman_uplift_mean,gap_reduction_mean
+breakhis_learned_utility,fail,metadata_routing,baseline,3,0.31555555555555553,0.0136986977843755,0.0,0.0,14.740761362027795,1.4339572688785336,0.0,0.0,0.0
+breakhis_response_learned_utility,fail,metadata_routing,baseline,3,0.3383333333333333,0.0164991582276861,0.0,0.0,32.15710498296169,1.9557274204023778,0.0,0.0,0.0
+camelyon17_response_learned_utility,fail,metadata_routing,baseline,3,0.32466666666666666,0.07727152702573496,0.0,0.0,10.93758340993799,2.0915186967405766,0.0,0.0,0.0
