@@ -1,0 +1,81 @@
+from __future__ import annotations
+
+from pathlib import Path
+import subprocess
+import sys
+
+import pytest
+import yaml
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.app.cli import build_parser
+from src.config.load_config import load_config
+from src.experiments.registry import EXPERIMENT_REGISTRY, create_experiment
+
+
+def test_quarantined_modes_are_not_registered() -> None:
+    assert "legacy_routed_cvae" not in EXPERIMENT_REGISTRY
+    assert "latent_compatibility" not in EXPERIMENT_REGISTRY
+
+    for mode in ["legacy_routed_cvae", "latent_compatibility"]:
+        with pytest.raises(ValueError, match="quarantined"):
+            create_experiment(mode)
+
+
+def test_cli_default_points_to_protocol_safe_config() -> None:
+    args = build_parser().parse_args([])
+    assert args.config == Path("configs/experiments/breakhis/learned_utility_routing_v1.yaml")
+
+    cfg = load_config(PROJECT_ROOT / args.config)
+    assert cfg["experiment"]["mode"] == "learned_utility_routing"
+
+
+def test_active_experiment_configs_have_supported_modes() -> None:
+    supported = {"hybrid_ablation", "learned_utility_routing"}
+    for path in (PROJECT_ROOT / "configs" / "experiments").rglob("*.yaml"):
+        cfg = yaml.safe_load(path.read_text(encoding="utf-8"))
+        mode = str((cfg.get("experiment") or {}).get("mode", "")).strip()
+        assert mode, f"{path} must declare experiment.mode"
+        assert mode in supported, f"{path} has unsupported experiment.mode={mode}"
+
+
+def test_quarantined_entrypoints_fail_fast() -> None:
+    checks = [
+        ([sys.executable, "scripts/run_learned_compatibility_loqdo.py"], "target expert"),
+        (["bash", "scripts/run_learned_compatibility_breakhis_seed_sweep.sh"], "legacy LOQDO"),
+        (["bash", "scripts/run_learned_compatibility_camelyon17_seed_sweep.sh"], "legacy LOQDO"),
+        (["bash", "scripts/run_legacy_conditioning_seed_sweep.sh"], "legacy routed-CVAE"),
+        (["bash", "scripts/run_metadata_aux_constraint_seed_sweep.sh"], "legacy routed mode"),
+        (["bash", "scripts/run_metadata_conditional_prior_seed_sweep.sh"], "legacy routed mode"),
+    ]
+    for cmd, expected in checks:
+        result = subprocess.run(
+            cmd,
+            cwd=PROJECT_ROOT,
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+        assert result.returncode == 2
+        assert "BLOCKED" in result.stderr
+        assert expected in result.stderr
+
+
+def test_thesis_facing_manifests_do_not_reference_quarantined_artifacts() -> None:
+    forbidden_terms = [
+        "quarantined",
+        "learned_compatibility_loqdo",
+        "response_dev",
+        "routed_cvae_v1_seed_sweep",
+        "legacy_std_v1",
+    ]
+    manifest_paths = sorted((PROJECT_ROOT / "results" / "comparison_tables").glob("*manifest*.txt"))
+    assert manifest_paths
+    for path in manifest_paths:
+        text = path.read_text(encoding="utf-8")
+        for term in forbidden_terms:
+            assert term not in text, f"{path} references forbidden artifact term: {term}"

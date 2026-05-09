@@ -2,20 +2,26 @@ from __future__ import annotations
 
 from src.experiments.base import BaseExperiment
 from src.experiments.hybrid import HybridAblationExperiment
-from src.experiments.latent_compatibility import LatentCompatibilityExperiment
 from src.experiments.learned_utility_routing import LearnedUtilityRoutingExperiment
-from src.experiments.legacy_routed import LegacyRoutedExperiment
 
 
 EXPERIMENT_REGISTRY = {
-    "legacy_routed_cvae": LegacyRoutedExperiment,
     "hybrid_ablation": HybridAblationExperiment,
-    "latent_compatibility": LatentCompatibilityExperiment,
     "learned_utility_routing": LearnedUtilityRoutingExperiment,
+}
+
+QUARANTINED_EXPERIMENT_MODES = {
+    "legacy_routed_cvae": "legacy routed-CVAE allowed target-expert candidates and is quarantined",
+    "latent_compatibility": "latent compatibility is diagnostic-only and is quarantined as a normal run mode",
 }
 
 
 def create_experiment(mode: str) -> BaseExperiment:
+    if mode in QUARANTINED_EXPERIMENT_MODES:
+        raise ValueError(
+            f"experiment.mode '{mode}' is quarantined: {QUARANTINED_EXPERIMENT_MODES[mode]}. "
+            f"Use one of: {sorted(EXPERIMENT_REGISTRY)}"
+        )
     exp_cls = EXPERIMENT_REGISTRY.get(mode)
     if exp_cls is None:
         raise ValueError(f"Unsupported experiment.mode: {mode}. Available: {sorted(EXPERIMENT_REGISTRY)}")

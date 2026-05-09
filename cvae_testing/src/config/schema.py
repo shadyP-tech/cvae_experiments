@@ -4,6 +4,8 @@ from typing import Any, Dict
 
 
 REQUIRED_TOP_LEVEL = ["seed", "data", "features", "model", "training", "routing"]
+SUPPORTED_EXPERIMENT_MODES = {"hybrid_ablation", "learned_utility_routing"}
+QUARANTINED_EXPERIMENT_MODES = {"legacy_routed_cvae", "latent_compatibility"}
 
 
 def _ensure_bool(value: object, name: str) -> None:
@@ -20,6 +22,19 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError(f"Missing required config sections: {missing}")
 
     experiment_cfg = cfg.get("experiment", {})
+    if not isinstance(experiment_cfg, dict):
+        raise ValueError("experiment must be a dictionary")
+    experiment_mode = str(experiment_cfg.get("mode", "")).strip()
+    if not experiment_mode:
+        raise ValueError("experiment.mode is required; implicit legacy defaults are quarantined")
+    if experiment_mode in QUARANTINED_EXPERIMENT_MODES:
+        raise ValueError(
+            f"experiment.mode '{experiment_mode}' is quarantined and cannot be used for thesis-facing runs"
+        )
+    if experiment_mode not in SUPPORTED_EXPERIMENT_MODES:
+        raise ValueError(
+            f"experiment.mode must be one of {sorted(SUPPORTED_EXPERIMENT_MODES)}, got: {experiment_mode}"
+        )
     experiment_name = str((experiment_cfg or {}).get("name", "")).strip().lower()
     is_response_routing_protocol = experiment_name == "learned_utility_response_routing_v1"
 

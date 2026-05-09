@@ -21,7 +21,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path("configs/experiments/breakhis/routed_cvae_v1.yaml"),
+        default=Path("configs/experiments/breakhis/learned_utility_routing_v1.yaml"),
     )
     parser.add_argument("--run-id", type=str, default=None)
     parser.add_argument("--seed", type=int, default=None)
@@ -51,7 +51,7 @@ def resolve_resume_run_id(project_root: Path, cfg: Dict[str, Any], run_id: str |
 
     exp_cfg = cfg.get("experiment", {})
     dataset_name = str(exp_cfg.get("dataset_name", "breakhis"))
-    experiment_name = str(exp_cfg.get("name", "routed_cvae_v1"))
+    experiment_name = str(exp_cfg.get("name", "learned_utility_routing_v1"))
     output_cfg = cfg.get("output", {})
     output_root = resolve_config_path(project_root, str(output_cfg.get("root", "outputs")))
     latest_file = output_root / dataset_name / experiment_name / "latest.txt"

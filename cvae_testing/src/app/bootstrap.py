@@ -30,7 +30,7 @@ def resolve_config_path(project_root: Path, raw_path: str) -> Path:
 def build_run_context(project_root: Path, cfg: Dict[str, Any], run_id_override: str | None) -> RunContext:
     exp_cfg = cfg.get("experiment", {})
     dataset_name = str(exp_cfg.get("dataset_name", "breakhis"))
-    experiment_name = str(exp_cfg.get("name", "routed_cvae_v1"))
+    experiment_name = str(exp_cfg.get("name", "learned_utility_routing_v1"))
     seed = int(cfg["seed"])
 
     output_cfg = cfg.get("output", {})

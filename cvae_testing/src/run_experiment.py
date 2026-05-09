@@ -32,7 +32,9 @@ def main() -> None:
     if args.seed is not None:
         cfg["seed"] = int(args.seed)
 
-    mode = str(cfg.get("experiment", {}).get("mode", "legacy_routed_cvae"))
+    mode = str(cfg.get("experiment", {}).get("mode", "")).strip()
+    if not mode:
+        raise ValueError("experiment.mode is required; implicit legacy_routed_cvae defaults are quarantined")
     experiment = create_experiment(mode)
 
     resolved_run_id = resolve_resume_run_id(project_root, cfg, run_id=args.run_id, resume=args.resume)
