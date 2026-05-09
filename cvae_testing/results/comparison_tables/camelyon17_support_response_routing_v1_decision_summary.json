@@ -1,0 +1,7 @@
+{
+  "protocol_version": "support_response_candidate_specific_v1",
+  "primary_method": "support_response_pairwise_static_response_indirect",
+  "selected_methods": [],
+  "claim_boundary": "Camelyon17 tests whether response/support signals recover compatibility when center identity alone is under-informative.",
+  "aggregation_unit": "seed_x_heldout_center_x_support_seed_x_support_size"
+}

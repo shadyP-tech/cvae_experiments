@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 
 import numpy as np
+import torch
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -13,11 +14,15 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.eval.evaluators.support_response_routing import (
+    AutoencoderProxyConfig,
     SupportResponseConfig,
+    _AutoencoderProxyBank,
     audit_support_response_features,
     evaluate_support_response_routing_from_arrays,
 )
 from src.eval.evaluators.support_set_calibration import make_support_eval_split
+from src.models.feature_autoencoder import FeatureAutoencoder
+from src.train.checkpoint_provenance import wrap_model_state_dict
 
 
 def _read_csv(path: Path) -> list[dict[str, str]]:
@@ -67,6 +72,25 @@ def _support_cfg() -> SupportResponseConfig:
     )
 
 
+def _support_cfg_with_autoencoder() -> SupportResponseConfig:
+    base = _support_cfg()
+    return SupportResponseConfig(
+        enabled=base.enabled,
+        support_sizes=base.support_sizes,
+        support_seeds=base.support_seeds,
+        sampling_policies=base.sampling_policies,
+        feature_regimes=base.feature_regimes,
+        primary_feature_regime=base.primary_feature_regime,
+        ranker=base.ranker,
+        ridge_l2=base.ridge_l2,
+        num_response_repeats=base.num_response_repeats,
+        tie_policy=base.tie_policy,
+        domain_level_aggregation=base.domain_level_aggregation,
+        source_leave_pseudo_domain_out_diagnostic=base.source_leave_pseudo_domain_out_diagnostic,
+        autoencoder_proxy=AutoencoderProxyConfig(enabled=True, score_normalization_eps=1.0e-8),
+    )
+
+
 def _run(tmp_path: Path) -> dict:
     embeddings, metadata, nelbo, expert_domains = _fixture()
     domain_by_index = {idx: int(row["magnification"]) for idx, row in enumerate(metadata)}
@@ -94,6 +118,69 @@ def _run(tmp_path: Path) -> dict:
         support_cfg=_support_cfg(),
         reports_dir=tmp_path,
         response_feature_fn=response_feature_fn,
+        data_cfg={
+            "dataset_domain_semantics": "camelyon17_center",
+            "legacy_domain_field_alias": "magnification",
+        },
+    )
+
+
+def _run_with_autoencoder(tmp_path: Path) -> dict:
+    embeddings, metadata, nelbo, expert_domains = _fixture()
+    domain_by_index = {idx: int(row["magnification"]) for idx, row in enumerate(metadata)}
+    preferred = {0: 2, 1: 3, 2: 4, 3: 0, 4: 1}
+
+    def response_feature_fn(support_indices, expert_domain: int, split_id: str):
+        _ = split_id
+        query_domain = domain_by_index[int(support_indices[0])]
+        rank = (int(expert_domain) - int(preferred[query_domain])) % len(expert_domains)
+        return {
+            "response_posterior_mu_mean": float(rank),
+            "response_decode_repeat_variance_mean": float(rank) / 10.0,
+        }
+
+    def autoencoder_score_fn(support_indices, candidate_experts, split_id: str):
+        _ = split_id
+        query_domain = domain_by_index[int(support_indices[0])]
+        out = {}
+        for expert in candidate_experts:
+            rank = float((int(expert) - int(preferred[query_domain])) % len(expert_domains))
+            out[int(expert)] = {
+                "raw_recon_mse": rank + 0.25,
+                "normalized_score": rank,
+                "source_val_mean_recon_mse": 0.25,
+                "source_val_std_recon_mse": 1.0,
+                "score_normalization_eps": 1.0e-8,
+                "zero_or_near_zero_std_flag": 0,
+            }
+        return out
+
+    return evaluate_support_response_routing_from_arrays(
+        embeddings=embeddings,
+        metadata=metadata,
+        nelbo_matrix=nelbo,
+        expert_domains=expert_domains,
+        seed=11,
+        dataset_name="camelyon17",
+        strategy="categorical_exact",
+        tau=1.0,
+        support_cfg=_support_cfg_with_autoencoder(),
+        reports_dir=tmp_path,
+        response_feature_fn=response_feature_fn,
+        autoencoder_score_fn=autoencoder_score_fn,
+        autoencoder_provenance={
+            "protocol_version": "support_ae_reconstruction_proxy_v1",
+            "domains": {
+                str(domain): {
+                    "source_domain": int(domain),
+                    "train_cache_indices": [0, 1],
+                    "val_cache_indices": [2, 3],
+                    "source_val_mean_recon_mse": 0.25,
+                    "source_val_std_recon_mse": 1.0,
+                }
+                for domain in expert_domains
+            },
+        },
         data_cfg={
             "dataset_domain_semantics": "camelyon17_center",
             "legacy_domain_field_alias": "magnification",
@@ -188,6 +275,98 @@ def test_support_response_artifacts_encode_protocol_controls_and_score_direction
         assert artifact_rows
         assert {row["dataset_domain_semantics"] for row in artifact_rows} == {"camelyon17_center"}
         assert {row["storage_field"] for row in artifact_rows} == {"magnification"}
+
+
+def test_support_ae_proxy_protocol_fields_score_direction_and_provenance(tmp_path: Path) -> None:
+    results = _run_with_autoencoder(tmp_path)
+    metrics = results["metrics_by_method"]["support_ae_reconstruction_routing"]
+    assert metrics["method_role"] == "learned"
+    assert metrics["adoption_eligible"] == 1.0
+    assert metrics["diagnostic_only"] == 0.0
+    assert metrics["adoption_candidate"] == 1.0
+    assert metrics["claim_requires_pass_rule"] == 1.0
+    assert metrics["initial_result_tier"] == "diagnostic_only"
+    assert metrics["spearman"] > 0.0
+
+    shuffled = results["metrics_by_method"]["support_ae_reconstruction_routing_shuffled"]
+    assert shuffled["method_role"] == "control"
+    assert shuffled["control_only"] == 1.0
+    assert shuffled["adoption_eligible"] == 0.0
+
+    sample_rows = _read_csv(tmp_path / "support_response_sample_selections.csv")
+    ae_rows = [r for r in sample_rows if r["method"] == "support_ae_reconstruction_routing"]
+    assert ae_rows
+    for row in ae_rows:
+        candidates = {int(v) for v in row["candidate_experts"].split("|") if v}
+        assert int(row["fold_query_domain"]) not in candidates
+        assert int(row["selected_expert"]) in candidates
+        assert int(row["candidate_oracle_expert"]) in candidates
+        assert int(row["adoption_candidate"]) == 1
+        assert int(row["claim_requires_pass_rule"]) == 1
+        assert row["initial_result_tier"] == "diagnostic_only"
+        assert row["spearman_definition"] == "Spearman(-ae_zscore_recon_mse,-heldout_eval_nelbo)"
+        score_map = {int(k): float(v) for k, v in json.loads(row["normalized_ae_score_by_expert_json"]).items()}
+        selected = int(row["selected_expert"])
+        assert selected == sorted(score_map, key=lambda expert: (score_map[expert], expert))[0]
+
+    oracle_rows = [r for r in sample_rows if r["method"] == "support_candidate_oracle"]
+    assert oracle_rows
+    for row in oracle_rows:
+        candidates = {int(v) for v in row["candidate_experts"].split("|") if v}
+        assert int(row["fold_query_domain"]) not in candidates
+        assert int(row["selected_expert"]) == int(row["candidate_oracle_expert"])
+        assert int(row["selected_expert"]) in candidates
+
+    method_rows = _read_csv(tmp_path / "support_response_method_summary.csv")
+    method_by_name = {row["method"]: row for row in method_rows}
+    assert method_by_name["support_ae_reconstruction_routing"]["initial_result_tier"] == "diagnostic_only"
+    domain_rows = _read_csv(tmp_path / "support_response_domain_breakdown.csv")
+    assert any(row["method"] == "support_ae_reconstruction_routing" for row in domain_rows)
+
+    provenance = json.loads((tmp_path / "support_ae_provenance.json").read_text(encoding="utf-8"))
+    assert provenance["protocol_version"] == "support_ae_reconstruction_proxy_v1"
+    for domain_payload in provenance["domains"].values():
+        assert domain_payload["train_cache_indices"]
+        assert domain_payload["val_cache_indices"]
+
+
+def test_autoencoder_proxy_bank_zscore_epsilon_guard(tmp_path: Path) -> None:
+    model = FeatureAutoencoder(input_dim=2, hidden_dim=4, latent_dim=1)
+    for param in model.parameters():
+        torch.nn.init.constant_(param, 0.0)
+    checkpoint = tmp_path / "autoencoder_1x.pt"
+    torch.save(wrap_model_state_dict(model.state_dict(), {"source_domain": 1}), checkpoint)
+
+    cfg = AutoencoderProxyConfig(
+        enabled=True,
+        hidden_dim=4,
+        latent_dim=1,
+        score_normalization_eps=1.0e-8,
+    )
+    bank = _AutoencoderProxyBank(
+        autoencoder_artifacts={
+            "checkpoints": {"1x": str(checkpoint)},
+            "provenance": {
+                "domains": {
+                    "1": {
+                        "source_val_mean_recon_mse": 0.0,
+                        "source_val_std_recon_mse": 0.0,
+                    }
+                }
+            },
+        },
+        input_dim=2,
+        cfg=cfg,
+        device=torch.device("cpu"),
+    )
+    scores = bank.score(
+        x_cpu=torch.tensor([[1.0, 1.0], [2.0, 2.0]], dtype=torch.float32),
+        support_indices=[0, 1],
+        candidate_experts=[1],
+    )
+    assert np.isfinite(float(scores[1]["normalized_score"]))
+    assert int(scores[1]["zero_or_near_zero_std_flag"]) == 1
+    assert float(scores[1]["score_normalization_eps"]) == 1.0e-8
 
 
 def test_source_global_prior_excludes_target_and_self_utility(tmp_path: Path) -> None:

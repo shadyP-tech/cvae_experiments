@@ -98,6 +98,10 @@ class MethodProtocol:
     routing_uses_query_features: int = 0
     routing_uses_eval_domain_statistics: int = 0
     routing_uses_eval_nelbo: int = 0
+    adoption_candidate: int = 0
+    claim_requires_pass_rule: int = 0
+    initial_result_tier: str = ""
+    control_only: int = 0
 
 
 def _protocol_row_fields(
@@ -123,6 +127,10 @@ def _protocol_row_fields(
         "method_role": str(method_protocol.method_role),
         "adoption_eligible": int(method_protocol.adoption_eligible),
         "diagnostic_only": int(method_protocol.diagnostic_only),
+        "adoption_candidate": int(method_protocol.adoption_candidate),
+        "claim_requires_pass_rule": int(method_protocol.claim_requires_pass_rule),
+        "initial_result_tier": str(method_protocol.initial_result_tier),
+        "control_only": int(method_protocol.control_only),
         "routing_uses_query_features": int(method_protocol.routing_uses_query_features),
         "routing_uses_eval_domain_statistics": int(method_protocol.routing_uses_eval_domain_statistics),
         "routing_uses_eval_nelbo": int(method_protocol.routing_uses_eval_nelbo),
@@ -160,12 +168,32 @@ def _method_protocol(method: str) -> MethodProtocol:
             diagnostic_only=0,
             routing_uses_query_features=1,
         )
+    if name == "support_ae_reconstruction_routing":
+        return MethodProtocol(
+            method_role="learned",
+            adoption_eligible=1,
+            diagnostic_only=0,
+            routing_uses_query_features=1,
+            adoption_candidate=1,
+            claim_requires_pass_rule=1,
+            initial_result_tier="diagnostic_only",
+        )
+    if name == "support_ae_reconstruction_routing_shuffled":
+        return MethodProtocol(
+            method_role="control",
+            adoption_eligible=0,
+            diagnostic_only=0,
+            routing_uses_query_features=1,
+            control_only=1,
+            initial_result_tier="control_only",
+        )
     if name == "expert_id_only_pairwise" or name.startswith("support_response_pairwise_response_indirect_shuffled"):
         return MethodProtocol(
             method_role="control",
             adoption_eligible=0,
             diagnostic_only=0,
             routing_uses_query_features=1,
+            control_only=1,
         )
     if name == "source_leave_pseudo_domain_out_ranker_diagnostic":
         return MethodProtocol(
@@ -350,6 +378,14 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         metrics["method_role"] = str(first.get("method_role", method_protocol.method_role))
         metrics["adoption_eligible"] = float(first.get("adoption_eligible", method_protocol.adoption_eligible))
         metrics["diagnostic_only"] = float(first.get("diagnostic_only", method_protocol.diagnostic_only))
+        metrics["adoption_candidate"] = float(first.get("adoption_candidate", method_protocol.adoption_candidate))
+        metrics["claim_requires_pass_rule"] = float(
+            first.get("claim_requires_pass_rule", method_protocol.claim_requires_pass_rule)
+        )
+        metrics["control_only"] = float(first.get("control_only", method_protocol.control_only))
+        tier = str(first.get("initial_result_tier", method_protocol.initial_result_tier))
+        if tier:
+            metrics["initial_result_tier"] = tier
         metrics["routing_uses_query_features"] = float(
             first.get("routing_uses_query_features", method_protocol.routing_uses_query_features)
         )
@@ -406,6 +442,10 @@ def _domain_breakdown_rows(sample_rows: Sequence[Dict[str, Any]]) -> List[Dict[s
                 "method_role": str(base.get("method_role", "")),
                 "adoption_eligible": int(base.get("adoption_eligible", 0)),
                 "diagnostic_only": int(base.get("diagnostic_only", 0)),
+                "adoption_candidate": int(base.get("adoption_candidate", 0)),
+                "claim_requires_pass_rule": int(base.get("claim_requires_pass_rule", 0)),
+                "initial_result_tier": str(base.get("initial_result_tier", "")),
+                "control_only": int(base.get("control_only", 0)),
                 "decision_policy_version": str(base.get("decision_policy_version", "")),
                 "residual_policy_version": str(base.get("residual_policy_version", "")),
                 "threshold_selection_policy": str(base.get("threshold_selection_policy", "")),

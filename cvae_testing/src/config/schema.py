@@ -38,6 +38,8 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
     experiment_name = str((experiment_cfg or {}).get("name", "")).strip().lower()
     is_response_routing_protocol = experiment_name == "learned_utility_response_routing_v1"
     is_support_response_routing_protocol = experiment_name == "learned_utility_support_response_routing_v1"
+    is_support_ae_routing_protocol = experiment_name == "learned_utility_support_ae_routing_v1"
+    is_support_response_family = is_support_response_routing_protocol or is_support_ae_routing_protocol
     is_learned_utility_v2 = experiment_name in {
         "learned_utility_routing_v2",
         "learned_utility_routing_safe_v2",
@@ -68,23 +70,23 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
     dataset_domain_semantics = data_cfg.get("dataset_domain_semantics")
     if dataset_domain_semantics is not None and not str(dataset_domain_semantics).strip():
         raise ValueError("data.dataset_domain_semantics must be non-empty when provided")
-    if is_support_response_routing_protocol:
+    if is_support_response_family:
         if str(data_cfg.get("dataset_type", "")).strip().lower() != "camelyon17":
             raise ValueError(
-                "data.dataset_type must be 'camelyon17' for learned_utility_support_response_routing_v1"
+                "data.dataset_type must be 'camelyon17' for learned utility support-response protocols"
             )
         if str(data_cfg.get("domain_field", "")).strip().lower() != "center":
             raise ValueError(
-                "data.domain_field must be 'center' for learned_utility_support_response_routing_v1"
+                "data.domain_field must be 'center' for learned utility support-response protocols"
             )
         if str(data_cfg.get("legacy_domain_field_alias", "")).strip().lower() != "magnification":
             raise ValueError(
-                "data.legacy_domain_field_alias must be 'magnification' for learned_utility_support_response_routing_v1"
+                "data.legacy_domain_field_alias must be 'magnification' for learned utility support-response protocols"
             )
         if str(data_cfg.get("dataset_domain_semantics", "")).strip().lower() != "camelyon17_center":
             raise ValueError(
                 "data.dataset_domain_semantics must be 'camelyon17_center' "
-                "for learned_utility_support_response_routing_v1"
+                "for learned utility support-response protocols"
             )
     split_cap_profile = str(data_cfg.get("split_cap_profile", "legacy")).strip().lower()
     allowed_split_cap_profiles = {"legacy", "development", "final", "custom"}
@@ -724,6 +726,65 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                 "learned_utility.support_response_routing.source_leave_pseudo_domain_out_diagnostic",
             )
 
+            ae_cfg = support_response_cfg.get("autoencoder_proxy", {})
+            if ae_cfg is not None and not isinstance(ae_cfg, dict):
+                raise ValueError(
+                    "learned_utility.support_response_routing.autoencoder_proxy must be a dictionary"
+                )
+            ae_cfg = ae_cfg or {}
+            _ensure_bool(
+                ae_cfg.get("enabled", False),
+                "learned_utility.support_response_routing.autoencoder_proxy.enabled",
+            )
+            if bool(ae_cfg.get("enabled", False)):
+                if str(data_cfg.get("dataset_type", "")).strip().lower() != "camelyon17":
+                    raise ValueError("autoencoder_proxy v1 is Camelyon17-only")
+                policies = {
+                    str(v).strip().lower()
+                    for v in support_response_cfg.get("sampling_policies", ["random"])
+                }
+                if policies != {"random"}:
+                    raise ValueError("autoencoder_proxy v1 requires sampling_policies: [random]")
+                for field_name in ["hidden_dim", "latent_dim", "epochs", "patience", "batch_size"]:
+                    if int(ae_cfg.get(field_name, {
+                        "hidden_dim": 256,
+                        "latent_dim": 32,
+                        "epochs": 25,
+                        "patience": 5,
+                        "batch_size": 128,
+                    }[field_name])) <= 0:
+                        raise ValueError(
+                            "learned_utility.support_response_routing.autoencoder_proxy."
+                            f"{field_name} must be > 0"
+                        )
+                if float(ae_cfg.get("learning_rate", 1.0e-3)) <= 0.0:
+                    raise ValueError(
+                        "learned_utility.support_response_routing.autoencoder_proxy.learning_rate must be > 0"
+                    )
+                score_norm = str(ae_cfg.get("score_normalization", "source_val_zscore")).strip().lower()
+                if score_norm != "source_val_zscore":
+                    raise ValueError(
+                        "learned_utility.support_response_routing.autoencoder_proxy."
+                        "score_normalization must be 'source_val_zscore'"
+                    )
+                if float(ae_cfg.get("score_normalization_eps", 1.0e-8)) <= 0.0:
+                    raise ValueError(
+                        "learned_utility.support_response_routing.autoencoder_proxy."
+                        "score_normalization_eps must be > 0"
+                    )
+                method_name = str(
+                    ae_cfg.get("method_name", "support_ae_reconstruction_routing")
+                ).strip()
+                if method_name != "support_ae_reconstruction_routing":
+                    raise ValueError(
+                        "learned_utility.support_response_routing.autoencoder_proxy."
+                        "method_name must be 'support_ae_reconstruction_routing'"
+                    )
+                _ensure_bool(
+                    ae_cfg.get("shuffled_control", True),
+                    "learned_utility.support_response_routing.autoencoder_proxy.shuffled_control",
+                )
+
         scoring_cfg = learned_cfg.get("scoring", {})
         if scoring_cfg is not None and not isinstance(scoring_cfg, dict):
             raise ValueError("learned_utility.scoring must be a dictionary when provided")
@@ -922,7 +983,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             )
 
         backbone = str(cfg.get("features", {}).get("backbone_type", "")).strip().lower()
-        if is_response_routing_protocol or is_support_response_routing_protocol:
+        if is_response_routing_protocol or is_support_response_family:
             if backbone != "dinov2_vitb14":
                 raise ValueError(
                     "features.backbone_type must be 'dinov2_vitb14' for learned utility response-routing protocols"

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import csv
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 import json
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Sequence, Tuple
@@ -22,7 +22,9 @@ from src.eval.evaluators.learned_utility_scoring import _load_model, _parse_expe
 from src.eval.evaluators.response_indirect import compute_response_features
 from src.eval.evaluators.support_set_calibration import make_support_eval_split
 from src.eval.metrics import spearman_corr
+from src.models.feature_autoencoder import FeatureAutoencoder, reconstruction_mse_per_sample
 from src.routing.strategies import compute_similarity
+from src.train.checkpoint_provenance import load_model_checkpoint
 
 
 SUPPORT_RESPONSE_PROTOCOL_VERSION = "support_response_candidate_specific_v1"
@@ -61,6 +63,21 @@ DIRECT_UTILITY_BLOCK_TERMS = [
 
 
 @dataclass(frozen=True)
+class AutoencoderProxyConfig:
+    enabled: bool = False
+    hidden_dim: int = 256
+    latent_dim: int = 32
+    learning_rate: float = 1.0e-3
+    epochs: int = 25
+    patience: int = 5
+    batch_size: int = 128
+    score_normalization: str = "source_val_zscore"
+    score_normalization_eps: float = 1.0e-8
+    method_name: str = "support_ae_reconstruction_routing"
+    shuffled_control: bool = True
+
+
+@dataclass(frozen=True)
 class SupportResponseConfig:
     enabled: bool
     support_sizes: Tuple[int, ...]
@@ -75,6 +92,7 @@ class SupportResponseConfig:
     domain_level_aggregation: bool
     source_leave_pseudo_domain_out_diagnostic: bool
     include_residual_shape_features: bool = False
+    autoencoder_proxy: AutoencoderProxyConfig = AutoencoderProxyConfig()
 
 
 @dataclass(frozen=True)
@@ -176,6 +194,88 @@ class _ResponseExpertBank:
         return x
 
 
+class _AutoencoderProxyBank:
+    def __init__(
+        self,
+        *,
+        autoencoder_artifacts: Mapping[str, Any],
+        input_dim: int,
+        cfg: AutoencoderProxyConfig,
+        device: torch.device,
+    ) -> None:
+        self.device = device
+        self.cfg = cfg
+        checkpoints = autoencoder_artifacts.get("checkpoints", {})
+        if not isinstance(checkpoints, Mapping) or not checkpoints:
+            raise ProtocolError("autoencoder_proxy requires non-empty autoencoder checkpoints")
+        provenance = autoencoder_artifacts.get("provenance", {})
+        if not isinstance(provenance, Mapping):
+            provenance = {}
+        domains_meta = provenance.get("domains", {})
+        if not isinstance(domains_meta, Mapping):
+            domains_meta = {}
+
+        self.models: Dict[int, FeatureAutoencoder] = {}
+        self.stats: Dict[int, Dict[str, float | int]] = {}
+        for raw_name, raw_path in sorted(checkpoints.items(), key=lambda item: _parse_expert_domain(str(item[0]))):
+            domain = _parse_expert_domain(str(raw_name))
+            model = FeatureAutoencoder(
+                input_dim=int(input_dim),
+                hidden_dim=int(cfg.hidden_dim),
+                latent_dim=int(cfg.latent_dim),
+            ).to(device)
+            model.load_state_dict(load_model_checkpoint(Path(str(raw_path)), map_location=device).model_state_dict)
+            model.eval()
+            self.models[int(domain)] = model
+
+            meta = domains_meta.get(str(int(domain)), {})
+            if not isinstance(meta, Mapping):
+                meta = {}
+            mean = float(meta.get("source_val_mean_recon_mse", float("nan")))
+            std = float(meta.get("source_val_std_recon_mse", float("nan")))
+            self.stats[int(domain)] = {
+                "source_val_mean_recon_mse": mean,
+                "source_val_std_recon_mse": std,
+                "score_normalization_eps": float(cfg.score_normalization_eps),
+                "zero_or_near_zero_std_flag": int(
+                    (not np.isfinite(std)) or std <= float(cfg.score_normalization_eps)
+                ),
+            }
+
+    def score(
+        self,
+        *,
+        x_cpu: torch.Tensor,
+        support_indices: Sequence[int],
+        candidate_experts: Sequence[int],
+    ) -> Dict[int, Dict[str, float | int]]:
+        if not support_indices:
+            raise ProtocolError("autoencoder_proxy requires a non-empty target support set")
+        support_x = x_cpu[list(int(i) for i in support_indices)].to(self.device)
+        out: Dict[int, Dict[str, float | int]] = {}
+        with torch.no_grad():
+            for expert in candidate_experts:
+                expert_i = int(expert)
+                if expert_i not in self.models:
+                    raise ProtocolError(f"Missing autoencoder checkpoint for candidate expert {expert_i}")
+                raw = float(reconstruction_mse_per_sample(self.models[expert_i], support_x).mean().item())
+                stats = self.stats.get(expert_i, {})
+                mean = float(stats.get("source_val_mean_recon_mse", float("nan")))
+                std = float(stats.get("source_val_std_recon_mse", float("nan")))
+                eps = float(self.cfg.score_normalization_eps)
+                denom = max(std if np.isfinite(std) else 0.0, eps)
+                normalized = float((raw - mean) / denom) if np.isfinite(mean) else float("inf")
+                out[expert_i] = {
+                    "raw_recon_mse": raw,
+                    "normalized_score": normalized,
+                    "source_val_mean_recon_mse": mean,
+                    "source_val_std_recon_mse": std,
+                    "score_normalization_eps": eps,
+                    "zero_or_near_zero_std_flag": int((not np.isfinite(std)) or std <= eps),
+                }
+        return out
+
+
 def parse_support_response_config(learned_cfg: Mapping[str, Any]) -> SupportResponseConfig:
     raw = learned_cfg.get("support_response_routing", {}) if isinstance(learned_cfg, Mapping) else {}
     if raw is None:
@@ -183,6 +283,24 @@ def parse_support_response_config(learned_cfg: Mapping[str, Any]) -> SupportResp
     if not isinstance(raw, Mapping):
         raise ValueError("learned_utility.support_response_routing must be a dictionary")
     enabled = bool(raw.get("enabled", False))
+    ae_raw = raw.get("autoencoder_proxy", {})
+    if ae_raw is None:
+        ae_raw = {}
+    if not isinstance(ae_raw, Mapping):
+        raise ValueError("learned_utility.support_response_routing.autoencoder_proxy must be a dictionary")
+    autoencoder_proxy = AutoencoderProxyConfig(
+        enabled=bool(ae_raw.get("enabled", False)),
+        hidden_dim=int(ae_raw.get("hidden_dim", 256)),
+        latent_dim=int(ae_raw.get("latent_dim", 32)),
+        learning_rate=float(ae_raw.get("learning_rate", 1.0e-3)),
+        epochs=int(ae_raw.get("epochs", 25)),
+        patience=int(ae_raw.get("patience", 5)),
+        batch_size=int(ae_raw.get("batch_size", 128)),
+        score_normalization=str(ae_raw.get("score_normalization", "source_val_zscore")).strip().lower(),
+        score_normalization_eps=float(ae_raw.get("score_normalization_eps", 1.0e-8)),
+        method_name=str(ae_raw.get("method_name", "support_ae_reconstruction_routing")).strip(),
+        shuffled_control=bool(ae_raw.get("shuffled_control", True)),
+    )
     return SupportResponseConfig(
         enabled=enabled,
         support_sizes=tuple(int(v) for v in raw.get("support_sizes", [8, 16, 32])),
@@ -202,6 +320,7 @@ def parse_support_response_config(learned_cfg: Mapping[str, Any]) -> SupportResp
             raw.get("source_leave_pseudo_domain_out_diagnostic", True)
         ),
         include_residual_shape_features=bool(raw.get("include_residual_shape_features", False)),
+        autoencoder_proxy=autoencoder_proxy,
     )
 
 
@@ -505,6 +624,7 @@ def _score_method_row(
     sample_index: int,
     run_seed: int,
     privacy_fields: Mapping[str, Any],
+    extra_fields: Mapping[str, Any] | None = None,
 ) -> Dict[str, Any]:
     if str(method) == "support_candidate_oracle":
         method_protocol = _method_protocol("support_candidate_oracle")
@@ -526,6 +646,7 @@ def _score_method_row(
     return {
         **base,
         **dict(privacy_fields),
+        **dict(extra_fields or {}),
         "sample_index": int(sample_index),
         "seed": int(run_seed),
         "query_domain": int(target_domain),
@@ -552,6 +673,94 @@ def _score_method_row(
         "eval_nelbo_by_expert_json": _json_mapping(candidate_experts, eval_mean_nelbo),
         "support_nelbo_by_expert_json": _json_mapping(candidate_experts, support_mean_nelbo),
     }
+
+
+def _autoencoder_row_fields(
+    *,
+    payload_by_expert: Mapping[int, Mapping[str, float | int]],
+    candidate_experts: Sequence[int],
+    selected_expert: int,
+    score_source_by_candidate: Mapping[int, int] | None = None,
+) -> Dict[str, Any]:
+    score_source_by_candidate = score_source_by_candidate or {int(e): int(e) for e in candidate_experts}
+    selected_source = int(score_source_by_candidate[int(selected_expert)])
+    selected_payload = payload_by_expert[selected_source]
+    raw_by_candidate: Dict[str, float] = {}
+    normalized_by_candidate: Dict[str, float] = {}
+    val_mean_by_candidate: Dict[str, float] = {}
+    val_std_by_candidate: Dict[str, float] = {}
+    zero_flag_by_candidate: Dict[str, int] = {}
+    for candidate in candidate_experts:
+        source = int(score_source_by_candidate[int(candidate)])
+        payload = payload_by_expert[source]
+        raw_by_candidate[str(int(candidate))] = float(payload["raw_recon_mse"])
+        normalized_by_candidate[str(int(candidate))] = float(payload["normalized_score"])
+        val_mean_by_candidate[str(int(candidate))] = float(payload["source_val_mean_recon_mse"])
+        val_std_by_candidate[str(int(candidate))] = float(payload["source_val_std_recon_mse"])
+        zero_flag_by_candidate[str(int(candidate))] = int(payload["zero_or_near_zero_std_flag"])
+
+    return {
+        "adoption_candidate": 1,
+        "claim_requires_pass_rule": 1,
+        "initial_result_tier": "diagnostic_only",
+        "control_only": 0,
+        "ae_score_direction": "lower_zscore_reconstruction_mse_is_higher_proxy_compatibility",
+        "spearman_definition": "Spearman(-ae_zscore_recon_mse,-heldout_eval_nelbo)",
+        "score_normalization": "source_val_zscore",
+        "source_val_mean_recon_mse": float(selected_payload["source_val_mean_recon_mse"]),
+        "source_val_std_recon_mse": float(selected_payload["source_val_std_recon_mse"]),
+        "score_normalization_eps": float(selected_payload["score_normalization_eps"]),
+        "zero_or_near_zero_std_flag": int(max(zero_flag_by_candidate.values()) if zero_flag_by_candidate else 0),
+        "raw_ae_recon_mse_by_expert_json": json.dumps(raw_by_candidate, sort_keys=True, separators=(",", ":")),
+        "normalized_ae_score_by_expert_json": json.dumps(
+            normalized_by_candidate,
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
+        "source_val_mean_recon_mse_by_expert_json": json.dumps(
+            val_mean_by_candidate,
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
+        "source_val_std_recon_mse_by_expert_json": json.dumps(
+            val_std_by_candidate,
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
+        "zero_or_near_zero_std_by_expert_json": json.dumps(
+            zero_flag_by_candidate,
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
+        "ae_score_source_expert_by_candidate_json": json.dumps(
+            {str(int(k)): int(v) for k, v in sorted(score_source_by_candidate.items())},
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
+    }
+
+
+def _shuffled_ae_score_source_map(
+    *,
+    candidate_experts: Sequence[int],
+    dataset_name: str,
+    seed: int,
+    target_domain: int,
+    split_id: str,
+) -> Dict[int, int]:
+    rng = np.random.default_rng(
+        stable_response_seed(
+            dataset=str(dataset_name),
+            seed=int(seed),
+            query_id=f"target{int(target_domain)}:{split_id}",
+            expert_domain="support_ae_reconstruction_routing_shuffled",
+            repeat_id=0,
+            stream_name="support_ae_candidate_label_shuffle",
+        )
+    )
+    candidates = [int(e) for e in candidate_experts]
+    shuffled = [int(e) for e in rng.permutation(candidates).tolist()]
+    return {int(candidate): int(source) for candidate, source in zip(candidates, shuffled)}
 
 
 def _support_split_manifest_row(
@@ -650,6 +859,12 @@ def evaluate_support_response_routing_from_arrays(
     support_cfg: SupportResponseConfig,
     reports_dir: Path,
     response_feature_fn: Callable[[Sequence[int], int, str], Mapping[str, float]],
+    autoencoder_score_fn: Callable[
+        [Sequence[int], Sequence[int], str],
+        Mapping[int, Mapping[str, float | int]],
+    ]
+    | None = None,
+    autoencoder_provenance: Mapping[str, Any] | None = None,
     data_cfg: Mapping[str, Any] | None = None,
 ) -> Dict[str, Any]:
     if not support_cfg.enabled:
@@ -662,6 +877,8 @@ def evaluate_support_response_routing_from_arrays(
         raise ValueError("Embedding and metadata lengths do not match")
     if nelbo_matrix.shape != (int(embeddings.shape[0]), len(expert_domains)):
         raise ValueError("NELBO matrix must be n_samples x n_experts")
+    if support_cfg.autoencoder_proxy.enabled and autoencoder_score_fn is None:
+        raise ProtocolError("autoencoder_proxy.enabled=true requires autoencoder_score_fn")
 
     expert_domains_int = [int(d) for d in expert_domains]
     expert_to_col = {int(e): idx for idx, e in enumerate(expert_domains_int)}
@@ -874,6 +1091,89 @@ def evaluate_support_response_routing_from_arrays(
                     )
                     sample_index_counter += 1
 
+                    if support_cfg.autoencoder_proxy.enabled:
+                        assert autoencoder_score_fn is not None
+                        ae_payload = {
+                            int(k): dict(v)
+                            for k, v in autoencoder_score_fn(
+                                target_split.support_indices,
+                                target_candidates,
+                                target_split.support_eval_split_id,
+                            ).items()
+                        }
+                        ae_scores = [float(ae_payload[int(e)]["normalized_score"]) for e in target_candidates]
+                        ae_row = _score_method_row(
+                            method=str(support_cfg.autoencoder_proxy.method_name),
+                            fold=target_fold,
+                            target_domain=int(outer_target),
+                            support_seed=int(support_seed),
+                            support_size=int(support_size),
+                            sampling_policy=str(sampling_policy),
+                            support_eval_split_id=target_split.support_eval_split_id,
+                            candidate_experts=target_candidates,
+                            predicted_scores=ae_scores,
+                            eval_mean_nelbo=target_eval_mean,
+                            support_mean_nelbo=target_support_mean,
+                            sample_index=sample_index_counter,
+                            run_seed=int(seed),
+                            privacy_fields=privacy,
+                        )
+                        ae_row.update(
+                            _autoencoder_row_fields(
+                                payload_by_expert=ae_payload,
+                                candidate_experts=target_candidates,
+                                selected_expert=int(ae_row["selected_expert"]),
+                            )
+                        )
+                        sample_rows.append(ae_row)
+                        sample_index_counter += 1
+
+                        if bool(support_cfg.autoencoder_proxy.shuffled_control):
+                            source_map = _shuffled_ae_score_source_map(
+                                candidate_experts=target_candidates,
+                                dataset_name=str(dataset_name),
+                                seed=int(seed),
+                                target_domain=int(outer_target),
+                                split_id=str(target_split.support_eval_split_id),
+                            )
+                            shuffled_scores = [
+                                float(ae_payload[int(source_map[int(e)])]["normalized_score"])
+                                for e in target_candidates
+                            ]
+                            shuffled_row = _score_method_row(
+                                method=f"{support_cfg.autoencoder_proxy.method_name}_shuffled",
+                                fold=target_fold,
+                                target_domain=int(outer_target),
+                                support_seed=int(support_seed),
+                                support_size=int(support_size),
+                                sampling_policy=str(sampling_policy),
+                                support_eval_split_id=target_split.support_eval_split_id,
+                                candidate_experts=target_candidates,
+                                predicted_scores=shuffled_scores,
+                                eval_mean_nelbo=target_eval_mean,
+                                support_mean_nelbo=target_support_mean,
+                                sample_index=sample_index_counter,
+                                run_seed=int(seed),
+                                privacy_fields=privacy,
+                            )
+                            shuffled_fields = _autoencoder_row_fields(
+                                payload_by_expert=ae_payload,
+                                candidate_experts=target_candidates,
+                                selected_expert=int(shuffled_row["selected_expert"]),
+                                score_source_by_candidate=source_map,
+                            )
+                            shuffled_fields.update(
+                                {
+                                    "adoption_candidate": 0,
+                                    "claim_requires_pass_rule": 0,
+                                    "initial_result_tier": "control_only",
+                                    "control_only": 1,
+                                }
+                            )
+                            shuffled_row.update(shuffled_fields)
+                            sample_rows.append(shuffled_row)
+                            sample_index_counter += 1
+
                     sample_rows.append(
                         _score_method_row(
                             method="support_candidate_oracle",
@@ -1076,6 +1376,8 @@ def evaluate_support_response_routing_from_arrays(
         "method_summary": "support_response_method_summary.csv",
         "results": "support_response_results.json",
     }
+    if support_cfg.autoencoder_proxy.enabled:
+        artifacts["autoencoder_provenance"] = "support_ae_provenance.json"
     protocol_lock = {
         "protocol_version": SUPPORT_RESPONSE_PROTOCOL_VERSION,
         "score_direction": "predicted_score_is_predicted_mean_nelbo_lower_is_better",
@@ -1085,6 +1387,12 @@ def evaluate_support_response_routing_from_arrays(
         "ridge_l2": float(support_cfg.ridge_l2),
         "scaler_fit_scope": "source_training_pairs_only",
         "domain_level_aggregation": bool(support_cfg.domain_level_aggregation),
+        "autoencoder_proxy": {
+            **asdict(support_cfg.autoencoder_proxy),
+            "score_definition": "source_val_zscore_mean_support_feature_reconstruction_mse_lower_is_better",
+            "spearman_definition": "Spearman(-ae_zscore_recon_mse,-heldout_eval_nelbo)",
+            "claim_boundary": "initial_result_tier_diagnostic_only_until_predeclared_pass_rule",
+        },
         **privacy,
     }
     results = {
@@ -1099,6 +1407,11 @@ def evaluate_support_response_routing_from_arrays(
     }
     reports_dir.mkdir(parents=True, exist_ok=True)
     (reports_dir / artifacts["protocol_lock"]).write_text(json.dumps(protocol_lock, indent=2) + "\n", encoding="utf-8")
+    if support_cfg.autoencoder_proxy.enabled:
+        (reports_dir / artifacts["autoencoder_provenance"]).write_text(
+            json.dumps(dict(autoencoder_provenance or {}), indent=2) + "\n",
+            encoding="utf-8",
+        )
     _write_csv(reports_dir / artifacts["split_manifest"], split_rows)
     _write_csv(reports_dir / artifacts["feature_audit"], feature_audit_rows)
     _write_csv(reports_dir / artifacts["pair_predictions"], pair_rows)
@@ -1126,6 +1439,7 @@ def evaluate_support_response_routing_for_checkpoints(
     reports_dir: Path,
     data_cfg: Mapping[str, Any] | None = None,
     metadata_constraint_cfg: Mapping[str, object] | None = None,
+    autoencoder_artifacts: Mapping[str, Any] | None = None,
 ) -> Dict[str, Any]:
     x_cpu = torch.from_numpy(np.asarray(embeddings, dtype=np.float32))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -1162,6 +1476,35 @@ def evaluate_support_response_routing_for_checkpoints(
             )
         return cache[key]
 
+    ae_score_fn = None
+    ae_provenance = None
+    if support_cfg.autoencoder_proxy.enabled:
+        if autoencoder_artifacts is None:
+            raise ProtocolError("autoencoder_proxy.enabled=true but no autoencoder_artifacts were provided")
+        ae_provenance_raw = autoencoder_artifacts.get("provenance", {})
+        ae_provenance = dict(ae_provenance_raw) if isinstance(ae_provenance_raw, Mapping) else {}
+        ae_bank = _AutoencoderProxyBank(
+            autoencoder_artifacts=autoencoder_artifacts,
+            input_dim=int(x_cpu.shape[1]),
+            cfg=support_cfg.autoencoder_proxy,
+            device=device,
+        )
+        ae_cache: Dict[Tuple[str, Tuple[int, ...]], Dict[int, Dict[str, float | int]]] = {}
+
+        def ae_score_fn(
+            support_indices: Sequence[int],
+            candidate_experts: Sequence[int],
+            split_id: str,
+        ) -> Mapping[int, Mapping[str, float | int]]:
+            key = (str(split_id), tuple(int(e) for e in candidate_experts))
+            if key not in ae_cache:
+                ae_cache[key] = ae_bank.score(
+                    x_cpu=x_cpu,
+                    support_indices=support_indices,
+                    candidate_experts=candidate_experts,
+                )
+            return ae_cache[key]
+
     return evaluate_support_response_routing_from_arrays(
         embeddings=embeddings,
         metadata=metadata,
@@ -1174,5 +1517,7 @@ def evaluate_support_response_routing_for_checkpoints(
         support_cfg=support_cfg,
         reports_dir=reports_dir,
         response_feature_fn=response_feature_fn,
+        autoencoder_score_fn=ae_score_fn,
+        autoencoder_provenance=ae_provenance,
         data_cfg=data_cfg,
     )

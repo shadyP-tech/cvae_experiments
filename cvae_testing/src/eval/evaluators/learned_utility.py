@@ -42,6 +42,7 @@ def evaluate_learned_utility_loqdo(
     configured_domains: Sequence[int] | None = None,
     metadata_constraint_cfg: Dict[str, Any] | None = None,
     data_cfg: Dict[str, Any] | None = None,
+    autoencoder_artifacts: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     eval_cfg = _parse_learned_utility_config(learned_cfg)
     hybrid_cfg = eval_cfg.hybrid
@@ -268,6 +269,7 @@ def evaluate_learned_utility_loqdo(
             reports_dir=reports_dir,
             data_cfg=data_cfg or {},
             metadata_constraint_cfg=metadata_constraint_cfg,
+            autoencoder_artifacts=autoencoder_artifacts,
         )
         results["support_response_results"] = support_response_results
         results.setdefault("artifacts", {})["support_response_results"] = "support_response_results.json"

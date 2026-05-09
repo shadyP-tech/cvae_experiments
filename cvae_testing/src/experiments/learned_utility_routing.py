@@ -8,6 +8,7 @@ from src.engine.contracts import RunContext
 from src.eval.evaluators.learned_utility import evaluate_learned_utility_loqdo
 from src.eval.reporting.run_summary import write_run_summary
 from src.experiments.base import BaseExperiment
+from src.train.train_autoencoders import train_domain_autoencoders
 from src.train.train_experts import train_domain_experts
 
 
@@ -30,8 +31,14 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
     """
 
     def estimate_total_steps(self, cfg: Dict[str, Any]) -> int:
-        # Base runner contributes 5 stages; this mode adds 3 stages.
-        return 8
+        # Base runner contributes 5 stages; this mode adds 3 stages, plus AE proxy training when enabled.
+        ae_enabled = bool(
+            cfg.get("learned_utility", {})
+            .get("support_response_routing", {})
+            .get("autoencoder_proxy", {})
+            .get("enabled", False)
+        )
+        return 9 if ae_enabled else 8
 
     def run(
         self,
@@ -54,6 +61,7 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
         )
         residual_routing_cfg = learned_cfg.get("residual_routing", {}) or {}
         support_response_cfg = learned_cfg.get("support_response_routing", {}) or {}
+        autoencoder_proxy_cfg = support_response_cfg.get("autoencoder_proxy", {}) or {}
 
         protocol_lock = {
             "experiment_mode": "learned_utility_routing",
@@ -201,6 +209,29 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
                 "scaler_fit_scope": "source_training_pairs_only",
                 "ranker_model_selection_scope": "source_only_fixed_config",
                 "score_direction": "predicted_mean_nelbo_lower_is_better",
+                "autoencoder_proxy": {
+                    "enabled": bool(autoencoder_proxy_cfg.get("enabled", False)),
+                    "hidden_dim": int(autoencoder_proxy_cfg.get("hidden_dim", 256)),
+                    "latent_dim": int(autoencoder_proxy_cfg.get("latent_dim", 32)),
+                    "learning_rate": float(autoencoder_proxy_cfg.get("learning_rate", 1.0e-3)),
+                    "epochs": int(autoencoder_proxy_cfg.get("epochs", 25)),
+                    "patience": int(autoencoder_proxy_cfg.get("patience", 5)),
+                    "batch_size": int(autoencoder_proxy_cfg.get("batch_size", 128)),
+                    "score_normalization": str(
+                        autoencoder_proxy_cfg.get("score_normalization", "source_val_zscore")
+                    ),
+                    "score_normalization_eps": float(
+                        autoencoder_proxy_cfg.get("score_normalization_eps", 1.0e-8)
+                    ),
+                    "method_name": str(
+                        autoencoder_proxy_cfg.get("method_name", "support_ae_reconstruction_routing")
+                    ),
+                    "shuffled_control": bool(autoencoder_proxy_cfg.get("shuffled_control", True)),
+                    "training_scope": "source_domain_train_embeddings_only",
+                    "validation_stats_scope": "source_domain_val_embeddings_only",
+                    "claim_requires_pass_rule": True,
+                    "initial_result_tier": "diagnostic_only",
+                },
             },
             "winner_rule": {
                 "primary_metric": str(
@@ -391,6 +422,26 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
         )
         progress.advance("domain experts trained for utility scoring")
 
+        autoencoder_artifacts = None
+        if bool(autoencoder_proxy_cfg.get("enabled", False)):
+            autoencoder_artifacts = train_domain_autoencoders(
+                train_cache=cache_paths["train"],
+                val_cache=cache_paths["val"],
+                out_dir=run_ctx.checkpoints_dir,
+                domains=[int(v) for v in cfg["data"]["magnifications"]],
+                hidden_dim=int(autoencoder_proxy_cfg.get("hidden_dim", 256)),
+                latent_dim=int(autoencoder_proxy_cfg.get("latent_dim", 32)),
+                learning_rate=float(autoencoder_proxy_cfg.get("learning_rate", 1.0e-3)),
+                epochs=int(autoencoder_proxy_cfg.get("epochs", 25)),
+                patience=int(autoencoder_proxy_cfg.get("patience", 5)),
+                batch_size=int(autoencoder_proxy_cfg.get("batch_size", 128)),
+                score_normalization=str(autoencoder_proxy_cfg.get("score_normalization", "source_val_zscore")),
+                score_normalization_eps=float(autoencoder_proxy_cfg.get("score_normalization_eps", 1.0e-8)),
+                seed=int(cfg["seed"]),
+                resume_from_dir=resume_checkpoints_dir,
+            )
+            progress.advance("source-domain autoencoders trained for support proxy")
+
         results = evaluate_learned_utility_loqdo(
             test_cache=cache_paths["test"],
             expert_checkpoints=experts,
@@ -405,6 +456,7 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
             configured_domains=cfg.get("data", {}).get("magnifications", []),
             metadata_constraint_cfg=cfg.get("model", {}).get("metadata_constraint", {}),
             data_cfg=cfg.get("data", {}),
+            autoencoder_artifacts=autoencoder_artifacts,
         )
         with (run_ctx.reports_dir / "learned_utility_results.json").open("w", encoding="utf-8") as f:
             json.dump(results, f, indent=2)
