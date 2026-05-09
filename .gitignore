@@ -35,6 +35,7 @@ cvae_testing/wandb/
 cvae_testing/data/
 
 # Local results (default ignore; allow select findings)
+cvae_testing/quarantine/*
 cvae_testing/results/*
 !cvae_testing/results/comparison_tables/
 !cvae_testing/results/comparison_tables/learned_utility*_decision*.md
