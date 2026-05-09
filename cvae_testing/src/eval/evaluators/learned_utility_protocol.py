@@ -135,6 +135,52 @@ def _protocol_row_fields(
 
 def _method_protocol(method: str) -> MethodProtocol:
     name = str(method)
+    if name in {
+        "support_metadata_routing",
+        "support_static_embedding_routing",
+        "support_set_nelbo_top1",
+    }:
+        return MethodProtocol(
+            method_role="baseline",
+            adoption_eligible=1,
+            diagnostic_only=0,
+            routing_uses_query_features=1,
+        )
+    if name == "source_global_prior_routing":
+        return MethodProtocol(
+            method_role="baseline",
+            adoption_eligible=1,
+            diagnostic_only=0,
+            routing_uses_query_features=0,
+        )
+    if name == "support_response_pairwise_static_response_indirect":
+        return MethodProtocol(
+            method_role="learned",
+            adoption_eligible=1,
+            diagnostic_only=0,
+            routing_uses_query_features=1,
+        )
+    if name == "expert_id_only_pairwise" or name.startswith("support_response_pairwise_response_indirect_shuffled"):
+        return MethodProtocol(
+            method_role="control",
+            adoption_eligible=0,
+            diagnostic_only=0,
+            routing_uses_query_features=1,
+        )
+    if name == "source_leave_pseudo_domain_out_ranker_diagnostic":
+        return MethodProtocol(
+            method_role="diagnostic",
+            adoption_eligible=0,
+            diagnostic_only=1,
+            routing_uses_query_features=1,
+        )
+    if name == "support_candidate_oracle":
+        return MethodProtocol(
+            method_role="diagnostic",
+            adoption_eligible=0,
+            diagnostic_only=1,
+            routing_uses_eval_nelbo=1,
+        )
     if name == "metadata_routing":
         return MethodProtocol(
             method_role="baseline",
@@ -206,6 +252,8 @@ def _assert_method_eligibility(method: str, protocol: MethodProtocol) -> None:
             raise ProtocolError(f"adoption_eligible method {method} cannot use eval-domain statistics")
     if str(method) == "candidate_oracle_routing" and int(protocol.adoption_eligible) == 1:
         raise ProtocolError("candidate_oracle_routing must not be adoption eligible")
+    if str(method) == "support_candidate_oracle" and int(protocol.adoption_eligible) == 1:
+        raise ProtocolError("support_candidate_oracle must not be adoption eligible")
 
 
 def _parse_candidate_experts_label(value: object) -> List[int]:
@@ -229,8 +277,8 @@ def _validate_sample_rows_for_aggregation(rows: Sequence[Mapping[str, Any]]) -> 
         uses_eval_stats = int(float(row.get("routing_uses_eval_domain_statistics", 0) or 0))
         if method == "oracle_routing":
             raise ProtocolError("oracle_routing must not be emitted under learned utility LOQDO v2")
-        if method == "candidate_oracle_routing" and adoption_eligible == 1:
-            raise ProtocolError("candidate_oracle_routing must not be adoption eligible")
+        if method in {"candidate_oracle_routing", "support_candidate_oracle"} and adoption_eligible == 1:
+            raise ProtocolError(f"{method} must not be adoption eligible")
         if adoption_eligible == 1 and (diagnostic_only != 0 or uses_eval_nelbo != 0 or uses_eval_stats != 0):
             raise ProtocolError(f"Invalid adoption eligibility flags for method={method}")
 
@@ -298,7 +346,7 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         )
         method_protocol = _method_protocol(method)
         first = vals[0]
-        metrics["protocol_version"] = _PROTOCOL_VERSION
+        metrics["protocol_version"] = str(first.get("protocol_version", _PROTOCOL_VERSION))
         metrics["method_role"] = str(first.get("method_role", method_protocol.method_role))
         metrics["adoption_eligible"] = float(first.get("adoption_eligible", method_protocol.adoption_eligible))
         metrics["diagnostic_only"] = float(first.get("diagnostic_only", method_protocol.diagnostic_only))
@@ -348,7 +396,7 @@ def _domain_breakdown_rows(sample_rows: Sequence[Dict[str, Any]]) -> List[Dict[s
         base = rows[0]
         domain_rows.append(
             {
-                "protocol_version": _PROTOCOL_VERSION,
+                "protocol_version": str(base.get("protocol_version", _PROTOCOL_VERSION)),
                 "method": method,
                 "query_domain": int(query_domain),
                 "fold_query_domain": int(query_domain),

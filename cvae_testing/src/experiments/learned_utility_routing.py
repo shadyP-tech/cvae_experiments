@@ -53,6 +53,7 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
             ["top1_oracle_hit", "spearman_with_oracle"],
         )
         residual_routing_cfg = learned_cfg.get("residual_routing", {}) or {}
+        support_response_cfg = learned_cfg.get("support_response_routing", {}) or {}
 
         protocol_lock = {
             "experiment_mode": "learned_utility_routing",
@@ -167,6 +168,39 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
                     "feature_set_variant_and_threshold_selected_by_inner_source_query_domain_loqdo"
                 ),
                 "target_scale": "delta_u_pct_for_training_and_thresholding_raw_nelbo_for_final_metrics",
+            },
+            "support_response_routing": {
+                "enabled": bool(support_response_cfg.get("enabled", False)),
+                "support_sizes": [
+                    int(v) for v in support_response_cfg.get("support_sizes", [8, 16, 32])
+                ],
+                "support_seeds": [
+                    int(v) for v in support_response_cfg.get("support_seeds", [17, 23])
+                ],
+                "sampling_policies": _as_str_list(
+                    support_response_cfg.get("sampling_policies"),
+                    ["random"],
+                ),
+                "feature_regimes": _as_str_list(
+                    support_response_cfg.get("feature_regimes"),
+                    ["static_response_indirect", "response_indirect_shuffled"],
+                ),
+                "primary_feature_regime": str(
+                    support_response_cfg.get("primary_feature_regime", "static_response_indirect")
+                ),
+                "ranker": str(support_response_cfg.get("ranker", "linear_pairwise_ridge")),
+                "ridge_l2": float(support_response_cfg.get("ridge_l2", 1.0e-3)),
+                "num_response_repeats": int(support_response_cfg.get("num_response_repeats", 8)),
+                "tie_policy": str(support_response_cfg.get("tie_policy", "stable_expert_index")),
+                "domain_level_aggregation": bool(
+                    support_response_cfg.get("domain_level_aggregation", True)
+                ),
+                "source_leave_pseudo_domain_out_diagnostic": bool(
+                    support_response_cfg.get("source_leave_pseudo_domain_out_diagnostic", True)
+                ),
+                "scaler_fit_scope": "source_training_pairs_only",
+                "ranker_model_selection_scope": "source_only_fixed_config",
+                "score_direction": "predicted_mean_nelbo_lower_is_better",
             },
             "winner_rule": {
                 "primary_metric": str(
@@ -354,6 +388,7 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
             conditioning_cfg=cfg.get("model", {}).get("conditioning", {}),
             configured_domains=cfg.get("data", {}).get("magnifications", []),
             metadata_constraint_cfg=cfg.get("model", {}).get("metadata_constraint", {}),
+            data_cfg=cfg.get("data", {}),
         )
         progress.advance("domain experts trained for utility scoring")
 
@@ -386,6 +421,7 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
                 "metrics_by_method": results.get("metrics_by_method", {}),
                 "compatibility_protocol": results.get("compatibility_protocol", {}),
                 "hybrid_diagnostics": results.get("hybrid_diagnostics", {}),
+                "support_response_results": results.get("support_response_results", {}),
             },
         )
         progress.advance("learned utility summary written")

@@ -37,6 +37,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         )
     experiment_name = str((experiment_cfg or {}).get("name", "")).strip().lower()
     is_response_routing_protocol = experiment_name == "learned_utility_response_routing_v1"
+    is_support_response_routing_protocol = experiment_name == "learned_utility_support_response_routing_v1"
     is_learned_utility_v2 = experiment_name in {
         "learned_utility_routing_v2",
         "learned_utility_routing_safe_v2",
@@ -58,6 +59,33 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError(f"data.split ratios must sum to 1.0, got {total:.6f}")
 
     data_cfg = cfg.get("data", {})
+    domain_field = data_cfg.get("domain_field")
+    if domain_field is not None and not str(domain_field).strip():
+        raise ValueError("data.domain_field must be non-empty when provided")
+    legacy_domain_field_alias = data_cfg.get("legacy_domain_field_alias")
+    if legacy_domain_field_alias is not None and not str(legacy_domain_field_alias).strip():
+        raise ValueError("data.legacy_domain_field_alias must be non-empty when provided")
+    dataset_domain_semantics = data_cfg.get("dataset_domain_semantics")
+    if dataset_domain_semantics is not None and not str(dataset_domain_semantics).strip():
+        raise ValueError("data.dataset_domain_semantics must be non-empty when provided")
+    if is_support_response_routing_protocol:
+        if str(data_cfg.get("dataset_type", "")).strip().lower() != "camelyon17":
+            raise ValueError(
+                "data.dataset_type must be 'camelyon17' for learned_utility_support_response_routing_v1"
+            )
+        if str(data_cfg.get("domain_field", "")).strip().lower() != "center":
+            raise ValueError(
+                "data.domain_field must be 'center' for learned_utility_support_response_routing_v1"
+            )
+        if str(data_cfg.get("legacy_domain_field_alias", "")).strip().lower() != "magnification":
+            raise ValueError(
+                "data.legacy_domain_field_alias must be 'magnification' for learned_utility_support_response_routing_v1"
+            )
+        if str(data_cfg.get("dataset_domain_semantics", "")).strip().lower() != "camelyon17_center":
+            raise ValueError(
+                "data.dataset_domain_semantics must be 'camelyon17_center' "
+                "for learned_utility_support_response_routing_v1"
+            )
     split_cap_profile = str(data_cfg.get("split_cap_profile", "legacy")).strip().lower()
     allowed_split_cap_profiles = {"legacy", "development", "final", "custom"}
     if split_cap_profile not in allowed_split_cap_profiles:
@@ -605,6 +633,97 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         if float(residual_cfg.get("ridge_l2", 1e-4)) < 0.0:
             raise ValueError("learned_utility.residual_routing.ridge_l2 must be >= 0")
 
+        support_response_cfg = learned_cfg.get("support_response_routing", {})
+        if support_response_cfg is not None and not isinstance(support_response_cfg, dict):
+            raise ValueError("learned_utility.support_response_routing must be a dictionary when provided")
+        support_response_cfg = support_response_cfg or {}
+        _ensure_bool(
+            support_response_cfg.get("enabled", False),
+            "learned_utility.support_response_routing.enabled",
+        )
+        if support_response_cfg.get("enabled", False):
+            support_sizes = support_response_cfg.get("support_sizes", [8, 16, 32])
+            if not isinstance(support_sizes, list) or not support_sizes:
+                raise ValueError("learned_utility.support_response_routing.support_sizes must be a non-empty list")
+            for value in support_sizes:
+                if int(value) <= 0:
+                    raise ValueError("learned_utility.support_response_routing.support_sizes must be positive")
+
+            support_seeds = support_response_cfg.get("support_seeds", [17, 23])
+            if not isinstance(support_seeds, list) or not support_seeds:
+                raise ValueError("learned_utility.support_response_routing.support_seeds must be a non-empty list")
+            for value in support_seeds:
+                if int(value) < 0:
+                    raise ValueError("learned_utility.support_response_routing.support_seeds must be non-negative")
+
+            sampling_policies = support_response_cfg.get("sampling_policies", ["random"])
+            if not isinstance(sampling_policies, list) or not sampling_policies:
+                raise ValueError(
+                    "learned_utility.support_response_routing.sampling_policies must be a non-empty list"
+                )
+            allowed_sampling = {"random", "class_balanced"}
+            bad_sampling = sorted(set(str(v).strip().lower() for v in sampling_policies) - allowed_sampling)
+            if bad_sampling:
+                raise ValueError(
+                    "learned_utility.support_response_routing.sampling_policies must be subset of "
+                    f"{sorted(allowed_sampling)}, got unknown {bad_sampling}"
+                )
+
+            feature_regimes = support_response_cfg.get(
+                "feature_regimes",
+                ["static_response_indirect", "response_indirect_shuffled"],
+            )
+            if not isinstance(feature_regimes, list) or not feature_regimes:
+                raise ValueError(
+                    "learned_utility.support_response_routing.feature_regimes must be a non-empty list"
+                )
+            allowed_feature_regimes = {
+                "static_response_indirect",
+                "response_indirect",
+                "response_indirect_shuffled",
+            }
+            normalized_feature_regimes = {str(v).strip().lower() for v in feature_regimes}
+            bad_regimes = sorted(normalized_feature_regimes - allowed_feature_regimes)
+            if bad_regimes:
+                raise ValueError(
+                    "learned_utility.support_response_routing.feature_regimes must be subset of "
+                    f"{sorted(allowed_feature_regimes)}, got unknown {bad_regimes}"
+                )
+            primary_feature_regime = str(
+                support_response_cfg.get("primary_feature_regime", "static_response_indirect")
+            ).strip().lower()
+            if primary_feature_regime not in normalized_feature_regimes:
+                raise ValueError(
+                    "learned_utility.support_response_routing.primary_feature_regime must appear in feature_regimes"
+                )
+            if primary_feature_regime == "response_indirect_shuffled":
+                raise ValueError(
+                    "learned_utility.support_response_routing.primary_feature_regime cannot be shuffled control"
+                )
+
+            ranker = str(support_response_cfg.get("ranker", "linear_pairwise_ridge")).strip().lower()
+            if ranker != "linear_pairwise_ridge":
+                raise ValueError(
+                    "learned_utility.support_response_routing.ranker must be 'linear_pairwise_ridge'"
+                )
+            if float(support_response_cfg.get("ridge_l2", 1.0e-3)) < 0.0:
+                raise ValueError("learned_utility.support_response_routing.ridge_l2 must be >= 0")
+            if int(support_response_cfg.get("num_response_repeats", 8)) <= 0:
+                raise ValueError("learned_utility.support_response_routing.num_response_repeats must be > 0")
+            tie_policy = str(support_response_cfg.get("tie_policy", "stable_expert_index")).strip().lower()
+            if tie_policy != "stable_expert_index":
+                raise ValueError(
+                    "learned_utility.support_response_routing.tie_policy must be 'stable_expert_index'"
+                )
+            _ensure_bool(
+                support_response_cfg.get("domain_level_aggregation", True),
+                "learned_utility.support_response_routing.domain_level_aggregation",
+            )
+            _ensure_bool(
+                support_response_cfg.get("source_leave_pseudo_domain_out_diagnostic", True),
+                "learned_utility.support_response_routing.source_leave_pseudo_domain_out_diagnostic",
+            )
+
         scoring_cfg = learned_cfg.get("scoring", {})
         if scoring_cfg is not None and not isinstance(scoring_cfg, dict):
             raise ValueError("learned_utility.scoring must be a dictionary when provided")
@@ -803,49 +922,49 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             )
 
         backbone = str(cfg.get("features", {}).get("backbone_type", "")).strip().lower()
-        if is_response_routing_protocol:
+        if is_response_routing_protocol or is_support_response_routing_protocol:
             if backbone != "dinov2_vitb14":
                 raise ValueError(
-                    "features.backbone_type must be 'dinov2_vitb14' for learned_utility_response_routing_v1"
+                    "features.backbone_type must be 'dinov2_vitb14' for learned utility response-routing protocols"
                 )
 
             if int(features_cfg.get("image_size", 0)) != 224:
-                raise ValueError("features.image_size must be 224 for learned_utility_response_routing_v1")
+                raise ValueError("features.image_size must be 224 for learned utility response-routing protocols")
 
             if int(features_cfg.get("embedding_dim", 0)) != 768:
-                raise ValueError("features.embedding_dim must be 768 for learned_utility_response_routing_v1")
+                raise ValueError("features.embedding_dim must be 768 for learned utility response-routing protocols")
 
             locked_name = str(features_cfg.get("feature_extractor_name", "")).strip().lower()
             if locked_name != "dinov2_vitb14":
                 raise ValueError(
-                    "features.feature_extractor_name must be 'dinov2_vitb14' for learned_utility_response_routing_v1"
+                    "features.feature_extractor_name must be 'dinov2_vitb14' for learned utility response-routing protocols"
                 )
 
             locked_checkpoint = str(features_cfg.get("feature_extractor_checkpoint", "")).strip().lower()
             if locked_checkpoint != "facebook/dinov2-base":
                 raise ValueError(
                     "features.feature_extractor_checkpoint must be 'facebook/dinov2-base' "
-                    "for learned_utility_response_routing_v1"
+                    "for learned utility response-routing protocols"
                 )
 
             locked_layer = str(features_cfg.get("feature_extractor_layer", "")).strip().lower()
             if locked_layer != "final_norm_cls":
                 raise ValueError(
                     "features.feature_extractor_layer must be 'final_norm_cls' "
-                    "for learned_utility_response_routing_v1"
+                    "for learned utility response-routing protocols"
                 )
 
             locked_pooling = str(features_cfg.get("embedding_pooling", "")).strip().lower()
             if locked_pooling != "cls_token":
                 raise ValueError(
-                    "features.embedding_pooling must be 'cls_token' for learned_utility_response_routing_v1"
+                    "features.embedding_pooling must be 'cls_token' for learned utility response-routing protocols"
                 )
 
             response_repeat_mode = str(learned_cfg.get("response_repeat_mode", "posterior_sampling")).strip().lower()
             if response_repeat_mode != "posterior_sampling":
                 raise ValueError(
                     "learned_utility.response_repeat_mode must be 'posterior_sampling' "
-                    "for learned_utility_response_routing_v1"
+                    "for learned utility response-routing protocols"
                 )
 
             _ensure_bool(
@@ -864,18 +983,18 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             if not bool(learned_cfg.get("posterior_sampling_enabled", True)):
                 raise ValueError(
                     "learned_utility.posterior_sampling_enabled must be true "
-                    "for learned_utility_response_routing_v1"
+                    "for learned utility response-routing protocols"
                 )
             if bool(learned_cfg.get("dropout_enabled", False)):
                 raise ValueError(
                     "learned_utility.dropout_enabled must be false "
-                    "for learned_utility_response_routing_v1"
+                    "for learned utility response-routing protocols"
                 )
 
             num_response_repeats = int(learned_cfg.get("num_response_repeats", 0))
             if num_response_repeats <= 0:
                 raise ValueError(
-                    "learned_utility.num_response_repeats must be > 0 for learned_utility_response_routing_v1"
+                    "learned_utility.num_response_repeats must be > 0 for learned utility response-routing protocols"
                 )
 
             response_norm = str(
@@ -884,7 +1003,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             if response_norm != "train_fold_standardize":
                 raise ValueError(
                     "learned_utility.response_feature_normalization must be 'train_fold_standardize' "
-                    "for learned_utility_response_routing_v1"
+                    "for learned utility response-routing protocols"
                 )
 
             calibration_definition = str(
@@ -893,7 +1012,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             if calibration_definition != "bin10_mean_abs_gap":
                 raise ValueError(
                     "learned_utility.calibration_error_definition must be 'bin10_mean_abs_gap' "
-                    "for learned_utility_response_routing_v1"
+                    "for learned utility response-routing protocols"
                 )
 
             near_tie_eps = float(learned_cfg.get("near_tie_epsilon_norm", 0.02))

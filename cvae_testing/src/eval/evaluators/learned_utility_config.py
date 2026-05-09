@@ -5,6 +5,10 @@ import math
 from typing import Any, Dict, Tuple
 
 from src.eval.evaluators.learned_utility_proxies import _DEFAULT_ALPHA_GRID
+from src.eval.evaluators.support_response_routing import (
+    SupportResponseConfig,
+    parse_support_response_config,
+)
 
 
 @dataclass(frozen=True)
@@ -76,6 +80,7 @@ class LearnedUtilityConfig:
     hybrid: HybridConfig
     compatibility: CompatibilityResearchConfig
     residual: ResidualRoutingConfig
+    support_response: SupportResponseConfig
 
 
 def _as_dict(value: Any) -> Dict[str, Any]:
@@ -217,4 +222,5 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         hybrid=hybrid,
         compatibility=compatibility,
         residual=residual,
+        support_response=parse_support_response_config(learned_cfg),
     )

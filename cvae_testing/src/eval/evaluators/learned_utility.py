@@ -22,6 +22,9 @@ from src.eval.evaluators.learned_utility_scoring import (
 from src.eval.evaluators.learned_utility_reporting import (
     _finalize_learned_utility_outputs,
 )
+from src.eval.evaluators.support_response_routing import (
+    evaluate_support_response_routing_for_checkpoints,
+)
 
 
 def evaluate_learned_utility_loqdo(
@@ -38,6 +41,7 @@ def evaluate_learned_utility_loqdo(
     conditioning_cfg: Dict[str, Any] | None = None,
     configured_domains: Sequence[int] | None = None,
     metadata_constraint_cfg: Dict[str, Any] | None = None,
+    data_cfg: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     eval_cfg = _parse_learned_utility_config(learned_cfg)
     hybrid_cfg = eval_cfg.hybrid
@@ -54,7 +58,6 @@ def evaluate_learned_utility_loqdo(
         configured_domains=configured_domains,
         metadata_constraint_cfg=metadata_constraint_cfg,
     )
-    _ = metadata
     print(
         f"[learned_utility] scored matrix shape={true_nelbo.shape}, n_samples={sample_domains.shape[0]}, n_experts={len(expert_domains)}"
     )
@@ -199,7 +202,7 @@ def evaluate_learned_utility_loqdo(
         else:
             print(f"[learned_utility] fold {fold_idx}/{total_folds} done")
 
-    return _finalize_learned_utility_outputs(
+    results = _finalize_learned_utility_outputs(
         reports_dir=reports_dir,
         sample_rows=sample_rows,
         pair_rows=pair_rows,
@@ -247,3 +250,25 @@ def evaluate_learned_utility_loqdo(
         run_metadata_permutation=compatibility_cfg.run_metadata_permutation,
         permutation_repeats=compatibility_cfg.permutation_repeats,
     )
+    if eval_cfg.support_response.enabled:
+        print("[learned_utility] running candidate-specific support-response routing...")
+        support_response_results = evaluate_support_response_routing_for_checkpoints(
+            embeddings=embeddings,
+            metadata=metadata,
+            nelbo_matrix=true_nelbo,
+            expert_domains=expert_domains,
+            expert_checkpoints=expert_checkpoints,
+            hidden_dim=int(hidden_dim),
+            latent_dim=int(latent_dim),
+            seed=int(seed),
+            dataset_name=str((data_cfg or {}).get("dataset_type", "unknown")),
+            strategy=str(strategy),
+            tau=float(tau),
+            support_cfg=eval_cfg.support_response,
+            reports_dir=reports_dir,
+            data_cfg=data_cfg or {},
+            metadata_constraint_cfg=metadata_constraint_cfg,
+        )
+        results["support_response_results"] = support_response_results
+        results.setdefault("artifacts", {})["support_response_results"] = "support_response_results.json"
+    return results
