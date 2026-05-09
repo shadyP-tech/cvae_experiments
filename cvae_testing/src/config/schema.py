@@ -37,6 +37,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         )
     experiment_name = str((experiment_cfg or {}).get("name", "")).strip().lower()
     is_response_routing_protocol = experiment_name == "learned_utility_response_routing_v1"
+    is_learned_utility_v2 = experiment_name == "learned_utility_routing_v2"
 
     split = cfg.get("data", {}).get("split")
     if not isinstance(split, dict):
@@ -861,7 +862,16 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             if near_tie_eps < 0:
                 raise ValueError("learned_utility.near_tie_epsilon_norm must be >= 0")
         else:
-            if backbone != "resnet50":
+            if is_learned_utility_v2:
+                if backbone != "dinov2_vitb14":
+                    raise ValueError(
+                        "features.backbone_type must be 'dinov2_vitb14' for learned_utility_routing_v2"
+                    )
+                if int(features_cfg.get("embedding_dim", 0)) != 768:
+                    raise ValueError(
+                        "features.embedding_dim must be 768 for learned_utility_routing_v2"
+                    )
+            elif backbone != "resnet50":
                 raise ValueError("features.backbone_type must be 'resnet50' for learned_utility protocol lock")
 
     latent_cfg = cfg.get("latent_compatibility")

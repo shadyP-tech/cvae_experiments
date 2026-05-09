@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Run the protocol-locked BreakHis learned utility routing sweep.
-# Scope: 3 seeds x 1 backbone (resnet50) x Variant B protocol config.
+# Scope: 3 seeds x 1 backbone (dinov2_vitb14) x Variant B protocol config.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -20,8 +20,8 @@ export TRANSFORMERS_CACHE="$HOME/.cache/huggingface/hub"
 export TORCH_HOME="$HOME/.cache/torch"
 
 SEEDS=(42 43 44)
-CONFIG="configs/experiments/breakhis/learned_utility_routing_v1.yaml"
-MANIFEST="results/comparison_tables/compatibility_run_manifest.txt"
+CONFIG="configs/experiments/breakhis/learned_utility_routing_v2.yaml"
+MANIFEST="results/comparison_tables/learned_utility_breakhis_v2_manifest.txt"
 
 mkdir -p "$(dirname "$MANIFEST")"
 : > "$MANIFEST"
@@ -42,7 +42,17 @@ root = pathlib.Path(cfg.get("output", {}).get("root", "outputs"))
 dataset = str(cfg["experiment"]["dataset_name"])
 exp_name = str(cfg["experiment"]["name"])
 latest = (root / dataset / exp_name / "latest.txt").read_text(encoding="utf-8").strip()
-print(root / dataset / exp_name / latest / "reports" / "learned_utility_results.json")
+base = root / dataset / exp_name / latest
+candidates = [
+  base / "reports_v2" / "learned_utility_results.json",
+  base / "reports" / "learned_utility_results.json",
+]
+for path in candidates:
+  if path.exists():
+    print(path)
+    break
+else:
+  print(candidates[0])
 PY
 )"
 
