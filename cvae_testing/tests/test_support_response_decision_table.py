@@ -10,7 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.build_support_response_decision_table import _aggregate, _read_rows
+from scripts.build_support_response_decision_table import _aggregate, _build_seed_stability_rows, _read_rows
 
 
 PROTOCOL_VERSION = "support_response_candidate_specific_v1"
@@ -26,6 +26,9 @@ def _metric(
     gap: float,
     routing_uses_eval_nelbo: int = 0,
     harmful_override_rate: float = 0.0,
+    high_regret_rate: float = 0.0,
+    catastrophic_rate: float = 0.0,
+    top1_tolerance_abs: float = 0.0,
 ) -> dict:
     return {
         "protocol_version": PROTOCOL_VERSION,
@@ -38,6 +41,9 @@ def _metric(
         "spearman": float(spearman),
         "mean_oracle_gap_pct": float(gap),
         "harmful_override_rate": float(harmful_override_rate),
+        "high_regret_selection_rate": float(high_regret_rate),
+        "catastrophic_mistake_rate": float(catastrophic_rate),
+        "top1_tolerance_abs": float(top1_tolerance_abs),
         "n_query_domains_macro": 2.0,
     }
 
@@ -220,6 +226,38 @@ def test_support_response_decision_table_reads_nested_learned_utility_results(tm
     assert rows[0]["n_domain_level_units"] == 2
 
 
+def test_seed_stability_uses_run_directory_when_result_is_under_reports(tmp_path: Path) -> None:
+    result = _write_result(
+        tmp_path / "risk_constrained_response_seed42" / "reports" / "support_response_results.json",
+        {
+            "support_metadata_routing": _metric(
+                method_role="baseline",
+                adoption_eligible=1,
+                diagnostic_only=0,
+                top1=0.20,
+                spearman=0.10,
+                gap=20.0,
+            ),
+            "risk_constrained_response_routing": _metric(
+                method_role="learned",
+                adoption_eligible=1,
+                diagnostic_only=0,
+                top1=0.25,
+                spearman=0.15,
+                gap=18.0,
+            ),
+        },
+    )
+
+    rows = _read_rows([result])
+    decisions, _ = _aggregate(rows)
+    stability_rows = _build_seed_stability_rows(rows, decisions)
+    risk_rows = [row for row in stability_rows if row["method"] == "risk_constrained_response_routing"]
+
+    assert risk_rows[0]["seed"] == "42"
+    assert risk_rows[0]["run_id"] == "risk_constrained_response_seed42"
+
+
 def test_support_response_decision_table_can_select_risk_constrained_method(tmp_path: Path) -> None:
     result = _write_result(
         tmp_path / "run_seed11" / "support_response_results.json",
@@ -278,3 +316,54 @@ def test_support_response_decision_table_can_select_risk_constrained_method(tmp_
     assert risk["decision"] == "selected"
     assert risk["harmful_override_rate_reduction_vs_unrestricted_response"] > 0.0
     assert summary["risk_constrained_method"] == "risk_constrained_response_routing"
+
+
+def test_support_response_decision_table_can_select_conservative_support_utility(tmp_path: Path) -> None:
+    result = _write_result(
+        tmp_path / "support_estimated_utility_seed42" / "support_response_results.json",
+        {
+            "support_metadata_routing": _metric(
+                method_role="baseline",
+                adoption_eligible=1,
+                diagnostic_only=0,
+                top1=0.20,
+                spearman=0.10,
+                gap=20.0,
+                high_regret_rate=0.50,
+                catastrophic_rate=0.50,
+            ),
+            "support_set_nelbo_top1": _metric(
+                method_role="baseline",
+                adoption_eligible=1,
+                diagnostic_only=0,
+                top1=0.80,
+                spearman=0.90,
+                gap=0.40,
+                high_regret_rate=0.20,
+                catastrophic_rate=0.20,
+            ),
+            "support_set_nelbo_conservative": _metric(
+                method_role="baseline",
+                adoption_eligible=1,
+                diagnostic_only=0,
+                top1=0.80,
+                spearman=0.88,
+                gap=0.45,
+                high_regret_rate=0.0,
+                catastrophic_rate=0.0,
+                top1_tolerance_abs=0.10,
+            ),
+        },
+    )
+
+    rows = _read_rows([result])
+    decisions, summary = _aggregate(rows)
+    by_method = {row["method"]: row for row in decisions}
+    conservative = by_method["support_set_nelbo_conservative"]
+
+    assert conservative["tier"] == "pass"
+    assert conservative["decision"] == "selected"
+    assert conservative["strict_support_non_regression"] == 1
+    assert conservative["improves_support_stability_or_regret"] == 1
+    assert conservative["top1_tolerance_abs"] == 0.10
+    assert summary["selected_methods"] == ["support_set_nelbo_conservative"]

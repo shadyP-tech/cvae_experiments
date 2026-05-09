@@ -40,6 +40,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
     is_support_response_routing_protocol = experiment_name in {
         "learned_utility_support_response_routing_v1",
         "learned_utility_response_routing_risk_constrained_v1",
+        "camelyon17_support_estimated_utility_routing_v2",
     }
     is_learned_utility_v2 = experiment_name in {
         "learned_utility_routing_v2",
@@ -726,6 +727,66 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                 support_response_cfg.get("source_leave_pseudo_domain_out_diagnostic", True),
                 "learned_utility.support_response_routing.source_leave_pseudo_domain_out_diagnostic",
             )
+            support_utility_cfg = support_response_cfg.get("support_utility", {})
+            if support_utility_cfg is not None and not isinstance(support_utility_cfg, dict):
+                raise ValueError(
+                    "learned_utility.support_response_routing.support_utility must be a dictionary when provided"
+                )
+            support_utility_cfg = support_utility_cfg or {}
+            _ensure_bool(
+                support_utility_cfg.get("enabled", False),
+                "learned_utility.support_response_routing.support_utility.enabled",
+            )
+            if bool(support_utility_cfg.get("enabled", False)):
+                alpha_grid = support_utility_cfg.get("alpha_grid", [0.0, 0.5, 1.0, 1.5, 2.0])
+                if not isinstance(alpha_grid, list) or not alpha_grid:
+                    raise ValueError(
+                        "learned_utility.support_response_routing.support_utility.alpha_grid "
+                        "must be a non-empty list"
+                    )
+                alpha_values = [float(v) for v in alpha_grid]
+                if any(v < 0.0 for v in alpha_values):
+                    raise ValueError(
+                        "learned_utility.support_response_routing.support_utility.alpha_grid "
+                        "must contain non-negative values"
+                    )
+                if 0.0 not in alpha_values:
+                    raise ValueError(
+                        "learned_utility.support_response_routing.support_utility.alpha_grid must include 0.0"
+                    )
+                alpha_policy = str(
+                    support_utility_cfg.get(
+                        "alpha_selection_policy",
+                        "source_inner_gap_min_with_non_regression",
+                    )
+                ).strip()
+                if alpha_policy != "source_inner_gap_min_with_non_regression":
+                    raise ValueError(
+                        "learned_utility.support_response_routing.support_utility.alpha_selection_policy "
+                        "must be 'source_inner_gap_min_with_non_regression'"
+                    )
+                _ensure_bool(
+                    support_utility_cfg.get("require_unlabeled_support", True),
+                    "learned_utility.support_response_routing.support_utility.require_unlabeled_support",
+                )
+                if bool(support_utility_cfg.get("require_unlabeled_support", True)):
+                    if any(str(v).strip().lower() != "random" for v in sampling_policies):
+                        raise ValueError(
+                            "support_utility.require_unlabeled_support=true requires random support sampling only"
+                        )
+                    model_cfg = cfg.get("model", {}) if isinstance(cfg.get("model", {}), dict) else {}
+                    conditioning_cfg = model_cfg.get("conditioning", {})
+                    if isinstance(conditioning_cfg, dict) and bool(conditioning_cfg.get("enabled", False)):
+                        raise ValueError(
+                            "support_utility requires an unconditioned scoring path; model.conditioning.enabled "
+                            "must be false"
+                        )
+                    metadata_constraint_cfg = model_cfg.get("metadata_constraint", {})
+                    if isinstance(metadata_constraint_cfg, dict) and bool(metadata_constraint_cfg.get("enabled", False)):
+                        raise ValueError(
+                            "support_utility requires an unconditioned scoring path; "
+                            "model.metadata_constraint.enabled must be false"
+                        )
             risk_cfg = support_response_cfg.get("risk_constrained_response_routing", {})
             if risk_cfg is not None and not isinstance(risk_cfg, dict):
                 raise ValueError(

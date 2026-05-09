@@ -139,6 +139,7 @@ def _method_protocol(method: str) -> MethodProtocol:
         "support_metadata_routing",
         "support_static_embedding_routing",
         "support_set_nelbo_top1",
+        "support_set_nelbo_conservative",
     }:
         return MethodProtocol(
             method_role="baseline",
@@ -319,6 +320,9 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         "pairwise_auc": "pairwise_auc",
         "selected_nelbo": "selected_nelbo",
         "candidate_oracle_nelbo": "candidate_oracle_nelbo",
+        "bottom_half_selection": "bottom_half_selection",
+        "high_regret_selection": "high_regret_selection",
+        "catastrophic_mistake": "catastrophic_mistake",
     }
     for method, vals in sorted(by_method.items()):
         metrics: Dict[str, float] = {}
@@ -341,6 +345,9 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         metrics["selected_nelbo"] = metrics["micro_selected_nelbo"]
         metrics["oracle_nelbo"] = metrics["micro_candidate_oracle_nelbo"]
         metrics["candidate_oracle_nelbo"] = metrics["micro_candidate_oracle_nelbo"]
+        metrics["bottom_half_selection_rate"] = metrics["micro_bottom_half_selection"]
+        metrics["high_regret_selection_rate"] = metrics["micro_high_regret_selection"]
+        metrics["catastrophic_mistake_rate"] = metrics["micro_catastrophic_mistake"]
 
         query_domains = sorted(set(int(r["query_domain"]) for r in vals))
         metrics["n_samples_micro"] = float(len(vals))
@@ -378,12 +385,18 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
             "selected_tau",
             "tau_margin",
             "tau_regret",
+            "alpha",
+            "alpha_grid",
+            "alpha_selection_policy",
             "selection_source",
             "policy_name",
             "adoption_selected_method",
             "harmful_override_max",
             "allow_calibrated_adoption",
             "fallback_used",
+            "fallback_to_alpha0",
+            "n_aggregation_units",
+            "top1_tolerance_abs",
         ]:
             vals_for_key = sorted(set(str(r.get(key, "")) for r in vals if str(r.get(key, "")) != ""))
             if vals_for_key:
@@ -425,6 +438,9 @@ def _domain_breakdown_rows(sample_rows: Sequence[Dict[str, Any]]) -> List[Dict[s
                 "selected_tau": str(base.get("selected_tau", "")),
                 "tau_margin": str(base.get("tau_margin", "")),
                 "tau_regret": str(base.get("tau_regret", "")),
+                "alpha": str(base.get("alpha", "")),
+                "alpha_grid": str(base.get("alpha_grid", "")),
+                "alpha_selection_policy": str(base.get("alpha_selection_policy", "")),
                 "selection_source": str(base.get("selection_source", "")),
                 "policy_name": str(base.get("policy_name", "")),
                 "selected_by_inner_validation": int(base.get("selected_by_inner_validation", 0) or 0),
@@ -432,6 +448,9 @@ def _domain_breakdown_rows(sample_rows: Sequence[Dict[str, Any]]) -> List[Dict[s
                 "harmful_override_max": str(base.get("harmful_override_max", "")),
                 "allow_calibrated_adoption": str(base.get("allow_calibrated_adoption", "")),
                 "fallback_used": str(base.get("fallback_used", "")),
+                "fallback_to_alpha0": str(base.get("fallback_to_alpha0", "")),
+                "n_aggregation_units": str(base.get("n_aggregation_units", "")),
+                "top1_tolerance_abs": str(base.get("top1_tolerance_abs", "")),
                 "n_samples": int(len(rows)),
                 "top1_oracle_hit": _finite_mean([float(r["top1_oracle_hit"]) for r in rows]),
                 "mean_rank": _finite_mean([float(r["selected_rank"]) for r in rows]),
@@ -439,6 +458,15 @@ def _domain_breakdown_rows(sample_rows: Sequence[Dict[str, Any]]) -> List[Dict[s
                 "mean_oracle_gap_pct": _finite_mean([float(r["oracle_gap_pct"]) for r in rows]),
                 "pairwise_auc": _finite_mean([float(r["pairwise_auc"]) for r in rows]),
                 "spearman": _finite_mean([float(r["spearman"]) for r in rows]),
+                "bottom_half_selection_rate": _finite_mean(
+                    [float(r.get("bottom_half_selection", 0.0)) for r in rows]
+                ),
+                "high_regret_selection_rate": _finite_mean(
+                    [float(r.get("high_regret_selection", 0.0)) for r in rows]
+                ),
+                "catastrophic_mistake_rate": _finite_mean(
+                    [float(r.get("catastrophic_mistake", 0.0)) for r in rows]
+                ),
             }
         )
     return domain_rows

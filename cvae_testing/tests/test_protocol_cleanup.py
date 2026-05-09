@@ -14,6 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.app.cli import build_parser
 from src.config.load_config import load_config
+from src.config.schema import validate_config
 from src.experiments.registry import EXPERIMENT_REGISTRY, create_experiment
 
 
@@ -41,6 +42,25 @@ def test_active_experiment_configs_have_supported_modes() -> None:
         mode = str((cfg.get("experiment") or {}).get("mode", "")).strip()
         assert mode, f"{path} must declare experiment.mode"
         assert mode in supported, f"{path} has unsupported experiment.mode={mode}"
+
+
+def test_support_estimated_utility_v2_config_is_unlabeled_and_grid_locked() -> None:
+    path = PROJECT_ROOT / "configs" / "experiments" / "camelyon17" / "camelyon17_support_estimated_utility_routing_v2.yaml"
+    cfg = load_config(path)
+    support_cfg = cfg["learned_utility"]["support_response_routing"]
+    utility_cfg = support_cfg["support_utility"]
+
+    assert cfg["experiment"]["name"] == "camelyon17_support_estimated_utility_routing_v2"
+    assert support_cfg["sampling_policies"] == ["random"]
+    assert utility_cfg["enabled"] is True
+    assert utility_cfg["alpha_grid"] == [0.0, 0.5, 1.0, 1.5, 2.0]
+    assert utility_cfg["alpha_selection_policy"] == "source_inner_gap_min_with_non_regression"
+    assert utility_cfg["require_unlabeled_support"] is True
+
+    invalid = yaml.safe_load(path.read_text(encoding="utf-8"))
+    invalid["learned_utility"]["support_response_routing"]["sampling_policies"] = ["class_balanced"]
+    with pytest.raises(ValueError, match="random support sampling only"):
+        validate_config(invalid)
 
 
 def test_quarantined_entrypoints_fail_fast() -> None:

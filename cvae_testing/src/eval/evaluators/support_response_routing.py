@@ -29,6 +29,12 @@ SUPPORT_RESPONSE_PROTOCOL_VERSION = "support_response_candidate_specific_v1"
 SUPPORT_RESPONSE_AGGREGATION_SOURCE = "support_response_sample_selections.csv"
 RISK_CONSTRAINED_METHOD = "risk_constrained_response_routing"
 RISK_CONSTRAINED_POLICY_NAME = "metadata_anchored_response_routing_with_support_regret_gate"
+SUPPORT_CONSERVATIVE_METHOD = "support_set_nelbo_conservative"
+SUPPORT_ALPHA_SELECTION_POLICY = "source_inner_gap_min_with_non_regression"
+SUPPORT_ALPHA_GRID_DEFAULT = (0.0, 0.5, 1.0, 1.5, 2.0)
+SUPPORT_ALPHA_SPEARMAN_TOLERANCE = 0.05
+HIGH_REGRET_GAP_PCT_THRESHOLD = 2.0
+BOTTOM_HALF_RANK_THRESHOLD = 3
 PRIVACY_PROVENANCE_FIELDS: Dict[str, object] = {
     "target_support_data_location": "target_local",
     "raw_target_images_exported": False,
@@ -74,6 +80,14 @@ class RiskConstrainedResponseConfig:
 
 
 @dataclass(frozen=True)
+class SupportUtilityConfig:
+    enabled: bool = False
+    alpha_grid: Tuple[float, ...] = SUPPORT_ALPHA_GRID_DEFAULT
+    alpha_selection_policy: str = SUPPORT_ALPHA_SELECTION_POLICY
+    require_unlabeled_support: bool = True
+
+
+@dataclass(frozen=True)
 class SupportResponseConfig:
     enabled: bool
     support_sizes: Tuple[int, ...]
@@ -88,6 +102,7 @@ class SupportResponseConfig:
     domain_level_aggregation: bool
     source_leave_pseudo_domain_out_diagnostic: bool
     include_residual_shape_features: bool = False
+    support_utility: SupportUtilityConfig = field(default_factory=SupportUtilityConfig)
     risk_constrained: RiskConstrainedResponseConfig = field(
         default_factory=lambda: RiskConstrainedResponseConfig(
             enabled=False,
@@ -111,6 +126,23 @@ class _RiskThresholdSelection:
     source_inner_gap_pct: float
     source_inner_harmful_override_rate: float
     fallback_used: bool
+
+
+@dataclass(frozen=True)
+class _SupportAlphaSelection:
+    selected_alpha: float
+    num_source_inner_units: int
+    source_inner_gap_pct_alpha0: float
+    source_inner_gap_pct_selected: float
+    source_inner_top1_alpha0: float
+    source_inner_top1_selected: float
+    source_inner_spearman_alpha0: float
+    source_inner_spearman_selected: float
+    source_inner_gap_variance_alpha0: float
+    source_inner_gap_variance_selected: float
+    fallback_to_alpha0: bool
+    n_aggregation_units: int
+    top1_tolerance_abs: float
 
 
 @dataclass(frozen=True)
@@ -250,6 +282,19 @@ def parse_support_response_config(learned_cfg: Mapping[str, Any]) -> SupportResp
         focus_query_domain=int(risk_raw.get("focus_query_domain", 3)),
         focus_expert=int(risk_raw.get("focus_expert", 4)),
     )
+    utility_raw = raw.get("support_utility", {})
+    if utility_raw is None:
+        utility_raw = {}
+    if not isinstance(utility_raw, Mapping):
+        raise ValueError("learned_utility.support_response_routing.support_utility must be a dictionary")
+    support_utility_cfg = SupportUtilityConfig(
+        enabled=bool(utility_raw.get("enabled", False)),
+        alpha_grid=tuple(float(v) for v in utility_raw.get("alpha_grid", SUPPORT_ALPHA_GRID_DEFAULT)),
+        alpha_selection_policy=str(
+            utility_raw.get("alpha_selection_policy", SUPPORT_ALPHA_SELECTION_POLICY)
+        ).strip(),
+        require_unlabeled_support=bool(utility_raw.get("require_unlabeled_support", True)),
+    )
     return SupportResponseConfig(
         enabled=enabled,
         support_sizes=tuple(int(v) for v in raw.get("support_sizes", [8, 16, 32])),
@@ -269,6 +314,7 @@ def parse_support_response_config(learned_cfg: Mapping[str, Any]) -> SupportResp
             raw.get("source_leave_pseudo_domain_out_diagnostic", True)
         ),
         include_residual_shape_features=bool(raw.get("include_residual_shape_features", False)),
+        support_utility=support_utility_cfg,
         risk_constrained=risk_cfg,
     )
 
@@ -336,6 +382,63 @@ def _pairwise_auc(score_row: Sequence[float], true_nelbo_row: Sequence[float]) -
             elif (si < sj) == (ti < tj):
                 correct += 1.0
     return float(correct / total) if total > 0.0 else float("nan")
+
+
+def _support_stderr(values: np.ndarray) -> float:
+    arr = np.asarray(values, dtype=np.float64)
+    n = int(arr.size)
+    if n <= 1:
+        return 0.0
+    return float(np.std(arr, ddof=1) / np.sqrt(float(n)))
+
+
+def _support_eval_stats_for_candidates(
+    *,
+    split: Any,
+    candidate_experts: Sequence[int],
+    nelbo_matrix: np.ndarray,
+    expert_to_col: Mapping[int, int],
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    support_idxs = np.asarray(split.support_indices, dtype=np.int64)
+    eval_idxs = np.asarray(split.eval_indices, dtype=np.int64)
+    support_mean: List[float] = []
+    support_stderr: List[float] = []
+    eval_mean: List[float] = []
+    for expert in candidate_experts:
+        col = int(expert_to_col[int(expert)])
+        if support_idxs.size:
+            support_values = np.asarray(nelbo_matrix[support_idxs, col], dtype=np.float64)
+            support_mean.append(float(np.mean(support_values)))
+            support_stderr.append(_support_stderr(support_values))
+        else:
+            support_mean.append(float("nan"))
+            support_stderr.append(float("nan"))
+        eval_mean.append(float(np.mean(nelbo_matrix[eval_idxs, col])) if eval_idxs.size else float("nan"))
+    return (
+        np.asarray(support_mean, dtype=np.float64),
+        np.asarray(support_stderr, dtype=np.float64),
+        np.asarray(eval_mean, dtype=np.float64),
+    )
+
+
+def _conservative_support_scores(
+    support_mean_nelbo: Sequence[float],
+    support_stderr_nelbo: Sequence[float],
+    alpha: float,
+) -> np.ndarray:
+    return np.asarray(support_mean_nelbo, dtype=np.float64) + (
+        float(alpha) * np.asarray(support_stderr_nelbo, dtype=np.float64)
+    )
+
+
+def _gap_variance(rows: Sequence[Mapping[str, Any]]) -> float:
+    vals = [float(row.get("oracle_gap_pct", float("nan"))) for row in rows]
+    clean = [v for v in vals if np.isfinite(v)]
+    return float(np.var(clean)) if clean else 0.0
+
+
+def _alpha_grid_label(values: Sequence[float]) -> str:
+    return json.dumps([float(v) for v in values], separators=(",", ":"))
 
 
 def _domain_centroids(embeddings: np.ndarray, sample_domains: np.ndarray) -> Dict[int, np.ndarray]:
@@ -570,11 +673,16 @@ def _score_method_row(
     predicted_scores: Sequence[float],
     eval_mean_nelbo: Sequence[float],
     support_mean_nelbo: Sequence[float],
+    support_stderr_nelbo: Sequence[float] | None,
     sample_index: int,
     run_seed: int,
     privacy_fields: Mapping[str, Any],
     selected_expert_override: int | None = None,
     ranking_scores: Sequence[float] | None = None,
+    alpha: float = 0.0,
+    support_n: int = 0,
+    support_labels_used_for_routing: int = 0,
+    conservative_scores: Sequence[float] | None = None,
     extra_fields: Mapping[str, Any] | None = None,
 ) -> Dict[str, Any]:
     if str(method) == "support_candidate_oracle":
@@ -599,6 +707,18 @@ def _score_method_row(
     gap_pct = float((gap / max(abs(oracle_nelbo), 1e-12)) * 100.0)
     rank_score = np.asarray(ranking_scores if ranking_scores is not None else predicted_scores, dtype=np.float64)
     true_nelbo = np.asarray(eval_mean_nelbo, dtype=np.float64)
+    selected_rank = _selected_rank(selected_idx, true_nelbo, candidate_experts)
+    support_mean_arr = np.asarray(support_mean_nelbo, dtype=np.float64)
+    support_stderr_arr = (
+        np.asarray(support_stderr_nelbo, dtype=np.float64)
+        if support_stderr_nelbo is not None
+        else np.zeros_like(support_mean_arr, dtype=np.float64)
+    )
+    conservative_arr = (
+        np.asarray(conservative_scores, dtype=np.float64)
+        if conservative_scores is not None
+        else _conservative_support_scores(support_mean_arr, support_stderr_arr, alpha=float(alpha))
+    )
     base = _protocol_row_fields(fold=fold, method_protocol=method_protocol, method=method)
     base["protocol_version"] = SUPPORT_RESPONSE_PROTOCOL_VERSION
     base["aggregation_source"] = SUPPORT_RESPONSE_AGGREGATION_SOURCE
@@ -624,12 +744,26 @@ def _score_method_row(
         "oracle_gap_pct": gap_pct,
         "mean_oracle_gap_pct": gap_pct,
         "top1_oracle_hit": int(selected_expert == oracle_expert),
-        "selected_rank": _selected_rank(selected_idx, true_nelbo, candidate_experts),
+        "selected_rank": selected_rank,
         "spearman": float(spearman_corr((-rank_score).tolist(), (-true_nelbo).tolist())),
         "pairwise_auc": _pairwise_auc(rank_score, true_nelbo),
+        "mean_support_nelbo": float(support_mean_arr[int(selected_idx)]),
+        "stderr_support_nelbo": float(support_stderr_arr[int(selected_idx)]),
+        "conservative_support_score": float(conservative_arr[int(selected_idx)]),
+        "alpha": float(alpha),
+        "support_n": int(support_n),
+        "support_labels_used_for_routing": int(support_labels_used_for_routing),
+        "bottom_half_selection": int(float(selected_rank) >= float(BOTTOM_HALF_RANK_THRESHOLD)),
+        "high_regret_selection": int(float(gap_pct) >= float(HIGH_REGRET_GAP_PCT_THRESHOLD)),
+        "catastrophic_mistake": int(
+            float(selected_rank) >= float(BOTTOM_HALF_RANK_THRESHOLD)
+            or float(gap_pct) >= float(HIGH_REGRET_GAP_PCT_THRESHOLD)
+        ),
         "predicted_score_by_expert_json": _json_mapping(candidate_experts, predicted_scores),
         "eval_nelbo_by_expert_json": _json_mapping(candidate_experts, eval_mean_nelbo),
         "support_nelbo_by_expert_json": _json_mapping(candidate_experts, support_mean_nelbo),
+        "support_stderr_nelbo_by_expert_json": _json_mapping(candidate_experts, support_stderr_arr),
+        "conservative_support_score_by_expert_json": _json_mapping(candidate_experts, conservative_arr),
     }
     if extra_fields:
         row.update(dict(extra_fields))
@@ -746,6 +880,8 @@ def _score_risk_constrained_row(
     metadata_scores: Sequence[float],
     eval_mean_nelbo: Sequence[float],
     support_mean_nelbo: Sequence[float],
+    support_stderr_nelbo: Sequence[float] | None,
+    support_n: int,
     sample_index: int,
     run_seed: int,
     privacy_fields: Mapping[str, Any],
@@ -783,11 +919,14 @@ def _score_risk_constrained_row(
         predicted_scores=learned_scores,
         eval_mean_nelbo=eval_mean_nelbo,
         support_mean_nelbo=support_mean_nelbo,
+        support_stderr_nelbo=support_stderr_nelbo,
         sample_index=int(sample_index),
         run_seed=int(run_seed),
         privacy_fields=privacy_fields,
         selected_expert_override=int(decision.selected_expert),
         ranking_scores=learned_scores,
+        support_n=int(support_n),
+        support_labels_used_for_routing=0,
         extra_fields=extra,
     )
     audit = {
@@ -890,18 +1029,18 @@ def _candidate_rows_for_query(
     tau: float,
     response_feature_fn: Callable[[Sequence[int], int, str], Mapping[str, float]],
     split_role: str,
-) -> Tuple[List[Dict[str, Any]], np.ndarray, np.ndarray]:
-    support_idxs = np.asarray(split.support_indices, dtype=np.int64)
-    eval_idxs = np.asarray(split.eval_indices, dtype=np.int64)
-    support_mean: List[float] = []
-    eval_mean: List[float] = []
+) -> Tuple[List[Dict[str, Any]], np.ndarray, np.ndarray, np.ndarray]:
+    support_mean, support_stderr, eval_mean = _support_eval_stats_for_candidates(
+        split=split,
+        candidate_experts=candidate_experts,
+        nelbo_matrix=nelbo_matrix,
+        expert_to_col=expert_to_col,
+    )
     rows: List[Dict[str, Any]] = []
-    for expert in candidate_experts:
-        col = int(expert_to_col[int(expert)])
-        support_nelbo = float(np.mean(nelbo_matrix[support_idxs, col])) if support_idxs.size else float("nan")
-        label_nelbo = float(np.mean(nelbo_matrix[eval_idxs, col])) if eval_idxs.size else float("nan")
-        support_mean.append(support_nelbo)
-        eval_mean.append(label_nelbo)
+    for idx, expert in enumerate(candidate_experts):
+        support_nelbo = float(support_mean[int(idx)])
+        support_se = float(support_stderr[int(idx)])
+        label_nelbo = float(eval_mean[int(idx)])
         row = {
             "outer_target_domain": int(outer_target_domain),
             "pseudo_query_domain": int(query_domain),
@@ -914,6 +1053,9 @@ def _candidate_rows_for_query(
             "support_seed": int(split.support_eval_split_id.split("_seed", 1)[1].split("_", 1)[0]),
             "label_nelbo": label_nelbo,
             "support_mean_nelbo": support_nelbo,
+            "support_stderr_nelbo": support_se,
+            "support_n": int(split.support_size_actual),
+            "support_labels_used_for_routing": 0,
             **_static_features(
                 query_domain=int(query_domain),
                 candidate_expert=int(expert),
@@ -927,7 +1069,7 @@ def _candidate_rows_for_query(
             **dict(response_feature_fn(split.support_indices, int(expert), str(split.support_eval_split_id))),
         }
         rows.append(row)
-    return rows, np.asarray(support_mean, dtype=np.float64), np.asarray(eval_mean, dtype=np.float64)
+    return rows, support_mean, support_stderr, eval_mean
 
 
 def _source_inner_units_for_outer(
@@ -974,7 +1116,7 @@ def _source_inner_units_for_outer(
                         expert_domains=expert_domains_int,
                         excluded_domains=[int(pseudo_query)],
                     )
-                    rows, _support_mean, _eval_mean = _candidate_rows_for_query(
+                    rows, _support_mean, _support_stderr, _eval_mean = _candidate_rows_for_query(
                         outer_target_domain=int(outer_target),
                         query_domain=int(pseudo_query),
                         candidate_experts=source_fold.candidate_expert_domains,
@@ -1023,6 +1165,10 @@ def _source_inner_units_for_outer(
                             "learned_scores": predicted.astype(np.float64),
                             "eval_mean_nelbo": [float(r["label_nelbo"]) for r in validation_rows],
                             "support_mean_nelbo": [float(r["support_mean_nelbo"]) for r in validation_rows],
+                            "support_stderr_nelbo": [
+                                float(r.get("support_stderr_nelbo", 0.0)) for r in validation_rows
+                            ],
+                            "support_n": int(validation_split.support_size_actual),
                             "fold": FoldCandidateSet.for_heldout_domain(
                                 heldout_domain=int(outer_target),
                                 expert_domains=expert_domains_int,
@@ -1052,6 +1198,8 @@ def _score_source_inner_units(
         learned_scores = list(unit["learned_scores"])
         eval_mean = list(unit["eval_mean_nelbo"])
         support_mean = list(unit["support_mean_nelbo"])
+        support_stderr = list(unit.get("support_stderr_nelbo", [0.0 for _ in support_mean]))
+        support_n = int(unit.get("support_n", 0))
         metadata_rows.append(
             _score_method_row(
                 method="support_metadata_routing",
@@ -1065,9 +1213,12 @@ def _score_source_inner_units(
                 predicted_scores=metadata_scores,
                 eval_mean_nelbo=eval_mean,
                 support_mean_nelbo=support_mean,
+                support_stderr_nelbo=support_stderr,
                 sample_index=idx,
                 run_seed=int(seed),
                 privacy_fields=privacy,
+                support_n=support_n,
+                support_labels_used_for_routing=0,
             )
         )
         unrestricted_rows.append(
@@ -1083,9 +1234,12 @@ def _score_source_inner_units(
                 predicted_scores=learned_scores,
                 eval_mean_nelbo=eval_mean,
                 support_mean_nelbo=support_mean,
+                support_stderr_nelbo=support_stderr,
                 sample_index=idx,
                 run_seed=int(seed),
                 privacy_fields=privacy,
+                support_n=support_n,
+                support_labels_used_for_routing=0,
             )
         )
         row, _audit, _expert4 = _score_risk_constrained_row(
@@ -1100,6 +1254,8 @@ def _score_source_inner_units(
             metadata_scores=metadata_scores,
             eval_mean_nelbo=eval_mean,
             support_mean_nelbo=support_mean,
+            support_stderr_nelbo=support_stderr,
+            support_n=support_n,
             sample_index=idx,
             run_seed=int(seed),
             privacy_fields=privacy,
@@ -1313,6 +1469,273 @@ def _selected_threshold_artifact_row(
     }
 
 
+def _source_inner_support_units_for_outer(
+    *,
+    outer_target: int,
+    support_cfg: SupportResponseConfig,
+    sample_domains: np.ndarray,
+    labels_by_index: Mapping[int, int],
+    nelbo_matrix: np.ndarray,
+    expert_domains_int: Sequence[int],
+    expert_to_col: Mapping[int, int],
+) -> List[Dict[str, Any]]:
+    units: List[Dict[str, Any]] = []
+    source_domains = sorted(set(int(v) for v in sample_domains.tolist()) - {int(outer_target)})
+    for support_seed in support_cfg.support_seeds:
+        for sampling_policy in support_cfg.sampling_policies:
+            for support_size in support_cfg.support_sizes:
+                for pseudo_query in source_domains:
+                    pseudo_indices = [
+                        int(i)
+                        for i, d in enumerate(sample_domains.tolist())
+                        if int(d) == int(pseudo_query)
+                    ]
+                    pseudo_split = make_support_eval_split(
+                        target_domain=int(pseudo_query),
+                        target_indices=pseudo_indices,
+                        labels_by_index=labels_by_index,
+                        support_size=int(support_size),
+                        sampling_policy=str(sampling_policy),
+                        support_seed=int(support_seed),
+                    )
+                    if pseudo_split.split_status != "ok":
+                        continue
+                    if (
+                        bool(support_cfg.support_utility.require_unlabeled_support)
+                        and int(pseudo_split.support_labels_used) != 0
+                    ):
+                        raise ProtocolError(
+                            "support_utility requires unlabeled support routing, but support split "
+                            f"{pseudo_split.support_eval_split_id} used target support labels"
+                        )
+                    source_fold = FoldCandidateSet.for_heldout_domain(
+                        heldout_domain=int(outer_target),
+                        expert_domains=expert_domains_int,
+                        excluded_domains=[int(pseudo_query)],
+                    )
+                    support_mean, support_stderr, eval_mean = _support_eval_stats_for_candidates(
+                        split=pseudo_split,
+                        candidate_experts=source_fold.candidate_expert_domains,
+                        nelbo_matrix=nelbo_matrix,
+                        expert_to_col=expert_to_col,
+                    )
+                    units.append(
+                        {
+                            "outer_target": int(outer_target),
+                            "validation_domain": int(pseudo_query),
+                            "support_seed": int(support_seed),
+                            "support_size": int(support_size),
+                            "sampling_policy": str(sampling_policy),
+                            "support_eval_split_id": str(pseudo_split.support_eval_split_id),
+                            "candidate_experts": list(source_fold.candidate_expert_domains),
+                            "eval_mean_nelbo": eval_mean.tolist(),
+                            "support_mean_nelbo": support_mean.tolist(),
+                            "support_stderr_nelbo": support_stderr.tolist(),
+                            "support_n": int(pseudo_split.support_size_actual),
+                            "fold": source_fold,
+                        }
+                    )
+    return units
+
+
+def _score_support_alpha_units(
+    *,
+    units: Sequence[Mapping[str, Any]],
+    alpha: float,
+    seed: int,
+    privacy: Mapping[str, Any],
+) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for idx, unit in enumerate(units):
+        support_mean = list(unit["support_mean_nelbo"])
+        support_stderr = list(unit["support_stderr_nelbo"])
+        scores = _conservative_support_scores(support_mean, support_stderr, alpha=float(alpha))
+        rows.append(
+            _score_method_row(
+                method=SUPPORT_CONSERVATIVE_METHOD,
+                fold=unit["fold"],
+                target_domain=int(unit["validation_domain"]),
+                support_seed=int(unit["support_seed"]),
+                support_size=int(unit["support_size"]),
+                sampling_policy=str(unit["sampling_policy"]),
+                support_eval_split_id=str(unit["support_eval_split_id"]),
+                candidate_experts=list(unit["candidate_experts"]),
+                predicted_scores=scores,
+                eval_mean_nelbo=list(unit["eval_mean_nelbo"]),
+                support_mean_nelbo=support_mean,
+                support_stderr_nelbo=support_stderr,
+                sample_index=int(idx),
+                run_seed=int(seed),
+                privacy_fields=privacy,
+                alpha=float(alpha),
+                support_n=int(unit.get("support_n", 0)),
+                support_labels_used_for_routing=0,
+                conservative_scores=scores,
+                extra_fields={
+                    "selection_source": "source_inner_only",
+                    "alpha_selection_policy": SUPPORT_ALPHA_SELECTION_POLICY,
+                },
+            )
+        )
+    return rows
+
+
+def _select_support_alpha(
+    *,
+    outer_target: int,
+    support_size: int,
+    sampling_policy: str,
+    units: Sequence[Mapping[str, Any]],
+    support_cfg: SupportResponseConfig,
+    seed: int,
+    privacy: Mapping[str, Any],
+) -> Tuple[_SupportAlphaSelection, Dict[str, Any]]:
+    alpha_grid = tuple(float(v) for v in support_cfg.support_utility.alpha_grid)
+    filtered_units = [
+        unit
+        for unit in units
+        if int(unit.get("support_size", -1)) == int(support_size)
+        and str(unit.get("sampling_policy", "")) == str(sampling_policy)
+    ]
+    if not filtered_units:
+        selection = _SupportAlphaSelection(
+            selected_alpha=0.0,
+            num_source_inner_units=0,
+            source_inner_gap_pct_alpha0=0.0,
+            source_inner_gap_pct_selected=0.0,
+            source_inner_top1_alpha0=0.0,
+            source_inner_top1_selected=0.0,
+            source_inner_spearman_alpha0=0.0,
+            source_inner_spearman_selected=0.0,
+            source_inner_gap_variance_alpha0=0.0,
+            source_inner_gap_variance_selected=0.0,
+            fallback_to_alpha0=True,
+            n_aggregation_units=0,
+            top1_tolerance_abs=0.0,
+        )
+        return selection, _selected_alpha_artifact_row(
+            seed=seed,
+            outer_center=int(outer_target),
+            support_size=int(support_size),
+            alpha_grid=alpha_grid,
+            selection=selection,
+            privacy=privacy,
+        )
+
+    alpha0_rows = _score_support_alpha_units(
+        units=filtered_units,
+        alpha=0.0,
+        seed=int(seed),
+        privacy=privacy,
+    )
+    alpha0_metrics = _aggregate_metrics_from_sample_rows(alpha0_rows)[SUPPORT_CONSERVATIVE_METHOD]
+    alpha0_gap_var = _gap_variance(alpha0_rows)
+    n_units = int(len(alpha0_rows))
+    top1_tolerance_abs = float(1.0 / max(n_units, 1))
+
+    candidates: List[Tuple[Tuple[float, float, float], _SupportAlphaSelection]] = []
+    for alpha in alpha_grid:
+        rows = _score_support_alpha_units(
+            units=filtered_units,
+            alpha=float(alpha),
+            seed=int(seed),
+            privacy=privacy,
+        )
+        metrics = _aggregate_metrics_from_sample_rows(rows)[SUPPORT_CONSERVATIVE_METHOD]
+        gap_var = _gap_variance(rows)
+        top1_ok = float(metrics["top1_oracle_hit"]) >= (
+            float(alpha0_metrics["top1_oracle_hit"]) - top1_tolerance_abs
+        )
+        spearman_ok = float(metrics["spearman"]) >= (
+            float(alpha0_metrics["spearman"]) - SUPPORT_ALPHA_SPEARMAN_TOLERANCE
+        )
+        if not (top1_ok and spearman_ok):
+            continue
+        selection = _SupportAlphaSelection(
+            selected_alpha=float(alpha),
+            num_source_inner_units=n_units,
+            source_inner_gap_pct_alpha0=float(alpha0_metrics["mean_oracle_gap_pct"]),
+            source_inner_gap_pct_selected=float(metrics["mean_oracle_gap_pct"]),
+            source_inner_top1_alpha0=float(alpha0_metrics["top1_oracle_hit"]),
+            source_inner_top1_selected=float(metrics["top1_oracle_hit"]),
+            source_inner_spearman_alpha0=float(alpha0_metrics["spearman"]),
+            source_inner_spearman_selected=float(metrics["spearman"]),
+            source_inner_gap_variance_alpha0=float(alpha0_gap_var),
+            source_inner_gap_variance_selected=float(gap_var),
+            fallback_to_alpha0=False,
+            n_aggregation_units=n_units,
+            top1_tolerance_abs=top1_tolerance_abs,
+        )
+        score = (
+            -float(metrics["mean_oracle_gap_pct"]),
+            -float(gap_var),
+            -float(alpha),
+        )
+        candidates.append((score, selection))
+
+    if candidates:
+        selection = sorted(candidates, key=lambda item: item[0], reverse=True)[0][1]
+    else:
+        selection = _SupportAlphaSelection(
+            selected_alpha=0.0,
+            num_source_inner_units=n_units,
+            source_inner_gap_pct_alpha0=float(alpha0_metrics["mean_oracle_gap_pct"]),
+            source_inner_gap_pct_selected=float(alpha0_metrics["mean_oracle_gap_pct"]),
+            source_inner_top1_alpha0=float(alpha0_metrics["top1_oracle_hit"]),
+            source_inner_top1_selected=float(alpha0_metrics["top1_oracle_hit"]),
+            source_inner_spearman_alpha0=float(alpha0_metrics["spearman"]),
+            source_inner_spearman_selected=float(alpha0_metrics["spearman"]),
+            source_inner_gap_variance_alpha0=float(alpha0_gap_var),
+            source_inner_gap_variance_selected=float(alpha0_gap_var),
+            fallback_to_alpha0=True,
+            n_aggregation_units=n_units,
+            top1_tolerance_abs=top1_tolerance_abs,
+        )
+
+    return selection, _selected_alpha_artifact_row(
+        seed=seed,
+        outer_center=int(outer_target),
+        support_size=int(support_size),
+        alpha_grid=alpha_grid,
+        selection=selection,
+        privacy=privacy,
+    )
+
+
+def _selected_alpha_artifact_row(
+    *,
+    seed: int,
+    outer_center: int,
+    support_size: int,
+    alpha_grid: Sequence[float],
+    selection: _SupportAlphaSelection,
+    privacy: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        **dict(privacy),
+        "method": SUPPORT_CONSERVATIVE_METHOD,
+        "seed": int(seed),
+        "outer_center": int(outer_center),
+        "support_size": int(support_size),
+        "alpha_grid": _alpha_grid_label(alpha_grid),
+        "alpha_selection_policy": SUPPORT_ALPHA_SELECTION_POLICY,
+        "selected_alpha": float(selection.selected_alpha),
+        "selection_source": "source_inner_only",
+        "selected_before_target_eval_scoring": 1,
+        "source_inner_gap_pct_alpha0": float(selection.source_inner_gap_pct_alpha0),
+        "source_inner_gap_pct_selected": float(selection.source_inner_gap_pct_selected),
+        "source_inner_top1_alpha0": float(selection.source_inner_top1_alpha0),
+        "source_inner_top1_selected": float(selection.source_inner_top1_selected),
+        "source_inner_spearman_alpha0": float(selection.source_inner_spearman_alpha0),
+        "source_inner_spearman_selected": float(selection.source_inner_spearman_selected),
+        "source_inner_gap_variance_alpha0": float(selection.source_inner_gap_variance_alpha0),
+        "source_inner_gap_variance_selected": float(selection.source_inner_gap_variance_selected),
+        "fallback_to_alpha0": int(bool(selection.fallback_to_alpha0)),
+        "n_aggregation_units": int(selection.n_aggregation_units),
+        "top1_tolerance_abs": float(selection.top1_tolerance_abs),
+    }
+
+
 def evaluate_support_response_routing_from_arrays(
     *,
     embeddings: np.ndarray,
@@ -1353,6 +1776,7 @@ def evaluate_support_response_routing_from_arrays(
     risk_threshold_rows: List[Dict[str, Any]] = []
     risk_override_rows: List[Dict[str, Any]] = []
     risk_expert4_rows: List[Dict[str, Any]] = []
+    support_utility_hyper_rows: List[Dict[str, Any]] = []
     sample_index_counter = 0
 
     if support_cfg.risk_constrained.enabled:
@@ -1366,6 +1790,30 @@ def evaluate_support_response_routing_from_arrays(
         )
         target_candidates = list(target_fold.candidate_expert_domains)
         risk_selection: _RiskThresholdSelection | None = None
+        support_alpha_by_key: Dict[Tuple[int, str], _SupportAlphaSelection] = {}
+        if support_cfg.support_utility.enabled:
+            source_support_units = _source_inner_support_units_for_outer(
+                outer_target=int(outer_target),
+                support_cfg=support_cfg,
+                sample_domains=sample_domains,
+                labels_by_index=labels_by_index,
+                nelbo_matrix=nelbo_matrix,
+                expert_domains_int=expert_domains_int,
+                expert_to_col=expert_to_col,
+            )
+            for sampling_policy in support_cfg.sampling_policies:
+                for support_size in support_cfg.support_sizes:
+                    selection, alpha_row = _select_support_alpha(
+                        outer_target=int(outer_target),
+                        support_size=int(support_size),
+                        sampling_policy=str(sampling_policy),
+                        units=source_support_units,
+                        support_cfg=support_cfg,
+                        seed=int(seed),
+                        privacy=privacy,
+                    )
+                    support_alpha_by_key[(int(support_size), str(sampling_policy))] = selection
+                    support_utility_hyper_rows.append(alpha_row)
         if support_cfg.risk_constrained.enabled:
             risk_selection, threshold_row = _select_risk_threshold_for_outer(
                 outer_target=int(outer_target),
@@ -1409,6 +1857,15 @@ def evaluate_support_response_routing_from_arrays(
                     )
                     if target_split.split_status != "ok":
                         continue
+                    if (
+                        bool(support_cfg.support_utility.enabled)
+                        and bool(support_cfg.support_utility.require_unlabeled_support)
+                        and int(target_split.support_labels_used) != 0
+                    ):
+                        raise ProtocolError(
+                            "support_utility requires unlabeled support routing, but target support split "
+                            f"{target_split.support_eval_split_id} used labels"
+                        )
 
                     source_rows: List[Dict[str, Any]] = []
                     source_split_by_domain: Dict[int, Any] = {}
@@ -1445,7 +1902,7 @@ def evaluate_support_response_routing_from_arrays(
                             expert_domains=expert_domains_int,
                             excluded_domains=[int(pseudo_query)],
                         )
-                        rows, _support_mean, eval_mean = _candidate_rows_for_query(
+                        rows, _support_mean, _support_stderr, eval_mean = _candidate_rows_for_query(
                             outer_target_domain=int(outer_target),
                             query_domain=int(pseudo_query),
                             candidate_experts=source_fold.candidate_expert_domains,
@@ -1467,7 +1924,7 @@ def evaluate_support_response_routing_from_arrays(
                     if not source_rows:
                         continue
 
-                    target_rows, target_support_mean, target_eval_mean = _candidate_rows_for_query(
+                    target_rows, target_support_mean, target_support_stderr, target_eval_mean = _candidate_rows_for_query(
                         outer_target_domain=int(outer_target),
                         query_domain=int(outer_target),
                         candidate_experts=target_candidates,
@@ -1498,9 +1955,12 @@ def evaluate_support_response_routing_from_arrays(
                             predicted_scores=metadata_scores,
                             eval_mean_nelbo=target_eval_mean,
                             support_mean_nelbo=target_support_mean,
+                            support_stderr_nelbo=target_support_stderr,
                             sample_index=sample_index_counter,
                             run_seed=int(seed),
                             privacy_fields=privacy,
+                            support_n=int(target_split.support_size_actual),
+                            support_labels_used_for_routing=0,
                         )
                     )
                     sample_index_counter += 1
@@ -1519,9 +1979,12 @@ def evaluate_support_response_routing_from_arrays(
                             predicted_scores=embedding_scores,
                             eval_mean_nelbo=target_eval_mean,
                             support_mean_nelbo=target_support_mean,
+                            support_stderr_nelbo=target_support_stderr,
                             sample_index=sample_index_counter,
                             run_seed=int(seed),
                             privacy_fields=privacy,
+                            support_n=int(target_split.support_size_actual),
+                            support_labels_used_for_routing=0,
                         )
                     )
                     sample_index_counter += 1
@@ -1539,12 +2002,82 @@ def evaluate_support_response_routing_from_arrays(
                             predicted_scores=target_support_mean,
                             eval_mean_nelbo=target_eval_mean,
                             support_mean_nelbo=target_support_mean,
+                            support_stderr_nelbo=target_support_stderr,
                             sample_index=sample_index_counter,
                             run_seed=int(seed),
                             privacy_fields=privacy,
+                            alpha=0.0,
+                            support_n=int(target_split.support_size_actual),
+                            support_labels_used_for_routing=0,
+                            conservative_scores=target_support_mean,
                         )
                     )
                     sample_index_counter += 1
+
+                    if support_cfg.support_utility.enabled:
+                        alpha_selection = support_alpha_by_key[(int(support_size), str(sampling_policy))]
+                        conservative_scores = _conservative_support_scores(
+                            target_support_mean,
+                            target_support_stderr,
+                            alpha=float(alpha_selection.selected_alpha),
+                        )
+                        sample_rows.append(
+                            _score_method_row(
+                                method=SUPPORT_CONSERVATIVE_METHOD,
+                                fold=target_fold,
+                                target_domain=int(outer_target),
+                                support_seed=int(support_seed),
+                                support_size=int(support_size),
+                                sampling_policy=str(sampling_policy),
+                                support_eval_split_id=target_split.support_eval_split_id,
+                                candidate_experts=target_candidates,
+                                predicted_scores=conservative_scores,
+                                eval_mean_nelbo=target_eval_mean,
+                                support_mean_nelbo=target_support_mean,
+                                support_stderr_nelbo=target_support_stderr,
+                                sample_index=sample_index_counter,
+                                run_seed=int(seed),
+                                privacy_fields=privacy,
+                                alpha=float(alpha_selection.selected_alpha),
+                                support_n=int(target_split.support_size_actual),
+                                support_labels_used_for_routing=0,
+                                conservative_scores=conservative_scores,
+                                extra_fields={
+                                    "alpha_grid": _alpha_grid_label(support_cfg.support_utility.alpha_grid),
+                                    "alpha_selection_policy": SUPPORT_ALPHA_SELECTION_POLICY,
+                                    "selection_source": "source_inner_only",
+                                    "selected_before_target_eval_scoring": 1,
+                                    "source_inner_gap_pct_alpha0": float(
+                                        alpha_selection.source_inner_gap_pct_alpha0
+                                    ),
+                                    "source_inner_gap_pct_selected": float(
+                                        alpha_selection.source_inner_gap_pct_selected
+                                    ),
+                                    "source_inner_top1_alpha0": float(
+                                        alpha_selection.source_inner_top1_alpha0
+                                    ),
+                                    "source_inner_top1_selected": float(
+                                        alpha_selection.source_inner_top1_selected
+                                    ),
+                                    "source_inner_spearman_alpha0": float(
+                                        alpha_selection.source_inner_spearman_alpha0
+                                    ),
+                                    "source_inner_spearman_selected": float(
+                                        alpha_selection.source_inner_spearman_selected
+                                    ),
+                                    "source_inner_gap_variance_alpha0": float(
+                                        alpha_selection.source_inner_gap_variance_alpha0
+                                    ),
+                                    "source_inner_gap_variance_selected": float(
+                                        alpha_selection.source_inner_gap_variance_selected
+                                    ),
+                                    "fallback_to_alpha0": int(bool(alpha_selection.fallback_to_alpha0)),
+                                    "n_aggregation_units": int(alpha_selection.n_aggregation_units),
+                                    "top1_tolerance_abs": float(alpha_selection.top1_tolerance_abs),
+                                },
+                            )
+                        )
+                        sample_index_counter += 1
 
                     prior_scores: List[float] = []
                     for expert in target_candidates:
@@ -1569,9 +2102,12 @@ def evaluate_support_response_routing_from_arrays(
                             predicted_scores=prior_scores,
                             eval_mean_nelbo=target_eval_mean,
                             support_mean_nelbo=target_support_mean,
+                            support_stderr_nelbo=target_support_stderr,
                             sample_index=sample_index_counter,
                             run_seed=int(seed),
                             privacy_fields=privacy,
+                            support_n=int(target_split.support_size_actual),
+                            support_labels_used_for_routing=0,
                         )
                     )
                     sample_index_counter += 1
@@ -1589,9 +2125,12 @@ def evaluate_support_response_routing_from_arrays(
                             predicted_scores=target_eval_mean,
                             eval_mean_nelbo=target_eval_mean,
                             support_mean_nelbo=target_support_mean,
+                            support_stderr_nelbo=target_support_stderr,
                             sample_index=sample_index_counter,
                             run_seed=int(seed),
                             privacy_fields=privacy,
+                            support_n=int(target_split.support_size_actual),
+                            support_labels_used_for_routing=0,
                         )
                     )
                     sample_index_counter += 1
@@ -1688,9 +2227,12 @@ def evaluate_support_response_routing_from_arrays(
                                 predicted_scores=predicted,
                                 eval_mean_nelbo=target_eval_mean,
                                 support_mean_nelbo=target_support_mean,
+                                support_stderr_nelbo=target_support_stderr,
                                 sample_index=sample_index_counter,
                                 run_seed=int(seed),
                                 privacy_fields=privacy,
+                                support_n=int(target_split.support_size_actual),
+                                support_labels_used_for_routing=0,
                             )
                         )
                         sample_index_counter += 1
@@ -1712,6 +2254,8 @@ def evaluate_support_response_routing_from_arrays(
                                 metadata_scores=metadata_scores,
                                 eval_mean_nelbo=target_eval_mean,
                                 support_mean_nelbo=target_support_mean,
+                                support_stderr_nelbo=target_support_stderr,
+                                support_n=int(target_split.support_size_actual),
                                 sample_index=sample_index_counter,
                                 run_seed=int(seed),
                                 privacy_fields=privacy,
@@ -1762,6 +2306,10 @@ def evaluate_support_response_routing_from_arrays(
                                     [float(r["support_mean_nelbo"]) for r in validation_rows],
                                     dtype=np.float64,
                                 )
+                                validation_support_stderr = np.asarray(
+                                    [float(r.get("support_stderr_nelbo", 0.0)) for r in validation_rows],
+                                    dtype=np.float64,
+                                )
                                 validation_fold = FoldCandidateSet.for_heldout_domain(
                                     heldout_domain=int(outer_target),
                                     expert_domains=expert_domains_int,
@@ -1779,9 +2327,14 @@ def evaluate_support_response_routing_from_arrays(
                                     predicted_scores=validation_scores,
                                     eval_mean_nelbo=validation_eval,
                                     support_mean_nelbo=validation_support,
+                                    support_stderr_nelbo=validation_support_stderr,
                                     sample_index=sample_index_counter,
                                     run_seed=int(seed),
                                     privacy_fields=privacy,
+                                    support_n=int(
+                                        source_split_by_domain[int(validation_domain)].support_size_actual
+                                    ),
+                                    support_labels_used_for_routing=0,
                                 )
                                 diag["outer_target_domain"] = int(outer_target)
                                 diag["validation_pseudo_query_domain"] = int(validation_domain)
@@ -1895,6 +2448,8 @@ def evaluate_support_response_routing_from_arrays(
         "method_summary": "support_response_method_summary.csv",
         "results": "support_response_results.json",
     }
+    if support_cfg.support_utility.enabled:
+        artifacts["support_utility_selected_hyperparams"] = "support_utility_selected_hyperparams.csv"
     if support_cfg.risk_constrained.enabled:
         artifacts.update(
             {
@@ -1914,6 +2469,20 @@ def evaluate_support_response_routing_from_arrays(
         "ridge_l2": float(support_cfg.ridge_l2),
         "scaler_fit_scope": "source_training_pairs_only",
         "domain_level_aggregation": bool(support_cfg.domain_level_aggregation),
+        "support_estimated_utility": {
+            "enabled": bool(support_cfg.support_utility.enabled),
+            "method": SUPPORT_CONSERVATIVE_METHOD,
+            "direct_support_baseline_method": "support_set_nelbo_top1",
+            "score_definition": "mean_support_nelbo_plus_alpha_times_stderr_support_nelbo",
+            "alpha_grid": list(float(v) for v in support_cfg.support_utility.alpha_grid),
+            "alpha_selection_policy": str(support_cfg.support_utility.alpha_selection_policy),
+            "alpha_selection_scope": "source_inner_only_per_outer_center_x_support_size",
+            "selected_before_target_eval_scoring": 1,
+            "support_labels_used_for_routing": 0,
+            "require_unlabeled_support": bool(support_cfg.support_utility.require_unlabeled_support),
+            "high_regret_gap_pct_threshold": float(HIGH_REGRET_GAP_PCT_THRESHOLD),
+            "bottom_half_rank_threshold": int(BOTTOM_HALF_RANK_THRESHOLD),
+        },
         "risk_constrained_response_routing": {
             "enabled": bool(support_cfg.risk_constrained.enabled),
             "method": RISK_CONSTRAINED_METHOD,
@@ -1940,6 +2509,7 @@ def evaluate_support_response_routing_from_arrays(
         "artifacts": artifacts,
         "n_domain_level_rows": int(len(sample_rows)),
         "n_pairwise_training_comparisons": int(len(pair_rows)),
+        "n_support_utility_hyperparameter_rows": int(len(support_utility_hyper_rows)),
     }
     reports_dir.mkdir(parents=True, exist_ok=True)
     (reports_dir / artifacts["protocol_lock"]).write_text(json.dumps(protocol_lock, indent=2) + "\n", encoding="utf-8")
@@ -1949,6 +2519,8 @@ def evaluate_support_response_routing_from_arrays(
     _write_csv(reports_dir / artifacts["sample_selections"], sample_rows)
     _write_csv(reports_dir / artifacts["domain_breakdown"], domain_rows)
     _write_csv(reports_dir / artifacts["method_summary"], method_summary)
+    if support_cfg.support_utility.enabled:
+        _write_csv(reports_dir / artifacts["support_utility_selected_hyperparams"], support_utility_hyper_rows)
     if support_cfg.risk_constrained.enabled:
         risk_sample_rows = [row for row in sample_rows if str(row.get("method", "")) == RISK_CONSTRAINED_METHOD]
         risk_domain_rows = [
