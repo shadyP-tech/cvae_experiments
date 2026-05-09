@@ -510,6 +510,62 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         for key in ["include_metadata_features", "include_domain_stats"]:
             _ensure_bool((pair_features or {}).get(key, False), f"learned_utility.pair_features.{key}")
 
+        residual_cfg = learned_cfg.get("residual_routing", {})
+        if residual_cfg is not None and not isinstance(residual_cfg, dict):
+            raise ValueError("learned_utility.residual_routing must be a dictionary when provided")
+        residual_cfg = residual_cfg or {}
+        _ensure_bool(
+            residual_cfg.get("enabled", False),
+            "learned_utility.residual_routing.enabled",
+        )
+        residual_policy_version = str(
+            residual_cfg.get("residual_policy_version", "metadata_residual_v1")
+        ).strip()
+        if residual_policy_version != "metadata_residual_v1":
+            raise ValueError(
+                "learned_utility.residual_routing.residual_policy_version must be 'metadata_residual_v1'"
+            )
+        residual_models = residual_cfg.get("models", ["ridge"])
+        if not isinstance(residual_models, list) or not residual_models:
+            raise ValueError("learned_utility.residual_routing.models must be a non-empty list")
+        bad_residual_models = sorted(set(str(v).strip().lower() for v in residual_models) - {"ridge"})
+        if bad_residual_models:
+            raise ValueError(
+                "learned_utility.residual_routing.models must be subset of ['ridge'], "
+                f"got unknown {bad_residual_models}"
+            )
+        residual_thresholds = residual_cfg.get("thresholds", [0, 0.01, 0.05, 0.10, 0.25, 0.50, "inf"])
+        if not isinstance(residual_thresholds, list) or not residual_thresholds:
+            raise ValueError("learned_utility.residual_routing.thresholds must be a non-empty list")
+        has_inf_threshold = False
+        for threshold in residual_thresholds:
+            if isinstance(threshold, str) and threshold.strip().lower() == "inf":
+                has_inf_threshold = True
+                continue
+            if float(threshold) < 0.0:
+                raise ValueError("learned_utility.residual_routing.thresholds must be >= 0 or 'inf'")
+        if not has_inf_threshold:
+            raise ValueError("learned_utility.residual_routing.thresholds must include 'inf'")
+        residual_feature_sets = residual_cfg.get("feature_sets", ["minimal", "latent", "calibrated"])
+        if not isinstance(residual_feature_sets, list) or not residual_feature_sets:
+            raise ValueError("learned_utility.residual_routing.feature_sets must be a non-empty list")
+        allowed_residual_feature_sets = {"minimal", "latent", "calibrated"}
+        bad_feature_sets = sorted(set(str(v).strip().lower() for v in residual_feature_sets) - allowed_residual_feature_sets)
+        if bad_feature_sets:
+            raise ValueError(
+                "learned_utility.residual_routing.feature_sets must be subset of "
+                f"{sorted(allowed_residual_feature_sets)}, got unknown {bad_feature_sets}"
+            )
+        residual_selection_metric = str(
+            residual_cfg.get("selection_metric", "validation_safe_gap_then_top1")
+        ).strip().lower()
+        if residual_selection_metric != "validation_safe_gap_then_top1":
+            raise ValueError(
+                "learned_utility.residual_routing.selection_metric must be 'validation_safe_gap_then_top1'"
+            )
+        if float(residual_cfg.get("ridge_l2", 1e-4)) < 0.0:
+            raise ValueError("learned_utility.residual_routing.ridge_l2 must be >= 0")
+
         scoring_cfg = learned_cfg.get("scoring", {})
         if scoring_cfg is not None and not isinstance(scoring_cfg, dict):
             raise ValueError("learned_utility.scoring must be a dictionary when provided")

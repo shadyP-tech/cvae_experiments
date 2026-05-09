@@ -219,6 +219,14 @@ def _read_rows(
                     "spearman_uplift_vs_metadata": float(spearman - b_spearman),
                     "oracle_gap_pct_reduction_vs_metadata": float(b_gap_pct - gap_pct),
                     "source_json": str(path),
+                    "decision_policy_version": str(mm.get("decision_policy_version", "")),
+                    "residual_policy_version": str(mm.get("residual_policy_version", "")),
+                    "threshold_selection_policy": str(mm.get("threshold_selection_policy", "")),
+                    "feature_set": str(mm.get("feature_set", "")),
+                    "residual_variant": str(mm.get("residual_variant", "")),
+                    "selected_tau": str(mm.get("selected_tau", "")),
+                    "selected_by_inner_validation": _to_int(mm.get("selected_by_inner_validation", 0)),
+                    "adoption_selected_method": str(mm.get("adoption_selected_method", "")),
                 }
             )
     if len(seen_protocol_versions) > 1:
@@ -511,6 +519,13 @@ def _aggregate(
                 "routing_uses_eval_domain_statistics": _to_int(
                     base.get("routing_uses_eval_domain_statistics", 0)
                 ),
+                "residual_policy_version": str(base.get("residual_policy_version", "")),
+                "threshold_selection_policy": str(base.get("threshold_selection_policy", "")),
+                "feature_set": str(base.get("feature_set", "")),
+                "residual_variant": str(base.get("residual_variant", "")),
+                "selected_tau": str(base.get("selected_tau", "")),
+                "selected_by_inner_validation": _to_int(base.get("selected_by_inner_validation", 0)),
+                "adoption_selected_method": str(base.get("adoption_selected_method", "")),
                 "selection_eligible": int(selectable),
                 "n_seeds": int(len(seeds)),
                 "seeds": ",".join(str(s) for s in seeds),

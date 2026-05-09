@@ -14,6 +14,7 @@ from src.eval.evaluators.learned_utility_proxies import (
     _latent_wasserstein_scores,
     _metadata_scores,
 )
+from src.eval.evaluators.learned_utility_residual import run_residual_methods_for_fold
 from src.eval.evaluators.learned_utility_scoring import (
     _domain_to_expert_index,
     _score_experts_batched,
@@ -73,6 +74,11 @@ def evaluate_learned_utility_loqdo(
     pair_rows: List[Dict[str, Any]] = []
     pair_training_rows: List[Dict[str, Any]] = []
     proxy_diag_rows: List[Dict[str, Any]] = []
+    residual_sample_rows: List[Dict[str, Any]] = []
+    residual_raw_rows: List[Dict[str, Any]] = []
+    residual_override_rows: List[Dict[str, Any]] = []
+    residual_audit_rows: List[Dict[str, Any]] = []
+    residual_confusion_rows: List[Dict[str, Any]] = []
     hybrid_method_meta: Dict[str, Dict[str, Any]] = {}
     permutation_sample_rows: Dict[Tuple[str, int], List[Dict[str, Any]]] = {}
 
@@ -164,6 +170,27 @@ def evaluate_learned_utility_loqdo(
         pair_rows.extend(learned_outputs.pair_rows)
         pair_training_rows.extend(learned_outputs.pair_training_rows)
 
+        residual_outputs = run_residual_methods_for_fold(
+            embeddings=embeddings,
+            sample_domains=sample_domains,
+            true_nelbo=true_nelbo,
+            expert_domains=expert_domains,
+            metadata_similarity=metadata_similarity,
+            train_idx=train_idx,
+            test_idx=test_idx,
+            fold=fold,
+            global_eval=global_eval,
+            residual_cfg=eval_cfg.residual,
+            learned_sample_rows=learned_outputs.sample_rows,
+            tie_policy=hybrid_cfg.tie_policy,
+        )
+        sample_rows.extend(residual_outputs.sample_rows)
+        residual_sample_rows.extend(residual_outputs.sample_rows)
+        residual_raw_rows.extend(residual_outputs.raw_rows)
+        residual_override_rows.extend(residual_outputs.override_rows)
+        residual_audit_rows.extend(residual_outputs.audit_rows)
+        residual_confusion_rows.extend(residual_outputs.confusion_rows)
+
         if fold_end is not None:
             fold_end.record()
             torch.cuda.synchronize()
@@ -178,6 +205,11 @@ def evaluate_learned_utility_loqdo(
         pair_rows=pair_rows,
         pair_training_rows=pair_training_rows,
         proxy_diag_rows=proxy_diag_rows,
+        residual_sample_rows=residual_sample_rows,
+        residual_raw_rows=residual_raw_rows,
+        residual_override_rows=residual_override_rows,
+        residual_audit_rows=residual_audit_rows,
+        residual_confusion_rows=residual_confusion_rows,
         permutation_sample_rows=permutation_sample_rows,
         hybrid_method_meta=hybrid_method_meta,
         sample_domains=sample_domains,

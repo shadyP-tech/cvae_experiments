@@ -77,6 +77,16 @@ learned_utility:
     include_metadata_features: true
     include_domain_stats: false
 
+  residual_routing:
+    enabled: true
+    residual_policy_version: metadata_residual_v1
+    models: [ridge]
+    thresholds: [0, 0.01, 0.05, 0.10, 0.25, 0.50, "inf"]
+    feature_sets: [minimal, latent, calibrated]
+    selection_metric: validation_safe_gap_then_top1
+    unconstrained_reference_method: pairwise_ranker_metadata_only
+    ridge_l2: 1.0e-4
+
   scoring:
     granularity: sample_expert_pair
     enforce_full_expert_scoring: true

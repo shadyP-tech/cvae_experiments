@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Any, Dict, Tuple
 
 from src.eval.evaluators.learned_utility_proxies import _DEFAULT_ALPHA_GRID
@@ -48,6 +49,18 @@ class CompatibilityResearchConfig:
 
 
 @dataclass(frozen=True)
+class ResidualRoutingConfig:
+    enabled: bool
+    residual_policy_version: str
+    models: Tuple[str, ...]
+    thresholds: Tuple[float, ...]
+    feature_sets: Tuple[str, ...]
+    selection_metric: str
+    unconstrained_reference_method: str
+    ridge_l2: float
+
+
+@dataclass(frozen=True)
 class LearnedUtilityConfig:
     pair_batch_size: int
     include_metadata_features: bool
@@ -56,10 +69,20 @@ class LearnedUtilityConfig:
     pairwise_cfg: Dict[str, Any]
     hybrid: HybridConfig
     compatibility: CompatibilityResearchConfig
+    residual: ResidualRoutingConfig
 
 
 def _as_dict(value: Any) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
+
+
+def _parse_threshold(value: Any) -> float:
+    if isinstance(value, str) and value.strip().lower() == "inf":
+        return float("inf")
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        return float("inf")
+    return parsed
 
 
 def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtilityConfig:
@@ -135,6 +158,30 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         ),
     )
 
+    residual_cfg = _as_dict(learned_cfg.get("residual_routing", {}))
+    residual = ResidualRoutingConfig(
+        enabled=bool((residual_cfg or {}).get("enabled", False)),
+        residual_policy_version=str(
+            (residual_cfg or {}).get("residual_policy_version", "metadata_residual_v1")
+        ),
+        models=tuple(str(v) for v in (residual_cfg or {}).get("models", ["ridge"])),
+        thresholds=tuple(
+            _parse_threshold(v)
+            for v in (residual_cfg or {}).get("thresholds", [0, 0.01, 0.05, 0.10, 0.25, 0.50, "inf"])
+        ),
+        feature_sets=tuple(
+            str(v).strip().lower()
+            for v in (residual_cfg or {}).get("feature_sets", ["minimal", "latent", "calibrated"])
+        ),
+        selection_metric=str(
+            (residual_cfg or {}).get("selection_metric", "validation_safe_gap_then_top1")
+        ).strip().lower(),
+        unconstrained_reference_method=str(
+            (residual_cfg or {}).get("unconstrained_reference_method", "pairwise_ranker_metadata_only")
+        ),
+        ridge_l2=float((residual_cfg or {}).get("ridge_l2", 1e-4)),
+    )
+
     return LearnedUtilityConfig(
         pair_batch_size=pair_batch_size,
         include_metadata_features=include_metadata_features,
@@ -143,4 +190,5 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         pairwise_cfg=pairwise_cfg,
         hybrid=hybrid,
         compatibility=compatibility,
+        residual=residual,
     )

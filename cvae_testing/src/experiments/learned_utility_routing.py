@@ -52,6 +52,7 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
             learned_cfg.get("winner_rule", {}).get("tie_breakers"),
             ["top1_oracle_hit", "spearman_with_oracle"],
         )
+        residual_routing_cfg = learned_cfg.get("residual_routing", {}) or {}
 
         protocol_lock = {
             "experiment_mode": "learned_utility_routing",
@@ -109,6 +110,47 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
                         learned_cfg.get("hybrid_scoring", {}).get("acceptance", {}).get("max_top1_drop_abs", 0.0)
                     ),
                 },
+            },
+            "residual_routing": {
+                "enabled": bool(residual_routing_cfg.get("enabled", False)),
+                "residual_policy_version": str(
+                    residual_routing_cfg.get(
+                        "residual_policy_version",
+                        "metadata_residual_v1",
+                    )
+                ),
+                "models": _as_str_list(
+                    residual_routing_cfg.get("models"),
+                    ["ridge"],
+                ),
+                "thresholds": [
+                    str(v)
+                    for v in residual_routing_cfg.get(
+                        "thresholds",
+                        [0, 0.01, 0.05, 0.10, 0.25, 0.50, "inf"],
+                    )
+                ],
+                "feature_sets": _as_str_list(
+                    residual_routing_cfg.get("feature_sets"),
+                    ["minimal", "latent", "calibrated"],
+                ),
+                "selection_metric": str(
+                    residual_routing_cfg.get(
+                        "selection_metric",
+                        "validation_safe_gap_then_top1",
+                    )
+                ),
+                "unconstrained_reference_method": str(
+                    residual_routing_cfg.get(
+                        "unconstrained_reference_method",
+                        "pairwise_ranker_metadata_only",
+                    )
+                ),
+                "ridge_l2": float(residual_routing_cfg.get("ridge_l2", 1.0e-4)),
+                "selection_discipline": (
+                    "feature_set_variant_and_threshold_selected_by_inner_source_query_domain_loqdo"
+                ),
+                "target_scale": "delta_u_pct_for_training_and_thresholding_raw_nelbo_for_final_metrics",
             },
             "winner_rule": {
                 "primary_metric": str(

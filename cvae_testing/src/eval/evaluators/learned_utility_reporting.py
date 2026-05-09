@@ -21,6 +21,7 @@ from src.eval.evaluators.learned_utility_protocol import (
     _domain_breakdown_rows,
     _method_protocol,
 )
+from src.eval.evaluators.learned_utility_residual_reporting import write_residual_routing_artifacts
 
 
 def _mean(values: Sequence[float]) -> float:
@@ -417,6 +418,14 @@ def _build_method_summary_rows(method_metrics: Dict[str, Dict[str, Any]]) -> Lis
                     float(metrics.get("routing_uses_eval_domain_statistics", 0.0))
                 ),
                 "routing_uses_eval_nelbo": int(float(metrics.get("routing_uses_eval_nelbo", 0.0))),
+                "decision_policy_version": str(metrics.get("decision_policy_version", "")),
+                "residual_policy_version": str(metrics.get("residual_policy_version", "")),
+                "threshold_selection_policy": str(metrics.get("threshold_selection_policy", "")),
+                "feature_set": str(metrics.get("feature_set", "")),
+                "residual_variant": str(metrics.get("residual_variant", "")),
+                "selected_tau": str(metrics.get("selected_tau", "")),
+                "selected_by_inner_validation": int(float(metrics.get("selected_by_inner_validation", 0.0) or 0.0)),
+                "adoption_selected_method": str(metrics.get("adoption_selected_method", "")),
                 "top1_oracle_hit": float(metrics.get("top1_oracle_hit", float("nan"))),
                 "mean_rank": float(metrics.get("mean_rank", float("nan"))),
                 "mean_oracle_gap": float(metrics.get("mean_oracle_gap", float("nan"))),
@@ -541,6 +550,11 @@ def _finalize_learned_utility_outputs(
     pair_rows: Sequence[Dict[str, Any]],
     pair_training_rows: Sequence[Dict[str, Any]],
     proxy_diag_rows: Sequence[Dict[str, Any]],
+    residual_sample_rows: Sequence[Dict[str, Any]],
+    residual_raw_rows: Sequence[Dict[str, Any]],
+    residual_override_rows: Sequence[Dict[str, Any]],
+    residual_audit_rows: Sequence[Dict[str, Any]],
+    residual_confusion_rows: Sequence[Dict[str, Any]],
     permutation_sample_rows: Dict[Tuple[str, int], List[Dict[str, Any]]],
     hybrid_method_meta: Dict[str, Dict[str, Any]],
     sample_domains: np.ndarray,
@@ -578,6 +592,21 @@ def _finalize_learned_utility_outputs(
     run_metadata_permutation: bool,
     permutation_repeats: int,
 ) -> Dict[str, Any]:
+    def _with_decision_policy(rows: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        annotated: List[Dict[str, Any]] = []
+        for row in rows:
+            new_row = dict(row)
+            new_row.setdefault("decision_policy_version", str(decision_policy_version))
+            annotated.append(new_row)
+        return annotated
+
+    sample_rows = _with_decision_policy(sample_rows)
+    residual_sample_rows = _with_decision_policy(residual_sample_rows)
+    residual_raw_rows = _with_decision_policy(residual_raw_rows)
+    residual_override_rows = _with_decision_policy(residual_override_rows)
+    residual_audit_rows = _with_decision_policy(residual_audit_rows)
+    residual_confusion_rows = _with_decision_policy(residual_confusion_rows)
+
     method_metrics = _aggregate_metrics_from_sample_rows(sample_rows)
     domain_rows = _domain_breakdown_rows(sample_rows)
 
@@ -666,6 +695,15 @@ def _finalize_learned_utility_outputs(
     if hybrid_summary_rows:
         _write_csv(reports_dir / "learned_utility_hybrid_alpha_summary.csv", hybrid_summary_rows)
 
+    residual_artifacts = write_residual_routing_artifacts(
+        reports_dir=reports_dir,
+        residual_sample_rows=residual_sample_rows,
+        residual_raw_rows=residual_raw_rows,
+        residual_override_rows=residual_override_rows,
+        residual_audit_rows=residual_audit_rows,
+        residual_confusion_rows=residual_confusion_rows,
+    ) if residual_sample_rows or residual_raw_rows or residual_override_rows or residual_audit_rows else {}
+
     return {
         "metrics_by_method": method_metrics,
         "artifacts": {
@@ -678,6 +716,7 @@ def _finalize_learned_utility_outputs(
             "permutation_nulls": "learned_utility_permutation_nulls.csv" if permutation_rows else "",
             "diagnostic_plots": diagnostic_plot_artifacts,
             "hybrid_alpha_summary": "learned_utility_hybrid_alpha_summary.csv" if hybrid_summary_rows else "",
+            **residual_artifacts,
         },
         "protocol_version": _PROTOCOL_VERSION,
         "protocol_contract": {

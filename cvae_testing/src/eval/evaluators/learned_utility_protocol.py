@@ -158,6 +158,20 @@ def _method_protocol(method: str) -> MethodProtocol:
         )
     if name in {"random_rank_floor", "random_score_floor", "expert_label_permutation", "metadata_permutation"}:
         return MethodProtocol(method_role="control", adoption_eligible=0, diagnostic_only=0)
+    if name == "unconstrained_learned_reference" or name == "metadata_residual_argmax":
+        return MethodProtocol(
+            method_role="diagnostic",
+            adoption_eligible=0,
+            diagnostic_only=1,
+            routing_uses_query_features=1,
+        )
+    if name in {"metadata_residual_thresholded", "metadata_residual_group_robust", "metadata_residual_inner_selected"}:
+        return MethodProtocol(
+            method_role="learned",
+            adoption_eligible=1,
+            diagnostic_only=0,
+            routing_uses_query_features=1,
+        )
     if name in {"linear_regressor", "mlp_regressor", "metadata_only_regressor"} or name.startswith("pairwise_ranker"):
         return MethodProtocol(
             method_role="learned",
@@ -277,13 +291,39 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
             sum(1 for r in vals if np.isfinite(float(r.get("pairwise_auc", float("nan")))))
         )
         method_protocol = _method_protocol(method)
+        first = vals[0]
         metrics["protocol_version"] = _PROTOCOL_VERSION
-        metrics["method_role"] = str(method_protocol.method_role)
-        metrics["adoption_eligible"] = float(method_protocol.adoption_eligible)
-        metrics["diagnostic_only"] = float(method_protocol.diagnostic_only)
-        metrics["routing_uses_query_features"] = float(method_protocol.routing_uses_query_features)
-        metrics["routing_uses_eval_nelbo"] = float(method_protocol.routing_uses_eval_nelbo)
-        metrics["routing_uses_eval_domain_statistics"] = float(method_protocol.routing_uses_eval_domain_statistics)
+        metrics["method_role"] = str(first.get("method_role", method_protocol.method_role))
+        metrics["adoption_eligible"] = float(first.get("adoption_eligible", method_protocol.adoption_eligible))
+        metrics["diagnostic_only"] = float(first.get("diagnostic_only", method_protocol.diagnostic_only))
+        metrics["routing_uses_query_features"] = float(
+            first.get("routing_uses_query_features", method_protocol.routing_uses_query_features)
+        )
+        metrics["routing_uses_eval_nelbo"] = float(
+            first.get("routing_uses_eval_nelbo", method_protocol.routing_uses_eval_nelbo)
+        )
+        metrics["routing_uses_eval_domain_statistics"] = float(
+            first.get(
+                "routing_uses_eval_domain_statistics",
+                method_protocol.routing_uses_eval_domain_statistics,
+            )
+        )
+        for key in [
+            "decision_policy_version",
+            "residual_policy_version",
+            "threshold_selection_policy",
+            "feature_set",
+            "residual_variant",
+            "selected_tau",
+            "adoption_selected_method",
+        ]:
+            vals_for_key = sorted(set(str(r.get(key, "")) for r in vals if str(r.get(key, "")) != ""))
+            if vals_for_key:
+                metrics[key] = vals_for_key[0] if len(vals_for_key) == 1 else "|".join(vals_for_key)
+        if any("selected_by_inner_validation" in r for r in vals):
+            metrics["selected_by_inner_validation"] = float(
+                max(int(float(r.get("selected_by_inner_validation", 0) or 0)) for r in vals)
+            )
         out[method] = metrics
     return out
 
@@ -309,6 +349,14 @@ def _domain_breakdown_rows(sample_rows: Sequence[Dict[str, Any]]) -> List[Dict[s
                 "method_role": str(base.get("method_role", "")),
                 "adoption_eligible": int(base.get("adoption_eligible", 0)),
                 "diagnostic_only": int(base.get("diagnostic_only", 0)),
+                "decision_policy_version": str(base.get("decision_policy_version", "")),
+                "residual_policy_version": str(base.get("residual_policy_version", "")),
+                "threshold_selection_policy": str(base.get("threshold_selection_policy", "")),
+                "feature_set": str(base.get("feature_set", "")),
+                "residual_variant": str(base.get("residual_variant", "")),
+                "selected_tau": str(base.get("selected_tau", "")),
+                "selected_by_inner_validation": int(base.get("selected_by_inner_validation", 0) or 0),
+                "adoption_selected_method": str(base.get("adoption_selected_method", "")),
                 "n_samples": int(len(rows)),
                 "top1_oracle_hit": _finite_mean([float(r["top1_oracle_hit"]) for r in rows]),
                 "mean_rank": _finite_mean([float(r["selected_rank"]) for r in rows]),

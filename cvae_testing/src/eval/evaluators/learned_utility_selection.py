@@ -84,6 +84,8 @@ def _selection_metrics(
     global_true_nelbo_matrix: np.ndarray,
     global_expert_domains: Sequence[int],
     tie_policy: str = "stable_expert_index",
+    selected_idx_override: np.ndarray | None = None,
+    ranking_score_matrix: np.ndarray | None = None,
 ) -> Tuple[Dict[str, float], List[Dict[str, Any]]]:
     if str(tie_policy).strip().lower() != "stable_expert_index":
         raise ValueError("Only tie_policy='stable_expert_index' is currently supported")
@@ -101,7 +103,20 @@ def _selection_metrics(
     method_protocol = _method_protocol(method)
     _assert_method_eligibility(method, method_protocol)
 
-    selected_idx = _stable_argmin_indices(score_matrix)
+    selected_idx = (
+        np.asarray(selected_idx_override, dtype=np.int64)
+        if selected_idx_override is not None
+        else _stable_argmin_indices(score_matrix)
+    )
+    if selected_idx.shape != (score_matrix.shape[0],):
+        raise ProtocolError(
+            f"selected_idx_override shape mismatch for {method}: {selected_idx.shape} vs {(score_matrix.shape[0],)}"
+        )
+    rank_score = score_matrix if ranking_score_matrix is None else np.asarray(ranking_score_matrix, dtype=np.float64)
+    if rank_score.shape != score_matrix.shape:
+        raise ProtocolError(
+            f"ranking_score_matrix shape mismatch for {method}: {rank_score.shape} vs {score_matrix.shape}"
+        )
     oracle_idx = _stable_argmin_indices(true_nelbo_matrix)
     global_oracle_idx = _stable_argmin_indices(global_true_nelbo_matrix)
 
@@ -122,12 +137,12 @@ def _selection_metrics(
     for i in range(score_matrix.shape[0]):
         if rank_metrics_valid:
             pair_auc_vals.append(
-                float(_pairwise_auc_single(score_matrix[i, :], true_nelbo_matrix[i, :]))
+                float(_pairwise_auc_single(rank_score[i, :], true_nelbo_matrix[i, :]))
             )
             rho_vals.append(
                 float(
                     spearman_corr(
-                        (-score_matrix[i, :]).tolist(),
+                        (-rank_score[i, :]).tolist(),
                         (-true_nelbo_matrix[i, :]).tolist(),
                     )
                 )
