@@ -388,7 +388,6 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
             conditioning_cfg=cfg.get("model", {}).get("conditioning", {}),
             configured_domains=cfg.get("data", {}).get("magnifications", []),
             metadata_constraint_cfg=cfg.get("model", {}).get("metadata_constraint", {}),
-            data_cfg=cfg.get("data", {}),
         )
         progress.advance("domain experts trained for utility scoring")
 
@@ -405,6 +404,7 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
             conditioning_cfg=cfg.get("model", {}).get("conditioning", {}),
             configured_domains=cfg.get("data", {}).get("magnifications", []),
             metadata_constraint_cfg=cfg.get("model", {}).get("metadata_constraint", {}),
+            data_cfg=cfg.get("data", {}),
         )
         with (run_ctx.reports_dir / "learned_utility_results.json").open("w", encoding="utf-8") as f:
             json.dump(results, f, indent=2)
