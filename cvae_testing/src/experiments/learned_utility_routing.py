@@ -198,6 +198,29 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
                 "source_leave_pseudo_domain_out_diagnostic": bool(
                     support_response_cfg.get("source_leave_pseudo_domain_out_diagnostic", True)
                 ),
+                "support_utility": {
+                    "enabled": bool((support_response_cfg.get("support_utility", {}) or {}).get("enabled", False)),
+                    "alpha_grid": [
+                        float(v)
+                        for v in (support_response_cfg.get("support_utility", {}) or {}).get(
+                            "alpha_grid",
+                            [0.0, 0.5, 1.0, 1.5, 2.0],
+                        )
+                    ],
+                    "alpha_selection_policy": str(
+                        (support_response_cfg.get("support_utility", {}) or {}).get(
+                            "alpha_selection_policy",
+                            "source_inner_gap_min_with_non_regression",
+                        )
+                    ),
+                    "require_unlabeled_support": bool(
+                        (support_response_cfg.get("support_utility", {}) or {}).get(
+                            "require_unlabeled_support",
+                            True,
+                        )
+                    ),
+                    "support_labels_used_for_routing": 0,
+                },
                 "scaler_fit_scope": "source_training_pairs_only",
                 "ranker_model_selection_scope": "source_only_fixed_config",
                 "score_direction": "predicted_mean_nelbo_lower_is_better",

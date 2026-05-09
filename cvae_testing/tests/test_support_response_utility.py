@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 
 import numpy as np
+import pytest
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -13,8 +14,10 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.eval.evaluators.support_response_routing import (
+    ProtocolError,
     RiskConstrainedResponseConfig,
     SupportResponseConfig,
+    SupportUtilityConfig,
     audit_support_response_features,
     evaluate_support_response_routing_from_arrays,
 )
@@ -95,6 +98,30 @@ def _risk_support_cfg() -> SupportResponseConfig:
     )
 
 
+def _support_utility_cfg(*, sampling_policies: tuple[str, ...] = ("random",)) -> SupportResponseConfig:
+    cfg = _support_cfg()
+    return SupportResponseConfig(
+        enabled=cfg.enabled,
+        support_sizes=cfg.support_sizes,
+        support_seeds=cfg.support_seeds,
+        sampling_policies=sampling_policies,
+        feature_regimes=cfg.feature_regimes,
+        primary_feature_regime=cfg.primary_feature_regime,
+        ranker=cfg.ranker,
+        ridge_l2=cfg.ridge_l2,
+        num_response_repeats=cfg.num_response_repeats,
+        tie_policy=cfg.tie_policy,
+        domain_level_aggregation=cfg.domain_level_aggregation,
+        source_leave_pseudo_domain_out_diagnostic=cfg.source_leave_pseudo_domain_out_diagnostic,
+        support_utility=SupportUtilityConfig(
+            enabled=True,
+            alpha_grid=(0.0, 0.5, 1.0),
+            alpha_selection_policy="source_inner_gap_min_with_non_regression",
+            require_unlabeled_support=True,
+        ),
+    )
+
+
 def _run(tmp_path: Path) -> dict:
     embeddings, metadata, nelbo, expert_domains = _fixture()
     domain_by_index = {idx: int(row["magnification"]) for idx, row in enumerate(metadata)}
@@ -153,6 +180,39 @@ def _run_risk(tmp_path: Path) -> dict:
         strategy="categorical_exact",
         tau=1.0,
         support_cfg=_risk_support_cfg(),
+        reports_dir=tmp_path,
+        response_feature_fn=response_feature_fn,
+        data_cfg={
+            "dataset_domain_semantics": "camelyon17_center",
+            "legacy_domain_field_alias": "magnification",
+        },
+    )
+
+
+def _run_support_utility(tmp_path: Path, *, sampling_policies: tuple[str, ...] = ("random",)) -> dict:
+    embeddings, metadata, nelbo, expert_domains = _fixture()
+    domain_by_index = {idx: int(row["magnification"]) for idx, row in enumerate(metadata)}
+    preferred = {0: 2, 1: 3, 2: 4, 3: 0, 4: 1}
+
+    def response_feature_fn(support_indices, expert_domain: int, split_id: str):
+        assert support_indices
+        query_domain = domain_by_index[int(support_indices[0])]
+        rank = (int(expert_domain) - int(preferred[query_domain])) % len(expert_domains)
+        return {
+            "response_posterior_mu_mean": float(rank),
+            "response_decode_repeat_variance_mean": float(rank) / 10.0,
+        }
+
+    return evaluate_support_response_routing_from_arrays(
+        embeddings=embeddings,
+        metadata=metadata,
+        nelbo_matrix=nelbo,
+        expert_domains=expert_domains,
+        seed=11,
+        dataset_name="camelyon17",
+        strategy="categorical_exact",
+        tau=1.0,
+        support_cfg=_support_utility_cfg(sampling_policies=sampling_policies),
         reports_dir=tmp_path,
         response_feature_fn=response_feature_fn,
         data_cfg={
@@ -282,6 +342,53 @@ def test_risk_constrained_response_writes_frozen_threshold_and_audits(tmp_path: 
     expert4_rows = _read_csv(tmp_path / "risk_constrained_expert4_audit.csv")
     assert len(override_rows) == len(risk_rows)
     assert len(expert4_rows) == len(risk_rows)
+
+
+def test_support_utility_conservative_writes_alpha_and_unlabeled_protocol_fields(tmp_path: Path) -> None:
+    results = _run_support_utility(tmp_path)
+
+    assert "support_set_nelbo_top1" in results["metrics_by_method"]
+    assert "support_set_nelbo_conservative" in results["metrics_by_method"]
+    conservative_metrics = results["metrics_by_method"]["support_set_nelbo_conservative"]
+    assert conservative_metrics["adoption_eligible"] == 1.0
+    assert conservative_metrics["routing_uses_eval_nelbo"] == 0.0
+    assert "high_regret_selection_rate" in conservative_metrics
+    assert results["protocol_lock"]["support_estimated_utility"]["alpha_grid"] == [0.0, 0.5, 1.0]
+    assert (
+        results["protocol_lock"]["support_estimated_utility"]["alpha_selection_policy"]
+        == "source_inner_gap_min_with_non_regression"
+    )
+
+    hyper_rows = _read_csv(tmp_path / "support_utility_selected_hyperparams.csv")
+    assert len(hyper_rows) == 5
+    for row in hyper_rows:
+        assert row["method"] == "support_set_nelbo_conservative"
+        assert json.loads(row["alpha_grid"]) == [0.0, 0.5, 1.0]
+        assert row["alpha_selection_policy"] == "source_inner_gap_min_with_non_regression"
+        assert row["selection_source"] == "source_inner_only"
+        assert row["selected_before_target_eval_scoring"] == "1"
+        assert int(row["n_aggregation_units"]) > 0
+        assert abs(float(row["top1_tolerance_abs"]) - (1.0 / int(row["n_aggregation_units"]))) < 1e-12
+
+    sample_rows = [
+        row
+        for row in _read_csv(tmp_path / "support_response_sample_selections.csv")
+        if row["method"] == "support_set_nelbo_conservative"
+    ]
+    assert len(sample_rows) == 5
+    for row in sample_rows:
+        assert row["support_labels_used_for_routing"] == "0"
+        assert int(row["support_n"]) == 2
+        assert float(row["stderr_support_nelbo"]) >= 0.0
+        assert "conservative_support_score" in row
+        assert row["bottom_half_selection"] in {"0", "1"}
+        assert row["high_regret_selection"] in {"0", "1"}
+        assert row["catastrophic_mistake"] in {"0", "1"}
+
+
+def test_support_utility_blocks_label_dependent_support_sampling(tmp_path: Path) -> None:
+    with pytest.raises(ProtocolError, match="requires unlabeled support routing"):
+        _run_support_utility(tmp_path, sampling_policies=("class_balanced",))
 
 
 def test_source_global_prior_excludes_target_and_self_utility(tmp_path: Path) -> None:
