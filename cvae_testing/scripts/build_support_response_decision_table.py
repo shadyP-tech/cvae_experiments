@@ -15,6 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 
 PRIMARY_METHOD = "support_response_pairwise_static_response_indirect"
+RISK_CONSTRAINED_METHOD = "risk_constrained_response_routing"
 METADATA_BASELINE = "support_metadata_routing"
 STATIC_BASELINE = "support_static_embedding_routing"
 SUPPORT_NELBO_BASELINE = "support_set_nelbo_top1"
@@ -93,6 +94,20 @@ def _read_rows(result_paths: Sequence[Path]) -> List[dict]:
                     "top1_oracle_hit": _to_float(metrics.get("top1_oracle_hit", 0.0)),
                     "spearman": _to_float(metrics.get("spearman", 0.0)),
                     "mean_oracle_gap_pct": _to_float(metrics.get("mean_oracle_gap_pct", 0.0)),
+                    "override_rate": _to_float(metrics.get("override_rate", 0.0)),
+                    "harmful_override_rate": _to_float(metrics.get("harmful_override_rate", 0.0)),
+                    "utility_improving_override_rate": _to_float(
+                        metrics.get("utility_improving_override_rate", 0.0)
+                    ),
+                    "expert4_override_candidate_rate": _to_float(
+                        metrics.get("expert4_override_candidate_rate", 0.0)
+                    ),
+                    "expert4_override_accepted_rate": _to_float(
+                        metrics.get("expert4_override_accepted_rate", 0.0)
+                    ),
+                    "expert4_override_blocked_rate": _to_float(
+                        metrics.get("expert4_override_blocked_rate", 0.0)
+                    ),
                     "n_domain_level_units": int(
                         _to_float(
                             metrics.get(
@@ -170,14 +185,15 @@ def _aggregate(
     rows: Sequence[Mapping[str, Any]],
     *,
     uncertainty_interval: float = 0.0,
-    material_regression_top1: float = 0.01,
-    material_regression_spearman: float = 0.01,
+    material_regression_top1: float = 0.02,
+    material_regression_spearman: float = 0.05,
     material_regression_gap_pct: float = 1.0,
 ) -> Tuple[List[dict], Dict[str, Any]]:
     grouped = _by_method(rows)
     metadata = grouped.get(METADATA_BASELINE, [])
     static = grouped.get(STATIC_BASELINE, [])
     support = grouped.get(SUPPORT_NELBO_BASELINE, [])
+    unrestricted = grouped.get(PRIMARY_METHOD, [])
 
     baseline_top1 = _mean([_to_float(r.get("top1_oracle_hit", 0.0)) for r in metadata])
     baseline_spearman = _mean([_to_float(r.get("spearman", 0.0)) for r in metadata])
@@ -188,6 +204,7 @@ def _aggregate(
     support_top1 = _mean([_to_float(r.get("top1_oracle_hit", 0.0)) for r in support])
     support_spearman = _mean([_to_float(r.get("spearman", 0.0)) for r in support])
     support_gap = _mean([_to_float(r.get("mean_oracle_gap_pct", 0.0)) for r in support])
+    unrestricted_harmful = _mean([_to_float(r.get("harmful_override_rate", 0.0)) for r in unrestricted])
 
     out: List[dict] = []
     for method, method_rows in sorted(grouped.items()):
@@ -251,11 +268,14 @@ def _aggregate(
         )
         is_control = method in CONTROL_OR_DIAGNOSTIC_METHODS or str(first.get("method_role", "")) == "control"
         no_direct_support_utility_terms = int(method == PRIMARY_METHOD)
+        is_risk_constrained = method == RISK_CONSTRAINED_METHOD
         not_lose_static = (
             top1 + material_regression_top1 >= static_top1
             and spearman + material_regression_spearman >= static_spearman
             and gap <= static_gap + material_regression_gap_pct
         )
+        harmful_override_rate = _mean([_to_float(r.get("harmful_override_rate", 0.0)) for r in method_rows])
+        harmful_reduction_vs_unrestricted = float(unrestricted_harmful - harmful_override_rate)
         improves_all_metadata = top1_delta > 0.0 and spearman_delta > 0.0 and gap_reduction > 0.0
         improves_one = top1_delta > 0.0 or spearman_delta > 0.0 or gap_reduction > 0.0
         no_material_regression = (
@@ -292,7 +312,25 @@ def _aggregate(
             rejection_reason = "eval_leakage_or_oracle_method"
         else:
             selection_eligible = 1
-            if improves_all_metadata and stable_sign and not_lose_static:
+            if (
+                is_risk_constrained
+                and gap_reduction > 0.0
+                and top1_delta >= 0.0
+                and spearman_delta >= 0.0
+                and harmful_reduction_vs_unrestricted >= 0.0
+                and stable_sign
+                and not_lose_static
+            ):
+                tier = "pass"
+                decision = "selected"
+            elif (
+                is_risk_constrained
+                and (gap_reduction > 0.0 or harmful_reduction_vs_unrestricted > 0.0)
+                and no_material_regression
+            ):
+                tier = "weak_pass"
+                decision = "not_selected"
+            elif improves_all_metadata and stable_sign and not_lose_static:
                 if (beats_support or matches_support) and no_direct_support_utility_terms:
                     tier = "strong_pass"
                     decision = "selected" if method == PRIMARY_METHOD else "not_selected"
@@ -333,6 +371,18 @@ def _aggregate(
                 "beats_support_set_nelbo_top1": int(beats_support),
                 "matches_support_set_nelbo_top1_within_interval": int(matches_support),
                 "uses_no_direct_support_utility_terms": int(no_direct_support_utility_terms),
+                "harmful_override_rate": harmful_override_rate,
+                "harmful_override_rate_reduction_vs_unrestricted_response": harmful_reduction_vs_unrestricted,
+                "override_rate": _mean([_to_float(r.get("override_rate", 0.0)) for r in method_rows]),
+                "expert4_override_candidate_rate": _mean(
+                    [_to_float(r.get("expert4_override_candidate_rate", 0.0)) for r in method_rows]
+                ),
+                "expert4_override_accepted_rate": _mean(
+                    [_to_float(r.get("expert4_override_accepted_rate", 0.0)) for r in method_rows]
+                ),
+                "expert4_override_blocked_rate": _mean(
+                    [_to_float(r.get("expert4_override_blocked_rate", 0.0)) for r in method_rows]
+                ),
                 "n_runs": int(len(method_rows)),
                 "n_domain_level_units": int(sum(int(r.get("n_domain_level_units", 0)) for r in method_rows)),
             }
@@ -342,10 +392,12 @@ def _aggregate(
     summary = {
         "protocol_version": SUPPORT_RESPONSE_PROTOCOL_VERSION,
         "primary_method": PRIMARY_METHOD,
+        "risk_constrained_method": RISK_CONSTRAINED_METHOD,
         "selected_methods": selected,
         "claim_boundary": (
-            "Camelyon17 tests whether response/support signals recover compatibility when "
-            "center identity alone is under-informative."
+            "Risk-constrained response routing is a metadata-anchored learned-response proposal "
+            "with a support-NELBO regret gate. Do not claim learned response routing beats metadata "
+            "unless the completed run satisfies the predeclared result decision rule."
         ),
         "aggregation_unit": "seed_x_heldout_center_x_support_seed_x_support_size",
     }

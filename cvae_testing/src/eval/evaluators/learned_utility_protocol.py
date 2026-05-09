@@ -160,6 +160,13 @@ def _method_protocol(method: str) -> MethodProtocol:
             diagnostic_only=0,
             routing_uses_query_features=1,
         )
+    if name == "risk_constrained_response_routing":
+        return MethodProtocol(
+            method_role="learned",
+            adoption_eligible=1,
+            diagnostic_only=0,
+            routing_uses_query_features=1,
+        )
     if name == "expert_id_only_pairwise" or name.startswith("support_response_pairwise_response_indirect_shuffled"):
         return MethodProtocol(
             method_role="control",
@@ -369,6 +376,10 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
             "feature_set",
             "residual_variant",
             "selected_tau",
+            "tau_margin",
+            "tau_regret",
+            "selection_source",
+            "policy_name",
             "adoption_selected_method",
             "harmful_override_max",
             "allow_calibrated_adoption",
@@ -412,6 +423,10 @@ def _domain_breakdown_rows(sample_rows: Sequence[Dict[str, Any]]) -> List[Dict[s
                 "feature_set": str(base.get("feature_set", "")),
                 "residual_variant": str(base.get("residual_variant", "")),
                 "selected_tau": str(base.get("selected_tau", "")),
+                "tau_margin": str(base.get("tau_margin", "")),
+                "tau_regret": str(base.get("tau_regret", "")),
+                "selection_source": str(base.get("selection_source", "")),
+                "policy_name": str(base.get("policy_name", "")),
                 "selected_by_inner_validation": int(base.get("selected_by_inner_validation", 0) or 0),
                 "adoption_selected_method": str(base.get("adoption_selected_method", "")),
                 "harmful_override_max": str(base.get("harmful_override_max", "")),

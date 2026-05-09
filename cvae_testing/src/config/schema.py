@@ -37,7 +37,10 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         )
     experiment_name = str((experiment_cfg or {}).get("name", "")).strip().lower()
     is_response_routing_protocol = experiment_name == "learned_utility_response_routing_v1"
-    is_support_response_routing_protocol = experiment_name == "learned_utility_support_response_routing_v1"
+    is_support_response_routing_protocol = experiment_name in {
+        "learned_utility_support_response_routing_v1",
+        "learned_utility_response_routing_risk_constrained_v1",
+    }
     is_learned_utility_v2 = experiment_name in {
         "learned_utility_routing_v2",
         "learned_utility_routing_safe_v2",
@@ -723,6 +726,52 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                 support_response_cfg.get("source_leave_pseudo_domain_out_diagnostic", True),
                 "learned_utility.support_response_routing.source_leave_pseudo_domain_out_diagnostic",
             )
+            risk_cfg = support_response_cfg.get("risk_constrained_response_routing", {})
+            if risk_cfg is not None and not isinstance(risk_cfg, dict):
+                raise ValueError(
+                    "learned_utility.support_response_routing.risk_constrained_response_routing "
+                    "must be a dictionary when provided"
+                )
+            risk_cfg = risk_cfg or {}
+            _ensure_bool(
+                risk_cfg.get("enabled", False),
+                "learned_utility.support_response_routing.risk_constrained_response_routing.enabled",
+            )
+            if bool(risk_cfg.get("enabled", False)):
+                margin_thresholds = risk_cfg.get("margin_thresholds", [0.0, 0.25, 0.5, 1.0, 1.5])
+                if not isinstance(margin_thresholds, list) or not margin_thresholds:
+                    raise ValueError(
+                        "learned_utility.support_response_routing.risk_constrained_response_routing."
+                        "margin_thresholds must be a non-empty list"
+                    )
+                for value in margin_thresholds:
+                    if float(value) < 0.0:
+                        raise ValueError(
+                            "learned_utility.support_response_routing.risk_constrained_response_routing."
+                            "margin_thresholds must be >= 0"
+                        )
+                regret_thresholds = risk_cfg.get("support_regret_thresholds", [0.0, 2.5, 5.0, 10.0])
+                if not isinstance(regret_thresholds, list) or not regret_thresholds:
+                    raise ValueError(
+                        "learned_utility.support_response_routing.risk_constrained_response_routing."
+                        "support_regret_thresholds must be a non-empty list"
+                    )
+                for value in regret_thresholds:
+                    if float(value) < 0.0:
+                        raise ValueError(
+                            "learned_utility.support_response_routing.risk_constrained_response_routing."
+                            "support_regret_thresholds must be >= 0"
+                        )
+                if float(risk_cfg.get("top1_tolerance", 0.02)) < 0.0:
+                    raise ValueError(
+                        "learned_utility.support_response_routing.risk_constrained_response_routing."
+                        "top1_tolerance must be >= 0"
+                    )
+                if float(risk_cfg.get("spearman_tolerance", 0.05)) < 0.0:
+                    raise ValueError(
+                        "learned_utility.support_response_routing.risk_constrained_response_routing."
+                        "spearman_tolerance must be >= 0"
+                    )
 
         scoring_cfg = learned_cfg.get("scoring", {})
         if scoring_cfg is not None and not isinstance(scoring_cfg, dict):

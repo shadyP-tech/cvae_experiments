@@ -13,6 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.eval.evaluators.support_response_routing import (
+    RiskConstrainedResponseConfig,
     SupportResponseConfig,
     audit_support_response_features,
     evaluate_support_response_routing_from_arrays,
@@ -67,6 +68,33 @@ def _support_cfg() -> SupportResponseConfig:
     )
 
 
+def _risk_support_cfg() -> SupportResponseConfig:
+    cfg = _support_cfg()
+    return SupportResponseConfig(
+        enabled=cfg.enabled,
+        support_sizes=cfg.support_sizes,
+        support_seeds=cfg.support_seeds,
+        sampling_policies=cfg.sampling_policies,
+        feature_regimes=cfg.feature_regimes,
+        primary_feature_regime=cfg.primary_feature_regime,
+        ranker=cfg.ranker,
+        ridge_l2=cfg.ridge_l2,
+        num_response_repeats=cfg.num_response_repeats,
+        tie_policy=cfg.tie_policy,
+        domain_level_aggregation=cfg.domain_level_aggregation,
+        source_leave_pseudo_domain_out_diagnostic=cfg.source_leave_pseudo_domain_out_diagnostic,
+        risk_constrained=RiskConstrainedResponseConfig(
+            enabled=True,
+            margin_thresholds=(0.0, 0.25),
+            support_regret_thresholds=(0.0, 10.0),
+            top1_tolerance=0.02,
+            spearman_tolerance=0.05,
+            focus_query_domain=3,
+            focus_expert=4,
+        ),
+    )
+
+
 def _run(tmp_path: Path) -> dict:
     embeddings, metadata, nelbo, expert_domains = _fixture()
     domain_by_index = {idx: int(row["magnification"]) for idx, row in enumerate(metadata)}
@@ -92,6 +120,39 @@ def _run(tmp_path: Path) -> dict:
         strategy="categorical_exact",
         tau=1.0,
         support_cfg=_support_cfg(),
+        reports_dir=tmp_path,
+        response_feature_fn=response_feature_fn,
+        data_cfg={
+            "dataset_domain_semantics": "camelyon17_center",
+            "legacy_domain_field_alias": "magnification",
+        },
+    )
+
+
+def _run_risk(tmp_path: Path) -> dict:
+    embeddings, metadata, nelbo, expert_domains = _fixture()
+    domain_by_index = {idx: int(row["magnification"]) for idx, row in enumerate(metadata)}
+    preferred = {0: 2, 1: 3, 2: 4, 3: 0, 4: 1}
+
+    def response_feature_fn(support_indices, expert_domain: int, split_id: str):
+        assert support_indices
+        query_domain = domain_by_index[int(support_indices[0])]
+        rank = (int(expert_domain) - int(preferred[query_domain])) % len(expert_domains)
+        return {
+            "response_posterior_mu_mean": float(rank),
+            "response_decode_repeat_variance_mean": float(rank) / 10.0,
+        }
+
+    return evaluate_support_response_routing_from_arrays(
+        embeddings=embeddings,
+        metadata=metadata,
+        nelbo_matrix=nelbo,
+        expert_domains=expert_domains,
+        seed=11,
+        dataset_name="camelyon17",
+        strategy="categorical_exact",
+        tau=1.0,
+        support_cfg=_risk_support_cfg(),
         reports_dir=tmp_path,
         response_feature_fn=response_feature_fn,
         data_cfg={
@@ -188,6 +249,39 @@ def test_support_response_artifacts_encode_protocol_controls_and_score_direction
         assert artifact_rows
         assert {row["dataset_domain_semantics"] for row in artifact_rows} == {"camelyon17_center"}
         assert {row["storage_field"] for row in artifact_rows} == {"magnification"}
+
+
+def test_risk_constrained_response_writes_frozen_threshold_and_audits(tmp_path: Path) -> None:
+    results = _run_risk(tmp_path)
+
+    assert "risk_constrained_response_routing" in results["metrics_by_method"]
+    risk_metrics = results["metrics_by_method"]["risk_constrained_response_routing"]
+    assert risk_metrics["method_role"] == "learned"
+    assert risk_metrics["adoption_eligible"] == 1.0
+    assert risk_metrics["routing_uses_eval_nelbo"] == 0.0
+
+    threshold_rows = _read_csv(tmp_path / "risk_constrained_selected_thresholds.csv")
+    assert len(threshold_rows) == 5
+    for row in threshold_rows:
+        assert row["selection_source"] == "source_inner_only"
+        assert row["created_before_target_eval_scoring"] == "1"
+        assert int(row["num_source_inner_units"]) > 0
+        assert row["method"] == "risk_constrained_response_routing"
+
+    risk_rows = _read_csv(tmp_path / "risk_constrained_sample_selections.csv")
+    assert len(risk_rows) == 5
+    for row in risk_rows:
+        candidates = {int(v) for v in row["candidate_experts"].split("|") if v}
+        assert int(row["selected_expert"]) in candidates
+        assert int(row["fold_query_domain"]) not in candidates
+        assert row["policy_name"] == "metadata_anchored_response_routing_with_support_regret_gate"
+        assert row["threshold_selection_policy"] == "source_inner_only"
+        assert row["risk_gate_source"] == "support_nelbo_regret_vs_metadata_anchor"
+
+    override_rows = _read_csv(tmp_path / "risk_constrained_override_audit.csv")
+    expert4_rows = _read_csv(tmp_path / "risk_constrained_expert4_audit.csv")
+    assert len(override_rows) == len(risk_rows)
+    assert len(expert4_rows) == len(risk_rows)
 
 
 def test_source_global_prior_excludes_target_and_self_utility(tmp_path: Path) -> None:

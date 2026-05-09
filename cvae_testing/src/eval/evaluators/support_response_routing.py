@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import csv
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Sequence, Tuple
@@ -27,6 +27,8 @@ from src.routing.strategies import compute_similarity
 
 SUPPORT_RESPONSE_PROTOCOL_VERSION = "support_response_candidate_specific_v1"
 SUPPORT_RESPONSE_AGGREGATION_SOURCE = "support_response_sample_selections.csv"
+RISK_CONSTRAINED_METHOD = "risk_constrained_response_routing"
+RISK_CONSTRAINED_POLICY_NAME = "metadata_anchored_response_routing_with_support_regret_gate"
 PRIVACY_PROVENANCE_FIELDS: Dict[str, object] = {
     "target_support_data_location": "target_local",
     "raw_target_images_exported": False,
@@ -61,6 +63,17 @@ DIRECT_UTILITY_BLOCK_TERMS = [
 
 
 @dataclass(frozen=True)
+class RiskConstrainedResponseConfig:
+    enabled: bool
+    margin_thresholds: Tuple[float, ...]
+    support_regret_thresholds: Tuple[float, ...]
+    top1_tolerance: float
+    spearman_tolerance: float
+    focus_query_domain: int
+    focus_expert: int
+
+
+@dataclass(frozen=True)
 class SupportResponseConfig:
     enabled: bool
     support_sizes: Tuple[int, ...]
@@ -75,6 +88,42 @@ class SupportResponseConfig:
     domain_level_aggregation: bool
     source_leave_pseudo_domain_out_diagnostic: bool
     include_residual_shape_features: bool = False
+    risk_constrained: RiskConstrainedResponseConfig = field(
+        default_factory=lambda: RiskConstrainedResponseConfig(
+            enabled=False,
+            margin_thresholds=(0.0, 0.25, 0.5, 1.0, 1.5),
+            support_regret_thresholds=(0.0, 2.5, 5.0, 10.0),
+            top1_tolerance=0.02,
+            spearman_tolerance=0.05,
+            focus_query_domain=3,
+            focus_expert=4,
+        )
+    )
+
+
+@dataclass(frozen=True)
+class _RiskThresholdSelection:
+    tau_margin: float
+    tau_regret: float
+    num_source_inner_units: int
+    source_inner_top1: float
+    source_inner_spearman: float
+    source_inner_gap_pct: float
+    source_inner_harmful_override_rate: float
+    fallback_used: bool
+
+
+@dataclass(frozen=True)
+class _RiskPolicyDecision:
+    selected_expert: int
+    metadata_anchor_expert: int
+    response_proposal_expert: int
+    confidence_margin: float
+    support_regret_pct_vs_anchor: float
+    override_candidate: int
+    accepted_override: int
+    true_harmful_override: int
+    true_improving_override: int
 
 
 @dataclass(frozen=True)
@@ -183,6 +232,24 @@ def parse_support_response_config(learned_cfg: Mapping[str, Any]) -> SupportResp
     if not isinstance(raw, Mapping):
         raise ValueError("learned_utility.support_response_routing must be a dictionary")
     enabled = bool(raw.get("enabled", False))
+    risk_raw = raw.get("risk_constrained_response_routing", {})
+    if risk_raw is None:
+        risk_raw = {}
+    if not isinstance(risk_raw, Mapping):
+        raise ValueError(
+            "learned_utility.support_response_routing.risk_constrained_response_routing must be a dictionary"
+        )
+    risk_cfg = RiskConstrainedResponseConfig(
+        enabled=bool(risk_raw.get("enabled", False)),
+        margin_thresholds=tuple(float(v) for v in risk_raw.get("margin_thresholds", [0.0, 0.25, 0.5, 1.0, 1.5])),
+        support_regret_thresholds=tuple(
+            float(v) for v in risk_raw.get("support_regret_thresholds", [0.0, 2.5, 5.0, 10.0])
+        ),
+        top1_tolerance=float(risk_raw.get("top1_tolerance", 0.02)),
+        spearman_tolerance=float(risk_raw.get("spearman_tolerance", 0.05)),
+        focus_query_domain=int(risk_raw.get("focus_query_domain", 3)),
+        focus_expert=int(risk_raw.get("focus_expert", 4)),
+    )
     return SupportResponseConfig(
         enabled=enabled,
         support_sizes=tuple(int(v) for v in raw.get("support_sizes", [8, 16, 32])),
@@ -202,6 +269,7 @@ def parse_support_response_config(learned_cfg: Mapping[str, Any]) -> SupportResp
             raw.get("source_leave_pseudo_domain_out_diagnostic", True)
         ),
         include_residual_shape_features=bool(raw.get("include_residual_shape_features", False)),
+        risk_constrained=risk_cfg,
     )
 
 
@@ -505,12 +573,23 @@ def _score_method_row(
     sample_index: int,
     run_seed: int,
     privacy_fields: Mapping[str, Any],
+    selected_expert_override: int | None = None,
+    ranking_scores: Sequence[float] | None = None,
+    extra_fields: Mapping[str, Any] | None = None,
 ) -> Dict[str, Any]:
     if str(method) == "support_candidate_oracle":
         method_protocol = _method_protocol("support_candidate_oracle")
     else:
         method_protocol = _method_protocol(method)
-    selected_idx = _stable_argmin(predicted_scores, candidate_experts)
+    if selected_expert_override is None:
+        selected_idx = _stable_argmin(predicted_scores, candidate_experts)
+    else:
+        selected_lookup = {int(expert): idx for idx, expert in enumerate(candidate_experts)}
+        if int(selected_expert_override) not in selected_lookup:
+            raise ProtocolError(
+                f"selected_expert_override={selected_expert_override} is outside candidate experts"
+            )
+        selected_idx = int(selected_lookup[int(selected_expert_override)])
     oracle_idx = _stable_argmin(eval_mean_nelbo, candidate_experts)
     selected_expert = int(candidate_experts[selected_idx])
     oracle_expert = int(candidate_experts[oracle_idx])
@@ -518,12 +597,12 @@ def _score_method_row(
     oracle_nelbo = float(eval_mean_nelbo[oracle_idx])
     gap = float(selected_nelbo - oracle_nelbo)
     gap_pct = float((gap / max(abs(oracle_nelbo), 1e-12)) * 100.0)
-    rank_score = np.asarray(predicted_scores, dtype=np.float64)
+    rank_score = np.asarray(ranking_scores if ranking_scores is not None else predicted_scores, dtype=np.float64)
     true_nelbo = np.asarray(eval_mean_nelbo, dtype=np.float64)
     base = _protocol_row_fields(fold=fold, method_protocol=method_protocol, method=method)
     base["protocol_version"] = SUPPORT_RESPONSE_PROTOCOL_VERSION
     base["aggregation_source"] = SUPPORT_RESPONSE_AGGREGATION_SOURCE
-    return {
+    row = {
         **base,
         **dict(privacy_fields),
         "sample_index": int(sample_index),
@@ -552,6 +631,220 @@ def _score_method_row(
         "eval_nelbo_by_expert_json": _json_mapping(candidate_experts, eval_mean_nelbo),
         "support_nelbo_by_expert_json": _json_mapping(candidate_experts, support_mean_nelbo),
     }
+    if extra_fields:
+        row.update(dict(extra_fields))
+    return row
+
+
+def _risk_policy_decision(
+    *,
+    candidate_experts: Sequence[int],
+    learned_scores: Sequence[float],
+    metadata_scores: Sequence[float],
+    support_mean_nelbo: Sequence[float],
+    eval_mean_nelbo: Sequence[float],
+    tau_margin: float,
+    tau_regret: float,
+) -> _RiskPolicyDecision:
+    learned_arr = np.asarray(learned_scores, dtype=np.float64)
+    metadata_arr = np.asarray(metadata_scores, dtype=np.float64)
+    support_arr = np.asarray(support_mean_nelbo, dtype=np.float64)
+    eval_arr = np.asarray(eval_mean_nelbo, dtype=np.float64)
+    experts = [int(e) for e in candidate_experts]
+
+    metadata_idx = _stable_argmin(metadata_arr, experts)
+    proposal_idx = _stable_argmin(learned_arr, experts)
+    order = sorted(range(len(experts)), key=lambda i: (float(learned_arr[i]), int(experts[i])))
+    confidence_margin = (
+        float(learned_arr[int(order[1])] - learned_arr[int(order[0])])
+        if len(order) >= 2
+        else 0.0
+    )
+    anchor_support = float(support_arr[int(metadata_idx)])
+    proposal_support = float(support_arr[int(proposal_idx)])
+    support_regret = float(
+        ((proposal_support - anchor_support) / max(abs(anchor_support), 1e-12)) * 100.0
+    )
+    override_candidate = int(proposal_idx != metadata_idx)
+    accepted = int(
+        bool(override_candidate)
+        and confidence_margin >= float(tau_margin)
+        and support_regret <= float(tau_regret)
+    )
+    selected_idx = int(proposal_idx if accepted else metadata_idx)
+    selected_eval = float(eval_arr[int(selected_idx)])
+    metadata_eval = float(eval_arr[int(metadata_idx)])
+    return _RiskPolicyDecision(
+        selected_expert=int(experts[int(selected_idx)]),
+        metadata_anchor_expert=int(experts[int(metadata_idx)]),
+        response_proposal_expert=int(experts[int(proposal_idx)]),
+        confidence_margin=float(confidence_margin),
+        support_regret_pct_vs_anchor=float(support_regret),
+        override_candidate=int(override_candidate),
+        accepted_override=int(accepted),
+        true_harmful_override=int(bool(accepted) and selected_eval > metadata_eval + 1e-12),
+        true_improving_override=int(bool(accepted) and selected_eval < metadata_eval - 1e-12),
+    )
+
+
+def _risk_extra_fields(
+    *,
+    decision: _RiskPolicyDecision,
+    tau_margin: float,
+    tau_regret: float,
+    selection: _RiskThresholdSelection,
+    focus_query_domain: int,
+    focus_expert: int,
+    query_domain: int,
+) -> Dict[str, Any]:
+    focus_candidate = int(
+        decision.response_proposal_expert == int(focus_expert)
+        and bool(decision.override_candidate)
+    )
+    return {
+        "policy_name": RISK_CONSTRAINED_POLICY_NAME,
+        "threshold_selection_policy": "source_inner_only",
+        "selection_source": "source_inner_only",
+        "tau_margin": float(tau_margin),
+        "tau_regret": float(tau_regret),
+        "selected_tau": f"margin={float(tau_margin):.6g};regret={float(tau_regret):.6g}",
+        "fallback_used": int(bool(selection.fallback_used)),
+        "created_before_target_eval_scoring": 1,
+        "score_source": "learned_response_scores",
+        "risk_gate_source": "support_nelbo_regret_vs_metadata_anchor",
+        "metadata_anchor_expert": int(decision.metadata_anchor_expert),
+        "response_proposal_expert": int(decision.response_proposal_expert),
+        "confidence_margin": float(decision.confidence_margin),
+        "support_regret_pct_vs_anchor": float(decision.support_regret_pct_vs_anchor),
+        "override_candidate": int(decision.override_candidate),
+        "accepted_override": int(decision.accepted_override),
+        "true_harmful_override": int(decision.true_harmful_override),
+        "true_improving_override": int(decision.true_improving_override),
+        "focus_query_domain": int(focus_query_domain),
+        "focus_expert": int(focus_expert),
+        "focus_query_row": int(int(query_domain) == int(focus_query_domain)),
+        "focus_expert_override_candidate": int(focus_candidate),
+        "focus_expert_override_accepted": int(
+            bool(focus_candidate) and bool(decision.accepted_override)
+        ),
+        "focus_expert_override_blocked": int(
+            bool(focus_candidate) and not bool(decision.accepted_override)
+        ),
+    }
+
+
+def _score_risk_constrained_row(
+    *,
+    fold: FoldCandidateSet,
+    target_domain: int,
+    support_seed: int,
+    support_size: int,
+    sampling_policy: str,
+    support_eval_split_id: str,
+    candidate_experts: Sequence[int],
+    learned_scores: Sequence[float],
+    metadata_scores: Sequence[float],
+    eval_mean_nelbo: Sequence[float],
+    support_mean_nelbo: Sequence[float],
+    sample_index: int,
+    run_seed: int,
+    privacy_fields: Mapping[str, Any],
+    selection: _RiskThresholdSelection,
+    focus_query_domain: int,
+    focus_expert: int,
+) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
+    decision = _risk_policy_decision(
+        candidate_experts=candidate_experts,
+        learned_scores=learned_scores,
+        metadata_scores=metadata_scores,
+        support_mean_nelbo=support_mean_nelbo,
+        eval_mean_nelbo=eval_mean_nelbo,
+        tau_margin=float(selection.tau_margin),
+        tau_regret=float(selection.tau_regret),
+    )
+    extra = _risk_extra_fields(
+        decision=decision,
+        tau_margin=float(selection.tau_margin),
+        tau_regret=float(selection.tau_regret),
+        selection=selection,
+        focus_query_domain=int(focus_query_domain),
+        focus_expert=int(focus_expert),
+        query_domain=int(target_domain),
+    )
+    row = _score_method_row(
+        method=RISK_CONSTRAINED_METHOD,
+        fold=fold,
+        target_domain=int(target_domain),
+        support_seed=int(support_seed),
+        support_size=int(support_size),
+        sampling_policy=str(sampling_policy),
+        support_eval_split_id=str(support_eval_split_id),
+        candidate_experts=candidate_experts,
+        predicted_scores=learned_scores,
+        eval_mean_nelbo=eval_mean_nelbo,
+        support_mean_nelbo=support_mean_nelbo,
+        sample_index=int(sample_index),
+        run_seed=int(run_seed),
+        privacy_fields=privacy_fields,
+        selected_expert_override=int(decision.selected_expert),
+        ranking_scores=learned_scores,
+        extra_fields=extra,
+    )
+    audit = {
+        **dict(privacy_fields),
+        "method": RISK_CONSTRAINED_METHOD,
+        "seed": int(run_seed),
+        "outer_center": int(fold.heldout_domain),
+        "query_domain": int(target_domain),
+        "support_seed": int(support_seed),
+        "support_size_requested": int(support_size),
+        "sampling_policy": str(sampling_policy),
+        "support_eval_split_id": str(support_eval_split_id),
+        "selected_expert": int(decision.selected_expert),
+        **extra,
+    }
+    expert4 = {
+        **audit,
+        "expert4_audit_scope": "focus_expert_from_config",
+    }
+    return row, audit, expert4
+
+
+def _harmful_override_rate(rows: Sequence[Mapping[str, Any]]) -> float:
+    accepted = [r for r in rows if int(float(r.get("accepted_override", 0) or 0)) == 1]
+    if not accepted:
+        return 0.0
+    harmful = sum(int(float(r.get("true_harmful_override", 0) or 0)) for r in accepted)
+    return float(harmful / max(len(accepted), 1))
+
+
+def _fit_predict_support_response(
+    *,
+    train_rows: Sequence[Mapping[str, Any]],
+    target_rows: Sequence[Mapping[str, Any]],
+    regime: str,
+    ridge_l2: float,
+    allow_candidate_identity: bool = False,
+) -> Tuple[np.ndarray, FeatureAuditResult, List[Dict[str, Any]]]:
+    train_audit = audit_support_response_features(
+        train_rows,
+        regime=str(regime),
+        allow_candidate_identity=bool(allow_candidate_identity),
+    )
+    scaler = fit_support_response_scaler(train_audit)
+    x_train = scaler.transform(train_audit.matrix)
+    target_audit = audit_support_response_features(
+        target_rows,
+        regime=str(regime),
+        feature_names=scaler.feature_names,
+        allow_candidate_identity=bool(allow_candidate_identity),
+        drop_zero_variance=False,
+    )
+    x_target = scaler.transform(target_audit.matrix)
+    pairs, pair_rows = build_candidate_specific_pairs(train_rows)
+    ranker = LinearPairwiseRidge(ridge_l2=float(ridge_l2))
+    ranker.fit(x_train, pairs)
+    return ranker.predict(x_target), train_audit, pair_rows
 
 
 def _support_split_manifest_row(
@@ -637,6 +930,389 @@ def _candidate_rows_for_query(
     return rows, np.asarray(support_mean, dtype=np.float64), np.asarray(eval_mean, dtype=np.float64)
 
 
+def _source_inner_units_for_outer(
+    *,
+    outer_target: int,
+    support_cfg: SupportResponseConfig,
+    embeddings: np.ndarray,
+    sample_domains: np.ndarray,
+    labels_by_index: Mapping[int, int],
+    centroids: Mapping[int, np.ndarray],
+    nelbo_matrix: np.ndarray,
+    expert_domains_int: Sequence[int],
+    expert_to_col: Mapping[int, int],
+    strategy: str,
+    tau: float,
+    response_feature_fn: Callable[[Sequence[int], int, str], Mapping[str, float]],
+) -> List[Dict[str, Any]]:
+    units: List[Dict[str, Any]] = []
+    source_domains = sorted(set(int(v) for v in sample_domains.tolist()) - {int(outer_target)})
+    for support_seed in support_cfg.support_seeds:
+        for sampling_policy in support_cfg.sampling_policies:
+            for support_size in support_cfg.support_sizes:
+                source_rows: List[Dict[str, Any]] = []
+                source_split_by_domain: Dict[int, Any] = {}
+                for pseudo_query in source_domains:
+                    pseudo_indices = [
+                        int(i)
+                        for i, d in enumerate(sample_domains.tolist())
+                        if int(d) == int(pseudo_query)
+                    ]
+                    pseudo_split = make_support_eval_split(
+                        target_domain=int(pseudo_query),
+                        target_indices=pseudo_indices,
+                        labels_by_index=labels_by_index,
+                        support_size=int(support_size),
+                        sampling_policy=str(sampling_policy),
+                        support_seed=int(support_seed),
+                    )
+                    source_split_by_domain[int(pseudo_query)] = pseudo_split
+                    if pseudo_split.split_status != "ok":
+                        continue
+                    source_fold = FoldCandidateSet.for_heldout_domain(
+                        heldout_domain=int(outer_target),
+                        expert_domains=expert_domains_int,
+                        excluded_domains=[int(pseudo_query)],
+                    )
+                    rows, _support_mean, _eval_mean = _candidate_rows_for_query(
+                        outer_target_domain=int(outer_target),
+                        query_domain=int(pseudo_query),
+                        candidate_experts=source_fold.candidate_expert_domains,
+                        split=pseudo_split,
+                        embeddings=embeddings,
+                        centroids=centroids,
+                        nelbo_matrix=nelbo_matrix,
+                        expert_domains=expert_domains_int,
+                        expert_to_col=expert_to_col,
+                        strategy=strategy,
+                        tau=float(tau),
+                        response_feature_fn=response_feature_fn,
+                        split_role="source_inner_threshold",
+                    )
+                    source_rows.extend(rows)
+                if not source_rows:
+                    continue
+
+                for validation_domain in sorted(source_split_by_domain):
+                    validation_rows = [
+                        r for r in source_rows if int(r["pseudo_query_domain"]) == int(validation_domain)
+                    ]
+                    inner_rows = [
+                        r for r in source_rows if int(r["pseudo_query_domain"]) != int(validation_domain)
+                    ]
+                    if not validation_rows or not inner_rows:
+                        continue
+                    predicted, _audit, _pairs = _fit_predict_support_response(
+                        train_rows=inner_rows,
+                        target_rows=validation_rows,
+                        regime=support_cfg.primary_feature_regime,
+                        ridge_l2=float(support_cfg.ridge_l2),
+                        allow_candidate_identity=False,
+                    )
+                    validation_split = source_split_by_domain[int(validation_domain)]
+                    units.append(
+                        {
+                            "outer_target": int(outer_target),
+                            "validation_domain": int(validation_domain),
+                            "support_seed": int(support_seed),
+                            "support_size": int(support_size),
+                            "sampling_policy": str(sampling_policy),
+                            "support_eval_split_id": str(validation_split.support_eval_split_id),
+                            "candidate_experts": [int(r["candidate_expert"]) for r in validation_rows],
+                            "metadata_scores": [float(r["metadata_distance"]) for r in validation_rows],
+                            "learned_scores": predicted.astype(np.float64),
+                            "eval_mean_nelbo": [float(r["label_nelbo"]) for r in validation_rows],
+                            "support_mean_nelbo": [float(r["support_mean_nelbo"]) for r in validation_rows],
+                            "fold": FoldCandidateSet.for_heldout_domain(
+                                heldout_domain=int(outer_target),
+                                expert_domains=expert_domains_int,
+                                excluded_domains=[int(validation_domain)],
+                            ),
+                        }
+                    )
+    return units
+
+
+def _score_source_inner_units(
+    *,
+    units: Sequence[Mapping[str, Any]],
+    seed: int,
+    privacy: Mapping[str, Any],
+    selection: _RiskThresholdSelection,
+    risk_cfg: RiskConstrainedResponseConfig,
+    primary_feature_regime: str,
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
+    metadata_rows: List[Dict[str, Any]] = []
+    unrestricted_rows: List[Dict[str, Any]] = []
+    risk_rows: List[Dict[str, Any]] = []
+    for idx, unit in enumerate(units):
+        fold = unit["fold"]
+        candidate_experts = list(unit["candidate_experts"])
+        metadata_scores = list(unit["metadata_scores"])
+        learned_scores = list(unit["learned_scores"])
+        eval_mean = list(unit["eval_mean_nelbo"])
+        support_mean = list(unit["support_mean_nelbo"])
+        metadata_rows.append(
+            _score_method_row(
+                method="support_metadata_routing",
+                fold=fold,
+                target_domain=int(unit["validation_domain"]),
+                support_seed=int(unit["support_seed"]),
+                support_size=int(unit["support_size"]),
+                sampling_policy=str(unit["sampling_policy"]),
+                support_eval_split_id=str(unit["support_eval_split_id"]),
+                candidate_experts=candidate_experts,
+                predicted_scores=metadata_scores,
+                eval_mean_nelbo=eval_mean,
+                support_mean_nelbo=support_mean,
+                sample_index=idx,
+                run_seed=int(seed),
+                privacy_fields=privacy,
+            )
+        )
+        unrestricted_rows.append(
+            _score_method_row(
+                method=f"support_response_pairwise_{primary_feature_regime}",
+                fold=fold,
+                target_domain=int(unit["validation_domain"]),
+                support_seed=int(unit["support_seed"]),
+                support_size=int(unit["support_size"]),
+                sampling_policy=str(unit["sampling_policy"]),
+                support_eval_split_id=str(unit["support_eval_split_id"]),
+                candidate_experts=candidate_experts,
+                predicted_scores=learned_scores,
+                eval_mean_nelbo=eval_mean,
+                support_mean_nelbo=support_mean,
+                sample_index=idx,
+                run_seed=int(seed),
+                privacy_fields=privacy,
+            )
+        )
+        row, _audit, _expert4 = _score_risk_constrained_row(
+            fold=fold,
+            target_domain=int(unit["validation_domain"]),
+            support_seed=int(unit["support_seed"]),
+            support_size=int(unit["support_size"]),
+            sampling_policy=str(unit["sampling_policy"]),
+            support_eval_split_id=str(unit["support_eval_split_id"]),
+            candidate_experts=candidate_experts,
+            learned_scores=learned_scores,
+            metadata_scores=metadata_scores,
+            eval_mean_nelbo=eval_mean,
+            support_mean_nelbo=support_mean,
+            sample_index=idx,
+            run_seed=int(seed),
+            privacy_fields=privacy,
+            selection=selection,
+            focus_query_domain=int(risk_cfg.focus_query_domain),
+            focus_expert=int(risk_cfg.focus_expert),
+        )
+        risk_rows.append(row)
+    return metadata_rows, unrestricted_rows, risk_rows
+
+
+def _select_risk_threshold_for_outer(
+    *,
+    outer_target: int,
+    support_cfg: SupportResponseConfig,
+    embeddings: np.ndarray,
+    sample_domains: np.ndarray,
+    labels_by_index: Mapping[int, int],
+    centroids: Mapping[int, np.ndarray],
+    nelbo_matrix: np.ndarray,
+    expert_domains_int: Sequence[int],
+    expert_to_col: Mapping[int, int],
+    seed: int,
+    strategy: str,
+    tau: float,
+    response_feature_fn: Callable[[Sequence[int], int, str], Mapping[str, float]],
+    privacy: Mapping[str, Any],
+) -> Tuple[_RiskThresholdSelection, Dict[str, Any]]:
+    risk_cfg = support_cfg.risk_constrained
+    units = _source_inner_units_for_outer(
+        outer_target=int(outer_target),
+        support_cfg=support_cfg,
+        embeddings=embeddings,
+        sample_domains=sample_domains,
+        labels_by_index=labels_by_index,
+        centroids=centroids,
+        nelbo_matrix=nelbo_matrix,
+        expert_domains_int=expert_domains_int,
+        expert_to_col=expert_to_col,
+        strategy=strategy,
+        tau=float(tau),
+        response_feature_fn=response_feature_fn,
+    )
+    if not units:
+        selection = _RiskThresholdSelection(
+            tau_margin=float("inf"),
+            tau_regret=0.0,
+            num_source_inner_units=0,
+            source_inner_top1=0.0,
+            source_inner_spearman=0.0,
+            source_inner_gap_pct=0.0,
+            source_inner_harmful_override_rate=0.0,
+            fallback_used=True,
+        )
+        return selection, _selected_threshold_artifact_row(
+            seed=seed,
+            outer_center=int(outer_target),
+            selection=selection,
+            privacy=privacy,
+        )
+
+    fallback = _RiskThresholdSelection(
+        tau_margin=float("inf"),
+        tau_regret=0.0,
+        num_source_inner_units=len(units),
+        source_inner_top1=0.0,
+        source_inner_spearman=0.0,
+        source_inner_gap_pct=0.0,
+        source_inner_harmful_override_rate=0.0,
+        fallback_used=True,
+    )
+    metadata_rows, unrestricted_rows, fallback_rows = _score_source_inner_units(
+        units=units,
+        seed=int(seed),
+        privacy=privacy,
+        selection=fallback,
+        risk_cfg=risk_cfg,
+        primary_feature_regime=str(support_cfg.primary_feature_regime),
+    )
+    metadata_metrics = _aggregate_metrics_from_sample_rows(metadata_rows)["support_metadata_routing"]
+    unrestricted_metrics = _aggregate_metrics_from_sample_rows(unrestricted_rows)[
+        f"support_response_pairwise_{support_cfg.primary_feature_regime}"
+    ]
+    unrestricted_harmful = _harmful_override_rate(
+        [
+            _risk_extra_fields(
+                decision=_risk_policy_decision(
+                    candidate_experts=unit["candidate_experts"],
+                    learned_scores=unit["learned_scores"],
+                    metadata_scores=unit["metadata_scores"],
+                    support_mean_nelbo=unit["support_mean_nelbo"],
+                    eval_mean_nelbo=unit["eval_mean_nelbo"],
+                    tau_margin=float("-inf"),
+                    tau_regret=float("inf"),
+                ),
+                tau_margin=float("-inf"),
+                tau_regret=float("inf"),
+                selection=fallback,
+                focus_query_domain=int(risk_cfg.focus_query_domain),
+                focus_expert=int(risk_cfg.focus_expert),
+                query_domain=int(unit["validation_domain"]),
+            )
+            for unit in units
+        ]
+    )
+
+    candidates: List[Tuple[Tuple[float, float, float, float, float, float, float], _RiskThresholdSelection]] = []
+    for tau_margin in risk_cfg.margin_thresholds:
+        for tau_regret in risk_cfg.support_regret_thresholds:
+            current = _RiskThresholdSelection(
+                tau_margin=float(tau_margin),
+                tau_regret=float(tau_regret),
+                num_source_inner_units=len(units),
+                source_inner_top1=0.0,
+                source_inner_spearman=0.0,
+                source_inner_gap_pct=0.0,
+                source_inner_harmful_override_rate=0.0,
+                fallback_used=False,
+            )
+            _meta, _unrestricted, risk_rows = _score_source_inner_units(
+                units=units,
+                seed=int(seed),
+                privacy=privacy,
+                selection=current,
+                risk_cfg=risk_cfg,
+                primary_feature_regime=str(support_cfg.primary_feature_regime),
+            )
+            risk_metrics = _aggregate_metrics_from_sample_rows(risk_rows)[RISK_CONSTRAINED_METHOD]
+            harmful_rate = _harmful_override_rate(risk_rows)
+            override_rate = float(
+                np.mean([float(r.get("accepted_override", 0.0)) for r in risk_rows])
+            ) if risk_rows else 0.0
+            eligible = (
+                float(risk_metrics["mean_oracle_gap_pct"]) <= float(metadata_metrics["mean_oracle_gap_pct"])
+                and harmful_rate <= float(unrestricted_harmful)
+                and float(risk_metrics["top1_oracle_hit"])
+                >= float(metadata_metrics["top1_oracle_hit"]) - float(risk_cfg.top1_tolerance)
+                and float(risk_metrics["spearman"])
+                >= float(metadata_metrics["spearman"]) - float(risk_cfg.spearman_tolerance)
+            )
+            if not eligible:
+                continue
+            selected = _RiskThresholdSelection(
+                tau_margin=float(tau_margin),
+                tau_regret=float(tau_regret),
+                num_source_inner_units=len(units),
+                source_inner_top1=float(risk_metrics["top1_oracle_hit"]),
+                source_inner_spearman=float(risk_metrics["spearman"]),
+                source_inner_gap_pct=float(risk_metrics["mean_oracle_gap_pct"]),
+                source_inner_harmful_override_rate=float(harmful_rate),
+                fallback_used=False,
+            )
+            score = (
+                float(metadata_metrics["mean_oracle_gap_pct"]) - float(risk_metrics["mean_oracle_gap_pct"]),
+                float(risk_metrics["top1_oracle_hit"]) - float(metadata_metrics["top1_oracle_hit"]),
+                float(risk_metrics["spearman"]) - float(metadata_metrics["spearman"]),
+                -float(harmful_rate),
+                -float(override_rate),
+                float(tau_margin),
+                -float(tau_regret),
+            )
+            candidates.append((score, selected))
+
+    if candidates:
+        selection = sorted(candidates, key=lambda item: item[0], reverse=True)[0][1]
+    else:
+        fallback_metrics = _aggregate_metrics_from_sample_rows(fallback_rows)[RISK_CONSTRAINED_METHOD]
+        selection = _RiskThresholdSelection(
+            tau_margin=float("inf"),
+            tau_regret=0.0,
+            num_source_inner_units=len(units),
+            source_inner_top1=float(fallback_metrics["top1_oracle_hit"]),
+            source_inner_spearman=float(fallback_metrics["spearman"]),
+            source_inner_gap_pct=float(fallback_metrics["mean_oracle_gap_pct"]),
+            source_inner_harmful_override_rate=0.0,
+            fallback_used=True,
+        )
+
+    _ = unrestricted_metrics
+    return selection, _selected_threshold_artifact_row(
+        seed=seed,
+        outer_center=int(outer_target),
+        selection=selection,
+        privacy=privacy,
+    )
+
+
+def _selected_threshold_artifact_row(
+    *,
+    seed: int,
+    outer_center: int,
+    selection: _RiskThresholdSelection,
+    privacy: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        **dict(privacy),
+        "method": RISK_CONSTRAINED_METHOD,
+        "policy_name": RISK_CONSTRAINED_POLICY_NAME,
+        "seed": int(seed),
+        "outer_center": int(outer_center),
+        "tau_margin": "inf" if np.isinf(float(selection.tau_margin)) else float(selection.tau_margin),
+        "tau_regret": "inf" if np.isinf(float(selection.tau_regret)) else float(selection.tau_regret),
+        "selection_source": "source_inner_only",
+        "num_source_inner_units": int(selection.num_source_inner_units),
+        "source_inner_top1": float(selection.source_inner_top1),
+        "source_inner_spearman": float(selection.source_inner_spearman),
+        "source_inner_gap_pct": float(selection.source_inner_gap_pct),
+        "source_inner_harmful_override_rate": float(selection.source_inner_harmful_override_rate),
+        "fallback_used": int(bool(selection.fallback_used)),
+        "created_before_target_eval_scoring": 1,
+    }
+
+
 def evaluate_support_response_routing_from_arrays(
     *,
     embeddings: np.ndarray,
@@ -674,7 +1350,13 @@ def evaluate_support_response_routing_from_arrays(
     pair_rows: List[Dict[str, Any]] = []
     split_rows: List[Dict[str, Any]] = []
     feature_audit_rows: List[Dict[str, Any]] = []
+    risk_threshold_rows: List[Dict[str, Any]] = []
+    risk_override_rows: List[Dict[str, Any]] = []
+    risk_expert4_rows: List[Dict[str, Any]] = []
     sample_index_counter = 0
+
+    if support_cfg.risk_constrained.enabled:
+        reports_dir.mkdir(parents=True, exist_ok=True)
 
     for outer_target in sorted(set(int(v) for v in sample_domains.tolist())):
         target_indices = [int(i) for i, d in enumerate(sample_domains.tolist()) if int(d) == int(outer_target)]
@@ -683,6 +1365,26 @@ def evaluate_support_response_routing_from_arrays(
             expert_domains=expert_domains_int,
         )
         target_candidates = list(target_fold.candidate_expert_domains)
+        risk_selection: _RiskThresholdSelection | None = None
+        if support_cfg.risk_constrained.enabled:
+            risk_selection, threshold_row = _select_risk_threshold_for_outer(
+                outer_target=int(outer_target),
+                support_cfg=support_cfg,
+                embeddings=np.asarray(embeddings, dtype=np.float64),
+                sample_domains=sample_domains,
+                labels_by_index=labels_by_index,
+                centroids=centroids,
+                nelbo_matrix=nelbo_matrix,
+                expert_domains_int=expert_domains_int,
+                expert_to_col=expert_to_col,
+                seed=int(seed),
+                strategy=strategy,
+                tau=float(tau),
+                response_feature_fn=response_feature_fn,
+                privacy=privacy,
+            )
+            risk_threshold_rows.append(threshold_row)
+            _write_csv(reports_dir / "risk_constrained_selected_thresholds.csv", risk_threshold_rows)
 
         for support_seed in support_cfg.support_seeds:
             for sampling_policy in support_cfg.sampling_policies:
@@ -993,6 +1695,35 @@ def evaluate_support_response_routing_from_arrays(
                         )
                         sample_index_counter += 1
 
+                        if (
+                            support_cfg.risk_constrained.enabled
+                            and regime == support_cfg.primary_feature_regime
+                            and risk_selection is not None
+                        ):
+                            risk_row, risk_audit, expert4_audit = _score_risk_constrained_row(
+                                fold=target_fold,
+                                target_domain=int(outer_target),
+                                support_seed=int(support_seed),
+                                support_size=int(support_size),
+                                sampling_policy=str(sampling_policy),
+                                support_eval_split_id=target_split.support_eval_split_id,
+                                candidate_experts=target_candidates,
+                                learned_scores=predicted,
+                                metadata_scores=metadata_scores,
+                                eval_mean_nelbo=target_eval_mean,
+                                support_mean_nelbo=target_support_mean,
+                                sample_index=sample_index_counter,
+                                run_seed=int(seed),
+                                privacy_fields=privacy,
+                                selection=risk_selection,
+                                focus_query_domain=int(support_cfg.risk_constrained.focus_query_domain),
+                                focus_expert=int(support_cfg.risk_constrained.focus_expert),
+                            )
+                            sample_rows.append(risk_row)
+                            risk_override_rows.append(risk_audit)
+                            risk_expert4_rows.append(expert4_audit)
+                            sample_index_counter += 1
+
                         if support_cfg.source_leave_pseudo_domain_out_diagnostic and regime == support_cfg.primary_feature_regime:
                             for validation_domain in sorted(source_split_by_domain):
                                 validation_rows = [
@@ -1058,6 +1789,94 @@ def evaluate_support_response_routing_from_arrays(
                                 sample_index_counter += 1
 
     method_metrics = _aggregate_metrics_from_sample_rows(sample_rows) if sample_rows else {}
+    if support_cfg.risk_constrained.enabled:
+        metadata_by_unit = {
+            (
+                int(row.get("seed", 0)),
+                int(row.get("query_domain", 0)),
+                int(row.get("support_seed", 0)),
+                int(row.get("support_size_requested", 0)),
+                str(row.get("sampling_policy", "")),
+            ): row
+            for row in sample_rows
+            if str(row.get("method", "")) == "support_metadata_routing"
+        }
+        primary_method = f"support_response_pairwise_{support_cfg.primary_feature_regime}"
+        primary_rows = [row for row in sample_rows if str(row.get("method", "")) == primary_method]
+        primary_override_count = 0
+        primary_harmful_count = 0
+        primary_improving_count = 0
+        for row in primary_rows:
+            key = (
+                int(row.get("seed", 0)),
+                int(row.get("query_domain", 0)),
+                int(row.get("support_seed", 0)),
+                int(row.get("support_size_requested", 0)),
+                str(row.get("sampling_policy", "")),
+            )
+            metadata_row = metadata_by_unit.get(key)
+            if metadata_row is None:
+                continue
+            if int(row.get("selected_expert", -1)) == int(metadata_row.get("selected_expert", -2)):
+                continue
+            primary_override_count += 1
+            delta = float(row.get("selected_nelbo", 0.0)) - float(metadata_row.get("selected_nelbo", 0.0))
+            if delta > 1e-12:
+                primary_harmful_count += 1
+            if delta < -1e-12:
+                primary_improving_count += 1
+        if primary_method in method_metrics:
+            denom = max(len(primary_rows), 1)
+            method_metrics[primary_method].update(
+                {
+                    "override_rate": float(primary_override_count / denom),
+                    "harmful_override_rate": float(primary_harmful_count / max(primary_override_count, 1)),
+                    "utility_improving_override_rate": float(
+                        primary_improving_count / max(primary_override_count, 1)
+                    ),
+                    "accepted_override_count": float(primary_override_count),
+                    "harmful_override_count": float(primary_harmful_count),
+                    "utility_improving_override_count": float(primary_improving_count),
+                }
+            )
+    if support_cfg.risk_constrained.enabled and RISK_CONSTRAINED_METHOD in method_metrics:
+        risk_rows_for_metrics = [
+            row for row in sample_rows if str(row.get("method", "")) == RISK_CONSTRAINED_METHOD
+        ]
+        accepted_count = sum(int(float(row.get("accepted_override", 0) or 0)) for row in risk_rows_for_metrics)
+        override_candidate_count = sum(
+            int(float(row.get("override_candidate", 0) or 0)) for row in risk_rows_for_metrics
+        )
+        harmful_count = sum(
+            int(float(row.get("true_harmful_override", 0) or 0)) for row in risk_rows_for_metrics
+        )
+        improving_count = sum(
+            int(float(row.get("true_improving_override", 0) or 0)) for row in risk_rows_for_metrics
+        )
+        expert4_candidate_count = sum(
+            int(float(row.get("focus_expert_override_candidate", 0) or 0)) for row in risk_rows_for_metrics
+        )
+        expert4_accepted_count = sum(
+            int(float(row.get("focus_expert_override_accepted", 0) or 0)) for row in risk_rows_for_metrics
+        )
+        expert4_blocked_count = sum(
+            int(float(row.get("focus_expert_override_blocked", 0) or 0)) for row in risk_rows_for_metrics
+        )
+        denom = max(len(risk_rows_for_metrics), 1)
+        method_metrics[RISK_CONSTRAINED_METHOD].update(
+            {
+                "override_rate": float(accepted_count / denom),
+                "override_candidate_rate": float(override_candidate_count / denom),
+                "harmful_override_rate": _harmful_override_rate(risk_rows_for_metrics),
+                "utility_improving_override_rate": float(improving_count / max(accepted_count, 1)),
+                "expert4_override_candidate_rate": float(expert4_candidate_count / denom),
+                "expert4_override_accepted_rate": float(expert4_accepted_count / denom),
+                "expert4_override_blocked_rate": float(expert4_blocked_count / max(expert4_candidate_count, 1)),
+                "accepted_override_count": float(accepted_count),
+                "harmful_override_count": float(harmful_count),
+                "utility_improving_override_count": float(improving_count),
+            }
+        )
     domain_rows = [
         {**dict(privacy), **row}
         for row in (_domain_breakdown_rows(sample_rows) if sample_rows else [])
@@ -1076,6 +1895,16 @@ def evaluate_support_response_routing_from_arrays(
         "method_summary": "support_response_method_summary.csv",
         "results": "support_response_results.json",
     }
+    if support_cfg.risk_constrained.enabled:
+        artifacts.update(
+            {
+                "risk_constrained_selected_thresholds": "risk_constrained_selected_thresholds.csv",
+                "risk_constrained_sample_selections": "risk_constrained_sample_selections.csv",
+                "risk_constrained_domain_breakdown": "risk_constrained_domain_breakdown.csv",
+                "risk_constrained_override_audit": "risk_constrained_override_audit.csv",
+                "risk_constrained_expert4_audit": "risk_constrained_expert4_audit.csv",
+            }
+        )
     protocol_lock = {
         "protocol_version": SUPPORT_RESPONSE_PROTOCOL_VERSION,
         "score_direction": "predicted_score_is_predicted_mean_nelbo_lower_is_better",
@@ -1085,6 +1914,21 @@ def evaluate_support_response_routing_from_arrays(
         "ridge_l2": float(support_cfg.ridge_l2),
         "scaler_fit_scope": "source_training_pairs_only",
         "domain_level_aggregation": bool(support_cfg.domain_level_aggregation),
+        "risk_constrained_response_routing": {
+            "enabled": bool(support_cfg.risk_constrained.enabled),
+            "method": RISK_CONSTRAINED_METHOD,
+            "policy_name": RISK_CONSTRAINED_POLICY_NAME,
+            "threshold_selection_policy": "source_inner_only",
+            "margin_thresholds": list(float(v) for v in support_cfg.risk_constrained.margin_thresholds),
+            "support_regret_thresholds": list(
+                float(v) for v in support_cfg.risk_constrained.support_regret_thresholds
+            ),
+            "top1_tolerance": float(support_cfg.risk_constrained.top1_tolerance),
+            "spearman_tolerance": float(support_cfg.risk_constrained.spearman_tolerance),
+            "target_evaluation_labels_scope": (
+                "final_heldout_utility_scorer_only_if_required_for_conditional_nelbo"
+            ),
+        },
         **privacy,
     }
     results = {
@@ -1105,6 +1949,17 @@ def evaluate_support_response_routing_from_arrays(
     _write_csv(reports_dir / artifacts["sample_selections"], sample_rows)
     _write_csv(reports_dir / artifacts["domain_breakdown"], domain_rows)
     _write_csv(reports_dir / artifacts["method_summary"], method_summary)
+    if support_cfg.risk_constrained.enabled:
+        risk_sample_rows = [row for row in sample_rows if str(row.get("method", "")) == RISK_CONSTRAINED_METHOD]
+        risk_domain_rows = [
+            {**dict(privacy), **row}
+            for row in (_domain_breakdown_rows(risk_sample_rows) if risk_sample_rows else [])
+        ]
+        _write_csv(reports_dir / artifacts["risk_constrained_selected_thresholds"], risk_threshold_rows)
+        _write_csv(reports_dir / artifacts["risk_constrained_sample_selections"], risk_sample_rows)
+        _write_csv(reports_dir / artifacts["risk_constrained_domain_breakdown"], risk_domain_rows)
+        _write_csv(reports_dir / artifacts["risk_constrained_override_audit"], risk_override_rows)
+        _write_csv(reports_dir / artifacts["risk_constrained_expert4_audit"], risk_expert4_rows)
     (reports_dir / artifacts["results"]).write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
     return results
 

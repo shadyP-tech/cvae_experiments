@@ -25,6 +25,7 @@ def _metric(
     spearman: float,
     gap: float,
     routing_uses_eval_nelbo: int = 0,
+    harmful_override_rate: float = 0.0,
 ) -> dict:
     return {
         "protocol_version": PROTOCOL_VERSION,
@@ -36,6 +37,7 @@ def _metric(
         "top1_oracle_hit": float(top1),
         "spearman": float(spearman),
         "mean_oracle_gap_pct": float(gap),
+        "harmful_override_rate": float(harmful_override_rate),
         "n_query_domains_macro": 2.0,
     }
 
@@ -216,3 +218,63 @@ def test_support_response_decision_table_reads_nested_learned_utility_results(tm
     assert len(rows) == 1
     assert rows[0]["method"] == "support_metadata_routing"
     assert rows[0]["n_domain_level_units"] == 2
+
+
+def test_support_response_decision_table_can_select_risk_constrained_method(tmp_path: Path) -> None:
+    result = _write_result(
+        tmp_path / "run_seed11" / "support_response_results.json",
+        {
+            "support_metadata_routing": _metric(
+                method_role="baseline",
+                adoption_eligible=1,
+                diagnostic_only=0,
+                top1=0.40,
+                spearman=0.20,
+                gap=12.0,
+            ),
+            "support_static_embedding_routing": _metric(
+                method_role="baseline",
+                adoption_eligible=1,
+                diagnostic_only=0,
+                top1=0.39,
+                spearman=0.18,
+                gap=12.5,
+            ),
+            "support_set_nelbo_top1": _metric(
+                method_role="baseline",
+                adoption_eligible=1,
+                diagnostic_only=0,
+                top1=0.80,
+                spearman=0.80,
+                gap=2.0,
+            ),
+            "support_response_pairwise_static_response_indirect": _metric(
+                method_role="learned",
+                adoption_eligible=1,
+                diagnostic_only=0,
+                top1=0.50,
+                spearman=0.35,
+                gap=10.0,
+                harmful_override_rate=0.40,
+            ),
+            "risk_constrained_response_routing": _metric(
+                method_role="learned",
+                adoption_eligible=1,
+                diagnostic_only=0,
+                top1=0.42,
+                spearman=0.25,
+                gap=9.0,
+                harmful_override_rate=0.10,
+            ),
+        },
+    )
+
+    rows = _read_rows([result])
+    decisions, summary = _aggregate(rows)
+    by_method = {row["method"]: row for row in decisions}
+    risk = by_method["risk_constrained_response_routing"]
+
+    assert risk["tier"] == "pass"
+    assert risk["decision"] == "selected"
+    assert risk["harmful_override_rate_reduction_vs_unrestricted_response"] > 0.0
+    assert summary["risk_constrained_method"] == "risk_constrained_response_routing"
