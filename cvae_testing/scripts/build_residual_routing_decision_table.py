@@ -32,6 +32,8 @@ _RESIDUAL_METHODS = {
     "metadata_residual_argmax",
     "metadata_residual_thresholded",
     "metadata_residual_group_robust",
+    "metadata_residual_thresholded_safe_v2",
+    "metadata_residual_group_robust_safe_v2",
     "metadata_residual_inner_selected",
 }
 

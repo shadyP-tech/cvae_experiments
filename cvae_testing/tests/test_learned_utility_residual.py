@@ -12,10 +12,13 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.eval.evaluators import learned_utility as lu
+from src.eval.evaluators.learned_utility_config import ResidualRoutingConfig
 from src.eval.evaluators.learned_utility_protocol import FoldCandidateSet
 from src.eval.evaluators.learned_utility_residual import (
     _build_residual_training_rows,
     _feature_context,
+    _safe_v2_adoption_feature_sets,
+    _safe_v2_validation_report,
     _selected_from_residual,
 )
 
@@ -88,6 +91,81 @@ def _residual_cfg() -> dict:
     }
 
 
+def _safe_v2_cfg() -> dict:
+    cfg = _residual_cfg()
+    cfg["residual_routing"] = {
+        **cfg["residual_routing"],
+        "residual_policy_version": "metadata_residual_safe_override_v2",
+        "feature_sets": ["minimal", "latent", "calibrated"],
+        "adoption_feature_sets": ["minimal", "latent"],
+        "diagnostic_feature_sets": ["calibrated"],
+        "allow_calibrated_adoption": False,
+        "harmful_override_max": 0.05,
+        "gap_regression_max": 2.0,
+        "catastrophic_top1_floor": -0.05,
+    }
+    return cfg
+
+
+def _safe_v2_residual_config(**overrides) -> ResidualRoutingConfig:
+    values = {
+        "enabled": True,
+        "residual_policy_version": "metadata_residual_safe_override_v2",
+        "models": ("ridge",),
+        "thresholds": (0.0, 0.01, 0.05, 0.10, 0.25, 0.50, float("inf")),
+        "feature_sets": ("minimal", "latent", "calibrated"),
+        "adoption_feature_sets": ("minimal", "latent"),
+        "diagnostic_feature_sets": ("calibrated",),
+        "allow_calibrated_adoption": False,
+        "harmful_override_max": 0.05,
+        "gap_regression_max": 2.0,
+        "catastrophic_top1_floor": -0.05,
+        "selection_metric": "validation_safe_gap_then_top1",
+        "unconstrained_reference_method": "linear_regressor",
+        "ridge_l2": 1.0e-4,
+    }
+    values.update(overrides)
+    return ResidualRoutingConfig(**values)
+
+
+def _selection_row(
+    *,
+    method: str,
+    query_domain: int,
+    sample_index: int,
+    selected_expert: int,
+    oracle_expert: int,
+    oracle_gap_pct: float,
+    top1_hit: int,
+) -> dict:
+    return {
+        "protocol_version": "learned_utility_loqdo_candidate_exclusion_v2",
+        "method": method,
+        "query_domain": query_domain,
+        "fold_query_domain": query_domain,
+        "candidate_experts": "100|200",
+        "n_candidate_experts": 2,
+        "target_expert_excluded": 1,
+        "method_role": "learned" if method != "metadata_routing" else "baseline",
+        "adoption_eligible": 1,
+        "diagnostic_only": 0,
+        "routing_uses_eval_nelbo": 0,
+        "routing_uses_eval_domain_statistics": 0,
+        "selected_expert": selected_expert,
+        "candidate_oracle_expert": oracle_expert,
+        "oracle_expert": oracle_expert,
+        "sample_index": sample_index,
+        "top1_oracle_hit": top1_hit,
+        "selected_rank": 1.0 if top1_hit else 2.0,
+        "oracle_gap": oracle_gap_pct,
+        "oracle_gap_pct": oracle_gap_pct,
+        "spearman": 1.0,
+        "pairwise_auc": 1.0,
+        "selected_nelbo": 1.0 + oracle_gap_pct,
+        "candidate_oracle_nelbo": 1.0,
+    }
+
+
 def test_residual_target_uses_normalized_metadata_relative_utility() -> None:
     expert_domains = [40, 100, 200, 400]
     sample_domains = np.asarray([100, 100, 200, 200], dtype=np.int64)
@@ -147,6 +225,101 @@ def test_tau_inf_fallback_selects_metadata_indices() -> None:
     assert _selected_from_residual(raw_scores, meta_idx, tau=0.0).tolist() == [0, 1]
 
 
+def test_safe_v2_harmful_override_veto_rejects_seed43_like_pattern() -> None:
+    baseline_rows = [
+        _selection_row(
+            method="metadata_routing",
+            query_domain=40,
+            sample_index=0,
+            selected_expert=100,
+            oracle_expert=100,
+            oracle_gap_pct=10.0,
+            top1_hit=1,
+        )
+    ]
+    candidate_rows = [
+        _selection_row(
+            method="metadata_residual_thresholded_safe_v2",
+            query_domain=40,
+            sample_index=0,
+            selected_expert=200,
+            oracle_expert=100,
+            oracle_gap_pct=5.0,
+            top1_hit=0,
+        )
+    ]
+    report = _safe_v2_validation_report(
+        candidate_rows=candidate_rows,
+        baseline_rows=baseline_rows,
+        override_rows=[
+            {
+                "fold_query_domain": 40,
+                "override_rate": 1.0,
+                "utility_improving_override_rate": 0.053,
+                "harmful_override_rate": 0.947,
+            }
+        ],
+        method="metadata_residual_thresholded_safe_v2",
+        residual_cfg=_safe_v2_residual_config(),
+    )
+
+    assert report["gap_pct_reduction"] > 0.0
+    assert report["safety_pass"] is False
+    assert report["max_harmful_override_rate"] == 0.947
+    assert "harmful_override" in report["domains_failed_gate"]
+
+
+def test_safe_v2_zero_override_gate_allows_exact_metadata_match() -> None:
+    baseline_rows = [
+        _selection_row(
+            method="metadata_routing",
+            query_domain=40,
+            sample_index=0,
+            selected_expert=100,
+            oracle_expert=100,
+            oracle_gap_pct=0.0,
+            top1_hit=1,
+        )
+    ]
+    candidate_rows = [
+        _selection_row(
+            method="metadata_residual_thresholded_safe_v2",
+            query_domain=40,
+            sample_index=0,
+            selected_expert=100,
+            oracle_expert=100,
+            oracle_gap_pct=0.0,
+            top1_hit=1,
+        )
+    ]
+    report = _safe_v2_validation_report(
+        candidate_rows=candidate_rows,
+        baseline_rows=baseline_rows,
+        override_rows=[
+            {
+                "fold_query_domain": 40,
+                "override_rate": 0.0,
+                "utility_improving_override_rate": 0.0,
+                "harmful_override_rate": 0.0,
+            }
+        ],
+        method="metadata_residual_thresholded_safe_v2",
+        residual_cfg=_safe_v2_residual_config(),
+    )
+
+    assert report["safety_pass"] is True
+    assert report["domains_failed_gate"] == ""
+
+
+def test_safe_v2_calibrated_excluded_from_adoption_by_default() -> None:
+    cfg = _safe_v2_residual_config(
+        adoption_feature_sets=("minimal", "latent", "calibrated"),
+        allow_calibrated_adoption=False,
+    )
+
+    assert _safe_v2_adoption_feature_sets(cfg) == ("minimal", "latent")
+
+
 def test_residual_artifacts_and_single_inner_selected_adoption_candidate(tmp_path, monkeypatch) -> None:
     def fake_score(**kwargs):
         _ = kwargs
@@ -197,3 +370,51 @@ def test_residual_artifacts_and_single_inner_selected_adoption_candidate(tmp_pat
     assert raw_rows
     assert all(row["residual_target_scale"] == "delta_u_pct" for row in raw_rows)
     assert all(row["spearman_score_source"] == "raw_residual_pre_threshold" for row in raw_rows)
+
+
+def test_safe_v2_writes_isolated_artifacts_and_required_policy_fields(tmp_path, monkeypatch) -> None:
+    def fake_score(**kwargs):
+        _ = kwargs
+        return _fake_scored_payload()
+
+    monkeypatch.setattr(lu, "_score_experts_batched", fake_score)
+    results = lu.evaluate_learned_utility_loqdo(
+        test_cache=tmp_path / "unused.pt",
+        expert_checkpoints={"expert_40": "unused", "expert_100": "unused", "expert_200": "unused"},
+        hidden_dim=4,
+        latent_dim=2,
+        strategy="categorical_exact",
+        tau=1.0,
+        seed=7,
+        learned_cfg=_safe_v2_cfg(),
+        reports_dir=tmp_path,
+    )
+
+    assert results["artifacts"]["residual_raw"] == "residual_safe_v2_raw.csv"
+    assert results["artifacts"]["residual_decision_table"] == "residual_safe_v2_decision_table.csv"
+    assert results["artifacts"]["residual_selection_policy_audit"] == "residual_safe_v2_selection_policy_audit.md"
+    assert (tmp_path / "residual_safe_v2_override_diagnostics.csv").exists()
+
+    raw_rows = _read_csv(tmp_path / "residual_safe_v2_raw.csv")
+    assert raw_rows
+    required = {
+        "decision_policy_version",
+        "residual_policy_version",
+        "threshold_selection_policy",
+        "feature_set",
+        "selected_tau",
+        "adoption_eligible",
+        "diagnostic_only",
+        "selected_by_inner_validation",
+        "harmful_override_max",
+        "allow_calibrated_adoption",
+        "fallback_used",
+    }
+    assert required.issubset(set(raw_rows[0]))
+    selected_rows = [
+        row
+        for row in _read_csv(tmp_path / "residual_safe_v2_policy_audit.csv")
+        if int(row["selected_by_inner_validation"]) == 1
+    ]
+    assert selected_rows
+    assert all(row["feature_set"] != "calibrated" for row in selected_rows)

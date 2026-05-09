@@ -37,7 +37,10 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         )
     experiment_name = str((experiment_cfg or {}).get("name", "")).strip().lower()
     is_response_routing_protocol = experiment_name == "learned_utility_response_routing_v1"
-    is_learned_utility_v2 = experiment_name == "learned_utility_routing_v2"
+    is_learned_utility_v2 = experiment_name in {
+        "learned_utility_routing_v2",
+        "learned_utility_routing_safe_v2",
+    }
 
     split = cfg.get("data", {}).get("split")
     if not isinstance(split, dict):
@@ -522,9 +525,11 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         residual_policy_version = str(
             residual_cfg.get("residual_policy_version", "metadata_residual_v1")
         ).strip()
-        if residual_policy_version != "metadata_residual_v1":
+        allowed_residual_policies = {"metadata_residual_v1", "metadata_residual_safe_override_v2"}
+        if residual_policy_version not in allowed_residual_policies:
             raise ValueError(
-                "learned_utility.residual_routing.residual_policy_version must be 'metadata_residual_v1'"
+                "learned_utility.residual_routing.residual_policy_version must be one of "
+                f"{sorted(allowed_residual_policies)}"
             )
         residual_models = residual_cfg.get("models", ["ridge"])
         if not isinstance(residual_models, list) or not residual_models:
@@ -557,6 +562,39 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                 "learned_utility.residual_routing.feature_sets must be subset of "
                 f"{sorted(allowed_residual_feature_sets)}, got unknown {bad_feature_sets}"
             )
+        for key in ["adoption_feature_sets", "diagnostic_feature_sets"]:
+            configured = residual_cfg.get(key)
+            if configured is None:
+                continue
+            if not isinstance(configured, list):
+                raise ValueError(f"learned_utility.residual_routing.{key} must be a list when provided")
+            bad = sorted(set(str(v).strip().lower() for v in configured) - allowed_residual_feature_sets)
+            if bad:
+                raise ValueError(
+                    f"learned_utility.residual_routing.{key} must be subset of "
+                    f"{sorted(allowed_residual_feature_sets)}, got unknown {bad}"
+                )
+        _ensure_bool(
+            residual_cfg.get("allow_calibrated_adoption", False),
+            "learned_utility.residual_routing.allow_calibrated_adoption",
+        )
+        if float(residual_cfg.get("harmful_override_max", 0.05)) < 0.0:
+            raise ValueError("learned_utility.residual_routing.harmful_override_max must be >= 0")
+        if float(residual_cfg.get("gap_regression_max", 2.0)) < 0.0:
+            raise ValueError("learned_utility.residual_routing.gap_regression_max must be >= 0")
+        if residual_policy_version == "metadata_residual_safe_override_v2":
+            adoption_feature_sets = residual_cfg.get("adoption_feature_sets", ["minimal", "latent"])
+            if not isinstance(adoption_feature_sets, list) or not adoption_feature_sets:
+                raise ValueError(
+                    "learned_utility.residual_routing.adoption_feature_sets must be non-empty for safe v2"
+                )
+            allow_calibrated = bool(residual_cfg.get("allow_calibrated_adoption", False))
+            if not allow_calibrated and "calibrated" in {
+                str(v).strip().lower() for v in adoption_feature_sets
+            }:
+                raise ValueError(
+                    "calibrated cannot appear in adoption_feature_sets when allow_calibrated_adoption=false"
+                )
         residual_selection_metric = str(
             residual_cfg.get("selection_metric", "validation_safe_gap_then_top1")
         ).strip().lower()

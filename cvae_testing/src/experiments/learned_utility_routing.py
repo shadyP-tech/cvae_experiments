@@ -134,6 +134,22 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
                     residual_routing_cfg.get("feature_sets"),
                     ["minimal", "latent", "calibrated"],
                 ),
+                "adoption_feature_sets": _as_str_list(
+                    residual_routing_cfg.get("adoption_feature_sets"),
+                    ["minimal", "latent"],
+                ),
+                "diagnostic_feature_sets": _as_str_list(
+                    residual_routing_cfg.get("diagnostic_feature_sets"),
+                    ["calibrated"],
+                ),
+                "allow_calibrated_adoption": bool(
+                    residual_routing_cfg.get("allow_calibrated_adoption", False)
+                ),
+                "harmful_override_max": float(residual_routing_cfg.get("harmful_override_max", 0.05)),
+                "gap_regression_max": float(residual_routing_cfg.get("gap_regression_max", 2.0)),
+                "catastrophic_top1_floor": float(
+                    residual_routing_cfg.get("catastrophic_top1_floor", -0.05)
+                ),
                 "selection_metric": str(
                     residual_routing_cfg.get(
                         "selection_metric",

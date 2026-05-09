@@ -55,6 +55,12 @@ class ResidualRoutingConfig:
     models: Tuple[str, ...]
     thresholds: Tuple[float, ...]
     feature_sets: Tuple[str, ...]
+    adoption_feature_sets: Tuple[str, ...]
+    diagnostic_feature_sets: Tuple[str, ...]
+    allow_calibrated_adoption: bool
+    harmful_override_max: float
+    gap_regression_max: float
+    catastrophic_top1_floor: float
     selection_metric: str
     unconstrained_reference_method: str
     ridge_l2: float
@@ -159,20 +165,40 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
     )
 
     residual_cfg = _as_dict(learned_cfg.get("residual_routing", {}))
+    residual_policy_version = str(
+        (residual_cfg or {}).get("residual_policy_version", "metadata_residual_v1")
+    )
+    feature_sets = tuple(
+        str(v).strip().lower()
+        for v in (residual_cfg or {}).get("feature_sets", ["minimal", "latent", "calibrated"])
+    )
     residual = ResidualRoutingConfig(
         enabled=bool((residual_cfg or {}).get("enabled", False)),
-        residual_policy_version=str(
-            (residual_cfg or {}).get("residual_policy_version", "metadata_residual_v1")
-        ),
+        residual_policy_version=str(residual_policy_version),
         models=tuple(str(v) for v in (residual_cfg or {}).get("models", ["ridge"])),
         thresholds=tuple(
             _parse_threshold(v)
             for v in (residual_cfg or {}).get("thresholds", [0, 0.01, 0.05, 0.10, 0.25, 0.50, "inf"])
         ),
-        feature_sets=tuple(
+        feature_sets=feature_sets,
+        adoption_feature_sets=tuple(
             str(v).strip().lower()
-            for v in (residual_cfg or {}).get("feature_sets", ["minimal", "latent", "calibrated"])
+            for v in (residual_cfg or {}).get(
+                "adoption_feature_sets",
+                ["minimal", "latent"] if residual_policy_version == "metadata_residual_safe_override_v2" else feature_sets,
+            )
         ),
+        diagnostic_feature_sets=tuple(
+            str(v).strip().lower()
+            for v in (residual_cfg or {}).get(
+                "diagnostic_feature_sets",
+                ["calibrated"] if residual_policy_version == "metadata_residual_safe_override_v2" else (),
+            )
+        ),
+        allow_calibrated_adoption=bool((residual_cfg or {}).get("allow_calibrated_adoption", False)),
+        harmful_override_max=float((residual_cfg or {}).get("harmful_override_max", 0.05)),
+        gap_regression_max=float((residual_cfg or {}).get("gap_regression_max", 2.0)),
+        catastrophic_top1_floor=float((residual_cfg or {}).get("catastrophic_top1_floor", -0.05)),
         selection_metric=str(
             (residual_cfg or {}).get("selection_metric", "validation_safe_gap_then_top1")
         ).strip().lower(),

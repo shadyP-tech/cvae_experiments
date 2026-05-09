@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import math
 from typing import Any, Dict, List, Mapping, Sequence, Tuple
 
@@ -24,6 +24,13 @@ _CATASTROPHIC_TOP1_UPLIFT_MIN = -0.05
 _CATASTROPHIC_SPEARMAN_UPLIFT_MIN = -0.05
 _CATASTROPHIC_GAP_PCT_REDUCTION_MIN = -2.0
 _FEATURE_SETS = {"minimal", "latent", "calibrated"}
+_SAFE_OVERRIDE_POLICY_V2 = "metadata_residual_safe_override_v2"
+_SAFE_V2_METHODS = {"metadata_residual_thresholded_safe_v2", "metadata_residual_group_robust_safe_v2"}
+_RESIDUAL_ADOPTION_METHODS = {
+    "metadata_residual_thresholded",
+    "metadata_residual_group_robust",
+    *_SAFE_V2_METHODS,
+}
 
 
 @dataclass(frozen=True)
@@ -64,6 +71,13 @@ class _SelectedResidualConfig:
     validation_gap_reduction: float
     validation_safety_pass: bool
     threshold_selection_policy: str
+    fallback_used: bool = False
+    validation_max_harmful_override_rate: float = 0.0
+    validation_min_utility_improving_override_rate: float = 0.0
+    validation_mean_override_rate: float = 0.0
+    validation_domains_failed_gate: str = ""
+    validation_worst_domain_top1_uplift: float = 0.0
+    validation_worst_domain_gap_pct_reduction: float = 0.0
 
 
 def _stable_argmax_indices(matrix: np.ndarray) -> np.ndarray:
@@ -78,6 +92,33 @@ def _stable_argmax_indices(matrix: np.ndarray) -> np.ndarray:
 
 def _threshold_label(value: float) -> str:
     return "inf" if math.isinf(float(value)) else f"{float(value):.6g}"
+
+
+def _is_safe_override_v2(residual_cfg: ResidualRoutingConfig) -> bool:
+    return str(residual_cfg.residual_policy_version) == _SAFE_OVERRIDE_POLICY_V2
+
+
+def _feature_complexity_rank(feature_set: str) -> int:
+    order = {"minimal": 0, "latent": 1, "calibrated": 2}
+    return int(order.get(str(feature_set).strip().lower(), 99))
+
+
+def _safe_v2_adoption_feature_sets(residual_cfg: ResidualRoutingConfig) -> Tuple[str, ...]:
+    configured = tuple(
+        str(v).strip().lower()
+        for v in (residual_cfg.adoption_feature_sets or ("minimal", "latent"))
+    )
+    if bool(residual_cfg.allow_calibrated_adoption):
+        return tuple(v for v in configured if v in _FEATURE_SETS)
+    return tuple(v for v in configured if v in _FEATURE_SETS and v != "calibrated")
+
+
+def _safe_v2_diagnostic_feature_sets(residual_cfg: ResidualRoutingConfig) -> Tuple[str, ...]:
+    configured = tuple(
+        str(v).strip().lower()
+        for v in (residual_cfg.diagnostic_feature_sets or ("calibrated",))
+    )
+    return tuple(v for v in configured if v in _FEATURE_SETS)
 
 
 def _metadata_selected_local_indices(metadata_similarity_eval: np.ndarray) -> np.ndarray:
@@ -448,9 +489,8 @@ def _evaluate_residual_config(
     )
 
     row_protocol = _method_protocol(method)
-    if (
-        method in {"metadata_residual_thresholded", "metadata_residual_group_robust"}
-        and (not bool(selected_by_inner_validation) or bool(force_diagnostic))
+    if method in _RESIDUAL_ADOPTION_METHODS and (
+        not bool(selected_by_inner_validation) or bool(force_diagnostic)
     ):
         row_protocol = MethodProtocol(
             method_role="diagnostic",
@@ -474,6 +514,24 @@ def _evaluate_residual_config(
         "validation_spearman_uplift": float(validation_summary.get("spearman_uplift", 0.0)),
         "validation_gap_pct_reduction": float(validation_summary.get("gap_pct_reduction", 0.0)),
         "validation_safety_pass": int(bool(validation_summary.get("safety_pass", False))),
+        "inner_validation_mean_top1_uplift": float(validation_summary.get("top1_uplift", 0.0)),
+        "inner_validation_mean_gap_reduction": float(validation_summary.get("gap_pct_reduction", 0.0)),
+        "inner_validation_max_harmful_override_rate": float(
+            validation_summary.get("max_harmful_override_rate", 0.0)
+        ),
+        "inner_validation_min_utility_improving_override_rate": float(
+            validation_summary.get("min_utility_improving_override_rate", 0.0)
+        ),
+        "inner_validation_domains_failed_gate": str(validation_summary.get("domains_failed_gate", "")),
+        "inner_validation_worst_domain_top1_uplift": float(
+            validation_summary.get("worst_domain_top1_uplift", 0.0)
+        ),
+        "inner_validation_worst_domain_gap_pct_reduction": float(
+            validation_summary.get("worst_domain_gap_pct_reduction", 0.0)
+        ),
+        "fallback_used": int(bool(validation_summary.get("fallback_used", False))),
+        "harmful_override_max": float(residual_cfg.harmful_override_max),
+        "allow_calibrated_adoption": int(bool(residual_cfg.allow_calibrated_adoption)),
     }
     for row in rows:
         row["sample_index"] = int(sample_indices[int(row["sample_index"])])
@@ -506,6 +564,7 @@ def _evaluate_residual_config(
                         ),
                         "true_nelbo": float(nelbo_candidate),
                         "metadata_selected_nelbo": float(nelbo_meta),
+                        **method_fields,
                         **extra,
                     }
                 )
@@ -527,6 +586,8 @@ def _evaluate_residual_config(
         dtype=bool,
     )
     denom = max(n_override, 1)
+    override_delta_nelbo = selected_nelbo[override_mask] - meta_nelbo[override_mask]
+    harmful_delta_nelbo = override_delta_nelbo[override_delta_nelbo > 1e-12]
     override_diag = {
         "method": str(method),
         "fold_query_domain": int(fold.heldout_domain),
@@ -536,6 +597,10 @@ def _evaluate_residual_config(
         "utility_improving_override_rate": float(np.sum(override_mask & improving) / denom),
         "oracle_correct_override_rate": float(np.sum(override_mask & oracle_correct) / denom),
         "harmful_override_rate": float(np.sum(override_mask & harmful) / denom),
+        "mean_delta_nelbo_for_overrides": float(np.mean(override_delta_nelbo)) if n_override else 0.0,
+        "median_delta_nelbo_for_overrides": float(np.median(override_delta_nelbo)) if n_override else 0.0,
+        "max_harmful_delta_nelbo": float(np.max(harmful_delta_nelbo)) if harmful_delta_nelbo.size else 0.0,
+        **method_fields,
         **extra,
     }
 
@@ -550,6 +615,7 @@ def _evaluate_residual_config(
             "selected_expert": int(selected),
             "oracle_expert": int(oracle),
             "count": int(count),
+            **method_fields,
             **extra,
         }
         for (selected, oracle), count in sorted(confusion_counts.items())
@@ -611,6 +677,268 @@ def _validation_report(
     }
 
 
+def _safe_v2_validation_report(
+    *,
+    candidate_rows: Sequence[Dict[str, Any]],
+    baseline_rows: Sequence[Dict[str, Any]],
+    override_rows: Sequence[Dict[str, Any]],
+    method: str,
+    residual_cfg: ResidualRoutingConfig,
+) -> Dict[str, Any]:
+    report = _validation_report(candidate_rows=candidate_rows, baseline_rows=baseline_rows, method=method)
+    domain_rows = _domain_breakdown_rows(list(candidate_rows) + list(baseline_rows))
+    by_key = {(str(r["method"]), int(r["query_domain"])): r for r in domain_rows}
+    override_by_domain = {
+        int(r.get("validation_query_domain", r.get("fold_query_domain", 0))): r
+        for r in override_rows
+    }
+
+    candidate_by_domain: Dict[int, List[Dict[str, Any]]] = {}
+    baseline_by_domain: Dict[int, List[Dict[str, Any]]] = {}
+    for row in candidate_rows:
+        candidate_by_domain.setdefault(int(row["query_domain"]), []).append(row)
+    for row in baseline_rows:
+        baseline_by_domain.setdefault(int(row["query_domain"]), []).append(row)
+
+    failed: List[str] = []
+    harmful_rates: List[float] = []
+    improving_rates: List[float] = []
+    override_rates: List[float] = []
+    worst_top1 = 0.0
+    worst_gap = 0.0
+
+    domains = sorted(q for m, q in by_key if m == "metadata_routing")
+    for q in domains:
+        base = by_key.get(("metadata_routing", q))
+        cand = by_key.get((str(method), q))
+        diag = override_by_domain.get(int(q), {})
+        reasons: List[str] = []
+        if base is None or cand is None:
+            reasons.append("missing_domain_metrics")
+        else:
+            top1_uplift = float(cand["top1_oracle_hit"]) - float(base["top1_oracle_hit"])
+            gap_reduction = float(base["mean_oracle_gap_pct"]) - float(cand["mean_oracle_gap_pct"])
+            worst_top1 = min(worst_top1, top1_uplift)
+            worst_gap = min(worst_gap, gap_reduction)
+            if top1_uplift < float(residual_cfg.catastrophic_top1_floor):
+                reasons.append("catastrophic_top1")
+            if gap_reduction < -float(residual_cfg.gap_regression_max):
+                reasons.append("gap_regression")
+
+        harmful_rate = float(diag.get("harmful_override_rate", 0.0))
+        improving_rate = float(diag.get("utility_improving_override_rate", 0.0))
+        override_rate = float(diag.get("override_rate", 0.0))
+        harmful_rates.append(harmful_rate)
+        improving_rates.append(improving_rate)
+        override_rates.append(override_rate)
+        if harmful_rate > float(residual_cfg.harmful_override_max):
+            reasons.append("harmful_override")
+        if override_rate > 0.0:
+            if improving_rate <= harmful_rate:
+                reasons.append("override_usefulness")
+        else:
+            base_selected_by_sample = {
+                int(r["sample_index"]): int(r["selected_expert"])
+                for r in baseline_by_domain.get(int(q), [])
+            }
+            exact_metadata = all(
+                int(r["selected_expert"]) == int(base_selected_by_sample.get(int(r["sample_index"]), -1))
+                for r in candidate_by_domain.get(int(q), [])
+            )
+            if not exact_metadata:
+                reasons.append("zero_override_not_metadata")
+
+        if reasons:
+            failed.append(f"{int(q)}:{'|'.join(sorted(set(reasons)))}")
+
+    report.update(
+        {
+            "safety_pass": bool(not failed and domains),
+            "catastrophic_regression_breach": int(
+                any("catastrophic_top1" in item or "gap_regression" in item for item in failed)
+            ),
+            "max_harmful_override_rate": float(max(harmful_rates)) if harmful_rates else 0.0,
+            "mean_harmful_override_rate": float(np.mean(harmful_rates)) if harmful_rates else 0.0,
+            "min_utility_improving_override_rate": float(min(improving_rates)) if improving_rates else 0.0,
+            "mean_override_rate": float(np.mean(override_rates)) if override_rates else 0.0,
+            "domains_failed_gate": ";".join(failed),
+            "worst_domain_top1_uplift": float(worst_top1),
+            "worst_domain_gap_pct_reduction": float(worst_gap),
+        }
+    )
+    return report
+
+
+def _safe_v2_fallback_config(method: str, residual_cfg: ResidualRoutingConfig, policy: str) -> _SelectedResidualConfig:
+    feature = "minimal"
+    if feature not in _safe_v2_adoption_feature_sets(residual_cfg):
+        feature = str((_safe_v2_adoption_feature_sets(residual_cfg) or ("minimal",))[0])
+    return _SelectedResidualConfig(
+        method=method,
+        feature_set=feature,
+        tau=float("inf"),
+        validation_top1_uplift=0.0,
+        validation_spearman_uplift=0.0,
+        validation_gap_reduction=0.0,
+        validation_safety_pass=True,
+        threshold_selection_policy=policy,
+        fallback_used=True,
+        validation_max_harmful_override_rate=0.0,
+        validation_min_utility_improving_override_rate=0.0,
+        validation_mean_override_rate=0.0,
+        validation_domains_failed_gate="",
+        validation_worst_domain_top1_uplift=0.0,
+        validation_worst_domain_gap_pct_reduction=0.0,
+    )
+
+
+def _select_inner_config_safe_v2(
+    *,
+    method: str,
+    residual_cfg: ResidualRoutingConfig,
+    sample_domains: np.ndarray,
+    embeddings: np.ndarray,
+    true_nelbo: np.ndarray,
+    expert_domains: Sequence[int],
+    metadata_similarity: np.ndarray,
+    outer_heldout_domain: int,
+    train_idx: np.ndarray,
+    group_balanced: bool,
+    tie_policy: str,
+) -> _SelectedResidualConfig:
+    source_domains = sorted(set(int(sample_domains[int(i)]) for i in np.asarray(train_idx, dtype=np.int64).tolist()))
+    finite_thresholds = [float(v) for v in residual_cfg.thresholds if not math.isinf(float(v))]
+    feature_sets = _safe_v2_adoption_feature_sets(residual_cfg)
+    candidates: List[Tuple[Tuple[float, float, float, float, int, float], str, float, Dict[str, Any]]] = []
+
+    if len(source_domains) < 2 or not finite_thresholds or not feature_sets:
+        return _safe_v2_fallback_config(
+            method,
+            residual_cfg,
+            "safe_override_v2_inner_loqdo_insufficient_source_domains_fallback_inf",
+        )
+
+    for feature in feature_sets:
+        if feature not in _FEATURE_SETS:
+            continue
+        by_threshold_rows: Dict[float, List[Dict[str, Any]]] = {float(t): [] for t in finite_thresholds}
+        by_threshold_override_rows: Dict[float, List[Dict[str, Any]]] = {float(t): [] for t in finite_thresholds}
+        baseline_rows: List[Dict[str, Any]] = []
+        for validation_domain in source_domains:
+            train_idx_arr = np.asarray(train_idx, dtype=np.int64)
+            inner_train_idx = train_idx_arr[sample_domains[train_idx_arr] != int(validation_domain)]
+            validation_idx = train_idx_arr[sample_domains[train_idx_arr] == int(validation_domain)]
+            if inner_train_idx.size == 0 or validation_idx.size == 0:
+                continue
+            validation_fold = FoldCandidateSet.for_heldout_domain(
+                heldout_domain=int(outer_heldout_domain),
+                expert_domains=expert_domains,
+                excluded_domains=[int(validation_domain)],
+            )
+            model, context = _fit_residual_model(
+                embeddings=embeddings,
+                sample_domains=sample_domains,
+                true_nelbo=true_nelbo,
+                expert_domains=expert_domains,
+                metadata_similarity=metadata_similarity,
+                outer_heldout_domain=int(outer_heldout_domain),
+                train_indices=inner_train_idx,
+                feature_set=feature,
+                group_balanced=bool(group_balanced),
+                l2=float(residual_cfg.ridge_l2),
+            )
+            true_eval = validation_fold.slice_nelbo(true_nelbo, validation_idx)
+            global_eval = true_nelbo[np.asarray(validation_idx, dtype=np.int64)]
+            baseline_rows.extend(
+                _metadata_rows(
+                    sample_domains=sample_domains,
+                    expert_domains=expert_domains,
+                    sample_indices=validation_idx,
+                    fold=validation_fold,
+                    metadata_similarity=metadata_similarity,
+                    true_eval=true_eval,
+                    global_eval=global_eval,
+                    tie_policy=tie_policy,
+                )
+            )
+            for tau in finite_thresholds:
+                rows, _raw, diag, _conf = _evaluate_residual_config(
+                    method=method,
+                    residual_cfg=residual_cfg,
+                    sample_domains=sample_domains,
+                    embeddings=embeddings,
+                    true_nelbo=true_nelbo,
+                    expert_domains=expert_domains,
+                    metadata_similarity=metadata_similarity,
+                    sample_indices=validation_idx,
+                    fold=validation_fold,
+                    global_eval=global_eval,
+                    model=model,
+                    context=context,
+                    tau=float(tau),
+                    selected_feature_set=feature,
+                    selected_variant=method,
+                    threshold_selection_policy="safe_override_v2_inner_leave_query_domain_out",
+                    validation_summary={},
+                    tie_policy=tie_policy,
+                    selected_by_inner_validation=True,
+                    adoption_selected_method=str(method),
+                    emit_raw_rows=False,
+                )
+                by_threshold_rows[float(tau)].extend(rows)
+                diag = dict(diag)
+                diag["validation_query_domain"] = int(validation_domain)
+                by_threshold_override_rows[float(tau)].append(diag)
+
+        for tau, rows in by_threshold_rows.items():
+            if not rows or not baseline_rows:
+                continue
+            report = _safe_v2_validation_report(
+                candidate_rows=rows,
+                baseline_rows=baseline_rows,
+                override_rows=by_threshold_override_rows[float(tau)],
+                method=method,
+                residual_cfg=residual_cfg,
+            )
+            if not bool(report["safety_pass"]):
+                continue
+            score = (
+                float(report["gap_pct_reduction"]),
+                float(report["top1_uplift"]),
+                -float(report["mean_harmful_override_rate"]),
+                -float(report["mean_override_rate"]),
+                -_feature_complexity_rank(feature),
+                float(tau),
+            )
+            candidates.append((score, feature, float(tau), report))
+
+    if not candidates:
+        return _safe_v2_fallback_config(
+            method,
+            residual_cfg,
+            "safe_override_v2_inner_leave_query_domain_out_fallback_inf",
+        )
+
+    _score, feature, tau, report = sorted(candidates, key=lambda item: item[0], reverse=True)[0]
+    return _SelectedResidualConfig(
+        method=method,
+        feature_set=str(feature),
+        tau=float(tau),
+        validation_top1_uplift=float(report["top1_uplift"]),
+        validation_spearman_uplift=float(report["spearman_uplift"]),
+        validation_gap_reduction=float(report["gap_pct_reduction"]),
+        validation_safety_pass=bool(report["safety_pass"]),
+        threshold_selection_policy="safe_override_v2_inner_leave_query_domain_out",
+        fallback_used=False,
+        validation_max_harmful_override_rate=float(report["max_harmful_override_rate"]),
+        validation_min_utility_improving_override_rate=float(report["min_utility_improving_override_rate"]),
+        validation_mean_override_rate=float(report["mean_override_rate"]),
+        validation_domains_failed_gate=str(report["domains_failed_gate"]),
+        validation_worst_domain_top1_uplift=float(report["worst_domain_top1_uplift"]),
+        validation_worst_domain_gap_pct_reduction=float(report["worst_domain_gap_pct_reduction"]),
+    )
+
+
 def _select_inner_config(
     *,
     method: str,
@@ -626,6 +954,20 @@ def _select_inner_config(
     tie_policy: str,
     force_tau_zero: bool = False,
 ) -> _SelectedResidualConfig:
+    if _is_safe_override_v2(residual_cfg) and not bool(force_tau_zero):
+        return _select_inner_config_safe_v2(
+            method=method,
+            residual_cfg=residual_cfg,
+            sample_domains=sample_domains,
+            embeddings=embeddings,
+            true_nelbo=true_nelbo,
+            expert_domains=expert_domains,
+            metadata_similarity=metadata_similarity,
+            outer_heldout_domain=int(outer_heldout_domain),
+            train_idx=train_idx,
+            group_balanced=bool(group_balanced),
+            tie_policy=tie_policy,
+        )
     source_domains = sorted(set(int(sample_domains[int(i)]) for i in np.asarray(train_idx, dtype=np.int64).tolist()))
     thresholds = [0.0] if force_tau_zero else list(residual_cfg.thresholds)
     finite_thresholds = [float(v) for v in thresholds if not math.isinf(float(v))]
@@ -753,6 +1095,20 @@ def _select_inner_config(
 def _select_adoption_variant(configs: Sequence[_SelectedResidualConfig]) -> str:
     if not configs:
         return ""
+    if not any(str(item.method) in _SAFE_V2_METHODS for item in configs):
+        ordered_v1 = sorted(
+            configs,
+            key=lambda item: (
+                int(bool(item.validation_safety_pass)),
+                float(item.validation_gap_reduction),
+                float(item.validation_top1_uplift),
+                float(item.validation_spearman_uplift),
+                -float(item.tau) if math.isfinite(float(item.tau)) else float("-inf"),
+                str(item.method),
+            ),
+            reverse=True,
+        )
+        return str(ordered_v1[0].method)
     ordered = sorted(
         configs,
         key=lambda item: (
@@ -760,7 +1116,10 @@ def _select_adoption_variant(configs: Sequence[_SelectedResidualConfig]) -> str:
             float(item.validation_gap_reduction),
             float(item.validation_top1_uplift),
             float(item.validation_spearman_uplift),
-            -float(item.tau) if math.isfinite(float(item.tau)) else float("-inf"),
+            -float(item.validation_max_harmful_override_rate),
+            -float(item.validation_mean_override_rate),
+            -int(bool(item.fallback_used)),
+            float(item.tau) if math.isfinite(float(item.tau)) else float("inf"),
             str(item.method),
         ),
         reverse=True,
@@ -800,6 +1159,19 @@ def _copy_diagnostic_rows_as_inner_selected_method(
     for row in rows:
         new_row = dict(row)
         new_row["method"] = "metadata_residual_inner_selected"
+        candidate_label = str(new_row.get("candidate_experts", "")).strip()
+        if candidate_label and "fold_query_domain" in new_row:
+            candidate_domains = [int(v) for v in candidate_label.split("|") if str(v).strip()]
+            fold_domain = int(new_row["fold_query_domain"])
+            method_fields = _protocol_row_fields(
+                fold=FoldCandidateSet.for_heldout_domain(
+                    heldout_domain=fold_domain,
+                    expert_domains=candidate_domains + [fold_domain],
+                ),
+                method_protocol=_method_protocol("metadata_residual_inner_selected"),
+                method="metadata_residual_inner_selected",
+            )
+            new_row.update(method_fields)
         new_row["source_residual_method"] = str(source_method)
         new_row["residual_variant"] = str(source_method)
         new_row["selected_by_inner_validation"] = 1
@@ -846,7 +1218,22 @@ def _audit_row(
     selected: _SelectedResidualConfig,
     residual_cfg: ResidualRoutingConfig,
     adoption_selected_method: str,
+    override_diag: Mapping[str, Any],
+    heldout_report: Mapping[str, Any],
 ) -> Dict[str, Any]:
+    selected_by_inner = int(str(method) == str(adoption_selected_method))
+    heldout_harmful = float(override_diag.get("harmful_override_rate", 0.0))
+    policy_pass = bool(
+        fold.target_expert_excluded
+        and not math.isnan(float(selected.validation_gap_reduction))
+        and (
+            not _is_safe_override_v2(residual_cfg)
+            or (
+                float(selected.validation_max_harmful_override_rate) <= float(residual_cfg.harmful_override_max)
+                and int(heldout_report.get("catastrophic_regression_breach", 0)) == 0
+            )
+        )
+    )
     return {
         "method": str(method),
         "fold_query_domain": int(fold.heldout_domain),
@@ -863,11 +1250,26 @@ def _audit_row(
         "selected_tau": _threshold_label(float(selected.tau)),
         "threshold_selection_policy": str(selected.threshold_selection_policy),
         "adoption_selected_method": str(adoption_selected_method),
-        "selected_by_inner_validation": int(str(method) == str(adoption_selected_method)),
-        "policy_audit_pass": int(
-            fold.target_expert_excluded
-            and not math.isnan(float(selected.validation_gap_reduction))
+        "selected_by_inner_validation": int(selected_by_inner),
+        "fallback_used": int(bool(selected.fallback_used)),
+        "harmful_override_max": float(residual_cfg.harmful_override_max),
+        "allow_calibrated_adoption": int(bool(residual_cfg.allow_calibrated_adoption)),
+        "inner_validation_mean_top1_uplift": float(selected.validation_top1_uplift),
+        "inner_validation_mean_gap_reduction": float(selected.validation_gap_reduction),
+        "inner_validation_max_harmful_override_rate": float(selected.validation_max_harmful_override_rate),
+        "inner_validation_min_utility_improving_override_rate": float(
+            selected.validation_min_utility_improving_override_rate
         ),
+        "inner_validation_domains_failed_gate": str(selected.validation_domains_failed_gate),
+        "inner_validation_worst_domain_top1_uplift": float(selected.validation_worst_domain_top1_uplift),
+        "inner_validation_worst_domain_gap_pct_reduction": float(
+            selected.validation_worst_domain_gap_pct_reduction
+        ),
+        "heldout_top1_uplift": float(heldout_report.get("top1_uplift", 0.0)),
+        "heldout_gap_reduction": float(heldout_report.get("gap_pct_reduction", 0.0)),
+        "heldout_harmful_override_rate": float(heldout_harmful),
+        "catastrophic_regression_breach": int(heldout_report.get("catastrophic_regression_breach", 0)),
+        "policy_audit_pass": int(policy_pass),
     }
 
 
@@ -889,7 +1291,7 @@ def run_residual_methods_for_fold(
     if not bool(residual_cfg.enabled):
         return ResidualFoldOutputs([], [], [], [], [])
     if "ridge" not in {str(v).strip().lower() for v in residual_cfg.models}:
-        raise ProtocolError("Residual routing v1 supports only models containing 'ridge'")
+        raise ProtocolError("Residual routing supports only models containing 'ridge'")
 
     sample_rows: List[Dict[str, Any]] = []
     raw_rows: List[Dict[str, Any]] = []
@@ -904,16 +1306,30 @@ def run_residual_methods_for_fold(
         )
     )
 
-    method_specs = [
-        ("metadata_residual_argmax", False, True),
-        ("metadata_residual_thresholded", False, False),
-        ("metadata_residual_group_robust", True, False),
-    ]
+    if _is_safe_override_v2(residual_cfg):
+        method_specs = [
+            ("metadata_residual_argmax", False, True),
+            ("metadata_residual_thresholded_safe_v2", False, False),
+            ("metadata_residual_group_robust_safe_v2", True, False),
+        ]
+        adoption_methods = ("metadata_residual_thresholded_safe_v2", "metadata_residual_group_robust_safe_v2")
+    else:
+        method_specs = [
+            ("metadata_residual_argmax", False, True),
+            ("metadata_residual_thresholded", False, False),
+            ("metadata_residual_group_robust", True, False),
+        ]
+        adoption_methods = ("metadata_residual_thresholded", "metadata_residual_group_robust")
     selected_by_method: Dict[str, _SelectedResidualConfig] = {}
     for method, group_balanced, force_tau_zero in method_specs:
+        selection_cfg = residual_cfg
+        if _is_safe_override_v2(residual_cfg) and bool(force_tau_zero):
+            diagnostic_feature_sets = _safe_v2_diagnostic_feature_sets(residual_cfg)
+            if diagnostic_feature_sets:
+                selection_cfg = replace(residual_cfg, feature_sets=diagnostic_feature_sets)
         selected_by_method[str(method)] = _select_inner_config(
             method=method,
-            residual_cfg=residual_cfg,
+            residual_cfg=selection_cfg,
             sample_domains=sample_domains,
             embeddings=embeddings,
             true_nelbo=true_nelbo,
@@ -929,9 +1345,21 @@ def run_residual_methods_for_fold(
     adoption_selected_method = _select_adoption_variant(
         [
             selected_by_method[m]
-            for m in ("metadata_residual_thresholded", "metadata_residual_group_robust")
+            for m in adoption_methods
             if m in selected_by_method
         ]
+    )
+
+    test_true_eval = fold.slice_nelbo(true_nelbo, test_idx)
+    metadata_eval_rows = _metadata_rows(
+        sample_domains=sample_domains,
+        expert_domains=expert_domains,
+        sample_indices=test_idx,
+        fold=fold,
+        metadata_similarity=metadata_similarity,
+        true_eval=test_true_eval,
+        global_eval=global_eval,
+        tie_policy=tie_policy,
     )
 
     for method, group_balanced, _force_tau_zero in method_specs:
@@ -971,6 +1399,14 @@ def run_residual_methods_for_fold(
                 "spearman_uplift": float(selected.validation_spearman_uplift),
                 "gap_pct_reduction": float(selected.validation_gap_reduction),
                 "safety_pass": bool(selected.validation_safety_pass),
+                "max_harmful_override_rate": float(selected.validation_max_harmful_override_rate),
+                "min_utility_improving_override_rate": float(
+                    selected.validation_min_utility_improving_override_rate
+                ),
+                "domains_failed_gate": str(selected.validation_domains_failed_gate),
+                "worst_domain_top1_uplift": float(selected.validation_worst_domain_top1_uplift),
+                "worst_domain_gap_pct_reduction": float(selected.validation_worst_domain_gap_pct_reduction),
+                "fallback_used": bool(selected.fallback_used),
             },
             tie_policy=tie_policy,
             selected_by_inner_validation=is_selected_adoption_candidate,
@@ -1008,6 +1444,20 @@ def run_residual_methods_for_fold(
                     source_method=str(method),
                 )
             )
+        if _is_safe_override_v2(residual_cfg):
+            heldout_report = _safe_v2_validation_report(
+                candidate_rows=eval_rows,
+                baseline_rows=metadata_eval_rows,
+                override_rows=[override_diag],
+                method=str(method),
+                residual_cfg=residual_cfg,
+            )
+        else:
+            heldout_report = _validation_report(
+                candidate_rows=eval_rows,
+                baseline_rows=metadata_eval_rows,
+                method=str(method),
+            )
         audit_rows.append(
             _audit_row(
                 method=method,
@@ -1015,6 +1465,8 @@ def run_residual_methods_for_fold(
                 selected=selected,
                 residual_cfg=residual_cfg,
                 adoption_selected_method=str(adoption_selected_method),
+                override_diag=override_diag,
+                heldout_report=heldout_report,
             )
         )
 

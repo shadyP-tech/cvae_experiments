@@ -165,7 +165,13 @@ def _method_protocol(method: str) -> MethodProtocol:
             diagnostic_only=1,
             routing_uses_query_features=1,
         )
-    if name in {"metadata_residual_thresholded", "metadata_residual_group_robust", "metadata_residual_inner_selected"}:
+    if name in {
+        "metadata_residual_thresholded",
+        "metadata_residual_group_robust",
+        "metadata_residual_thresholded_safe_v2",
+        "metadata_residual_group_robust_safe_v2",
+        "metadata_residual_inner_selected",
+    }:
         return MethodProtocol(
             method_role="learned",
             adoption_eligible=1,
@@ -316,6 +322,9 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
             "residual_variant",
             "selected_tau",
             "adoption_selected_method",
+            "harmful_override_max",
+            "allow_calibrated_adoption",
+            "fallback_used",
         ]:
             vals_for_key = sorted(set(str(r.get(key, "")) for r in vals if str(r.get(key, "")) != ""))
             if vals_for_key:
@@ -357,6 +366,9 @@ def _domain_breakdown_rows(sample_rows: Sequence[Dict[str, Any]]) -> List[Dict[s
                 "selected_tau": str(base.get("selected_tau", "")),
                 "selected_by_inner_validation": int(base.get("selected_by_inner_validation", 0) or 0),
                 "adoption_selected_method": str(base.get("adoption_selected_method", "")),
+                "harmful_override_max": str(base.get("harmful_override_max", "")),
+                "allow_calibrated_adoption": str(base.get("allow_calibrated_adoption", "")),
+                "fallback_used": str(base.get("fallback_used", "")),
                 "n_samples": int(len(rows)),
                 "top1_oracle_hit": _finite_mean([float(r["top1_oracle_hit"]) for r in rows]),
                 "mean_rank": _finite_mean([float(r["selected_rank"]) for r in rows]),

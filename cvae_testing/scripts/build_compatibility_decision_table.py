@@ -227,6 +227,9 @@ def _read_rows(
                     "selected_tau": str(mm.get("selected_tau", "")),
                     "selected_by_inner_validation": _to_int(mm.get("selected_by_inner_validation", 0)),
                     "adoption_selected_method": str(mm.get("adoption_selected_method", "")),
+                    "harmful_override_max": str(mm.get("harmful_override_max", "")),
+                    "allow_calibrated_adoption": str(mm.get("allow_calibrated_adoption", "")),
+                    "fallback_used": str(mm.get("fallback_used", "")),
                 }
             )
     if len(seen_protocol_versions) > 1:
@@ -506,6 +509,15 @@ def _aggregate(
                 weak=weak,
                 instability_breach=instability_breach,
             )
+            if (
+                str(base.get("residual_policy_version", "")) == "metadata_residual_safe_override_v2"
+                and str(tier) == "fail"
+                and not catastrophic_breach
+                and not instability_breach
+                and float(top1_uplift_mean) >= 0.0
+                and float(gap_reduction_mean) >= 0.0
+            ):
+                tier = "safe_no_gain"
 
         out_rows.append(
             {
@@ -526,6 +538,9 @@ def _aggregate(
                 "selected_tau": str(base.get("selected_tau", "")),
                 "selected_by_inner_validation": _to_int(base.get("selected_by_inner_validation", 0)),
                 "adoption_selected_method": str(base.get("adoption_selected_method", "")),
+                "harmful_override_max": str(base.get("harmful_override_max", "")),
+                "allow_calibrated_adoption": str(base.get("allow_calibrated_adoption", "")),
+                "fallback_used": str(base.get("fallback_used", "")),
                 "selection_eligible": int(selectable),
                 "n_seeds": int(len(seeds)),
                 "seeds": ",".join(str(s) for s in seeds),
