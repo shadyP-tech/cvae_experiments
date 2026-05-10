@@ -1,0 +1,11 @@
+{
+  "protocol_version": "support_response_candidate_specific_v1",
+  "primary_method": "support_response_pairwise_static_response_indirect",
+  "support_estimated_utility_method": "support_set_nelbo_conservative",
+  "risk_constrained_method": "risk_constrained_response_routing",
+  "selected_methods": [
+    "support_set_nelbo_conservative"
+  ],
+  "claim_boundary": "Risk-constrained response routing is a metadata-anchored learned-response proposal with a support-NELBO regret gate. Do not claim learned response routing beats metadata unless the completed run satisfies the predeclared result decision rule.",
+  "aggregation_unit": "seed_x_heldout_center_x_support_seed_x_support_size"
+}
