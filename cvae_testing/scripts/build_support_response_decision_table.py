@@ -463,9 +463,11 @@ def _aggregate(
         "risk_constrained_method": RISK_CONSTRAINED_METHOD,
         "selected_methods": selected,
         "claim_boundary": (
-            "Risk-constrained response routing is a metadata-anchored learned-response proposal "
-            "with a support-NELBO regret gate. Do not claim learned response routing beats metadata "
-            "unless the completed run satisfies the predeclared result decision rule."
+            "Support-estimated utility routing treats compatibility as expected utility from "
+            "unlabeled target-local support NELBO. Conservative support scoring may be claimed "
+            "only if it satisfies direct-support non-regression and improves stability or "
+            "high-regret selection rate. Do not claim learned response routing is the main "
+            "solution for this experiment."
         ),
         "aggregation_unit": "seed_x_heldout_center_x_support_seed_x_support_size",
     }
@@ -702,35 +704,64 @@ def _write_markdown_summary(
     by_method = {str(row.get("method", "")): row for row in decision_rows}
     key_methods = [
         METADATA_BASELINE,
-        RISK_CONSTRAINED_METHOD,
-        PRIMARY_METHOD,
         STATIC_BASELINE,
         SUPPORT_NELBO_BASELINE,
         SUPPORT_CONSERVATIVE_METHOD,
+        RISK_CONSTRAINED_METHOD,
+        PRIMARY_METHOD,
+        "support_candidate_oracle",
     ]
-    risk = by_method.get(RISK_CONSTRAINED_METHOD, {})
+    selected_methods = [str(item) for item in summary.get("selected_methods", [])]
+    if SUPPORT_CONSERVATIVE_METHOD in selected_methods or SUPPORT_CONSERVATIVE_METHOD in by_method:
+        focus_method = SUPPORT_CONSERVATIVE_METHOD
+        title = "Camelyon17 Support-Estimated Utility Routing v2"
+        method_description = (
+            "`support_set_nelbo_conservative`: mean support NELBO plus source-inner-selected "
+            "alpha times support NELBO standard error."
+        )
+        short_label = "`support_set_nelbo_conservative`"
+        decision_basis = (
+            "Classification follows the support-utility v2 rule: conservative support NELBO must "
+            "match direct support NELBO within strict non-regression tolerance and improve "
+            "stability or high-regret/catastrophic selection rate."
+        )
+    else:
+        focus_method = RISK_CONSTRAINED_METHOD
+        title = "Camelyon17 Risk-Constrained Response Routing v1"
+        method_description = "`metadata_anchored_response_routing_with_support_regret_gate`"
+        short_label = "`risk_constrained_response_routing`"
+        decision_basis = (
+            "Classification follows the risk-constrained response rule against metadata, static "
+            "embedding, unrestricted learned response, and direct support-set NELBO."
+        )
+
+    focus = by_method.get(focus_method, {})
+    focus_seed_rows = [
+        row for row in seed_stability_rows if str(row.get("method", "")) == focus_method
+    ]
     risk_seed_rows = [
         row for row in seed_stability_rows if str(row.get("method", "")) == RISK_CONSTRAINED_METHOD
     ]
     fallback_centers = sum(int(_to_float(row.get("fallback_outer_centers", 0))) for row in risk_seed_rows)
     total_centers = sum(int(row.get("n_domain_level_units", 0)) for row in risk_seed_rows)
+    result_status = str(focus.get("tier", "unknown")).upper().replace("_", " ")
 
     lines = [
-        "# Camelyon17 Risk-Constrained Response Routing v1",
+        f"# {title}",
         "",
         "Protocol status: completed run, protocol-compliant from checked artifacts",
-        f"Result status: {str(risk.get('tier', 'unknown')).upper().replace('_', ' ')}",
+        f"Result status: {result_status}",
         "",
-        "Method under test: `metadata_anchored_response_routing_with_support_regret_gate`",
+        f"Method under test: {method_description}",
         "",
-        "Short label: `risk_constrained_response_routing`",
+        f"Short label: {short_label}",
         "",
         "## Evidence source",
         "",
         f"- Protocol version: `{summary.get('protocol_version', '')}`",
         f"- Aggregation unit: `{summary.get('aggregation_unit', '')}`",
         f"- Runs inspected: {', '.join(str(item) for item in validation.get('run_ids', []))}",
-        "- Compared against metadata routing, static embedding routing, unrestricted learned response routing, direct support-set NELBO top1, and candidate oracle diagnostics.",
+        "- Compared against metadata routing, static embedding routing, direct support-set NELBO top1, risk-constrained response routing, unrestricted learned response routing, and candidate oracle diagnostics.",
         "",
         "## Protocol checks",
         "",
@@ -739,18 +770,31 @@ def _write_markdown_summary(
         f"| Support/evaluation disjoint | {'ok' if int(validation.get('bad_split_disjoint_rows', 0)) == 0 else 'blocked'} | {int(validation.get('split_rows', 0))} split rows, {int(validation.get('bad_split_disjoint_rows', 0))} bad disjoint rows |",
         f"| Split status | {'ok' if int(validation.get('bad_split_status_rows', 0)) == 0 else 'blocked'} | {int(validation.get('bad_split_status_rows', 0))} non-ok split rows |",
         f"| Target expert exclusion | {'ok' if int(validation.get('target_expert_exclusion_bad_rows', 0)) == 0 and int(validation.get('candidate_pool_bad_rows', 0)) == 0 else 'blocked'} | {int(validation.get('target_expert_exclusion_bad_rows', 0))} bad exclusion rows, {int(validation.get('candidate_pool_bad_rows', 0))} candidate-pool violations |",
+        f"| Support-utility alpha selection | {'ok' if int(validation.get('support_utility_bad_selection_source_rows', 0)) == 0 and int(validation.get('support_utility_bad_created_before_scoring_rows', 0)) == 0 else 'blocked'} | {int(validation.get('support_utility_hyper_rows', 0))} rows, source-inner-only and pre-scoring flags checked |",
         f"| Frozen thresholds | {'ok' if int(validation.get('threshold_bad_selection_source_rows', 0)) == 0 and int(validation.get('threshold_bad_created_before_scoring_rows', 0)) == 0 else 'blocked'} | {int(validation.get('threshold_rows', 0))} rows, source-inner-only and pre-scoring flags checked |",
         f"| Leakage report | {'ok' if int(validation.get('leakage_duplicate_paths', 0)) == 0 and int(validation.get('leakage_patient_overlap_entries', 0)) == 0 else 'blocked'} | {int(validation.get('leakage_duplicate_paths', 0))} duplicate paths, {int(validation.get('leakage_patient_overlap_entries', 0))} patient-overlap entries |",
         "",
         "## Aggregate metrics",
         "",
-        "| Method | Tier | Top1 | Spearman | Oracle gap pct | Harmful override | Override rate |",
-        "|---|---:|---:|---:|---:|---:|---:|",
+        "| Method | Tier | Top1 | Spearman | Oracle gap pct | High-regret rate | Catastrophic rate | Harmful override | Override rate |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for method in key_methods:
         row = by_method.get(method, {})
-        harmful = "n/a" if method in {METADATA_BASELINE, STATIC_BASELINE, SUPPORT_NELBO_BASELINE} else _fmt(row.get("harmful_override_rate", ""))
-        override = "n/a" if method in {METADATA_BASELINE, STATIC_BASELINE, SUPPORT_NELBO_BASELINE} else _fmt(row.get("override_rate", ""))
+        if not row:
+            continue
+        harmful = (
+            "n/a"
+            if method
+            in {METADATA_BASELINE, STATIC_BASELINE, SUPPORT_NELBO_BASELINE, SUPPORT_CONSERVATIVE_METHOD}
+            else _fmt(row.get("harmful_override_rate", ""))
+        )
+        override = (
+            "n/a"
+            if method
+            in {METADATA_BASELINE, STATIC_BASELINE, SUPPORT_NELBO_BASELINE, SUPPORT_CONSERVATIVE_METHOD}
+            else _fmt(row.get("override_rate", ""))
+        )
         lines.append(
             "| "
             + " | ".join(
@@ -760,6 +804,8 @@ def _write_markdown_summary(
                     _fmt(row.get("top1_oracle_hit_mean", "")),
                     _fmt(row.get("spearman_mean", "")),
                     _fmt(row.get("mean_oracle_gap_pct_mean", "")),
+                    _fmt(row.get("high_regret_selection_rate", "")),
+                    _fmt(row.get("catastrophic_mistake_rate", "")),
                     harmful,
                     override,
                 ]
@@ -772,11 +818,11 @@ def _write_markdown_summary(
             "",
             "## Seed stability",
             "",
-            "| Seed | Top1 | Spearman | Oracle gap pct | Gap reduction vs metadata | Harmful override | Override rate | Fallback centers |",
-            "|---:|---:|---:|---:|---:|---:|---:|---:|",
+            "| Seed | Top1 | Spearman | Oracle gap pct | Gap reduction vs metadata | High-regret rate | Catastrophic rate |",
+            "|---:|---:|---:|---:|---:|---:|---:|",
         ]
     )
-    for row in sorted(risk_seed_rows, key=lambda item: int(str(item.get("seed", 0)))):
+    for row in sorted(focus_seed_rows, key=lambda item: int(str(item.get("seed", 0)))):
         lines.append(
             "| "
             + " | ".join(
@@ -786,9 +832,8 @@ def _write_markdown_summary(
                     _fmt(row.get("spearman", "")),
                     _fmt(row.get("mean_oracle_gap_pct", "")),
                     _fmt(row.get("oracle_gap_pct_reduction_vs_metadata", "")),
-                    _fmt(row.get("harmful_override_rate", "")),
-                    _fmt(row.get("override_rate", "")),
-                    _fmt(row.get("fallback_outer_centers", ""), 0),
+                    _fmt(row.get("high_regret_selection_rate", "")),
+                    _fmt(row.get("catastrophic_mistake_rate", "")),
                 ]
             )
             + " |"
@@ -799,16 +844,24 @@ def _write_markdown_summary(
             "",
             "## Decision",
             "",
-            "Classification: `WEAK PASS`.",
+            f"Classification: `{result_status}`.",
             "",
-            "The risk-constrained policy improves metadata routing on aggregate top1, Spearman, and mean oracle-gap percentage, and reduces harmful overrides relative to unrestricted learned-response routing. It is not result-level `PASS` because it fails the static-embedding non-regression check and remains far below direct support-set NELBO.",
+            decision_basis,
             "",
-            f"The gate fell back to metadata for {fallback_centers} of {total_centers} seed-by-held-out-center units. This partial collapse is thesis-useful evidence that learned response proposals are safer with a support-NELBO regret gate but remain fragile under domain shift.",
+            f"Selected methods: {', '.join(selected_methods) if selected_methods else 'none'}.",
             "",
-            "Claim boundary: do not claim learned response routing beats metadata. The tested method is a metadata-anchored learned-response proposal with a support-NELBO regret gate.",
+            f"Claim boundary: {summary.get('claim_boundary', '')}",
             "",
         ]
     )
+    if total_centers:
+        lines.extend(
+            [
+                "Risk-constrained response comparator:",
+                f"the support-regret gate fell back to metadata for {fallback_centers} of {total_centers} seed-by-held-out-center units.",
+                "",
+            ]
+        )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines), encoding="utf-8")
 

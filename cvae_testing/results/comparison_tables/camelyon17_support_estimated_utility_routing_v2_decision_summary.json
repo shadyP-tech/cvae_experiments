@@ -1,0 +1,11 @@
+{
+  "protocol_version": "support_response_candidate_specific_v1",
+  "primary_method": "support_response_pairwise_static_response_indirect",
+  "support_estimated_utility_method": "support_set_nelbo_conservative",
+  "risk_constrained_method": "risk_constrained_response_routing",
+  "selected_methods": [
+    "support_set_nelbo_conservative"
+  ],
+  "claim_boundary": "Support-estimated utility routing treats compatibility as expected utility from unlabeled target-local support NELBO. Conservative support scoring may be claimed only if it satisfies direct-support non-regression and improves stability or high-regret selection rate. Do not claim learned response routing is the main solution for this experiment.",
+  "aggregation_unit": "seed_x_heldout_center_x_support_seed_x_support_size"
+}

@@ -35,6 +35,8 @@ SUPPORT_ALPHA_GRID_DEFAULT = (0.0, 0.5, 1.0, 1.5, 2.0)
 SUPPORT_ALPHA_SPEARMAN_TOLERANCE = 0.05
 HIGH_REGRET_GAP_PCT_THRESHOLD = 2.0
 BOTTOM_HALF_RANK_THRESHOLD = 3
+SUPPORT_BOOTSTRAP_REPS_DEFAULT = 10000
+SUPPORT_BOOTSTRAP_SEED_DEFAULT = 1337
 PRIVACY_PROVENANCE_FIELDS: Dict[str, object] = {
     "target_support_data_location": "target_local",
     "raw_target_images_exported": False,
@@ -1072,6 +1074,41 @@ def _candidate_rows_for_query(
     return rows, support_mean, support_stderr, eval_mean
 
 
+def _support_nelbo_raw_rows_for_split(
+    *,
+    run_id: str,
+    seed: int,
+    outer_target: int,
+    split: Any,
+    candidate_experts: Sequence[int],
+    nelbo_matrix: np.ndarray,
+    expert_to_col: Mapping[int, int],
+) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    support_seed = int(split.support_eval_split_id.split("_seed", 1)[1].split("_", 1)[0])
+    for support_pos, sample_idx in enumerate(split.support_indices):
+        for expert in candidate_experts:
+            col = int(expert_to_col[int(expert)])
+            rows.append(
+                {
+                    "run_id": str(run_id),
+                    "experiment_seed": int(seed),
+                    "heldout_center": int(outer_target),
+                    "support_size": int(split.support_size_requested),
+                    "support_seed": int(support_seed),
+                    "support_pos_anon": int(support_pos),
+                    "candidate_expert": int(expert),
+                    "support_nelbo": float(nelbo_matrix[int(sample_idx), col]),
+                    "method_family": "support_nelbo",
+                    "split_id": str(split.support_eval_split_id),
+                    "outer_fold_id": f"heldout_center_{int(outer_target)}",
+                    "target_expert_excluded": 1,
+                    "protocol_version": SUPPORT_RESPONSE_PROTOCOL_VERSION,
+                }
+            )
+    return rows
+
+
 def _source_inner_units_for_outer(
     *,
     outer_target: int,
@@ -1773,11 +1810,13 @@ def evaluate_support_response_routing_from_arrays(
     pair_rows: List[Dict[str, Any]] = []
     split_rows: List[Dict[str, Any]] = []
     feature_audit_rows: List[Dict[str, Any]] = []
+    support_nelbo_raw_rows: List[Dict[str, Any]] = []
     risk_threshold_rows: List[Dict[str, Any]] = []
     risk_override_rows: List[Dict[str, Any]] = []
     risk_expert4_rows: List[Dict[str, Any]] = []
     support_utility_hyper_rows: List[Dict[str, Any]] = []
     sample_index_counter = 0
+    run_id = str(reports_dir.parent.name)
 
     if support_cfg.risk_constrained.enabled:
         reports_dir.mkdir(parents=True, exist_ok=True)
@@ -1938,6 +1977,17 @@ def evaluate_support_response_routing_from_arrays(
                         tau=float(tau),
                         response_feature_fn=response_feature_fn,
                         split_role="target",
+                    )
+                    support_nelbo_raw_rows.extend(
+                        _support_nelbo_raw_rows_for_split(
+                            run_id=run_id,
+                            seed=int(seed),
+                            outer_target=int(outer_target),
+                            split=target_split,
+                            candidate_experts=target_candidates,
+                            nelbo_matrix=nelbo_matrix,
+                            expert_to_col=expert_to_col,
+                        )
                     )
 
                     # Matched non-learned baselines.
@@ -2442,6 +2492,7 @@ def evaluate_support_response_routing_from_arrays(
         "protocol_lock": "support_response_protocol_lock.json",
         "split_manifest": "support_response_split_manifest.csv",
         "feature_audit": "support_response_feature_audit.csv",
+        "support_nelbo_raw_rows": "support_response_support_nelbo_rows.csv",
         "pair_predictions": "support_response_pair_predictions.csv",
         "sample_selections": "support_response_sample_selections.csv",
         "domain_breakdown": "support_response_domain_breakdown.csv",
@@ -2469,6 +2520,13 @@ def evaluate_support_response_routing_from_arrays(
         "ridge_l2": float(support_cfg.ridge_l2),
         "scaler_fit_scope": "source_training_pairs_only",
         "domain_level_aggregation": bool(support_cfg.domain_level_aggregation),
+        "support_raw_rows_exported": True,
+        "support_raw_rows_contains_eval_nelbo": False,
+        "support_raw_rows_contains_identity_fields": False,
+        "support_bootstrap_posthoc_only": True,
+        "bootstrap_reps": SUPPORT_BOOTSTRAP_REPS_DEFAULT,
+        "bootstrap_seed": SUPPORT_BOOTSTRAP_SEED_DEFAULT,
+        "conservative_alpha_selection": "source_inner_fixed",
         "support_estimated_utility": {
             "enabled": bool(support_cfg.support_utility.enabled),
             "method": SUPPORT_CONSERVATIVE_METHOD,
@@ -2508,6 +2566,7 @@ def evaluate_support_response_routing_from_arrays(
         "metrics_by_method": method_metrics,
         "artifacts": artifacts,
         "n_domain_level_rows": int(len(sample_rows)),
+        "n_support_nelbo_raw_rows": int(len(support_nelbo_raw_rows)),
         "n_pairwise_training_comparisons": int(len(pair_rows)),
         "n_support_utility_hyperparameter_rows": int(len(support_utility_hyper_rows)),
     }
@@ -2515,6 +2574,7 @@ def evaluate_support_response_routing_from_arrays(
     (reports_dir / artifacts["protocol_lock"]).write_text(json.dumps(protocol_lock, indent=2) + "\n", encoding="utf-8")
     _write_csv(reports_dir / artifacts["split_manifest"], split_rows)
     _write_csv(reports_dir / artifacts["feature_audit"], feature_audit_rows)
+    _write_csv(reports_dir / artifacts["support_nelbo_raw_rows"], support_nelbo_raw_rows)
     _write_csv(reports_dir / artifacts["pair_predictions"], pair_rows)
     _write_csv(reports_dir / artifacts["sample_selections"], sample_rows)
     _write_csv(reports_dir / artifacts["domain_breakdown"], domain_rows)

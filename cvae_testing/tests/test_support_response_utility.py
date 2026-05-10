@@ -265,8 +265,68 @@ def test_candidate_specific_pairwise_labels_and_exclusions(tmp_path: Path) -> No
 def test_support_response_artifacts_encode_protocol_controls_and_score_direction(tmp_path: Path) -> None:
     results = _run(tmp_path)
     assert results["protocol_lock"]["score_direction"] == "predicted_score_is_predicted_mean_nelbo_lower_is_better"
+    assert results["protocol_lock"]["support_raw_rows_exported"] is True
+    assert results["protocol_lock"]["support_raw_rows_contains_eval_nelbo"] is False
+    assert results["protocol_lock"]["support_raw_rows_contains_identity_fields"] is False
+    assert results["protocol_lock"]["support_bootstrap_posthoc_only"] is True
+    assert results["protocol_lock"]["conservative_alpha_selection"] == "source_inner_fixed"
+    assert results["artifacts"]["support_nelbo_raw_rows"] == "support_response_support_nelbo_rows.csv"
     assert results["metrics_by_method"]["support_metadata_routing"]["n_samples_micro"] == 5.0
     assert results["metrics_by_method"]["support_metadata_routing"]["n_query_domains_macro"] == 5.0
+
+    raw_rows = _read_csv(tmp_path / "support_response_support_nelbo_rows.csv")
+    assert len(raw_rows) == 5 * 2 * 4
+    expected_fields = {
+        "run_id",
+        "experiment_seed",
+        "heldout_center",
+        "support_size",
+        "support_seed",
+        "support_pos_anon",
+        "candidate_expert",
+        "support_nelbo",
+        "method_family",
+        "split_id",
+        "outer_fold_id",
+        "target_expert_excluded",
+        "protocol_version",
+    }
+    forbidden_fields = {
+        "image_path",
+        "patient_id",
+        "slide_id",
+        "label",
+        "embedding",
+        "cache_row_index",
+        "eval_nelbo",
+        "raw_manifest_index",
+    }
+    assert expected_fields <= set(raw_rows[0])
+    assert forbidden_fields.isdisjoint(set(raw_rows[0]))
+    grouped: dict[tuple[int, int, int, int, str], list[dict[str, str]]] = {}
+    for row in raw_rows:
+        key = (
+            int(row["experiment_seed"]),
+            int(row["heldout_center"]),
+            int(row["support_size"]),
+            int(row["support_seed"]),
+            row["split_id"],
+        )
+        grouped.setdefault(key, []).append(row)
+        assert row["method_family"] == "support_nelbo"
+        assert int(row["target_expert_excluded"]) == 1
+        assert row["protocol_version"] == "support_response_candidate_specific_v1"
+    assert len(grouped) == 5
+    for (_seed, heldout, support_size, _support_seed, _split_id), rows in grouped.items():
+        assert support_size == 2
+        positions = sorted({int(row["support_pos_anon"]) for row in rows})
+        assert positions == [0, 1]
+        candidates = sorted({int(row["candidate_expert"]) for row in rows})
+        assert heldout not in candidates
+        assert len(candidates) == 4
+        for pos in positions:
+            pos_rows = [row for row in rows if int(row["support_pos_anon"]) == pos]
+            assert sorted(int(row["candidate_expert"]) for row in pos_rows) == candidates
 
     sample_rows = _read_csv(tmp_path / "support_response_sample_selections.csv")
     methods = {row["method"] for row in sample_rows}
