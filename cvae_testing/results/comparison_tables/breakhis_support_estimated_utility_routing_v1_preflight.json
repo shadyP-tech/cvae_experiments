@@ -1,0 +1,183 @@
+{
+  "configured_domains": [
+    40,
+    100,
+    200,
+    400
+  ],
+  "dataset_leakage_report": {
+    "duplicate_paths": [],
+    "limitations": {},
+    "patient_overlap": {
+      "train_test": [],
+      "train_val": [],
+      "val_test": []
+    },
+    "split_cap_accounting": {
+      "mode": "fixed_split_caps",
+      "rows": [
+        {
+          "actual_count": 250,
+          "available_count": 884,
+          "domain": 100,
+          "requested_count": 250,
+          "shortfall": 0,
+          "shortfall_flag": 0,
+          "split": "train"
+        },
+        {
+          "actual_count": 100,
+          "available_count": 212,
+          "domain": 100,
+          "requested_count": 100,
+          "shortfall": 0,
+          "shortfall_flag": 0,
+          "split": "val"
+        },
+        {
+          "actual_count": 900,
+          "available_count": 985,
+          "domain": 100,
+          "requested_count": 900,
+          "shortfall": 0,
+          "shortfall_flag": 0,
+          "split": "test"
+        },
+        {
+          "actual_count": 250,
+          "available_count": 822,
+          "domain": 200,
+          "requested_count": 250,
+          "shortfall": 0,
+          "shortfall_flag": 0,
+          "split": "train"
+        },
+        {
+          "actual_count": 100,
+          "available_count": 202,
+          "domain": 200,
+          "requested_count": 100,
+          "shortfall": 0,
+          "shortfall_flag": 0,
+          "split": "val"
+        },
+        {
+          "actual_count": 900,
+          "available_count": 989,
+          "domain": 200,
+          "requested_count": 900,
+          "shortfall": 0,
+          "shortfall_flag": 0,
+          "split": "test"
+        },
+        {
+          "actual_count": 250,
+          "available_count": 761,
+          "domain": 400,
+          "requested_count": 250,
+          "shortfall": 0,
+          "shortfall_flag": 0,
+          "split": "train"
+        },
+        {
+          "actual_count": 100,
+          "available_count": 187,
+          "domain": 400,
+          "requested_count": 100,
+          "shortfall": 0,
+          "shortfall_flag": 0,
+          "split": "val"
+        },
+        {
+          "actual_count": 872,
+          "available_count": 872,
+          "domain": 400,
+          "requested_count": 900,
+          "shortfall": 28,
+          "shortfall_flag": 1,
+          "split": "test"
+        },
+        {
+          "actual_count": 250,
+          "available_count": 801,
+          "domain": 40,
+          "requested_count": 250,
+          "shortfall": 0,
+          "shortfall_flag": 0,
+          "split": "train"
+        },
+        {
+          "actual_count": 100,
+          "available_count": 209,
+          "domain": 40,
+          "requested_count": 100,
+          "shortfall": 0,
+          "shortfall_flag": 0,
+          "split": "val"
+        },
+        {
+          "actual_count": 900,
+          "available_count": 985,
+          "domain": 40,
+          "requested_count": 900,
+          "shortfall": 0,
+          "shortfall_flag": 0,
+          "split": "test"
+        }
+      ],
+      "split_caps": {
+        "test": 900,
+        "train": 250,
+        "val": 100
+      }
+    }
+  },
+  "domain_normalization": [
+    {
+      "normalized_magnification": 40,
+      "raw_domain_name": "40x"
+    },
+    {
+      "normalized_magnification": 100,
+      "raw_domain_name": "100x"
+    },
+    {
+      "normalized_magnification": 200,
+      "raw_domain_name": "200x"
+    },
+    {
+      "normalized_magnification": 400,
+      "raw_domain_name": "400x"
+    }
+  ],
+  "max_support_size": 32,
+  "n_records": 4972,
+  "observed_normalized_domains": [
+    40,
+    100,
+    200,
+    400
+  ],
+  "patient_id_coverage_pct": 100.0,
+  "split_patient_overlap": {
+    "train_test": [],
+    "train_val": [],
+    "val_test": []
+  },
+  "status": "pass",
+  "target_image_counts_by_magnification": {
+    "100": 900,
+    "200": 900,
+    "40": 900,
+    "400": 872
+  },
+  "target_patient_counts_by_magnification": {
+    "100": 39,
+    "200": 39,
+    "40": 39,
+    "400": 39
+  },
+  "target_splits": [
+    "test"
+  ]
+}

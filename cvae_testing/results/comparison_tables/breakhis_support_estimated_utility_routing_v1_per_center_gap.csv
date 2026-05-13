@@ -1,0 +1,5 @@
+heldout_center,direct_n_rows,conservative_n_rows,direct_top1_oracle_hit_mean,conservative_top1_oracle_hit_mean,conservative_minus_direct_top1,direct_oracle_gap_pct_mean,conservative_oracle_gap_pct_mean,direct_minus_conservative_oracle_gap_pct,direct_high_regret_rate,conservative_high_regret_rate
+40,36,36,1.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0
+100,36,36,0.75,0.75,0.0,1.8556519383302392,1.8556519383302392,0.0,0.25,0.25
+200,36,36,0.6111111111111112,0.6111111111111112,0.0,2.032839163502809,2.032839163502809,0.0,0.25,0.25
+400,36,36,1.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0
