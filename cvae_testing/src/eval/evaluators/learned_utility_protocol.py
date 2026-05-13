@@ -189,6 +189,12 @@ def _method_protocol(method: str) -> MethodProtocol:
             diagnostic_only=1,
             routing_uses_eval_nelbo=1,
         )
+    if name == "support_random_expert_floor":
+        return MethodProtocol(
+            method_role="control",
+            adoption_eligible=0,
+            diagnostic_only=1,
+        )
     if name == "metadata_routing":
         return MethodProtocol(
             method_role="baseline",

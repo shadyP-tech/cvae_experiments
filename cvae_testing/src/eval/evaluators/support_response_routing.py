@@ -104,6 +104,7 @@ class SupportResponseConfig:
     domain_level_aggregation: bool
     source_leave_pseudo_domain_out_diagnostic: bool
     include_residual_shape_features: bool = False
+    random_floor_enabled: bool = False
     support_utility: SupportUtilityConfig = field(default_factory=SupportUtilityConfig)
     risk_constrained: RiskConstrainedResponseConfig = field(
         default_factory=lambda: RiskConstrainedResponseConfig(
@@ -297,6 +298,11 @@ def parse_support_response_config(learned_cfg: Mapping[str, Any]) -> SupportResp
         ).strip(),
         require_unlabeled_support=bool(utility_raw.get("require_unlabeled_support", True)),
     )
+    random_floor_raw = raw.get("random_floor", {})
+    if random_floor_raw is None:
+        random_floor_raw = {}
+    if not isinstance(random_floor_raw, Mapping):
+        raise ValueError("learned_utility.support_response_routing.random_floor must be a dictionary")
     return SupportResponseConfig(
         enabled=enabled,
         support_sizes=tuple(int(v) for v in raw.get("support_sizes", [8, 16, 32])),
@@ -316,6 +322,7 @@ def parse_support_response_config(learned_cfg: Mapping[str, Any]) -> SupportResp
             raw.get("source_leave_pseudo_domain_out_diagnostic", True)
         ),
         include_residual_shape_features=bool(raw.get("include_residual_shape_features", False)),
+        random_floor_enabled=bool(random_floor_raw.get("enabled", False)),
         support_utility=support_utility_cfg,
         risk_constrained=risk_cfg,
     )
@@ -458,6 +465,18 @@ def _privacy_fields(data_cfg: Mapping[str, Any] | None) -> Dict[str, Any]:
         "dataset_domain_semantics": str(data_cfg.get("dataset_domain_semantics", "unknown")),
         "storage_field": str(data_cfg.get("legacy_domain_field_alias", "magnification")),
         **PRIVACY_PROVENANCE_FIELDS,
+    }
+
+
+def _requires_patient_disjoint_support(data_cfg: Mapping[str, Any] | None) -> bool:
+    data_cfg = data_cfg or {}
+    return str(data_cfg.get("dataset_domain_semantics", "")).strip().lower() == "breakhis_magnification"
+
+
+def _patient_ids_by_index(metadata: Sequence[Mapping[str, object]]) -> Dict[int, str]:
+    return {
+        int(idx): str(row.get("patient_id", "") or "").strip()
+        for idx, row in enumerate(metadata)
     }
 
 
@@ -772,6 +791,25 @@ def _score_method_row(
     return row
 
 
+def _support_random_floor_scores(
+    *,
+    candidate_experts: Sequence[int],
+    seed: int,
+    target_domain: int,
+    support_seed: int,
+    support_size: int,
+) -> List[float]:
+    seed_value = (
+        int(seed) * 1_000_003
+        + int(target_domain) * 10_007
+        + int(support_seed) * 101
+        + int(support_size)
+        + 37
+    )
+    rng = np.random.default_rng(seed_value)
+    return [float(v) for v in rng.random(len(candidate_experts)).tolist()]
+
+
 def _risk_policy_decision(
     *,
     candidate_experts: Sequence[int],
@@ -1012,6 +1050,13 @@ def _support_split_manifest_row(
         "split_status": str(split.split_status),
         "support_eval_disjoint": int(set(split.support_indices).isdisjoint(set(split.eval_indices))),
         "support_labels_used": int(split.support_labels_used),
+        "patient_disjoint_required": int(getattr(split, "patient_disjoint_required", 0)),
+        "support_eval_patient_disjoint": int(getattr(split, "support_eval_patient_disjoint", 0)),
+        "support_patient_ids": str(getattr(split, "support_patient_ids", "")),
+        "eval_patient_ids": str(getattr(split, "eval_patient_ids", "")),
+        "missing_patient_id_count": int(getattr(split, "missing_patient_id_count", 0)),
+        "support_label_counts_json": str(getattr(split, "support_label_counts_json", "{}")),
+        "eval_label_counts_json": str(getattr(split, "eval_label_counts_json", "{}")),
         "support_eval_split_id": str(split.support_eval_split_id),
     }
 
@@ -1116,6 +1161,8 @@ def _source_inner_units_for_outer(
     embeddings: np.ndarray,
     sample_domains: np.ndarray,
     labels_by_index: Mapping[int, int],
+    patient_ids_by_index: Mapping[int, object] | None,
+    require_patient_disjoint: bool,
     centroids: Mapping[int, np.ndarray],
     nelbo_matrix: np.ndarray,
     expert_domains_int: Sequence[int],
@@ -1144,6 +1191,8 @@ def _source_inner_units_for_outer(
                         support_size=int(support_size),
                         sampling_policy=str(sampling_policy),
                         support_seed=int(support_seed),
+                        patient_ids_by_index=patient_ids_by_index,
+                        require_patient_disjoint=bool(require_patient_disjoint),
                     )
                     source_split_by_domain[int(pseudo_query)] = pseudo_split
                     if pseudo_split.split_status != "ok":
@@ -1311,6 +1360,8 @@ def _select_risk_threshold_for_outer(
     embeddings: np.ndarray,
     sample_domains: np.ndarray,
     labels_by_index: Mapping[int, int],
+    patient_ids_by_index: Mapping[int, object] | None,
+    require_patient_disjoint: bool,
     centroids: Mapping[int, np.ndarray],
     nelbo_matrix: np.ndarray,
     expert_domains_int: Sequence[int],
@@ -1328,6 +1379,8 @@ def _select_risk_threshold_for_outer(
         embeddings=embeddings,
         sample_domains=sample_domains,
         labels_by_index=labels_by_index,
+        patient_ids_by_index=patient_ids_by_index,
+        require_patient_disjoint=bool(require_patient_disjoint),
         centroids=centroids,
         nelbo_matrix=nelbo_matrix,
         expert_domains_int=expert_domains_int,
@@ -1512,6 +1565,8 @@ def _source_inner_support_units_for_outer(
     support_cfg: SupportResponseConfig,
     sample_domains: np.ndarray,
     labels_by_index: Mapping[int, int],
+    patient_ids_by_index: Mapping[int, object] | None,
+    require_patient_disjoint: bool,
     nelbo_matrix: np.ndarray,
     expert_domains_int: Sequence[int],
     expert_to_col: Mapping[int, int],
@@ -1534,6 +1589,8 @@ def _source_inner_support_units_for_outer(
                         support_size=int(support_size),
                         sampling_policy=str(sampling_policy),
                         support_seed=int(support_seed),
+                        patient_ids_by_index=patient_ids_by_index,
+                        require_patient_disjoint=bool(require_patient_disjoint),
                     )
                     if pseudo_split.split_status != "ok":
                         continue
@@ -1803,6 +1860,8 @@ def evaluate_support_response_routing_from_arrays(
     expert_to_col = {int(e): idx for idx, e in enumerate(expert_domains_int)}
     sample_domains = np.asarray([_as_domain(m["magnification"]) for m in metadata], dtype=np.int64)
     labels_by_index = {idx: _as_label(m) for idx, m in enumerate(metadata)}
+    patient_ids = _patient_ids_by_index(metadata)
+    require_patient_disjoint = _requires_patient_disjoint_support(data_cfg)
     centroids = _domain_centroids(np.asarray(embeddings, dtype=np.float64), sample_domains)
     privacy = _privacy_fields(data_cfg)
 
@@ -1836,6 +1895,8 @@ def evaluate_support_response_routing_from_arrays(
                 support_cfg=support_cfg,
                 sample_domains=sample_domains,
                 labels_by_index=labels_by_index,
+                patient_ids_by_index=patient_ids,
+                require_patient_disjoint=bool(require_patient_disjoint),
                 nelbo_matrix=nelbo_matrix,
                 expert_domains_int=expert_domains_int,
                 expert_to_col=expert_to_col,
@@ -1860,6 +1921,8 @@ def evaluate_support_response_routing_from_arrays(
                 embeddings=np.asarray(embeddings, dtype=np.float64),
                 sample_domains=sample_domains,
                 labels_by_index=labels_by_index,
+                patient_ids_by_index=patient_ids,
+                require_patient_disjoint=bool(require_patient_disjoint),
                 centroids=centroids,
                 nelbo_matrix=nelbo_matrix,
                 expert_domains_int=expert_domains_int,
@@ -1883,6 +1946,8 @@ def evaluate_support_response_routing_from_arrays(
                         support_size=int(support_size),
                         sampling_policy=str(sampling_policy),
                         support_seed=int(support_seed),
+                        patient_ids_by_index=patient_ids,
+                        require_patient_disjoint=bool(require_patient_disjoint),
                     )
                     split_rows.append(
                         _support_split_manifest_row(
@@ -1922,6 +1987,8 @@ def evaluate_support_response_routing_from_arrays(
                             support_size=int(support_size),
                             sampling_policy=str(sampling_policy),
                             support_seed=int(support_seed),
+                            patient_ids_by_index=patient_ids,
+                            require_patient_disjoint=bool(require_patient_disjoint),
                         )
                         source_split_by_domain[int(pseudo_query)] = pseudo_split
                         split_rows.append(
@@ -2038,6 +2105,42 @@ def evaluate_support_response_routing_from_arrays(
                         )
                     )
                     sample_index_counter += 1
+
+                    if support_cfg.random_floor_enabled:
+                        random_scores = _support_random_floor_scores(
+                            candidate_experts=target_candidates,
+                            seed=int(seed),
+                            target_domain=int(outer_target),
+                            support_seed=int(support_seed),
+                            support_size=int(support_size),
+                        )
+                        sample_rows.append(
+                            _score_method_row(
+                                method="support_random_expert_floor",
+                                fold=target_fold,
+                                target_domain=int(outer_target),
+                                support_seed=int(support_seed),
+                                support_size=int(support_size),
+                                sampling_policy=str(sampling_policy),
+                                support_eval_split_id=target_split.support_eval_split_id,
+                                candidate_experts=target_candidates,
+                                predicted_scores=random_scores,
+                                eval_mean_nelbo=target_eval_mean,
+                                support_mean_nelbo=target_support_mean,
+                                support_stderr_nelbo=target_support_stderr,
+                                sample_index=sample_index_counter,
+                                run_seed=int(seed),
+                                privacy_fields=privacy,
+                                support_n=int(target_split.support_size_actual),
+                                support_labels_used_for_routing=0,
+                                extra_fields={
+                                    "report_only": 1,
+                                    "chance_top1_oracle_hit": float(1.0 / max(len(target_candidates), 1)),
+                                    "random_floor_scope": "matched_seed_domain_support_seed_support_size",
+                                },
+                            )
+                        )
+                        sample_index_counter += 1
 
                     sample_rows.append(
                         _score_method_row(
@@ -2520,6 +2623,7 @@ def evaluate_support_response_routing_from_arrays(
         "ridge_l2": float(support_cfg.ridge_l2),
         "scaler_fit_scope": "source_training_pairs_only",
         "domain_level_aggregation": bool(support_cfg.domain_level_aggregation),
+        "patient_disjoint_support_eval_required": bool(require_patient_disjoint),
         "support_raw_rows_exported": True,
         "support_raw_rows_contains_eval_nelbo": False,
         "support_raw_rows_contains_identity_fields": False,
@@ -2540,6 +2644,15 @@ def evaluate_support_response_routing_from_arrays(
             "require_unlabeled_support": bool(support_cfg.support_utility.require_unlabeled_support),
             "high_regret_gap_pct_threshold": float(HIGH_REGRET_GAP_PCT_THRESHOLD),
             "bottom_half_rank_threshold": int(BOTTOM_HALF_RANK_THRESHOLD),
+        },
+        "random_floor": {
+            "enabled": bool(support_cfg.random_floor_enabled),
+            "method": "support_random_expert_floor",
+            "method_role": "control",
+            "adoption_eligible": False,
+            "diagnostic_only": True,
+            "report_only": True,
+            "selection_scope": "matched_seed_domain_support_seed_support_size",
         },
         "risk_constrained_response_routing": {
             "enabled": bool(support_cfg.risk_constrained.enabled),

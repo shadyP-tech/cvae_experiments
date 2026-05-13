@@ -37,11 +37,19 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         )
     experiment_name = str((experiment_cfg or {}).get("name", "")).strip().lower()
     is_response_routing_protocol = experiment_name == "learned_utility_response_routing_v1"
-    is_support_response_routing_protocol = experiment_name in {
+    camelyon17_support_response_protocols = {
         "learned_utility_support_response_routing_v1",
         "learned_utility_response_routing_risk_constrained_v1",
         "camelyon17_support_estimated_utility_routing_v2",
     }
+    breakhis_support_response_protocols = {
+        "breakhis_support_estimated_utility_routing_v1",
+    }
+    is_camelyon17_support_response_protocol = experiment_name in camelyon17_support_response_protocols
+    is_breakhis_support_response_protocol = experiment_name in breakhis_support_response_protocols
+    is_support_response_routing_protocol = (
+        is_camelyon17_support_response_protocol or is_breakhis_support_response_protocol
+    )
     is_learned_utility_v2 = experiment_name in {
         "learned_utility_routing_v2",
         "learned_utility_routing_safe_v2",
@@ -72,7 +80,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
     dataset_domain_semantics = data_cfg.get("dataset_domain_semantics")
     if dataset_domain_semantics is not None and not str(dataset_domain_semantics).strip():
         raise ValueError("data.dataset_domain_semantics must be non-empty when provided")
-    if is_support_response_routing_protocol:
+    if is_camelyon17_support_response_protocol:
         if str(data_cfg.get("dataset_type", "")).strip().lower() != "camelyon17":
             raise ValueError(
                 "data.dataset_type must be 'camelyon17' for learned_utility_support_response_routing_v1"
@@ -90,6 +98,21 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                 "data.dataset_domain_semantics must be 'camelyon17_center' "
                 "for learned_utility_support_response_routing_v1"
             )
+    if is_breakhis_support_response_protocol:
+        if str(data_cfg.get("dataset_type", "")).strip().lower() != "breakhis":
+            raise ValueError("data.dataset_type must be 'breakhis' for breakhis_support_estimated_utility_routing_v1")
+        if str(data_cfg.get("dataset_domain_semantics", "")).strip().lower() != "breakhis_magnification":
+            raise ValueError(
+                "data.dataset_domain_semantics must be 'breakhis_magnification' "
+                "for breakhis_support_estimated_utility_routing_v1"
+            )
+        if str(data_cfg.get("legacy_domain_field_alias", "magnification")).strip().lower() != "magnification":
+            raise ValueError(
+                "data.legacy_domain_field_alias must be 'magnification' "
+                "for breakhis_support_estimated_utility_routing_v1"
+            )
+        if bool(data_cfg.get("require_patient_ids", False)) is not True:
+            raise ValueError("data.require_patient_ids must be true for breakhis_support_estimated_utility_routing_v1")
     split_cap_profile = str(data_cfg.get("split_cap_profile", "legacy")).strip().lower()
     allowed_split_cap_profiles = {"legacy", "development", "final", "custom"}
     if split_cap_profile not in allowed_split_cap_profiles:
@@ -278,6 +301,11 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError(
             f"features.backbone_type must be one of {sorted(allowed_backbones)}, got: {backbone_type}"
         )
+    if is_breakhis_support_response_protocol and backbone_type != "dinov2_vitb14":
+        raise ValueError(
+            "features.backbone_type must be 'dinov2_vitb14' "
+            "for breakhis_support_estimated_utility_routing_v1"
+        )
 
     feature_extractor_name = features_cfg.get("feature_extractor_name")
     if feature_extractor_name is not None:
@@ -322,6 +350,13 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
     for m in magnifications:
         if int(m) < 0:
             raise ValueError(f"data.magnifications must contain only non-negative integers, got: {m}")
+    if is_breakhis_support_response_protocol:
+        configured_domains = [int(m) for m in magnifications]
+        if configured_domains != [40, 100, 200, 400]:
+            raise ValueError(
+                "data.magnifications must be exactly [40, 100, 200, 400] "
+                "for breakhis_support_estimated_utility_routing_v1"
+            )
 
     routing_strategy = str(cfg.get("routing", {}).get("strategy", "")).strip()
     if not routing_strategy:
@@ -652,6 +687,11 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             for value in support_sizes:
                 if int(value) <= 0:
                     raise ValueError("learned_utility.support_response_routing.support_sizes must be positive")
+            if is_breakhis_support_response_protocol and [int(v) for v in support_sizes] != [4, 8, 16, 32]:
+                raise ValueError(
+                    "learned_utility.support_response_routing.support_sizes must be exactly [4, 8, 16, 32] "
+                    "for breakhis_support_estimated_utility_routing_v1"
+                )
 
             support_seeds = support_response_cfg.get("support_seeds", [17, 23])
             if not isinstance(support_seeds, list) or not support_seeds:
@@ -659,6 +699,11 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             for value in support_seeds:
                 if int(value) < 0:
                     raise ValueError("learned_utility.support_response_routing.support_seeds must be non-negative")
+            if is_breakhis_support_response_protocol and [int(v) for v in support_seeds] != [17, 23, 31]:
+                raise ValueError(
+                    "learned_utility.support_response_routing.support_seeds must be exactly [17, 23, 31] "
+                    "for breakhis_support_estimated_utility_routing_v1"
+                )
 
             sampling_policies = support_response_cfg.get("sampling_policies", ["random"])
             if not isinstance(sampling_policies, list) or not sampling_policies:
@@ -671,6 +716,11 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                 raise ValueError(
                     "learned_utility.support_response_routing.sampling_policies must be subset of "
                     f"{sorted(allowed_sampling)}, got unknown {bad_sampling}"
+                )
+            if is_breakhis_support_response_protocol and [str(v).strip().lower() for v in sampling_policies] != ["random"]:
+                raise ValueError(
+                    "learned_utility.support_response_routing.sampling_policies must be exactly ['random'] "
+                    "for breakhis_support_estimated_utility_routing_v1"
                 )
 
             feature_regimes = support_response_cfg.get(
@@ -727,6 +777,38 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                 support_response_cfg.get("source_leave_pseudo_domain_out_diagnostic", True),
                 "learned_utility.support_response_routing.source_leave_pseudo_domain_out_diagnostic",
             )
+            random_floor_cfg = support_response_cfg.get("random_floor", {})
+            if random_floor_cfg is not None and not isinstance(random_floor_cfg, dict):
+                raise ValueError("learned_utility.support_response_routing.random_floor must be a dictionary")
+            random_floor_cfg = random_floor_cfg or {}
+            _ensure_bool(
+                random_floor_cfg.get("enabled", False),
+                "learned_utility.support_response_routing.random_floor.enabled",
+            )
+            _ensure_bool(
+                random_floor_cfg.get("adoption_eligible", False),
+                "learned_utility.support_response_routing.random_floor.adoption_eligible",
+            )
+            _ensure_bool(
+                random_floor_cfg.get("diagnostic_only", True),
+                "learned_utility.support_response_routing.random_floor.diagnostic_only",
+            )
+            _ensure_bool(
+                random_floor_cfg.get("report_only", True),
+                "learned_utility.support_response_routing.random_floor.report_only",
+            )
+            if bool(random_floor_cfg.get("enabled", False)):
+                if bool(random_floor_cfg.get("adoption_eligible", False)):
+                    raise ValueError("support random floor must not be adoption eligible")
+                if not bool(random_floor_cfg.get("diagnostic_only", True)):
+                    raise ValueError("support random floor must be diagnostic_only")
+                if not bool(random_floor_cfg.get("report_only", True)):
+                    raise ValueError("support random floor must be report_only")
+            if is_breakhis_support_response_protocol and not bool(random_floor_cfg.get("enabled", False)):
+                raise ValueError(
+                    "learned_utility.support_response_routing.random_floor.enabled must be true "
+                    "for breakhis_support_estimated_utility_routing_v1"
+                )
             support_utility_cfg = support_response_cfg.get("support_utility", {})
             if support_utility_cfg is not None and not isinstance(support_utility_cfg, dict):
                 raise ValueError(

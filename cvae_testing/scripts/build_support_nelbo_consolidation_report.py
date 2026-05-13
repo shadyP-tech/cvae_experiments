@@ -31,16 +31,21 @@ RUN_SEEDS = (42, 43, 44)
 HELDOUT_CENTERS = (0, 1, 2, 3, 4)
 SUPPORT_SEEDS = (17, 23, 31)
 SUPPORT_SIZES = (4, 8, 16, 32)
+RUN_ID_TEMPLATE = "support_utility_v2_seed{seed}"
+OUTPUT_PREFIX = "support_nelbo"
+DATASET_CONTEXT = "camelyon17"
 
 DIRECT_METHOD = "support_set_nelbo_top1"
 CONSERVATIVE_METHOD = "support_set_nelbo_conservative"
 METADATA_METHOD = "support_metadata_routing"
 STATIC_METHOD = "support_static_embedding_routing"
+RANDOM_METHOD = "support_random_expert_floor"
 METHOD_LABELS = {
     DIRECT_METHOD: "direct_support_nelbo",
     CONSERVATIVE_METHOD: "conservative_support_nelbo",
     METADATA_METHOD: "metadata_routing",
     STATIC_METHOD: "static_embedding_routing",
+    RANDOM_METHOD: "random_expert_floor",
 }
 PRIMARY_METHOD_LABEL = "direct_support_nelbo"
 CONSERVATIVE_METHOD_LABEL = "conservative_support_nelbo"
@@ -53,11 +58,21 @@ EXPECTED_SELECTED_ROWS = (
     * 2
 )
 EXPECTED_ALPHA_ROWS = len(RUN_SEEDS) * len(HELDOUT_CENTERS) * len(SUPPORT_SIZES)
+EXPECTED_RAW_SUPPORT_ROWS = (
+    len(RUN_SEEDS)
+    * len(HELDOUT_CENTERS)
+    * len(SUPPORT_SEEDS)
+    * sum(SUPPORT_SIZES)
+    * max(len(HELDOUT_CENTERS) - 1, 0)
+)
 LINEAGE_NOTE = (
     "This report supersedes earlier selection summaries for thesis interpretation. "
     "It does not invalidate their protocol checks; it revises the claim level based "
     "on per-k support-seed stability and alpha-selection diagnostics."
 )
+SEED_TOP1_MARGIN = 0.0
+STATIC_GAP_MATERIAL_LOSS_TOLERANCE_PCT = 1.0
+RANDOM_FLOOR_TOP1_MARGIN = 0.05
 
 
 def _read_csv(path: Path) -> List[dict]:
@@ -189,12 +204,13 @@ def _spearman_tie_present(row: Mapping[str, Any]) -> bool:
 def _result_paths(experiment_root: Path) -> List[Path]:
     paths: List[Path] = []
     for seed in RUN_SEEDS:
-        run_dir = experiment_root / f"support_utility_v2_seed{seed}"
+        run_dir = experiment_root / RUN_ID_TEMPLATE.format(seed=seed)
         reports_dir = run_dir / "reports"
         required = [
             run_dir / "config_resolved.yaml",
             reports_dir / "support_response_sample_selections.csv",
             reports_dir / "support_utility_selected_hyperparams.csv",
+            reports_dir / "support_response_support_nelbo_rows.csv",
             reports_dir / "support_response_split_manifest.csv",
             reports_dir / "support_response_results.json",
             reports_dir / "leakage_report.json",
@@ -208,10 +224,11 @@ def _result_paths(experiment_root: Path) -> List[Path]:
     return paths
 
 
-def _load_source_rows(experiment_root: Path) -> Tuple[List[dict], List[dict], List[dict]]:
+def _load_source_rows(experiment_root: Path) -> Tuple[List[dict], List[dict], List[dict], int]:
     selected_rows: List[dict] = []
     alpha_rows: List[dict] = []
     split_rows: List[dict] = []
+    raw_support_rows_observed = 0
     for run_dir in _result_paths(experiment_root):
         run_seed = _run_seed_from_run_dir(run_dir)
         reports_dir = run_dir / "reports"
@@ -219,7 +236,7 @@ def _load_source_rows(experiment_root: Path) -> Tuple[List[dict], List[dict], Li
         sample_path = reports_dir / "support_response_sample_selections.csv"
         for row in _read_csv(sample_path):
             method = str(row.get("method", ""))
-            if method not in {DIRECT_METHOD, CONSERVATIVE_METHOD, METADATA_METHOD, STATIC_METHOD}:
+            if method not in {DIRECT_METHOD, CONSERVATIVE_METHOD, METADATA_METHOD, STATIC_METHOD, RANDOM_METHOD}:
                 continue
             row = dict(row)
             row["run_seed"] = run_seed
@@ -244,6 +261,9 @@ def _load_source_rows(experiment_root: Path) -> Tuple[List[dict], List[dict], Li
             row["source_path"] = str(split_path)
             split_rows.append(row)
 
+        raw_path = reports_dir / "support_response_support_nelbo_rows.csv"
+        raw_support_rows_observed += len(_read_csv(raw_path))
+
     direct_conservative = [
         row for row in selected_rows if row.get("method") in {DIRECT_METHOD, CONSERVATIVE_METHOD}
     ]
@@ -258,7 +278,12 @@ def _load_source_rows(experiment_root: Path) -> Tuple[List[dict], List[dict], Li
             "Alpha-selection row-count assertion failed. "
             f"Expected {EXPECTED_ALPHA_ROWS} alpha-selection rows; found {len(alpha_rows)}."
         )
-    return selected_rows, alpha_rows, split_rows
+    if raw_support_rows_observed != EXPECTED_RAW_SUPPORT_ROWS:
+        raise RuntimeError(
+            "Raw support-NELBO row-count assertion failed. "
+            f"Expected {EXPECTED_RAW_SUPPORT_ROWS} raw rows; found {raw_support_rows_observed}."
+        )
+    return selected_rows, alpha_rows, split_rows, raw_support_rows_observed
 
 
 def _group_key(row: Mapping[str, Any]) -> Tuple[int, int, int, int, str]:
@@ -286,7 +311,15 @@ def _summarize_method(rows: Sequence[Mapping[str, Any]], method: str) -> dict:
     return {
         "method": METHOD_LABELS.get(method, method),
         "source_method": method,
-        "role": "primary" if method == DIRECT_METHOD else "diagnostic_ablation" if method == CONSERVATIVE_METHOD else "baseline",
+        "role": (
+            "primary"
+            if method == DIRECT_METHOD
+            else "diagnostic_ablation"
+            if method == CONSERVATIVE_METHOD
+            else "diagnostic_floor"
+            if method == RANDOM_METHOD
+            else "baseline"
+        ),
         "n_rows": len(vals),
         "top1_oracle_hit_mean": _mean(_to_float(row.get("top1_oracle_hit", 0.0)) for row in vals),
         "top1_oracle_hit_std": _std(_to_float(row.get("top1_oracle_hit", 0.0)) for row in vals),
@@ -304,9 +337,11 @@ def _summarize_method(rows: Sequence[Mapping[str, Any]], method: str) -> dict:
 
 
 def build_summary_rows(rows: Sequence[Mapping[str, Any]]) -> List[dict]:
+    methods = [METADATA_METHOD, STATIC_METHOD, RANDOM_METHOD, DIRECT_METHOD, CONSERVATIVE_METHOD]
     return [
         _summarize_method(rows, method)
-        for method in [METADATA_METHOD, STATIC_METHOD, DIRECT_METHOD, CONSERVATIVE_METHOD]
+        for method in methods
+        if any(str(row.get("method", "")) == method for row in rows)
     ]
 
 
@@ -403,6 +438,257 @@ def build_per_center_gap_rows(rows: Sequence[Mapping[str, Any]]) -> List[dict]:
             }
         )
     return out
+
+
+def _matched_rows_by_unit(rows: Sequence[Mapping[str, Any]], method: str) -> Dict[Tuple[int, int, int, int], Mapping[str, Any]]:
+    return {
+        (
+            _to_int(row.get("run_seed", row.get("seed", 0))),
+            _to_int(row.get("query_domain", row.get("target_domain", 0))),
+            _to_int(row.get("support_size_requested", row.get("support_size", 0))),
+            _to_int(row.get("support_seed", 0)),
+        ): row
+        for row in rows
+        if str(row.get("method", "")) == method
+    }
+
+
+def build_per_magnification_decision_rows(rows: Sequence[Mapping[str, Any]]) -> List[dict]:
+    metadata = _matched_rows_by_unit(rows, METADATA_METHOD)
+    static = _matched_rows_by_unit(rows, STATIC_METHOD)
+    out: List[dict] = []
+    for row in sorted(
+        [r for r in rows if str(r.get("method", "")) == DIRECT_METHOD],
+        key=lambda r: (
+            _to_int(r.get("query_domain", 0)),
+            _to_int(r.get("support_size_requested", 0)),
+            _to_int(r.get("support_seed", 0)),
+            _to_int(r.get("run_seed", r.get("seed", 0))),
+        ),
+    ):
+        key = (
+            _to_int(row.get("run_seed", row.get("seed", 0))),
+            _to_int(row.get("query_domain", row.get("target_domain", 0))),
+            _to_int(row.get("support_size_requested", 0)),
+            _to_int(row.get("support_seed", 0)),
+        )
+        metadata_row = metadata.get(key, {})
+        static_row = static.get(key, {})
+        out.append(
+            {
+                "heldout_magnification": key[1],
+                "support_size": key[2],
+                "support_seed": key[3],
+                "seed": key[0],
+                "selected_expert": _to_int(row.get("selected_expert", 0)),
+                "oracle_expert": _to_int(row.get("candidate_oracle_expert", row.get("oracle_expert", 0))),
+                "support_nelbo_selected": _to_float(row.get("mean_support_nelbo", 0.0)),
+                "eval_nelbo_selected": _to_float(row.get("selected_nelbo", 0.0)),
+                "eval_nelbo_oracle": _to_float(row.get("candidate_oracle_nelbo", row.get("oracle_nelbo", 0.0))),
+                "oracle_gap_pct": _to_float(row.get("mean_oracle_gap_pct", row.get("oracle_gap_pct", 0.0))),
+                "metadata_selected_expert": _to_int(metadata_row.get("selected_expert", 0)),
+                "static_embedding_selected_expert": _to_int(static_row.get("selected_expert", 0)),
+            }
+        )
+    return out
+
+
+def build_rank_consistency_rows(rows: Sequence[Mapping[str, Any]]) -> List[dict]:
+    out: List[dict] = []
+    for center in HELDOUT_CENTERS:
+        center_rows = [
+            row for row in rows
+            if str(row.get("method", "")) == DIRECT_METHOD
+            and _to_int(row.get("query_domain", row.get("target_domain", 0))) == int(center)
+        ]
+        spearman_vals = [_to_float(row.get("spearman", 0.0)) for row in center_rows if _spearman_valid(row)]
+        spearman_sorted = sorted(spearman_vals)
+        if not spearman_sorted:
+            median_spearman = 0.0
+        elif len(spearman_sorted) % 2 == 1:
+            median_spearman = float(spearman_sorted[len(spearman_sorted) // 2])
+        else:
+            mid = len(spearman_sorted) // 2
+            median_spearman = float((spearman_sorted[mid - 1] + spearman_sorted[mid]) / 2.0)
+        by_k: Dict[int, List[Mapping[str, Any]]] = {}
+        for row in center_rows:
+            by_k.setdefault(_to_int(row.get("support_size_requested", 0)), []).append(row)
+        gap_by_k = {
+            k: _mean(_to_float(row.get("mean_oracle_gap_pct", 0.0)) for row in vals)
+            for k, vals in by_k.items()
+        }
+        best_k = min(gap_by_k, key=gap_by_k.get) if gap_by_k else ""
+        worst_k = max(gap_by_k, key=gap_by_k.get) if gap_by_k else ""
+        out.append(
+            {
+                "heldout_magnification": int(center),
+                "mean_spearman": _mean(spearman_vals),
+                "median_spearman": median_spearman,
+                "top1": _mean(_to_float(row.get("top1_oracle_hit", 0.0)) for row in center_rows),
+                "oracle_gap_pct": _mean(_to_float(row.get("mean_oracle_gap_pct", 0.0)) for row in center_rows),
+                "best_k": best_k,
+                "worst_k": worst_k,
+            }
+        )
+    return out
+
+
+def build_seed_stability_rows(rows: Sequence[Mapping[str, Any]]) -> List[dict]:
+    return [
+        {
+            "seed": seed,
+            "method": method,
+            "top1_oracle_hit_mean": _mean(
+                _to_float(row.get("top1_oracle_hit", 0.0))
+                for row in rows
+                if _to_int(row.get("run_seed", row.get("seed", 0))) == int(seed)
+                and str(row.get("method", "")) == method
+            ),
+            "spearman_mean": _mean(
+                _to_float(row.get("spearman", 0.0))
+                for row in rows
+                if _to_int(row.get("run_seed", row.get("seed", 0))) == int(seed)
+                and str(row.get("method", "")) == method
+                and _spearman_valid(row)
+            ),
+            "oracle_gap_pct_mean": _mean(
+                _to_float(row.get("mean_oracle_gap_pct", 0.0))
+                for row in rows
+                if _to_int(row.get("run_seed", row.get("seed", 0))) == int(seed)
+                and str(row.get("method", "")) == method
+            ),
+        }
+        for seed in RUN_SEEDS
+        for method in [METADATA_METHOD, STATIC_METHOD, RANDOM_METHOD, DIRECT_METHOD, CONSERVATIVE_METHOD]
+        if any(
+            _to_int(row.get("run_seed", row.get("seed", 0))) == int(seed)
+            and str(row.get("method", "")) == method
+            for row in rows
+        )
+    ]
+
+
+def build_pass_rule_summary(
+    summary_rows: Sequence[Mapping[str, Any]],
+    seed_stability_rows: Sequence[Mapping[str, Any]],
+) -> Dict[str, Any]:
+    by_source = {str(row.get("source_method", "")): row for row in summary_rows}
+    seed_by_method = {
+        (int(row["seed"]), str(row["method"])): row
+        for row in seed_stability_rows
+    }
+
+    direct = by_source.get(DIRECT_METHOD, {})
+    metadata = by_source.get(METADATA_METHOD, {})
+    static = by_source.get(STATIC_METHOD, {})
+    random_floor = by_source.get(RANDOM_METHOD, {})
+
+    per_seed_top1 = []
+    per_seed_gap = []
+    for seed in RUN_SEEDS:
+        direct_seed = seed_by_method.get((int(seed), DIRECT_METHOD))
+        metadata_seed = seed_by_method.get((int(seed), METADATA_METHOD))
+        if direct_seed is None or metadata_seed is None:
+            continue
+        direct_top1 = _to_float(direct_seed.get("top1_oracle_hit_mean", 0.0))
+        metadata_top1 = _to_float(metadata_seed.get("top1_oracle_hit_mean", 0.0))
+        direct_gap = _to_float(direct_seed.get("oracle_gap_pct_mean", 0.0))
+        metadata_gap = _to_float(metadata_seed.get("oracle_gap_pct_mean", 0.0))
+        per_seed_top1.append(
+            {
+                "seed": int(seed),
+                "direct_top1": direct_top1,
+                "metadata_top1": metadata_top1,
+                "margin": direct_top1 - metadata_top1,
+                "pass": int(direct_top1 > metadata_top1 + SEED_TOP1_MARGIN),
+            }
+        )
+        per_seed_gap.append(
+            {
+                "seed": int(seed),
+                "direct_oracle_gap_pct": direct_gap,
+                "metadata_oracle_gap_pct": metadata_gap,
+                "direct_minus_metadata_gap_pct": direct_gap - metadata_gap,
+                "pass": int(direct_gap <= metadata_gap + 1.0e-12),
+            }
+        )
+
+    direct_top1 = _to_float(direct.get("top1_oracle_hit_mean", 0.0))
+    metadata_top1 = _to_float(metadata.get("top1_oracle_hit_mean", 0.0))
+    direct_spearman = _to_float(direct.get("spearman_mean", 0.0))
+    metadata_spearman = _to_float(metadata.get("spearman_mean", 0.0))
+    direct_gap = _to_float(direct.get("oracle_gap_pct_mean", 0.0))
+    metadata_gap = _to_float(metadata.get("oracle_gap_pct_mean", 0.0))
+    static_gap = _to_float(static.get("oracle_gap_pct_mean", float("inf")), default=float("inf"))
+    random_top1 = _to_float(random_floor.get("top1_oracle_hit_mean", float("nan")), default=float("nan"))
+
+    checks = {
+        "top1_beats_metadata_consistent_seed_margin": {
+            "status": "pass" if per_seed_top1 and all(row["pass"] for row in per_seed_top1) else "fail",
+            "margin_required": SEED_TOP1_MARGIN,
+            "per_seed": per_seed_top1,
+        },
+        "spearman_beats_metadata_and_positive": {
+            "status": "pass" if direct_spearman > metadata_spearman and direct_spearman > 0.0 else "fail",
+            "direct_spearman": direct_spearman,
+            "metadata_spearman": metadata_spearman,
+        },
+        "oracle_gap_lower_than_metadata": {
+            "status": "pass" if direct_gap < metadata_gap else "fail",
+            "direct_oracle_gap_pct": direct_gap,
+            "metadata_oracle_gap_pct": metadata_gap,
+        },
+        "no_seed_oracle_gap_sign_reversal_against_metadata": {
+            "status": "pass" if per_seed_gap and all(row["pass"] for row in per_seed_gap) else "fail",
+            "per_seed": per_seed_gap,
+        },
+        "oracle_gap_not_materially_worse_than_static_embedding": {
+            "status": (
+                "pass"
+                if math.isfinite(static_gap)
+                and direct_gap <= static_gap + STATIC_GAP_MATERIAL_LOSS_TOLERANCE_PCT
+                else "fail"
+            ),
+            "direct_oracle_gap_pct": direct_gap,
+            "static_embedding_oracle_gap_pct": static_gap,
+            "material_loss_tolerance_pct": STATIC_GAP_MATERIAL_LOSS_TOLERANCE_PCT,
+        },
+        "top1_meaningfully_above_random_floor": {
+            "status": (
+                "pass"
+                if math.isfinite(random_top1)
+                and direct_top1 >= random_top1 + RANDOM_FLOOR_TOP1_MARGIN
+                else "fail"
+            ),
+            "direct_top1": direct_top1,
+            "random_floor_top1": random_top1,
+            "margin_required": RANDOM_FLOOR_TOP1_MARGIN,
+            "chance_level_note": "BreakHis LOQDO has three candidate experts per fold, so random top1 is approximately 1/3.",
+        },
+    }
+    first_five = [
+        "top1_beats_metadata_consistent_seed_margin",
+        "spearman_beats_metadata_and_positive",
+        "oracle_gap_lower_than_metadata",
+        "no_seed_oracle_gap_sign_reversal_against_metadata",
+        "oracle_gap_not_materially_worse_than_static_embedding",
+    ]
+    first_five_pass = all(checks[name]["status"] == "pass" for name in first_five)
+    random_pass = checks["top1_meaningfully_above_random_floor"]["status"] == "pass"
+    if first_five_pass and random_pass:
+        verdict = "PASS"
+    elif first_five_pass:
+        verdict = "DOWNGRADED_RANDOM_FLOOR"
+    else:
+        verdict = "FAIL"
+    return {
+        "verdict": verdict,
+        "checks": checks,
+        "interpretation": (
+            "PASS supports cross-domain plausibility under BreakHis magnification shift only. "
+            "DOWNGRADED_RANDOM_FLOOR means the non-random criteria pass but top1 is too close to matched random."
+        ),
+    }
 
 
 def _alpha_distribution_rows(alpha_rows: Sequence[Mapping[str, Any]]) -> List[dict]:
@@ -606,6 +892,11 @@ def build_protocol_audit_rows(rows: Sequence[Mapping[str, Any]], alpha_rows: Seq
             if alpha_applicable
             else ""
         )
+        patient_required = _to_int(split.get("patient_disjoint_required", 0))
+        support_eval_patient_disjoint_ok = int(
+            patient_required == 0
+            or _to_int(split.get("support_eval_patient_disjoint", 0)) == 1
+        )
         out.append(
             {
                 "run_seed": run_seed,
@@ -617,6 +908,10 @@ def build_protocol_audit_rows(rows: Sequence[Mapping[str, Any]], alpha_rows: Seq
                 "split_status": split.get("split_status", ""),
                 "split_row_found": int(bool(split)),
                 "support_eval_disjoint_ok": int(_to_int(split.get("support_eval_disjoint", 0)) == 1),
+                "patient_disjoint_required": patient_required,
+                "support_eval_patient_disjoint_ok": support_eval_patient_disjoint_ok,
+                "missing_patient_id_count": _to_int(split.get("missing_patient_id_count", 0)),
+                "support_label_counts_json": split.get("support_label_counts_json", "{}"),
                 "support_labels_unused_for_routing_ok": int(_to_int(split.get("support_labels_used", 1)) == 0),
                 "target_expert_excluded_ok": int(_to_int(row.get("target_expert_excluded", 0)) == 1),
                 "candidate_pool_excludes_target_expert_ok": int(target not in candidates),
@@ -641,6 +936,7 @@ def build_protocol_audit_rows(rows: Sequence[Mapping[str, Any]], alpha_rows: Seq
 def _audit_summary(audit_rows: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
     checks = [
         "support_eval_disjoint_ok",
+        "support_eval_patient_disjoint_ok",
         "support_labels_unused_for_routing_ok",
         "target_expert_excluded_ok",
         "candidate_pool_excludes_target_expert_ok",
@@ -760,6 +1056,12 @@ def _format_float(value: object, digits: int = 3) -> str:
         return str(value)
 
 
+def outputs_protocol_audit_name() -> str:
+    if OUTPUT_PREFIX == "support_nelbo":
+        return "support_nelbo_protocol_audit.csv"
+    return f"{OUTPUT_PREFIX}_protocol_audit.csv"
+
+
 def _markdown_table(rows: Sequence[Mapping[str, Any]], columns: Sequence[Tuple[str, str]], *, limit: int | None = None) -> str:
     chosen = list(rows[:limit] if limit is not None else rows)
     header = "| " + " | ".join(label for label, _ in columns) + " |"
@@ -787,6 +1089,7 @@ def write_report(
     stability_rows: Sequence[Mapping[str, Any]],
     audit_summary: Mapping[str, Any],
     cross_check: Mapping[str, Any],
+    pass_rule: Mapping[str, Any],
     spearman_warnings: Sequence[str],
 ) -> None:
     alpha_summary = _alpha_degeneracy_summary(alpha_distribution)
@@ -796,13 +1099,35 @@ def write_report(
     ]
     primary = next(row for row in summary_rows if row["method"] == PRIMARY_METHOD_LABEL)
     conservative = next(row for row in summary_rows if row["method"] == CONSERVATIVE_METHOD_LABEL)
+    is_breakhis = str(DATASET_CONTEXT).strip().lower() == "breakhis"
+    title = (
+        "BreakHis Cross-Dataset Stress Test Of Direct Support-NELBO"
+        if is_breakhis
+        else "Support-NELBO Consolidation Report"
+    )
+    claim_boundary = (
+        "direct support-set NELBO is stress-tested under BreakHis magnification-domain shift; "
+        "this does not prove robustness across hospital, scanner, staining, lab, or patient-population shifts."
+        if is_breakhis
+        else "direct support-set NELBO is the strongest support-estimated utility variant in the current Camelyon17 support experiment; this report does not make a broader overall router-ranking claim."
+    )
+    allowed_claim = (
+        "Direct support-set NELBO was stress-tested as a target-local utility estimator under BreakHis leave-one-magnification-out routing using unlabeled patient-disjoint target support and held-out NELBO utility evaluation."
+        if is_breakhis
+        else "Direct support-set NELBO is the primary support-estimated utility router and the strongest support-estimated utility variant in the current Camelyon17 support experiment."
+    )
+    disallowed_claim = (
+        "This experiment does not prove general support-NELBO robustness across all medical domain shifts; BreakHis magnification shift is narrower than hospital, scanner, staining, lab, or patient-population shift."
+        if is_breakhis
+        else "Conservative support NELBO improves small-k stability, or alpha regularization is meaningful in this run."
+    )
     small_k = _small_k_stability_conclusion(stability_rows)
     warnings = list(spearman_warnings)
     if not warnings:
         warnings.append("No Spearman variance groups were dropped.")
 
     lines = [
-        "# Support-NELBO Consolidation Report",
+        f"# {title}",
         "",
         LINEAGE_NOTE,
         "",
@@ -811,7 +1136,8 @@ def write_report(
         "- Primary method: `direct_support_nelbo`",
         "- Conservative method: `diagnostic ablation only`",
         "- Result wording: Direct support-set NELBO is the primary support-estimated utility router.",
-        "- Claim boundary: direct support-set NELBO is the strongest support-estimated utility variant in the current Camelyon17 support experiment; this report does not make a broader overall router-ranking claim.",
+        *([f"- PASS-rule verdict: `{pass_rule.get('verdict', 'unknown')}`"] if is_breakhis else []),
+        f"- Claim boundary: {claim_boundary}",
         "- Reason: conservative scoring is protocol-safe, but alpha selection is mostly degenerate and does not demonstrate a stable small-k improvement.",
         "",
         "## Decision layers",
@@ -819,7 +1145,7 @@ def write_report(
         "### Protocol validity",
         "",
         f"- Overall protocol validity: `{audit_summary.get('overall_protocol_validity', 'unknown')}`",
-        "- Support/eval disjointness, target expert exclusion, candidate-pool exclusion, eval-NELBO isolation, eval-statistics isolation, and alpha preselection are audited in `support_nelbo_protocol_audit.csv`.",
+        f"- Support/eval disjointness, target expert exclusion, candidate-pool exclusion, eval-NELBO isolation, eval-statistics isolation, and alpha preselection are audited in `{outputs_protocol_audit_name()}`.",
         "",
         "### Utility performance",
         "",
@@ -908,9 +1234,9 @@ def write_report(
         "",
         str(cross_check.get("interpretation", "")),
         "",
-        "Allowed thesis claim: Direct support-set NELBO is the primary support-estimated utility router and the strongest support-estimated utility variant in the current Camelyon17 support experiment.",
+        f"Allowed thesis claim: {allowed_claim}",
         "",
-        "Not allowed: Conservative support NELBO improves small-k stability, or alpha regularization is meaningful in this run.",
+        f"Not allowed: {disallowed_claim}",
         "",
     ]
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -918,29 +1244,59 @@ def write_report(
 
 
 def build_outputs(experiment_root: Path, output_dir: Path, decision_table: Path) -> Dict[str, Any]:
-    all_rows, alpha_rows, split_rows = _load_source_rows(experiment_root)
+    all_rows, alpha_rows, split_rows, raw_support_rows_observed = _load_source_rows(experiment_root)
     selected_support_rows = _selected_rows(all_rows, [DIRECT_METHOD, CONSERVATIVE_METHOD])
 
     summary_rows = build_summary_rows(all_rows)
     per_k_rows = build_per_k_rows(selected_support_rows)
     alpha_distribution = _alpha_distribution_rows(alpha_rows)
     per_center_rows = build_per_center_gap_rows(selected_support_rows)
+    per_magnification_rows = build_per_magnification_decision_rows(all_rows)
+    rank_consistency_rows = build_rank_consistency_rows(all_rows)
+    seed_stability_rows = build_seed_stability_rows(all_rows)
+    pass_rule = (
+        build_pass_rule_summary(summary_rows, seed_stability_rows)
+        if str(DATASET_CONTEXT).strip().lower() == "breakhis"
+        else {
+            "verdict": "NOT_APPLICABLE_CAMELYON17_DEFAULT",
+            "checks": {},
+            "interpretation": "BreakHis PASS/downgrade rule is only applied when --dataset-context breakhis.",
+        }
+    )
     stability_rows, stability_extra = build_stability_rows(selected_support_rows)
     audit_rows = build_protocol_audit_rows(all_rows, alpha_rows, split_rows)
     audit_summary = _audit_summary(audit_rows)
     cross_check = _cross_check_decision_table(summary_rows, decision_table)
     alpha_summary = _alpha_degeneracy_summary(alpha_distribution)
 
-    outputs = {
-        "report": output_dir / "support_nelbo_consolidation_report.md",
-        "summary_csv": output_dir / "support_nelbo_consolidation_summary.csv",
-        "summary_json": output_dir / "support_nelbo_consolidation_summary.json",
-        "per_k_metrics": output_dir / "support_nelbo_per_k_metrics.csv",
-        "alpha_distribution": output_dir / "support_nelbo_alpha_distribution.csv",
-        "per_center_gap": output_dir / "support_nelbo_per_center_gap.csv",
-        "stability_by_k": output_dir / "support_nelbo_stability_by_k.csv",
-        "protocol_audit": output_dir / "support_nelbo_protocol_audit.csv",
-    }
+    if OUTPUT_PREFIX == "support_nelbo":
+        outputs = {
+            "report": output_dir / "support_nelbo_consolidation_report.md",
+            "summary_csv": output_dir / "support_nelbo_consolidation_summary.csv",
+            "summary_json": output_dir / "support_nelbo_consolidation_summary.json",
+            "per_k_metrics": output_dir / "support_nelbo_per_k_metrics.csv",
+            "alpha_distribution": output_dir / "support_nelbo_alpha_distribution.csv",
+            "per_center_gap": output_dir / "support_nelbo_per_center_gap.csv",
+            "per_magnification_decisions": output_dir / "support_nelbo_per_magnification_decisions.csv",
+            "rank_consistency": output_dir / "support_nelbo_rank_consistency.csv",
+            "stability_by_k": output_dir / "support_nelbo_stability_by_k.csv",
+            "seed_stability": output_dir / "support_nelbo_seed_stability.csv",
+            "protocol_audit": output_dir / "support_nelbo_protocol_audit.csv",
+        }
+    else:
+        outputs = {
+            "report": output_dir / f"{OUTPUT_PREFIX}.md",
+            "summary_csv": output_dir / f"{OUTPUT_PREFIX}_decision_table.csv",
+            "summary_json": output_dir / f"{OUTPUT_PREFIX}_decision_summary.json",
+            "per_k_metrics": output_dir / f"{OUTPUT_PREFIX}_per_k_metrics.csv",
+            "alpha_distribution": output_dir / f"{OUTPUT_PREFIX}_alpha_distribution.csv",
+            "per_center_gap": output_dir / f"{OUTPUT_PREFIX}_per_center_gap.csv",
+            "per_magnification_decisions": output_dir / f"{OUTPUT_PREFIX}_per_magnification_decisions.csv",
+            "rank_consistency": output_dir / f"{OUTPUT_PREFIX}_rank_consistency.csv",
+            "stability_by_k": output_dir / f"{OUTPUT_PREFIX}_stability_by_k.csv",
+            "seed_stability": output_dir / f"{OUTPUT_PREFIX}_seed_stability.csv",
+            "protocol_audit": output_dir / f"{OUTPUT_PREFIX}_protocol_audit.csv",
+        }
 
     _write_csv(
         outputs["summary_csv"],
@@ -1013,6 +1369,42 @@ def build_outputs(experiment_root: Path, output_dir: Path, decision_table: Path)
         ],
     )
     _write_csv(
+        outputs["per_magnification_decisions"],
+        per_magnification_rows,
+        [
+            "heldout_magnification",
+            "support_size",
+            "support_seed",
+            "seed",
+            "selected_expert",
+            "oracle_expert",
+            "support_nelbo_selected",
+            "eval_nelbo_selected",
+            "eval_nelbo_oracle",
+            "oracle_gap_pct",
+            "metadata_selected_expert",
+            "static_embedding_selected_expert",
+        ],
+    )
+    _write_csv(
+        outputs["rank_consistency"],
+        rank_consistency_rows,
+        [
+            "heldout_magnification",
+            "mean_spearman",
+            "median_spearman",
+            "top1",
+            "oracle_gap_pct",
+            "best_k",
+            "worst_k",
+        ],
+    )
+    _write_csv(
+        outputs["seed_stability"],
+        seed_stability_rows,
+        ["seed", "method", "top1_oracle_hit_mean", "spearman_mean", "oracle_gap_pct_mean"],
+    )
+    _write_csv(
         outputs["stability_by_k"],
         stability_rows,
         [
@@ -1044,6 +1436,10 @@ def build_outputs(experiment_root: Path, output_dir: Path, decision_table: Path)
             "split_status",
             "split_row_found",
             "support_eval_disjoint_ok",
+            "patient_disjoint_required",
+            "support_eval_patient_disjoint_ok",
+            "missing_patient_id_count",
+            "support_label_counts_json",
             "support_labels_unused_for_routing_ok",
             "target_expert_excluded_ok",
             "candidate_pool_excludes_target_expert_ok",
@@ -1061,6 +1457,32 @@ def build_outputs(experiment_root: Path, output_dir: Path, decision_table: Path)
         ],
     )
 
+    is_breakhis = str(DATASET_CONTEXT).strip().lower() == "breakhis"
+    allowed_claim = (
+        "Direct support-set NELBO was stress-tested as a target-local utility estimator "
+        "under BreakHis leave-one-magnification-out routing, using an unlabeled "
+        "patient-disjoint target support set and held-out NELBO utility evaluation."
+        if is_breakhis
+        else (
+            "Direct support-set NELBO is the primary support-estimated utility router "
+            "and the strongest support-estimated utility variant in the current "
+            "Camelyon17 support experiment."
+        )
+    )
+    disallowed_claims = (
+        [
+            "This experiment does not prove general support-NELBO robustness across all medical domain shifts.",
+            "BreakHis magnification shift is equivalent to Camelyon17 hospital or site shift.",
+            "A BreakHis failure invalidates the Camelyon17 support-NELBO result.",
+        ]
+        if is_breakhis
+        else [
+            "Conservative support NELBO improves small-k stability.",
+            "Alpha regularization is meaningful when alpha collapses to zero in most selections.",
+            "Direct support-set NELBO supports a broader overall router-ranking claim.",
+        ]
+    )
+
     summary_payload = {
         "artifact_lineage": LINEAGE_NOTE,
         "decision_layers": {
@@ -1076,6 +1498,9 @@ def build_outputs(experiment_root: Path, output_dir: Path, decision_table: Path)
             },
             "stability_diagnostics": {
                 "rows": stability_rows,
+                "rank_consistency_rows": rank_consistency_rows,
+                "per_magnification_decision_rows": per_magnification_rows,
+                "seed_stability_rows": seed_stability_rows,
                 "per_group_rows": stability_extra["per_group"],
                 "warnings": stability_extra["warnings"],
                 "variance_grouping": [
@@ -1092,7 +1517,9 @@ def build_outputs(experiment_root: Path, output_dir: Path, decision_table: Path)
             "selected_direct_conservative_rows_observed": len(selected_support_rows),
             "alpha_selection_rows_expected": EXPECTED_ALPHA_ROWS,
             "alpha_selection_rows_observed": len(alpha_rows),
-            "note": "Counts are selected-method rows, not raw candidate rows.",
+            "raw_support_nelbo_rows_expected": EXPECTED_RAW_SUPPORT_ROWS,
+            "raw_support_nelbo_rows_observed": raw_support_rows_observed,
+            "note": "Selected counts are selected-method rows; raw support rows are candidate-by-support-image rows.",
         },
         "thesis_facing_decision": {
             "primary_method": "direct_support_nelbo",
@@ -1104,17 +1531,10 @@ def build_outputs(experiment_root: Path, output_dir: Path, decision_table: Path)
             ),
         },
         "alpha_degeneracy": alpha_summary,
+        "pass_rule": pass_rule,
         "cross_check_against_earlier_decision_table": cross_check,
-        "allowed_thesis_claim": (
-            "Direct support-set NELBO is the primary support-estimated utility router "
-            "and the strongest support-estimated utility variant in the current "
-            "Camelyon17 support experiment."
-        ),
-        "disallowed_thesis_claims": [
-            "Conservative support NELBO improves small-k stability.",
-            "Alpha regularization is meaningful when alpha collapses to zero in most selections.",
-            "Direct support-set NELBO supports a broader overall router-ranking claim.",
-        ],
+        "allowed_thesis_claim": allowed_claim,
+        "disallowed_thesis_claims": disallowed_claims,
     }
     _write_json(outputs["summary_json"], summary_payload)
     write_report(
@@ -1126,6 +1546,7 @@ def build_outputs(experiment_root: Path, output_dir: Path, decision_table: Path)
         stability_rows=stability_rows,
         audit_summary=audit_summary,
         cross_check=cross_check,
+        pass_rule=pass_rule,
         spearman_warnings=stability_extra["warnings"],
     )
 
@@ -1137,11 +1558,47 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--experiment-root", type=Path, default=EXPERIMENT_ROOT)
     parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
     parser.add_argument("--decision-table", type=Path, default=EARLIER_DECISION_TABLE)
+    parser.add_argument("--run-seeds", default="42,43,44")
+    parser.add_argument("--heldout-domains", default="0,1,2,3,4")
+    parser.add_argument("--support-seeds", default="17,23,31")
+    parser.add_argument("--support-sizes", default="4,8,16,32")
+    parser.add_argument("--run-id-template", default=RUN_ID_TEMPLATE)
+    parser.add_argument("--output-prefix", default=OUTPUT_PREFIX)
+    parser.add_argument("--dataset-context", default=DATASET_CONTEXT)
     return parser.parse_args()
+
+
+def _parse_int_tuple(value: str) -> Tuple[int, ...]:
+    return tuple(int(part.strip()) for part in str(value).split(",") if part.strip())
 
 
 def main() -> None:
     args = parse_args()
+    global RUN_SEEDS, HELDOUT_CENTERS, SUPPORT_SEEDS, SUPPORT_SIZES
+    global RUN_ID_TEMPLATE, OUTPUT_PREFIX, DATASET_CONTEXT
+    global EXPECTED_SELECTED_ROWS, EXPECTED_ALPHA_ROWS, EXPECTED_RAW_SUPPORT_ROWS
+    RUN_SEEDS = _parse_int_tuple(args.run_seeds)
+    HELDOUT_CENTERS = _parse_int_tuple(args.heldout_domains)
+    SUPPORT_SEEDS = _parse_int_tuple(args.support_seeds)
+    SUPPORT_SIZES = _parse_int_tuple(args.support_sizes)
+    RUN_ID_TEMPLATE = str(args.run_id_template)
+    OUTPUT_PREFIX = str(args.output_prefix)
+    DATASET_CONTEXT = str(args.dataset_context)
+    EXPECTED_SELECTED_ROWS = (
+        len(RUN_SEEDS)
+        * len(HELDOUT_CENTERS)
+        * len(SUPPORT_SEEDS)
+        * len(SUPPORT_SIZES)
+        * 2
+    )
+    EXPECTED_ALPHA_ROWS = len(RUN_SEEDS) * len(HELDOUT_CENTERS) * len(SUPPORT_SIZES)
+    EXPECTED_RAW_SUPPORT_ROWS = (
+        len(RUN_SEEDS)
+        * len(HELDOUT_CENTERS)
+        * len(SUPPORT_SEEDS)
+        * sum(SUPPORT_SIZES)
+        * max(len(HELDOUT_CENTERS) - 1, 0)
+    )
     outputs = build_outputs(
         experiment_root=args.experiment_root,
         output_dir=args.output_dir,

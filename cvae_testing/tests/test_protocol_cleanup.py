@@ -63,6 +63,77 @@ def test_support_estimated_utility_v2_config_is_unlabeled_and_grid_locked() -> N
         validate_config(invalid)
 
 
+def test_breakhis_support_estimated_utility_config_is_protocol_locked() -> None:
+    path = (
+        PROJECT_ROOT
+        / "configs"
+        / "experiments"
+        / "breakhis"
+        / "breakhis_support_estimated_utility_routing_v1.yaml"
+    )
+    cfg = load_config(path)
+    validate_config(cfg)
+
+    assert cfg["experiment"]["name"] == "breakhis_support_estimated_utility_routing_v1"
+    assert cfg["data"]["dataset_type"] == "breakhis"
+    assert cfg["data"]["dataset_domain_semantics"] == "breakhis_magnification"
+    assert cfg["data"]["magnifications"] == [40, 100, 200, 400]
+    assert cfg["data"]["require_patient_ids"] is True
+    assert cfg["features"]["backbone_type"] == "dinov2_vitb14"
+
+    support_cfg = cfg["learned_utility"]["support_response_routing"]
+    assert support_cfg["support_sizes"] == [4, 8, 16, 32]
+    assert support_cfg["support_seeds"] == [17, 23, 31]
+    assert support_cfg["sampling_policies"] == ["random"]
+    assert support_cfg["support_utility"]["require_unlabeled_support"] is True
+    assert support_cfg["random_floor"] == {
+        "enabled": True,
+        "adoption_eligible": False,
+        "diagnostic_only": True,
+        "report_only": True,
+    }
+
+
+def test_breakhis_support_estimated_utility_config_rejects_protocol_drift() -> None:
+    path = (
+        PROJECT_ROOT
+        / "configs"
+        / "experiments"
+        / "breakhis"
+        / "breakhis_support_estimated_utility_routing_v1.yaml"
+    )
+    invalid_domains = yaml.safe_load(path.read_text(encoding="utf-8"))
+    invalid_domains["data"]["magnifications"] = [40, 100, 400]
+    with pytest.raises(ValueError, match=r"exactly \[40, 100, 200, 400\]"):
+        validate_config(invalid_domains)
+
+    missing_patient_gate = yaml.safe_load(path.read_text(encoding="utf-8"))
+    missing_patient_gate["data"]["require_patient_ids"] = False
+    with pytest.raises(ValueError, match="require_patient_ids must be true"):
+        validate_config(missing_patient_gate)
+
+    class_balanced = yaml.safe_load(path.read_text(encoding="utf-8"))
+    class_balanced["learned_utility"]["support_response_routing"]["sampling_policies"] = ["class_balanced"]
+    with pytest.raises(ValueError, match=r"exactly \['random'\]"):
+        validate_config(class_balanced)
+
+    random_floor_disabled = yaml.safe_load(path.read_text(encoding="utf-8"))
+    random_floor_disabled["learned_utility"]["support_response_routing"]["random_floor"]["enabled"] = False
+    with pytest.raises(ValueError, match="random_floor.enabled must be true"):
+        validate_config(random_floor_disabled)
+
+    random_floor_adoptable = yaml.safe_load(path.read_text(encoding="utf-8"))
+    random_floor_adoptable["learned_utility"]["support_response_routing"]["random_floor"][
+        "adoption_eligible"
+    ] = True
+    with pytest.raises(ValueError, match="must not be adoption eligible"):
+        validate_config(random_floor_adoptable)
+
+    assert 3 * 4 * 4 * 3 == 144
+    assert 144 * 2 == 288
+    assert 3 * 4 * 3 * 3 * sum([4, 8, 16, 32]) == 6480
+
+
 def test_quarantined_entrypoints_fail_fast() -> None:
     checks = [
         ([sys.executable, "scripts/run_learned_compatibility_loqdo.py"], "target expert"),

@@ -98,7 +98,11 @@ def _risk_support_cfg() -> SupportResponseConfig:
     )
 
 
-def _support_utility_cfg(*, sampling_policies: tuple[str, ...] = ("random",)) -> SupportResponseConfig:
+def _support_utility_cfg(
+    *,
+    sampling_policies: tuple[str, ...] = ("random",),
+    random_floor_enabled: bool = False,
+) -> SupportResponseConfig:
     cfg = _support_cfg()
     return SupportResponseConfig(
         enabled=cfg.enabled,
@@ -113,6 +117,7 @@ def _support_utility_cfg(*, sampling_policies: tuple[str, ...] = ("random",)) ->
         tie_policy=cfg.tie_policy,
         domain_level_aggregation=cfg.domain_level_aggregation,
         source_leave_pseudo_domain_out_diagnostic=cfg.source_leave_pseudo_domain_out_diagnostic,
+        random_floor_enabled=bool(random_floor_enabled),
         support_utility=SupportUtilityConfig(
             enabled=True,
             alpha_grid=(0.0, 0.5, 1.0),
@@ -189,7 +194,12 @@ def _run_risk(tmp_path: Path) -> dict:
     )
 
 
-def _run_support_utility(tmp_path: Path, *, sampling_policies: tuple[str, ...] = ("random",)) -> dict:
+def _run_support_utility(
+    tmp_path: Path,
+    *,
+    sampling_policies: tuple[str, ...] = ("random",),
+    random_floor_enabled: bool = False,
+) -> dict:
     embeddings, metadata, nelbo, expert_domains = _fixture()
     domain_by_index = {idx: int(row["magnification"]) for idx, row in enumerate(metadata)}
     preferred = {0: 2, 1: 3, 2: 4, 3: 0, 4: 1}
@@ -212,7 +222,10 @@ def _run_support_utility(tmp_path: Path, *, sampling_policies: tuple[str, ...] =
         dataset_name="camelyon17",
         strategy="categorical_exact",
         tau=1.0,
-        support_cfg=_support_utility_cfg(sampling_policies=sampling_policies),
+        support_cfg=_support_utility_cfg(
+            sampling_policies=sampling_policies,
+            random_floor_enabled=random_floor_enabled,
+        ),
         reports_dir=tmp_path,
         response_feature_fn=response_feature_fn,
         data_cfg={
@@ -449,6 +462,85 @@ def test_support_utility_conservative_writes_alpha_and_unlabeled_protocol_fields
 def test_support_utility_blocks_label_dependent_support_sampling(tmp_path: Path) -> None:
     with pytest.raises(ProtocolError, match="requires unlabeled support routing"):
         _run_support_utility(tmp_path, sampling_policies=("class_balanced",))
+
+
+def test_patient_disjoint_support_eval_split_uses_patient_groups() -> None:
+    labels_by_index = {idx: idx % 2 for idx in range(10)}
+    patient_ids_by_index = {
+        0: "p0",
+        1: "p0",
+        2: "p1",
+        3: "p1",
+        4: "p2",
+        5: "p2",
+        6: "p3",
+        7: "p3",
+        8: "p4",
+        9: "p4",
+    }
+
+    split = make_support_eval_split(
+        target_domain=40,
+        target_indices=list(range(10)),
+        labels_by_index=labels_by_index,
+        support_size=2,
+        sampling_policy="random",
+        support_seed=17,
+        patient_ids_by_index=patient_ids_by_index,
+        require_patient_disjoint=True,
+    )
+
+    support_patients = {patient_ids_by_index[idx] for idx in split.support_indices}
+    eval_patients = {patient_ids_by_index[idx] for idx in split.eval_indices}
+    assert split.split_status == "ok"
+    assert split.support_size_actual == 2
+    assert support_patients.isdisjoint(eval_patients)
+    assert split.patient_disjoint_required == 1
+    assert split.support_eval_patient_disjoint == 1
+    assert split.support_labels_used == 0
+    assert json.loads(split.support_label_counts_json)
+
+
+def test_patient_disjoint_support_eval_split_requires_patient_ids() -> None:
+    labels_by_index = {idx: idx % 2 for idx in range(5)}
+    with pytest.raises(ValueError, match="Missing patient IDs"):
+        make_support_eval_split(
+            target_domain=40,
+            target_indices=list(range(5)),
+            labels_by_index=labels_by_index,
+            support_size=2,
+            sampling_policy="random",
+            support_seed=17,
+            patient_ids_by_index={0: "p0", 1: "p1", 2: "", 3: "p3", 4: "p4"},
+            require_patient_disjoint=True,
+        )
+
+
+def test_random_expert_floor_is_matched_and_diagnostic_only(tmp_path: Path) -> None:
+    results = _run_support_utility(tmp_path, random_floor_enabled=True)
+
+    floor_metrics = results["metrics_by_method"]["support_random_expert_floor"]
+    assert floor_metrics["method_role"] == "control"
+    assert floor_metrics["adoption_eligible"] == 0.0
+    assert floor_metrics["diagnostic_only"] == 1.0
+    assert results["protocol_lock"]["random_floor"]["enabled"] is True
+    assert results["protocol_lock"]["random_floor"]["adoption_eligible"] is False
+    assert results["protocol_lock"]["random_floor"]["diagnostic_only"] is True
+    assert results["protocol_lock"]["random_floor"]["report_only"] is True
+
+    floor_rows = [
+        row
+        for row in _read_csv(tmp_path / "support_response_sample_selections.csv")
+        if row["method"] == "support_random_expert_floor"
+    ]
+    assert len(floor_rows) == 5
+    for row in floor_rows:
+        assert row["report_only"] == "1"
+        assert int(row["adoption_eligible"]) == 0
+        assert int(row["diagnostic_only"]) == 1
+        assert abs(float(row["chance_top1_oracle_hit"]) - 0.25) < 1e-12
+        assert row["random_floor_scope"] == "matched_seed_domain_support_seed_support_size"
+        assert row["support_labels_used_for_routing"] == "0"
 
 
 def test_source_global_prior_excludes_target_and_self_utility(tmp_path: Path) -> None:

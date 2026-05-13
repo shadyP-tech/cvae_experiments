@@ -45,6 +45,13 @@ class SplitResult:
     split_status: str
     no_data_reason: str
     support_eval_split_id: str
+    patient_disjoint_required: int = 0
+    support_eval_patient_disjoint: int = 0
+    support_patient_ids: str = ""
+    eval_patient_ids: str = ""
+    missing_patient_id_count: int = 0
+    support_label_counts_json: str = "{}"
+    eval_label_counts_json: str = "{}"
 
 
 @dataclass(frozen=True)
@@ -366,10 +373,111 @@ def make_support_eval_split(
     support_size: int,
     sampling_policy: str,
     support_seed: int,
+    patient_ids_by_index: Mapping[int, object] | None = None,
+    require_patient_disjoint: bool = False,
 ) -> SplitResult:
     indices = sorted(int(i) for i in target_indices)
     requested = int(support_size)
     policy = str(sampling_policy).strip().lower()
+    require_patient_disjoint = bool(require_patient_disjoint)
+
+    def label_counts_json(chosen: Sequence[int]) -> str:
+        counts: Dict[str, int] = {}
+        for idx in chosen:
+            label = str(int(labels_by_index[int(idx)]))
+            counts[label] = counts.get(label, 0) + 1
+        return json.dumps(counts, sort_keys=True, separators=(",", ":"))
+
+    def patient_id(idx: int) -> str:
+        if patient_ids_by_index is None:
+            return ""
+        value = patient_ids_by_index.get(int(idx), "")
+        return str(value or "").strip()
+
+    if require_patient_disjoint:
+        if policy != "random":
+            raise ValueError("Patient-disjoint support/eval splitting supports random sampling only")
+        if patient_ids_by_index is None:
+            raise ValueError("patient_ids_by_index is required when require_patient_disjoint=true")
+
+        missing = [idx for idx in indices if not patient_id(idx)]
+        if missing:
+            raise ValueError(
+                "Missing patient IDs while require_patient_disjoint=true "
+                f"for target_domain={int(target_domain)}: {len(missing)} samples"
+            )
+
+        by_patient: Dict[str, List[int]] = {}
+        for idx in indices:
+            by_patient.setdefault(patient_id(idx), []).append(int(idx))
+
+        if len(by_patient) < requested + 1:
+            split_id = f"target{int(target_domain)}_seed{int(support_seed)}_{policy}_k{requested}_skipped"
+            return SplitResult(
+                target_domain=int(target_domain),
+                support_size_requested=requested,
+                support_size_actual=0,
+                eval_size=0,
+                support_indices=[],
+                eval_indices=[],
+                sampling_policy_requested=policy,
+                sampling_policy_effective=policy,
+                support_labels_used=0,
+                split_status="skipped_insufficient_distinct_patients",
+                no_data_reason="fewer_than_k_plus_one_target_patients",
+                support_eval_split_id=split_id,
+                patient_disjoint_required=1,
+                support_eval_patient_disjoint=0,
+                missing_patient_id_count=0,
+                support_label_counts_json="{}",
+                eval_label_counts_json="{}",
+            )
+
+        split_seed = int(support_seed) + int(target_domain) * 1009
+        rng = np.random.default_rng(split_seed)
+        patient_order = [str(p) for p in rng.permutation(np.asarray(sorted(by_patient), dtype=object)).tolist()]
+        support_patients = patient_order[:requested]
+        support_patient_set = set(support_patients)
+        support: List[int] = []
+        for pos, pid in enumerate(support_patients):
+            patient_indices = np.asarray(sorted(by_patient[pid]), dtype=np.int64)
+            patient_rng = np.random.default_rng(split_seed + (pos + 1) * 7919)
+            support.append(int(patient_rng.permutation(patient_indices)[0]))
+        support_set = set(support)
+        evaluate = [
+            int(idx)
+            for idx in indices
+            if int(idx) not in support_set and patient_id(int(idx)) not in support_patient_set
+        ]
+        support_patients_actual = sorted({patient_id(idx) for idx in support})
+        eval_patients_actual = sorted({patient_id(idx) for idx in evaluate})
+        patient_disjoint = int(set(support_patients_actual).isdisjoint(set(eval_patients_actual)))
+        if not patient_disjoint:
+            raise RuntimeError("Support/eval patient overlap detected")
+
+        split_id = f"target{int(target_domain)}_seed{int(support_seed)}_{policy}_patient_disjoint_k{requested}"
+        return SplitResult(
+            target_domain=int(target_domain),
+            support_size_requested=requested,
+            support_size_actual=len(support),
+            eval_size=len(evaluate),
+            support_indices=support,
+            eval_indices=evaluate,
+            sampling_policy_requested=policy,
+            sampling_policy_effective="random_patient_disjoint",
+            support_labels_used=0,
+            split_status="ok",
+            no_data_reason="",
+            support_eval_split_id=split_id,
+            patient_disjoint_required=1,
+            support_eval_patient_disjoint=patient_disjoint,
+            support_patient_ids="|".join(support_patients_actual),
+            eval_patient_ids="|".join(eval_patients_actual),
+            missing_patient_id_count=0,
+            support_label_counts_json=label_counts_json(support),
+            eval_label_counts_json=label_counts_json(evaluate),
+        )
+
     if len(indices) < requested + 1:
         split_id = f"target{int(target_domain)}_seed{int(support_seed)}_{policy}_k{requested}_skipped"
         return SplitResult(
@@ -385,6 +493,8 @@ def make_support_eval_split(
             split_status="skipped_insufficient_samples",
             no_data_reason="fewer_than_k_plus_one_target_samples",
             support_eval_split_id=split_id,
+            support_label_counts_json="{}",
+            eval_label_counts_json="{}",
         )
 
     split_seed = int(support_seed) + int(target_domain) * 1009
@@ -422,6 +532,8 @@ def make_support_eval_split(
         split_status="ok",
         no_data_reason="",
         support_eval_split_id=split_id,
+        support_label_counts_json=label_counts_json(support),
+        eval_label_counts_json=label_counts_json(evaluate),
     )
 
 
