@@ -13,15 +13,15 @@ data:
   image_extensions: [".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"]
   magnifications: [40, 100, 200, 400]
   split:
-    train: 0.70
-    val: 0.15
-    test: 0.15
+    train: 0.45
+    val: 0.10
+    test: 0.45
   require_patient_ids: true
-  split_cap_profile: development
+  split_cap_profile: custom
   split_domain_caps:
     train: 250
     val: 100
-    test: 200
+    test: 900
   max_samples_per_domain: 1000
 
 features:
