@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Sequence, Tuple
 
@@ -27,10 +28,16 @@ from src.eval.metrics import spearman_corr
 
 
 PRIMARY_METHOD = "ae_utility_calibrated_safe_override_v1"
+PRIMARY_METHOD_V2 = "ae_utility_calibrated_consensus_safe_override_v2"
 HYBRID_METADATA_METHOD = "ae_metadata_utility_calibrated_safe_override_v1"
 HYBRID_COMBINED_METHOD = "ae_combined_utility_calibrated_safe_override_v1"
+HYBRID_METADATA_METHOD_V2 = "ae_metadata_utility_calibrated_consensus_safe_override_v2"
+HYBRID_COMBINED_METHOD_V2 = "ae_combined_utility_calibrated_consensus_safe_override_v2"
 PAIRWISE_DIAG_METHOD = "ae_utility_pairwise_ranker_diagnostic_v1"
 ORACLE_HEADROOM_METHOD = "oracle_safe_override_over_ae_argmin"
+V2_METHODS = {PRIMARY_METHOD_V2, HYBRID_METADATA_METHOD_V2, HYBRID_COMBINED_METHOD_V2}
+V2_PRIMARY_FEATURE_SETS = {"ae_consensus_core", "ae_consensus_quality"}
+V2_DIAGNOSTIC_FEATURE_SETS = {"ae_metadata_consensus", "ae_combined_consensus"}
 
 
 @dataclass(frozen=True)
@@ -72,6 +79,18 @@ class _SelectedConfig:
     delta_threshold: float
     margin_threshold: float
     selected_by_source_inner: int
+    consensus_threshold: float = 0.0
+
+
+@dataclass(frozen=True)
+class _ConsensusPredictions:
+    mean_matrix: np.ndarray
+    std_matrix: np.ndarray
+    lower_matrix: np.ndarray
+    positive_rate_matrix: np.ndarray
+    n_members_matrix: np.ndarray
+    n_positive_matrix: np.ndarray
+    member_labels: Tuple[str, ...]
 
 
 def _safe_div(num: np.ndarray, denom: np.ndarray) -> np.ndarray:
@@ -85,6 +104,38 @@ def _finite_mean(values: Sequence[float], default: float = 0.0) -> float:
 
 def _quality_by_domain(ae_scores: AutoencoderScoreMatrices) -> Dict[int, Dict[str, Any]]:
     return {int(row.get("source_domain")): dict(row) for row in ae_scores.quality_rows}
+
+
+def _normal_cdf(value: float) -> float:
+    return float(0.5 * (1.0 + math.erf(float(value) / math.sqrt(2.0))))
+
+
+def _uses_quality_features(feature_set: str) -> bool:
+    return str(feature_set) in {
+        "ae_quality",
+        "ae_metadata",
+        "ae_combined",
+        "ae_consensus_quality",
+        "ae_metadata_consensus",
+        "ae_combined_consensus",
+    }
+
+
+def _uses_metadata_features(feature_set: str) -> bool:
+    return str(feature_set) in {
+        "ae_metadata",
+        "ae_combined",
+        "ae_metadata_consensus",
+        "ae_combined_consensus",
+    }
+
+
+def _uses_combined_features(feature_set: str) -> bool:
+    return str(feature_set) in {"ae_combined", "ae_combined_consensus"}
+
+
+def _uses_consensus_features(feature_set: str) -> bool:
+    return str(feature_set) in V2_PRIMARY_FEATURE_SETS | V2_DIAGNOSTIC_FEATURE_SETS
 
 
 def _rank_order(values: np.ndarray, *, lower_is_better: bool) -> np.ndarray:
@@ -147,17 +198,30 @@ def _feature_vector(
     candidate_raw = float(ae_raw[int(candidate_local)])
     anchor_raw = float(ae_raw[int(anchor_local)])
     n_candidates = max(float(len(candidate_cols)), 1.0)
-    values: List[float] = [
-        candidate_z,
-        anchor_z,
-        candidate_z - anchor_z,
-        float(ae_ranks[int(candidate_local)]),
-        float(ae_ranks[int(candidate_local)]) / n_candidates,
-        float(ae_margin),
-        candidate_raw,
-        anchor_raw,
-    ]
-    if str(feature_set) in {"ae_quality", "ae_metadata", "ae_combined"}:
+    if _uses_consensus_features(feature_set):
+        candidate_quantile = _normal_cdf(candidate_z)
+        anchor_quantile = _normal_cdf(anchor_z)
+        values: List[float] = [
+            float(ae_ranks[int(candidate_local)]),
+            float(ae_ranks[int(candidate_local)]) / n_candidates,
+            float(ae_margin),
+            candidate_z - anchor_z,
+            candidate_quantile,
+            anchor_quantile,
+            candidate_quantile - anchor_quantile,
+        ]
+    else:
+        values = [
+            candidate_z,
+            anchor_z,
+            candidate_z - anchor_z,
+            float(ae_ranks[int(candidate_local)]),
+            float(ae_ranks[int(candidate_local)]) / n_candidates,
+            float(ae_margin),
+            candidate_raw,
+            anchor_raw,
+        ]
+    if _uses_quality_features(feature_set):
         q_candidate = quality.get(int(candidate_domain), {})
         q_anchor = quality.get(int(anchor_domain), {})
         values.extend(
@@ -172,7 +236,7 @@ def _feature_vector(
                 float(q_anchor.get("source_val_reconstruction_std_by_domain", 1.0)),
             ]
         )
-    if str(feature_set) in {"ae_metadata", "ae_combined"}:
+    if _uses_metadata_features(feature_set):
         values.extend(
             _metadata_features(
                 sample_index=int(sample_index),
@@ -184,7 +248,7 @@ def _feature_vector(
                 sample_domains=sample_domains,
             )
         )
-    if str(feature_set) == "ae_combined":
+    if _uses_combined_features(feature_set):
         values.extend(float(v) for v in embeddings[int(sample_index), :].tolist())
         one_hot = [0.0] * len(expert_domains)
         domain_to_pos = {int(domain): i for i, domain in enumerate(expert_domains)}
@@ -437,6 +501,7 @@ def _policy_summary(
     true_eval: np.ndarray,
     metadata_idx: np.ndarray,
     ae_zscore_eval: np.ndarray,
+    abstention_correct_gap_pct_epsilon: float = 1.0,
 ) -> Dict[str, float]:
     rows = np.arange(true_eval.shape[0])
     oracle_idx = _stable_argmin_indices(true_eval)
@@ -473,6 +538,15 @@ def _policy_summary(
     )
     oracle_improvable = oracle_nelbo < anchor_nelbo
     oracle_improvable_count = int(np.sum(oracle_improvable))
+    oracle_headroom = np.maximum(anchor_nelbo - oracle_nelbo, 0.0)
+    captured_headroom = np.maximum(anchor_nelbo - selected_nelbo, 0.0)
+    headroom_denom = float(np.sum(oracle_headroom))
+    abstained = ~active
+    abstained_count = int(np.sum(abstained))
+    abstention_correct = abstained & (
+        (anchor_idx == oracle_idx) | (anchor_gap_pct <= float(abstention_correct_gap_pct_epsilon))
+    )
+    abstention_missed_gain_values = anchor_nelbo[abstained] - oracle_nelbo[abstained]
     return {
         "top1_oracle_hit": float(np.mean(selected_idx == oracle_idx)) if selected_idx.size else 0.0,
         "mean_oracle_gap_pct": float(np.mean(gap_pct)) if gap_pct.size else 0.0,
@@ -503,7 +577,23 @@ def _policy_summary(
             if oracle_improvable_count > 0
             else float("nan")
         ),
+        "captured_oracle_headroom_rate": (
+            float(np.sum(captured_headroom) / headroom_denom)
+            if headroom_denom > 0.0
+            else float("nan")
+        ),
         "ae_argmin_already_oracle_rate": float(np.mean(anchor_idx == oracle_idx)) if anchor_idx.size else 0.0,
+        "abstention_rate": float(np.mean(abstained)) if abstained.size else 1.0,
+        "abstention_correct_rate": (
+            float(np.sum(abstention_correct) / abstained_count)
+            if abstained_count > 0
+            else float("nan")
+        ),
+        "abstention_missed_gain": (
+            float(np.mean(abstention_missed_gain_values))
+            if abstention_missed_gain_values.size
+            else float("nan")
+        ),
     }
 
 
@@ -519,6 +609,66 @@ def _passes_risk_gates(summary: Mapping[str, float], cfg: AEUtilityCalibratorCon
         and gap_degradation <= float(cfg.max_gap_pct_degradation_vs_ae_argmin)
         and float(summary["harmful_vs_ae_argmin_rate"]) <= float(summary["improving_vs_ae_argmin_rate"])
     )
+
+
+def _gap_reduction(summary: Mapping[str, float]) -> float:
+    return float(summary["ae_argmin_mean_oracle_gap_pct"]) - float(summary["mean_oracle_gap_pct"])
+
+
+def _material_degradation_vs_ae_argmin(summary: Mapping[str, float], cfg: AEUtilityCalibratorConfig) -> bool:
+    top1_drop = float(summary["ae_argmin_top1_oracle_hit"]) - float(summary["top1_oracle_hit"])
+    spearman_drop = float(summary["ae_delta_spearman_non_anchor"]) - float(
+        summary["raw_predicted_delta_spearman_non_anchor"]
+    )
+    gap_degradation = float(summary["mean_oracle_gap_pct"]) - float(summary["ae_argmin_mean_oracle_gap_pct"])
+    return bool(
+        top1_drop > float(cfg.max_top1_drop_vs_ae_argmin_abs)
+        or spearman_drop > float(cfg.max_spearman_drop_vs_ae_argmin_abs)
+        or gap_degradation > float(cfg.max_gap_pct_degradation_vs_ae_argmin)
+    )
+
+
+def _passes_consensus_risk_gates(summary: Mapping[str, float], cfg: AEUtilityCalibratorConfig) -> bool:
+    precision = float(summary.get("selected_override_precision", float("nan")))
+    precision_ok = (
+        float(summary.get("active_override_rate", 0.0)) <= 0.0
+        or (np.isfinite(precision) and precision >= 0.50)
+    )
+    return bool(
+        not _material_degradation_vs_ae_argmin(summary, cfg)
+        and float(summary["harmful_vs_ae_argmin_rate"]) <= float(summary["improving_vs_ae_argmin_rate"])
+        and precision_ok
+        and float(summary["net_gain_vs_ae_argmin"]) >= 0.0
+    )
+
+
+def _source_inner_stability(summary_rows: Sequence[Mapping[str, float]], cfg: AEUtilityCalibratorConfig) -> Dict[str, float]:
+    if not summary_rows:
+        return {
+            "source_inner_pseudo_domain_positive_rate": 0.0,
+            "max_pseudo_domain_gain_share": 1.0,
+            "max_source_inner_fold_gain_share": 1.0,
+            "source_inner_material_degradation_count": 1,
+            "passes_source_inner_stability_gates": 0,
+        }
+    gains = np.asarray([max(_gap_reduction(row), 0.0) for row in summary_rows], dtype=np.float64)
+    total_gain = float(np.sum(gains))
+    max_share = float(np.max(gains) / total_gain) if total_gain > 0.0 and gains.size else 1.0
+    positive_rate = float(np.mean(gains > 0.0)) if gains.size else 0.0
+    material_count = int(sum(1 for row in summary_rows if _material_degradation_vs_ae_argmin(row, cfg)))
+    passes = bool(
+        material_count == 0
+        and positive_rate >= float(cfg.min_pseudo_domain_positive_rate)
+        and max_share <= float(cfg.max_pseudo_domain_gain_share)
+        and max_share <= float(cfg.max_source_inner_fold_gain_share)
+    )
+    return {
+        "source_inner_pseudo_domain_positive_rate": positive_rate,
+        "max_pseudo_domain_gain_share": max_share,
+        "max_source_inner_fold_gain_share": max_share,
+        "source_inner_material_degradation_count": material_count,
+        "passes_source_inner_stability_gates": int(passes),
+    }
 
 
 def _train_predict_for_fold(
@@ -570,6 +720,170 @@ def _train_predict_for_fold(
     )
     anchor_idx = _anchor_indices_from_rows(rows=eval_rows, n_samples=int(eval_idx.shape[0]))
     return eval_rows, pred, pred_matrix, anchor_idx
+
+
+def _member_train_indices(
+    *,
+    train_idx: np.ndarray,
+    sample_domains: np.ndarray,
+    excluded_member_domain: int | None,
+) -> np.ndarray:
+    if excluded_member_domain is None:
+        return np.asarray(train_idx, dtype=np.int64)
+    return np.asarray(
+        [i for i in np.asarray(train_idx, dtype=np.int64).tolist() if int(sample_domains[int(i)]) != int(excluded_member_domain)],
+        dtype=np.int64,
+    )
+
+
+def _train_predict_consensus_for_fold(
+    *,
+    embeddings: np.ndarray,
+    sample_domains: np.ndarray,
+    true_nelbo: np.ndarray,
+    expert_domains: Sequence[int],
+    train_idx: np.ndarray,
+    eval_idx: np.ndarray,
+    heldout_domain: int,
+    eval_fold_for_sample: Callable[[int], FoldCandidateSet],
+    metadata_similarity: np.ndarray,
+    ae_scores: AutoencoderScoreMatrices,
+    feature_set: str,
+    ridge_l2: float,
+    n_eval_candidates: int,
+    member_excluded_domains: Sequence[int | None],
+    uncertainty_multiplier: float,
+) -> Tuple[_FeatureRows, _ConsensusPredictions, np.ndarray]:
+    eval_rows = _build_feature_rows(
+        embeddings=embeddings,
+        sample_domains=sample_domains,
+        true_nelbo=true_nelbo,
+        expert_domains=expert_domains,
+        sample_indices=eval_idx,
+        fold_for_sample=eval_fold_for_sample,
+        metadata_similarity=metadata_similarity,
+        ae_scores=ae_scores,
+        feature_set=feature_set,
+        exclude_anchor=True,
+    )
+    anchor_idx = _anchor_indices_from_rows(rows=eval_rows, n_samples=int(eval_idx.shape[0]))
+    pred_matrices: List[np.ndarray] = []
+    member_labels: List[str] = []
+    for excluded_member_domain in member_excluded_domains:
+        member_train_idx = _member_train_indices(
+            train_idx=train_idx,
+            sample_domains=sample_domains,
+            excluded_member_domain=excluded_member_domain,
+        )
+        if member_train_idx.size == 0:
+            continue
+        train_fold_for_sample = (
+            lambda sample_index, h=int(heldout_domain), excluded=excluded_member_domain: FoldCandidateSet.for_heldout_domain(
+                heldout_domain=h,
+                expert_domains=expert_domains,
+                excluded_domains=[
+                    v
+                    for v in [int(sample_domains[int(sample_index)]), excluded]
+                    if v is not None
+                ],
+            )
+        )
+        train_rows = _build_feature_rows(
+            embeddings=embeddings,
+            sample_domains=sample_domains,
+            true_nelbo=true_nelbo,
+            expert_domains=expert_domains,
+            sample_indices=member_train_idx,
+            fold_for_sample=train_fold_for_sample,
+            metadata_similarity=metadata_similarity,
+            ae_scores=ae_scores,
+            feature_set=feature_set,
+            exclude_anchor=True,
+        )
+        pred = _fit_predict_delta(train_rows=train_rows, eval_rows=eval_rows, ridge_l2=float(ridge_l2))
+        if train_rows.x.size == 0 or pred.size == 0:
+            continue
+        pred_matrices.append(
+            _prediction_matrix_from_rows(
+                rows=eval_rows,
+                predicted_delta=pred,
+                n_samples=int(eval_idx.shape[0]),
+                n_candidates=int(n_eval_candidates),
+            )
+        )
+        member_labels.append("full_source" if excluded_member_domain is None else f"leave_domain_{int(excluded_member_domain)}")
+
+    if len(pred_matrices) < 2:
+        shape = (int(eval_idx.shape[0]), int(n_eval_candidates))
+        consensus = _ConsensusPredictions(
+            mean_matrix=np.zeros(shape, dtype=np.float64),
+            std_matrix=np.full(shape, float("nan"), dtype=np.float64),
+            lower_matrix=np.full(shape, float("-inf"), dtype=np.float64),
+            positive_rate_matrix=np.zeros(shape, dtype=np.float64),
+            n_members_matrix=np.zeros(shape, dtype=np.float64),
+            n_positive_matrix=np.zeros(shape, dtype=np.float64),
+            member_labels=tuple(member_labels),
+        )
+        return eval_rows, consensus, anchor_idx
+
+    stacked = np.stack(pred_matrices, axis=0).astype(np.float64, copy=False)
+    mean_matrix = np.mean(stacked, axis=0)
+    std_matrix = np.std(stacked, axis=0)
+    lower_matrix = mean_matrix - float(uncertainty_multiplier) * std_matrix
+    n_positive = np.sum(stacked > 0.0, axis=0).astype(np.float64, copy=False)
+    n_members = np.full(mean_matrix.shape, float(stacked.shape[0]), dtype=np.float64)
+    consensus = _ConsensusPredictions(
+        mean_matrix=mean_matrix,
+        std_matrix=std_matrix,
+        lower_matrix=lower_matrix,
+        positive_rate_matrix=n_positive / np.maximum(n_members, 1.0),
+        n_members_matrix=n_members,
+        n_positive_matrix=n_positive,
+        member_labels=tuple(member_labels),
+    )
+    return eval_rows, consensus, anchor_idx
+
+
+def _apply_consensus_safe_override_policy(
+    *,
+    consensus: _ConsensusPredictions,
+    anchor_idx: np.ndarray,
+    delta_threshold: float,
+    margin_threshold: float,
+    consensus_threshold: float,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    n_rows, n_cols = consensus.lower_matrix.shape
+    selected = np.asarray(anchor_idx, dtype=np.int64).copy()
+    best_override = np.full((n_rows,), -1, dtype=np.int64)
+    second_override = np.full((n_rows,), -1, dtype=np.int64)
+    lower_best = np.full((n_rows,), float("-inf"), dtype=np.float64)
+    lower_second = np.full((n_rows,), float("-inf"), dtype=np.float64)
+    margins = np.full((n_rows,), float("inf"), dtype=np.float64)
+    positive_rate_best = np.zeros((n_rows,), dtype=np.float64)
+    for i in range(n_rows):
+        candidates = [j for j in range(n_cols) if int(j) != int(anchor_idx[i])]
+        if not candidates:
+            continue
+        order = sorted(candidates, key=lambda j: (-float(consensus.lower_matrix[i, j]), int(j)))
+        best = int(order[0])
+        second = int(order[1]) if len(order) > 1 else -1
+        best_override[i] = best
+        second_override[i] = second
+        lower_best[i] = float(consensus.lower_matrix[i, best])
+        lower_second[i] = float(consensus.lower_matrix[i, second]) if second >= 0 else float("-inf")
+        margins[i] = (
+            float(lower_best[i] - lower_second[i])
+            if np.isfinite(lower_second[i])
+            else float("inf")
+        )
+        positive_rate_best[i] = float(consensus.positive_rate_matrix[i, best])
+        if (
+            float(lower_best[i]) >= float(delta_threshold)
+            and float(margins[i]) >= float(margin_threshold)
+            and float(positive_rate_best[i]) >= float(consensus_threshold)
+        ):
+            selected[i] = best
+    return selected, best_override, second_override, lower_best, lower_second, margins, positive_rate_best
 
 
 def _select_config_for_method(
@@ -731,7 +1045,202 @@ def _select_config_for_method(
     return selected, validation_rows
 
 
+def _select_consensus_config_for_method(
+    *,
+    method: str,
+    feature_sets: Sequence[str],
+    embeddings: np.ndarray,
+    sample_domains: np.ndarray,
+    true_nelbo: np.ndarray,
+    expert_domains: Sequence[int],
+    train_idx: np.ndarray,
+    outer_fold: FoldCandidateSet,
+    metadata_similarity: np.ndarray,
+    ae_scores: AutoencoderScoreMatrices,
+    cfg: AEUtilityCalibratorConfig,
+) -> Tuple[_SelectedConfig, List[Dict[str, Any]]]:
+    source_domains = sorted(set(int(sample_domains[int(i)]) for i in np.asarray(train_idx, dtype=np.int64)))
+    validation_rows: List[Dict[str, Any]] = []
+    config_summaries: List[Dict[str, Any]] = []
+    deltas = tuple(dict.fromkeys(float(v) for v in cfg.delta_thresholds))
+    if not any(not np.isfinite(v) for v in deltas):
+        deltas = tuple(list(deltas) + [float("inf")])
+    margins = tuple(dict.fromkeys(float(v) for v in cfg.margin_thresholds))
+    consensus_thresholds = tuple(dict.fromkeys(float(v) for v in cfg.consensus_thresholds))
+
+    for feature_set in feature_sets:
+        threshold_domain_summaries: Dict[Tuple[float, float, float], List[Dict[str, float]]] = {}
+        for pseudo_domain in source_domains:
+            val_idx = np.asarray(
+                [i for i in train_idx.tolist() if int(sample_domains[int(i)]) == int(pseudo_domain)],
+                dtype=np.int64,
+            )
+            inner_train_idx = np.asarray(
+                [i for i in train_idx.tolist() if int(sample_domains[int(i)]) != int(pseudo_domain)],
+                dtype=np.int64,
+            )
+            if val_idx.size == 0 or inner_train_idx.size == 0:
+                continue
+            inner_fold = FoldCandidateSet.for_heldout_domain(
+                heldout_domain=int(outer_fold.heldout_domain),
+                expert_domains=expert_domains,
+                excluded_domains=[int(pseudo_domain)],
+            )
+            if len(inner_fold.candidate_expert_domains) < 2:
+                continue
+            inner_train_domains = sorted(set(int(sample_domains[int(i)]) for i in inner_train_idx.tolist()))
+            member_exclusions: List[int | None] = [None] + inner_train_domains
+            eval_fold_for_sample = lambda _sample_index, f=inner_fold: f
+            eval_rows, consensus, anchor_idx = _train_predict_consensus_for_fold(
+                embeddings=embeddings,
+                sample_domains=sample_domains,
+                true_nelbo=true_nelbo,
+                expert_domains=expert_domains,
+                train_idx=inner_train_idx,
+                eval_idx=val_idx,
+                heldout_domain=int(outer_fold.heldout_domain),
+                eval_fold_for_sample=eval_fold_for_sample,
+                metadata_similarity=metadata_similarity,
+                ae_scores=ae_scores,
+                feature_set=str(feature_set),
+                ridge_l2=float(cfg.ridge_l2),
+                n_eval_candidates=len(inner_fold.candidate_expert_domains),
+                member_excluded_domains=member_exclusions,
+                uncertainty_multiplier=float(cfg.uncertainty_multiplier),
+            )
+            if eval_rows.x.size == 0:
+                continue
+            true_val = inner_fold.slice_nelbo(true_nelbo, val_idx)
+            metadata_val = metadata_similarity[val_idx][:, list(inner_fold.candidate_col_indices)]
+            metadata_idx = _metadata_selected_local_indices(metadata_val)
+            ae_val = ae_scores.zscore_matrix[val_idx][:, list(inner_fold.candidate_col_indices)]
+            for delta_threshold in deltas:
+                for margin_threshold in margins:
+                    for consensus_threshold in consensus_thresholds:
+                        selected_idx, _best, _second, _lower_best, _lower_second, _override_margin, _positive_rate = (
+                            _apply_consensus_safe_override_policy(
+                                consensus=consensus,
+                                anchor_idx=anchor_idx,
+                                delta_threshold=float(delta_threshold),
+                                margin_threshold=float(margin_threshold),
+                                consensus_threshold=float(consensus_threshold),
+                            )
+                        )
+                        summary = _policy_summary(
+                            selected_idx=selected_idx,
+                            anchor_idx=anchor_idx,
+                            pred_delta_matrix=consensus.lower_matrix,
+                            true_eval=true_val,
+                            metadata_idx=metadata_idx,
+                            ae_zscore_eval=ae_val,
+                            abstention_correct_gap_pct_epsilon=float(cfg.abstention_correct_gap_pct_epsilon),
+                        )
+                        threshold_domain_summaries.setdefault(
+                            (float(delta_threshold), float(margin_threshold), float(consensus_threshold)),
+                            [],
+                        ).append(summary)
+                        validation_rows.append(
+                            {
+                                "method": str(method),
+                                "feature_set": str(feature_set),
+                                "model_type": "ridge_delta_consensus",
+                                "fold_query_domain": int(outer_fold.heldout_domain),
+                                "source_inner_pseudo_query_domain": int(pseudo_domain),
+                                "delta_threshold": _threshold_label(float(delta_threshold)),
+                                "margin_threshold": _threshold_label(float(margin_threshold)),
+                                "consensus_threshold": float(consensus_threshold),
+                                "threshold_selection_policy": "source_inner_stability_then_ae_argmin_gap",
+                                "n_validation_samples": int(val_idx.shape[0]),
+                                "n_ensemble_members": int(len(consensus.member_labels)),
+                                "ensemble_member_labels": "|".join(consensus.member_labels),
+                                "ensemble_training_domains_used": "|".join(str(int(d)) for d in inner_train_domains),
+                                "source_inner_validation_domain_excluded_from_ensemble_training": 1,
+                                "candidate_experts": inner_fold.label(),
+                                "excluded_target_ae": 1,
+                                "excluded_target_cvae": 1,
+                                "excluded_pseudo_query_ae": 1,
+                                "excluded_pseudo_query_cvae": 1,
+                                "heldout_target_nelbo_used_for_selection": 0,
+                                **{f"macro_{k}": float(v) for k, v in summary.items()},
+                            }
+                        )
+
+        for (delta_threshold, margin_threshold, consensus_threshold), summaries in threshold_domain_summaries.items():
+            if not summaries:
+                continue
+            keys = set().union(*(row.keys() for row in summaries))
+            macro = {k: _finite_mean([float(row.get(k, float("nan"))) for row in summaries], default=float("nan")) for k in keys}
+            passes_risk = _passes_consensus_risk_gates(macro, cfg)
+            stability = _source_inner_stability(summaries, cfg)
+            config_summaries.append(
+                {
+                    "method": str(method),
+                    "feature_set": str(feature_set),
+                    "delta_threshold": float(delta_threshold),
+                    "margin_threshold": float(margin_threshold),
+                    "consensus_threshold": float(consensus_threshold),
+                    "passes_source_inner_risk_gates": bool(passes_risk),
+                    "passes_source_inner_stability_gates": bool(stability["passes_source_inner_stability_gates"]),
+                    **stability,
+                    **macro,
+                }
+            )
+
+    passing = [
+        row
+        for row in config_summaries
+        if bool(row.get("passes_source_inner_risk_gates", False))
+        and bool(row.get("passes_source_inner_stability_gates", False))
+    ]
+    if not passing:
+        selected = _SelectedConfig(str(method), str(feature_sets[0]), float("inf"), 0.0, 0, 1.0)
+    else:
+        selected_row = sorted(
+            passing,
+            key=lambda row: (
+                _gap_reduction(row),
+                float(row.get("selected_override_precision", float("nan")))
+                if np.isfinite(float(row.get("selected_override_precision", float("nan"))))
+                else -1.0,
+                float(row.get("captured_oracle_headroom_rate", float("nan")))
+                if np.isfinite(float(row.get("captured_oracle_headroom_rate", float("nan"))))
+                else -1.0,
+                -float(row["harmful_vs_ae_argmin_rate"]),
+                float(row["consensus_threshold"]),
+                float(row["delta_threshold"]),
+            ),
+            reverse=True,
+        )[0]
+        selected = _SelectedConfig(
+            str(method),
+            str(selected_row["feature_set"]),
+            float(selected_row["delta_threshold"]),
+            float(selected_row["margin_threshold"]),
+            1,
+            float(selected_row["consensus_threshold"]),
+        )
+    for row in validation_rows:
+        row["selected_feature_set"] = selected.feature_set
+        row["selected_delta_threshold"] = _threshold_label(selected.delta_threshold)
+        row["selected_margin_threshold"] = _threshold_label(selected.margin_threshold)
+        row["selected_consensus_threshold"] = float(selected.consensus_threshold)
+        row["selected_by_source_inner_validation"] = int(
+            row["feature_set"] == selected.feature_set
+            and row["delta_threshold"] == _threshold_label(selected.delta_threshold)
+            and row["margin_threshold"] == _threshold_label(selected.margin_threshold)
+            and float(row.get("consensus_threshold", -1.0)) == float(selected.consensus_threshold)
+        )
+    return selected, validation_rows
+
+
 def _method_feature_sets(cfg: AEUtilityCalibratorConfig) -> List[Tuple[str, Tuple[str, ...], str]]:
+    if str(cfg.primary_method) == PRIMARY_METHOD_V2:
+        methods = [(PRIMARY_METHOD_V2, tuple(cfg.feature_sets_primary), "primary_metadata_free")]
+        if "ae_metadata_consensus" in set(cfg.feature_sets_diagnostic):
+            methods.append((HYBRID_METADATA_METHOD_V2, ("ae_metadata_consensus",), "hybrid_metadata"))
+        if "ae_combined_consensus" in set(cfg.feature_sets_diagnostic):
+            methods.append((HYBRID_COMBINED_METHOD_V2, ("ae_combined_consensus",), "hybrid_combined"))
+        return methods
     methods = [(PRIMARY_METHOD, tuple(cfg.feature_sets_primary), "primary_metadata_free")]
     if "ae_metadata" in set(cfg.feature_sets_diagnostic):
         methods.append((HYBRID_METADATA_METHOD, ("ae_metadata",), "hybrid_metadata"))
@@ -748,6 +1257,7 @@ def _oracle_headroom_rows(
     true_eval: np.ndarray,
     anchor_idx: np.ndarray,
     selected_idx: np.ndarray,
+    primary_method: str = PRIMARY_METHOD,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     oracle_idx = _stable_argmin_indices(true_eval)
     oracle_ranks = _oracle_ranks_for_matrix(true_eval)
@@ -786,7 +1296,7 @@ def _oracle_headroom_rows(
         headroom_rows.append(row)
         anchor_rank_rows.append(
             {
-                "method": PRIMARY_METHOD,
+                "method": primary_method,
                 "fold_query_domain": int(fold.heldout_domain),
                 "sample_index": int(sample_index),
                 "query_domain": int(sample_domains[int(sample_index)]),
@@ -911,9 +1421,16 @@ def run_ae_utility_calibrator_methods_for_fold(
 ) -> AEUtilityCalibratorFoldOutputs:
     if not bool(cfg.enabled):
         return AEUtilityCalibratorFoldOutputs([], [], [], [], [], [], [], [], [])
-    if str(cfg.primary_method) != PRIMARY_METHOD:
-        raise ProtocolError("AE utility calibrator primary_method must be ae_utility_calibrated_safe_override_v1")
-    if str(cfg.primary_model_type) != "ridge_delta" or set(cfg.model_types) != {"ridge_delta"}:
+    is_v2 = str(cfg.primary_method) == PRIMARY_METHOD_V2
+    if str(cfg.primary_method) not in {PRIMARY_METHOD, PRIMARY_METHOD_V2}:
+        raise ProtocolError(
+            "AE utility calibrator primary_method must be "
+            f"{PRIMARY_METHOD} or {PRIMARY_METHOD_V2}"
+        )
+    if is_v2:
+        if str(cfg.primary_model_type) != "ridge_delta_consensus" or set(cfg.model_types) != {"ridge_delta_consensus"}:
+            raise ProtocolError("AE utility calibrator v2 primary model_types must be ['ridge_delta_consensus']")
+    elif str(cfg.primary_model_type) != "ridge_delta" or set(cfg.model_types) != {"ridge_delta"}:
         raise ProtocolError("AE utility calibrator v1 primary model_types must be ['ridge_delta']")
     if str(cfg.fallback_policy) != "ae_argmin_zscore":
         raise ProtocolError("AE utility calibrator fallback_policy must be ae_argmin_zscore")
@@ -942,41 +1459,96 @@ def run_ae_utility_calibrator_methods_for_fold(
     primary_selected_idx: np.ndarray | None = None
 
     for method, feature_sets, method_kind in _method_feature_sets(cfg):
-        selected_cfg, rows = _select_config_for_method(
-            method=method,
-            feature_sets=feature_sets,
-            embeddings=embeddings,
-            sample_domains=sample_domains,
-            true_nelbo=true_nelbo,
-            expert_domains=expert_domains,
-            train_idx=train_idx,
-            outer_fold=fold,
-            metadata_similarity=metadata_similarity,
-            ae_scores=ae_scores,
-            cfg=cfg,
-        )
+        if method in V2_METHODS:
+            selected_cfg, rows = _select_consensus_config_for_method(
+                method=method,
+                feature_sets=feature_sets,
+                embeddings=embeddings,
+                sample_domains=sample_domains,
+                true_nelbo=true_nelbo,
+                expert_domains=expert_domains,
+                train_idx=train_idx,
+                outer_fold=fold,
+                metadata_similarity=metadata_similarity,
+                ae_scores=ae_scores,
+                cfg=cfg,
+            )
+        else:
+            selected_cfg, rows = _select_config_for_method(
+                method=method,
+                feature_sets=feature_sets,
+                embeddings=embeddings,
+                sample_domains=sample_domains,
+                true_nelbo=true_nelbo,
+                expert_domains=expert_domains,
+                train_idx=train_idx,
+                outer_fold=fold,
+                metadata_similarity=metadata_similarity,
+                ae_scores=ae_scores,
+                cfg=cfg,
+            )
         validation_rows.extend(rows)
-        eval_rows, pred_flat, pred_matrix, anchor_idx = _train_predict_for_fold(
-            embeddings=embeddings,
-            sample_domains=sample_domains,
-            true_nelbo=true_nelbo,
-            expert_domains=expert_domains,
-            train_idx=train_idx,
-            eval_idx=test_idx,
-            train_fold_for_sample=train_fold_for_sample,
-            eval_fold_for_sample=eval_fold_for_sample,
-            metadata_similarity=metadata_similarity,
-            ae_scores=ae_scores,
-            feature_set=selected_cfg.feature_set,
-            ridge_l2=float(cfg.ridge_l2),
-            n_eval_candidates=len(fold.candidate_expert_domains),
-        )
-        selected_idx, best_override, best_delta, override_margin = _apply_safe_override_policy(
-            pred_delta_matrix=pred_matrix,
-            anchor_idx=anchor_idx,
-            delta_threshold=float(selected_cfg.delta_threshold),
-            margin_threshold=float(selected_cfg.margin_threshold),
-        )
+        if method in V2_METHODS:
+            source_domains = sorted(set(int(sample_domains[int(i)]) for i in train_idx.tolist()))
+            eval_rows, consensus, anchor_idx = _train_predict_consensus_for_fold(
+                embeddings=embeddings,
+                sample_domains=sample_domains,
+                true_nelbo=true_nelbo,
+                expert_domains=expert_domains,
+                train_idx=train_idx,
+                eval_idx=test_idx,
+                heldout_domain=int(fold.heldout_domain),
+                eval_fold_for_sample=eval_fold_for_sample,
+                metadata_similarity=metadata_similarity,
+                ae_scores=ae_scores,
+                feature_set=selected_cfg.feature_set,
+                ridge_l2=float(cfg.ridge_l2),
+                n_eval_candidates=len(fold.candidate_expert_domains),
+                member_excluded_domains=[None] + source_domains,
+                uncertainty_multiplier=float(cfg.uncertainty_multiplier),
+            )
+            selected_idx, best_override, second_override, best_delta, second_delta, override_margin, positive_rate_best = (
+                _apply_consensus_safe_override_policy(
+                    consensus=consensus,
+                    anchor_idx=anchor_idx,
+                    delta_threshold=float(selected_cfg.delta_threshold),
+                    margin_threshold=float(selected_cfg.margin_threshold),
+                    consensus_threshold=float(selected_cfg.consensus_threshold),
+                )
+            )
+            pred_matrix = consensus.lower_matrix
+            pred_flat = np.asarray(
+                [
+                    float(consensus.mean_matrix[int(eval_rows.sample_positions[k]), int(eval_rows.candidate_local_indices[k])])
+                    for k in range(eval_rows.sample_positions.shape[0])
+                ],
+                dtype=np.float64,
+            )
+        else:
+            eval_rows, pred_flat, pred_matrix, anchor_idx = _train_predict_for_fold(
+                embeddings=embeddings,
+                sample_domains=sample_domains,
+                true_nelbo=true_nelbo,
+                expert_domains=expert_domains,
+                train_idx=train_idx,
+                eval_idx=test_idx,
+                train_fold_for_sample=train_fold_for_sample,
+                eval_fold_for_sample=eval_fold_for_sample,
+                metadata_similarity=metadata_similarity,
+                ae_scores=ae_scores,
+                feature_set=selected_cfg.feature_set,
+                ridge_l2=float(cfg.ridge_l2),
+                n_eval_candidates=len(fold.candidate_expert_domains),
+            )
+            selected_idx, best_override, best_delta, override_margin = _apply_safe_override_policy(
+                pred_delta_matrix=pred_matrix,
+                anchor_idx=anchor_idx,
+                delta_threshold=float(selected_cfg.delta_threshold),
+                margin_threshold=float(selected_cfg.margin_threshold),
+            )
+            second_override = np.full(best_override.shape, -1, dtype=np.int64)
+            second_delta = np.full(best_delta.shape, float("-inf"), dtype=np.float64)
+            positive_rate_best = np.ones(best_delta.shape, dtype=np.float64)
         summary = _policy_summary(
             selected_idx=selected_idx,
             anchor_idx=anchor_idx,
@@ -984,6 +1556,7 @@ def run_ae_utility_calibrator_methods_for_fold(
             true_eval=true_eval,
             metadata_idx=metadata_idx,
             ae_zscore_eval=ae_zscore_eval,
+            abstention_correct_gap_pct_epsilon=float(cfg.abstention_correct_gap_pct_epsilon),
         )
         score_matrix = -pred_matrix
         _metrics_unused, rows_for_method = _selection_metrics(
@@ -1012,7 +1585,8 @@ def run_ae_utility_calibrator_methods_for_fold(
             row["sample_index"] = int(test_idx[local])
             row.update(
                 {
-                    "model_type": "ridge_delta",
+                    "model_type": "ridge_delta_consensus" if method in V2_METHODS else "ridge_delta",
+                    "ensemble_strategy": str(cfg.ensemble_strategy) if method in V2_METHODS else "",
                     "feature_set": selected_cfg.feature_set,
                     "method_kind": method_kind,
                     "fallback_policy": "ae_argmin_zscore",
@@ -1024,6 +1598,46 @@ def run_ae_utility_calibrator_methods_for_fold(
                     ),
                     "override_accepted": int(int(selected_idx[local]) != int(anchor_idx[local])),
                     "predicted_delta_best_override": float(best_delta[local]),
+                    "mean_predicted_delta_best": (
+                        float(consensus.mean_matrix[local, int(best_override[local])])
+                        if method in V2_METHODS and int(best_override[local]) >= 0
+                        else float(best_delta[local])
+                    ),
+                    "std_predicted_delta_best": (
+                        float(consensus.std_matrix[local, int(best_override[local])])
+                        if method in V2_METHODS and int(best_override[local]) >= 0
+                        else float("nan")
+                    ),
+                    "lower_confidence_delta_best": (
+                        float(best_delta[local])
+                        if method in V2_METHODS
+                        else float("nan")
+                    ),
+                    "positive_consensus_rate_best": (
+                        float(positive_rate_best[local])
+                        if method in V2_METHODS
+                        else float("nan")
+                    ),
+                    "mean_predicted_delta_second": (
+                        float(consensus.mean_matrix[local, int(second_override[local])])
+                        if method in V2_METHODS and int(second_override[local]) >= 0
+                        else float("nan")
+                    ),
+                    "lower_confidence_delta_second": (
+                        float(second_delta[local])
+                        if method in V2_METHODS
+                        else float("nan")
+                    ),
+                    "n_ensemble_members": (
+                        int(consensus.n_members_matrix[local, int(best_override[local])])
+                        if method in V2_METHODS and int(best_override[local]) >= 0
+                        else 1
+                    ),
+                    "n_positive_members": (
+                        int(consensus.n_positive_matrix[local, int(best_override[local])])
+                        if method in V2_METHODS and int(best_override[local]) >= 0
+                        else int(float(best_delta[local]) > 0.0)
+                    ),
                     "true_delta_best_override": (
                         float(true_delta[local, int(best_override[local])])
                         if int(best_override[local]) >= 0
@@ -1032,13 +1646,18 @@ def run_ae_utility_calibrator_methods_for_fold(
                     "predicted_override_margin": float(override_margin[local]),
                     "selected_delta_threshold": _threshold_label(float(selected_cfg.delta_threshold)),
                     "selected_margin_threshold": _threshold_label(float(selected_cfg.margin_threshold)),
+                    "selected_consensus_threshold": (
+                        float(selected_cfg.consensus_threshold)
+                        if method in V2_METHODS
+                        else ""
+                    ),
                     "selected_by_source_inner_validation": int(selected_cfg.selected_by_source_inner),
                     "target_support_free": 1,
                     "target_support_used": 0,
                     "target_ae_excluded": 1,
                     "source_inner_self_ae_excluded": 1,
                     "source_inner_self_expert_excluded": 1,
-                    "metadata_role": "not_used" if method == PRIMARY_METHOD else "hybrid_auxiliary_feature",
+                    "metadata_role": "not_used" if method in {PRIMARY_METHOD, PRIMARY_METHOD_V2} else "hybrid_auxiliary_feature",
                     "proxy_claim_boundary": "AE reconstruction fit is a proxy for CVAE utility, not compatibility.",
                     "net_gain_vs_ae_argmin": float(anchor_nelbo[local] - selected_nelbo[local]),
                     "net_gain_vs_metadata": float(row_metadata_nelbo - selected_nelbo[local]),
@@ -1056,6 +1675,10 @@ def run_ae_utility_calibrator_methods_for_fold(
                     "raw_predicted_delta_spearman_with_anchor": float(
                         summary["raw_predicted_delta_spearman_with_anchor"]
                     ),
+                    "abstention_rate": float(summary["abstention_rate"]),
+                    "abstention_correct_rate": float(summary["abstention_correct_rate"]),
+                    "abstention_missed_gain": float(summary["abstention_missed_gain"]),
+                    "captured_oracle_headroom_rate": float(summary["captured_oracle_headroom_rate"]),
                 }
             )
             sample_rows.append(row)
@@ -1072,6 +1695,24 @@ def run_ae_utility_calibrator_methods_for_fold(
                     "candidate_expert": int(eval_rows.expert_domains[k]),
                     "ae_anchor_expert": int(fold.candidate_expert_domains[int(anchor_idx[local])]),
                     "predicted_delta_u_ae_pct": float(value),
+                    "mean_predicted_delta": (
+                        float(value) if method in V2_METHODS else ""
+                    ),
+                    "std_predicted_delta": (
+                        float(consensus.std_matrix[local, int(eval_rows.candidate_local_indices[k])])
+                        if method in V2_METHODS
+                        else ""
+                    ),
+                    "lower_confidence_delta": (
+                        float(consensus.lower_matrix[local, int(eval_rows.candidate_local_indices[k])])
+                        if method in V2_METHODS
+                        else ""
+                    ),
+                    "positive_consensus_rate": (
+                        float(consensus.positive_rate_matrix[local, int(eval_rows.candidate_local_indices[k])])
+                        if method in V2_METHODS
+                        else ""
+                    ),
                     "true_delta_u_ae_pct": float(eval_rows.y_delta[k]),
                     "ae_zscore": float(eval_rows.ae_z[k]),
                     "anchor_ae_zscore": float(eval_rows.anchor_ae_z[k]),
@@ -1082,6 +1723,11 @@ def run_ae_utility_calibrator_methods_for_fold(
                     else "",
                     "override_accepted": int(int(selected_idx[local]) != int(anchor_idx[local])),
                     "predicted_override_margin": float(override_margin[local]),
+                    "selected_consensus_threshold": (
+                        float(selected_cfg.consensus_threshold)
+                        if method in V2_METHODS
+                        else ""
+                    ),
                     "heldout_target_nelbo_used_for_selection": 0,
                 }
             )
@@ -1093,11 +1739,18 @@ def run_ae_utility_calibrator_methods_for_fold(
             "query_domain": int(fold.heldout_domain),
             "aggregation_unit": "seed_x_heldout_domain_x_query_domain",
             "primary_aggregation": "macro_by_domain",
-            "model_type": "ridge_delta",
+            "model_type": "ridge_delta_consensus" if method in V2_METHODS else "ridge_delta",
             "feature_set": selected_cfg.feature_set,
             "method_kind": method_kind,
             "selected_delta_threshold": _threshold_label(float(selected_cfg.delta_threshold)),
             "selected_margin_threshold": _threshold_label(float(selected_cfg.margin_threshold)),
+            "selected_consensus_threshold": (
+                float(selected_cfg.consensus_threshold)
+                if method in V2_METHODS
+                else ""
+            ),
+            "ensemble_strategy": str(cfg.ensemble_strategy) if method in V2_METHODS else "",
+            "uncertainty_multiplier": float(cfg.uncertainty_multiplier) if method in V2_METHODS else "",
             "source_train_domains": "|".join(
                 str(int(v)) for v in sorted(set(int(sample_domains[int(i)]) for i in train_idx.tolist()))
             ),
@@ -1121,6 +1774,7 @@ def run_ae_utility_calibrator_methods_for_fold(
                 "selected_override_precision": float(summary["selected_override_precision"]),
                 "active_override_rate": float(summary["active_override_rate"]),
                 "override_capture_rate": float(summary["override_capture_rate"]),
+                "captured_oracle_headroom_rate": float(summary["captured_oracle_headroom_rate"]),
             }
         )
         override_diag_rows.append(
@@ -1135,6 +1789,10 @@ def run_ae_utility_calibrator_methods_for_fold(
                 "improving_vs_ae_argmin_rate": float(summary["improving_vs_ae_argmin_rate"]),
                 "harmful_vs_metadata_rate": float(summary["harmful_vs_metadata_rate"]),
                 "improving_vs_metadata_rate": float(summary["improving_vs_metadata_rate"]),
+                "captured_oracle_headroom_rate": float(summary["captured_oracle_headroom_rate"]),
+                "abstention_rate": float(summary["abstention_rate"]),
+                "abstention_correct_rate": float(summary["abstention_correct_rate"]),
+                "abstention_missed_gain": float(summary["abstention_missed_gain"]),
             }
         )
         selected_feature_rows.append(
@@ -1144,10 +1802,15 @@ def run_ae_utility_calibrator_methods_for_fold(
                 "selected_feature_set": selected_cfg.feature_set,
                 "selected_delta_threshold": _threshold_label(float(selected_cfg.delta_threshold)),
                 "selected_margin_threshold": _threshold_label(float(selected_cfg.margin_threshold)),
+                "selected_consensus_threshold": (
+                    float(selected_cfg.consensus_threshold)
+                    if method in V2_METHODS
+                    else ""
+                ),
                 "selected_by_source_inner_validation": int(selected_cfg.selected_by_source_inner),
             }
         )
-        if method == PRIMARY_METHOD:
+        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V2}:
             primary_anchor_idx = anchor_idx
             primary_selected_idx = selected_idx
 
@@ -1159,6 +1822,7 @@ def run_ae_utility_calibrator_methods_for_fold(
             true_eval=true_eval,
             anchor_idx=primary_anchor_idx,
             selected_idx=primary_selected_idx,
+            primary_method=str(cfg.primary_method),
         )
         oracle_headroom_rows.extend(headroom)
         anchor_rank_rows.extend(anchor_rows)
@@ -1226,7 +1890,7 @@ def write_ae_utility_calibrator_artifacts(
     _write_csv(reports_dir / "ae_utility_calibrator_selected_feature_sets.csv", selected_feature_rows)
     _write_csv(reports_dir / "ae_utility_calibrator_override_precision.csv", override_precision_rows)
     _write_csv(reports_dir / "ae_utility_calibrator_anchor_rank_diagnostics.csv", anchor_rank_rows)
-    return {
+    artifacts = {
         "ae_utility_calibrator_raw": "ae_utility_calibrator_raw.csv",
         "ae_utility_calibrator_source_inner_validation": "ae_utility_calibrator_source_inner_validation.csv",
         "ae_utility_calibrator_policy_audit": "ae_utility_calibrator_policy_audit.csv",
@@ -1236,3 +1900,37 @@ def write_ae_utility_calibrator_artifacts(
         "ae_utility_calibrator_override_precision": "ae_utility_calibrator_override_precision.csv",
         "ae_utility_calibrator_anchor_rank_diagnostics": "ae_utility_calibrator_anchor_rank_diagnostics.csv",
     }
+    v2_raw_rows = [row for row in raw_rows if str(row.get("method")) in V2_METHODS]
+    v2_validation_rows = [row for row in source_inner_validation_rows if str(row.get("method")) in V2_METHODS]
+    v2_policy_rows = [row for row in policy_audit_rows if str(row.get("method")) in V2_METHODS]
+    v2_override_rows = [row for row in override_diagnostic_rows if str(row.get("method")) in V2_METHODS]
+    v2_headroom_rows = [row for row in oracle_headroom_rows if str(row.get("method")) in V2_METHODS | {ORACLE_HEADROOM_METHOD}]
+    v2_precision_rows = [row for row in override_precision_rows if str(row.get("method")) in V2_METHODS]
+    v2_anchor_rows = [row for row in anchor_rank_rows if str(row.get("method")) in V2_METHODS]
+    v2_sample_rows = [row for row in raw_rows if str(row.get("method")) in V2_METHODS]
+    if v2_raw_rows or v2_policy_rows:
+        _write_csv(reports_dir / "ae_utility_calibrator_v2_raw.csv", v2_raw_rows)
+        _write_csv(reports_dir / "ae_utility_calibrator_v2_source_inner_validation.csv", v2_validation_rows)
+        _write_csv(reports_dir / "ae_utility_calibrator_v2_policy_audit.csv", v2_policy_rows)
+        _write_csv(reports_dir / "ae_utility_calibrator_v2_override_diagnostics.csv", v2_override_rows)
+        _write_csv(reports_dir / "ae_utility_calibrator_v2_override_precision.csv", v2_precision_rows)
+        _write_csv(reports_dir / "ae_utility_calibrator_v2_consensus_diagnostics.csv", v2_sample_rows)
+        _write_csv(reports_dir / "ae_utility_calibrator_v2_coverage_precision_tradeoff.csv", v2_policy_rows)
+        _write_csv(reports_dir / "ae_utility_calibrator_v2_oracle_headroom.csv", v2_headroom_rows)
+        _write_csv(reports_dir / "ae_utility_calibrator_v2_anchor_rank_diagnostics.csv", v2_anchor_rows)
+        _write_csv(reports_dir / "ae_utility_calibrator_v2_abstention_diagnostics.csv", v2_override_rows)
+        artifacts.update(
+            {
+                "ae_utility_calibrator_v2_raw": "ae_utility_calibrator_v2_raw.csv",
+                "ae_utility_calibrator_v2_source_inner_validation": "ae_utility_calibrator_v2_source_inner_validation.csv",
+                "ae_utility_calibrator_v2_policy_audit": "ae_utility_calibrator_v2_policy_audit.csv",
+                "ae_utility_calibrator_v2_override_diagnostics": "ae_utility_calibrator_v2_override_diagnostics.csv",
+                "ae_utility_calibrator_v2_override_precision": "ae_utility_calibrator_v2_override_precision.csv",
+                "ae_utility_calibrator_v2_consensus_diagnostics": "ae_utility_calibrator_v2_consensus_diagnostics.csv",
+                "ae_utility_calibrator_v2_coverage_precision_tradeoff": "ae_utility_calibrator_v2_coverage_precision_tradeoff.csv",
+                "ae_utility_calibrator_v2_oracle_headroom": "ae_utility_calibrator_v2_oracle_headroom.csv",
+                "ae_utility_calibrator_v2_anchor_rank_diagnostics": "ae_utility_calibrator_v2_anchor_rank_diagnostics.csv",
+                "ae_utility_calibrator_v2_abstention_diagnostics": "ae_utility_calibrator_v2_abstention_diagnostics.csv",
+            }
+        )
+    return artifacts

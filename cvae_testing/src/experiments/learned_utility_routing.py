@@ -270,6 +270,25 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
                             [0.0, 0.05, 0.10, 0.25],
                         )
                     ],
+                    "consensus_thresholds": [
+                        str(v)
+                        for v in (autoencoder_proxy_cfg.get("utility_calibrator", {}) or {}).get(
+                            "consensus_thresholds",
+                            [0.60, 0.75, 1.00],
+                        )
+                    ],
+                    "uncertainty_multiplier": float(
+                        (autoencoder_proxy_cfg.get("utility_calibrator", {}) or {}).get(
+                            "uncertainty_multiplier",
+                            1.0,
+                        )
+                    ),
+                    "ensemble_strategy": str(
+                        (autoencoder_proxy_cfg.get("utility_calibrator", {}) or {}).get(
+                            "ensemble_strategy",
+                            "source_domain_leave_one_plus_full",
+                        )
+                    ),
                     "threshold_selection_policy": "source_inner_ae_argmin_noninferiority_then_gap",
                     "fallback_policy_semantics": "delta_threshold_inf_returns_exact_ae_argmin",
                     "heldout_target_nelbo_used_for_selection": 0,

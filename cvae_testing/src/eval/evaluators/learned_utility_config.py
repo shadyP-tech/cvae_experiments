@@ -115,6 +115,13 @@ class AEUtilityCalibratorConfig:
     feature_sets_diagnostic: Tuple[str, ...]
     delta_thresholds: Tuple[float, ...]
     margin_thresholds: Tuple[float, ...]
+    consensus_thresholds: Tuple[float, ...]
+    uncertainty_multiplier: float
+    ensemble_strategy: str
+    abstention_correct_gap_pct_epsilon: float
+    min_pseudo_domain_positive_rate: float
+    max_pseudo_domain_gain_share: float
+    max_source_inner_fold_gain_share: float
     max_top1_drop_vs_ae_argmin_abs: float
     max_spearman_drop_vs_ae_argmin_abs: float
     max_gap_pct_degradation_vs_ae_argmin: float
@@ -332,6 +339,38 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
             for v in (utility_calibrator_cfg or {}).get(
                 "margin_thresholds",
                 [0.0, 0.05, 0.10, 0.25],
+            )
+        ),
+        consensus_thresholds=tuple(
+            float(v)
+            for v in (utility_calibrator_cfg or {}).get(
+                "consensus_thresholds",
+                [0.60, 0.75, 1.00],
+            )
+        ),
+        uncertainty_multiplier=float((utility_calibrator_cfg or {}).get("uncertainty_multiplier", 1.0)),
+        ensemble_strategy=str(
+            (utility_calibrator_cfg or {}).get("ensemble_strategy", "source_domain_leave_one_plus_full")
+        ).strip().lower(),
+        abstention_correct_gap_pct_epsilon=float(
+            (utility_calibrator_cfg or {}).get("abstention_correct_gap_pct_epsilon", 1.0)
+        ),
+        min_pseudo_domain_positive_rate=float(
+            _as_dict((utility_calibrator_cfg or {}).get("source_inner_stability_gates", {})).get(
+                "min_pseudo_domain_positive_rate",
+                0.80,
+            )
+        ),
+        max_pseudo_domain_gain_share=float(
+            _as_dict((utility_calibrator_cfg or {}).get("source_inner_stability_gates", {})).get(
+                "max_pseudo_domain_gain_share",
+                0.50,
+            )
+        ),
+        max_source_inner_fold_gain_share=float(
+            _as_dict((utility_calibrator_cfg or {}).get("source_inner_stability_gates", {})).get(
+                "max_source_inner_fold_gain_share",
+                0.50,
             )
         ),
         max_top1_drop_vs_ae_argmin_abs=float(

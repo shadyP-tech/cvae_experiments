@@ -4,12 +4,14 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 from pathlib import Path
 from statistics import mean
 from typing import Any, Dict, List, Sequence
 
 
 PRIMARY_METHOD = "ae_utility_calibrated_safe_override_v1"
+PRIMARY_METHOD_V2 = "ae_utility_calibrated_consensus_safe_override_v2"
 AE_ARGMIN_METHOD = "ae_argmin_zscore"
 METADATA_METHOD = "metadata_routing"
 GLOBAL_BASELINES = {
@@ -20,9 +22,12 @@ GLOBAL_BASELINES = {
 }
 REQUIRED_METHODS = set(GLOBAL_BASELINES) | {
     PRIMARY_METHOD,
+    PRIMARY_METHOD_V2,
     AE_ARGMIN_METHOD,
     "ae_metadata_utility_calibrated_safe_override_v1",
     "ae_combined_utility_calibrated_safe_override_v1",
+    "ae_metadata_utility_calibrated_consensus_safe_override_v2",
+    "ae_combined_utility_calibrated_consensus_safe_override_v2",
     "ae_utility_pairwise_ranker_diagnostic_v1",
 }
 THRESHOLDS = {
@@ -113,14 +118,17 @@ def _load_run_rows(path: Path) -> List[Dict[str, Any]]:
             "diagnostic_only": int(_float(metrics.get("diagnostic_only"))),
             "adoption_eligible": int(_float(metrics.get("adoption_eligible"))),
         }
-        if method == PRIMARY_METHOD:
-            matching = [r for (m, _q), r in by_policy.items() if m == PRIMARY_METHOD]
+        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V2}:
+            matching = [r for (m, _q), r in by_policy.items() if m == method]
             if matching:
                 row["raw_predicted_delta_spearman_non_anchor"] = _mean(
                     matching, "raw_predicted_delta_spearman_non_anchor", default=float("nan")
                 )
                 row["override_capture_rate"] = _mean(matching, "override_capture_rate", default=float("nan"))
                 row["oracle_improvable_query_rate"] = _mean(matching, "oracle_improvable_query_rate", default=float("nan"))
+                row["captured_oracle_headroom_rate"] = _mean(matching, "captured_oracle_headroom_rate", default=float("nan"))
+                row["abstention_rate"] = _mean(matching, "abstention_rate", default=float("nan"))
+                row["abstention_correct_rate"] = _mean(matching, "abstention_correct_rate", default=float("nan"))
         rows.append(row)
     return rows
 
@@ -153,7 +161,8 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
     for dataset in sorted(set(str(r["dataset"]) for r in rows)):
         dataset_rows = [r for r in rows if str(r["dataset"]) == dataset]
         by_method = {method: [r for r in dataset_rows if r["method"] == method] for method in REQUIRED_METHODS}
-        primary = by_method.get(PRIMARY_METHOD, [])
+        primary_method = PRIMARY_METHOD_V2 if by_method.get(PRIMARY_METHOD_V2, []) else PRIMARY_METHOD
+        primary = by_method.get(primary_method, [])
         ae_argmin = by_method.get(AE_ARGMIN_METHOD, [])
         metadata = by_method.get(METADATA_METHOD, [])
         if not primary or not ae_argmin or not metadata:
@@ -185,8 +194,34 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
             and m_spearman - p_spearman <= THRESHOLDS["spearman_drop_abs_max"]
             and p_gap - m_gap <= THRESHOLDS["gap_pct_degradation_pp_max"]
         )
-        domain_ok = _domain_non_degradation_ok(paths, dataset=dataset, method=PRIMARY_METHOD, baseline=AE_ARGMIN_METHOD)
-        local_pass = (
+        domain_ok = _domain_non_degradation_ok(paths, dataset=dataset, method=primary_method, baseline=AE_ARGMIN_METHOD)
+        if primary_method == PRIMARY_METHOD_V2:
+            v1_rows = by_method.get(PRIMARY_METHOD, [])
+            v1_gap_reduction = a_gap - _mean(v1_rows, "mean_oracle_gap_pct") if v1_rows else 0.0
+            v2_gap_reduction = a_gap - p_gap
+            retained_v1_gain = (
+                v2_gap_reduction >= 0.80 * v1_gap_reduction
+                if v1_gap_reduction > 0.0
+                else v2_gap_reduction > 0.0
+            )
+            v1_precision = _mean(v1_rows, "selected_override_precision", default=float("nan")) if v1_rows else float("nan")
+            v1_harmful = _mean(v1_rows, "harmful_vs_ae_argmin_rate", default=float("nan")) if v1_rows else float("nan")
+            precision_or_harm_ok = (
+                (v1_rows and math.isfinite(v1_precision) and precision >= v1_precision)
+                or (v1_rows and math.isfinite(v1_harmful) and harmful <= v1_harmful)
+                or not v1_rows
+            )
+            local_pass = (
+                (p_gap < a_gap or p_top1 > a_top1)
+                and no_ae_degrade
+                and retained_v1_gain
+                and precision_or_harm_ok
+                and precision >= THRESHOLDS["min_selected_override_precision_for_pass"]
+                and net_gain >= 0.0
+                and domain_ok
+            )
+        else:
+            local_pass = (
             p_gap < a_gap
             and p_top1 >= a_top1
             and p_spearman >= a_spearman
@@ -195,7 +230,7 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
             and precision > THRESHOLDS["min_selected_override_precision_for_pass"]
             and harmful <= improving
             and domain_ok
-        )
+            )
         local_weak = (
             (p_gap < a_gap or p_top1 > a_top1)
             and no_ae_degrade
@@ -234,8 +269,8 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
                     "net_gain_vs_ae_argmin": _mean(method_rows, "net_gain_vs_ae_argmin"),
                     "harmful_vs_ae_argmin_rate": _mean(method_rows, "harmful_vs_ae_argmin_rate"),
                     "improving_vs_ae_argmin_rate": _mean(method_rows, "improving_vs_ae_argmin_rate"),
-                    "local_ae_calibration_verdict": local_verdict if method == PRIMARY_METHOD else "",
-                    "global_adoption_verdict": global_verdict if method == PRIMARY_METHOD else "",
+                    "local_ae_calibration_verdict": local_verdict if method == primary_method else "",
+                    "global_adoption_verdict": global_verdict if method == primary_method else "",
                 }
             )
 

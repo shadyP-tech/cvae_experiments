@@ -234,6 +234,9 @@ def _method_protocol(method: str) -> MethodProtocol:
         "ae_utility_calibrated_safe_override_v1",
         "ae_metadata_utility_calibrated_safe_override_v1",
         "ae_combined_utility_calibrated_safe_override_v1",
+        "ae_utility_calibrated_consensus_safe_override_v2",
+        "ae_metadata_utility_calibrated_consensus_safe_override_v2",
+        "ae_combined_utility_calibrated_consensus_safe_override_v2",
     }:
         return MethodProtocol(
             method_role="learned",

@@ -54,6 +54,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_support_free_ae_routing_v1",
         "learned_utility_ae_first_routing_v1",
         "learned_utility_ae_utility_calibrator_v1",
+        "learned_utility_ae_utility_calibrator_v2",
         "breakhis_support_free_ae_routing_v1",
         "camelyon17_support_free_ae_routing_v1",
     }
@@ -63,6 +64,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_support_free_ae_routing_v1",
         "learned_utility_ae_first_routing_v1",
         "learned_utility_ae_utility_calibrator_v1",
+        "learned_utility_ae_utility_calibrator_v2",
         "breakhis_support_free_ae_routing_v1",
         "camelyon17_support_free_ae_routing_v1",
     }
@@ -827,25 +829,33 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                         "ae_utility_calibrated_safe_override_v1",
                     )
                 ).strip()
-                if primary_method != "ae_utility_calibrated_safe_override_v1":
+                allowed_primary_methods = {
+                    "ae_utility_calibrated_safe_override_v1",
+                    "ae_utility_calibrated_consensus_safe_override_v2",
+                }
+                if primary_method not in allowed_primary_methods:
                     raise ValueError(
                         "learned_utility.autoencoder_proxy.utility_calibrator.primary_method "
-                        "must be 'ae_utility_calibrated_safe_override_v1'"
+                        f"must be one of {sorted(allowed_primary_methods)}"
                     )
+                is_consensus_v2 = primary_method == "ae_utility_calibrated_consensus_safe_override_v2"
                 model_types = utility_calibrator_cfg.get("model_types", ["ridge_delta"])
                 if not isinstance(model_types, list) or not model_types:
                     raise ValueError(
                         "learned_utility.autoencoder_proxy.utility_calibrator.model_types must be a non-empty list"
                     )
-                bad_models = sorted(set(str(v).strip().lower() for v in model_types) - {"ridge_delta"})
+                allowed_models = {"ridge_delta_consensus"} if is_consensus_v2 else {"ridge_delta"}
+                bad_models = sorted(set(str(v).strip().lower() for v in model_types) - allowed_models)
                 if bad_models:
                     raise ValueError(
                         "learned_utility.autoencoder_proxy.utility_calibrator.model_types must be subset of "
-                        f"['ridge_delta'], got unknown {bad_models}"
+                        f"{sorted(allowed_models)}, got unknown {bad_models}"
                     )
-                if str(utility_calibrator_cfg.get("primary_model_type", "ridge_delta")).strip().lower() != "ridge_delta":
+                expected_primary_model = "ridge_delta_consensus" if is_consensus_v2 else "ridge_delta"
+                if str(utility_calibrator_cfg.get("primary_model_type", expected_primary_model)).strip().lower() != expected_primary_model:
                     raise ValueError(
-                        "learned_utility.autoencoder_proxy.utility_calibrator.primary_model_type must be 'ridge_delta'"
+                        "learned_utility.autoencoder_proxy.utility_calibrator.primary_model_type "
+                        f"must be '{expected_primary_model}'"
                     )
                 diagnostic_models = utility_calibrator_cfg.get("diagnostic_model_types", ["pairwise_ranker"])
                 if not isinstance(diagnostic_models, list):
@@ -862,9 +872,19 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                     raise ValueError(
                         "learned_utility.autoencoder_proxy.utility_calibrator.fallback_policy must be 'ae_argmin_zscore'"
                     )
-                allowed_feature_sets = {"ae_core", "ae_quality", "ae_metadata", "ae_combined"}
-                primary_features = utility_calibrator_cfg.get("feature_sets_primary", ["ae_core", "ae_quality"])
-                diagnostic_features = utility_calibrator_cfg.get("feature_sets_diagnostic", ["ae_metadata", "ae_combined"])
+                allowed_feature_sets = (
+                    {"ae_consensus_core", "ae_consensus_quality", "ae_metadata_consensus", "ae_combined_consensus"}
+                    if is_consensus_v2
+                    else {"ae_core", "ae_quality", "ae_metadata", "ae_combined"}
+                )
+                primary_features = utility_calibrator_cfg.get(
+                    "feature_sets_primary",
+                    ["ae_consensus_core", "ae_consensus_quality"] if is_consensus_v2 else ["ae_core", "ae_quality"],
+                )
+                diagnostic_features = utility_calibrator_cfg.get(
+                    "feature_sets_diagnostic",
+                    ["ae_metadata_consensus", "ae_combined_consensus"] if is_consensus_v2 else ["ae_metadata", "ae_combined"],
+                )
                 for key, values in {
                     "feature_sets_primary": primary_features,
                     "feature_sets_diagnostic": diagnostic_features,
@@ -879,7 +899,8 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                             f"learned_utility.autoencoder_proxy.utility_calibrator.{key} must be subset of "
                             f"{sorted(allowed_feature_sets)}, got unknown {bad}"
                         )
-                if any(str(v).strip().lower() in {"ae_metadata", "ae_combined"} for v in primary_features):
+                metadata_feature_names = {"ae_metadata", "ae_combined", "ae_metadata_consensus", "ae_combined_consensus"}
+                if any(str(v).strip().lower() in metadata_feature_names for v in primary_features):
                     raise ValueError(
                         "learned_utility.autoencoder_proxy.utility_calibrator.feature_sets_primary "
                         "must remain metadata-free"
@@ -908,6 +929,56 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                             "learned_utility.autoencoder_proxy.utility_calibrator.delta_thresholds "
                             "must include '__inf__'"
                         )
+                if is_consensus_v2:
+                    consensus_thresholds = utility_calibrator_cfg.get("consensus_thresholds", [0.60, 0.75, 1.00])
+                    if not isinstance(consensus_thresholds, list) or not consensus_thresholds:
+                        raise ValueError(
+                            "learned_utility.autoencoder_proxy.utility_calibrator.consensus_thresholds "
+                            "must be a non-empty list"
+                        )
+                    for value in consensus_thresholds:
+                        if float(value) < 0.0 or float(value) > 1.0:
+                            raise ValueError(
+                                "learned_utility.autoencoder_proxy.utility_calibrator.consensus_thresholds "
+                                "must be in [0,1]"
+                            )
+                    if float(utility_calibrator_cfg.get("uncertainty_multiplier", 1.0)) < 0.0:
+                        raise ValueError(
+                            "learned_utility.autoencoder_proxy.utility_calibrator.uncertainty_multiplier must be >= 0"
+                        )
+                    if str(
+                        utility_calibrator_cfg.get(
+                            "ensemble_strategy",
+                            "source_domain_leave_one_plus_full",
+                        )
+                    ).strip().lower() != "source_domain_leave_one_plus_full":
+                        raise ValueError(
+                            "learned_utility.autoencoder_proxy.utility_calibrator.ensemble_strategy "
+                            "must be 'source_domain_leave_one_plus_full'"
+                        )
+                    if float(utility_calibrator_cfg.get("abstention_correct_gap_pct_epsilon", 1.0)) < 0.0:
+                        raise ValueError(
+                            "learned_utility.autoencoder_proxy.utility_calibrator."
+                            "abstention_correct_gap_pct_epsilon must be >= 0"
+                        )
+                    stability_gates = utility_calibrator_cfg.get("source_inner_stability_gates", {})
+                    if stability_gates is not None and not isinstance(stability_gates, dict):
+                        raise ValueError(
+                            "learned_utility.autoencoder_proxy.utility_calibrator.source_inner_stability_gates "
+                            "must be a dictionary"
+                        )
+                    stability_gates = stability_gates or {}
+                    for key in [
+                        "min_pseudo_domain_positive_rate",
+                        "max_pseudo_domain_gain_share",
+                        "max_source_inner_fold_gain_share",
+                    ]:
+                        value = float(stability_gates.get(key, 0.0 if key.startswith("min_") else 1.0))
+                        if value < 0.0 or value > 1.0:
+                            raise ValueError(
+                                "learned_utility.autoencoder_proxy.utility_calibrator."
+                                f"source_inner_stability_gates.{key} must be in [0,1]"
+                            )
                 risk_gates = utility_calibrator_cfg.get("risk_gates", {})
                 if risk_gates is not None and not isinstance(risk_gates, dict):
                     raise ValueError(

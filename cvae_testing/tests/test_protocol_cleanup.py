@@ -163,6 +163,24 @@ def test_ae_utility_calibrator_configs_are_protocol_locked() -> None:
         assert utility["delta_thresholds"][-1] == "__inf__"
 
 
+def test_ae_utility_calibrator_v2_configs_are_protocol_locked() -> None:
+    for dataset in ["breakhis", "camelyon17"]:
+        path = PROJECT_ROOT / "configs" / "experiments" / dataset / "learned_utility_ae_utility_calibrator_v2.yaml"
+        cfg = load_config(path)
+        validate_config(cfg)
+        utility = cfg["learned_utility"]["autoencoder_proxy"]["utility_calibrator"]
+        assert cfg["experiment"]["name"] == "learned_utility_ae_utility_calibrator_v2"
+        assert utility["primary_method"] == "ae_utility_calibrated_consensus_safe_override_v2"
+        assert utility["model_types"] == ["ridge_delta_consensus"]
+        assert utility["primary_model_type"] == "ridge_delta_consensus"
+        assert utility["fallback_policy"] == "ae_argmin_zscore"
+        assert utility["feature_sets_primary"] == ["ae_consensus_core", "ae_consensus_quality"]
+        assert not any("metadata" in name for name in utility["feature_sets_primary"])
+        assert "ae_metadata_consensus" in utility["feature_sets_diagnostic"]
+        assert utility["delta_thresholds"][-1] == "__inf__"
+        assert utility["ensemble_strategy"] == "source_domain_leave_one_plus_full"
+
+
 def test_quarantined_entrypoints_fail_fast() -> None:
     checks = [
         ([sys.executable, "scripts/run_learned_compatibility_loqdo.py"], "target expert"),

@@ -303,6 +303,41 @@ def _ae_utility_calibrator_cfg(*, delta_thresholds=None):
     return lu._parse_learned_utility_config(cfg).autoencoder.utility_calibrator
 
 
+def _ae_utility_consensus_v2_cfg(*, delta_thresholds=None, consensus_thresholds=None):
+    cfg = _support_free_ae_cfg()
+    cfg["autoencoder_proxy"]["utility_calibrator"] = {
+        "enabled": True,
+        "primary_method": "ae_utility_calibrated_consensus_safe_override_v2",
+        "model_types": ["ridge_delta_consensus"],
+        "primary_model_type": "ridge_delta_consensus",
+        "diagnostic_model_types": ["pairwise_ranker"],
+        "fallback_policy": "ae_argmin_zscore",
+        "feature_sets_primary": ["ae_consensus_core", "ae_consensus_quality"],
+        "feature_sets_diagnostic": ["ae_metadata_consensus", "ae_combined_consensus"],
+        "delta_thresholds": list(delta_thresholds if delta_thresholds is not None else [0.0, "__inf__"]),
+        "margin_thresholds": [0.0, 0.05],
+        "consensus_thresholds": list(consensus_thresholds if consensus_thresholds is not None else [0.60, 1.00]),
+        "uncertainty_multiplier": 1.0,
+        "ensemble_strategy": "source_domain_leave_one_plus_full",
+        "abstention_correct_gap_pct_epsilon": 1.0,
+        "source_inner_stability_gates": {
+            "min_pseudo_domain_positive_rate": 0.80,
+            "max_pseudo_domain_gain_share": 0.50,
+            "max_source_inner_fold_gain_share": 0.50,
+        },
+        "ridge_l2": 1.0e-4,
+        "risk_gates": {
+            "max_top1_drop_vs_ae_argmin_abs": 0.02,
+            "max_spearman_drop_vs_ae_argmin_abs": 0.03,
+            "max_gap_pct_degradation_vs_ae_argmin": 1.0,
+            "max_top1_drop_vs_metadata_abs": 0.02,
+            "max_spearman_drop_vs_metadata_abs": 0.03,
+            "max_gap_pct_degradation_vs_metadata": 1.0,
+        },
+    }
+    return lu._parse_learned_utility_config(cfg).autoencoder.utility_calibrator
+
+
 def _run_ae_first_direct(*, thresholds=None, metadata_similarity=None):
     sample_domains, expert_domains, true_nelbo, meta, ae_scores = _fake_payload_ae_first()
     if metadata_similarity is not None:
@@ -347,6 +382,34 @@ def _run_ae_utility_calibrator_direct(*, delta_thresholds=None):
         metadata_similarity_eval=meta[test_idx][:, list(fold.candidate_col_indices)],
         ae_scores=ae_scores,
         cfg=_ae_utility_calibrator_cfg(delta_thresholds=delta_thresholds),
+        seed=7,
+        tie_policy="stable_expert_index",
+    )
+
+
+def _run_ae_utility_consensus_v2_direct(*, delta_thresholds=None, consensus_thresholds=None):
+    sample_domains, expert_domains, true_nelbo, meta, ae_scores = _fake_payload_ae_first()
+    embeddings = np.stack([np.asarray([float(i), 0.0]) for i in range(len(sample_domains))])
+    fold = FoldCandidateSet.for_heldout_domain(heldout_domain=10, expert_domains=expert_domains)
+    test_idx = np.where(sample_domains == 10)[0]
+    train_idx = np.where(sample_domains != 10)[0]
+    return auc.run_ae_utility_calibrator_methods_for_fold(
+        embeddings=embeddings,
+        sample_domains=sample_domains,
+        expert_domains=expert_domains,
+        train_idx=train_idx,
+        test_idx=test_idx,
+        fold=fold,
+        true_nelbo=true_nelbo,
+        true_eval=fold.slice_nelbo(true_nelbo, test_idx),
+        global_eval=true_nelbo[test_idx],
+        metadata_similarity=meta,
+        metadata_similarity_eval=meta[test_idx][:, list(fold.candidate_col_indices)],
+        ae_scores=ae_scores,
+        cfg=_ae_utility_consensus_v2_cfg(
+            delta_thresholds=delta_thresholds,
+            consensus_thresholds=consensus_thresholds,
+        ),
         seed=7,
         tie_policy="stable_expert_index",
     )
@@ -1186,6 +1249,280 @@ def test_ae_utility_calibrator_policy_audit_provenance_fields() -> None:
     }
     assert required.issubset(policy)
     assert int(policy["heldout_target_nelbo_used_for_selection"]) == 0
+
+
+def test_ae_utility_consensus_v2_primary_is_metadata_free() -> None:
+    outputs = _run_ae_utility_consensus_v2_direct(delta_thresholds=["__inf__"])
+    rows = [row for row in outputs.sample_rows if row["method"] == "ae_utility_calibrated_consensus_safe_override_v2"]
+    assert rows
+    assert all(row["metadata_role"] == "not_used" for row in rows)
+    assert all(row["feature_set"] in {"ae_consensus_core", "ae_consensus_quality"} for row in rows)
+
+
+def test_ae_utility_consensus_v2_hybrids_are_separate_methods() -> None:
+    outputs = _run_ae_utility_consensus_v2_direct(delta_thresholds=["__inf__"])
+    methods = {row["method"] for row in outputs.sample_rows}
+    assert "ae_metadata_utility_calibrated_consensus_safe_override_v2" in methods
+    assert "ae_combined_utility_calibrated_consensus_safe_override_v2" in methods
+    hybrid_rows = [
+        row for row in outputs.sample_rows
+        if row["method"] in {
+            "ae_metadata_utility_calibrated_consensus_safe_override_v2",
+            "ae_combined_utility_calibrated_consensus_safe_override_v2",
+        }
+    ]
+    assert hybrid_rows
+    assert all(row["metadata_role"] == "hybrid_auxiliary_feature" for row in hybrid_rows)
+
+
+def test_ae_utility_consensus_v2_features_exclude_metadata() -> None:
+    cfg = _ae_utility_consensus_v2_cfg()
+    assert cfg.feature_sets_primary == ("ae_consensus_core", "ae_consensus_quality")
+    assert not any("metadata" in feature_set for feature_set in cfg.feature_sets_primary)
+
+
+def test_ae_utility_consensus_v2_excludes_target_ae_and_cvae() -> None:
+    outputs = _run_ae_utility_consensus_v2_direct(delta_thresholds=["__inf__"])
+    assert outputs.policy_audit_rows
+    for row in outputs.policy_audit_rows:
+        assert int(row["excluded_target_ae"]) == 1
+        assert int(row["excluded_target_cvae"]) == 1
+        assert int(row["heldout_target_nelbo_used_for_selection"]) == 0
+
+
+def test_ae_utility_consensus_v2_source_inner_self_exclusion() -> None:
+    outputs = _run_ae_utility_consensus_v2_direct(delta_thresholds=["__inf__"])
+    assert outputs.source_inner_validation_rows
+    for row in outputs.source_inner_validation_rows:
+        assert int(row["excluded_pseudo_query_ae"]) == 1
+        assert int(row["excluded_pseudo_query_cvae"]) == 1
+
+
+def test_ae_utility_consensus_v2_ensemble_members_exclude_source_inner_validation_domain() -> None:
+    outputs = _run_ae_utility_consensus_v2_direct(delta_thresholds=["__inf__"])
+    rows = [
+        row for row in outputs.source_inner_validation_rows
+        if row["method"] == "ae_utility_calibrated_consensus_safe_override_v2"
+    ]
+    assert rows
+    for row in rows:
+        pseudo = str(int(row["source_inner_pseudo_query_domain"]))
+        domains = str(row["ensemble_training_domains_used"]).split("|")
+        assert int(row["source_inner_validation_domain_excluded_from_ensemble_training"]) == 1
+        assert pseudo not in domains
+
+
+def test_ae_utility_consensus_v2_threshold_selection_source_only() -> None:
+    outputs = _run_ae_utility_consensus_v2_direct(delta_thresholds=["__inf__"])
+    assert outputs.source_inner_validation_rows
+    assert all(int(row["heldout_target_nelbo_used_for_selection"]) == 0 for row in outputs.source_inner_validation_rows)
+
+
+def test_ae_utility_consensus_v2_source_inner_stability_gates_precede_gap_selection() -> None:
+    outputs = _run_ae_utility_consensus_v2_direct(delta_thresholds=["__inf__"])
+    rows = [
+        row for row in outputs.source_inner_validation_rows
+        if row["method"] == "ae_utility_calibrated_consensus_safe_override_v2"
+    ]
+    assert rows
+    assert all(row["threshold_selection_policy"] == "source_inner_stability_then_ae_argmin_gap" for row in rows)
+
+
+def test_ae_utility_consensus_v2_inf_threshold_matches_ae_argmin() -> None:
+    outputs = _run_ae_utility_consensus_v2_direct(delta_thresholds=["__inf__"])
+    rows = [row for row in outputs.sample_rows if row["method"] == "ae_utility_calibrated_consensus_safe_override_v2"]
+    assert rows
+    for row in rows:
+        assert int(row["selected_expert"]) == int(row["ae_anchor_expert"])
+        assert int(row["override_accepted"]) == 0
+
+
+def test_ae_utility_consensus_v2_override_candidates_exclude_anchor() -> None:
+    outputs = _run_ae_utility_consensus_v2_direct(delta_thresholds=["__inf__"])
+    raw_rows = [row for row in outputs.raw_rows if row["method"] == "ae_utility_calibrated_consensus_safe_override_v2"]
+    assert raw_rows
+    assert all(int(row["candidate_expert"]) != int(row["ae_anchor_expert"]) for row in raw_rows)
+
+
+def test_ae_utility_consensus_v2_single_override_candidate_margin_behavior() -> None:
+    consensus = auc._ConsensusPredictions(
+        mean_matrix=np.asarray([[0.0, 0.10]], dtype=np.float64),
+        std_matrix=np.asarray([[0.0, 0.01]], dtype=np.float64),
+        lower_matrix=np.asarray([[0.0, 0.09]], dtype=np.float64),
+        positive_rate_matrix=np.asarray([[0.0, 1.0]], dtype=np.float64),
+        n_members_matrix=np.asarray([[2.0, 2.0]], dtype=np.float64),
+        n_positive_matrix=np.asarray([[0.0, 2.0]], dtype=np.float64),
+        member_labels=("full_source", "leave_domain_20"),
+    )
+    selected, best, second, lower_best, lower_second, margin, positive = auc._apply_consensus_safe_override_policy(
+        consensus=consensus,
+        anchor_idx=np.asarray([0], dtype=np.int64),
+        delta_threshold=0.05,
+        margin_threshold=999.0,
+        consensus_threshold=1.0,
+    )
+    assert int(best[0]) == 1
+    assert int(second[0]) == -1
+    assert np.isinf(float(margin[0]))
+    assert int(selected[0]) == 1
+    assert float(lower_best[0]) == 0.09
+    assert not np.isfinite(float(lower_second[0]))
+    assert float(positive[0]) == 1.0
+
+
+def test_ae_utility_consensus_v2_lower_confidence_delta_rule() -> None:
+    consensus = auc._ConsensusPredictions(
+        mean_matrix=np.asarray([[0.0, 0.20, 0.15]], dtype=np.float64),
+        std_matrix=np.asarray([[0.0, 0.20, 0.01]], dtype=np.float64),
+        lower_matrix=np.asarray([[0.0, 0.00, 0.14]], dtype=np.float64),
+        positive_rate_matrix=np.asarray([[0.0, 1.0, 1.0]], dtype=np.float64),
+        n_members_matrix=np.ones((1, 3), dtype=np.float64) * 2.0,
+        n_positive_matrix=np.ones((1, 3), dtype=np.float64) * 2.0,
+        member_labels=("full_source", "leave_domain_20"),
+    )
+    selected, best, _second, lower_best, _lower_second, _margin, _positive = auc._apply_consensus_safe_override_policy(
+        consensus=consensus,
+        anchor_idx=np.asarray([0], dtype=np.int64),
+        delta_threshold=0.05,
+        margin_threshold=0.0,
+        consensus_threshold=1.0,
+    )
+    assert int(best[0]) == 2
+    assert int(selected[0]) == 2
+    assert float(lower_best[0]) == 0.14
+
+
+def test_ae_utility_consensus_v2_consensus_threshold_rule() -> None:
+    consensus = auc._ConsensusPredictions(
+        mean_matrix=np.asarray([[0.0, 0.20]], dtype=np.float64),
+        std_matrix=np.asarray([[0.0, 0.01]], dtype=np.float64),
+        lower_matrix=np.asarray([[0.0, 0.19]], dtype=np.float64),
+        positive_rate_matrix=np.asarray([[0.0, 0.50]], dtype=np.float64),
+        n_members_matrix=np.asarray([[2.0, 2.0]], dtype=np.float64),
+        n_positive_matrix=np.asarray([[0.0, 1.0]], dtype=np.float64),
+        member_labels=("full_source", "leave_domain_20"),
+    )
+    selected, *_ = auc._apply_consensus_safe_override_policy(
+        consensus=consensus,
+        anchor_idx=np.asarray([0], dtype=np.int64),
+        delta_threshold=0.05,
+        margin_threshold=0.0,
+        consensus_threshold=0.75,
+    )
+    assert int(selected[0]) == 0
+
+
+def test_ae_utility_consensus_v2_reports_candidate_consensus_fields() -> None:
+    outputs = _run_ae_utility_consensus_v2_direct(delta_thresholds=["__inf__"])
+    row = [row for row in outputs.sample_rows if row["method"] == "ae_utility_calibrated_consensus_safe_override_v2"][0]
+    required = {
+        "mean_predicted_delta_best",
+        "std_predicted_delta_best",
+        "lower_confidence_delta_best",
+        "positive_consensus_rate_best",
+        "mean_predicted_delta_second",
+        "lower_confidence_delta_second",
+        "predicted_override_margin",
+        "n_ensemble_members",
+        "n_positive_members",
+    }
+    assert required.issubset(row)
+
+
+def test_ae_utility_consensus_v2_reports_coverage_precision_tradeoff() -> None:
+    outputs = _run_ae_utility_consensus_v2_direct(delta_thresholds=["__inf__"])
+    row = [row for row in outputs.policy_audit_rows if row["method"] == "ae_utility_calibrated_consensus_safe_override_v2"][0]
+    required = {
+        "active_override_rate",
+        "selected_override_precision",
+        "net_gain_vs_ae_argmin",
+        "captured_oracle_headroom_rate",
+    }
+    assert required.issubset(row)
+
+
+def test_ae_utility_consensus_v2_reports_captured_oracle_headroom_rate() -> None:
+    outputs = _run_ae_utility_consensus_v2_direct(delta_thresholds=["__inf__"])
+    assert outputs.override_precision_rows
+    row = [row for row in outputs.override_precision_rows if row["method"] == "ae_utility_calibrated_consensus_safe_override_v2"][0]
+    assert "captured_oracle_headroom_rate" in row
+
+
+def test_ae_utility_consensus_v2_reports_abstention_correctness() -> None:
+    outputs = _run_ae_utility_consensus_v2_direct(delta_thresholds=["__inf__"])
+    row = [row for row in outputs.override_diagnostic_rows if row["method"] == "ae_utility_calibrated_consensus_safe_override_v2"][0]
+    assert {"abstention_rate", "abstention_correct_rate", "abstention_missed_gain"}.issubset(row)
+
+
+def test_ae_utility_consensus_v2_rejects_source_inner_domain_degradation() -> None:
+    cfg = _ae_utility_consensus_v2_cfg()
+    good = {
+        "ae_argmin_top1_oracle_hit": 0.5,
+        "top1_oracle_hit": 0.5,
+        "ae_delta_spearman_non_anchor": 0.2,
+        "raw_predicted_delta_spearman_non_anchor": 0.2,
+        "ae_argmin_mean_oracle_gap_pct": 10.0,
+        "mean_oracle_gap_pct": 9.0,
+    }
+    bad = dict(good, top1_oracle_hit=0.0)
+    stability = auc._source_inner_stability([good, bad], cfg)
+    assert int(stability["source_inner_material_degradation_count"]) == 1
+    assert int(stability["passes_source_inner_stability_gates"]) == 0
+
+
+def test_ae_utility_consensus_v2_tiny_capped_smoke_run(tmp_path, monkeypatch) -> None:
+    sample_domains, expert_domains, true_nelbo, _meta, ae_scores = _fake_payload_ae_first()
+
+    def fake_score(**kwargs):
+        _ = kwargs
+        embeddings = np.stack([np.asarray([float(i), 0.0]) for i in range(len(sample_domains))])
+        metadata = [{"magnification": int(domain), "sample_id": f"s{i}"} for i, domain in enumerate(sample_domains)]
+        return embeddings, sample_domains, true_nelbo, expert_domains, metadata
+
+    def fake_ae_scores(**kwargs):
+        _ = kwargs
+        return ae_scores
+
+    cfg = _support_free_ae_cfg()
+    cfg["autoencoder_proxy"]["utility_calibrator"] = {
+        "enabled": True,
+        "primary_method": "ae_utility_calibrated_consensus_safe_override_v2",
+        "model_types": ["ridge_delta_consensus"],
+        "primary_model_type": "ridge_delta_consensus",
+        "diagnostic_model_types": ["pairwise_ranker"],
+        "fallback_policy": "ae_argmin_zscore",
+        "feature_sets_primary": ["ae_consensus_core", "ae_consensus_quality"],
+        "feature_sets_diagnostic": ["ae_metadata_consensus", "ae_combined_consensus"],
+        "delta_thresholds": ["__inf__"],
+        "margin_thresholds": [0.0],
+        "consensus_thresholds": [1.0],
+        "uncertainty_multiplier": 1.0,
+        "ensemble_strategy": "source_domain_leave_one_plus_full",
+        "abstention_correct_gap_pct_epsilon": 1.0,
+        "source_inner_stability_gates": {
+            "min_pseudo_domain_positive_rate": 0.80,
+            "max_pseudo_domain_gain_share": 0.50,
+            "max_source_inner_fold_gain_share": 0.50,
+        },
+    }
+    monkeypatch.setattr(lu, "_score_experts_batched", fake_score)
+    monkeypatch.setattr(lu, "build_autoencoder_score_matrices", fake_ae_scores)
+    results = lu.evaluate_learned_utility_loqdo(
+        test_cache=tmp_path / "unused.pt",
+        expert_checkpoints={f"expert_{d}": "unused" for d in expert_domains},
+        hidden_dim=4,
+        latent_dim=2,
+        strategy="categorical_exact",
+        tau=1.0,
+        seed=7,
+        learned_cfg=cfg,
+        reports_dir=tmp_path,
+        autoencoder_artifacts={"dummy": True},
+    )
+
+    assert "ae_utility_calibrated_consensus_safe_override_v2" in results["metrics_by_method"]
+    assert results["artifacts"]["ae_utility_calibrator_v2_raw"] == "ae_utility_calibrator_v2_raw.csv"
+    assert (tmp_path / "ae_utility_calibrator_v2_policy_audit.csv").exists()
 
 
 def test_ae_utility_calibrator_tiny_capped_smoke_run(tmp_path, monkeypatch) -> None:
