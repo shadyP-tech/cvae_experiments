@@ -1,0 +1,19 @@
+{
+  "thresholds": {
+    "top1_drop_abs_max": 0.02,
+    "spearman_drop_abs_max": 0.03,
+    "gap_pct_degradation_pp_max": 1.0,
+    "min_active_override_rate_for_weak_pass": 0.1,
+    "min_active_override_rate_for_pass": 0.2,
+    "min_selected_override_precision_for_weak_pass": 0.5,
+    "min_selected_override_precision_for_pass": 0.5
+  },
+  "verdicts": {
+    "breakhis_local_ae_calibration_verdict": "FAIL",
+    "breakhis_global_adoption_verdict": "DIAGNOSTIC ONLY",
+    "camelyon17_local_ae_calibration_verdict": "PASS",
+    "camelyon17_global_adoption_verdict": "PASS",
+    "cross_dataset_local_ae_calibration_verdict": "DIAGNOSTIC ONLY",
+    "cross_dataset_global_adoption_verdict": "DIAGNOSTIC ONLY"
+  }
+}
