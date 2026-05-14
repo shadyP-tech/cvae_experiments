@@ -71,6 +71,21 @@ class ResidualRoutingConfig:
 
 
 @dataclass(frozen=True)
+class AutoencoderProxyConfig:
+    enabled: bool
+    hidden_dim: int
+    latent_dim: int
+    learning_rate: float
+    epochs: int
+    patience: int
+    batch_size: int
+    score_normalization: str
+    score_normalization_eps: float
+    margin_threshold: float
+    run_diagnostics: bool
+
+
+@dataclass(frozen=True)
 class LearnedUtilityConfig:
     pair_batch_size: int
     include_metadata_features: bool
@@ -80,6 +95,7 @@ class LearnedUtilityConfig:
     hybrid: HybridConfig
     compatibility: CompatibilityResearchConfig
     residual: ResidualRoutingConfig
+    autoencoder: AutoencoderProxyConfig
     support_response: SupportResponseConfig
 
 
@@ -213,6 +229,23 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         ridge_l2=float((residual_cfg or {}).get("ridge_l2", 1e-4)),
     )
 
+    autoencoder_cfg = _as_dict(learned_cfg.get("autoencoder_proxy", {}))
+    autoencoder = AutoencoderProxyConfig(
+        enabled=bool((autoencoder_cfg or {}).get("enabled", False)),
+        hidden_dim=int((autoencoder_cfg or {}).get("hidden_dim", 256)),
+        latent_dim=int((autoencoder_cfg or {}).get("latent_dim", 32)),
+        learning_rate=float((autoencoder_cfg or {}).get("learning_rate", 1e-3)),
+        epochs=int((autoencoder_cfg or {}).get("epochs", 25)),
+        patience=int((autoencoder_cfg or {}).get("patience", 5)),
+        batch_size=int((autoencoder_cfg or {}).get("batch_size", 512)),
+        score_normalization=str((autoencoder_cfg or {}).get("score_normalization", "source_val_zscore"))
+        .strip()
+        .lower(),
+        score_normalization_eps=float((autoencoder_cfg or {}).get("score_normalization_eps", 1e-6)),
+        margin_threshold=float((autoencoder_cfg or {}).get("margin_threshold", 0.0)),
+        run_diagnostics=bool((autoencoder_cfg or {}).get("run_diagnostics", True)),
+    )
+
     return LearnedUtilityConfig(
         pair_batch_size=pair_batch_size,
         include_metadata_features=include_metadata_features,
@@ -222,5 +255,6 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         hybrid=hybrid,
         compatibility=compatibility,
         residual=residual,
+        autoencoder=autoencoder,
         support_response=parse_support_response_config(learned_cfg),
     )

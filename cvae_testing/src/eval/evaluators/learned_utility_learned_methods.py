@@ -52,6 +52,7 @@ def _run_learned_methods_for_fold(
     embedding_feature_dim: int,
     expert_feature_dim: int,
     tie_policy: str,
+    ae_zscore_matrix: np.ndarray | None = None,
 ) -> LearnedFoldOutputs:
     x_train, q_train, e_train, s_train = _build_fold_training_pair_features(
         sample_embeddings=embeddings,
@@ -175,6 +176,32 @@ def _run_learned_methods_for_fold(
             combined_test = np.concatenate([latent_test, test_meta], axis=1)
             combined_train_z, combined_test_z = _zscore_features(combined_train, combined_test)
 
+            ae_train_z = ae_test_z = None
+            if ae_zscore_matrix is not None:
+                ae_train = np.asarray(
+                    [
+                        [float(ae_zscore_matrix[int(s), domain_to_idx[int(e)]])]
+                        for s, e in zip(s_train.tolist(), e_train.tolist())
+                    ],
+                    dtype=np.float64,
+                )
+                ae_test = np.asarray(
+                    [
+                        [float(ae_zscore_matrix[int(s), domain_to_idx[int(e)]])]
+                        for s, e in zip(s_test.tolist(), e_test.tolist())
+                    ],
+                    dtype=np.float64,
+                )
+                ae_train_z, ae_test_z = _zscore_features(ae_train, ae_test)
+                ae_metadata_train_z, ae_metadata_test_z = _zscore_features(
+                    np.concatenate([ae_train, metadata_train], axis=1),
+                    np.concatenate([ae_test, metadata_test], axis=1),
+                )
+                ae_combined_train_z, ae_combined_test_z = _zscore_features(
+                    np.concatenate([ae_train, combined_train], axis=1),
+                    np.concatenate([ae_test, combined_test], axis=1),
+                )
+
             pair_variants: List[Tuple[str, np.ndarray, np.ndarray]]
             if run_ablations:
                 pair_variants = [
@@ -182,6 +209,14 @@ def _run_learned_methods_for_fold(
                     ("pairwise_ranker_latent_only", latent_train_z, latent_test_z),
                     ("pairwise_ranker_combined", combined_train_z, combined_test_z),
                 ]
+                if ae_train_z is not None and ae_test_z is not None:
+                    pair_variants.extend(
+                        [
+                            ("pairwise_ranker_ae_only", ae_train_z, ae_test_z),
+                            ("pairwise_ranker_ae_metadata", ae_metadata_train_z, ae_metadata_test_z),
+                            ("pairwise_ranker_ae_combined", ae_combined_train_z, ae_combined_test_z),
+                        ]
+                    )
             else:
                 pair_variants = [
                     ("pairwise_ranker", combined_train_z, combined_test_z),

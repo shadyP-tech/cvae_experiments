@@ -216,6 +216,13 @@ def _method_protocol(method: str) -> MethodProtocol:
             diagnostic_only=1,
             routing_uses_eval_domain_statistics=1,
         )
+    if name in {"ae_argmin_zscore", "ae_argmin_margin_gated"}:
+        return MethodProtocol(
+            method_role="diagnostic",
+            adoption_eligible=0,
+            diagnostic_only=1,
+            routing_uses_query_features=1,
+        )
     if name in {"random_rank_floor", "random_score_floor", "expert_label_permutation", "metadata_permutation"}:
         return MethodProtocol(method_role="control", adoption_eligible=0, diagnostic_only=0)
     if name == "unconstrained_learned_reference" or name == "metadata_residual_argmax":
@@ -230,6 +237,7 @@ def _method_protocol(method: str) -> MethodProtocol:
         "metadata_residual_group_robust",
         "metadata_residual_thresholded_safe_v2",
         "metadata_residual_group_robust_safe_v2",
+        "metadata_ae_residual_safe_override_v1",
         "metadata_residual_inner_selected",
     }:
         return MethodProtocol(

@@ -1,0 +1,187 @@
+seed: 42
+
+experiment:
+  dataset_name: breakhis
+  name: learned_utility_support_free_ae_routing_v1
+  mode: learned_utility_routing
+  default_seeds: [42, 43, 44]
+
+data:
+  dataset_type: breakhis
+  root: data/BreakHis
+  image_extensions: [".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"]
+  magnifications: [40, 100, 200, 400]
+  max_samples_per_domain: 500
+  split:
+    train: 0.70
+    val: 0.15
+    test: 0.15
+  require_patient_ids: false
+  dataset_domain_semantics: breakhis_magnification
+  legacy_domain_field_alias: magnification
+
+features:
+  image_size: 224
+  extraction_batch_size: 16
+  backbone_type: dinov2_vitb14
+  feature_extractor_name: dinov2_vitb14
+  feature_extractor_checkpoint: facebook/dinov2-base
+  feature_extractor_layer: final_norm_cls
+  embedding_pooling: cls_token
+  embedding_dim: 768
+
+model:
+  hidden_dim: 256
+  latent_dim: 16
+
+training:
+  batch_size: 128
+  learning_rate: 0.001
+  epochs: 25
+  patience: 5
+
+routing:
+  strategy: categorical_exact
+  tau: 1.0
+  temperature: 1.0
+
+learned_utility:
+  split_protocol: loqdo_query_domain
+  query_domain_field: magnification
+  splits: [test]
+  predictors: [linear_regressor, pairwise_ranker]
+
+  autoencoder_proxy:
+    enabled: true
+    hidden_dim: 256
+    latent_dim: 32
+    learning_rate: 1.0e-3
+    epochs: 25
+    patience: 5
+    batch_size: 512
+    score_normalization: source_val_zscore
+    score_normalization_eps: 1.0e-6
+    margin_threshold: 0.0
+    run_diagnostics: true
+
+  predictor_params:
+    pairwise_ranker:
+      hidden_dim: 128
+      epochs: 40
+      lr: 1.0e-3
+      batch_size: 2048
+      device: auto
+      loss_type: hinge
+      margin: 1.0
+      near_tie_delta: 0.01
+      hard_pair_fraction: 0.5
+      random_pair_fraction: 0.5
+      max_pairs_per_sample: 12
+      max_pairs_per_domain: 5000
+      run_ablations: true
+
+  target:
+    name: nelbo
+    normalization: per_query_domain_zscore
+    normalization_stats_source: train_fold_only
+    eval_scale: raw_nelbo
+
+  pair_features:
+    include_sample_embedding: true
+    expert_id_encoding: one_hot
+    include_metadata_features: true
+    include_domain_stats: false
+
+  residual_routing:
+    enabled: true
+    residual_policy_version: metadata_ae_residual_safe_override_v1
+    models: [ridge]
+    thresholds: [0, 0.01, 0.05, 0.10, 0.25, 0.50, "inf"]
+    feature_sets: [ae]
+    adoption_feature_sets: [ae]
+    diagnostic_feature_sets: []
+    allow_calibrated_adoption: false
+    harmful_override_max: 0.50
+    gap_regression_max: 1.0
+    catastrophic_top1_floor: -0.02
+    selection_metric: validation_safe_gap_then_top1
+    unconstrained_reference_method: pairwise_ranker_ae_metadata
+    ridge_l2: 1.0e-4
+
+  support_response_routing:
+    enabled: false
+
+  scoring:
+    granularity: sample_expert_pair
+    enforce_full_expert_scoring: true
+    pair_batch_size: 4096
+
+  latent_comparator:
+    primary: wasserstein
+    diagnostics: [centroid, gaussian_kl]
+
+  hybrid_scoring:
+    enabled: false
+    alphas: [0.0, 1.0]
+    latent_metric: wasserstein
+    normalization_primary: per_query_zscore
+    normalization_sensitivity: per_query_minmax
+    run_sensitivity: false
+    tie_policy: stable_expert_index
+    acceptance:
+      min_mean_rank_improvement_abs: 0.05
+      min_mean_oracle_gap_pct_improvement_abs: 0.50
+      max_top1_drop_abs: 0.0
+
+  leakage_guards:
+    require_zero_query_domain_overlap: true
+    forbid_heldout_oracle_labels_in_training: true
+
+  winner_rule:
+    primary_metric: mean_oracle_gap_pct
+    tie_breakers: [top1_oracle_hit, spearman_with_oracle]
+    mlp_min_improvement_abs_pct: 1.0
+    max_allowed_seed_regression_pct: 5.0
+
+  artifacts:
+    save_pair_predictions_csv: true
+    save_sample_selection_csv: true
+    save_domain_breakdown_csv: true
+    save_training_fold_manifest_json: true
+
+  compatibility_research:
+    floors:
+      random_rank_floor: true
+      random_score_floor: true
+    permutation_tests:
+      expert_label_permutation: true
+      metadata_permutation: true
+      repeats: 200
+    diagnostics:
+      save_distribution_plots: true
+    gate:
+      decision_policy_version: sign_ci_v2
+      uplift_reference_method: metadata_routing
+      min_improving_seeds: 2
+      strong:
+        spearman_uplift_min: 0.05
+        top1_uplift_min: 0.10
+        oracle_gap_pct_reduction_min: 5.0
+      weak:
+        spearman_uplift_min: 0.0
+        top1_uplift_min: 0.0
+        oracle_gap_pct_reduction_min: 0.0
+      instability:
+        std_threshold: 0.05
+        top1_uplift_std_threshold: 0.05
+        spearman_uplift_std_threshold: 0.05
+        gap_pct_reduction_std_threshold: 3.0
+        sign_inconsistency_min_count: 2
+        min_positive_fraction: 0.67
+        ci_level: 0.95
+        ci_bootstrap_reps: 10000
+        ci_bootstrap_seed: 1337
+        allow_missing_domain_breakdown_as_diagnostic: false
+
+output:
+  root: outputs

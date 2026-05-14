@@ -8,6 +8,7 @@ from src.eval.evaluators.learned_utility_protocol import _domain_breakdown_rows
 
 
 SAFE_V2_POLICY = "metadata_residual_safe_override_v2"
+AE_SAFE_V1_POLICY = "metadata_ae_residual_safe_override_v1"
 
 
 def _write_csv(path: Path, rows: Sequence[Dict[str, Any]]) -> None:
@@ -142,7 +143,7 @@ def _write_summary_md(
 
 def _residual_prefix(rows: Sequence[Dict[str, Any]]) -> str:
     policies = {str(r.get("residual_policy_version", "")) for r in rows if str(r.get("residual_policy_version", ""))}
-    return "residual_safe_v2" if SAFE_V2_POLICY in policies else "residual_routing"
+    return "residual_safe_v2" if (SAFE_V2_POLICY in policies or AE_SAFE_V1_POLICY in policies) else "residual_routing"
 
 
 def _confusion_rows_from_samples(sample_rows: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:

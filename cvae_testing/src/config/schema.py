@@ -50,9 +50,17 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
     is_support_response_routing_protocol = (
         is_camelyon17_support_response_protocol or is_breakhis_support_response_protocol
     )
+    is_support_free_ae_protocol = experiment_name in {
+        "learned_utility_support_free_ae_routing_v1",
+        "breakhis_support_free_ae_routing_v1",
+        "camelyon17_support_free_ae_routing_v1",
+    }
     is_learned_utility_v2 = experiment_name in {
         "learned_utility_routing_v2",
         "learned_utility_routing_safe_v2",
+        "learned_utility_support_free_ae_routing_v1",
+        "breakhis_support_free_ae_routing_v1",
+        "camelyon17_support_free_ae_routing_v1",
     }
 
     split = cfg.get("data", {}).get("split")
@@ -592,7 +600,11 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         residual_policy_version = str(
             residual_cfg.get("residual_policy_version", "metadata_residual_v1")
         ).strip()
-        allowed_residual_policies = {"metadata_residual_v1", "metadata_residual_safe_override_v2"}
+        allowed_residual_policies = {
+            "metadata_residual_v1",
+            "metadata_residual_safe_override_v2",
+            "metadata_ae_residual_safe_override_v1",
+        }
         if residual_policy_version not in allowed_residual_policies:
             raise ValueError(
                 "learned_utility.residual_routing.residual_policy_version must be one of "
@@ -622,7 +634,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         residual_feature_sets = residual_cfg.get("feature_sets", ["minimal", "latent", "calibrated"])
         if not isinstance(residual_feature_sets, list) or not residual_feature_sets:
             raise ValueError("learned_utility.residual_routing.feature_sets must be a non-empty list")
-        allowed_residual_feature_sets = {"minimal", "latent", "calibrated"}
+        allowed_residual_feature_sets = {"minimal", "latent", "calibrated", "ae"}
         bad_feature_sets = sorted(set(str(v).strip().lower() for v in residual_feature_sets) - allowed_residual_feature_sets)
         if bad_feature_sets:
             raise ValueError(
@@ -649,11 +661,21 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             raise ValueError("learned_utility.residual_routing.harmful_override_max must be >= 0")
         if float(residual_cfg.get("gap_regression_max", 2.0)) < 0.0:
             raise ValueError("learned_utility.residual_routing.gap_regression_max must be >= 0")
-        if residual_policy_version == "metadata_residual_safe_override_v2":
-            adoption_feature_sets = residual_cfg.get("adoption_feature_sets", ["minimal", "latent"])
+        if residual_policy_version in {"metadata_residual_safe_override_v2", "metadata_ae_residual_safe_override_v1"}:
+            adoption_feature_sets = residual_cfg.get(
+                "adoption_feature_sets",
+                ["ae"] if residual_policy_version == "metadata_ae_residual_safe_override_v1" else ["minimal", "latent"],
+            )
             if not isinstance(adoption_feature_sets, list) or not adoption_feature_sets:
                 raise ValueError(
-                    "learned_utility.residual_routing.adoption_feature_sets must be non-empty for safe v2"
+                    "learned_utility.residual_routing.adoption_feature_sets must be non-empty for safe policies"
+                )
+            if residual_policy_version == "metadata_ae_residual_safe_override_v1" and {
+                str(v).strip().lower() for v in adoption_feature_sets
+            } != {"ae"}:
+                raise ValueError(
+                    "learned_utility.residual_routing.adoption_feature_sets must be ['ae'] "
+                    "for metadata_ae_residual_safe_override_v1"
                 )
             allow_calibrated = bool(residual_cfg.get("allow_calibrated_adoption", False))
             if not allow_calibrated and "calibrated" in {
@@ -671,6 +693,52 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             )
         if float(residual_cfg.get("ridge_l2", 1e-4)) < 0.0:
             raise ValueError("learned_utility.residual_routing.ridge_l2 must be >= 0")
+
+        ae_proxy_cfg = learned_cfg.get("autoencoder_proxy", {})
+        if ae_proxy_cfg is not None and not isinstance(ae_proxy_cfg, dict):
+            raise ValueError("learned_utility.autoencoder_proxy must be a dictionary when provided")
+        ae_proxy_cfg = ae_proxy_cfg or {}
+        _ensure_bool(ae_proxy_cfg.get("enabled", False), "learned_utility.autoencoder_proxy.enabled")
+        if bool(ae_proxy_cfg.get("enabled", False)):
+            if int(ae_proxy_cfg.get("hidden_dim", 256)) <= 0:
+                raise ValueError("learned_utility.autoencoder_proxy.hidden_dim must be > 0")
+            if int(ae_proxy_cfg.get("latent_dim", 32)) <= 0:
+                raise ValueError("learned_utility.autoencoder_proxy.latent_dim must be > 0")
+            if float(ae_proxy_cfg.get("learning_rate", 1e-3)) <= 0.0:
+                raise ValueError("learned_utility.autoencoder_proxy.learning_rate must be > 0")
+            if int(ae_proxy_cfg.get("epochs", 25)) <= 0:
+                raise ValueError("learned_utility.autoencoder_proxy.epochs must be > 0")
+            if int(ae_proxy_cfg.get("patience", 5)) < 0:
+                raise ValueError("learned_utility.autoencoder_proxy.patience must be >= 0")
+            if int(ae_proxy_cfg.get("batch_size", 512)) <= 0:
+                raise ValueError("learned_utility.autoencoder_proxy.batch_size must be > 0")
+            score_norm = str(ae_proxy_cfg.get("score_normalization", "source_val_zscore")).strip().lower()
+            if score_norm != "source_val_zscore":
+                raise ValueError(
+                    "learned_utility.autoencoder_proxy.score_normalization must be 'source_val_zscore'"
+                )
+            if float(ae_proxy_cfg.get("score_normalization_eps", 1e-6)) <= 0.0:
+                raise ValueError("learned_utility.autoencoder_proxy.score_normalization_eps must be > 0")
+            if float(ae_proxy_cfg.get("margin_threshold", 0.0)) < 0.0:
+                raise ValueError("learned_utility.autoencoder_proxy.margin_threshold must be >= 0")
+            _ensure_bool(
+                ae_proxy_cfg.get("run_diagnostics", True),
+                "learned_utility.autoencoder_proxy.run_diagnostics",
+            )
+            if residual_policy_version == "metadata_ae_residual_safe_override_v1":
+                if not bool(residual_cfg.get("enabled", False)):
+                    raise ValueError(
+                        "learned_utility.residual_routing.enabled must be true for AE residual safe override"
+                    )
+                if "ae" not in {str(v).strip().lower() for v in residual_feature_sets}:
+                    raise ValueError(
+                        "learned_utility.residual_routing.feature_sets must include 'ae' "
+                        "for AE residual safe override"
+                    )
+        if is_support_free_ae_protocol and not bool(ae_proxy_cfg.get("enabled", False)):
+            raise ValueError(
+                "learned_utility.autoencoder_proxy.enabled must be true for support-free AE routing configs"
+            )
 
         support_response_cfg = learned_cfg.get("support_response_routing", {})
         if support_response_cfg is not None and not isinstance(support_response_cfg, dict):

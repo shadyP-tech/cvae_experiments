@@ -430,9 +430,24 @@ def _build_method_summary_rows(method_metrics: Dict[str, Dict[str, Any]]) -> Lis
                 "allow_calibrated_adoption": str(metrics.get("allow_calibrated_adoption", "")),
                 "fallback_used": str(metrics.get("fallback_used", "")),
                 "top1_oracle_hit": float(metrics.get("top1_oracle_hit", float("nan"))),
+                "raw_predicted_delta_spearman": float(
+                    metrics.get("raw_predicted_delta_spearman", metrics.get("spearman", float("nan")))
+                ),
+                "post_policy_selection_spearman": float(
+                    metrics.get("post_policy_selection_spearman", float("nan"))
+                ),
                 "mean_rank": float(metrics.get("mean_rank", float("nan"))),
                 "mean_oracle_gap": float(metrics.get("mean_oracle_gap", float("nan"))),
                 "mean_oracle_gap_pct": float(metrics.get("mean_oracle_gap_pct", float("nan"))),
+                "override_rate": float(metrics.get("override_rate", float("nan"))),
+                "safe_fallback_rate": float(metrics.get("safe_fallback_rate", float("nan"))),
+                "net_override_gain": float(metrics.get("net_override_gain", float("nan"))),
+                "harmful_override_rate": float(metrics.get("harmful_override_rate", float("nan"))),
+                "utility_improving_override_rate": float(
+                    metrics.get("utility_improving_override_rate", float("nan"))
+                ),
+                "mean_gain_when_improving": float(metrics.get("mean_gain_when_improving", float("nan"))),
+                "mean_loss_when_harmful": float(metrics.get("mean_loss_when_harmful", float("nan"))),
                 "pairwise_auc": float(metrics.get("pairwise_auc", float("nan"))),
                 "spearman": float(metrics.get("spearman", float("nan"))),
                 "selected_nelbo": float(metrics.get("selected_nelbo", float("nan"))),
@@ -444,6 +459,54 @@ def _build_method_summary_rows(method_metrics: Dict[str, Dict[str, Any]]) -> Lis
             }
         )
     return rows
+
+
+def _augment_method_metrics_with_override_diagnostics(
+    method_metrics: Dict[str, Dict[str, Any]],
+    override_rows: Sequence[Dict[str, Any]],
+) -> None:
+    by_method: Dict[str, List[Dict[str, Any]]] = {}
+    for row in override_rows:
+        method = str(row.get("method", ""))
+        if method:
+            by_method.setdefault(method, []).append(dict(row))
+    for method, rows in by_method.items():
+        metrics = method_metrics.setdefault(method, {})
+        n_samples = sum(int(r.get("n_samples", 0) or 0) for r in rows)
+        n_overrides = sum(int(r.get("n_overrides", 0) or 0) for r in rows)
+        if n_samples > 0:
+            metrics["override_rate"] = float(n_overrides / n_samples)
+            metrics["safe_fallback_rate"] = float(1.0 - (n_overrides / n_samples))
+        if n_overrides > 0:
+            metrics["harmful_override_rate"] = float(
+                sum(float(r.get("harmful_override_rate", 0.0)) * int(r.get("n_overrides", 0) or 0) for r in rows)
+                / n_overrides
+            )
+            metrics["utility_improving_override_rate"] = float(
+                sum(
+                    float(r.get("utility_improving_override_rate", 0.0)) * int(r.get("n_overrides", 0) or 0)
+                    for r in rows
+                )
+                / n_overrides
+            )
+            metrics["net_override_gain"] = float(
+                sum(float(r.get("net_override_gain", 0.0)) * int(r.get("n_overrides", 0) or 0) for r in rows)
+                / n_overrides
+            )
+            metrics["mean_gain_when_improving"] = float(
+                np.mean([float(r.get("mean_gain_when_improving", 0.0)) for r in rows])
+            )
+            metrics["mean_loss_when_harmful"] = float(
+                np.mean([float(r.get("mean_loss_when_harmful", 0.0)) for r in rows])
+            )
+        else:
+            metrics["harmful_override_rate"] = 0.0
+            metrics["utility_improving_override_rate"] = 0.0
+            metrics["net_override_gain"] = 0.0
+            metrics["mean_gain_when_improving"] = 0.0
+            metrics["mean_loss_when_harmful"] = 0.0
+        metrics["raw_predicted_delta_spearman"] = float(metrics.get("spearman", float("nan")))
+        metrics.setdefault("post_policy_selection_spearman", float("nan"))
 
 
 def _build_hybrid_diagnostics(
@@ -611,6 +674,7 @@ def _finalize_learned_utility_outputs(
     residual_confusion_rows = _with_decision_policy(residual_confusion_rows)
 
     method_metrics = _aggregate_metrics_from_sample_rows(sample_rows)
+    _augment_method_metrics_with_override_diagnostics(method_metrics, residual_override_rows)
     domain_rows = _domain_breakdown_rows(sample_rows)
 
     permutation_rows = _build_permutation_rows(

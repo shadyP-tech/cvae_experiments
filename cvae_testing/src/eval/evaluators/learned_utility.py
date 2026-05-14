@@ -22,6 +22,12 @@ from src.eval.evaluators.learned_utility_scoring import (
 from src.eval.evaluators.learned_utility_reporting import (
     _finalize_learned_utility_outputs,
 )
+from src.eval.evaluators.support_free_ae import (
+    AutoencoderScoreMatrices,
+    build_autoencoder_score_matrices,
+    run_autoencoder_proxy_methods_for_fold,
+    write_support_free_ae_artifacts,
+)
 from src.eval.evaluators.support_response_routing import (
     evaluate_support_response_routing_for_checkpoints,
 )
@@ -42,6 +48,7 @@ def evaluate_learned_utility_loqdo(
     configured_domains: Sequence[int] | None = None,
     metadata_constraint_cfg: Dict[str, Any] | None = None,
     data_cfg: Dict[str, Any] | None = None,
+    autoencoder_artifacts: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     eval_cfg = _parse_learned_utility_config(learned_cfg)
     hybrid_cfg = eval_cfg.hybrid
@@ -72,6 +79,17 @@ def evaluate_learned_utility_loqdo(
     )
     if not np.isfinite(metadata_similarity).all() or not np.isfinite(latent_similarity).all():
         raise ValueError("Metadata/latent proxy similarity matrices must be finite")
+
+    ae_scores: AutoencoderScoreMatrices | None = None
+    if eval_cfg.autoencoder.enabled:
+        if not autoencoder_artifacts:
+            raise ValueError("learned_utility.autoencoder_proxy.enabled requires autoencoder_artifacts")
+        ae_scores = build_autoencoder_score_matrices(
+            embeddings=embeddings,
+            expert_domains=expert_domains,
+            autoencoder_artifacts=autoencoder_artifacts,
+            cfg=eval_cfg.autoencoder,
+        )
 
     sample_rows: List[Dict[str, Any]] = []
     pair_rows: List[Dict[str, Any]] = []
@@ -150,6 +168,23 @@ def evaluate_learned_utility_loqdo(
         for key, rows in proxy_outputs.permutation_sample_rows.items():
             permutation_sample_rows.setdefault(key, []).extend(rows)
 
+        if ae_scores is not None and eval_cfg.autoencoder.run_diagnostics:
+            ae_outputs = run_autoencoder_proxy_methods_for_fold(
+                sample_domains=sample_domains,
+                expert_domains=expert_domains,
+                test_idx=test_idx,
+                fold=fold,
+                true_eval=true_eval,
+                global_eval=global_eval,
+                metadata_similarity_eval=metadata_similarity_eval,
+                ae_zscore_matrix=ae_scores.zscore_matrix,
+                ae_raw_mse_matrix=ae_scores.raw_mse_matrix,
+                margin_threshold=eval_cfg.autoencoder.margin_threshold,
+                tie_policy=hybrid_cfg.tie_policy,
+            )
+            sample_rows.extend(ae_outputs.sample_rows)
+            proxy_diag_rows.extend(ae_outputs.proxy_diag_rows)
+
         learned_outputs = _run_learned_methods_for_fold(
             embeddings=embeddings,
             sample_domains=sample_domains,
@@ -168,6 +203,7 @@ def evaluate_learned_utility_loqdo(
             embedding_feature_dim=embedding_feature_dim,
             expert_feature_dim=expert_feature_dim,
             tie_policy=hybrid_cfg.tie_policy,
+            ae_zscore_matrix=None if ae_scores is None else ae_scores.zscore_matrix,
         )
         sample_rows.extend(learned_outputs.sample_rows)
         pair_rows.extend(learned_outputs.pair_rows)
@@ -186,6 +222,7 @@ def evaluate_learned_utility_loqdo(
             residual_cfg=eval_cfg.residual,
             learned_sample_rows=learned_outputs.sample_rows,
             tie_policy=hybrid_cfg.tie_policy,
+            ae_zscore_matrix=None if ae_scores is None else ae_scores.zscore_matrix,
         )
         sample_rows.extend(residual_outputs.sample_rows)
         residual_sample_rows.extend(residual_outputs.sample_rows)
@@ -250,6 +287,16 @@ def evaluate_learned_utility_loqdo(
         run_metadata_permutation=compatibility_cfg.run_metadata_permutation,
         permutation_repeats=compatibility_cfg.permutation_repeats,
     )
+    ae_artifacts = write_support_free_ae_artifacts(
+        reports_dir=reports_dir,
+        ae_scores=ae_scores,
+        proxy_diag_rows=[
+            row for row in proxy_diag_rows if str(row.get("method", "")) == "ae_reconstruction_zscore_raw"
+        ],
+        residual_override_rows=residual_override_rows,
+    )
+    if ae_artifacts:
+        results.setdefault("artifacts", {}).update(ae_artifacts)
     if eval_cfg.support_response.enabled:
         print("[learned_utility] running candidate-specific support-response routing...")
         support_response_results = evaluate_support_response_routing_for_checkpoints(

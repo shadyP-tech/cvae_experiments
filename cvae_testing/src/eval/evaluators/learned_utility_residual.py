@@ -23,13 +23,16 @@ _RESIDUAL_EPS = 1e-12
 _CATASTROPHIC_TOP1_UPLIFT_MIN = -0.05
 _CATASTROPHIC_SPEARMAN_UPLIFT_MIN = -0.05
 _CATASTROPHIC_GAP_PCT_REDUCTION_MIN = -2.0
-_FEATURE_SETS = {"minimal", "latent", "calibrated"}
+_FEATURE_SETS = {"minimal", "latent", "calibrated", "ae"}
 _SAFE_OVERRIDE_POLICY_V2 = "metadata_residual_safe_override_v2"
+_AE_SAFE_OVERRIDE_POLICY_V1 = "metadata_ae_residual_safe_override_v1"
 _SAFE_V2_METHODS = {"metadata_residual_thresholded_safe_v2", "metadata_residual_group_robust_safe_v2"}
+_AE_SAFE_METHODS = {"metadata_ae_residual_safe_override_v1"}
 _RESIDUAL_ADOPTION_METHODS = {
     "metadata_residual_thresholded",
     "metadata_residual_group_robust",
     *_SAFE_V2_METHODS,
+    *_AE_SAFE_METHODS,
 }
 
 
@@ -59,6 +62,7 @@ class _FeatureContext:
     feature_set: str
     centroid_by_domain: Mapping[int, np.ndarray]
     calibration_by_domain: Mapping[int, Tuple[float, float]]
+    ae_zscore_matrix: np.ndarray | None = None
 
 
 @dataclass(frozen=True)
@@ -98,16 +102,27 @@ def _is_safe_override_v2(residual_cfg: ResidualRoutingConfig) -> bool:
     return str(residual_cfg.residual_policy_version) == _SAFE_OVERRIDE_POLICY_V2
 
 
+def _is_ae_safe_override_v1(residual_cfg: ResidualRoutingConfig) -> bool:
+    return str(residual_cfg.residual_policy_version) == _AE_SAFE_OVERRIDE_POLICY_V1
+
+
+def _is_safe_like_policy(residual_cfg: ResidualRoutingConfig) -> bool:
+    return _is_safe_override_v2(residual_cfg) or _is_ae_safe_override_v1(residual_cfg)
+
+
 def _feature_complexity_rank(feature_set: str) -> int:
-    order = {"minimal": 0, "latent": 1, "calibrated": 2}
+    order = {"minimal": 0, "latent": 1, "ae": 2, "calibrated": 3}
     return int(order.get(str(feature_set).strip().lower(), 99))
 
 
 def _safe_v2_adoption_feature_sets(residual_cfg: ResidualRoutingConfig) -> Tuple[str, ...]:
+    default = ("ae",) if _is_ae_safe_override_v1(residual_cfg) else ("minimal", "latent")
     configured = tuple(
         str(v).strip().lower()
-        for v in (residual_cfg.adoption_feature_sets or ("minimal", "latent"))
+        for v in (residual_cfg.adoption_feature_sets or default)
     )
+    if _is_ae_safe_override_v1(residual_cfg):
+        return tuple(v for v in configured if v == "ae")
     if bool(residual_cfg.allow_calibrated_adoption):
         return tuple(v for v in configured if v in _FEATURE_SETS)
     return tuple(v for v in configured if v in _FEATURE_SETS and v != "calibrated")
@@ -164,10 +179,13 @@ def _feature_context(
     true_nelbo: np.ndarray,
     expert_domains: Sequence[int],
     stats_indices: np.ndarray,
+    ae_zscore_matrix: np.ndarray | None = None,
 ) -> _FeatureContext:
     normalized = str(feature_set).strip().lower()
     if normalized not in _FEATURE_SETS:
         raise ProtocolError(f"Unknown residual feature_set={feature_set!r}")
+    if normalized == "ae" and ae_zscore_matrix is None:
+        raise ProtocolError("Residual feature_set='ae' requires source-validation-normalized AE z-scores")
 
     centroid_by_domain: Dict[int, np.ndarray] = {}
     calibration_by_domain: Dict[int, Tuple[float, float]] = {}
@@ -189,6 +207,7 @@ def _feature_context(
         feature_set=normalized,
         centroid_by_domain=centroid_by_domain,
         calibration_by_domain=calibration_by_domain,
+        ae_zscore_matrix=None if ae_zscore_matrix is None else np.asarray(ae_zscore_matrix, dtype=np.float64),
     )
 
 
@@ -259,6 +278,21 @@ def _build_feature_matrix(
         meta_local = int(meta_local_idx[local_sample_idx])
         meta_col = int(candidate_cols[meta_local])
         meta_domain = int(candidate_domains[meta_local])
+        ae_candidate_scores: np.ndarray | None = None
+        ae_ranks: np.ndarray | None = None
+        ae_best = 0.0
+        ae_meta = 0.0
+        if context.feature_set == "ae":
+            if context.ae_zscore_matrix is None:
+                raise ProtocolError("AE residual features require ae_zscore_matrix")
+            ae_candidate_scores = context.ae_zscore_matrix[int(sample_index), candidate_cols]
+            if not np.isfinite(ae_candidate_scores).all():
+                raise ProtocolError("AE residual feature scores must be finite")
+            order = np.lexsort((np.arange(len(candidate_cols), dtype=np.int64), ae_candidate_scores))
+            ae_ranks = np.empty((len(candidate_cols),), dtype=np.float64)
+            ae_ranks[order] = np.arange(1, len(candidate_cols) + 1, dtype=np.float64)
+            ae_best = float(np.min(ae_candidate_scores))
+            ae_meta = float(ae_candidate_scores[meta_local])
         for local_candidate_idx, (candidate_col, candidate_domain) in enumerate(
             zip(candidate_cols.tolist(), candidate_domains.tolist())
         ):
@@ -286,6 +320,19 @@ def _build_feature_matrix(
                         candidate_domain=int(candidate_domain),
                         meta_domain=int(meta_domain),
                     )
+                )
+            if context.feature_set == "ae":
+                assert ae_candidate_scores is not None
+                assert ae_ranks is not None
+                ae_candidate = float(ae_candidate_scores[int(local_candidate_idx)])
+                vals.extend(
+                    [
+                        ae_candidate,
+                        float(ae_meta),
+                        float(ae_candidate - ae_meta),
+                        float(ae_ranks[int(local_candidate_idx)]),
+                        float(ae_candidate - ae_best),
+                    ]
                 )
             features.append(vals)
             row_meta_local.append(meta_local)
@@ -367,6 +414,7 @@ def _fit_residual_model(
     feature_set: str,
     group_balanced: bool,
     l2: float,
+    ae_zscore_matrix: np.ndarray | None = None,
 ) -> Tuple[_ResidualModel, _FeatureContext]:
     context = _feature_context(
         feature_set=feature_set,
@@ -375,6 +423,7 @@ def _fit_residual_model(
         true_nelbo=true_nelbo,
         expert_domains=expert_domains,
         stats_indices=train_indices,
+        ae_zscore_matrix=ae_zscore_matrix,
     )
     x, y, q = _build_residual_training_rows(
         embeddings=embeddings,
@@ -562,6 +611,12 @@ def _evaluate_residual_config(
                         "true_residual_pct": float(
                             (nelbo_meta - nelbo_candidate) / max(abs(nelbo_meta), _RESIDUAL_EPS)
                         ),
+                        "delta_u_pct": float(
+                            (nelbo_meta - nelbo_candidate) / max(abs(nelbo_meta), _RESIDUAL_EPS)
+                        ),
+                        "delta_u_pct_sign_convention": (
+                            "positive_candidate_lower_nelbo_than_metadata_negative_harmful_override"
+                        ),
                         "true_nelbo": float(nelbo_candidate),
                         "metadata_selected_nelbo": float(nelbo_meta),
                         **method_fields,
@@ -587,6 +642,9 @@ def _evaluate_residual_config(
     )
     denom = max(n_override, 1)
     override_delta_nelbo = selected_nelbo[override_mask] - meta_nelbo[override_mask]
+    override_gain_nelbo = meta_nelbo[override_mask] - selected_nelbo[override_mask]
+    improving_gain = override_gain_nelbo[override_gain_nelbo > 1e-12]
+    harmful_loss = (-override_gain_nelbo)[override_gain_nelbo < -1e-12]
     harmful_delta_nelbo = override_delta_nelbo[override_delta_nelbo > 1e-12]
     override_diag = {
         "method": str(method),
@@ -594,9 +652,13 @@ def _evaluate_residual_config(
         "n_samples": int(n_samples),
         "n_overrides": int(n_override),
         "override_rate": float(n_override / max(n_samples, 1)),
+        "safe_fallback_rate": float(1.0 - (n_override / max(n_samples, 1))),
         "utility_improving_override_rate": float(np.sum(override_mask & improving) / denom),
         "oracle_correct_override_rate": float(np.sum(override_mask & oracle_correct) / denom),
         "harmful_override_rate": float(np.sum(override_mask & harmful) / denom),
+        "mean_gain_when_improving": float(np.mean(improving_gain)) if improving_gain.size else 0.0,
+        "mean_loss_when_harmful": float(np.mean(harmful_loss)) if harmful_loss.size else 0.0,
+        "net_override_gain": float(np.mean(override_gain_nelbo)) if n_override else 0.0,
         "mean_delta_nelbo_for_overrides": float(np.mean(override_delta_nelbo)) if n_override else 0.0,
         "median_delta_nelbo_for_overrides": float(np.median(override_delta_nelbo)) if n_override else 0.0,
         "max_harmful_delta_nelbo": float(np.max(harmful_delta_nelbo)) if harmful_delta_nelbo.size else 0.0,
@@ -805,6 +867,7 @@ def _select_inner_config_safe_v2(
     train_idx: np.ndarray,
     group_balanced: bool,
     tie_policy: str,
+    ae_zscore_matrix: np.ndarray | None = None,
 ) -> _SelectedResidualConfig:
     source_domains = sorted(set(int(sample_domains[int(i)]) for i in np.asarray(train_idx, dtype=np.int64).tolist()))
     finite_thresholds = [float(v) for v in residual_cfg.thresholds if not math.isinf(float(v))]
@@ -846,6 +909,7 @@ def _select_inner_config_safe_v2(
                 feature_set=feature,
                 group_balanced=bool(group_balanced),
                 l2=float(residual_cfg.ridge_l2),
+                ae_zscore_matrix=ae_zscore_matrix,
             )
             true_eval = validation_fold.slice_nelbo(true_nelbo, validation_idx)
             global_eval = true_nelbo[np.asarray(validation_idx, dtype=np.int64)]
@@ -952,9 +1016,10 @@ def _select_inner_config(
     train_idx: np.ndarray,
     group_balanced: bool,
     tie_policy: str,
+    ae_zscore_matrix: np.ndarray | None = None,
     force_tau_zero: bool = False,
 ) -> _SelectedResidualConfig:
-    if _is_safe_override_v2(residual_cfg) and not bool(force_tau_zero):
+    if _is_safe_like_policy(residual_cfg) and not bool(force_tau_zero):
         return _select_inner_config_safe_v2(
             method=method,
             residual_cfg=residual_cfg,
@@ -967,6 +1032,7 @@ def _select_inner_config(
             train_idx=train_idx,
             group_balanced=bool(group_balanced),
             tie_policy=tie_policy,
+            ae_zscore_matrix=ae_zscore_matrix,
         )
     source_domains = sorted(set(int(sample_domains[int(i)]) for i in np.asarray(train_idx, dtype=np.int64).tolist()))
     thresholds = [0.0] if force_tau_zero else list(residual_cfg.thresholds)
@@ -1012,6 +1078,7 @@ def _select_inner_config(
                 feature_set=feature,
                 group_balanced=bool(group_balanced),
                 l2=float(residual_cfg.ridge_l2),
+                ae_zscore_matrix=ae_zscore_matrix,
             )
             true_eval = validation_fold.slice_nelbo(true_nelbo, validation_idx)
             global_eval = true_nelbo[np.asarray(validation_idx, dtype=np.int64)]
@@ -1228,6 +1295,7 @@ def _audit_row(
         and not math.isnan(float(selected.validation_gap_reduction))
         and (
             not _is_safe_override_v2(residual_cfg)
+            and not _is_ae_safe_override_v1(residual_cfg)
             or (
                 float(selected.validation_max_harmful_override_rate) <= float(residual_cfg.harmful_override_max)
                 and int(heldout_report.get("catastrophic_regression_breach", 0)) == 0
@@ -1238,6 +1306,9 @@ def _audit_row(
         "method": str(method),
         "fold_query_domain": int(fold.heldout_domain),
         "target_expert_excluded": int(fold.target_expert_excluded),
+        "target_ae_excluded": int(fold.target_expert_excluded),
+        "source_inner_self_expert_excluded": 1,
+        "source_inner_self_ae_excluded": int(_is_ae_safe_override_v1(residual_cfg)),
         "heldout_query_domain_used_for_training": 0,
         "heldout_query_domain_used_for_threshold_tuning": 0,
         "uses_eval_domain_latent_statistics": 0,
@@ -1287,6 +1358,7 @@ def run_residual_methods_for_fold(
     residual_cfg: ResidualRoutingConfig,
     learned_sample_rows: Sequence[Dict[str, Any]],
     tie_policy: str,
+    ae_zscore_matrix: np.ndarray | None = None,
 ) -> ResidualFoldOutputs:
     if not bool(residual_cfg.enabled):
         return ResidualFoldOutputs([], [], [], [], [])
@@ -1306,7 +1378,12 @@ def run_residual_methods_for_fold(
         )
     )
 
-    if _is_safe_override_v2(residual_cfg):
+    if _is_ae_safe_override_v1(residual_cfg):
+        method_specs = [
+            ("metadata_ae_residual_safe_override_v1", False, False),
+        ]
+        adoption_methods = ("metadata_ae_residual_safe_override_v1",)
+    elif _is_safe_override_v2(residual_cfg):
         method_specs = [
             ("metadata_residual_argmax", False, True),
             ("metadata_residual_thresholded_safe_v2", False, False),
@@ -1339,6 +1416,7 @@ def run_residual_methods_for_fold(
             train_idx=train_idx,
             group_balanced=bool(group_balanced),
             tie_policy=tie_policy,
+            ae_zscore_matrix=ae_zscore_matrix,
             force_tau_zero=bool(force_tau_zero),
         )
 
@@ -1376,6 +1454,7 @@ def run_residual_methods_for_fold(
             feature_set=str(selected.feature_set),
             group_balanced=bool(group_balanced),
             l2=float(residual_cfg.ridge_l2),
+            ae_zscore_matrix=ae_zscore_matrix,
         )
         eval_rows, eval_raw, override_diag, eval_confusion = _evaluate_residual_config(
             method=method,
@@ -1411,7 +1490,7 @@ def run_residual_methods_for_fold(
             tie_policy=tie_policy,
             selected_by_inner_validation=is_selected_adoption_candidate,
             adoption_selected_method=str(adoption_selected_method),
-            force_diagnostic=True,
+            force_diagnostic=not _is_ae_safe_override_v1(residual_cfg),
             emit_raw_rows=True,
         )
         sample_rows.extend(eval_rows)
@@ -1444,7 +1523,7 @@ def run_residual_methods_for_fold(
                     source_method=str(method),
                 )
             )
-        if _is_safe_override_v2(residual_cfg):
+        if _is_safe_like_policy(residual_cfg):
             heldout_report = _safe_v2_validation_report(
                 candidate_rows=eval_rows,
                 baseline_rows=metadata_eval_rows,

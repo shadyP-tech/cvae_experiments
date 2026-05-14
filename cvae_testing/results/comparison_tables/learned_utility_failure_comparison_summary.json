@@ -1,0 +1,18 @@
+{
+  "classification": "FAIL",
+  "reason": "All adoption-eligible learned-utility rows are rejected by the strict decision gate; metadata routing remains the selected baseline.",
+  "n_rows": 30,
+  "n_learned_rows": 15,
+  "n_learned_failures": 15,
+  "scenarios": [
+    "breakhis_learned_utility",
+    "breakhis_response_learned_utility",
+    "camelyon17_response_learned_utility"
+  ],
+  "plots": [
+    "/Users/stephpark/Documents/Master/Thesis/cvae_metadata_routing/cvae_testing/results/plots/learned_utility_failure/learned_utility_metric_comparison.png",
+    "/Users/stephpark/Documents/Master/Thesis/cvae_metadata_routing/cvae_testing/results/plots/learned_utility_failure/learned_utility_uplifts_vs_metadata.png",
+    "/Users/stephpark/Documents/Master/Thesis/cvae_metadata_routing/cvae_testing/results/plots/learned_utility_failure/learned_utility_gate_failures.png",
+    "/Users/stephpark/Documents/Master/Thesis/cvae_metadata_routing/cvae_testing/results/plots/learned_utility_failure/learned_utility_top1_gap_tradeoff.png"
+  ]
+}
