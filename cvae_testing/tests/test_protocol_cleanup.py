@@ -134,6 +134,19 @@ def test_breakhis_support_estimated_utility_config_rejects_protocol_drift() -> N
     assert 3 * 4 * 3 * 3 * sum([4, 8, 16, 32]) == 6480
 
 
+def test_ae_first_routing_configs_are_protocol_locked() -> None:
+    for dataset in ["breakhis", "camelyon17"]:
+        path = PROJECT_ROOT / "configs" / "experiments" / dataset / "learned_utility_ae_first_routing_v1.yaml"
+        cfg = load_config(path)
+        validate_config(cfg)
+        ae_first = cfg["learned_utility"]["autoencoder_proxy"]["ae_first_routing"]
+        assert cfg["experiment"]["name"] == "learned_utility_ae_first_routing_v1"
+        assert ae_first["primary_method"] == "ae_first_margin_gated_v1"
+        assert ae_first["fallback_baseline"] == "source_prior_fallback"
+        assert ae_first["margin_thresholds"][-1] == "__inf__"
+        assert ae_first["metadata_auxiliary_features"] is True
+
+
 def test_quarantined_entrypoints_fail_fast() -> None:
     checks = [
         ([sys.executable, "scripts/run_learned_compatibility_loqdo.py"], "target expert"),

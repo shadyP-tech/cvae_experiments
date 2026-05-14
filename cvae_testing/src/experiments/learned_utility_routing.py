@@ -191,6 +191,33 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
                 ),
                 "margin_threshold": float(autoencoder_proxy_cfg.get("margin_threshold", 0.0)),
                 "run_diagnostics": bool(autoencoder_proxy_cfg.get("run_diagnostics", True)),
+                "ae_first_routing": {
+                    "enabled": bool(
+                        (autoencoder_proxy_cfg.get("ae_first_routing", {}) or {}).get("enabled", False)
+                    ),
+                    "primary_method": str(
+                        (autoencoder_proxy_cfg.get("ae_first_routing", {}) or {}).get(
+                            "primary_method",
+                            "ae_first_margin_gated_v1",
+                        )
+                    ),
+                    "fallback_baseline": str(
+                        (autoencoder_proxy_cfg.get("ae_first_routing", {}) or {}).get(
+                            "fallback_baseline",
+                            "source_prior_fallback",
+                        )
+                    ),
+                    "margin_thresholds": [
+                        str(v)
+                        for v in (autoencoder_proxy_cfg.get("ae_first_routing", {}) or {}).get(
+                            "margin_thresholds",
+                            [0.0, 0.05, 0.10, 0.25, 0.50, 1.0, "__inf__"],
+                        )
+                    ],
+                    "metadata_role": "auxiliary_only",
+                    "threshold_selection_policy": "source_inner_risk_gated_metadata_gain",
+                    "primary_aggregation": "macro_by_domain",
+                },
                 "claim_boundary": "AE reconstruction fit is a proxy, not CVAE compatibility.",
                 "forbidden_information": [
                     "target support set",

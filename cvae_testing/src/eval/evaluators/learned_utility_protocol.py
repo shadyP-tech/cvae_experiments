@@ -147,7 +147,7 @@ def _method_protocol(method: str) -> MethodProtocol:
             diagnostic_only=0,
             routing_uses_query_features=1,
         )
-    if name == "source_global_prior_routing":
+    if name in {"source_global_prior_routing", "source_prior_fallback"}:
         return MethodProtocol(
             method_role="baseline",
             adoption_eligible=1,
@@ -221,6 +221,13 @@ def _method_protocol(method: str) -> MethodProtocol:
             method_role="diagnostic",
             adoption_eligible=0,
             diagnostic_only=1,
+            routing_uses_query_features=1,
+        )
+    if name == "ae_first_margin_gated_v1":
+        return MethodProtocol(
+            method_role="learned",
+            adoption_eligible=1,
+            diagnostic_only=0,
             routing_uses_query_features=1,
         )
     if name in {"random_rank_floor", "random_score_floor", "expert_label_permutation", "metadata_permutation"}:
@@ -337,6 +344,14 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         "bottom_half_selection": "bottom_half_selection",
         "high_regret_selection": "high_regret_selection",
         "catastrophic_mistake": "catastrophic_mistake",
+        "metadata_relative_gain": "metadata_relative_gain",
+        "source_prior_relative_gain": "source_prior_relative_gain",
+        "harmful_vs_metadata_rate": "harmful_vs_metadata",
+        "improving_vs_metadata_rate": "improving_vs_metadata",
+        "harmful_vs_source_prior_rate": "harmful_vs_source_prior",
+        "improving_vs_source_prior_rate": "improving_vs_source_prior",
+        "ae_coverage_rate": "ae_coverage_rate",
+        "fallback_rate": "fallback_rate",
     }
     for method, vals in sorted(by_method.items()):
         metrics: Dict[str, float] = {}
@@ -362,6 +377,14 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         metrics["bottom_half_selection_rate"] = metrics["micro_bottom_half_selection"]
         metrics["high_regret_selection_rate"] = metrics["micro_high_regret_selection"]
         metrics["catastrophic_mistake_rate"] = metrics["micro_catastrophic_mistake"]
+        metrics["metadata_relative_gain"] = metrics["micro_metadata_relative_gain"]
+        metrics["source_prior_relative_gain"] = metrics["micro_source_prior_relative_gain"]
+        metrics["harmful_vs_metadata_rate"] = metrics["micro_harmful_vs_metadata_rate"]
+        metrics["improving_vs_metadata_rate"] = metrics["micro_improving_vs_metadata_rate"]
+        metrics["harmful_vs_source_prior_rate"] = metrics["micro_harmful_vs_source_prior_rate"]
+        metrics["improving_vs_source_prior_rate"] = metrics["micro_improving_vs_source_prior_rate"]
+        metrics["ae_coverage_rate"] = metrics["micro_ae_coverage_rate"]
+        metrics["fallback_rate"] = metrics["micro_fallback_rate"]
 
         query_domains = sorted(set(int(r["query_domain"]) for r in vals))
         metrics["n_samples_micro"] = float(len(vals))
@@ -481,6 +504,26 @@ def _domain_breakdown_rows(sample_rows: Sequence[Dict[str, Any]]) -> List[Dict[s
                 "catastrophic_mistake_rate": _finite_mean(
                     [float(r.get("catastrophic_mistake", 0.0)) for r in rows]
                 ),
+                "metadata_relative_gain": _finite_mean(
+                    [float(r.get("metadata_relative_gain", 0.0)) for r in rows]
+                ),
+                "source_prior_relative_gain": _finite_mean(
+                    [float(r.get("source_prior_relative_gain", 0.0)) for r in rows]
+                ),
+                "harmful_vs_metadata_rate": _finite_mean(
+                    [float(r.get("harmful_vs_metadata", 0.0)) for r in rows]
+                ),
+                "improving_vs_metadata_rate": _finite_mean(
+                    [float(r.get("improving_vs_metadata", 0.0)) for r in rows]
+                ),
+                "harmful_vs_source_prior_rate": _finite_mean(
+                    [float(r.get("harmful_vs_source_prior", 0.0)) for r in rows]
+                ),
+                "improving_vs_source_prior_rate": _finite_mean(
+                    [float(r.get("improving_vs_source_prior", 0.0)) for r in rows]
+                ),
+                "ae_coverage_rate": _finite_mean([float(r.get("ae_coverage_rate", 0.0)) for r in rows]),
+                "fallback_rate": _finite_mean([float(r.get("fallback_rate", 0.0)) for r in rows]),
             }
         )
     return domain_rows

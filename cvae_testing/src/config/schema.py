@@ -52,6 +52,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
     )
     is_support_free_ae_protocol = experiment_name in {
         "learned_utility_support_free_ae_routing_v1",
+        "learned_utility_ae_first_routing_v1",
         "breakhis_support_free_ae_routing_v1",
         "camelyon17_support_free_ae_routing_v1",
     }
@@ -59,6 +60,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_routing_v2",
         "learned_utility_routing_safe_v2",
         "learned_utility_support_free_ae_routing_v1",
+        "learned_utility_ae_first_routing_v1",
         "breakhis_support_free_ae_routing_v1",
         "camelyon17_support_free_ae_routing_v1",
     }
@@ -725,6 +727,89 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                 ae_proxy_cfg.get("run_diagnostics", True),
                 "learned_utility.autoencoder_proxy.run_diagnostics",
             )
+            ae_first_cfg = ae_proxy_cfg.get("ae_first_routing", {})
+            if ae_first_cfg is not None and not isinstance(ae_first_cfg, dict):
+                raise ValueError("learned_utility.autoencoder_proxy.ae_first_routing must be a dictionary")
+            ae_first_cfg = ae_first_cfg or {}
+            _ensure_bool(
+                ae_first_cfg.get("enabled", False),
+                "learned_utility.autoencoder_proxy.ae_first_routing.enabled",
+            )
+            if bool(ae_first_cfg.get("enabled", False)):
+                primary_method = str(
+                    ae_first_cfg.get("primary_method", "ae_first_margin_gated_v1")
+                ).strip()
+                if primary_method != "ae_first_margin_gated_v1":
+                    raise ValueError(
+                        "learned_utility.autoencoder_proxy.ae_first_routing.primary_method "
+                        "must be 'ae_first_margin_gated_v1'"
+                    )
+                fallback = str(ae_first_cfg.get("fallback_baseline", "source_prior_fallback")).strip()
+                if fallback != "source_prior_fallback":
+                    raise ValueError(
+                        "learned_utility.autoencoder_proxy.ae_first_routing.fallback_baseline "
+                        "must be 'source_prior_fallback'"
+                    )
+                thresholds = ae_first_cfg.get(
+                    "margin_thresholds",
+                    [0.0, 0.05, 0.10, 0.25, 0.50, 1.0, "__inf__"],
+                )
+                if not isinstance(thresholds, list) or not thresholds:
+                    raise ValueError(
+                        "learned_utility.autoencoder_proxy.ae_first_routing.margin_thresholds "
+                        "must be a non-empty list"
+                    )
+                has_inf_token = False
+                for threshold in thresholds:
+                    if isinstance(threshold, str) and threshold.strip().lower() == "__inf__":
+                        has_inf_token = True
+                        continue
+                    if float(threshold) < 0.0:
+                        raise ValueError(
+                            "learned_utility.autoencoder_proxy.ae_first_routing.margin_thresholds "
+                            "must be >= 0 or '__inf__'"
+                        )
+                if not has_inf_token:
+                    raise ValueError(
+                        "learned_utility.autoencoder_proxy.ae_first_routing.margin_thresholds "
+                        "must include '__inf__'"
+                    )
+                _ensure_bool(
+                    ae_first_cfg.get("metadata_auxiliary_features", True),
+                    "learned_utility.autoencoder_proxy.ae_first_routing.metadata_auxiliary_features",
+                )
+                floor_mode = str(
+                    ae_first_cfg.get("ae_z_sigma_floor_mode", "global_source_val_std_quantile")
+                ).strip().lower()
+                if floor_mode != "global_source_val_std_quantile":
+                    raise ValueError(
+                        "learned_utility.autoencoder_proxy.ae_first_routing.ae_z_sigma_floor_mode "
+                        "must be 'global_source_val_std_quantile'"
+                    )
+                q = float(ae_first_cfg.get("ae_z_sigma_floor_quantile", 0.05))
+                if q < 0.0 or q > 1.0:
+                    raise ValueError(
+                        "learned_utility.autoencoder_proxy.ae_first_routing.ae_z_sigma_floor_quantile "
+                        "must be in [0,1]"
+                    )
+                for key in ["min_ae_coverage_rate_for_weak_pass", "min_ae_coverage_rate_for_pass"]:
+                    value = float(ae_first_cfg.get(key, 0.10 if "weak" in key else 0.20))
+                    if value < 0.0 or value > 1.0:
+                        raise ValueError(
+                            f"learned_utility.autoencoder_proxy.ae_first_routing.{key} must be in [0,1]"
+                        )
+                risk_gates = ae_first_cfg.get("risk_gates", {})
+                if risk_gates is not None and not isinstance(risk_gates, dict):
+                    raise ValueError(
+                        "learned_utility.autoencoder_proxy.ae_first_routing.risk_gates must be a dictionary"
+                    )
+                risk_gates = risk_gates or {}
+                for key in ["max_top1_drop_abs", "max_raw_spearman_drop_abs", "max_gap_pct_degradation"]:
+                    if float(risk_gates.get(key, 0.0)) < 0.0:
+                        raise ValueError(
+                            f"learned_utility.autoencoder_proxy.ae_first_routing.risk_gates.{key} "
+                            "must be >= 0"
+                        )
             if residual_policy_version == "metadata_ae_residual_safe_override_v1":
                 if not bool(residual_cfg.get("enabled", False)):
                     raise ValueError(

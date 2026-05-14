@@ -192,6 +192,114 @@ def _fake_ae_scores() -> AutoencoderScoreMatrices:
     )
 
 
+def _fake_payload_ae_first():
+    expert_domains = [10, 20, 30, 40]
+    sample_domains = np.asarray([10, 10, 20, 20, 30, 30, 40, 40], dtype=np.int64)
+    true_nelbo = np.asarray(
+        [
+            [0.1, 3.0, 1.0, 4.0],
+            [0.1, 3.2, 1.1, 4.2],
+            [9.0, 0.1, 5.0, 6.0],
+            [9.0, 0.1, 5.2, 6.2],
+            [9.0, 1.0, 0.1, 4.0],
+            [9.0, 1.2, 0.1, 4.2],
+            [9.0, 1.0, 5.0, 0.1],
+            [9.0, 1.2, 5.2, 0.1],
+        ],
+        dtype=np.float64,
+    )
+    metadata_similarity = np.asarray(
+        [
+            [0.0, 1.0, 0.2, 0.1],
+            [0.0, 1.0, 0.2, 0.1],
+            [0.0, 0.0, 0.2, 1.0],
+            [0.0, 0.0, 0.2, 1.0],
+            [0.0, 0.3, 0.0, 1.0],
+            [0.0, 0.3, 0.0, 1.0],
+            [0.0, 1.0, 0.4, 0.0],
+            [0.0, 1.0, 0.4, 0.0],
+        ],
+        dtype=np.float64,
+    )
+    z = np.asarray(
+        [
+            [9.0, 1.0, 0.0, 2.0],
+            [9.0, 1.1, 0.0, 2.1],
+            [9.0, 9.0, 0.0, 2.0],
+            [9.0, 9.0, 0.1, 2.1],
+            [9.0, 0.0, 9.0, 2.0],
+            [9.0, 0.1, 9.0, 2.1],
+            [9.0, 0.0, 2.0, 9.0],
+            [9.0, 0.1, 2.1, 9.0],
+        ],
+        dtype=np.float64,
+    )
+    ae_scores = AutoencoderScoreMatrices(
+        raw_mse_matrix=z.copy(),
+        zscore_matrix=z,
+        quality_rows=[
+            {
+                "source_domain": d,
+                "source_val_reconstruction_mse_by_domain": 0.0,
+                "source_val_reconstruction_std_by_domain": 1.0,
+                "ae_source_val_count": 2,
+                "ae_z_sigma_floor": 0.1,
+                "ae_z_sigma_floor_applied": 0,
+            }
+            for d in expert_domains
+        ],
+        provenance_rows=[],
+        overlap_rows=[],
+        provenance={},
+    )
+    return sample_domains, expert_domains, true_nelbo, metadata_similarity, ae_scores
+
+
+def _ae_first_cfg(*, thresholds=None):
+    cfg = _support_free_ae_cfg()
+    cfg["autoencoder_proxy"]["ae_first_routing"] = {
+        "enabled": True,
+        "primary_method": "ae_first_margin_gated_v1",
+        "fallback_baseline": "source_prior_fallback",
+        "margin_thresholds": list(thresholds if thresholds is not None else [0.0, "__inf__"]),
+        "metadata_auxiliary_features": True,
+        "ae_z_sigma_floor_mode": "global_source_val_std_quantile",
+        "ae_z_sigma_floor_quantile": 0.05,
+        "min_ae_coverage_rate_for_weak_pass": 0.10,
+        "min_ae_coverage_rate_for_pass": 0.20,
+        "risk_gates": {
+            "max_top1_drop_abs": 0.02,
+            "max_raw_spearman_drop_abs": 0.03,
+            "max_gap_pct_degradation": 1.0,
+        },
+    }
+    return lu._parse_learned_utility_config(cfg).autoencoder.ae_first
+
+
+def _run_ae_first_direct(*, thresholds=None, metadata_similarity=None):
+    sample_domains, expert_domains, true_nelbo, meta, ae_scores = _fake_payload_ae_first()
+    if metadata_similarity is not None:
+        meta = metadata_similarity
+    fold = FoldCandidateSet.for_heldout_domain(heldout_domain=10, expert_domains=expert_domains)
+    test_idx = np.where(sample_domains == 10)[0]
+    train_idx = np.where(sample_domains != 10)[0]
+    return sfa.run_ae_first_methods_for_fold(
+        sample_domains=sample_domains,
+        expert_domains=expert_domains,
+        train_idx=train_idx,
+        test_idx=test_idx,
+        fold=fold,
+        true_nelbo=true_nelbo,
+        true_eval=fold.slice_nelbo(true_nelbo, test_idx),
+        global_eval=true_nelbo[test_idx],
+        metadata_similarity=meta,
+        metadata_similarity_eval=meta[test_idx][:, list(fold.candidate_col_indices)],
+        ae_scores=ae_scores,
+        cfg=_ae_first_cfg(thresholds=thresholds),
+        tie_policy="stable_expert_index",
+    )
+
+
 def _safe_v2_residual_config(**overrides) -> ResidualRoutingConfig:
     values = {
         "enabled": True,
@@ -622,6 +730,263 @@ def test_ae_argmin_zscore_diagnostic_rows() -> None:
     ae_rows = [row for row in outputs.sample_rows if row["method"] == "ae_argmin_zscore"]
     assert ae_rows[0]["method_role"] == "diagnostic"
     assert int(ae_rows[0]["diagnostic_only"]) == 1
+
+
+def test_source_prior_fallback_reported_as_named_baseline() -> None:
+    outputs = _run_ae_first_direct(thresholds=["__inf__"])
+    rows = [row for row in outputs.sample_rows if row["method"] == "source_prior_fallback"]
+    assert rows
+    assert all(row["method_role"] == "baseline" for row in rows)
+    assert all(int(row["adoption_eligible"]) == 1 for row in rows)
+    assert all(int(row["routing_uses_query_features"]) == 0 for row in rows)
+
+
+def test_ae_first_excludes_target_ae_and_expert() -> None:
+    outputs = _run_ae_first_direct(thresholds=[0.0, "__inf__"])
+    rows = [row for row in outputs.sample_rows if row["method"] == "ae_first_margin_gated_v1"]
+    assert rows
+    assert all(int(row["selected_expert"]) != 10 for row in rows)
+    assert all(int(row["target_ae_excluded"]) == 1 for row in rows)
+    assert all("10" not in row["candidate_experts"].split("|") for row in rows)
+
+
+def test_ae_first_source_inner_self_exclusion() -> None:
+    outputs = _run_ae_first_direct(thresholds=[0.0, "__inf__"])
+    validation_rows = outputs.source_inner_validation_rows
+    assert validation_rows
+    for row in validation_rows:
+        candidates = {int(v) for v in row["candidate_experts"].split("|") if v}
+        assert int(row["pseudo_query_domain"]) not in candidates
+        assert int(row["fold_query_domain"]) not in candidates
+        assert int(row["source_inner_self_ae_excluded"]) == 1
+        assert int(row["source_inner_self_expert_excluded"]) == 1
+
+
+def test_ae_first_threshold_selection_source_only() -> None:
+    outputs = _run_ae_first_direct(thresholds=[0.0, "__inf__"])
+    validation_rows = outputs.source_inner_validation_rows
+    assert validation_rows
+    assert all(row["selection_source"] == "source_inner_only" for row in outputs.sample_rows)
+    assert all(row["threshold_selection_policy"] == "source_inner_risk_gated_metadata_gain" for row in validation_rows)
+    assert all(int(row["heldout_target_domain_excluded"]) == 1 for row in validation_rows)
+
+
+def test_ae_first_threshold_objective_risk_gated_metadata_gain() -> None:
+    outputs = _run_ae_first_direct(thresholds=[0.0, "__inf__"])
+    policy = outputs.policy_audit_rows[0]
+    assert policy["threshold_selection_policy"] == "source_inner_risk_gated_metadata_gain"
+    assert policy["selected_tau_margin"] == "0"
+    assert float(policy["metadata_relative_gain"]) > 0.0
+    assert float(policy["source_prior_relative_gain"]) > 0.0
+
+
+def test_ae_first_no_metadata_anchor() -> None:
+    outputs = _run_ae_first_direct(thresholds=[0.0, "__inf__"])
+    rows = [row for row in outputs.sample_rows if row["method"] == "ae_first_margin_gated_v1"]
+    assert rows
+    assert all(row["metadata_role"] == "auxiliary_only" for row in rows)
+    assert any(int(row["selected_expert"]) != int(row["metadata_selected_expert"]) for row in rows)
+
+
+def test_metadata_auxiliary_fields_do_not_change_ae_first_selection() -> None:
+    sample_domains, _expert_domains, _true_nelbo, meta, _ae_scores = _fake_payload_ae_first()
+    changed_meta = np.zeros_like(meta)
+    changed_meta[:, 3] = 1.0
+    base = _run_ae_first_direct(thresholds=[0.0], metadata_similarity=meta)
+    changed = _run_ae_first_direct(thresholds=[0.0], metadata_similarity=changed_meta)
+    base_selected = [
+        int(row["selected_expert"])
+        for row in base.sample_rows
+        if row["method"] == "ae_first_margin_gated_v1"
+    ]
+    changed_selected = [
+        int(row["selected_expert"])
+        for row in changed.sample_rows
+        if row["method"] == "ae_first_margin_gated_v1"
+    ]
+    assert sample_domains.tolist()
+    assert base_selected == changed_selected
+
+
+def test_ae_first_tau_zero_matches_ae_argmin_zscore() -> None:
+    outputs = _run_ae_first_direct(thresholds=[0.0])
+    rows = [row for row in outputs.sample_rows if row["method"] == "ae_first_margin_gated_v1"]
+    assert rows
+    assert all(int(row["selected_expert"]) == int(row["ae_best_expert"]) for row in rows)
+    assert all(int(row["ae_selected_by_gate"]) == 1 for row in rows)
+
+
+def test_ae_first_tau_inf_matches_source_prior_fallback() -> None:
+    outputs = _run_ae_first_direct(thresholds=["__inf__"])
+    by_method = {}
+    for row in outputs.sample_rows:
+        by_method.setdefault(row["method"], []).append(row)
+    assert by_method["ae_first_margin_gated_v1"]
+    for ae_row, prior_row in zip(by_method["ae_first_margin_gated_v1"], by_method["source_prior_fallback"]):
+        assert ae_row["selected_expert"] == prior_row["selected_expert"]
+        assert ae_row["selected_nelbo"] == prior_row["selected_nelbo"]
+        assert ae_row["oracle_gap"] == prior_row["oracle_gap"]
+
+
+def test_ae_first_inf_threshold_parsed_consistently() -> None:
+    cfg = _ae_first_cfg(thresholds=[0.0, "__inf__"])
+    assert np.isinf(cfg.margin_thresholds[-1])
+
+
+def test_ae_first_reports_coverage_and_fallback_rate() -> None:
+    outputs = _run_ae_first_direct(thresholds=[0.0, "__inf__"])
+    policy = outputs.policy_audit_rows[0]
+    assert "ae_coverage_rate" in policy
+    assert "fallback_rate" in policy
+    assert np.isclose(float(policy["ae_coverage_rate"]) + float(policy["fallback_rate"]), 1.0)
+
+
+def test_ae_first_reports_metadata_and_source_prior_relative_gains() -> None:
+    outputs = _run_ae_first_direct(thresholds=[0.0, "__inf__"])
+    rows = [row for row in outputs.sample_rows if row["method"] == "ae_first_margin_gated_v1"]
+    assert rows
+    assert {"metadata_relative_gain", "source_prior_relative_gain"}.issubset(rows[0])
+
+
+def test_ae_first_reports_harmful_improving_against_both_baselines() -> None:
+    outputs = _run_ae_first_direct(thresholds=[0.0, "__inf__"])
+    rows = [row for row in outputs.sample_rows if row["method"] == "ae_first_margin_gated_v1"]
+    required = {
+        "harmful_vs_metadata",
+        "improving_vs_metadata",
+        "harmful_vs_source_prior",
+        "improving_vs_source_prior",
+    }
+    assert required.issubset(rows[0])
+
+
+def test_ae_first_reports_method_level_decomposition() -> None:
+    outputs = _run_ae_first_direct(thresholds=[0.0, "__inf__"])
+    policy = outputs.policy_audit_rows[0]
+    required = {
+        "overall_method_nelbo",
+        "fallback_only_nelbo",
+        "ae_selected_subset_nelbo",
+        "source_prior_on_ae_selected_subset_nelbo",
+        "metadata_on_ae_selected_subset_nelbo",
+        "oracle_on_ae_selected_subset_nelbo",
+    }
+    assert required.issubset(policy)
+
+
+def test_ae_first_reports_oracle_rank_of_ae_best() -> None:
+    outputs = _run_ae_first_direct(thresholds=[0.0, "__inf__"])
+    policy = outputs.policy_audit_rows[0]
+    assert "p_oracle_rank_of_ae_best_eq_1" in policy
+    assert "p_oracle_rank_of_ae_best_leq_2" in policy
+    assert "mean_oracle_rank_of_ae_best" in policy
+    assert all("oracle_rank_of_ae_best" in row for row in outputs.raw_rows)
+
+
+def test_ae_zscore_uses_global_source_only_sigma_floor(monkeypatch) -> None:
+    calls = []
+
+    def fake_score(**kwargs):
+        calls.append(kwargs)
+        return np.asarray([1.0, 3.0], dtype=np.float64)
+
+    monkeypatch.setattr(sfa, "_score_autoencoder", fake_score)
+    cfg_dict = _support_free_ae_cfg()
+    cfg_dict["autoencoder_proxy"]["ae_first_routing"] = {
+        "enabled": True,
+        "margin_thresholds": [0.0, "__inf__"],
+        "ae_z_sigma_floor_quantile": 0.5,
+    }
+    cfg = lu._parse_learned_utility_config(cfg_dict).autoencoder
+    scores = sfa.build_autoencoder_score_matrices(
+        embeddings=np.zeros((2, 2), dtype=np.float64),
+        expert_domains=[40, 100],
+        autoencoder_artifacts={
+            "checkpoints": {"40": "unused.pt", "100": "unused.pt"},
+            "provenance": {
+                "domains": {
+                    "40": {
+                        "checkpoint": "unused.pt",
+                        "source_val_reconstruction_mse": 1.0,
+                        "source_val_reconstruction_std": 0.01,
+                        "input_dim": 2,
+                        "autoencoder_config": {"hidden_dim": 4, "latent_dim": 2},
+                    },
+                    "100": {
+                        "checkpoint": "unused.pt",
+                        "source_val_reconstruction_mse": 1.0,
+                        "source_val_reconstruction_std": 1.0,
+                        "input_dim": 2,
+                        "autoencoder_config": {"hidden_dim": 4, "latent_dim": 2},
+                    },
+                }
+            },
+        },
+        cfg=cfg,
+    )
+    floor = float(scores.quality_rows[0]["ae_z_sigma_floor"])
+    assert floor > 0.01
+    assert scores.quality_rows[0]["ae_z_sigma_floor_applied"] == 1
+    assert scores.quality_rows[1]["ae_z_sigma_floor_applied"] == 0
+
+
+def test_ae_first_margin_usefulness_diagnostics_present() -> None:
+    outputs = _run_ae_first_direct(thresholds=[0.0, "__inf__"])
+    assert outputs.margin_bin_rows
+    assert {"margin_bin", "harmful_vs_metadata_rate", "mean_oracle_gap_pct", "top1_oracle_hit"}.issubset(
+        outputs.margin_bin_rows[0]
+    )
+
+
+def test_ae_first_macro_by_domain_is_primary_summary() -> None:
+    outputs = _run_ae_first_direct(thresholds=[0.0, "__inf__"])
+    policy = outputs.policy_audit_rows[0]
+    assert policy["primary_aggregation"] == "macro_by_domain"
+    assert policy["aggregation_unit"] == "seed_x_heldout_domain_x_query_domain"
+
+
+def test_ae_first_tiny_capped_smoke_run(tmp_path, monkeypatch) -> None:
+    sample_domains, expert_domains, true_nelbo, _meta, ae_scores = _fake_payload_ae_first()
+
+    def fake_score(**kwargs):
+        _ = kwargs
+        embeddings = np.stack([np.asarray([float(i), 0.0]) for i in range(len(sample_domains))])
+        metadata = [{"magnification": int(domain), "sample_id": f"s{i}"} for i, domain in enumerate(sample_domains)]
+        return embeddings, sample_domains, true_nelbo, expert_domains, metadata
+
+    def fake_ae_scores(**kwargs):
+        _ = kwargs
+        return ae_scores
+
+    cfg = _support_free_ae_cfg()
+    cfg["autoencoder_proxy"]["ae_first_routing"] = {
+        "enabled": True,
+        "primary_method": "ae_first_margin_gated_v1",
+        "fallback_baseline": "source_prior_fallback",
+        "margin_thresholds": [0.0, "__inf__"],
+        "metadata_auxiliary_features": True,
+        "ae_z_sigma_floor_mode": "global_source_val_std_quantile",
+        "ae_z_sigma_floor_quantile": 0.05,
+    }
+    monkeypatch.setattr(lu, "_score_experts_batched", fake_score)
+    monkeypatch.setattr(lu, "build_autoencoder_score_matrices", fake_ae_scores)
+    results = lu.evaluate_learned_utility_loqdo(
+        test_cache=tmp_path / "unused.pt",
+        expert_checkpoints={f"expert_{d}": "unused" for d in expert_domains},
+        hidden_dim=4,
+        latent_dim=2,
+        strategy="categorical_exact",
+        tau=1.0,
+        seed=7,
+        learned_cfg=cfg,
+        reports_dir=tmp_path,
+        autoencoder_artifacts={"dummy": True},
+    )
+
+    assert "ae_first_margin_gated_v1" in results["metrics_by_method"]
+    assert "source_prior_fallback" in results["metrics_by_method"]
+    assert results["artifacts"]["ae_first_raw"] == "ae_first_raw.csv"
+    assert (tmp_path / "ae_first_policy_audit.csv").exists()
 
 
 def test_safe_override_falls_back_to_metadata_with_tau_inf(tmp_path, monkeypatch) -> None:

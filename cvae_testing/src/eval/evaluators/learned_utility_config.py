@@ -83,6 +83,23 @@ class AutoencoderProxyConfig:
     score_normalization_eps: float
     margin_threshold: float
     run_diagnostics: bool
+    ae_first: "AEFirstRoutingConfig"
+
+
+@dataclass(frozen=True)
+class AEFirstRoutingConfig:
+    enabled: bool
+    primary_method: str
+    fallback_baseline: str
+    margin_thresholds: Tuple[float, ...]
+    metadata_auxiliary_features: bool
+    ae_z_sigma_floor_mode: str
+    ae_z_sigma_floor_quantile: float
+    min_ae_coverage_rate_for_weak_pass: float
+    min_ae_coverage_rate_for_pass: float
+    max_top1_drop_abs: float
+    max_raw_spearman_drop_abs: float
+    max_gap_pct_degradation: float
 
 
 @dataclass(frozen=True)
@@ -104,7 +121,7 @@ def _as_dict(value: Any) -> Dict[str, Any]:
 
 
 def _parse_threshold(value: Any) -> float:
-    if isinstance(value, str) and value.strip().lower() == "inf":
+    if isinstance(value, str) and value.strip().lower() in {"inf", "__inf__"}:
         return float("inf")
     parsed = float(value)
     if not math.isfinite(parsed):
@@ -230,6 +247,32 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
     )
 
     autoencoder_cfg = _as_dict(learned_cfg.get("autoencoder_proxy", {}))
+    ae_first_cfg = _as_dict((autoencoder_cfg or {}).get("ae_first_routing", {}))
+    ae_first_risk = _as_dict((ae_first_cfg or {}).get("risk_gates", {}))
+    ae_first = AEFirstRoutingConfig(
+        enabled=bool((ae_first_cfg or {}).get("enabled", False)),
+        primary_method=str((ae_first_cfg or {}).get("primary_method", "ae_first_margin_gated_v1")),
+        fallback_baseline=str((ae_first_cfg or {}).get("fallback_baseline", "source_prior_fallback")),
+        margin_thresholds=tuple(
+            _parse_threshold(v)
+            for v in (ae_first_cfg or {}).get(
+                "margin_thresholds",
+                [0.0, 0.05, 0.10, 0.25, 0.50, 1.0, "__inf__"],
+            )
+        ),
+        metadata_auxiliary_features=bool((ae_first_cfg or {}).get("metadata_auxiliary_features", True)),
+        ae_z_sigma_floor_mode=str(
+            (ae_first_cfg or {}).get("ae_z_sigma_floor_mode", "global_source_val_std_quantile")
+        ).strip().lower(),
+        ae_z_sigma_floor_quantile=float((ae_first_cfg or {}).get("ae_z_sigma_floor_quantile", 0.05)),
+        min_ae_coverage_rate_for_weak_pass=float(
+            (ae_first_cfg or {}).get("min_ae_coverage_rate_for_weak_pass", 0.10)
+        ),
+        min_ae_coverage_rate_for_pass=float((ae_first_cfg or {}).get("min_ae_coverage_rate_for_pass", 0.20)),
+        max_top1_drop_abs=float((ae_first_risk or {}).get("max_top1_drop_abs", 0.02)),
+        max_raw_spearman_drop_abs=float((ae_first_risk or {}).get("max_raw_spearman_drop_abs", 0.03)),
+        max_gap_pct_degradation=float((ae_first_risk or {}).get("max_gap_pct_degradation", 1.0)),
+    )
     autoencoder = AutoencoderProxyConfig(
         enabled=bool((autoencoder_cfg or {}).get("enabled", False)),
         hidden_dim=int((autoencoder_cfg or {}).get("hidden_dim", 256)),
@@ -244,6 +287,7 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         score_normalization_eps=float((autoencoder_cfg or {}).get("score_normalization_eps", 1e-6)),
         margin_threshold=float((autoencoder_cfg or {}).get("margin_threshold", 0.0)),
         run_diagnostics=bool((autoencoder_cfg or {}).get("run_diagnostics", True)),
+        ae_first=ae_first,
     )
 
     return LearnedUtilityConfig(

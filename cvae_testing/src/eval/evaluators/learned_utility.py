@@ -25,7 +25,9 @@ from src.eval.evaluators.learned_utility_reporting import (
 from src.eval.evaluators.support_free_ae import (
     AutoencoderScoreMatrices,
     build_autoencoder_score_matrices,
+    run_ae_first_methods_for_fold,
     run_autoencoder_proxy_methods_for_fold,
+    write_ae_first_artifacts,
     write_support_free_ae_artifacts,
 )
 from src.eval.evaluators.support_response_routing import (
@@ -100,6 +102,12 @@ def evaluate_learned_utility_loqdo(
     residual_override_rows: List[Dict[str, Any]] = []
     residual_audit_rows: List[Dict[str, Any]] = []
     residual_confusion_rows: List[Dict[str, Any]] = []
+    ae_first_raw_rows: List[Dict[str, Any]] = []
+    ae_first_policy_rows: List[Dict[str, Any]] = []
+    ae_first_validation_rows: List[Dict[str, Any]] = []
+    ae_first_selection_diag_rows: List[Dict[str, Any]] = []
+    ae_first_margin_bin_rows: List[Dict[str, Any]] = []
+    ae_first_calibration_rows: List[Dict[str, Any]] = []
     hybrid_method_meta: Dict[str, Dict[str, Any]] = {}
     permutation_sample_rows: Dict[Tuple[str, int], List[Dict[str, Any]]] = {}
 
@@ -184,6 +192,30 @@ def evaluate_learned_utility_loqdo(
             )
             sample_rows.extend(ae_outputs.sample_rows)
             proxy_diag_rows.extend(ae_outputs.proxy_diag_rows)
+
+        if ae_scores is not None and eval_cfg.autoencoder.ae_first.enabled:
+            ae_first_outputs = run_ae_first_methods_for_fold(
+                sample_domains=sample_domains,
+                expert_domains=expert_domains,
+                train_idx=train_idx,
+                test_idx=test_idx,
+                fold=fold,
+                true_nelbo=true_nelbo,
+                true_eval=true_eval,
+                global_eval=global_eval,
+                metadata_similarity=metadata_similarity,
+                metadata_similarity_eval=metadata_similarity_eval,
+                ae_scores=ae_scores,
+                cfg=eval_cfg.autoencoder.ae_first,
+                tie_policy=hybrid_cfg.tie_policy,
+            )
+            sample_rows.extend(ae_first_outputs.sample_rows)
+            ae_first_raw_rows.extend(ae_first_outputs.raw_rows)
+            ae_first_policy_rows.extend(ae_first_outputs.policy_audit_rows)
+            ae_first_validation_rows.extend(ae_first_outputs.source_inner_validation_rows)
+            ae_first_selection_diag_rows.extend(ae_first_outputs.selection_diag_rows)
+            ae_first_margin_bin_rows.extend(ae_first_outputs.margin_bin_rows)
+            ae_first_calibration_rows.extend(ae_first_outputs.calibration_rows)
 
         learned_outputs = _run_learned_methods_for_fold(
             embeddings=embeddings,
@@ -297,6 +329,17 @@ def evaluate_learned_utility_loqdo(
     )
     if ae_artifacts:
         results.setdefault("artifacts", {}).update(ae_artifacts)
+    ae_first_artifacts = write_ae_first_artifacts(
+        reports_dir=reports_dir,
+        raw_rows=ae_first_raw_rows,
+        policy_audit_rows=ae_first_policy_rows,
+        source_inner_validation_rows=ae_first_validation_rows,
+        selection_diag_rows=ae_first_selection_diag_rows,
+        margin_bin_rows=ae_first_margin_bin_rows,
+        calibration_rows=ae_first_calibration_rows,
+    )
+    if ae_first_artifacts:
+        results.setdefault("artifacts", {}).update(ae_first_artifacts)
     if eval_cfg.support_response.enabled:
         print("[learned_utility] running candidate-specific support-response routing...")
         support_response_results = evaluate_support_response_routing_for_checkpoints(
