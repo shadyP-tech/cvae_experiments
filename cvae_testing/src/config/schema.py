@@ -672,6 +672,83 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         if float(residual_cfg.get("ridge_l2", 1e-4)) < 0.0:
             raise ValueError("learned_utility.residual_routing.ridge_l2 must be >= 0")
 
+        source_transfer_cfg = learned_cfg.get("source_utility_transfer", {})
+        if source_transfer_cfg is not None and not isinstance(source_transfer_cfg, dict):
+            raise ValueError("learned_utility.source_utility_transfer must be a dictionary when provided")
+        source_transfer_cfg = source_transfer_cfg or {}
+        _ensure_bool(
+            source_transfer_cfg.get("enabled", False),
+            "learned_utility.source_utility_transfer.enabled",
+        )
+        if bool(source_transfer_cfg.get("enabled", False)):
+            variants = source_transfer_cfg.get("variants", ["metadata_only"])
+            if not isinstance(variants, list) or not variants:
+                raise ValueError("learned_utility.source_utility_transfer.variants must be a non-empty list")
+            bad_variants = sorted(set(str(v).strip().lower() for v in variants) - {"metadata_only"})
+            if bad_variants:
+                raise ValueError(
+                    "learned_utility.source_utility_transfer.variants must be subset of ['metadata_only'], "
+                    f"got unknown {bad_variants}"
+                )
+            query_unit = str(source_transfer_cfg.get("query_unit", "minibag")).strip().lower()
+            if query_unit != "minibag":
+                raise ValueError("learned_utility.source_utility_transfer.query_unit must be 'minibag' in v1")
+            if int(source_transfer_cfg.get("minibag_size", 16)) <= 0:
+                raise ValueError("learned_utility.source_utility_transfer.minibag_size must be > 0")
+            if int(source_transfer_cfg.get("minibags_per_domain", 32)) <= 0:
+                raise ValueError("learned_utility.source_utility_transfer.minibags_per_domain must be > 0")
+            minibag_seeds = source_transfer_cfg.get("minibag_seeds", [17, 23, 31])
+            if not isinstance(minibag_seeds, list) or not minibag_seeds:
+                raise ValueError("learned_utility.source_utility_transfer.minibag_seeds must be a non-empty list")
+            if any(int(v) < 0 for v in minibag_seeds):
+                raise ValueError("learned_utility.source_utility_transfer.minibag_seeds must be non-negative")
+            ranker = str(source_transfer_cfg.get("ranker", "linear_pairwise_ridge")).strip().lower()
+            if ranker != "linear_pairwise_ridge":
+                raise ValueError("learned_utility.source_utility_transfer.ranker must be 'linear_pairwise_ridge'")
+            if float(source_transfer_cfg.get("ridge_l2", 1.0e-3)) < 0.0:
+                raise ValueError("learned_utility.source_utility_transfer.ridge_l2 must be >= 0")
+            thresholds = source_transfer_cfg.get(
+                "normalized_margin_thresholds",
+                [0.0, 0.1, 0.25, 0.5, 1.0, "inf"],
+            )
+            if not isinstance(thresholds, list) or not thresholds:
+                raise ValueError(
+                    "learned_utility.source_utility_transfer.normalized_margin_thresholds must be non-empty"
+                )
+            has_inf = False
+            for threshold in thresholds:
+                if isinstance(threshold, str) and threshold.strip().lower() == "inf":
+                    has_inf = True
+                    continue
+                if float(threshold) < 0.0:
+                    raise ValueError(
+                        "learned_utility.source_utility_transfer.normalized_margin_thresholds "
+                        "must be >= 0 or 'inf'"
+                    )
+            if not has_inf:
+                raise ValueError(
+                    "learned_utility.source_utility_transfer.normalized_margin_thresholds must include 'inf'"
+                )
+            fallback_method = str(source_transfer_cfg.get("fallback_method", "metadata_routing")).strip().lower()
+            if fallback_method != "metadata_routing":
+                raise ValueError("learned_utility.source_utility_transfer.fallback_method must be 'metadata_routing'")
+            random_control_seeds = source_transfer_cfg.get("random_control_seeds", [101, 102, 103, 104, 105])
+            if not isinstance(random_control_seeds, list) or not random_control_seeds:
+                raise ValueError(
+                    "learned_utility.source_utility_transfer.random_control_seeds must be a non-empty list"
+                )
+            if any(int(v) < 0 for v in random_control_seeds):
+                raise ValueError("learned_utility.source_utility_transfer.random_control_seeds must be non-negative")
+            _ensure_bool(
+                source_transfer_cfg.get("enable_shuffled_profile_control", True),
+                "learned_utility.source_utility_transfer.enable_shuffled_profile_control",
+            )
+            pair_features_cfg = learned_cfg.get("pair_features", {}) or {}
+            if bool(pair_features_cfg.get("include_domain_stats", False)):
+                raise ValueError(
+                    "learned_utility.source_utility_transfer requires pair_features.include_domain_stats=false in v1"
+                )
+
         support_response_cfg = learned_cfg.get("support_response_routing", {})
         if support_response_cfg is not None and not isinstance(support_response_cfg, dict):
             raise ValueError("learned_utility.support_response_routing must be a dictionary when provided")

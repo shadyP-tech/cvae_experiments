@@ -1,0 +1,7 @@
+Dataset,Routing method,Top-1 oracle hit,Delta vs metadata,Spearman,Oracle gap pct,Gap reduction vs metadata,AE coverage,Harmful vs metadata,Verdict
+BreakHis,Metadata,34.2%,0.0%,0.00,35.7,0.0,,,
+BreakHis,AE argmin,69.7%,35.4%,0.46,6.6,29.1,,,
+BreakHis,AE margin-gated,59.8%,25.6%,0.46,11.8,23.9,78.9%,16.0%,DIAGNOSTIC ONLY
+Camelyon17,Metadata,32.9%,0.0%,0.00,11.0,0.0,,,
+Camelyon17,AE argmin,42.6%,9.7%,0.36,8.9,2.0,,,
+Camelyon17,AE margin-gated,39.4%,6.5%,0.36,9.3,1.7,71.0%,26.7%,DIAGNOSTIC ONLY

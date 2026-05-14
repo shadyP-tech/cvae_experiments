@@ -71,6 +71,22 @@ class ResidualRoutingConfig:
 
 
 @dataclass(frozen=True)
+class SourceUtilityTransferConfig:
+    enabled: bool
+    variants: Tuple[str, ...]
+    query_unit: str
+    minibag_size: int
+    minibags_per_domain: int
+    minibag_seeds: Tuple[int, ...]
+    ranker: str
+    ridge_l2: float
+    normalized_margin_thresholds: Tuple[float, ...]
+    fallback_method: str
+    random_control_seeds: Tuple[int, ...]
+    enable_shuffled_profile_control: bool
+
+
+@dataclass(frozen=True)
 class LearnedUtilityConfig:
     pair_batch_size: int
     include_metadata_features: bool
@@ -81,6 +97,7 @@ class LearnedUtilityConfig:
     compatibility: CompatibilityResearchConfig
     residual: ResidualRoutingConfig
     support_response: SupportResponseConfig
+    source_utility_transfer: SourceUtilityTransferConfig
 
 
 def _as_dict(value: Any) -> Dict[str, Any]:
@@ -94,6 +111,13 @@ def _parse_threshold(value: Any) -> float:
     if not math.isfinite(parsed):
         return float("inf")
     return parsed
+
+
+def _parse_float_thresholds(values: Any, default: Tuple[Any, ...]) -> Tuple[float, ...]:
+    raw_values = values if values is not None else default
+    if not isinstance(raw_values, (list, tuple)) or not raw_values:
+        raise ValueError("threshold list must be non-empty")
+    return tuple(_parse_threshold(v) for v in raw_values)
 
 
 def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtilityConfig:
@@ -213,6 +237,32 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         ridge_l2=float((residual_cfg or {}).get("ridge_l2", 1e-4)),
     )
 
+    source_transfer_cfg = _as_dict(learned_cfg.get("source_utility_transfer", {}))
+    source_utility_transfer = SourceUtilityTransferConfig(
+        enabled=bool((source_transfer_cfg or {}).get("enabled", False)),
+        variants=tuple(
+            str(v).strip().lower()
+            for v in (source_transfer_cfg or {}).get("variants", ["metadata_only"])
+        ),
+        query_unit=str((source_transfer_cfg or {}).get("query_unit", "minibag")).strip().lower(),
+        minibag_size=int((source_transfer_cfg or {}).get("minibag_size", 16)),
+        minibags_per_domain=int((source_transfer_cfg or {}).get("minibags_per_domain", 32)),
+        minibag_seeds=tuple(int(v) for v in (source_transfer_cfg or {}).get("minibag_seeds", [17, 23, 31])),
+        ranker=str((source_transfer_cfg or {}).get("ranker", "linear_pairwise_ridge")).strip().lower(),
+        ridge_l2=float((source_transfer_cfg or {}).get("ridge_l2", 1.0e-3)),
+        normalized_margin_thresholds=_parse_float_thresholds(
+            (source_transfer_cfg or {}).get("normalized_margin_thresholds"),
+            (0.0, 0.1, 0.25, 0.5, 1.0, "inf"),
+        ),
+        fallback_method=str((source_transfer_cfg or {}).get("fallback_method", "metadata_routing")).strip().lower(),
+        random_control_seeds=tuple(
+            int(v) for v in (source_transfer_cfg or {}).get("random_control_seeds", [101, 102, 103, 104, 105])
+        ),
+        enable_shuffled_profile_control=bool(
+            (source_transfer_cfg or {}).get("enable_shuffled_profile_control", True)
+        ),
+    )
+
     return LearnedUtilityConfig(
         pair_batch_size=pair_batch_size,
         include_metadata_features=include_metadata_features,
@@ -223,4 +273,5 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         compatibility=compatibility,
         residual=residual,
         support_response=parse_support_response_config(learned_cfg),
+        source_utility_transfer=source_utility_transfer,
     )

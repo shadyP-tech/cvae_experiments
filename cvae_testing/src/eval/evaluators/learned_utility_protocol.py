@@ -238,6 +238,30 @@ def _method_protocol(method: str) -> MethodProtocol:
             diagnostic_only=0,
             routing_uses_query_features=1,
         )
+    if name == "source_utility_transfer_metadata_safe_override_v1":
+        return MethodProtocol(
+            method_role="learned",
+            adoption_eligible=1,
+            diagnostic_only=0,
+            routing_uses_query_features=1,
+        )
+    if name == "source_utility_transfer_metadata_only_v1":
+        return MethodProtocol(
+            method_role="diagnostic",
+            adoption_eligible=0,
+            diagnostic_only=1,
+            routing_uses_query_features=1,
+        )
+    if name in {
+        "random_metadata_override_matched_coverage",
+        "source_utility_transfer_shuffled_profiles",
+    }:
+        return MethodProtocol(
+            method_role="control",
+            adoption_eligible=0,
+            diagnostic_only=0,
+            routing_uses_query_features=1,
+        )
     if name in {"linear_regressor", "mlp_regressor", "metadata_only_regressor"} or name.startswith("pairwise_ranker"):
         return MethodProtocol(
             method_role="learned",

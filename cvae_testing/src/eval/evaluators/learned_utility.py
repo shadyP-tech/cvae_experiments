@@ -22,6 +22,7 @@ from src.eval.evaluators.learned_utility_scoring import (
 from src.eval.evaluators.learned_utility_reporting import (
     _finalize_learned_utility_outputs,
 )
+from src.eval.evaluators.source_utility_transfer import evaluate_source_utility_transfer
 from src.eval.evaluators.support_response_routing import (
     evaluate_support_response_routing_for_checkpoints,
 )
@@ -202,6 +203,18 @@ def evaluate_learned_utility_loqdo(
         else:
             print(f"[learned_utility] fold {fold_idx}/{total_folds} done")
 
+    source_transfer_outputs = evaluate_source_utility_transfer(
+        true_nelbo=true_nelbo,
+        sample_domains=sample_domains,
+        metadata_similarity=metadata_similarity,
+        expert_domains=expert_domains,
+        domain_to_idx=domain_to_idx,
+        seed=int(seed),
+        cfg=eval_cfg.source_utility_transfer,
+        reports_dir=reports_dir,
+    )
+    sample_rows.extend(source_transfer_outputs.sample_rows)
+
     results = _finalize_learned_utility_outputs(
         reports_dir=reports_dir,
         sample_rows=sample_rows,
@@ -250,6 +263,19 @@ def evaluate_learned_utility_loqdo(
         run_metadata_permutation=compatibility_cfg.run_metadata_permutation,
         permutation_repeats=compatibility_cfg.permutation_repeats,
     )
+    if source_transfer_outputs.artifacts:
+        results.setdefault("artifacts", {}).update(source_transfer_outputs.artifacts)
+        results["source_utility_transfer_results"] = {
+            "enabled": True,
+            "methods": [
+                "source_utility_transfer_metadata_only_v1",
+                "source_utility_transfer_metadata_safe_override_v1",
+                "random_metadata_override_matched_coverage",
+                "source_utility_transfer_shuffled_profiles",
+            ],
+            "clustered_metrics": source_transfer_outputs.clustered_metric_rows,
+            "artifacts": source_transfer_outputs.artifacts,
+        }
     if eval_cfg.support_response.enabled:
         print("[learned_utility] running candidate-specific support-response routing...")
         support_response_results = evaluate_support_response_routing_for_checkpoints(

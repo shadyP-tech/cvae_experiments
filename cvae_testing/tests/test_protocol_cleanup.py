@@ -63,6 +63,34 @@ def test_support_estimated_utility_v2_config_is_unlabeled_and_grid_locked() -> N
         validate_config(invalid)
 
 
+def test_camelyon17_source_utility_transfer_config_is_protocol_locked() -> None:
+    path = (
+        PROJECT_ROOT
+        / "configs"
+        / "experiments"
+        / "camelyon17"
+        / "source_utility_transfer_metadata_only_v1.yaml"
+    )
+    cfg = load_config(path)
+    validate_config(cfg)
+
+    source_cfg = cfg["learned_utility"]["source_utility_transfer"]
+    assert cfg["experiment"]["name"] == "source_utility_transfer_metadata_only_v1"
+    assert cfg["features"]["backbone_type"] == "resnet50"
+    assert source_cfg["enabled"] is True
+    assert source_cfg["variants"] == ["metadata_only"]
+    assert source_cfg["query_unit"] == "minibag"
+    assert source_cfg["ranker"] == "linear_pairwise_ridge"
+    assert source_cfg["fallback_method"] == "metadata_routing"
+    assert source_cfg["normalized_margin_thresholds"][-1] == "inf"
+    assert cfg["learned_utility"]["pair_features"]["include_domain_stats"] is False
+
+    invalid = yaml.safe_load(path.read_text(encoding="utf-8"))
+    invalid["learned_utility"]["source_utility_transfer"]["query_unit"] = "domain"
+    with pytest.raises(ValueError, match="query_unit must be 'minibag'"):
+        validate_config(invalid)
+
+
 def test_breakhis_support_estimated_utility_config_is_protocol_locked() -> None:
     path = (
         PROJECT_ROOT

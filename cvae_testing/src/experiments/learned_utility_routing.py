@@ -54,6 +54,7 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
         )
         residual_routing_cfg = learned_cfg.get("residual_routing", {}) or {}
         support_response_cfg = learned_cfg.get("support_response_routing", {}) or {}
+        source_transfer_cfg = learned_cfg.get("source_utility_transfer", {}) or {}
 
         protocol_lock = {
             "experiment_mode": "learned_utility_routing",
@@ -224,6 +225,42 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
                 "scaler_fit_scope": "source_training_pairs_only",
                 "ranker_model_selection_scope": "source_only_fixed_config",
                 "score_direction": "predicted_mean_nelbo_lower_is_better",
+            },
+            "source_utility_transfer": {
+                "enabled": bool(source_transfer_cfg.get("enabled", False)),
+                "variants": _as_str_list(source_transfer_cfg.get("variants"), ["metadata_only"]),
+                "query_unit": str(source_transfer_cfg.get("query_unit", "minibag")),
+                "minibag_size": int(source_transfer_cfg.get("minibag_size", 16)),
+                "minibags_per_domain": int(source_transfer_cfg.get("minibags_per_domain", 32)),
+                "minibag_seeds": [
+                    int(v) for v in source_transfer_cfg.get("minibag_seeds", [17, 23, 31])
+                ],
+                "ranker": str(source_transfer_cfg.get("ranker", "linear_pairwise_ridge")),
+                "ridge_l2": float(source_transfer_cfg.get("ridge_l2", 1.0e-3)),
+                "normalized_margin_thresholds": [
+                    str(v)
+                    for v in source_transfer_cfg.get(
+                        "normalized_margin_thresholds",
+                        [0.0, 0.1, 0.25, 0.5, 1.0, "inf"],
+                    )
+                ],
+                "fallback_method": str(source_transfer_cfg.get("fallback_method", "metadata_routing")),
+                "random_control_seeds": [
+                    int(v) for v in source_transfer_cfg.get("random_control_seeds", [101, 102, 103, 104, 105])
+                ],
+                "enable_shuffled_profile_control": bool(
+                    source_transfer_cfg.get("enable_shuffled_profile_control", True)
+                ),
+                "mini_bag_role": "utility_label_stability_not_independent_feature_support",
+                "threshold_selection_policy": "fully_nested_source_inner_domain_aggregate",
+                "deployment_decision_unit": "outer_target_domain",
+                "feature_scope": "target_metadata_and_source_utility_profiles_only",
+                "adoption_eligible_method": "source_utility_transfer_metadata_safe_override_v1",
+                "diagnostic_methods": [
+                    "source_utility_transfer_metadata_only_v1",
+                    "random_metadata_override_matched_coverage",
+                    "source_utility_transfer_shuffled_profiles",
+                ],
             },
             "winner_rule": {
                 "primary_metric": str(
@@ -445,6 +482,7 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
                 "compatibility_protocol": results.get("compatibility_protocol", {}),
                 "hybrid_diagnostics": results.get("hybrid_diagnostics", {}),
                 "support_response_results": results.get("support_response_results", {}),
+                "source_utility_transfer_results": results.get("source_utility_transfer_results", {}),
             },
         )
         progress.advance("learned utility summary written")
