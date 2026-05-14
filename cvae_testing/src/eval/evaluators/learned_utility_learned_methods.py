@@ -18,6 +18,16 @@ from src.eval.evaluators.learned_utility_pairs import (
     _normalize_targets_per_query,
     _zscore_features,
 )
+from src.eval.evaluators.learned_utility_pairprob import (
+    PairprobModelBundle,
+    PairprobPolicySelection,
+    build_pairprob_training_data,
+    fit_pairprob_model,
+    pairprob_evidence_reason,
+    pairprob_probability_matrix,
+    pairprob_route_rows,
+    select_pairprob_policy,
+)
 from src.eval.evaluators.learned_utility_protocol import (
     FoldCandidateSet,
     ProtocolError,
@@ -42,6 +52,35 @@ class LearnedFoldOutputs:
     sample_rows: List[Dict[str, Any]]
     pair_rows: List[Dict[str, Any]]
     pair_training_rows: List[Dict[str, Any]]
+
+
+def _copy_pairprob_selection_with_reason(
+    selection: PairprobPolicySelection,
+    *,
+    diagnostic_only_reason: str,
+) -> PairprobPolicySelection:
+    return PairprobPolicySelection(
+        method=selection.method,
+        feature_set=selection.feature_set,
+        ridge_l2=selection.ridge_l2,
+        selected_by_inner_validation=selection.selected_by_inner_validation,
+        diagnostic_only_reason=str(diagnostic_only_reason or selection.diagnostic_only_reason),
+        source_inner_validation_domains=selection.source_inner_validation_domains,
+        source_inner_rows=selection.source_inner_rows,
+        source_inner_mean_oracle_gap_pct=selection.source_inner_mean_oracle_gap_pct,
+        source_inner_worst_domain_oracle_gap_pct=selection.source_inner_worst_domain_oracle_gap_pct,
+        source_inner_relative_catastrophic_rate=selection.source_inner_relative_catastrophic_rate,
+        source_inner_absolute_high_regret_rate=selection.source_inner_absolute_high_regret_rate,
+        source_inner_top1=selection.source_inner_top1,
+        source_inner_spearman=selection.source_inner_spearman,
+        source_inner_std_oracle_gap_pct=selection.source_inner_std_oracle_gap_pct,
+        source_inner_std_top1=selection.source_inner_std_top1,
+        source_inner_max_minus_min_oracle_gap_pct=selection.source_inner_max_minus_min_oracle_gap_pct,
+        pairwise_near_tie_drop_rate=selection.pairwise_near_tie_drop_rate,
+        pairwise_train_pairs_after_filter=selection.pairwise_train_pairs_after_filter,
+        pairwise_validation_pairs_after_filter=selection.pairwise_validation_pairs_after_filter,
+        pairwise_train_domains_after_filter=selection.pairwise_train_domains_after_filter,
+    )
 
 
 def _infer_experts_per_sample(s_train: np.ndarray) -> int:
@@ -170,6 +209,338 @@ def _fit_pairwise_variant_predictions(
         ranker.fit(x_tr_variant, train_pairs)
         predictions[method_name] = ranker.predict(x_te_variant)
     return predictions
+
+
+def _hard_gap_pct_for_score_matrix(
+    *,
+    fold: FoldCandidateSet,
+    query_domains: np.ndarray,
+    expert_domains: Sequence[int],
+    score_matrix: np.ndarray,
+    true_nelbo_matrix: np.ndarray,
+    global_true_nelbo_matrix: np.ndarray,
+    global_expert_domains: Sequence[int],
+    tournament_cfg: PairwiseTournamentConfig,
+    base_method: str,
+) -> np.ndarray:
+    rows = tournament_route_rows(
+        method="pairwise_tournament_hard",
+        fold=fold,
+        query_domains=query_domains,
+        expert_domains=expert_domains,
+        score_matrix=score_matrix,
+        true_nelbo_matrix=true_nelbo_matrix,
+        global_true_nelbo_matrix=global_true_nelbo_matrix,
+        global_expert_domains=global_expert_domains,
+        policy_name=tournament_cfg.policy_name,
+        base_method=str(base_method),
+        threshold=0.0,
+        topk=1,
+        temperature=float(tournament_cfg.score_temperature),
+        temperature_policy=tournament_cfg.temperature_policy,
+        selected_by_inner_validation=False,
+        threshold_selection_policy=tournament_cfg.calibration_policy,
+    )
+    return np.asarray([float(r["oracle_gap_pct"]) for r in rows], dtype=np.float64)
+
+
+def _fit_pairprob_bundle_from_rows(
+    *,
+    x_rows: np.ndarray,
+    q_rows: np.ndarray,
+    e_rows: np.ndarray,
+    s_rows: np.ndarray,
+    y_rows: np.ndarray,
+    feature_set: str,
+    ridge_l2: float,
+    tournament_cfg: PairwiseTournamentConfig,
+    embedding_feature_dim: int,
+    expert_feature_dim: int,
+    device: str,
+) -> Tuple[PairprobModelBundle | None, Dict[str, float], str]:
+    cfg = tournament_cfg.pairprob_tournament
+    train_data = build_pairprob_training_data(
+        x_rows=x_rows,
+        q_rows=q_rows,
+        e_rows=e_rows,
+        s_rows=s_rows,
+        y_rows=y_rows,
+        embedding_dim=int(embedding_feature_dim),
+        expert_feature_dim=int(expert_feature_dim),
+        feature_set=str(feature_set),
+        near_tie_delta_pct=float(cfg.near_tie_delta_pct),
+        margin_weight_scale_pct=float(cfg.margin_weight_scale_pct),
+        margin_weight_clip=cfg.margin_weight_clip,
+    )
+    reason = pairprob_evidence_reason(
+        train_data=train_data,
+        validation_data=None,
+        validation_domains=max(1, len(train_data.kept_by_domain)),
+        cfg=cfg,
+    )
+    total_pairs = max(int(train_data.total_pairs), 1)
+    evidence = {
+        "pairwise_near_tie_drop_rate": float(train_data.dropped_near_tie / total_pairs),
+        "pairwise_train_pairs_after_filter": float(train_data.x.shape[0]),
+        "pairwise_validation_pairs_after_filter": 0.0,
+        "pairwise_train_domains_after_filter": float(len(train_data.kept_by_domain)),
+        "diagnostic_only_reason": str(reason),
+    }
+    if train_data.x.shape[0] <= 0:
+        return None, evidence, reason or "insufficient_pairwise_evidence"
+    bundle = fit_pairprob_model(
+        train_data=train_data,
+        feature_set=str(feature_set),
+        ridge_l2=float(ridge_l2),
+        device=str(device),
+    )
+    return bundle, evidence, reason
+
+
+def _calibrate_pairprob_tournament(
+    *,
+    embeddings: np.ndarray,
+    sample_domains: np.ndarray,
+    true_nelbo: np.ndarray,
+    expert_domains: Sequence[int],
+    domain_to_idx: Dict[int, int],
+    train_idx: np.ndarray,
+    outer_heldout_domain: int,
+    pairwise_cfg: Dict[str, Any],
+    tournament_cfg: PairwiseTournamentConfig,
+    include_metadata_features: bool,
+    seed: int,
+    embedding_feature_dim: int,
+    expert_feature_dim: int,
+    global_expert_domains: Sequence[int],
+) -> Tuple[PairprobPolicySelection | None, PairprobPolicySelection | None, PairprobPolicySelection | None]:
+    cfg = tournament_cfg.pairprob_tournament
+    source_domains = sorted(set(int(sample_domains[int(i)]) for i in np.asarray(train_idx, dtype=np.int64).tolist()))
+    if len(source_domains) < int(cfg.min_source_inner_validation_domains):
+        return None, None, None
+
+    rows_by_key: Dict[Tuple[str, str, float], List[Dict[str, Any]]] = {}
+    evidence_by_key: Dict[Tuple[str, str, float], Dict[str, float]] = {}
+    validation_domains_by_key: Dict[Tuple[str, str, float], set[int]] = {}
+    feature_sets = [str(cfg.adoption_feature_set), *[str(v) for v in cfg.diagnostic_feature_sets]]
+    device = str(pairwise_cfg.get("device", "auto"))
+
+    for validation_domain in source_domains:
+        train_idx_arr = np.asarray(train_idx, dtype=np.int64)
+        inner_train_idx = train_idx_arr[sample_domains[train_idx_arr] != int(validation_domain)]
+        validation_idx = train_idx_arr[sample_domains[train_idx_arr] == int(validation_domain)]
+        if inner_train_idx.size == 0 or validation_idx.size == 0:
+            continue
+        try:
+            x_inner, q_inner, e_inner, s_inner = _build_fold_training_pair_features(
+                sample_embeddings=embeddings,
+                sample_domains=sample_domains,
+                train_indices=inner_train_idx,
+                expert_domains=expert_domains,
+                outer_heldout_domain=int(outer_heldout_domain),
+                include_metadata_features=include_metadata_features,
+                extra_excluded_domains=[int(validation_domain)],
+            )
+            validation_fold = FoldCandidateSet.for_heldout_domain(
+                heldout_domain=int(outer_heldout_domain),
+                expert_domains=expert_domains,
+                excluded_domains=[int(validation_domain)],
+            )
+            x_val, q_val, e_val, s_val = _build_pair_features(
+                sample_embeddings=embeddings,
+                sample_domains=sample_domains,
+                sample_indices=validation_idx,
+                expert_domains=validation_fold.candidate_expert_domains,
+                expert_id_domains=expert_domains,
+                include_metadata_features=include_metadata_features,
+            )
+        except ProtocolError:
+            continue
+
+        y_inner = true_nelbo[s_inner, [domain_to_idx[int(ed)] for ed in e_inner]]
+        y_val = true_nelbo[s_val, [domain_to_idx[int(ed)] for ed in e_val]]
+        val_n = int(validation_idx.size)
+        e_n = len(validation_fold.candidate_expert_domains)
+        true_matrix = y_val.reshape(val_n, e_n)
+        global_eval = true_nelbo[np.asarray(validation_idx, dtype=np.int64)]
+
+        pred_by_method = _fit_pairwise_variant_predictions(
+            x_train=x_inner,
+            x_test=x_val,
+            q_train=q_inner,
+            e_train=e_inner,
+            s_train=s_inner,
+            q_test=q_val,
+            e_test=e_val,
+            sample_domains=sample_domains,
+            y_train=y_inner,
+            pairwise_cfg=pairwise_cfg,
+            seed=int(seed) + int(validation_domain),
+            heldout_domain=int(outer_heldout_domain),
+            embedding_feature_dim=embedding_feature_dim,
+            expert_feature_dim=expert_feature_dim,
+        )
+        hard_gap = np.full((val_n,), float("nan"), dtype=np.float64)
+        hard_base = "pairwise_ranker_latent_only"
+        if hard_base in pred_by_method:
+            hard_gap = _hard_gap_pct_for_score_matrix(
+                fold=validation_fold,
+                query_domains=sample_domains[validation_idx],
+                expert_domains=validation_fold.candidate_expert_domains,
+                score_matrix=pred_by_method[hard_base].reshape(val_n, e_n),
+                true_nelbo_matrix=true_matrix,
+                global_true_nelbo_matrix=global_eval,
+                global_expert_domains=global_expert_domains,
+                tournament_cfg=tournament_cfg,
+                base_method=hard_base,
+            )
+
+        for feature_set in feature_sets:
+            train_data = build_pairprob_training_data(
+                x_rows=x_inner,
+                q_rows=q_inner,
+                e_rows=e_inner,
+                s_rows=s_inner,
+                y_rows=y_inner,
+                embedding_dim=int(embedding_feature_dim),
+                expert_feature_dim=int(expert_feature_dim),
+                feature_set=str(feature_set),
+                near_tie_delta_pct=float(cfg.near_tie_delta_pct),
+                margin_weight_scale_pct=float(cfg.margin_weight_scale_pct),
+                margin_weight_clip=cfg.margin_weight_clip,
+            )
+            val_data = build_pairprob_training_data(
+                x_rows=x_val,
+                q_rows=q_val,
+                e_rows=e_val,
+                s_rows=s_val,
+                y_rows=y_val,
+                embedding_dim=int(embedding_feature_dim),
+                expert_feature_dim=int(expert_feature_dim),
+                feature_set=str(feature_set),
+                near_tie_delta_pct=float(cfg.near_tie_delta_pct),
+                margin_weight_scale_pct=float(cfg.margin_weight_scale_pct),
+                margin_weight_clip=cfg.margin_weight_clip,
+            )
+            evidence_reason = pairprob_evidence_reason(
+                train_data=train_data,
+                validation_data=val_data,
+                validation_domains=cfg.min_source_inner_validation_domains,
+                cfg=cfg,
+            )
+            if train_data.x.shape[0] <= 0:
+                continue
+            for l2 in cfg.ridge_l2_values:
+                bundle = fit_pairprob_model(
+                    train_data=train_data,
+                    feature_set=str(feature_set),
+                    ridge_l2=float(l2),
+                    device=device,
+                )
+                prob = pairprob_probability_matrix(
+                    bundle=bundle,
+                    x_rows=x_val,
+                    expert_domains=validation_fold.candidate_expert_domains,
+                    embedding_dim=int(embedding_feature_dim),
+                    expert_feature_dim=int(expert_feature_dim),
+                )
+                method_names = (
+                    [cfg.direct_method, cfg.group_robust_method]
+                    if str(feature_set) == str(cfg.adoption_feature_set)
+                    else [cfg.combined_diagnostic_method]
+                )
+                for method_name in method_names:
+                    key = (str(method_name), str(feature_set), float(l2))
+                    total_pairs = max(int(train_data.total_pairs), 1)
+                    ev = evidence_by_key.setdefault(
+                        key,
+                        {
+                            "pairwise_near_tie_drop_rate_num": 0.0,
+                            "pairwise_near_tie_drop_rate_den": 0.0,
+                            "pairwise_train_pairs_after_filter": 0.0,
+                            "pairwise_validation_pairs_after_filter": 0.0,
+                            "pairwise_train_domains_after_filter": 0.0,
+                            "diagnostic_only_reason": "",
+                        },
+                    )
+                    ev["pairwise_near_tie_drop_rate_num"] += float(train_data.dropped_near_tie)
+                    ev["pairwise_near_tie_drop_rate_den"] += float(total_pairs)
+                    ev["pairwise_train_pairs_after_filter"] += float(train_data.x.shape[0])
+                    ev["pairwise_validation_pairs_after_filter"] += float(val_data.x.shape[0])
+                    ev["pairwise_train_domains_after_filter"] = max(
+                        float(ev["pairwise_train_domains_after_filter"]),
+                        float(len(train_data.kept_by_domain)),
+                    )
+                    if evidence_reason:
+                        ev["diagnostic_only_reason"] = str(evidence_reason)
+                    validation_domains_by_key.setdefault(key, set()).add(int(validation_domain))
+                    selection = PairprobPolicySelection(
+                        method=str(method_name),
+                        feature_set=str(feature_set),
+                        ridge_l2=float(l2),
+                        selected_by_inner_validation=True,
+                        diagnostic_only_reason=str(evidence_reason),
+                    )
+                    rows = pairprob_route_rows(
+                        method=str(method_name),
+                        fold=validation_fold,
+                        query_domains=sample_domains[validation_idx],
+                        expert_domains=validation_fold.candidate_expert_domains,
+                        prob_matrix=prob,
+                        true_nelbo_matrix=true_matrix,
+                        global_true_nelbo_matrix=global_eval,
+                        global_expert_domains=global_expert_domains,
+                        policy_name=cfg.policy_name,
+                        selection=selection,
+                        hard_oracle_gap_pct=hard_gap,
+                        diagnostic_only_reason=(
+                            "diagnostic_only_combined_metadata_features"
+                            if str(method_name) == str(cfg.combined_diagnostic_method)
+                            else str(evidence_reason)
+                        ),
+                        absolute_high_regret_gap_pct=float(cfg.absolute_high_regret_gap_pct),
+                        catastrophic_regression_vs_hard_gap_pct=float(
+                            cfg.catastrophic_regression_vs_hard_gap_pct
+                        ),
+                    )
+                    rows_by_key.setdefault(key, []).extend(rows)
+
+    cleaned_evidence: Dict[Tuple[str, str, float], Dict[str, float]] = {}
+    for key, ev in evidence_by_key.items():
+        den = max(float(ev.pop("pairwise_near_tie_drop_rate_den", 0.0)), 1.0)
+        num = float(ev.pop("pairwise_near_tie_drop_rate_num", 0.0))
+        ev["pairwise_near_tie_drop_rate"] = float(num / den)
+        if len(validation_domains_by_key.get(key, set())) < int(cfg.min_source_inner_validation_domains):
+            ev["diagnostic_only_reason"] = "insufficient_pairwise_evidence"
+        cleaned_evidence[key] = ev
+
+    direct = select_pairprob_policy(
+        rows_by_key=rows_by_key,
+        method=cfg.direct_method,
+        cfg=cfg,
+        selection_mode="direct",
+        evidence_by_key=cleaned_evidence,
+    )
+    group = select_pairprob_policy(
+        rows_by_key=rows_by_key,
+        method=cfg.group_robust_method,
+        cfg=cfg,
+        selection_mode="group_robust",
+        evidence_by_key=cleaned_evidence,
+    )
+    combined = select_pairprob_policy(
+        rows_by_key=rows_by_key,
+        method=cfg.combined_diagnostic_method,
+        cfg=cfg,
+        selection_mode="group_robust",
+        evidence_by_key=cleaned_evidence,
+    )
+    if combined is not None:
+        combined = _copy_pairprob_selection_with_reason(
+            combined,
+            diagnostic_only_reason="diagnostic_only_combined_metadata_features",
+        )
+    return direct, group, combined
 
 
 def _calibrate_pairwise_tournament(
@@ -559,6 +930,105 @@ def _calibrate_delta_gate_tournament(
         )
 
     return adoption, diagnostic
+
+
+def _run_pairprob_tournament_for_fold(
+    *,
+    x_train: np.ndarray,
+    q_train: np.ndarray,
+    e_train: np.ndarray,
+    s_train: np.ndarray,
+    y_train: np.ndarray,
+    x_test: np.ndarray,
+    query_domains: np.ndarray,
+    fold: FoldCandidateSet,
+    true_matrix: np.ndarray,
+    global_eval: np.ndarray,
+    expert_domains: Sequence[int],
+    global_expert_domains: Sequence[int],
+    selections: Sequence[PairprobPolicySelection | None],
+    tournament_cfg: PairwiseTournamentConfig,
+    pairwise_cfg: Dict[str, Any],
+    embedding_feature_dim: int,
+    expert_feature_dim: int,
+    hard_oracle_gap_pct: np.ndarray | None,
+) -> List[Dict[str, Any]]:
+    cfg = tournament_cfg.pairprob_tournament
+    rows: List[Dict[str, Any]] = []
+    device = str(pairwise_cfg.get("device", "auto"))
+    for selection in selections:
+        if selection is None:
+            continue
+        bundle, evidence, final_reason = _fit_pairprob_bundle_from_rows(
+            x_rows=x_train,
+            q_rows=q_train,
+            e_rows=e_train,
+            s_rows=s_train,
+            y_rows=y_train,
+            feature_set=str(selection.feature_set),
+            ridge_l2=float(selection.ridge_l2),
+            tournament_cfg=tournament_cfg,
+            embedding_feature_dim=int(embedding_feature_dim),
+            expert_feature_dim=int(expert_feature_dim),
+            device=device,
+        )
+        if bundle is None:
+            continue
+        reason_parts = [
+            str(selection.diagnostic_only_reason),
+            str(final_reason),
+        ]
+        if str(selection.method) == str(cfg.combined_diagnostic_method):
+            reason_parts.append("diagnostic_only_combined_metadata_features")
+        reason = "|".join(part for part in dict.fromkeys(reason_parts) if part)
+        selection_for_eval = PairprobPolicySelection(
+            method=selection.method,
+            feature_set=selection.feature_set,
+            ridge_l2=selection.ridge_l2,
+            selected_by_inner_validation=selection.selected_by_inner_validation,
+            diagnostic_only_reason=str(reason),
+            source_inner_validation_domains=selection.source_inner_validation_domains,
+            source_inner_rows=selection.source_inner_rows,
+            source_inner_mean_oracle_gap_pct=selection.source_inner_mean_oracle_gap_pct,
+            source_inner_worst_domain_oracle_gap_pct=selection.source_inner_worst_domain_oracle_gap_pct,
+            source_inner_relative_catastrophic_rate=selection.source_inner_relative_catastrophic_rate,
+            source_inner_absolute_high_regret_rate=selection.source_inner_absolute_high_regret_rate,
+            source_inner_top1=selection.source_inner_top1,
+            source_inner_spearman=selection.source_inner_spearman,
+            source_inner_std_oracle_gap_pct=selection.source_inner_std_oracle_gap_pct,
+            source_inner_std_top1=selection.source_inner_std_top1,
+            source_inner_max_minus_min_oracle_gap_pct=selection.source_inner_max_minus_min_oracle_gap_pct,
+            pairwise_near_tie_drop_rate=float(evidence.get("pairwise_near_tie_drop_rate", selection.pairwise_near_tie_drop_rate)),
+            pairwise_train_pairs_after_filter=int(evidence.get("pairwise_train_pairs_after_filter", selection.pairwise_train_pairs_after_filter)),
+            pairwise_validation_pairs_after_filter=int(selection.pairwise_validation_pairs_after_filter),
+            pairwise_train_domains_after_filter=int(evidence.get("pairwise_train_domains_after_filter", selection.pairwise_train_domains_after_filter)),
+        )
+        prob = pairprob_probability_matrix(
+            bundle=bundle,
+            x_rows=x_test,
+            expert_domains=fold.candidate_expert_domains,
+            embedding_dim=int(embedding_feature_dim),
+            expert_feature_dim=int(expert_feature_dim),
+        )
+        rows.extend(
+            pairprob_route_rows(
+                method=str(selection.method),
+                fold=fold,
+                query_domains=query_domains,
+                expert_domains=fold.candidate_expert_domains,
+                prob_matrix=prob,
+                true_nelbo_matrix=true_matrix,
+                global_true_nelbo_matrix=global_eval,
+                global_expert_domains=global_expert_domains,
+                policy_name=cfg.policy_name,
+                selection=selection_for_eval,
+                hard_oracle_gap_pct=hard_oracle_gap_pct,
+                diagnostic_only_reason=str(reason),
+                absolute_high_regret_gap_pct=float(cfg.absolute_high_regret_gap_pct),
+                catastrophic_regression_vs_hard_gap_pct=float(cfg.catastrophic_regression_vs_hard_gap_pct),
+            )
+        )
+    return rows
 
 
 def _run_learned_methods_for_fold(
@@ -1005,6 +1475,62 @@ def _run_learned_methods_for_fold(
                         temperature_policy=tournament_cfg.temperature_policy,
                     )
                 )
+
+        if bool(tournament_cfg.pairprob_tournament.enabled):
+            pairprob_hard_base = (
+                "pairwise_ranker_latent_only"
+                if "pairwise_ranker_latent_only" in pairwise_pred_matrices
+                else next(iter(sorted(pairwise_pred_matrices)))
+            )
+            pairprob_hard_gap = _hard_gap_pct_for_score_matrix(
+                fold=fold,
+                query_domains=sample_domains[test_idx],
+                expert_domains=fold.candidate_expert_domains,
+                score_matrix=pairwise_pred_matrices[pairprob_hard_base],
+                true_nelbo_matrix=true_matrix_for_tournament,
+                global_true_nelbo_matrix=global_eval,
+                global_expert_domains=expert_domains,
+                tournament_cfg=tournament_cfg,
+                base_method=pairprob_hard_base,
+            )
+            direct_selection, group_selection, combined_selection = _calibrate_pairprob_tournament(
+                embeddings=embeddings,
+                sample_domains=sample_domains,
+                true_nelbo=true_nelbo,
+                expert_domains=expert_domains,
+                domain_to_idx=domain_to_idx,
+                train_idx=train_idx,
+                outer_heldout_domain=int(fold.heldout_domain),
+                pairwise_cfg=pairwise_cfg,
+                tournament_cfg=tournament_cfg,
+                include_metadata_features=include_metadata_features,
+                seed=int(seed),
+                embedding_feature_dim=embedding_feature_dim,
+                expert_feature_dim=expert_feature_dim,
+                global_expert_domains=expert_domains,
+            )
+            sample_rows.extend(
+                _run_pairprob_tournament_for_fold(
+                    x_train=x_train,
+                    q_train=q_train,
+                    e_train=e_train,
+                    s_train=s_train,
+                    y_train=y_train,
+                    x_test=x_test,
+                    query_domains=sample_domains[test_idx],
+                    fold=fold,
+                    true_matrix=true_matrix_for_tournament,
+                    global_eval=global_eval,
+                    expert_domains=fold.candidate_expert_domains,
+                    global_expert_domains=expert_domains,
+                    selections=[direct_selection, group_selection, combined_selection],
+                    tournament_cfg=tournament_cfg,
+                    pairwise_cfg=pairwise_cfg,
+                    embedding_feature_dim=embedding_feature_dim,
+                    expert_feature_dim=expert_feature_dim,
+                    hard_oracle_gap_pct=pairprob_hard_gap,
+                )
+            )
 
     return LearnedFoldOutputs(
         sample_rows=sample_rows,

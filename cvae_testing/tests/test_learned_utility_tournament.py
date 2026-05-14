@@ -10,8 +10,18 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.eval.evaluators.learned_utility_config import FallbackBenefitGateConfig
+from src.eval.evaluators.learned_utility_config import FallbackBenefitGateConfig, PairprobTournamentConfig
+from src.eval.evaluators.learned_utility_models import _LogisticRidgePairprob
 from src.eval.evaluators.learned_utility_pairs import _build_fold_training_pair_features
+from src.eval.evaluators.learned_utility_pairprob import (
+    PairprobPolicySelection,
+    build_pairprob_training_data,
+    fit_pairprob_model,
+    pairprob_feature_names,
+    pairprob_probability_matrix,
+    pairprob_route_rows,
+    select_pairprob_policy,
+)
 from src.eval.evaluators import learned_utility as lu
 from src.eval.evaluators.learned_utility_protocol import (
     FoldCandidateSet,
@@ -55,6 +65,33 @@ def _gate_cfg(**overrides: object) -> FallbackBenefitGateConfig:
     return FallbackBenefitGateConfig(**values)
 
 
+def _pairprob_cfg(**overrides: object) -> PairprobTournamentConfig:
+    values = {
+        "enabled": True,
+        "policy_name": "pairwise_group_robust_pairprob_tournament_v1",
+        "predictor": "logistic_ridge_pairprob",
+        "ridge_l2_values": (1.0e-3,),
+        "probability_calibration": "none_v1",
+        "adoption_feature_set": "pairprob_latent_only_v1",
+        "diagnostic_feature_sets": ("pairprob_combined_diagnostic_v1",),
+        "direct_method": "pairwise_direct_pairprob_tournament_v1",
+        "group_robust_method": "pairwise_group_robust_pairprob_tournament_v1",
+        "combined_diagnostic_method": "pairwise_pairprob_combined_diagnostic_v1",
+        "near_tie_delta_pct": 0.5,
+        "margin_weight_scale_pct": 5.0,
+        "margin_weight_clip": (0.25, 3.0),
+        "min_pairwise_train_pairs": 1,
+        "min_pairwise_validation_pairs": 1,
+        "min_source_inner_validation_domains": 1,
+        "min_non_tie_pairs_per_inner_domain": 1,
+        "absolute_high_regret_gap_pct": 5.0,
+        "catastrophic_regression_vs_hard_gap_pct": 5.0,
+        "selection_policy": "source_inner_group_robust_worst_gap_then_catastrophic_then_mean_gap_v1",
+    }
+    values.update(overrides)
+    return PairprobTournamentConfig(**values)
+
+
 def test_tournament_win_scores_exclude_self_comparisons() -> None:
     scores = np.asarray([[0.0, 1.0, 2.0]], dtype=np.float64)
     wins = tournament_win_scores(scores, temperature=1.0)
@@ -72,6 +109,222 @@ def test_tournament_win_scores_exclude_self_comparisons() -> None:
     assert np.isclose(wins[0, 0], expected_best)
     assert np.isclose(wins[0, 1], expected_middle)
     assert wins[0, 0] > wins[0, 1] > wins[0, 2]
+
+
+def test_logistic_pairprob_model_outputs_probabilities() -> None:
+    model = _LogisticRidgePairprob(l2=1.0e-3, max_iter=20, device="cpu")
+    x = np.asarray([[0.0], [1.0], [2.0], [3.0]], dtype=np.float64)
+    y = np.asarray([0.0, 0.0, 1.0, 1.0], dtype=np.float64)
+    model.fit(x, y, np.ones_like(y))
+    p = model.predict_proba(x)
+
+    assert p.shape == (4,)
+    assert np.all(p >= 0.0)
+    assert np.all(p <= 1.0)
+
+
+def test_pairprob_training_data_filters_near_ties_and_clips_weights() -> None:
+    # Two samples, three experts per sample. The first pair in sample 0 is a near tie.
+    x_rows = np.asarray(
+        [
+            [1.0, 0.0, 1.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0, 1.0, 0.0],
+            [1.0, 0.0, 0.0, 0.0, 1.0],
+            [0.0, 1.0, 1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
+    q = np.asarray([10, 10, 10, 20, 20, 20], dtype=np.int64)
+    e = np.asarray([1, 2, 3, 1, 2, 3], dtype=np.int64)
+    s = np.asarray([0, 0, 0, 1, 1, 1], dtype=np.int64)
+    y = np.asarray([100.0, 100.1, 130.0, 90.0, 120.0, 300.0], dtype=np.float64)
+
+    data = build_pairprob_training_data(
+        x_rows=x_rows,
+        q_rows=q,
+        e_rows=e,
+        s_rows=s,
+        y_rows=y,
+        embedding_dim=2,
+        expert_feature_dim=3,
+        feature_set="pairprob_latent_only_v1",
+        near_tie_delta_pct=0.5,
+        margin_weight_scale_pct=5.0,
+        margin_weight_clip=(0.25, 3.0),
+    )
+
+    assert data.total_pairs == 6
+    assert data.dropped_near_tie == 1
+    assert data.x.shape[0] == 5
+    assert np.all(data.weight >= 0.25)
+    assert np.all(data.weight <= 3.0)
+    assert set(data.kept_by_domain) == {10, 20}
+
+
+def test_pairprob_feature_sets_preserve_metadata_free_adoption_boundary() -> None:
+    latent = pairprob_feature_names(
+        "pairprob_latent_only_v1",
+        embedding_dim=2,
+        expert_feature_dim=3,
+        metadata_dim=4,
+    )
+    combined = pairprob_feature_names(
+        "pairprob_combined_diagnostic_v1",
+        embedding_dim=2,
+        expert_feature_dim=3,
+        metadata_dim=4,
+    )
+    combined_protocol = _method_protocol("pairwise_pairprob_combined_diagnostic_v1")
+
+    assert not any("metadata" in name for name in latent)
+    assert any("metadata" in name for name in combined)
+    assert combined_protocol.adoption_eligible == 0
+    assert combined_protocol.diagnostic_only == 1
+
+
+def test_pairprob_canonical_orientation_enforces_reverse_complement() -> None:
+    x_rows = np.asarray(
+        [
+            [1.0, 0.0, 1.0, 0.0],
+            [1.0, 0.0, 0.0, 1.0],
+            [0.0, 1.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
+    q = np.asarray([10, 10, 20, 20], dtype=np.int64)
+    e = np.asarray([1, 2, 1, 2], dtype=np.int64)
+    s = np.asarray([0, 0, 1, 1], dtype=np.int64)
+    y = np.asarray([1.0, 3.0, 3.0, 1.0], dtype=np.float64)
+    train = build_pairprob_training_data(
+        x_rows=x_rows,
+        q_rows=q,
+        e_rows=e,
+        s_rows=s,
+        y_rows=y,
+        embedding_dim=2,
+        expert_feature_dim=2,
+        feature_set="pairprob_latent_only_v1",
+        near_tie_delta_pct=0.0,
+        margin_weight_scale_pct=5.0,
+        margin_weight_clip=(0.25, 3.0),
+    )
+    bundle = fit_pairprob_model(
+        train_data=train,
+        feature_set="pairprob_latent_only_v1",
+        ridge_l2=1.0e-3,
+        device="cpu",
+    )
+
+    probs = pairprob_probability_matrix(
+        bundle=bundle,
+        x_rows=x_rows,
+        expert_domains=[1, 2],
+        embedding_dim=2,
+        expert_feature_dim=2,
+    )
+
+    assert probs.shape == (2, 2, 2)
+    assert np.allclose(probs[:, 0, 1] + probs[:, 1, 0], 1.0)
+    assert np.allclose(np.diagonal(probs, axis1=1, axis2=2), 0.5)
+
+
+def test_pairprob_route_rows_use_win_tournament_and_cycle_na_for_two_candidates() -> None:
+    fold = FoldCandidateSet.for_heldout_domain(heldout_domain=0, expert_domains=[0, 1, 2])
+    prob = np.asarray([[[0.5, 0.8], [0.2, 0.5]]], dtype=np.float64)
+    true = np.asarray([[10.0, 20.0]], dtype=np.float64)
+    selection = PairprobPolicySelection(
+        method="pairwise_group_robust_pairprob_tournament_v1",
+        feature_set="pairprob_latent_only_v1",
+        ridge_l2=1.0e-3,
+        selected_by_inner_validation=True,
+    )
+
+    rows = pairprob_route_rows(
+        method="pairwise_group_robust_pairprob_tournament_v1",
+        fold=fold,
+        query_domains=np.asarray([0], dtype=np.int64),
+        expert_domains=fold.candidate_expert_domains,
+        prob_matrix=prob,
+        true_nelbo_matrix=true,
+        global_true_nelbo_matrix=np.asarray([[5.0, 10.0, 20.0]], dtype=np.float64),
+        global_expert_domains=[0, 1, 2],
+        policy_name="pairwise_group_robust_pairprob_tournament_v1",
+        selection=selection,
+        hard_oracle_gap_pct=np.asarray([0.0], dtype=np.float64),
+    )
+
+    row = rows[0]
+    assert row["selected_expert"] == 1
+    assert row["route_experts"] == "1"
+    assert np.isclose(row["pairprob_win_top1"], 0.8)
+    assert np.isnan(row["pairwise_cycle_rate"])
+
+
+def test_pairprob_group_robust_selection_prioritizes_worst_domain_gap() -> None:
+    cfg = _pairprob_cfg()
+    key_a = ("pairwise_group_robust_pairprob_tournament_v1", "pairprob_latent_only_v1", 1.0e-4)
+    key_b = ("pairwise_group_robust_pairprob_tournament_v1", "pairprob_latent_only_v1", 1.0e-3)
+    base = {
+        "spearman": 0.5,
+        "top1_oracle_hit": 1,
+        "relative_catastrophic_regression_vs_hard_gt_5": 0,
+        "absolute_high_regret_gap_gt_5": 0,
+    }
+    rows_by_key = {
+        key_a: [
+            {**base, "query_domain": 1, "oracle_gap_pct": 1.0},
+            {**base, "query_domain": 2, "oracle_gap_pct": 10.0},
+        ],
+        key_b: [
+            {**base, "query_domain": 1, "oracle_gap_pct": 4.0},
+            {**base, "query_domain": 2, "oracle_gap_pct": 4.0},
+        ],
+    }
+
+    selected = select_pairprob_policy(
+        rows_by_key=rows_by_key,
+        method="pairwise_group_robust_pairprob_tournament_v1",
+        cfg=cfg,
+        selection_mode="group_robust",
+        evidence_by_key={
+            key_a: {"pairwise_train_pairs_after_filter": 20},
+            key_b: {"pairwise_train_pairs_after_filter": 20},
+        },
+    )
+
+    assert selected is not None
+    assert np.isclose(selected.ridge_l2, 1.0e-3)
+
+
+def test_pairprob_evidence_guard_demotes_insufficient_validation_domains() -> None:
+    cfg = _pairprob_cfg(min_source_inner_validation_domains=2)
+    key = ("pairwise_group_robust_pairprob_tournament_v1", "pairprob_latent_only_v1", 1.0e-4)
+    rows_by_key = {
+        key: [
+            {
+                "query_domain": 1,
+                "oracle_gap_pct": 1.0,
+                "spearman": 1.0,
+                "top1_oracle_hit": 1,
+                "relative_catastrophic_regression_vs_hard_gt_5": 0,
+                "absolute_high_regret_gap_gt_5": 0,
+            }
+        ]
+    }
+
+    selected = select_pairprob_policy(
+        rows_by_key=rows_by_key,
+        method="pairwise_group_robust_pairprob_tournament_v1",
+        cfg=cfg,
+        selection_mode="group_robust",
+        evidence_by_key={key: {"pairwise_train_pairs_after_filter": 20}},
+    )
+
+    assert selected is not None
+    assert selected.diagnostic_only_reason == "insufficient_pairwise_evidence"
 
 
 def test_sparse_mix_rows_use_uniform_expected_nelbo_and_strict_top1() -> None:
@@ -355,10 +608,23 @@ def test_source_inner_training_features_exclude_outer_and_inner_validation_exper
 def test_pairwise_tournament_protocol_flags() -> None:
     learned = _method_protocol("pairwise_tournament_inner_selected")
     oracle = _method_protocol("oracle_confidence_set_diagnostic")
+    group_pairprob = _method_protocol("pairwise_group_robust_pairprob_tournament_v1")
+    direct_pairprob = _method_protocol("pairwise_direct_pairprob_tournament_v1")
+    combined_pairprob = _method_protocol("pairwise_pairprob_combined_diagnostic_v1")
 
     assert learned.method_role == "learned"
     assert learned.adoption_eligible == 1
     assert learned.routing_uses_eval_nelbo == 0
+    assert group_pairprob.method_role == "learned"
+    assert group_pairprob.adoption_eligible == 1
+    assert group_pairprob.diagnostic_only == 0
+    assert group_pairprob.routing_uses_eval_nelbo == 0
+    assert direct_pairprob.method_role == "diagnostic"
+    assert direct_pairprob.adoption_eligible == 0
+    assert direct_pairprob.diagnostic_only == 1
+    assert combined_pairprob.method_role == "diagnostic"
+    assert combined_pairprob.adoption_eligible == 0
+    assert combined_pairprob.diagnostic_only == 1
     assert oracle.method_role == "diagnostic"
     assert oracle.adoption_eligible == 0
     assert oracle.diagnostic_only == 1

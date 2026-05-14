@@ -105,6 +105,31 @@ class PairwiseTournamentConfig:
     calibration_policy: str
     max_sparse_mix_activation_rate: float
     fallback_benefit_gate: FallbackBenefitGateConfig
+    pairprob_tournament: "PairprobTournamentConfig"
+
+
+@dataclass(frozen=True)
+class PairprobTournamentConfig:
+    enabled: bool
+    policy_name: str
+    predictor: str
+    ridge_l2_values: Tuple[float, ...]
+    probability_calibration: str
+    adoption_feature_set: str
+    diagnostic_feature_sets: Tuple[str, ...]
+    direct_method: str
+    group_robust_method: str
+    combined_diagnostic_method: str
+    near_tie_delta_pct: float
+    margin_weight_scale_pct: float
+    margin_weight_clip: Tuple[float, float]
+    min_pairwise_train_pairs: int
+    min_pairwise_validation_pairs: int
+    min_source_inner_validation_domains: int
+    min_non_tie_pairs_per_inner_domain: int
+    absolute_high_regret_gap_pct: float
+    catastrophic_regression_vs_hard_gap_pct: float
+    selection_policy: str
 
 
 @dataclass(frozen=True)
@@ -311,6 +336,77 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
             (fallback_gate_cfg or {}).get("min_source_inner_validation_domains", 2)
         ),
     )
+    pairprob_cfg = _as_dict(tournament_cfg.get("pairprob_tournament", {}))
+    pairprob_methods_cfg = _as_dict(pairprob_cfg.get("methods", {}))
+    margin_clip_values = tuple(
+        float(v) for v in pairprob_cfg.get("margin_weight_clip", [0.25, 3.0])
+    )
+    if len(margin_clip_values) != 2:
+        raise ValueError("learned_utility.pairwise_tournament.pairprob_tournament.margin_weight_clip must have length 2")
+    pairprob_tournament = PairprobTournamentConfig(
+        enabled=bool((pairprob_cfg or {}).get("enabled", False)),
+        policy_name=str(
+            (pairprob_cfg or {}).get(
+                "policy_name",
+                "pairwise_group_robust_pairprob_tournament_v1",
+            )
+        ),
+        predictor=str((pairprob_cfg or {}).get("predictor", "logistic_ridge_pairprob")).strip().lower(),
+        ridge_l2_values=tuple(
+            float(v) for v in (pairprob_cfg or {}).get("ridge_l2_values", [1.0e-4, 1.0e-3, 1.0e-2])
+        ),
+        probability_calibration=str(
+            (pairprob_cfg or {}).get("probability_calibration", "none_v1")
+        ).strip().lower(),
+        adoption_feature_set=str(
+            (pairprob_cfg or {}).get("adoption_feature_set", "pairprob_latent_only_v1")
+        ).strip(),
+        diagnostic_feature_sets=tuple(
+            str(v).strip()
+            for v in (pairprob_cfg or {}).get(
+                "diagnostic_feature_sets",
+                ["pairprob_combined_diagnostic_v1"],
+            )
+        ),
+        direct_method=str(
+            (pairprob_methods_cfg or {}).get("direct", "pairwise_direct_pairprob_tournament_v1")
+        ),
+        group_robust_method=str(
+            (pairprob_methods_cfg or {}).get(
+                "group_robust",
+                "pairwise_group_robust_pairprob_tournament_v1",
+            )
+        ),
+        combined_diagnostic_method=str(
+            (pairprob_methods_cfg or {}).get(
+                "combined_diagnostic",
+                "pairwise_pairprob_combined_diagnostic_v1",
+            )
+        ),
+        near_tie_delta_pct=float((pairprob_cfg or {}).get("near_tie_delta_pct", 0.5)),
+        margin_weight_scale_pct=float((pairprob_cfg or {}).get("margin_weight_scale_pct", 5.0)),
+        margin_weight_clip=(float(margin_clip_values[0]), float(margin_clip_values[1])),
+        min_pairwise_train_pairs=int((pairprob_cfg or {}).get("min_pairwise_train_pairs", 20)),
+        min_pairwise_validation_pairs=int((pairprob_cfg or {}).get("min_pairwise_validation_pairs", 10)),
+        min_source_inner_validation_domains=int(
+            (pairprob_cfg or {}).get("min_source_inner_validation_domains", 2)
+        ),
+        min_non_tie_pairs_per_inner_domain=int(
+            (pairprob_cfg or {}).get("min_non_tie_pairs_per_inner_domain", 3)
+        ),
+        absolute_high_regret_gap_pct=float(
+            (pairprob_cfg or {}).get("absolute_high_regret_gap_pct", 5.0)
+        ),
+        catastrophic_regression_vs_hard_gap_pct=float(
+            (pairprob_cfg or {}).get("catastrophic_regression_vs_hard_gap_pct", 5.0)
+        ),
+        selection_policy=str(
+            (pairprob_cfg or {}).get(
+                "selection_policy",
+                "source_inner_group_robust_worst_gap_then_catastrophic_then_mean_gap_v1",
+            )
+        ).strip().lower(),
+    )
     tournament = PairwiseTournamentConfig(
         enabled=bool((tournament_cfg or {}).get("enabled", False)),
         policy_name=str(
@@ -351,6 +447,7 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
             (tournament_cfg or {}).get("max_sparse_mix_activation_rate", 0.80)
         ),
         fallback_benefit_gate=fallback_gate,
+        pairprob_tournament=pairprob_tournament,
     )
     if tournament.enabled:
         if tournament.sparse_mix_weighting != "uniform":
@@ -386,6 +483,35 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
                 )
             if not gate.feature_set:
                 raise ValueError("learned_utility.pairwise_tournament.fallback_benefit_gate.feature_set is required")
+        if tournament.pairprob_tournament.enabled:
+            pairprob = tournament.pairprob_tournament
+            if pairprob.predictor != "logistic_ridge_pairprob":
+                raise ValueError(
+                    "learned_utility.pairwise_tournament.pairprob_tournament.predictor must be "
+                    "'logistic_ridge_pairprob'"
+                )
+            if pairprob.probability_calibration != "none_v1":
+                raise ValueError(
+                    "learned_utility.pairwise_tournament.pairprob_tournament.probability_calibration "
+                    "must be 'none_v1'"
+                )
+            if not pairprob.ridge_l2_values:
+                raise ValueError(
+                    "learned_utility.pairwise_tournament.pairprob_tournament.ridge_l2_values must be non-empty"
+                )
+            if pairprob.margin_weight_scale_pct <= 0.0:
+                raise ValueError(
+                    "learned_utility.pairwise_tournament.pairprob_tournament.margin_weight_scale_pct must be > 0"
+                )
+            if pairprob.margin_weight_clip[0] <= 0.0 or pairprob.margin_weight_clip[0] > pairprob.margin_weight_clip[1]:
+                raise ValueError(
+                    "learned_utility.pairwise_tournament.pairprob_tournament.margin_weight_clip must be positive and ordered"
+                )
+            if pairprob.adoption_feature_set != "pairprob_latent_only_v1":
+                raise ValueError(
+                    "learned_utility.pairwise_tournament.pairprob_tournament.adoption_feature_set "
+                    "must be 'pairprob_latent_only_v1'"
+                )
 
     return LearnedUtilityConfig(
         pair_batch_size=pair_batch_size,

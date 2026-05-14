@@ -16,6 +16,15 @@ _AGGREGATION_SOURCE = "learned_utility_sample_selections.csv"
 _MIN_CANDIDATES_FOR_RANK_METRICS = 2
 _SPEARMAN_NAN_POLICY = "skip"
 _PAIRWISE_AUC_NAN_POLICY = "skip"
+_DELTA_GATE_GUARD_REASON_PRIORITY = (
+    "insufficient_validation_domains",
+    "insufficient_active_rows",
+    "insufficient_active_domains",
+    "activation_rate_too_high",
+    "harm_rate_too_high",
+    "help_minus_harm_too_low",
+    "insufficient_gap_reduction",
+)
 
 
 class ProtocolError(ValueError):
@@ -228,6 +237,20 @@ def _method_protocol(method: str) -> MethodProtocol:
             diagnostic_only=1,
             routing_uses_query_features=1,
         )
+    if name == "pairwise_group_robust_pairprob_tournament_v1":
+        return MethodProtocol(
+            method_role="learned",
+            adoption_eligible=1,
+            diagnostic_only=0,
+            routing_uses_query_features=1,
+        )
+    if name in {"pairwise_direct_pairprob_tournament_v1", "pairwise_pairprob_combined_diagnostic_v1"}:
+        return MethodProtocol(
+            method_role="diagnostic",
+            adoption_eligible=0,
+            diagnostic_only=1,
+            routing_uses_query_features=1,
+        )
     if name == "oracle_confidence_set_diagnostic":
         return MethodProtocol(
             method_role="diagnostic",
@@ -314,6 +337,44 @@ def _finite_median(values: Sequence[float]) -> float:
     return float(np.median(vals)) if vals else float("nan")
 
 
+def _pipe_tokens(value: object) -> List[str]:
+    return [part.strip() for part in str(value or "").split("|") if part.strip()]
+
+
+def _join_tokens(values: Sequence[object]) -> str:
+    seen: set[str] = set()
+    out: List[str] = []
+    for value in values:
+        for token in _pipe_tokens(value):
+            if token not in seen:
+                seen.add(token)
+                out.append(token)
+    return "|".join(out)
+
+
+def _prioritized_reason(tokens: Sequence[str]) -> str:
+    token_set = {str(token) for token in tokens if str(token)}
+    for reason in _DELTA_GATE_GUARD_REASON_PRIORITY:
+        if reason in token_set:
+            return reason
+    return sorted(token_set)[0] if token_set else ""
+
+
+def _delta_gate_guard_failure_reason(method: str, rows: Sequence[Mapping[str, Any]]) -> str:
+    if "delta_gated_sparse_mix" not in str(method):
+        return ""
+    statuses = _join_tokens([row.get("delta_gate_selection_status", "") for row in rows])
+    reasons = _join_tokens([row.get("delta_gate_diagnostic_only_reason", "") for row in rows])
+    status_tokens = _pipe_tokens(statuses)
+    reason_tokens = _pipe_tokens(reasons)
+    non_selected_statuses = [status for status in status_tokens if status != "selected"]
+    if reason_tokens:
+        return _prioritized_reason(reason_tokens)
+    if non_selected_statuses:
+        return _prioritized_reason(non_selected_statuses) or "delta_gate_source_inner_guard_failed"
+    return ""
+
+
 def _validate_sample_rows_for_aggregation(rows: Sequence[Mapping[str, Any]]) -> None:
     for row in rows:
         method = str(row.get("method", ""))
@@ -375,6 +436,14 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         "predicted_fallback_delta_pct": "predicted_fallback_delta_pct",
         "hard_oracle_gap_pct": "hard_oracle_gap_pct",
         "hard_high_regret_selection": "hard_high_regret_selection",
+        "pairprob_win_top1": "pairprob_win_top1",
+        "top1_win_margin": "top1_win_margin",
+        "absolute_high_regret_gap_gt_5": "absolute_high_regret_gap_gt_5",
+        "relative_catastrophic_regression_vs_hard_gt_5": "relative_catastrophic_regression_vs_hard_gt_5",
+        "pairwise_cycle_rate": "pairwise_cycle_rate",
+        "mean_pairwise_confidence": "mean_pairwise_confidence",
+        "pairwise_calibration_brier": "pairwise_calibration_brier",
+        "pairwise_auc_helpful_preferences": "pairwise_auc_helpful_preferences",
     }
     for method, vals in sorted(by_method.items()):
         metrics: Dict[str, float] = {}
@@ -417,6 +486,16 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         metrics["heldout_paired_high_regret_reduction_vs_hard"] = float(
             metrics["micro_hard_high_regret_selection"] - metrics["micro_high_regret_selection"]
         ) if np.isfinite(metrics["micro_hard_high_regret_selection"]) else float("nan")
+        metrics["absolute_high_regret_rate_gap_gt_5"] = metrics["micro_absolute_high_regret_gap_gt_5"]
+        metrics["relative_catastrophic_regression_vs_hard_gt_5_rate"] = (
+            metrics["micro_relative_catastrophic_regression_vs_hard_gt_5"]
+        )
+        metrics["mean_pairprob_win_top1"] = metrics["micro_pairprob_win_top1"]
+        metrics["top1_win_margin"] = metrics["micro_top1_win_margin"]
+        metrics["pairwise_cycle_rate"] = metrics["micro_pairwise_cycle_rate"]
+        metrics["mean_pairwise_confidence"] = metrics["micro_mean_pairwise_confidence"]
+        metrics["pairwise_calibration_brier"] = metrics["micro_pairwise_calibration_brier"]
+        metrics["pairwise_auc_helpful_preferences"] = metrics["micro_pairwise_auc_helpful_preferences"]
 
         if any("delta_gate_active" in r for r in vals):
             active_rows = [
@@ -565,6 +644,20 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
             "delta_gate_spearman_pred_vs_true_delta_source_inner",
             "delta_gate_auc_help_vs_harm_source_inner",
             "delta_gate_diagnostic_only_reason",
+            "pairprob_predictor",
+            "pairprob_probability_calibration",
+            "pairprob_feature_set",
+            "pairprob_selection_policy",
+            "pairwise_near_tie_drop_rate",
+            "pairwise_train_pairs_after_filter",
+            "pairwise_validation_pairs_after_filter",
+            "pairwise_train_domains_after_filter",
+            "worst_inner_domain_oracle_gap_pct",
+            "relative_catastrophic_regression_vs_hard_gt_5_rate",
+            "absolute_high_regret_rate_gap_gt_5",
+            "std_oracle_gap_pct_across_inner_domains",
+            "std_top1_across_inner_domains",
+            "max_minus_min_oracle_gap_pct_across_inner_domains",
         ]:
             vals_for_key = sorted(set(str(r.get(key, "")) for r in vals if str(r.get(key, "")) != ""))
             if vals_for_key:
@@ -572,6 +665,20 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         if any("selected_by_inner_validation" in r for r in vals):
             metrics["selected_by_inner_validation"] = float(
                 max(int(float(r.get("selected_by_inner_validation", 0) or 0)) for r in vals)
+            )
+        guard_reason = _delta_gate_guard_failure_reason(method, vals)
+        metrics["delta_gate_source_inner_guard_pass"] = float(0 if guard_reason else 1)
+        if guard_reason:
+            metrics["method_role"] = "diagnostic"
+            metrics["adoption_eligible"] = 0.0
+            metrics["diagnostic_only"] = 1.0
+            existing_diagnostic_reason = str(metrics.get("diagnostic_only_reason", ""))
+            existing_gate_reason = str(metrics.get("delta_gate_diagnostic_only_reason", ""))
+            metrics["diagnostic_only_reason"] = _join_tokens(
+                [existing_diagnostic_reason, guard_reason]
+            )
+            metrics["delta_gate_diagnostic_only_reason"] = _join_tokens(
+                [existing_gate_reason, guard_reason]
             )
         out[method] = metrics
     return out
@@ -649,6 +756,30 @@ def _domain_breakdown_rows(sample_rows: Sequence[Dict[str, Any]]) -> List[Dict[s
                 ),
                 "mean_tournament_margin": _finite_mean(
                     [float(r.get("tournament_margin", float("nan"))) for r in rows]
+                ),
+                "pairprob_win_top1": _finite_mean(
+                    [float(r.get("pairprob_win_top1", float("nan"))) for r in rows]
+                ),
+                "top1_win_margin": _finite_mean(
+                    [float(r.get("top1_win_margin", float("nan"))) for r in rows]
+                ),
+                "absolute_high_regret_rate_gap_gt_5": _finite_mean(
+                    [float(r.get("absolute_high_regret_gap_gt_5", float("nan"))) for r in rows]
+                ),
+                "relative_catastrophic_regression_vs_hard_gt_5_rate": _finite_mean(
+                    [float(r.get("relative_catastrophic_regression_vs_hard_gt_5", float("nan"))) for r in rows]
+                ),
+                "pairwise_cycle_rate": _finite_mean(
+                    [float(r.get("pairwise_cycle_rate", float("nan"))) for r in rows]
+                ),
+                "mean_pairwise_confidence": _finite_mean(
+                    [float(r.get("mean_pairwise_confidence", float("nan"))) for r in rows]
+                ),
+                "pairwise_calibration_brier": _finite_mean(
+                    [float(r.get("pairwise_calibration_brier", float("nan"))) for r in rows]
+                ),
+                "pairwise_auc_helpful_preferences": _finite_mean(
+                    [float(r.get("pairwise_auc_helpful_preferences", float("nan"))) for r in rows]
                 ),
                 "delta_gate_selection_status": str(base.get("delta_gate_selection_status", "")),
                 "delta_gate_threshold": str(base.get("delta_gate_threshold", "")),

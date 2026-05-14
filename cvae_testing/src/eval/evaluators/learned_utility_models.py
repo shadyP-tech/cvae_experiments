@@ -135,3 +135,77 @@ class _PairwiseRanker:
             x_t = torch.from_numpy(x.astype(np.float32, copy=False)).to(model_device)
             pred = self.model(x_t).view(-1)
         return pred.detach().cpu().numpy().astype(np.float64, copy=False)
+
+
+@dataclass
+class _LogisticRidgePairprob:
+    l2: float = 1e-3
+    max_iter: int = 100
+    device: str = "auto"
+    w: np.ndarray | None = None
+    b: float = 0.0
+
+    def fit(self, x: np.ndarray, y: np.ndarray, sample_weight: np.ndarray | None = None) -> None:
+        if x.ndim != 2:
+            raise RuntimeError("Logistic pair-prob model requires a 2D feature matrix")
+        if int(x.shape[0]) == 0:
+            raise RuntimeError("Logistic pair-prob model received zero training rows")
+        y_arr = np.asarray(y, dtype=np.float64).reshape(-1)
+        if int(y_arr.shape[0]) != int(x.shape[0]):
+            raise RuntimeError("Logistic pair-prob labels do not match feature rows")
+        weights = (
+            np.ones((x.shape[0],), dtype=np.float64)
+            if sample_weight is None
+            else np.asarray(sample_weight, dtype=np.float64).reshape(-1)
+        )
+        if int(weights.shape[0]) != int(x.shape[0]):
+            raise RuntimeError("Logistic pair-prob weights do not match feature rows")
+
+        if self.device == "auto":
+            run_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            run_device = torch.device(self.device)
+
+        layer = torch.nn.Linear(int(x.shape[1]), 1).to(run_device)
+        torch.nn.init.zeros_(layer.weight)
+        torch.nn.init.zeros_(layer.bias)
+
+        x_t = torch.from_numpy(x.astype(np.float32, copy=False)).to(run_device)
+        y_t = torch.from_numpy(y_arr.astype(np.float32, copy=False)).to(run_device)
+        w_t = torch.from_numpy(weights.astype(np.float32, copy=False)).to(run_device)
+        denom = torch.clamp(w_t.sum(), min=1.0)
+
+        opt = torch.optim.LBFGS(
+            layer.parameters(),
+            lr=1.0,
+            max_iter=int(self.max_iter),
+            line_search_fn="strong_wolfe",
+        )
+
+        def closure() -> torch.Tensor:
+            opt.zero_grad(set_to_none=True)
+            logits = layer(x_t).view(-1)
+            data_loss = torch.nn.functional.binary_cross_entropy_with_logits(
+                logits,
+                y_t,
+                weight=w_t,
+                reduction="sum",
+            ) / denom
+            penalty = 0.5 * float(self.l2) * torch.sum(layer.weight.view(-1) ** 2)
+            loss = data_loss + penalty
+            loss.backward()
+            return loss
+
+        opt.step(closure)
+        self.w = layer.weight.detach().cpu().numpy().reshape(-1).astype(np.float64, copy=False)
+        self.b = float(layer.bias.detach().cpu().numpy().reshape(-1)[0])
+
+    def predict_logit(self, x: np.ndarray) -> np.ndarray:
+        if self.w is None:
+            raise RuntimeError("Logistic pair-prob model is not fitted")
+        x_arr = np.asarray(x, dtype=np.float64)
+        return (x_arr @ self.w + float(self.b)).astype(np.float64, copy=False)
+
+    def predict_proba(self, x: np.ndarray) -> np.ndarray:
+        logits = self.predict_logit(x)
+        return (1.0 / (1.0 + np.exp(-logits))).astype(np.float64, copy=False)

@@ -40,6 +40,15 @@ REQUIRED_METHOD_POLICY_FIELDS = {
     "routing_uses_eval_nelbo",
     "routing_uses_eval_domain_statistics",
 }
+DELTA_GATE_GUARD_REASON_PRIORITY = (
+    "insufficient_validation_domains",
+    "insufficient_active_rows",
+    "insufficient_active_domains",
+    "activation_rate_too_high",
+    "harm_rate_too_high",
+    "help_minus_harm_too_low",
+    "insufficient_gap_reduction",
+)
 
 
 def _to_float(value: object, default: float = 0.0) -> float:
@@ -132,6 +141,44 @@ def _is_selectable_method(row: Dict[str, Any], uplift_reference_method: str) -> 
         and _to_int(row.get("routing_uses_eval_nelbo", 0)) == 0
         and _to_int(row.get("routing_uses_eval_domain_statistics", 0)) == 0
     )
+
+
+def _pipe_tokens(value: object) -> List[str]:
+    return [part.strip() for part in str(value or "").split("|") if part.strip()]
+
+
+def _join_tokens(values: Sequence[object]) -> str:
+    seen: set[str] = set()
+    out: List[str] = []
+    for value in values:
+        for token in _pipe_tokens(value):
+            if token not in seen:
+                seen.add(token)
+                out.append(token)
+    return "|".join(out)
+
+
+def _prioritized_delta_gate_reason(tokens: Sequence[str]) -> str:
+    token_set = {str(token) for token in tokens if str(token)}
+    for reason in DELTA_GATE_GUARD_REASON_PRIORITY:
+        if reason in token_set:
+            return reason
+    return sorted(token_set)[0] if token_set else ""
+
+
+def _delta_gate_guard_failure_reason(method: str, method_rows: Sequence[Dict[str, Any]]) -> str:
+    if "delta_gated_sparse_mix" not in str(method):
+        return ""
+    statuses = _join_tokens(row.get("delta_gate_selection_status", "") for row in method_rows)
+    reasons = _join_tokens(row.get("delta_gate_diagnostic_only_reason", "") for row in method_rows)
+    status_tokens = _pipe_tokens(statuses)
+    reason_tokens = _pipe_tokens(reasons)
+    non_selected_statuses = [status for status in status_tokens if status != "selected"]
+    if reason_tokens:
+        return _prioritized_delta_gate_reason(reason_tokens)
+    if non_selected_statuses:
+        return _prioritized_delta_gate_reason(non_selected_statuses) or "delta_gate_source_inner_guard_failed"
+    return ""
 
 
 def _tier(
@@ -230,6 +277,11 @@ def _read_rows(
                     "harmful_override_max": str(mm.get("harmful_override_max", "")),
                     "allow_calibrated_adoption": str(mm.get("allow_calibrated_adoption", "")),
                     "fallback_used": str(mm.get("fallback_used", "")),
+                    "diagnostic_only_reason": str(mm.get("diagnostic_only_reason", "")),
+                    "delta_gate_selection_status": str(mm.get("delta_gate_selection_status", "")),
+                    "delta_gate_diagnostic_only_reason": str(
+                        mm.get("delta_gate_diagnostic_only_reason", "")
+                    ),
                 }
             )
     if len(seen_protocol_versions) > 1:
@@ -430,7 +482,36 @@ def _aggregate(
         legacy_instability_breach = bool(std_breach or sign_breach)
 
         base = method_rows[0]
-        base_selectable = _is_selectable_method(base, uplift_reference_method=str(uplift_reference_method))
+        aggregate_adoption_eligible = min(_to_int(r.get("adoption_eligible", 0)) for r in method_rows)
+        aggregate_diagnostic_only = max(_to_int(r.get("diagnostic_only", 0)) for r in method_rows)
+        aggregate_uses_eval_nelbo = max(_to_int(r.get("routing_uses_eval_nelbo", 0)) for r in method_rows)
+        aggregate_uses_eval_stats = max(
+            _to_int(r.get("routing_uses_eval_domain_statistics", 0)) for r in method_rows
+        )
+        delta_gate_guard_reason = _delta_gate_guard_failure_reason(method, method_rows)
+        aggregate_method_role = str(base.get("method_role", ""))
+        if delta_gate_guard_reason:
+            aggregate_method_role = "diagnostic"
+            aggregate_adoption_eligible = 0
+            aggregate_diagnostic_only = 1
+
+        aggregate_policy_row = {
+            **base,
+            "method_role": aggregate_method_role,
+            "adoption_eligible": int(aggregate_adoption_eligible),
+            "diagnostic_only": int(aggregate_diagnostic_only),
+            "routing_uses_eval_nelbo": int(aggregate_uses_eval_nelbo),
+            "routing_uses_eval_domain_statistics": int(aggregate_uses_eval_stats),
+        }
+        base_selectable = _is_selectable_method(
+            aggregate_policy_row,
+            uplift_reference_method=str(uplift_reference_method),
+        )
+        selection_ineligible_reason = ""
+        if delta_gate_guard_reason:
+            selection_ineligible_reason = f"delta_gate_source_inner_guard_failed:{delta_gate_guard_reason}"
+        elif not base_selectable and method != str(uplift_reference_method):
+            selection_ineligible_reason = "method_policy_not_adoption_eligible"
 
         domain_uplifts: List[Dict[str, Any]] = []
         domain_missing = False
@@ -524,13 +605,11 @@ def _aggregate(
                 "protocol_version": str(base.get("protocol_version", "")),
                 "decision_policy_version": str(decision_policy_version),
                 "method": method,
-                "method_role": str(base.get("method_role", "")),
-                "adoption_eligible": _to_int(base.get("adoption_eligible", 0)),
-                "diagnostic_only": _to_int(base.get("diagnostic_only", 0)),
-                "routing_uses_eval_nelbo": _to_int(base.get("routing_uses_eval_nelbo", 0)),
-                "routing_uses_eval_domain_statistics": _to_int(
-                    base.get("routing_uses_eval_domain_statistics", 0)
-                ),
+                "method_role": str(aggregate_method_role),
+                "adoption_eligible": int(aggregate_adoption_eligible),
+                "diagnostic_only": int(aggregate_diagnostic_only),
+                "routing_uses_eval_nelbo": int(aggregate_uses_eval_nelbo),
+                "routing_uses_eval_domain_statistics": int(aggregate_uses_eval_stats),
                 "residual_policy_version": str(base.get("residual_policy_version", "")),
                 "threshold_selection_policy": str(base.get("threshold_selection_policy", "")),
                 "feature_set": str(base.get("feature_set", "")),
@@ -542,6 +621,14 @@ def _aggregate(
                 "allow_calibrated_adoption": str(base.get("allow_calibrated_adoption", "")),
                 "fallback_used": str(base.get("fallback_used", "")),
                 "selection_eligible": int(selectable),
+                "selection_ineligible_reason": str(selection_ineligible_reason),
+                "delta_gate_source_inner_guard_pass": int(not bool(delta_gate_guard_reason)),
+                "delta_gate_selection_status": _join_tokens(
+                    [r.get("delta_gate_selection_status", "") for r in method_rows]
+                ),
+                "delta_gate_diagnostic_only_reason": _join_tokens(
+                    [r.get("delta_gate_diagnostic_only_reason", "") for r in method_rows]
+                ),
                 "n_seeds": int(len(seeds)),
                 "seeds": ",".join(str(s) for s in seeds),
                 "top1_oracle_hit_mean": float(top1_mean),
@@ -695,14 +782,14 @@ def _write_md(path: Path, rows: Sequence[Dict[str, Any]], summary: Dict[str, Any
             "| method | role | eligible | decision | tier | n_seeds | top1 | spearman | mean_oracle_gap_pct | "
             "top1_uplift_vs_metadata | spearman_uplift_vs_metadata | gap_pct_reduction_vs_metadata | "
             "improving_seed_count | positive_threshold | ci_source | ci_low_top1/spearman/gap | "
-            "catastrophic_regression | regression_check_missing | raw_instability_breach | instability_gate_applied | instability_breach |\n"
+            "catastrophic_regression | regression_check_missing | raw_instability_breach | instability_gate_applied | instability_breach | ineligible_reason |\n"
         )
-        f.write("|---|---|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---:|---:|---:|---:|---:|\n")
+        f.write("|---|---|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---:|---:|---:|---:|---:|---|\n")
         for r in rows:
             f.write(
                 "| {} | {} | {} | {} | {} | {} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | "
                 "{:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {:.4f} +- {:.4f} | {} | {} | {} | "
-                "{:.4f}/{:.4f}/{:.4f} | {} | {} | {} | {} | {} |\n".format(
+                "{:.4f}/{:.4f}/{:.4f} | {} | {} | {} | {} | {} | {} |\n".format(
                     r["method"],
                     r["method_role"],
                     int(r["selection_eligible"]),
@@ -732,6 +819,7 @@ def _write_md(path: Path, rows: Sequence[Dict[str, Any]], summary: Dict[str, Any
                     int(r["raw_instability_breach"]),
                     int(r["instability_gate_applied"]),
                     int(r["instability_breach"]),
+                    str(r.get("selection_ineligible_reason", "")),
                 )
             )
 

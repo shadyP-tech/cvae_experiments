@@ -392,6 +392,57 @@ def test_missing_domain_breakdown_override_marks_needs_evidence(tmp_path: Path) 
     assert diagnostic[candidate]["tier"] == "needs_evidence"
 
 
+def test_delta_gate_guard_failure_makes_decision_table_reference_only(tmp_path: Path) -> None:
+    candidate = "pairwise_tournament_delta_gated_sparse_mix_v1"
+    result_paths = []
+    seed_specs = [
+        (42, "selected", ""),
+        (43, "failed_guards_noop", "activation_rate_too_high"),
+    ]
+    for seed, status, reason in seed_specs:
+        result_paths.append(
+            _write_result(
+                tmp_path / f"run_seed{seed}" / "learned_utility_results.json",
+                methods={
+                    "metadata_routing": _metric(
+                        method_role="baseline",
+                        adoption_eligible=1,
+                        diagnostic_only=0,
+                        top1=0.30,
+                        spearman=0.0,
+                        gap_pct=10.0,
+                    ),
+                    candidate: {
+                        **_metric(
+                            method_role="learned",
+                            adoption_eligible=1,
+                            diagnostic_only=0,
+                            top1=0.60,
+                            spearman=0.50,
+                            gap_pct=3.0,
+                        ),
+                        "delta_gate_selection_status": status,
+                        "delta_gate_diagnostic_only_reason": reason,
+                    },
+                },
+            )
+        )
+
+    by_method = {row["method"]: row for row in _decision_rows(result_paths)}
+    delta = by_method[candidate]
+
+    assert delta["method_role"] == "diagnostic"
+    assert delta["adoption_eligible"] == 0
+    assert delta["diagnostic_only"] == 1
+    assert delta["selection_eligible"] == 0
+    assert delta["tier"] == "reference_only"
+    assert delta["decision"] == "not_selected"
+    assert delta["delta_gate_source_inner_guard_pass"] == 0
+    assert delta["selection_ineligible_reason"] == (
+        "delta_gate_source_inner_guard_failed:activation_rate_too_high"
+    )
+
+
 def test_v2_protocol_validation_hard_fails_for_mixed_manifest(tmp_path: Path) -> None:
     v2_result = _write_result(
         tmp_path / "run_seed42" / "learned_utility_results.json",

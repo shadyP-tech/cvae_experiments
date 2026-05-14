@@ -218,3 +218,50 @@ def test_metric_aggregation_hard_fails_on_invalid_candidate_rows() -> None:
     metrics = _aggregate_metrics_from_sample_rows([valid])
     assert metrics["metadata_routing"]["n_samples_micro"] == 1.0
     assert metrics["metadata_routing"]["n_query_domains_macro"] == 1.0
+
+
+def test_delta_gate_guard_failure_demotes_method_summary_even_when_first_row_selected() -> None:
+    base = {
+        "method": "pairwise_tournament_delta_gated_sparse_mix_v1",
+        "query_domain": 40,
+        "fold_query_domain": 40,
+        "candidate_experts": "100|200",
+        "selected_expert": 100,
+        "candidate_oracle_expert": 100,
+        "adoption_eligible": 1,
+        "diagnostic_only": 0,
+        "routing_uses_eval_nelbo": 0,
+        "routing_uses_eval_domain_statistics": 0,
+        "top1_oracle_hit": 1,
+        "selected_rank": 1.0,
+        "oracle_gap": 0.0,
+        "oracle_gap_pct": 0.0,
+        "spearman": 1.0,
+        "pairwise_auc": 1.0,
+        "selected_nelbo": 0.5,
+        "candidate_oracle_nelbo": 0.5,
+    }
+    selected = {
+        **base,
+        "delta_gate_selection_status": "selected",
+        "delta_gate_diagnostic_only_reason": "",
+    }
+    failed = {
+        **base,
+        "query_domain": 100,
+        "fold_query_domain": 100,
+        "candidate_experts": "40|200",
+        "selected_expert": 40,
+        "candidate_oracle_expert": 40,
+        "delta_gate_selection_status": "failed_guards_noop",
+        "delta_gate_diagnostic_only_reason": "activation_rate_too_high",
+    }
+
+    metrics = _aggregate_metrics_from_sample_rows([selected, failed])
+    delta = metrics["pairwise_tournament_delta_gated_sparse_mix_v1"]
+
+    assert delta["method_role"] == "diagnostic"
+    assert delta["adoption_eligible"] == 0.0
+    assert delta["diagnostic_only"] == 1.0
+    assert delta["delta_gate_source_inner_guard_pass"] == 0.0
+    assert delta["diagnostic_only_reason"] == "activation_rate_too_high"

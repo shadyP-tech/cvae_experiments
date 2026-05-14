@@ -505,6 +505,46 @@ def _build_method_summary_rows(method_metrics: Dict[str, Dict[str, Any]]) -> Lis
                 "heldout_paired_high_regret_reduction_vs_hard": float(
                     metrics.get("heldout_paired_high_regret_reduction_vs_hard", float("nan"))
                 ),
+                "pairprob_predictor": str(metrics.get("pairprob_predictor", "")),
+                "pairprob_probability_calibration": str(metrics.get("pairprob_probability_calibration", "")),
+                "pairprob_feature_set": str(metrics.get("pairprob_feature_set", "")),
+                "pairprob_selection_policy": str(metrics.get("pairprob_selection_policy", "")),
+                "mean_pairprob_win_top1": float(metrics.get("mean_pairprob_win_top1", float("nan"))),
+                "top1_win_margin": float(metrics.get("top1_win_margin", float("nan"))),
+                "absolute_high_regret_rate_gap_gt_5": float(
+                    metrics.get("absolute_high_regret_rate_gap_gt_5", float("nan"))
+                ),
+                "relative_catastrophic_regression_vs_hard_gt_5_rate": float(
+                    metrics.get("relative_catastrophic_regression_vs_hard_gt_5_rate", float("nan"))
+                ),
+                "worst_inner_domain_oracle_gap_pct": str(
+                    metrics.get("worst_inner_domain_oracle_gap_pct", "")
+                ),
+                "pairwise_cycle_rate": float(metrics.get("pairwise_cycle_rate", float("nan"))),
+                "mean_pairwise_confidence": float(metrics.get("mean_pairwise_confidence", float("nan"))),
+                "pairwise_calibration_brier": float(
+                    metrics.get("pairwise_calibration_brier", float("nan"))
+                ),
+                "pairwise_auc_helpful_preferences": float(
+                    metrics.get("pairwise_auc_helpful_preferences", float("nan"))
+                ),
+                "pairwise_near_tie_drop_rate": str(metrics.get("pairwise_near_tie_drop_rate", "")),
+                "pairwise_train_pairs_after_filter": str(
+                    metrics.get("pairwise_train_pairs_after_filter", "")
+                ),
+                "pairwise_validation_pairs_after_filter": str(
+                    metrics.get("pairwise_validation_pairs_after_filter", "")
+                ),
+                "pairwise_train_domains_after_filter": str(
+                    metrics.get("pairwise_train_domains_after_filter", "")
+                ),
+                "std_oracle_gap_pct_across_inner_domains": str(
+                    metrics.get("std_oracle_gap_pct_across_inner_domains", "")
+                ),
+                "std_top1_across_inner_domains": str(metrics.get("std_top1_across_inner_domains", "")),
+                "max_minus_min_oracle_gap_pct_across_inner_domains": str(
+                    metrics.get("max_minus_min_oracle_gap_pct_across_inner_domains", "")
+                ),
                 "n_samples_micro": float(metrics.get("n_samples_micro", 0.0)),
                 "n_query_domains_macro": float(metrics.get("n_query_domains_macro", 0.0)),
                 "n_valid_spearman_samples": float(metrics.get("n_valid_spearman_samples", 0.0)),

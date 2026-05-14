@@ -39,6 +39,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
     is_response_routing_protocol = experiment_name in {
         "learned_utility_response_routing_v1",
         "learned_utility_response_routing_delta_gate_v1",
+        "learned_utility_response_routing_pairprob_tournament_v1",
     }
     camelyon17_support_response_protocols = {
         "learned_utility_support_response_routing_v1",
