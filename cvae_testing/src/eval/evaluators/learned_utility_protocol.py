@@ -230,6 +230,25 @@ def _method_protocol(method: str) -> MethodProtocol:
             diagnostic_only=0,
             routing_uses_query_features=1,
         )
+    if name in {
+        "ae_utility_calibrated_safe_override_v1",
+        "ae_metadata_utility_calibrated_safe_override_v1",
+        "ae_combined_utility_calibrated_safe_override_v1",
+    }:
+        return MethodProtocol(
+            method_role="learned",
+            adoption_eligible=1,
+            diagnostic_only=0,
+            routing_uses_query_features=1,
+        )
+    if name in {"ae_utility_pairwise_ranker_diagnostic_v1", "oracle_safe_override_over_ae_argmin"}:
+        return MethodProtocol(
+            method_role="diagnostic",
+            adoption_eligible=0,
+            diagnostic_only=1,
+            routing_uses_query_features=1,
+            routing_uses_eval_nelbo=1 if name == "oracle_safe_override_over_ae_argmin" else 0,
+        )
     if name in {"random_rank_floor", "random_score_floor", "expert_label_permutation", "metadata_permutation"}:
         return MethodProtocol(method_role="control", adoption_eligible=0, diagnostic_only=0)
     if name == "unconstrained_learned_reference" or name == "metadata_residual_argmax":
@@ -352,6 +371,14 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         "improving_vs_source_prior_rate": "improving_vs_source_prior",
         "ae_coverage_rate": "ae_coverage_rate",
         "fallback_rate": "fallback_rate",
+        "active_override_rate": "active_override",
+        "net_gain_vs_ae_argmin": "net_gain_vs_ae_argmin",
+        "net_gain_vs_metadata": "net_gain_vs_metadata",
+        "harmful_vs_ae_argmin_rate": "harmful_vs_ae_argmin",
+        "improving_vs_ae_argmin_rate": "improving_vs_ae_argmin",
+        "selected_override_precision": "selected_override_precision",
+        "raw_predicted_delta_spearman_non_anchor": "raw_predicted_delta_spearman_non_anchor",
+        "raw_predicted_delta_spearman_with_anchor": "raw_predicted_delta_spearman_with_anchor",
     }
     for method, vals in sorted(by_method.items()):
         metrics: Dict[str, float] = {}
@@ -385,6 +412,18 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         metrics["improving_vs_source_prior_rate"] = metrics["micro_improving_vs_source_prior_rate"]
         metrics["ae_coverage_rate"] = metrics["micro_ae_coverage_rate"]
         metrics["fallback_rate"] = metrics["micro_fallback_rate"]
+        metrics["active_override_rate"] = metrics["micro_active_override_rate"]
+        metrics["net_gain_vs_ae_argmin"] = metrics["micro_net_gain_vs_ae_argmin"]
+        metrics["net_gain_vs_metadata"] = metrics["micro_net_gain_vs_metadata"]
+        metrics["harmful_vs_ae_argmin_rate"] = metrics["micro_harmful_vs_ae_argmin_rate"]
+        metrics["improving_vs_ae_argmin_rate"] = metrics["micro_improving_vs_ae_argmin_rate"]
+        metrics["selected_override_precision"] = metrics["micro_selected_override_precision"]
+        metrics["raw_predicted_delta_spearman_non_anchor"] = metrics[
+            "micro_raw_predicted_delta_spearman_non_anchor"
+        ]
+        metrics["raw_predicted_delta_spearman_with_anchor"] = metrics[
+            "micro_raw_predicted_delta_spearman_with_anchor"
+        ]
 
         query_domains = sorted(set(int(r["query_domain"]) for r in vals))
         metrics["n_samples_micro"] = float(len(vals))

@@ -7,6 +7,10 @@ import numpy as np
 import torch
 
 from src.eval.evaluators.learned_utility_protocol import FoldCandidateSet
+from src.eval.evaluators.ae_utility_calibrator import (
+    run_ae_utility_calibrator_methods_for_fold,
+    write_ae_utility_calibrator_artifacts,
+)
 from src.eval.evaluators.learned_utility_config import _parse_learned_utility_config
 from src.eval.evaluators.learned_utility_learned_methods import _run_learned_methods_for_fold
 from src.eval.evaluators.learned_utility_proxy_methods import _run_proxy_methods_for_fold
@@ -108,6 +112,14 @@ def evaluate_learned_utility_loqdo(
     ae_first_selection_diag_rows: List[Dict[str, Any]] = []
     ae_first_margin_bin_rows: List[Dict[str, Any]] = []
     ae_first_calibration_rows: List[Dict[str, Any]] = []
+    ae_utility_raw_rows: List[Dict[str, Any]] = []
+    ae_utility_validation_rows: List[Dict[str, Any]] = []
+    ae_utility_policy_rows: List[Dict[str, Any]] = []
+    ae_utility_override_rows: List[Dict[str, Any]] = []
+    ae_utility_headroom_rows: List[Dict[str, Any]] = []
+    ae_utility_selected_feature_rows: List[Dict[str, Any]] = []
+    ae_utility_precision_rows: List[Dict[str, Any]] = []
+    ae_utility_anchor_rank_rows: List[Dict[str, Any]] = []
     hybrid_method_meta: Dict[str, Dict[str, Any]] = {}
     permutation_sample_rows: Dict[Tuple[str, int], List[Dict[str, Any]]] = {}
 
@@ -216,6 +228,34 @@ def evaluate_learned_utility_loqdo(
             ae_first_selection_diag_rows.extend(ae_first_outputs.selection_diag_rows)
             ae_first_margin_bin_rows.extend(ae_first_outputs.margin_bin_rows)
             ae_first_calibration_rows.extend(ae_first_outputs.calibration_rows)
+
+        if ae_scores is not None and eval_cfg.autoencoder.utility_calibrator.enabled:
+            ae_utility_outputs = run_ae_utility_calibrator_methods_for_fold(
+                embeddings=embeddings,
+                sample_domains=sample_domains,
+                expert_domains=expert_domains,
+                train_idx=train_idx,
+                test_idx=test_idx,
+                fold=fold,
+                true_nelbo=true_nelbo,
+                true_eval=true_eval,
+                global_eval=global_eval,
+                metadata_similarity=metadata_similarity,
+                metadata_similarity_eval=metadata_similarity_eval,
+                ae_scores=ae_scores,
+                cfg=eval_cfg.autoencoder.utility_calibrator,
+                seed=int(seed),
+                tie_policy=hybrid_cfg.tie_policy,
+            )
+            sample_rows.extend(ae_utility_outputs.sample_rows)
+            ae_utility_raw_rows.extend(ae_utility_outputs.raw_rows)
+            ae_utility_validation_rows.extend(ae_utility_outputs.source_inner_validation_rows)
+            ae_utility_policy_rows.extend(ae_utility_outputs.policy_audit_rows)
+            ae_utility_override_rows.extend(ae_utility_outputs.override_diagnostic_rows)
+            ae_utility_headroom_rows.extend(ae_utility_outputs.oracle_headroom_rows)
+            ae_utility_selected_feature_rows.extend(ae_utility_outputs.selected_feature_rows)
+            ae_utility_precision_rows.extend(ae_utility_outputs.override_precision_rows)
+            ae_utility_anchor_rank_rows.extend(ae_utility_outputs.anchor_rank_rows)
 
         learned_outputs = _run_learned_methods_for_fold(
             embeddings=embeddings,
@@ -340,6 +380,19 @@ def evaluate_learned_utility_loqdo(
     )
     if ae_first_artifacts:
         results.setdefault("artifacts", {}).update(ae_first_artifacts)
+    ae_utility_artifacts = write_ae_utility_calibrator_artifacts(
+        reports_dir=reports_dir,
+        raw_rows=ae_utility_raw_rows,
+        source_inner_validation_rows=ae_utility_validation_rows,
+        policy_audit_rows=ae_utility_policy_rows,
+        override_diagnostic_rows=ae_utility_override_rows,
+        oracle_headroom_rows=ae_utility_headroom_rows,
+        selected_feature_rows=ae_utility_selected_feature_rows,
+        override_precision_rows=ae_utility_precision_rows,
+        anchor_rank_rows=ae_utility_anchor_rank_rows,
+    )
+    if ae_utility_artifacts:
+        results.setdefault("artifacts", {}).update(ae_utility_artifacts)
     if eval_cfg.support_response.enabled:
         print("[learned_utility] running candidate-specific support-response routing...")
         support_response_results = evaluate_support_response_routing_for_checkpoints(

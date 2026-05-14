@@ -84,6 +84,7 @@ class AutoencoderProxyConfig:
     margin_threshold: float
     run_diagnostics: bool
     ae_first: "AEFirstRoutingConfig"
+    utility_calibrator: "AEUtilityCalibratorConfig"
 
 
 @dataclass(frozen=True)
@@ -100,6 +101,27 @@ class AEFirstRoutingConfig:
     max_top1_drop_abs: float
     max_raw_spearman_drop_abs: float
     max_gap_pct_degradation: float
+
+
+@dataclass(frozen=True)
+class AEUtilityCalibratorConfig:
+    enabled: bool
+    primary_method: str
+    model_types: Tuple[str, ...]
+    primary_model_type: str
+    diagnostic_model_types: Tuple[str, ...]
+    fallback_policy: str
+    feature_sets_primary: Tuple[str, ...]
+    feature_sets_diagnostic: Tuple[str, ...]
+    delta_thresholds: Tuple[float, ...]
+    margin_thresholds: Tuple[float, ...]
+    max_top1_drop_vs_ae_argmin_abs: float
+    max_spearman_drop_vs_ae_argmin_abs: float
+    max_gap_pct_degradation_vs_ae_argmin: float
+    max_top1_drop_vs_metadata_abs: float
+    max_spearman_drop_vs_metadata_abs: float
+    max_gap_pct_degradation_vs_metadata: float
+    ridge_l2: float
 
 
 @dataclass(frozen=True)
@@ -273,6 +295,65 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         max_raw_spearman_drop_abs=float((ae_first_risk or {}).get("max_raw_spearman_drop_abs", 0.03)),
         max_gap_pct_degradation=float((ae_first_risk or {}).get("max_gap_pct_degradation", 1.0)),
     )
+    utility_calibrator_cfg = _as_dict((autoencoder_cfg or {}).get("utility_calibrator", {}))
+    utility_calibrator_risk = _as_dict((utility_calibrator_cfg or {}).get("risk_gates", {}))
+    utility_calibrator = AEUtilityCalibratorConfig(
+        enabled=bool((utility_calibrator_cfg or {}).get("enabled", False)),
+        primary_method=str(
+            (utility_calibrator_cfg or {}).get(
+                "primary_method",
+                "ae_utility_calibrated_safe_override_v1",
+            )
+        ),
+        model_types=tuple(str(v).strip().lower() for v in (utility_calibrator_cfg or {}).get("model_types", ["ridge_delta"])),
+        primary_model_type=str((utility_calibrator_cfg or {}).get("primary_model_type", "ridge_delta")).strip().lower(),
+        diagnostic_model_types=tuple(
+            str(v).strip().lower()
+            for v in (utility_calibrator_cfg or {}).get("diagnostic_model_types", ["pairwise_ranker"])
+        ),
+        fallback_policy=str((utility_calibrator_cfg or {}).get("fallback_policy", "ae_argmin_zscore")).strip(),
+        feature_sets_primary=tuple(
+            str(v).strip().lower()
+            for v in (utility_calibrator_cfg or {}).get("feature_sets_primary", ["ae_core", "ae_quality"])
+        ),
+        feature_sets_diagnostic=tuple(
+            str(v).strip().lower()
+            for v in (utility_calibrator_cfg or {}).get("feature_sets_diagnostic", ["ae_metadata", "ae_combined"])
+        ),
+        delta_thresholds=tuple(
+            _parse_threshold(v)
+            for v in (utility_calibrator_cfg or {}).get(
+                "delta_thresholds",
+                [0.0, 0.01, 0.025, 0.05, 0.10, "__inf__"],
+            )
+        ),
+        margin_thresholds=tuple(
+            _parse_threshold(v)
+            for v in (utility_calibrator_cfg or {}).get(
+                "margin_thresholds",
+                [0.0, 0.05, 0.10, 0.25],
+            )
+        ),
+        max_top1_drop_vs_ae_argmin_abs=float(
+            (utility_calibrator_risk or {}).get("max_top1_drop_vs_ae_argmin_abs", 0.02)
+        ),
+        max_spearman_drop_vs_ae_argmin_abs=float(
+            (utility_calibrator_risk or {}).get("max_spearman_drop_vs_ae_argmin_abs", 0.03)
+        ),
+        max_gap_pct_degradation_vs_ae_argmin=float(
+            (utility_calibrator_risk or {}).get("max_gap_pct_degradation_vs_ae_argmin", 1.0)
+        ),
+        max_top1_drop_vs_metadata_abs=float(
+            (utility_calibrator_risk or {}).get("max_top1_drop_vs_metadata_abs", 0.02)
+        ),
+        max_spearman_drop_vs_metadata_abs=float(
+            (utility_calibrator_risk or {}).get("max_spearman_drop_vs_metadata_abs", 0.03)
+        ),
+        max_gap_pct_degradation_vs_metadata=float(
+            (utility_calibrator_risk or {}).get("max_gap_pct_degradation_vs_metadata", 1.0)
+        ),
+        ridge_l2=float((utility_calibrator_cfg or {}).get("ridge_l2", 1e-4)),
+    )
     autoencoder = AutoencoderProxyConfig(
         enabled=bool((autoencoder_cfg or {}).get("enabled", False)),
         hidden_dim=int((autoencoder_cfg or {}).get("hidden_dim", 256)),
@@ -288,6 +369,7 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         margin_threshold=float((autoencoder_cfg or {}).get("margin_threshold", 0.0)),
         run_diagnostics=bool((autoencoder_cfg or {}).get("run_diagnostics", True)),
         ae_first=ae_first,
+        utility_calibrator=utility_calibrator,
     )
 
     return LearnedUtilityConfig(

@@ -153,7 +153,7 @@ def build_autoencoder_score_matrices(
             source_val_stds.append(float(std))
 
     sigma_floor = float(cfg.score_normalization_eps)
-    if bool(cfg.ae_first.enabled):
+    if bool(cfg.ae_first.enabled) or bool(cfg.utility_calibrator.enabled):
         if str(cfg.ae_first.ae_z_sigma_floor_mode) != "global_source_val_std_quantile":
             raise ProtocolError(
                 "AE-first routing currently supports ae_z_sigma_floor_mode='global_source_val_std_quantile'"
@@ -175,7 +175,7 @@ def build_autoencoder_score_matrices(
             entry.get("source_val_reconstruction_std", entry.get("source_val_std_recon_mse", float("nan")))
         )
         eps = float(cfg.score_normalization_eps)
-        floor = float(sigma_floor) if bool(cfg.ae_first.enabled) else eps
+        floor = float(sigma_floor) if (bool(cfg.ae_first.enabled) or bool(cfg.utility_calibrator.enabled)) else eps
         denom = std if np.isfinite(std) and std > floor else floor
         raw[:, col] = scores
         zscore[:, col] = (scores - mean) / denom

@@ -13,6 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.eval.evaluators import learned_utility as lu
+from src.eval.evaluators import ae_utility_calibrator as auc
 from src.eval.evaluators import support_free_ae as sfa
 from src.eval.evaluators.learned_utility_config import ResidualRoutingConfig
 from src.eval.evaluators.learned_utility_protocol import FoldCandidateSet
@@ -276,6 +277,32 @@ def _ae_first_cfg(*, thresholds=None):
     return lu._parse_learned_utility_config(cfg).autoencoder.ae_first
 
 
+def _ae_utility_calibrator_cfg(*, delta_thresholds=None):
+    cfg = _support_free_ae_cfg()
+    cfg["autoencoder_proxy"]["utility_calibrator"] = {
+        "enabled": True,
+        "primary_method": "ae_utility_calibrated_safe_override_v1",
+        "model_types": ["ridge_delta"],
+        "primary_model_type": "ridge_delta",
+        "diagnostic_model_types": ["pairwise_ranker"],
+        "fallback_policy": "ae_argmin_zscore",
+        "feature_sets_primary": ["ae_core", "ae_quality"],
+        "feature_sets_diagnostic": ["ae_metadata", "ae_combined"],
+        "delta_thresholds": list(delta_thresholds if delta_thresholds is not None else [0.0, "__inf__"]),
+        "margin_thresholds": [0.0, 0.05],
+        "ridge_l2": 1.0e-4,
+        "risk_gates": {
+            "max_top1_drop_vs_ae_argmin_abs": 0.02,
+            "max_spearman_drop_vs_ae_argmin_abs": 0.03,
+            "max_gap_pct_degradation_vs_ae_argmin": 1.0,
+            "max_top1_drop_vs_metadata_abs": 0.02,
+            "max_spearman_drop_vs_metadata_abs": 0.03,
+            "max_gap_pct_degradation_vs_metadata": 1.0,
+        },
+    }
+    return lu._parse_learned_utility_config(cfg).autoencoder.utility_calibrator
+
+
 def _run_ae_first_direct(*, thresholds=None, metadata_similarity=None):
     sample_domains, expert_domains, true_nelbo, meta, ae_scores = _fake_payload_ae_first()
     if metadata_similarity is not None:
@@ -296,6 +323,31 @@ def _run_ae_first_direct(*, thresholds=None, metadata_similarity=None):
         metadata_similarity_eval=meta[test_idx][:, list(fold.candidate_col_indices)],
         ae_scores=ae_scores,
         cfg=_ae_first_cfg(thresholds=thresholds),
+        tie_policy="stable_expert_index",
+    )
+
+
+def _run_ae_utility_calibrator_direct(*, delta_thresholds=None):
+    sample_domains, expert_domains, true_nelbo, meta, ae_scores = _fake_payload_ae_first()
+    embeddings = np.stack([np.asarray([float(i), 0.0]) for i in range(len(sample_domains))])
+    fold = FoldCandidateSet.for_heldout_domain(heldout_domain=10, expert_domains=expert_domains)
+    test_idx = np.where(sample_domains == 10)[0]
+    train_idx = np.where(sample_domains != 10)[0]
+    return auc.run_ae_utility_calibrator_methods_for_fold(
+        embeddings=embeddings,
+        sample_domains=sample_domains,
+        expert_domains=expert_domains,
+        train_idx=train_idx,
+        test_idx=test_idx,
+        fold=fold,
+        true_nelbo=true_nelbo,
+        true_eval=fold.slice_nelbo(true_nelbo, test_idx),
+        global_eval=true_nelbo[test_idx],
+        metadata_similarity=meta,
+        metadata_similarity_eval=meta[test_idx][:, list(fold.candidate_col_indices)],
+        ae_scores=ae_scores,
+        cfg=_ae_utility_calibrator_cfg(delta_thresholds=delta_thresholds),
+        seed=7,
         tie_policy="stable_expert_index",
     )
 
@@ -987,6 +1039,199 @@ def test_ae_first_tiny_capped_smoke_run(tmp_path, monkeypatch) -> None:
     assert "source_prior_fallback" in results["metrics_by_method"]
     assert results["artifacts"]["ae_first_raw"] == "ae_first_raw.csv"
     assert (tmp_path / "ae_first_policy_audit.csv").exists()
+
+
+def test_ae_utility_calibrator_primary_is_metadata_free() -> None:
+    outputs = _run_ae_utility_calibrator_direct(delta_thresholds=["__inf__"])
+    rows = [row for row in outputs.sample_rows if row["method"] == "ae_utility_calibrated_safe_override_v1"]
+    assert rows
+    assert all(row["metadata_role"] == "not_used" for row in rows)
+    assert outputs.selected_feature_rows[0]["selected_feature_set"] in {"ae_core", "ae_quality"}
+
+
+def test_ae_metadata_calibrator_reported_as_hybrid_method() -> None:
+    outputs = _run_ae_utility_calibrator_direct(delta_thresholds=["__inf__"])
+    rows = [row for row in outputs.sample_rows if row["method"] == "ae_metadata_utility_calibrated_safe_override_v1"]
+    assert rows
+    assert all(row["metadata_role"] == "hybrid_auxiliary_feature" for row in rows)
+
+
+def test_ae_combined_calibrator_reported_as_hybrid_method() -> None:
+    outputs = _run_ae_utility_calibrator_direct(delta_thresholds=["__inf__"])
+    rows = [row for row in outputs.sample_rows if row["method"] == "ae_combined_utility_calibrated_safe_override_v1"]
+    assert rows
+    assert all(row["method_kind"] == "hybrid_combined" for row in rows)
+
+
+def test_ae_utility_calibrator_model_types_defined() -> None:
+    cfg = _ae_utility_calibrator_cfg()
+    assert cfg.model_types == ("ridge_delta",)
+    assert cfg.primary_model_type == "ridge_delta"
+    assert cfg.diagnostic_model_types == ("pairwise_ranker",)
+
+
+def test_ae_utility_calibrator_pairwise_ranker_diagnostic_only() -> None:
+    outputs = _run_ae_utility_calibrator_direct(delta_thresholds=["__inf__"])
+    rows = [row for row in outputs.sample_rows if row["method"] == "ae_utility_pairwise_ranker_diagnostic_v1"]
+    assert rows
+    assert all(int(row["diagnostic_only"]) == 1 for row in rows)
+    assert all(int(row["adoption_eligible"]) == 0 for row in rows)
+
+
+def test_ae_utility_calibrator_margin_threshold_semantics() -> None:
+    outputs = _run_ae_utility_calibrator_direct(delta_thresholds=["__inf__"])
+    rows = [row for row in outputs.sample_rows if row["method"] == "ae_utility_calibrated_safe_override_v1"]
+    assert rows
+    assert {"predicted_override_margin", "selected_margin_threshold", "predicted_delta_best_override"}.issubset(rows[0])
+
+
+def test_ae_utility_calibrator_override_candidates_exclude_anchor() -> None:
+    outputs = _run_ae_utility_calibrator_direct(delta_thresholds=["__inf__"])
+    raw_rows = [row for row in outputs.raw_rows if row["method"] == "ae_utility_calibrated_safe_override_v1"]
+    assert raw_rows
+    assert all(int(row["candidate_expert"]) != int(row["ae_anchor_expert"]) for row in raw_rows)
+
+
+def test_ae_utility_calibrator_label_sign_convention() -> None:
+    outputs = _run_ae_utility_calibrator_direct(delta_thresholds=["__inf__"])
+    raw_rows = [row for row in outputs.raw_rows if row["method"] == "ae_utility_calibrated_safe_override_v1"]
+    assert raw_rows
+    assert any(float(row["true_delta_u_ae_pct"]) < 0.0 for row in raw_rows)
+    assert all("true_delta_u_ae_pct" in row for row in raw_rows)
+
+
+def test_ae_utility_calibrator_inf_threshold_matches_ae_argmin() -> None:
+    outputs = _run_ae_utility_calibrator_direct(delta_thresholds=["__inf__"])
+    rows = [row for row in outputs.sample_rows if row["method"] == "ae_utility_calibrated_safe_override_v1"]
+    assert rows
+    for row in rows:
+        assert int(row["selected_expert"]) == int(row["ae_anchor_expert"])
+        assert int(row["override_accepted"]) == 0
+
+
+def test_ae_utility_calibrator_excludes_target_ae_and_expert() -> None:
+    outputs = _run_ae_utility_calibrator_direct(delta_thresholds=["__inf__"])
+    assert outputs.policy_audit_rows
+    for row in outputs.policy_audit_rows:
+        assert int(row["excluded_target_ae"]) == 1
+        assert int(row["excluded_target_cvae"]) == 1
+        assert int(row["heldout_target_nelbo_used_for_selection"]) == 0
+
+
+def test_ae_utility_calibrator_source_inner_self_exclusion() -> None:
+    outputs = _run_ae_utility_calibrator_direct(delta_thresholds=["__inf__"])
+    assert outputs.source_inner_validation_rows
+    for row in outputs.source_inner_validation_rows:
+        assert int(row["excluded_pseudo_query_ae"]) == 1
+        assert int(row["excluded_pseudo_query_cvae"]) == 1
+
+
+def test_ae_utility_calibrator_threshold_selection_source_only() -> None:
+    outputs = _run_ae_utility_calibrator_direct(delta_thresholds=["__inf__"])
+    assert outputs.source_inner_validation_rows
+    assert all(int(row["heldout_target_nelbo_used_for_selection"]) == 0 for row in outputs.source_inner_validation_rows)
+
+
+def test_raw_predicted_delta_spearman_non_anchor() -> None:
+    outputs = _run_ae_utility_calibrator_direct(delta_thresholds=["__inf__"])
+    policy = outputs.policy_audit_rows[0]
+    assert "raw_predicted_delta_spearman_non_anchor" in policy
+
+
+def test_raw_predicted_delta_spearman_with_anchor() -> None:
+    outputs = _run_ae_utility_calibrator_direct(delta_thresholds=["__inf__"])
+    policy = outputs.policy_audit_rows[0]
+    assert "raw_predicted_delta_spearman_with_anchor" in policy
+
+
+def test_selected_override_precision_nan_when_no_overrides() -> None:
+    outputs = _run_ae_utility_calibrator_direct(delta_thresholds=["__inf__"])
+    precision = [
+        row for row in outputs.override_precision_rows
+        if row["method"] == "ae_utility_calibrated_safe_override_v1"
+    ][0]
+    assert float(precision["active_override_rate"]) == 0.0
+    assert np.isnan(float(precision["selected_override_precision"]))
+
+
+def test_ae_utility_calibrator_reports_oracle_headroom() -> None:
+    outputs = _run_ae_utility_calibrator_direct(delta_thresholds=["__inf__"])
+    assert outputs.oracle_headroom_rows
+    assert {"oracle_headroom_vs_ae_argmin", "ae_argmin_already_oracle", "oracle_best_expert"}.issubset(
+        outputs.oracle_headroom_rows[0]
+    )
+
+
+def test_ae_utility_calibrator_reports_override_capture_rate() -> None:
+    outputs = _run_ae_utility_calibrator_direct(delta_thresholds=["__inf__"])
+    assert outputs.override_precision_rows
+    assert "override_capture_rate" in outputs.override_precision_rows[0]
+
+
+def test_ae_utility_calibrator_policy_audit_provenance_fields() -> None:
+    outputs = _run_ae_utility_calibrator_direct(delta_thresholds=["__inf__"])
+    policy = outputs.policy_audit_rows[0]
+    required = {
+        "outer_heldout_domain",
+        "source_train_domains",
+        "source_inner_pseudo_query_domain",
+        "excluded_target_ae",
+        "excluded_target_cvae",
+        "excluded_pseudo_query_ae",
+        "excluded_pseudo_query_cvae",
+        "ae_stats_domains_used",
+        "threshold_selection_domains_used",
+        "model_training_domains_used",
+        "heldout_target_nelbo_used_for_selection",
+    }
+    assert required.issubset(policy)
+    assert int(policy["heldout_target_nelbo_used_for_selection"]) == 0
+
+
+def test_ae_utility_calibrator_tiny_capped_smoke_run(tmp_path, monkeypatch) -> None:
+    sample_domains, expert_domains, true_nelbo, _meta, ae_scores = _fake_payload_ae_first()
+
+    def fake_score(**kwargs):
+        _ = kwargs
+        embeddings = np.stack([np.asarray([float(i), 0.0]) for i in range(len(sample_domains))])
+        metadata = [{"magnification": int(domain), "sample_id": f"s{i}"} for i, domain in enumerate(sample_domains)]
+        return embeddings, sample_domains, true_nelbo, expert_domains, metadata
+
+    def fake_ae_scores(**kwargs):
+        _ = kwargs
+        return ae_scores
+
+    cfg = _support_free_ae_cfg()
+    cfg["autoencoder_proxy"]["utility_calibrator"] = {
+        "enabled": True,
+        "primary_method": "ae_utility_calibrated_safe_override_v1",
+        "model_types": ["ridge_delta"],
+        "primary_model_type": "ridge_delta",
+        "diagnostic_model_types": ["pairwise_ranker"],
+        "fallback_policy": "ae_argmin_zscore",
+        "feature_sets_primary": ["ae_core", "ae_quality"],
+        "feature_sets_diagnostic": ["ae_metadata", "ae_combined"],
+        "delta_thresholds": ["__inf__"],
+        "margin_thresholds": [0.0],
+    }
+    monkeypatch.setattr(lu, "_score_experts_batched", fake_score)
+    monkeypatch.setattr(lu, "build_autoencoder_score_matrices", fake_ae_scores)
+    results = lu.evaluate_learned_utility_loqdo(
+        test_cache=tmp_path / "unused.pt",
+        expert_checkpoints={f"expert_{d}": "unused" for d in expert_domains},
+        hidden_dim=4,
+        latent_dim=2,
+        strategy="categorical_exact",
+        tau=1.0,
+        seed=7,
+        learned_cfg=cfg,
+        reports_dir=tmp_path,
+        autoencoder_artifacts={"dummy": True},
+    )
+
+    assert "ae_utility_calibrated_safe_override_v1" in results["metrics_by_method"]
+    assert results["artifacts"]["ae_utility_calibrator_raw"] == "ae_utility_calibrator_raw.csv"
+    assert (tmp_path / "ae_utility_calibrator_policy_audit.csv").exists()
 
 
 def test_safe_override_falls_back_to_metadata_with_tau_inf(tmp_path, monkeypatch) -> None:

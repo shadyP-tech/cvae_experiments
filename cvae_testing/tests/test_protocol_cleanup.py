@@ -147,6 +147,22 @@ def test_ae_first_routing_configs_are_protocol_locked() -> None:
         assert ae_first["metadata_auxiliary_features"] is True
 
 
+def test_ae_utility_calibrator_configs_are_protocol_locked() -> None:
+    for dataset in ["breakhis", "camelyon17"]:
+        path = PROJECT_ROOT / "configs" / "experiments" / dataset / "learned_utility_ae_utility_calibrator_v1.yaml"
+        cfg = load_config(path)
+        validate_config(cfg)
+        utility = cfg["learned_utility"]["autoencoder_proxy"]["utility_calibrator"]
+        assert cfg["experiment"]["name"] == "learned_utility_ae_utility_calibrator_v1"
+        assert utility["primary_method"] == "ae_utility_calibrated_safe_override_v1"
+        assert utility["model_types"] == ["ridge_delta"]
+        assert utility["primary_model_type"] == "ridge_delta"
+        assert utility["fallback_policy"] == "ae_argmin_zscore"
+        assert utility["feature_sets_primary"] == ["ae_core", "ae_quality"]
+        assert "ae_metadata" in utility["feature_sets_diagnostic"]
+        assert utility["delta_thresholds"][-1] == "__inf__"
+
+
 def test_quarantined_entrypoints_fail_fast() -> None:
     checks = [
         ([sys.executable, "scripts/run_learned_compatibility_loqdo.py"], "target expert"),

@@ -53,6 +53,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
     is_support_free_ae_protocol = experiment_name in {
         "learned_utility_support_free_ae_routing_v1",
         "learned_utility_ae_first_routing_v1",
+        "learned_utility_ae_utility_calibrator_v1",
         "breakhis_support_free_ae_routing_v1",
         "camelyon17_support_free_ae_routing_v1",
     }
@@ -61,6 +62,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_routing_safe_v2",
         "learned_utility_support_free_ae_routing_v1",
         "learned_utility_ae_first_routing_v1",
+        "learned_utility_ae_utility_calibrator_v1",
         "breakhis_support_free_ae_routing_v1",
         "camelyon17_support_free_ae_routing_v1",
     }
@@ -810,6 +812,122 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                             f"learned_utility.autoencoder_proxy.ae_first_routing.risk_gates.{key} "
                             "must be >= 0"
                         )
+            utility_calibrator_cfg = ae_proxy_cfg.get("utility_calibrator", {})
+            if utility_calibrator_cfg is not None and not isinstance(utility_calibrator_cfg, dict):
+                raise ValueError("learned_utility.autoencoder_proxy.utility_calibrator must be a dictionary")
+            utility_calibrator_cfg = utility_calibrator_cfg or {}
+            _ensure_bool(
+                utility_calibrator_cfg.get("enabled", False),
+                "learned_utility.autoencoder_proxy.utility_calibrator.enabled",
+            )
+            if bool(utility_calibrator_cfg.get("enabled", False)):
+                primary_method = str(
+                    utility_calibrator_cfg.get(
+                        "primary_method",
+                        "ae_utility_calibrated_safe_override_v1",
+                    )
+                ).strip()
+                if primary_method != "ae_utility_calibrated_safe_override_v1":
+                    raise ValueError(
+                        "learned_utility.autoencoder_proxy.utility_calibrator.primary_method "
+                        "must be 'ae_utility_calibrated_safe_override_v1'"
+                    )
+                model_types = utility_calibrator_cfg.get("model_types", ["ridge_delta"])
+                if not isinstance(model_types, list) or not model_types:
+                    raise ValueError(
+                        "learned_utility.autoencoder_proxy.utility_calibrator.model_types must be a non-empty list"
+                    )
+                bad_models = sorted(set(str(v).strip().lower() for v in model_types) - {"ridge_delta"})
+                if bad_models:
+                    raise ValueError(
+                        "learned_utility.autoencoder_proxy.utility_calibrator.model_types must be subset of "
+                        f"['ridge_delta'], got unknown {bad_models}"
+                    )
+                if str(utility_calibrator_cfg.get("primary_model_type", "ridge_delta")).strip().lower() != "ridge_delta":
+                    raise ValueError(
+                        "learned_utility.autoencoder_proxy.utility_calibrator.primary_model_type must be 'ridge_delta'"
+                    )
+                diagnostic_models = utility_calibrator_cfg.get("diagnostic_model_types", ["pairwise_ranker"])
+                if not isinstance(diagnostic_models, list):
+                    raise ValueError(
+                        "learned_utility.autoencoder_proxy.utility_calibrator.diagnostic_model_types must be a list"
+                    )
+                bad_diag_models = sorted(set(str(v).strip().lower() for v in diagnostic_models) - {"pairwise_ranker"})
+                if bad_diag_models:
+                    raise ValueError(
+                        "learned_utility.autoencoder_proxy.utility_calibrator.diagnostic_model_types must be subset of "
+                        f"['pairwise_ranker'], got unknown {bad_diag_models}"
+                    )
+                if str(utility_calibrator_cfg.get("fallback_policy", "ae_argmin_zscore")).strip() != "ae_argmin_zscore":
+                    raise ValueError(
+                        "learned_utility.autoencoder_proxy.utility_calibrator.fallback_policy must be 'ae_argmin_zscore'"
+                    )
+                allowed_feature_sets = {"ae_core", "ae_quality", "ae_metadata", "ae_combined"}
+                primary_features = utility_calibrator_cfg.get("feature_sets_primary", ["ae_core", "ae_quality"])
+                diagnostic_features = utility_calibrator_cfg.get("feature_sets_diagnostic", ["ae_metadata", "ae_combined"])
+                for key, values in {
+                    "feature_sets_primary": primary_features,
+                    "feature_sets_diagnostic": diagnostic_features,
+                }.items():
+                    if not isinstance(values, list) or not values:
+                        raise ValueError(
+                            f"learned_utility.autoencoder_proxy.utility_calibrator.{key} must be a non-empty list"
+                        )
+                    bad = sorted(set(str(v).strip().lower() for v in values) - allowed_feature_sets)
+                    if bad:
+                        raise ValueError(
+                            f"learned_utility.autoencoder_proxy.utility_calibrator.{key} must be subset of "
+                            f"{sorted(allowed_feature_sets)}, got unknown {bad}"
+                        )
+                if any(str(v).strip().lower() in {"ae_metadata", "ae_combined"} for v in primary_features):
+                    raise ValueError(
+                        "learned_utility.autoencoder_proxy.utility_calibrator.feature_sets_primary "
+                        "must remain metadata-free"
+                    )
+                for key in ["delta_thresholds", "margin_thresholds"]:
+                    thresholds = utility_calibrator_cfg.get(
+                        key,
+                        [0.0, 0.01, 0.025, 0.05, 0.10, "__inf__"] if key == "delta_thresholds" else [0.0, 0.05, 0.10, 0.25],
+                    )
+                    if not isinstance(thresholds, list) or not thresholds:
+                        raise ValueError(
+                            f"learned_utility.autoencoder_proxy.utility_calibrator.{key} must be a non-empty list"
+                        )
+                    has_inf_token = False
+                    for threshold in thresholds:
+                        if isinstance(threshold, str) and threshold.strip().lower() == "__inf__":
+                            has_inf_token = True
+                            continue
+                        if float(threshold) < 0.0:
+                            raise ValueError(
+                                f"learned_utility.autoencoder_proxy.utility_calibrator.{key} "
+                                "must be >= 0 or '__inf__'"
+                            )
+                    if key == "delta_thresholds" and not has_inf_token:
+                        raise ValueError(
+                            "learned_utility.autoencoder_proxy.utility_calibrator.delta_thresholds "
+                            "must include '__inf__'"
+                        )
+                risk_gates = utility_calibrator_cfg.get("risk_gates", {})
+                if risk_gates is not None and not isinstance(risk_gates, dict):
+                    raise ValueError(
+                        "learned_utility.autoencoder_proxy.utility_calibrator.risk_gates must be a dictionary"
+                    )
+                risk_gates = risk_gates or {}
+                for key in [
+                    "max_top1_drop_vs_ae_argmin_abs",
+                    "max_spearman_drop_vs_ae_argmin_abs",
+                    "max_gap_pct_degradation_vs_ae_argmin",
+                    "max_top1_drop_vs_metadata_abs",
+                    "max_spearman_drop_vs_metadata_abs",
+                    "max_gap_pct_degradation_vs_metadata",
+                ]:
+                    if float(risk_gates.get(key, 0.0)) < 0.0:
+                        raise ValueError(
+                            f"learned_utility.autoencoder_proxy.utility_calibrator.risk_gates.{key} must be >= 0"
+                        )
+                if float(utility_calibrator_cfg.get("ridge_l2", 1e-4)) < 0.0:
+                    raise ValueError("learned_utility.autoencoder_proxy.utility_calibrator.ridge_l2 must be >= 0")
             if residual_policy_version == "metadata_ae_residual_safe_override_v1":
                 if not bool(residual_cfg.get("enabled", False)):
                     raise ValueError(

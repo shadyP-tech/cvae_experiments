@@ -218,6 +218,63 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
                     "threshold_selection_policy": "source_inner_risk_gated_metadata_gain",
                     "primary_aggregation": "macro_by_domain",
                 },
+                "utility_calibrator": {
+                    "enabled": bool(
+                        (autoencoder_proxy_cfg.get("utility_calibrator", {}) or {}).get("enabled", False)
+                    ),
+                    "primary_method": str(
+                        (autoencoder_proxy_cfg.get("utility_calibrator", {}) or {}).get(
+                            "primary_method",
+                            "ae_utility_calibrated_safe_override_v1",
+                        )
+                    ),
+                    "model_types": _as_str_list(
+                        (autoencoder_proxy_cfg.get("utility_calibrator", {}) or {}).get("model_types"),
+                        ["ridge_delta"],
+                    ),
+                    "primary_model_type": str(
+                        (autoencoder_proxy_cfg.get("utility_calibrator", {}) or {}).get(
+                            "primary_model_type",
+                            "ridge_delta",
+                        )
+                    ),
+                    "diagnostic_model_types": _as_str_list(
+                        (autoencoder_proxy_cfg.get("utility_calibrator", {}) or {}).get("diagnostic_model_types"),
+                        ["pairwise_ranker"],
+                    ),
+                    "fallback_policy": str(
+                        (autoencoder_proxy_cfg.get("utility_calibrator", {}) or {}).get(
+                            "fallback_policy",
+                            "ae_argmin_zscore",
+                        )
+                    ),
+                    "feature_sets_primary": _as_str_list(
+                        (autoencoder_proxy_cfg.get("utility_calibrator", {}) or {}).get("feature_sets_primary"),
+                        ["ae_core", "ae_quality"],
+                    ),
+                    "feature_sets_diagnostic": _as_str_list(
+                        (autoencoder_proxy_cfg.get("utility_calibrator", {}) or {}).get("feature_sets_diagnostic"),
+                        ["ae_metadata", "ae_combined"],
+                    ),
+                    "delta_thresholds": [
+                        str(v)
+                        for v in (autoencoder_proxy_cfg.get("utility_calibrator", {}) or {}).get(
+                            "delta_thresholds",
+                            [0.0, 0.01, 0.025, 0.05, 0.10, "__inf__"],
+                        )
+                    ],
+                    "margin_thresholds": [
+                        str(v)
+                        for v in (autoencoder_proxy_cfg.get("utility_calibrator", {}) or {}).get(
+                            "margin_thresholds",
+                            [0.0, 0.05, 0.10, 0.25],
+                        )
+                    ],
+                    "threshold_selection_policy": "source_inner_ae_argmin_noninferiority_then_gap",
+                    "fallback_policy_semantics": "delta_threshold_inf_returns_exact_ae_argmin",
+                    "heldout_target_nelbo_used_for_selection": 0,
+                    "claim_boundary": "source-only AE utility calibration of a proxy, not direct compatibility estimation",
+                },
                 "claim_boundary": "AE reconstruction fit is a proxy, not CVAE compatibility.",
                 "forbidden_information": [
                     "target support set",
