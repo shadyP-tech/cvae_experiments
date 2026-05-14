@@ -653,8 +653,6 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
             "pairwise_validation_pairs_after_filter",
             "pairwise_train_domains_after_filter",
             "worst_inner_domain_oracle_gap_pct",
-            "relative_catastrophic_regression_vs_hard_gt_5_rate",
-            "absolute_high_regret_rate_gap_gt_5",
             "std_oracle_gap_pct_across_inner_domains",
             "std_top1_across_inner_domains",
             "max_minus_min_oracle_gap_pct_across_inner_domains",
