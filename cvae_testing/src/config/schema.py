@@ -36,7 +36,10 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             f"experiment.mode must be one of {sorted(SUPPORTED_EXPERIMENT_MODES)}, got: {experiment_mode}"
         )
     experiment_name = str((experiment_cfg or {}).get("name", "")).strip().lower()
-    is_response_routing_protocol = experiment_name == "learned_utility_response_routing_v1"
+    is_response_routing_protocol = experiment_name in {
+        "learned_utility_response_routing_v1",
+        "learned_utility_response_routing_delta_gate_v1",
+    }
     camelyon17_support_response_protocols = {
         "learned_utility_support_response_routing_v1",
         "learned_utility_response_routing_risk_constrained_v1",

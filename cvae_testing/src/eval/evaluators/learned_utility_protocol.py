@@ -213,11 +213,19 @@ def _method_protocol(method: str) -> MethodProtocol:
         "pairwise_tournament_hard",
         "pairwise_tournament_topk_uniform",
         "pairwise_tournament_inner_selected",
+        "pairwise_tournament_delta_gated_sparse_mix_v1",
     }:
         return MethodProtocol(
             method_role="learned",
             adoption_eligible=1,
             diagnostic_only=0,
+            routing_uses_query_features=1,
+        )
+    if name == "pairwise_tournament_delta_gated_sparse_mix_combined_diagnostic_v1":
+        return MethodProtocol(
+            method_role="diagnostic",
+            adoption_eligible=0,
+            diagnostic_only=1,
             routing_uses_query_features=1,
         )
     if name == "oracle_confidence_set_diagnostic":
@@ -301,6 +309,11 @@ def _finite_mean(values: Sequence[float]) -> float:
     return float(np.mean(vals)) if vals else float("nan")
 
 
+def _finite_median(values: Sequence[float]) -> float:
+    vals = [float(v) for v in values if np.isfinite(float(v))]
+    return float(np.median(vals)) if vals else float("nan")
+
+
 def _validate_sample_rows_for_aggregation(rows: Sequence[Mapping[str, Any]]) -> None:
     for row in rows:
         method = str(row.get("method", ""))
@@ -356,6 +369,12 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         "fallback_help": "fallback_help",
         "fallback_harm": "fallback_harm",
         "tournament_margin": "tournament_margin",
+        "delta_gate_active": "delta_gate_active",
+        "fallback_delta_pct_raw": "fallback_delta_pct_raw",
+        "fallback_delta_pct_clipped_for_training": "fallback_delta_pct_clipped_for_training",
+        "predicted_fallback_delta_pct": "predicted_fallback_delta_pct",
+        "hard_oracle_gap_pct": "hard_oracle_gap_pct",
+        "hard_high_regret_selection": "hard_high_regret_selection",
     }
     for method, vals in sorted(by_method.items()):
         metrics: Dict[str, float] = {}
@@ -389,6 +408,55 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         metrics["fallback_help_rate"] = metrics["micro_fallback_help"]
         metrics["fallback_harm_rate"] = metrics["micro_fallback_harm"]
         metrics["mean_tournament_margin"] = metrics["micro_tournament_margin"]
+        metrics["delta_gate_active_rate"] = metrics["micro_delta_gate_active"]
+        metrics["mean_fallback_delta_pct_raw"] = metrics["micro_fallback_delta_pct_raw"]
+        metrics["mean_predicted_fallback_delta_pct"] = metrics["micro_predicted_fallback_delta_pct"]
+        metrics["heldout_paired_gap_reduction_vs_hard"] = float(
+            metrics["micro_hard_oracle_gap_pct"] - metrics["micro_oracle_gap_pct"]
+        ) if np.isfinite(metrics["micro_hard_oracle_gap_pct"]) else float("nan")
+        metrics["heldout_paired_high_regret_reduction_vs_hard"] = float(
+            metrics["micro_hard_high_regret_selection"] - metrics["micro_high_regret_selection"]
+        ) if np.isfinite(metrics["micro_hard_high_regret_selection"]) else float("nan")
+
+        if any("delta_gate_active" in r for r in vals):
+            active_rows = [
+                r for r in vals
+                if int(float(r.get("delta_gate_active", 0) or 0)) == 1
+            ]
+            metrics["fallback_help_rate_active_only"] = _finite_mean(
+                [float(r.get("fallback_help", float("nan"))) for r in active_rows]
+            )
+            metrics["fallback_harm_rate_active_only"] = _finite_mean(
+                [float(r.get("fallback_harm", float("nan"))) for r in active_rows]
+            )
+            metrics["fallback_help_rate_all_rows"] = float(
+                np.mean(
+                    [
+                        1.0
+                        if int(float(r.get("delta_gate_active", 0) or 0)) == 1
+                        and float(r.get("fallback_delta_pct_raw", float("nan"))) < 0.0
+                        else 0.0
+                        for r in vals
+                    ]
+                )
+            )
+            metrics["fallback_harm_rate_all_rows"] = float(
+                np.mean(
+                    [
+                        1.0
+                        if int(float(r.get("delta_gate_active", 0) or 0)) == 1
+                        and float(r.get("fallback_delta_pct_raw", float("nan"))) > 0.0
+                        else 0.0
+                        for r in vals
+                    ]
+                )
+            )
+            metrics["mean_fallback_delta_pct_when_active"] = _finite_mean(
+                [float(r.get("fallback_delta_pct_raw", float("nan"))) for r in active_rows]
+            )
+            metrics["median_fallback_delta_pct_when_active"] = _finite_median(
+                [float(r.get("fallback_delta_pct_raw", float("nan"))) for r in active_rows]
+            )
 
         correct_margins = [
             float(r.get("tournament_margin", float("nan")))
@@ -486,6 +554,17 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
             "source_inner_oracle_in_route_set",
             "source_inner_top1",
             "source_inner_sparse_mix_rate",
+            "delta_gate_selection_status",
+            "delta_gate_threshold",
+            "delta_gate_feature_set",
+            "delta_gate_source_inner_gap_pct",
+            "delta_gate_source_inner_paired_gap_reduction_vs_hard",
+            "delta_gate_source_inner_activation_rate",
+            "delta_gate_source_inner_harm_rate_active_only",
+            "delta_gate_source_inner_help_rate_active_only",
+            "delta_gate_spearman_pred_vs_true_delta_source_inner",
+            "delta_gate_auc_help_vs_harm_source_inner",
+            "delta_gate_diagnostic_only_reason",
         ]:
             vals_for_key = sorted(set(str(r.get(key, "")) for r in vals if str(r.get(key, "")) != ""))
             if vals_for_key:
@@ -570,6 +649,40 @@ def _domain_breakdown_rows(sample_rows: Sequence[Dict[str, Any]]) -> List[Dict[s
                 ),
                 "mean_tournament_margin": _finite_mean(
                     [float(r.get("tournament_margin", float("nan"))) for r in rows]
+                ),
+                "delta_gate_selection_status": str(base.get("delta_gate_selection_status", "")),
+                "delta_gate_threshold": str(base.get("delta_gate_threshold", "")),
+                "delta_gate_feature_set": str(base.get("delta_gate_feature_set", "")),
+                "delta_gate_diagnostic_only_reason": str(base.get("delta_gate_diagnostic_only_reason", "")),
+                "delta_gate_active_rate": _finite_mean(
+                    [float(r.get("delta_gate_active", float("nan"))) for r in rows]
+                ),
+                "fallback_help_rate_active_only": _finite_mean(
+                    [
+                        float(r.get("fallback_help", float("nan")))
+                        for r in rows
+                        if int(float(r.get("delta_gate_active", 0) or 0)) == 1
+                    ]
+                ),
+                "fallback_harm_rate_active_only": _finite_mean(
+                    [
+                        float(r.get("fallback_harm", float("nan")))
+                        for r in rows
+                        if int(float(r.get("delta_gate_active", 0) or 0)) == 1
+                    ]
+                ),
+                "heldout_paired_gap_reduction_vs_hard": _finite_mean(
+                    [
+                        float(r.get("hard_oracle_gap_pct", float("nan"))) - float(r.get("oracle_gap_pct", float("nan")))
+                        for r in rows
+                    ]
+                ),
+                "heldout_paired_high_regret_reduction_vs_hard": _finite_mean(
+                    [
+                        float(r.get("hard_high_regret_selection", float("nan")))
+                        - float(r.get("high_regret_selection", float("nan")))
+                        for r in rows
+                    ]
                 ),
             }
         )

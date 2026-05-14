@@ -71,10 +71,32 @@ class ResidualRoutingConfig:
 
 
 @dataclass(frozen=True)
+class FallbackBenefitGateConfig:
+    enabled: bool
+    method_name: str
+    predictor: str
+    feature_set: str
+    diagnostic_feature_sets: Tuple[str, ...]
+    calibration_policy: str
+    ridge_l2: float
+    predicted_delta_pct_thresholds: Tuple[float, ...]
+    target_clip_delta_pct: Tuple[float, float]
+    feature_standardization: str
+    max_sparse_mix_activation_rate: float
+    max_fallback_harm_rate_active_only: float
+    min_fallback_help_minus_harm_active_only: float
+    min_source_inner_gap_reduction_pct: float
+    min_source_inner_active_rows: int
+    min_source_inner_active_domains: int
+    min_source_inner_validation_domains: int
+
+
+@dataclass(frozen=True)
 class PairwiseTournamentConfig:
     enabled: bool
     policy_name: str
     base_methods: Tuple[str, ...]
+    diagnostic_base_methods: Tuple[str, ...]
     margin_thresholds: Tuple[float, ...]
     sparse_mix_topk_values: Tuple[int, ...]
     sparse_mix_weighting: str
@@ -82,6 +104,7 @@ class PairwiseTournamentConfig:
     temperature_policy: str
     calibration_policy: str
     max_sparse_mix_activation_rate: float
+    fallback_benefit_gate: FallbackBenefitGateConfig
 
 
 @dataclass(frozen=True)
@@ -229,6 +252,65 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
     )
 
     tournament_cfg = _as_dict(learned_cfg.get("pairwise_tournament", {}))
+    fallback_gate_cfg = _as_dict(tournament_cfg.get("fallback_benefit_gate", {}))
+    target_clip_values = tuple(
+        float(v) for v in fallback_gate_cfg.get("target_clip_delta_pct", [-50.0, 50.0])
+    )
+    if len(target_clip_values) != 2:
+        raise ValueError("learned_utility.pairwise_tournament.fallback_benefit_gate.target_clip_delta_pct must have length 2")
+    fallback_gate = FallbackBenefitGateConfig(
+        enabled=bool((fallback_gate_cfg or {}).get("enabled", False)),
+        method_name=str(
+            (fallback_gate_cfg or {}).get(
+                "method_name",
+                "pairwise_tournament_delta_gated_sparse_mix_v1",
+            )
+        ),
+        predictor=str((fallback_gate_cfg or {}).get("predictor", "ridge_delta_pct")).strip().lower(),
+        feature_set=str(
+            (fallback_gate_cfg or {}).get("feature_set", "tournament_uncertainty_latent_only_v1")
+        ).strip(),
+        diagnostic_feature_sets=tuple(
+            str(v).strip()
+            for v in (fallback_gate_cfg or {}).get(
+                "diagnostic_feature_sets",
+                ["tournament_uncertainty_combined_diagnostic_v1"],
+            )
+        ),
+        calibration_policy=str(
+            (fallback_gate_cfg or {}).get(
+                "calibration_policy",
+                "source_inner_leave_query_domain_out_crossfit_delta_gate_v1",
+            )
+        ).strip().lower(),
+        ridge_l2=float((fallback_gate_cfg or {}).get("ridge_l2", 1e-4)),
+        predicted_delta_pct_thresholds=tuple(
+            float(v)
+            for v in (fallback_gate_cfg or {}).get(
+                "predicted_delta_pct_thresholds",
+                [-10.0, -5.0, -2.5, -1.0, -0.5],
+            )
+        ),
+        target_clip_delta_pct=(float(target_clip_values[0]), float(target_clip_values[1])),
+        feature_standardization=str(
+            (fallback_gate_cfg or {}).get("feature_standardization", "source_inner_train_only")
+        ).strip().lower(),
+        max_sparse_mix_activation_rate=float((fallback_gate_cfg or {}).get("max_sparse_mix_activation_rate", 0.40)),
+        max_fallback_harm_rate_active_only=float(
+            (fallback_gate_cfg or {}).get("max_fallback_harm_rate_active_only", 0.45)
+        ),
+        min_fallback_help_minus_harm_active_only=float(
+            (fallback_gate_cfg or {}).get("min_fallback_help_minus_harm_active_only", 0.05)
+        ),
+        min_source_inner_gap_reduction_pct=float(
+            (fallback_gate_cfg or {}).get("min_source_inner_gap_reduction_pct", 0.25)
+        ),
+        min_source_inner_active_rows=int((fallback_gate_cfg or {}).get("min_source_inner_active_rows", 10)),
+        min_source_inner_active_domains=int((fallback_gate_cfg or {}).get("min_source_inner_active_domains", 2)),
+        min_source_inner_validation_domains=int(
+            (fallback_gate_cfg or {}).get("min_source_inner_validation_domains", 2)
+        ),
+    )
     tournament = PairwiseTournamentConfig(
         enabled=bool((tournament_cfg or {}).get("enabled", False)),
         policy_name=str(
@@ -242,6 +324,13 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
             for v in (tournament_cfg or {}).get(
                 "base_methods",
                 ["pairwise_ranker_latent_only", "pairwise_ranker_combined"],
+            )
+        ),
+        diagnostic_base_methods=tuple(
+            str(v)
+            for v in (tournament_cfg or {}).get(
+                "diagnostic_base_methods",
+                [],
             )
         ),
         margin_thresholds=tuple(
@@ -261,6 +350,7 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         max_sparse_mix_activation_rate=float(
             (tournament_cfg or {}).get("max_sparse_mix_activation_rate", 0.80)
         ),
+        fallback_benefit_gate=fallback_gate,
     )
     if tournament.enabled:
         if tournament.sparse_mix_weighting != "uniform":
@@ -273,6 +363,29 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
             raise ValueError("learned_utility.pairwise_tournament.margin_thresholds must be non-empty")
         if any(int(v) < 1 for v in tournament.sparse_mix_topk_values):
             raise ValueError("learned_utility.pairwise_tournament.sparse_mix_topk_values must be >= 1")
+        if tournament.fallback_benefit_gate.enabled:
+            gate = tournament.fallback_benefit_gate
+            if gate.predictor != "ridge_delta_pct":
+                raise ValueError(
+                    "learned_utility.pairwise_tournament.fallback_benefit_gate.predictor must be 'ridge_delta_pct'"
+                )
+            if gate.feature_standardization != "source_inner_train_only":
+                raise ValueError(
+                    "learned_utility.pairwise_tournament.fallback_benefit_gate.feature_standardization "
+                    "must be 'source_inner_train_only'"
+                )
+            if not gate.predicted_delta_pct_thresholds:
+                raise ValueError(
+                    "learned_utility.pairwise_tournament.fallback_benefit_gate."
+                    "predicted_delta_pct_thresholds must be non-empty"
+                )
+            if gate.target_clip_delta_pct[0] >= gate.target_clip_delta_pct[1]:
+                raise ValueError(
+                    "learned_utility.pairwise_tournament.fallback_benefit_gate.target_clip_delta_pct "
+                    "must be ordered [low, high]"
+                )
+            if not gate.feature_set:
+                raise ValueError("learned_utility.pairwise_tournament.fallback_benefit_gate.feature_set is required")
 
     return LearnedUtilityConfig(
         pair_batch_size=pair_batch_size,

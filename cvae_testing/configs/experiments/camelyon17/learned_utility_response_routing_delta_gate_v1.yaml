@@ -1,0 +1,205 @@
+seed: 42
+
+experiment:
+  dataset_name: camelyon17
+  name: learned_utility_response_routing_delta_gate_v1
+  mode: learned_utility_routing
+
+data:
+  dataset_type: camelyon17
+  root: data/Camelyon17/data/camelyon17_v1.0
+  metadata_file: metadata.csv
+  domain_field: center
+  use_metadata_split: false
+  image_extensions: [".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"]
+  magnifications: [0, 1, 2, 3, 4]
+  split:
+    train: 0.70
+    val: 0.15
+    test: 0.15
+  require_patient_ids: true
+  split_cap_profile: development
+  split_domain_caps:
+    train: 250
+    val: 100
+    test: 200
+  max_samples_per_domain: 1000
+
+features:
+  image_size: 224
+  extraction_batch_size: 16
+  backbone_type: dinov2_vitb14
+  feature_extractor_name: dinov2_vitb14
+  feature_extractor_checkpoint: facebook/dinov2-base
+  feature_extractor_layer: final_norm_cls
+  embedding_pooling: cls_token
+  embedding_dim: 768
+
+model:
+  hidden_dim: 256
+  latent_dim: 16
+
+training:
+  batch_size: 128
+  learning_rate: 0.001
+  epochs: 25
+  patience: 5
+
+routing:
+  strategy: categorical_exact
+  tau: 1.0
+  temperature: 1.0
+
+learned_utility:
+  split_protocol: loqdo_query_domain
+  query_domain_field: magnification
+  splits: [test]
+  predictors: [linear_regressor, mlp_regressor, pairwise_ranker]
+
+  response_repeat_mode: posterior_sampling
+  posterior_sampling_enabled: true
+  dropout_enabled: false
+  decoder_sampling_enabled: false
+  num_response_repeats: 8
+  response_feature_normalization: train_fold_standardize
+  calibration_error_definition: bin10_mean_abs_gap
+  near_tie_epsilon_norm: 0.02
+
+  predictor_params:
+    mlp:
+      hidden_dim: 128
+      epochs: 40
+      lr: 1.0e-3
+      batch_size: 2048
+      device: auto
+    pairwise_ranker:
+      hidden_dim: 128
+      epochs: 40
+      lr: 1.0e-3
+      batch_size: 2048
+      device: auto
+      loss_type: hinge
+      margin: 1.0
+      near_tie_delta: 0.01
+      hard_pair_fraction: 0.5
+      random_pair_fraction: 0.5
+      max_pairs_per_sample: 12
+      max_pairs_per_domain: 5000
+      run_ablations: true
+
+  pairwise_tournament:
+    enabled: true
+    policy_name: pairwise_tournament_delta_gated_sparse_mix_v1
+    base_methods: [pairwise_ranker_latent_only]
+    diagnostic_base_methods: [pairwise_ranker_combined]
+    sparse_mix_topk_values: [2]
+    sparse_mix_weighting: uniform
+    score_temperature: 1.0
+    temperature_policy: fixed_temperature_not_selected
+    calibration_policy: inner_leave_query_domain_out_gap_then_top1
+    max_sparse_mix_activation_rate: 0.80
+    fallback_benefit_gate:
+      enabled: true
+      method_name: pairwise_tournament_delta_gated_sparse_mix_v1
+      predictor: ridge_delta_pct
+      feature_set: tournament_uncertainty_latent_only_v1
+      diagnostic_feature_sets: [tournament_uncertainty_combined_diagnostic_v1]
+      calibration_policy: source_inner_leave_query_domain_out_crossfit_delta_gate_v1
+      ridge_l2: 1.0e-4
+      predicted_delta_pct_thresholds: [-10.0, -5.0, -2.5, -1.0, -0.5]
+      target_clip_delta_pct: [-50.0, 50.0]
+      feature_standardization: source_inner_train_only
+      max_sparse_mix_activation_rate: 0.40
+      max_fallback_harm_rate_active_only: 0.45
+      min_fallback_help_minus_harm_active_only: 0.05
+      min_source_inner_gap_reduction_pct: 0.25
+      min_source_inner_active_rows: 10
+      min_source_inner_active_domains: 2
+      min_source_inner_validation_domains: 2
+
+  target:
+    name: nelbo
+    normalization: per_query_domain_zscore
+    normalization_stats_source: train_fold_only
+    eval_scale: raw_nelbo
+
+  pair_features:
+    include_sample_embedding: true
+    expert_id_encoding: one_hot
+    include_metadata_features: true
+    include_domain_stats: false
+
+  scoring:
+    granularity: sample_expert_pair
+    enforce_full_expert_scoring: true
+    pair_batch_size: 4096
+
+  latent_comparator:
+    primary: wasserstein
+    diagnostics: [centroid, gaussian_kl]
+
+  hybrid_scoring:
+    enabled: true
+    alphas: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    latent_metric: wasserstein
+    normalization_primary: per_query_zscore
+    normalization_sensitivity: per_query_minmax
+    run_sensitivity: true
+    tie_policy: stable_expert_index
+    acceptance:
+      min_mean_rank_improvement_abs: 0.05
+      min_mean_oracle_gap_pct_improvement_abs: 0.50
+      max_top1_drop_abs: 0.0
+
+  leakage_guards:
+    require_zero_query_domain_overlap: true
+    forbid_heldout_oracle_labels_in_training: true
+
+  winner_rule:
+    primary_metric: mean_oracle_gap_pct
+    tie_breakers: [top1_oracle_hit, spearman_with_oracle]
+    mlp_min_improvement_abs_pct: 1.0
+    max_allowed_seed_regression_pct: 5.0
+
+  artifacts:
+    save_pair_predictions_csv: true
+    save_sample_selection_csv: true
+    save_domain_breakdown_csv: true
+    save_training_fold_manifest_json: true
+
+  compatibility_research:
+    floors:
+      random_rank_floor: true
+      random_score_floor: true
+    permutation_tests:
+      expert_label_permutation: true
+      metadata_permutation: true
+      repeats: 200
+    diagnostics:
+      save_distribution_plots: true
+    gate:
+      decision_policy_version: sign_ci_v2
+      uplift_reference_method: metadata_routing
+      min_improving_seeds: 2
+      strong:
+        spearman_uplift_min: 0.05
+        top1_uplift_min: 0.10
+        oracle_gap_pct_reduction_min: 5.0
+      weak:
+        spearman_uplift_min: 0.025
+        top1_uplift_min: 0.05
+        oracle_gap_pct_reduction_min: 2.5
+      instability:
+        std_threshold: 0.05
+        top1_uplift_std_threshold: 0.05
+        spearman_uplift_std_threshold: 0.05
+        gap_pct_reduction_std_threshold: 3.0
+        sign_inconsistency_min_count: 2
+        min_positive_fraction: 0.67
+        ci_level: 0.95
+        ci_bootstrap_reps: 10000
+        ci_bootstrap_seed: 1337
+        allow_missing_domain_breakdown_as_diagnostic: false
+
+output:
+  root: outputs

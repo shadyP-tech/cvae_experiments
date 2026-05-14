@@ -26,8 +26,12 @@ from src.eval.evaluators.learned_utility_protocol import (
 )
 from src.eval.evaluators.learned_utility_selection import _selection_metrics
 from src.eval.evaluators.learned_utility_tournament import (
+    DeltaGatePolicySelection,
     TournamentPolicySelection,
+    build_delta_gate_calibration_rows,
+    delta_gate_route_rows,
     oracle_confidence_set_rows,
+    select_delta_gate_policy,
     summarize_tournament_rows,
     tournament_route_rows,
 )
@@ -314,6 +318,249 @@ def _calibrate_pairwise_tournament(
     )
 
 
+def _copy_delta_selection_with_reason(
+    selection: DeltaGatePolicySelection,
+    *,
+    diagnostic_only_reason: str,
+) -> DeltaGatePolicySelection:
+    return DeltaGatePolicySelection(
+        base_method=selection.base_method,
+        feature_set=selection.feature_set,
+        threshold=selection.threshold,
+        topk=selection.topk,
+        selected_by_inner_validation=selection.selected_by_inner_validation,
+        selection_status=selection.selection_status,
+        diagnostic_only_reason=str(diagnostic_only_reason or selection.diagnostic_only_reason),
+        source_inner_rows=selection.source_inner_rows,
+        source_inner_validation_domains=selection.source_inner_validation_domains,
+        source_inner_active_rows=selection.source_inner_active_rows,
+        source_inner_active_domains=selection.source_inner_active_domains,
+        source_inner_gap_pct=selection.source_inner_gap_pct,
+        source_inner_paired_gap_reduction_vs_hard=selection.source_inner_paired_gap_reduction_vs_hard,
+        source_inner_high_regret_rate=selection.source_inner_high_regret_rate,
+        source_inner_paired_high_regret_reduction_vs_hard=selection.source_inner_paired_high_regret_reduction_vs_hard,
+        source_inner_activation_rate=selection.source_inner_activation_rate,
+        source_inner_help_rate_active_only=selection.source_inner_help_rate_active_only,
+        source_inner_harm_rate_active_only=selection.source_inner_harm_rate_active_only,
+        source_inner_help_rate_all_rows=selection.source_inner_help_rate_all_rows,
+        source_inner_harm_rate_all_rows=selection.source_inner_harm_rate_all_rows,
+        source_inner_mean_delta_pct_when_active=selection.source_inner_mean_delta_pct_when_active,
+        source_inner_median_delta_pct_when_active=selection.source_inner_median_delta_pct_when_active,
+        source_inner_spearman_pred_vs_true_delta=selection.source_inner_spearman_pred_vs_true_delta,
+        source_inner_auc_help_vs_harm=selection.source_inner_auc_help_vs_harm,
+        model=selection.model,
+    )
+
+
+def _delta_noop_selection(
+    *,
+    base_method: str,
+    feature_set: str,
+    topk: int,
+    reason: str,
+) -> DeltaGatePolicySelection:
+    return DeltaGatePolicySelection(
+        base_method=str(base_method),
+        feature_set=str(feature_set),
+        threshold=float("nan"),
+        topk=int(topk),
+        selected_by_inner_validation=False,
+        selection_status="insufficient_evidence_noop",
+        diagnostic_only_reason=str(reason),
+    )
+
+
+def _calibrate_delta_gate_tournament(
+    *,
+    embeddings: np.ndarray,
+    sample_domains: np.ndarray,
+    true_nelbo: np.ndarray,
+    expert_domains: Sequence[int],
+    domain_to_idx: Dict[int, int],
+    train_idx: np.ndarray,
+    outer_heldout_domain: int,
+    pairwise_cfg: Dict[str, Any],
+    tournament_cfg: PairwiseTournamentConfig,
+    include_metadata_features: bool,
+    seed: int,
+    embedding_feature_dim: int,
+    expert_feature_dim: int,
+    global_expert_domains: Sequence[int],
+) -> Tuple[DeltaGatePolicySelection, DeltaGatePolicySelection | None]:
+    gate_cfg = tournament_cfg.fallback_benefit_gate
+    source_domains = sorted(set(int(sample_domains[int(i)]) for i in np.asarray(train_idx, dtype=np.int64).tolist()))
+    topk = int(tournament_cfg.sparse_mix_topk_values[0])
+    adoption_base = str(tournament_cfg.base_methods[0]) if tournament_cfg.base_methods else "pairwise_ranker_latent_only"
+    diagnostic_base = (
+        str(tournament_cfg.diagnostic_base_methods[0])
+        if tournament_cfg.diagnostic_base_methods
+        else "pairwise_ranker_combined"
+    )
+    if len(source_domains) < 2:
+        adoption = _delta_noop_selection(
+            base_method=adoption_base,
+            feature_set=gate_cfg.feature_set,
+            topk=topk,
+            reason="insufficient_validation_domains",
+        )
+        diagnostic = _delta_noop_selection(
+            base_method=diagnostic_base,
+            feature_set=gate_cfg.diagnostic_feature_sets[0] if gate_cfg.diagnostic_feature_sets else gate_cfg.feature_set,
+            topk=topk,
+            reason="insufficient_validation_domains",
+        ) if tournament_cfg.diagnostic_base_methods else None
+        return adoption, diagnostic
+
+    rows_by_key: Dict[Tuple[str, str, int], List[Dict[str, Any]]] = {}
+    for validation_domain in source_domains:
+        train_idx_arr = np.asarray(train_idx, dtype=np.int64)
+        inner_train_idx = train_idx_arr[sample_domains[train_idx_arr] != int(validation_domain)]
+        validation_idx = train_idx_arr[sample_domains[train_idx_arr] == int(validation_domain)]
+        if inner_train_idx.size == 0 or validation_idx.size == 0:
+            continue
+
+        try:
+            x_inner, q_inner, e_inner, s_inner = _build_fold_training_pair_features(
+                sample_embeddings=embeddings,
+                sample_domains=sample_domains,
+                train_indices=inner_train_idx,
+                expert_domains=expert_domains,
+                outer_heldout_domain=int(outer_heldout_domain),
+                include_metadata_features=include_metadata_features,
+                extra_excluded_domains=[int(validation_domain)],
+            )
+            validation_fold = FoldCandidateSet.for_heldout_domain(
+                heldout_domain=int(outer_heldout_domain),
+                expert_domains=expert_domains,
+                excluded_domains=[int(validation_domain)],
+            )
+            x_val, q_val, e_val, s_val = _build_pair_features(
+                sample_embeddings=embeddings,
+                sample_domains=sample_domains,
+                sample_indices=validation_idx,
+                expert_domains=validation_fold.candidate_expert_domains,
+                expert_id_domains=expert_domains,
+                include_metadata_features=include_metadata_features,
+            )
+        except ProtocolError:
+            continue
+
+        y_inner = true_nelbo[s_inner, [domain_to_idx[int(ed)] for ed in e_inner]]
+        y_val = true_nelbo[s_val, [domain_to_idx[int(ed)] for ed in e_val]]
+        pred_by_method = _fit_pairwise_variant_predictions(
+            x_train=x_inner,
+            x_test=x_val,
+            q_train=q_inner,
+            e_train=e_inner,
+            s_train=s_inner,
+            q_test=q_val,
+            e_test=e_val,
+            sample_domains=sample_domains,
+            y_train=y_inner,
+            pairwise_cfg=pairwise_cfg,
+            seed=int(seed) + int(validation_domain),
+            heldout_domain=int(outer_heldout_domain),
+            embedding_feature_dim=embedding_feature_dim,
+            expert_feature_dim=expert_feature_dim,
+        )
+        if not pred_by_method:
+            continue
+
+        val_n = int(validation_idx.size)
+        e_n = len(validation_fold.candidate_expert_domains)
+        true_matrix = y_val.reshape(val_n, e_n)
+        latent_matrix = (
+            pred_by_method["pairwise_ranker_latent_only"].reshape(val_n, e_n)
+            if "pairwise_ranker_latent_only" in pred_by_method
+            else None
+        )
+        combined_matrix = (
+            pred_by_method["pairwise_ranker_combined"].reshape(val_n, e_n)
+            if "pairwise_ranker_combined" in pred_by_method
+            else None
+        )
+
+        for base_method in tournament_cfg.base_methods:
+            if str(base_method) not in pred_by_method:
+                continue
+            score_matrix = pred_by_method[str(base_method)].reshape(val_n, e_n)
+            rows = build_delta_gate_calibration_rows(
+                validation_domain=int(validation_domain),
+                query_domains=sample_domains[validation_idx],
+                expert_domains=validation_fold.candidate_expert_domains,
+                score_matrix=score_matrix,
+                true_nelbo_matrix=true_matrix,
+                feature_set=gate_cfg.feature_set,
+                base_method=str(base_method),
+                topk=topk,
+                temperature=float(tournament_cfg.score_temperature),
+                gate_cfg=gate_cfg,
+            )
+            rows_by_key.setdefault((str(base_method), gate_cfg.feature_set, topk), []).extend(rows)
+
+        for base_method in tournament_cfg.diagnostic_base_methods:
+            if str(base_method) not in pred_by_method:
+                continue
+            for feature_set in gate_cfg.diagnostic_feature_sets:
+                score_matrix = pred_by_method[str(base_method)].reshape(val_n, e_n)
+                try:
+                    rows = build_delta_gate_calibration_rows(
+                        validation_domain=int(validation_domain),
+                        query_domains=sample_domains[validation_idx],
+                        expert_domains=validation_fold.candidate_expert_domains,
+                        score_matrix=score_matrix,
+                        true_nelbo_matrix=true_matrix,
+                        feature_set=str(feature_set),
+                        base_method=str(base_method),
+                        topk=topk,
+                        temperature=float(tournament_cfg.score_temperature),
+                        gate_cfg=gate_cfg,
+                        latent_score_matrix=latent_matrix,
+                        combined_score_matrix=combined_matrix,
+                    )
+                except ProtocolError:
+                    continue
+                rows_by_key.setdefault((str(base_method), str(feature_set), topk), []).extend(rows)
+
+    adoption_rows = {
+        key: rows
+        for key, rows in rows_by_key.items()
+        if key[0] in set(str(v) for v in tournament_cfg.base_methods) and key[1] == gate_cfg.feature_set
+    }
+    adoption = select_delta_gate_policy(rows_by_key=adoption_rows, gate_cfg=gate_cfg)
+    if adoption is None:
+        adoption = _delta_noop_selection(
+            base_method=adoption_base,
+            feature_set=gate_cfg.feature_set,
+            topk=topk,
+            reason="insufficient_validation_domains",
+        )
+
+    diagnostic: DeltaGatePolicySelection | None = None
+    diagnostic_rows = {
+        key: rows
+        for key, rows in rows_by_key.items()
+        if key[0] in set(str(v) for v in tournament_cfg.diagnostic_base_methods)
+        and key[1] in set(str(v) for v in gate_cfg.diagnostic_feature_sets)
+    }
+    if diagnostic_rows:
+        diagnostic = select_delta_gate_policy(rows_by_key=diagnostic_rows, gate_cfg=gate_cfg)
+        if diagnostic is not None:
+            diagnostic = _copy_delta_selection_with_reason(
+                diagnostic,
+                diagnostic_only_reason=diagnostic.diagnostic_only_reason or "diagnostic_only_combined_metadata_features",
+            )
+    elif tournament_cfg.diagnostic_base_methods:
+        diagnostic = _delta_noop_selection(
+            base_method=diagnostic_base,
+            feature_set=gate_cfg.diagnostic_feature_sets[0] if gate_cfg.diagnostic_feature_sets else gate_cfg.feature_set,
+            topk=topk,
+            reason="insufficient_validation_domains",
+        )
+
+    return adoption, diagnostic
+
+
 def _run_learned_methods_for_fold(
     *,
     embeddings: np.ndarray,
@@ -512,119 +759,252 @@ def _run_learned_methods_for_fold(
             )
 
     if bool(tournament_cfg.enabled) and pairwise_pred_matrices and true_matrix_for_tournament is not None:
-        selected_policy = _calibrate_pairwise_tournament(
-            embeddings=embeddings,
-            sample_domains=sample_domains,
-            true_nelbo=true_nelbo,
-            expert_domains=expert_domains,
-            domain_to_idx=domain_to_idx,
-            train_idx=train_idx,
-            outer_heldout_domain=int(fold.heldout_domain),
-            pairwise_cfg=pairwise_cfg,
-            tournament_cfg=tournament_cfg,
-            include_metadata_features=include_metadata_features,
-            seed=int(seed),
-            embedding_feature_dim=embedding_feature_dim,
-            expert_feature_dim=expert_feature_dim,
-            global_expert_domains=expert_domains,
-        )
-        available_bases = [str(m) for m in tournament_cfg.base_methods if str(m) in pairwise_pred_matrices]
-        if not available_bases:
-            available_bases = sorted(pairwise_pred_matrices)
-        hard_base = (
-            str(selected_policy.base_method)
-            if selected_policy is not None and str(selected_policy.base_method) in pairwise_pred_matrices
-            else str(available_bases[0])
-        )
-        hard_score = pairwise_pred_matrices[hard_base]
-        sample_rows.extend(
-            tournament_route_rows(
-                method="pairwise_tournament_hard",
-                fold=fold,
-                query_domains=sample_domains[test_idx],
-                expert_domains=fold.candidate_expert_domains,
-                score_matrix=hard_score,
-                true_nelbo_matrix=true_matrix_for_tournament,
-                global_true_nelbo_matrix=global_eval,
+        if bool(tournament_cfg.fallback_benefit_gate.enabled):
+            delta_selection, diagnostic_delta_selection = _calibrate_delta_gate_tournament(
+                embeddings=embeddings,
+                sample_domains=sample_domains,
+                true_nelbo=true_nelbo,
+                expert_domains=expert_domains,
+                domain_to_idx=domain_to_idx,
+                train_idx=train_idx,
+                outer_heldout_domain=int(fold.heldout_domain),
+                pairwise_cfg=pairwise_cfg,
+                tournament_cfg=tournament_cfg,
+                include_metadata_features=include_metadata_features,
+                seed=int(seed),
+                embedding_feature_dim=embedding_feature_dim,
+                expert_feature_dim=expert_feature_dim,
                 global_expert_domains=expert_domains,
-                policy_name=tournament_cfg.policy_name,
-                base_method=hard_base,
-                threshold=0.0,
-                topk=1,
-                temperature=float(tournament_cfg.score_temperature),
-                temperature_policy=tournament_cfg.temperature_policy,
-                selected_by_inner_validation=bool(selected_policy is not None),
-                threshold_selection_policy=tournament_cfg.calibration_policy,
             )
-        )
-
-        topk_for_reference = int(
-            selected_policy.topk
-            if selected_policy is not None
-            else min(max(int(tournament_cfg.sparse_mix_topk_values[0]), 1), len(fold.candidate_expert_domains))
-        )
-        sample_rows.extend(
-            tournament_route_rows(
-                method="pairwise_tournament_topk_uniform",
-                fold=fold,
-                query_domains=sample_domains[test_idx],
-                expert_domains=fold.candidate_expert_domains,
-                score_matrix=hard_score,
-                true_nelbo_matrix=true_matrix_for_tournament,
-                global_true_nelbo_matrix=global_eval,
-                global_expert_domains=expert_domains,
-                policy_name=tournament_cfg.policy_name,
-                base_method=hard_base,
-                threshold=float("inf"),
-                topk=topk_for_reference,
-                temperature=float(tournament_cfg.score_temperature),
-                temperature_policy=tournament_cfg.temperature_policy,
-                selected_by_inner_validation=bool(selected_policy is not None),
-                threshold_selection_policy="always_sparse_mix_topk_reference",
-                diagnostic_only_reason="diagnostic_only_sparse_mix_always_active",
+            available_bases = [str(m) for m in tournament_cfg.base_methods if str(m) in pairwise_pred_matrices]
+            if not available_bases:
+                available_bases = sorted(pairwise_pred_matrices)
+            hard_base = (
+                str(delta_selection.base_method)
+                if str(delta_selection.base_method) in pairwise_pred_matrices
+                else str(available_bases[0])
             )
-        )
-
-        if selected_policy is not None and str(selected_policy.base_method) in pairwise_pred_matrices:
-            selected_score = pairwise_pred_matrices[str(selected_policy.base_method)]
+            hard_score = pairwise_pred_matrices[hard_base]
             sample_rows.extend(
                 tournament_route_rows(
-                    method="pairwise_tournament_inner_selected",
+                    method="pairwise_tournament_hard",
                     fold=fold,
                     query_domains=sample_domains[test_idx],
                     expert_domains=fold.candidate_expert_domains,
-                    score_matrix=selected_score,
+                    score_matrix=hard_score,
                     true_nelbo_matrix=true_matrix_for_tournament,
                     global_true_nelbo_matrix=global_eval,
                     global_expert_domains=expert_domains,
                     policy_name=tournament_cfg.policy_name,
-                    base_method=str(selected_policy.base_method),
-                    threshold=float(selected_policy.threshold),
-                    topk=int(selected_policy.topk),
+                    base_method=hard_base,
+                    threshold=0.0,
+                    topk=1,
                     temperature=float(tournament_cfg.score_temperature),
                     temperature_policy=tournament_cfg.temperature_policy,
-                    selected_by_inner_validation=True,
-                    threshold_selection_policy=tournament_cfg.calibration_policy,
-                    diagnostic_only_reason=str(selected_policy.diagnostic_only_reason),
-                    source_inner_summary=selected_policy,
+                    selected_by_inner_validation=bool(delta_selection.selected_by_inner_validation),
+                    threshold_selection_policy=tournament_cfg.fallback_benefit_gate.calibration_policy,
                 )
             )
+            topk_for_reference = int(delta_selection.topk)
+            sample_rows.extend(
+                tournament_route_rows(
+                    method="pairwise_tournament_topk_uniform",
+                    fold=fold,
+                    query_domains=sample_domains[test_idx],
+                    expert_domains=fold.candidate_expert_domains,
+                    score_matrix=hard_score,
+                    true_nelbo_matrix=true_matrix_for_tournament,
+                    global_true_nelbo_matrix=global_eval,
+                    global_expert_domains=expert_domains,
+                    policy_name=tournament_cfg.policy_name,
+                    base_method=hard_base,
+                    threshold=float("inf"),
+                    topk=topk_for_reference,
+                    temperature=float(tournament_cfg.score_temperature),
+                    temperature_policy=tournament_cfg.temperature_policy,
+                    selected_by_inner_validation=bool(delta_selection.selected_by_inner_validation),
+                    threshold_selection_policy="always_sparse_mix_topk_reference",
+                    diagnostic_only_reason="diagnostic_only_sparse_mix_always_active",
+                )
+            )
+            sample_rows.extend(
+                delta_gate_route_rows(
+                    method=tournament_cfg.fallback_benefit_gate.method_name,
+                    fold=fold,
+                    query_domains=sample_domains[test_idx],
+                    expert_domains=fold.candidate_expert_domains,
+                    score_matrix=hard_score,
+                    true_nelbo_matrix=true_matrix_for_tournament,
+                    global_true_nelbo_matrix=global_eval,
+                    global_expert_domains=expert_domains,
+                    policy_name=tournament_cfg.policy_name,
+                    selection=delta_selection,
+                    temperature=float(tournament_cfg.score_temperature),
+                    temperature_policy=tournament_cfg.temperature_policy,
+                    gate_cfg=tournament_cfg.fallback_benefit_gate,
+                )
+            )
+            if (
+                diagnostic_delta_selection is not None
+                and str(diagnostic_delta_selection.base_method) in pairwise_pred_matrices
+                and (
+                    str(diagnostic_delta_selection.feature_set) != "tournament_uncertainty_combined_diagnostic_v1"
+                    or (
+                        "pairwise_ranker_latent_only" in pairwise_pred_matrices
+                        and "pairwise_ranker_combined" in pairwise_pred_matrices
+                    )
+                )
+            ):
+                sample_rows.extend(
+                    delta_gate_route_rows(
+                        method="pairwise_tournament_delta_gated_sparse_mix_combined_diagnostic_v1",
+                        fold=fold,
+                        query_domains=sample_domains[test_idx],
+                        expert_domains=fold.candidate_expert_domains,
+                        score_matrix=pairwise_pred_matrices[str(diagnostic_delta_selection.base_method)],
+                        true_nelbo_matrix=true_matrix_for_tournament,
+                        global_true_nelbo_matrix=global_eval,
+                        global_expert_domains=expert_domains,
+                        policy_name=tournament_cfg.policy_name,
+                        selection=diagnostic_delta_selection,
+                        temperature=float(tournament_cfg.score_temperature),
+                        temperature_policy=tournament_cfg.temperature_policy,
+                        gate_cfg=tournament_cfg.fallback_benefit_gate,
+                        diagnostic_only_reason="diagnostic_only_combined_metadata_features",
+                        latent_score_matrix=pairwise_pred_matrices.get("pairwise_ranker_latent_only"),
+                        combined_score_matrix=pairwise_pred_matrices.get("pairwise_ranker_combined"),
+                    )
+                )
             sample_rows.extend(
                 oracle_confidence_set_rows(
                     fold=fold,
                     query_domains=sample_domains[test_idx],
                     expert_domains=fold.candidate_expert_domains,
-                    score_matrix=selected_score,
+                    score_matrix=hard_score,
                     true_nelbo_matrix=true_matrix_for_tournament,
                     global_true_nelbo_matrix=global_eval,
                     global_expert_domains=expert_domains,
                     policy_name=tournament_cfg.policy_name,
-                    base_method=str(selected_policy.base_method),
-                    topk=int(selected_policy.topk),
+                    base_method=hard_base,
+                    topk=topk_for_reference,
                     temperature=float(tournament_cfg.score_temperature),
                     temperature_policy=tournament_cfg.temperature_policy,
                 )
             )
+        else:
+            selected_policy = _calibrate_pairwise_tournament(
+                embeddings=embeddings,
+                sample_domains=sample_domains,
+                true_nelbo=true_nelbo,
+                expert_domains=expert_domains,
+                domain_to_idx=domain_to_idx,
+                train_idx=train_idx,
+                outer_heldout_domain=int(fold.heldout_domain),
+                pairwise_cfg=pairwise_cfg,
+                tournament_cfg=tournament_cfg,
+                include_metadata_features=include_metadata_features,
+                seed=int(seed),
+                embedding_feature_dim=embedding_feature_dim,
+                expert_feature_dim=expert_feature_dim,
+                global_expert_domains=expert_domains,
+            )
+            available_bases = [str(m) for m in tournament_cfg.base_methods if str(m) in pairwise_pred_matrices]
+            if not available_bases:
+                available_bases = sorted(pairwise_pred_matrices)
+            hard_base = (
+                str(selected_policy.base_method)
+                if selected_policy is not None and str(selected_policy.base_method) in pairwise_pred_matrices
+                else str(available_bases[0])
+            )
+            hard_score = pairwise_pred_matrices[hard_base]
+            sample_rows.extend(
+                tournament_route_rows(
+                    method="pairwise_tournament_hard",
+                    fold=fold,
+                    query_domains=sample_domains[test_idx],
+                    expert_domains=fold.candidate_expert_domains,
+                    score_matrix=hard_score,
+                    true_nelbo_matrix=true_matrix_for_tournament,
+                    global_true_nelbo_matrix=global_eval,
+                    global_expert_domains=expert_domains,
+                    policy_name=tournament_cfg.policy_name,
+                    base_method=hard_base,
+                    threshold=0.0,
+                    topk=1,
+                    temperature=float(tournament_cfg.score_temperature),
+                    temperature_policy=tournament_cfg.temperature_policy,
+                    selected_by_inner_validation=bool(selected_policy is not None),
+                    threshold_selection_policy=tournament_cfg.calibration_policy,
+                )
+            )
+
+            topk_for_reference = int(
+                selected_policy.topk
+                if selected_policy is not None
+                else min(max(int(tournament_cfg.sparse_mix_topk_values[0]), 1), len(fold.candidate_expert_domains))
+            )
+            sample_rows.extend(
+                tournament_route_rows(
+                    method="pairwise_tournament_topk_uniform",
+                    fold=fold,
+                    query_domains=sample_domains[test_idx],
+                    expert_domains=fold.candidate_expert_domains,
+                    score_matrix=hard_score,
+                    true_nelbo_matrix=true_matrix_for_tournament,
+                    global_true_nelbo_matrix=global_eval,
+                    global_expert_domains=expert_domains,
+                    policy_name=tournament_cfg.policy_name,
+                    base_method=hard_base,
+                    threshold=float("inf"),
+                    topk=topk_for_reference,
+                    temperature=float(tournament_cfg.score_temperature),
+                    temperature_policy=tournament_cfg.temperature_policy,
+                    selected_by_inner_validation=bool(selected_policy is not None),
+                    threshold_selection_policy="always_sparse_mix_topk_reference",
+                    diagnostic_only_reason="diagnostic_only_sparse_mix_always_active",
+                )
+            )
+
+            if selected_policy is not None and str(selected_policy.base_method) in pairwise_pred_matrices:
+                selected_score = pairwise_pred_matrices[str(selected_policy.base_method)]
+                sample_rows.extend(
+                    tournament_route_rows(
+                        method="pairwise_tournament_inner_selected",
+                        fold=fold,
+                        query_domains=sample_domains[test_idx],
+                        expert_domains=fold.candidate_expert_domains,
+                        score_matrix=selected_score,
+                        true_nelbo_matrix=true_matrix_for_tournament,
+                        global_true_nelbo_matrix=global_eval,
+                        global_expert_domains=expert_domains,
+                        policy_name=tournament_cfg.policy_name,
+                        base_method=str(selected_policy.base_method),
+                        threshold=float(selected_policy.threshold),
+                        topk=int(selected_policy.topk),
+                        temperature=float(tournament_cfg.score_temperature),
+                        temperature_policy=tournament_cfg.temperature_policy,
+                        selected_by_inner_validation=True,
+                        threshold_selection_policy=tournament_cfg.calibration_policy,
+                        diagnostic_only_reason=str(selected_policy.diagnostic_only_reason),
+                        source_inner_summary=selected_policy,
+                    )
+                )
+                sample_rows.extend(
+                    oracle_confidence_set_rows(
+                        fold=fold,
+                        query_domains=sample_domains[test_idx],
+                        expert_domains=fold.candidate_expert_domains,
+                        score_matrix=selected_score,
+                        true_nelbo_matrix=true_matrix_for_tournament,
+                        global_true_nelbo_matrix=global_eval,
+                        global_expert_domains=expert_domains,
+                        policy_name=tournament_cfg.policy_name,
+                        base_method=str(selected_policy.base_method),
+                        topk=int(selected_policy.topk),
+                        temperature=float(tournament_cfg.score_temperature),
+                        temperature_policy=tournament_cfg.temperature_policy,
+                    )
+                )
 
     return LearnedFoldOutputs(
         sample_rows=sample_rows,

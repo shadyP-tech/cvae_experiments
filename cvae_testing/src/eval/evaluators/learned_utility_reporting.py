@@ -429,6 +429,10 @@ def _build_method_summary_rows(method_metrics: Dict[str, Dict[str, Any]]) -> Lis
                 "score_temperature": str(metrics.get("score_temperature", "")),
                 "temperature_policy": str(metrics.get("temperature_policy", "")),
                 "diagnostic_only_reason": str(metrics.get("diagnostic_only_reason", "")),
+                "delta_gate_selection_status": str(metrics.get("delta_gate_selection_status", "")),
+                "delta_gate_threshold": str(metrics.get("delta_gate_threshold", "")),
+                "delta_gate_feature_set": str(metrics.get("delta_gate_feature_set", "")),
+                "delta_gate_diagnostic_only_reason": str(metrics.get("delta_gate_diagnostic_only_reason", "")),
                 "selected_by_inner_validation": int(float(metrics.get("selected_by_inner_validation", 0.0) or 0.0)),
                 "adoption_selected_method": str(metrics.get("adoption_selected_method", "")),
                 "harmful_override_max": str(metrics.get("harmful_override_max", "")),
@@ -457,6 +461,50 @@ def _build_method_summary_rows(method_metrics: Dict[str, Dict[str, Any]]) -> Lis
                 ),
                 "mean_margin_when_top1_wrong": float(metrics.get("mean_margin_when_top1_wrong", float("nan"))),
                 "margin_auc_for_oracle_hit": float(metrics.get("margin_auc_for_oracle_hit", float("nan"))),
+                "delta_gate_active_rate": float(metrics.get("delta_gate_active_rate", float("nan"))),
+                "mean_fallback_delta_pct_raw": float(metrics.get("mean_fallback_delta_pct_raw", float("nan"))),
+                "mean_predicted_fallback_delta_pct": float(
+                    metrics.get("mean_predicted_fallback_delta_pct", float("nan"))
+                ),
+                "fallback_help_rate_active_only": float(
+                    metrics.get("fallback_help_rate_active_only", float("nan"))
+                ),
+                "fallback_harm_rate_active_only": float(
+                    metrics.get("fallback_harm_rate_active_only", float("nan"))
+                ),
+                "fallback_help_rate_all_rows": float(metrics.get("fallback_help_rate_all_rows", float("nan"))),
+                "fallback_harm_rate_all_rows": float(metrics.get("fallback_harm_rate_all_rows", float("nan"))),
+                "mean_fallback_delta_pct_when_active": float(
+                    metrics.get("mean_fallback_delta_pct_when_active", float("nan"))
+                ),
+                "median_fallback_delta_pct_when_active": float(
+                    metrics.get("median_fallback_delta_pct_when_active", float("nan"))
+                ),
+                "delta_gate_source_inner_gap_pct": str(metrics.get("delta_gate_source_inner_gap_pct", "")),
+                "delta_gate_source_inner_paired_gap_reduction_vs_hard": str(
+                    metrics.get("delta_gate_source_inner_paired_gap_reduction_vs_hard", "")
+                ),
+                "delta_gate_source_inner_activation_rate": str(
+                    metrics.get("delta_gate_source_inner_activation_rate", "")
+                ),
+                "delta_gate_source_inner_harm_rate_active_only": str(
+                    metrics.get("delta_gate_source_inner_harm_rate_active_only", "")
+                ),
+                "delta_gate_source_inner_help_rate_active_only": str(
+                    metrics.get("delta_gate_source_inner_help_rate_active_only", "")
+                ),
+                "delta_gate_spearman_pred_vs_true_delta_source_inner": str(
+                    metrics.get("delta_gate_spearman_pred_vs_true_delta_source_inner", "")
+                ),
+                "delta_gate_auc_help_vs_harm_source_inner": str(
+                    metrics.get("delta_gate_auc_help_vs_harm_source_inner", "")
+                ),
+                "heldout_paired_gap_reduction_vs_hard": float(
+                    metrics.get("heldout_paired_gap_reduction_vs_hard", float("nan"))
+                ),
+                "heldout_paired_high_regret_reduction_vs_hard": float(
+                    metrics.get("heldout_paired_high_regret_reduction_vs_hard", float("nan"))
+                ),
                 "n_samples_micro": float(metrics.get("n_samples_micro", 0.0)),
                 "n_query_domains_macro": float(metrics.get("n_query_domains_macro", 0.0)),
                 "n_valid_spearman_samples": float(metrics.get("n_valid_spearman_samples", 0.0)),
