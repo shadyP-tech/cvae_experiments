@@ -163,6 +163,7 @@ def evaluate_learned_utility_loqdo(
             predictors=eval_cfg.predictors,
             mlp_cfg=eval_cfg.mlp_cfg,
             pairwise_cfg=eval_cfg.pairwise_cfg,
+            tournament_cfg=eval_cfg.pairwise_tournament,
             include_metadata_features=eval_cfg.include_metadata_features,
             seed=int(seed),
             embedding_feature_dim=embedding_feature_dim,

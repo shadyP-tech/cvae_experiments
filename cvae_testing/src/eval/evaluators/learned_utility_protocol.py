@@ -209,6 +209,25 @@ def _method_protocol(method: str) -> MethodProtocol:
             diagnostic_only=1,
             routing_uses_eval_nelbo=1,
         )
+    if name in {
+        "pairwise_tournament_hard",
+        "pairwise_tournament_topk_uniform",
+        "pairwise_tournament_inner_selected",
+    }:
+        return MethodProtocol(
+            method_role="learned",
+            adoption_eligible=1,
+            diagnostic_only=0,
+            routing_uses_query_features=1,
+        )
+    if name == "oracle_confidence_set_diagnostic":
+        return MethodProtocol(
+            method_role="diagnostic",
+            adoption_eligible=0,
+            diagnostic_only=1,
+            routing_uses_query_features=1,
+            routing_uses_eval_nelbo=1,
+        )
     if name == "latent_wasserstein_routing" or name.startswith("hybrid_alpha_"):
         return MethodProtocol(
             method_role="diagnostic",
@@ -329,6 +348,14 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         "bottom_half_selection": "bottom_half_selection",
         "high_regret_selection": "high_regret_selection",
         "catastrophic_mistake": "catastrophic_mistake",
+        "oracle_in_route_set": "oracle_in_route_set",
+        "sparse_mix_active": "sparse_mix_active",
+        "mean_nelbo_spread_in_route_set": "mean_nelbo_spread_in_route_set",
+        "route_set_regret": "route_set_regret",
+        "fallback_delta": "fallback_delta",
+        "fallback_help": "fallback_help",
+        "fallback_harm": "fallback_harm",
+        "tournament_margin": "tournament_margin",
     }
     for method, vals in sorted(by_method.items()):
         metrics: Dict[str, float] = {}
@@ -354,6 +381,50 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         metrics["bottom_half_selection_rate"] = metrics["micro_bottom_half_selection"]
         metrics["high_regret_selection_rate"] = metrics["micro_high_regret_selection"]
         metrics["catastrophic_mistake_rate"] = metrics["micro_catastrophic_mistake"]
+        metrics["oracle_in_route_set"] = metrics["micro_oracle_in_route_set"]
+        metrics["sparse_mix_active_rate"] = metrics["micro_sparse_mix_active"]
+        metrics["mean_nelbo_spread_in_route_set"] = metrics["micro_mean_nelbo_spread_in_route_set"]
+        metrics["route_set_regret"] = metrics["micro_route_set_regret"]
+        metrics["fallback_delta"] = metrics["micro_fallback_delta"]
+        metrics["fallback_help_rate"] = metrics["micro_fallback_help"]
+        metrics["fallback_harm_rate"] = metrics["micro_fallback_harm"]
+        metrics["mean_tournament_margin"] = metrics["micro_tournament_margin"]
+
+        correct_margins = [
+            float(r.get("tournament_margin", float("nan")))
+            for r in vals
+            if int(float(r.get("top1_oracle_hit", 0) or 0)) == 1
+        ]
+        wrong_margins = [
+            float(r.get("tournament_margin", float("nan")))
+            for r in vals
+            if int(float(r.get("top1_oracle_hit", 0) or 0)) == 0
+        ]
+        metrics["mean_margin_when_top1_correct"] = _finite_mean(correct_margins)
+        metrics["mean_margin_when_top1_wrong"] = _finite_mean(wrong_margins)
+        margins_for_auc = [
+            (
+                float(r.get("tournament_margin", float("nan"))),
+                int(float(r.get("top1_oracle_hit", 0) or 0)),
+            )
+            for r in vals
+            if np.isfinite(float(r.get("tournament_margin", float("nan"))))
+        ]
+        positives = [m for m, y in margins_for_auc if y == 1]
+        negatives = [m for m, y in margins_for_auc if y == 0]
+        if positives and negatives:
+            total = 0.0
+            correct = 0.0
+            for p in positives:
+                for n in negatives:
+                    total += 1.0
+                    if p > n:
+                        correct += 1.0
+                    elif abs(p - n) < 1e-12:
+                        correct += 0.5
+            metrics["margin_auc_for_oracle_hit"] = float(correct / total)
+        else:
+            metrics["margin_auc_for_oracle_hit"] = float("nan")
 
         query_domains = sorted(set(int(r["query_domain"]) for r in vals))
         metrics["n_samples_micro"] = float(len(vals))
@@ -403,6 +474,18 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
             "fallback_to_alpha0",
             "n_aggregation_units",
             "top1_tolerance_abs",
+            "base_method",
+            "sparse_mix_topk",
+            "score_temperature",
+            "temperature_policy",
+            "route_mode",
+            "diagnostic_only_reason",
+            "source_inner_rows",
+            "source_inner_gap_pct",
+            "source_inner_high_regret_rate",
+            "source_inner_oracle_in_route_set",
+            "source_inner_top1",
+            "source_inner_sparse_mix_rate",
         ]:
             vals_for_key = sorted(set(str(r.get(key, "")) for r in vals if str(r.get(key, "")) != ""))
             if vals_for_key:
@@ -472,6 +555,21 @@ def _domain_breakdown_rows(sample_rows: Sequence[Dict[str, Any]]) -> List[Dict[s
                 ),
                 "catastrophic_mistake_rate": _finite_mean(
                     [float(r.get("catastrophic_mistake", 0.0)) for r in rows]
+                ),
+                "oracle_in_route_set": _finite_mean(
+                    [float(r.get("oracle_in_route_set", float("nan"))) for r in rows]
+                ),
+                "sparse_mix_active_rate": _finite_mean(
+                    [float(r.get("sparse_mix_active", float("nan"))) for r in rows]
+                ),
+                "fallback_help_rate": _finite_mean(
+                    [float(r.get("fallback_help", float("nan"))) for r in rows]
+                ),
+                "fallback_harm_rate": _finite_mean(
+                    [float(r.get("fallback_harm", float("nan"))) for r in rows]
+                ),
+                "mean_tournament_margin": _finite_mean(
+                    [float(r.get("tournament_margin", float("nan"))) for r in rows]
                 ),
             }
         )

@@ -71,6 +71,20 @@ class ResidualRoutingConfig:
 
 
 @dataclass(frozen=True)
+class PairwiseTournamentConfig:
+    enabled: bool
+    policy_name: str
+    base_methods: Tuple[str, ...]
+    margin_thresholds: Tuple[float, ...]
+    sparse_mix_topk_values: Tuple[int, ...]
+    sparse_mix_weighting: str
+    score_temperature: float
+    temperature_policy: str
+    calibration_policy: str
+    max_sparse_mix_activation_rate: float
+
+
+@dataclass(frozen=True)
 class LearnedUtilityConfig:
     pair_batch_size: int
     include_metadata_features: bool
@@ -80,6 +94,7 @@ class LearnedUtilityConfig:
     hybrid: HybridConfig
     compatibility: CompatibilityResearchConfig
     residual: ResidualRoutingConfig
+    pairwise_tournament: PairwiseTournamentConfig
     support_response: SupportResponseConfig
 
 
@@ -213,6 +228,52 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         ridge_l2=float((residual_cfg or {}).get("ridge_l2", 1e-4)),
     )
 
+    tournament_cfg = _as_dict(learned_cfg.get("pairwise_tournament", {}))
+    tournament = PairwiseTournamentConfig(
+        enabled=bool((tournament_cfg or {}).get("enabled", False)),
+        policy_name=str(
+            (tournament_cfg or {}).get(
+                "policy_name",
+                "pairwise_tournament_margin_sparse_mix_v1",
+            )
+        ),
+        base_methods=tuple(
+            str(v)
+            for v in (tournament_cfg or {}).get(
+                "base_methods",
+                ["pairwise_ranker_latent_only", "pairwise_ranker_combined"],
+            )
+        ),
+        margin_thresholds=tuple(
+            float(v) for v in (tournament_cfg or {}).get("margin_thresholds", [0.0, 0.1, 0.2, 0.3, 0.5])
+        ),
+        sparse_mix_topk_values=tuple(
+            int(v) for v in (tournament_cfg or {}).get("sparse_mix_topk_values", [2, 3])
+        ),
+        sparse_mix_weighting=str((tournament_cfg or {}).get("sparse_mix_weighting", "uniform")).strip().lower(),
+        score_temperature=float((tournament_cfg or {}).get("score_temperature", 1.0)),
+        temperature_policy=str(
+            (tournament_cfg or {}).get("temperature_policy", "fixed_temperature_not_selected")
+        ).strip().lower(),
+        calibration_policy=str(
+            (tournament_cfg or {}).get("calibration_policy", "inner_leave_query_domain_out_gap_then_top1")
+        ).strip().lower(),
+        max_sparse_mix_activation_rate=float(
+            (tournament_cfg or {}).get("max_sparse_mix_activation_rate", 0.80)
+        ),
+    )
+    if tournament.enabled:
+        if tournament.sparse_mix_weighting != "uniform":
+            raise ValueError("learned_utility.pairwise_tournament.sparse_mix_weighting must be 'uniform'")
+        if tournament.score_temperature <= 0.0:
+            raise ValueError("learned_utility.pairwise_tournament.score_temperature must be > 0")
+        if not tournament.base_methods:
+            raise ValueError("learned_utility.pairwise_tournament.base_methods must be non-empty")
+        if not tournament.margin_thresholds:
+            raise ValueError("learned_utility.pairwise_tournament.margin_thresholds must be non-empty")
+        if any(int(v) < 1 for v in tournament.sparse_mix_topk_values):
+            raise ValueError("learned_utility.pairwise_tournament.sparse_mix_topk_values must be >= 1")
+
     return LearnedUtilityConfig(
         pair_batch_size=pair_batch_size,
         include_metadata_features=include_metadata_features,
@@ -222,5 +283,6 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         hybrid=hybrid,
         compatibility=compatibility,
         residual=residual,
+        pairwise_tournament=tournament,
         support_response=parse_support_response_config(learned_cfg),
     )

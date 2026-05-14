@@ -424,6 +424,11 @@ def _build_method_summary_rows(method_metrics: Dict[str, Dict[str, Any]]) -> Lis
                 "feature_set": str(metrics.get("feature_set", "")),
                 "residual_variant": str(metrics.get("residual_variant", "")),
                 "selected_tau": str(metrics.get("selected_tau", "")),
+                "base_method": str(metrics.get("base_method", "")),
+                "sparse_mix_topk": str(metrics.get("sparse_mix_topk", "")),
+                "score_temperature": str(metrics.get("score_temperature", "")),
+                "temperature_policy": str(metrics.get("temperature_policy", "")),
+                "diagnostic_only_reason": str(metrics.get("diagnostic_only_reason", "")),
                 "selected_by_inner_validation": int(float(metrics.get("selected_by_inner_validation", 0.0) or 0.0)),
                 "adoption_selected_method": str(metrics.get("adoption_selected_method", "")),
                 "harmful_override_max": str(metrics.get("harmful_override_max", "")),
@@ -437,6 +442,21 @@ def _build_method_summary_rows(method_metrics: Dict[str, Dict[str, Any]]) -> Lis
                 "spearman": float(metrics.get("spearman", float("nan"))),
                 "selected_nelbo": float(metrics.get("selected_nelbo", float("nan"))),
                 "candidate_oracle_nelbo": float(metrics.get("candidate_oracle_nelbo", float("nan"))),
+                "oracle_in_route_set": float(metrics.get("oracle_in_route_set", float("nan"))),
+                "sparse_mix_active_rate": float(metrics.get("sparse_mix_active_rate", float("nan"))),
+                "mean_nelbo_spread_in_route_set": float(
+                    metrics.get("mean_nelbo_spread_in_route_set", float("nan"))
+                ),
+                "route_set_regret": float(metrics.get("route_set_regret", float("nan"))),
+                "fallback_delta": float(metrics.get("fallback_delta", float("nan"))),
+                "fallback_help_rate": float(metrics.get("fallback_help_rate", float("nan"))),
+                "fallback_harm_rate": float(metrics.get("fallback_harm_rate", float("nan"))),
+                "mean_tournament_margin": float(metrics.get("mean_tournament_margin", float("nan"))),
+                "mean_margin_when_top1_correct": float(
+                    metrics.get("mean_margin_when_top1_correct", float("nan"))
+                ),
+                "mean_margin_when_top1_wrong": float(metrics.get("mean_margin_when_top1_wrong", float("nan"))),
+                "margin_auc_for_oracle_hit": float(metrics.get("margin_auc_for_oracle_hit", float("nan"))),
                 "n_samples_micro": float(metrics.get("n_samples_micro", 0.0)),
                 "n_query_domains_macro": float(metrics.get("n_query_domains_macro", 0.0)),
                 "n_valid_spearman_samples": float(metrics.get("n_valid_spearman_samples", 0.0)),

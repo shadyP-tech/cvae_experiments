@@ -52,6 +52,7 @@ def _build_fold_training_pair_features(
     expert_domains: Sequence[int],
     outer_heldout_domain: int,
     include_metadata_features: bool,
+    extra_excluded_domains: Sequence[int] | None = None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     x_parts: List[np.ndarray] = []
     q_parts: List[np.ndarray] = []
@@ -70,7 +71,7 @@ def _build_fold_training_pair_features(
         fold = FoldCandidateSet.for_heldout_domain(
             heldout_domain=int(outer_heldout_domain),
             expert_domains=expert_domains,
-            excluded_domains=[int(query_domain)],
+            excluded_domains=[int(query_domain), *[int(v) for v in (extra_excluded_domains or ())]],
         )
         if not fold.candidate_expert_domains:
             raise ProtocolError(

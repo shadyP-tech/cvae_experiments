@@ -87,6 +87,18 @@ learned_utility:
       max_pairs_per_domain: 5000
       run_ablations: true
 
+  pairwise_tournament:
+    enabled: true
+    policy_name: pairwise_tournament_margin_sparse_mix_v1
+    base_methods: [pairwise_ranker_latent_only, pairwise_ranker_combined]
+    margin_thresholds: [0.0, 0.1, 0.2, 0.3, 0.5]
+    sparse_mix_topk_values: [2, 3]
+    sparse_mix_weighting: uniform
+    score_temperature: 1.0
+    temperature_policy: fixed_temperature_not_selected
+    calibration_policy: inner_leave_query_domain_out_gap_then_top1
+    max_sparse_mix_activation_rate: 0.80
+
   target:
     name: nelbo
     normalization: per_query_domain_zscore
