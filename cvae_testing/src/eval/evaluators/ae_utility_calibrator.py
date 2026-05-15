@@ -29,6 +29,7 @@ from src.eval.metrics import spearman_corr
 
 PRIMARY_METHOD = "ae_utility_calibrated_safe_override_v1"
 PRIMARY_METHOD_V11 = "ae_utility_calibrated_precision_lcb_safe_override_v11"
+PRIMARY_METHOD_V12 = "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12"
 PRIMARY_METHOD_V2 = "ae_utility_calibrated_consensus_safe_override_v2"
 HYBRID_METADATA_METHOD = "ae_metadata_utility_calibrated_safe_override_v1"
 HYBRID_COMBINED_METHOD = "ae_combined_utility_calibrated_safe_override_v1"
@@ -37,7 +38,7 @@ HYBRID_COMBINED_METHOD_V2 = "ae_combined_utility_calibrated_consensus_safe_overr
 PAIRWISE_DIAG_METHOD = "ae_utility_pairwise_ranker_diagnostic_v1"
 ORACLE_HEADROOM_METHOD = "oracle_safe_override_over_ae_argmin"
 V2_METHODS = {PRIMARY_METHOD_V2, HYBRID_METADATA_METHOD_V2, HYBRID_COMBINED_METHOD_V2}
-V11_METHODS = {PRIMARY_METHOD_V11}
+PRECISION_LCB_METHODS = {PRIMARY_METHOD_V11, PRIMARY_METHOD_V12}
 V2_PRIMARY_FEATURE_SETS = {"ae_consensus_core", "ae_consensus_quality"}
 V2_DIAGNOSTIC_FEATURE_SETS = {"ae_metadata_consensus", "ae_combined_consensus"}
 
@@ -785,6 +786,81 @@ def _gap_reduction(summary: Mapping[str, float]) -> float:
     return float(summary["ae_argmin_mean_oracle_gap_pct"]) - float(summary["mean_oracle_gap_pct"])
 
 
+def _v1_guard_metrics(
+    candidate_rows: Sequence[Mapping[str, float]],
+    v1_rows: Sequence[Mapping[str, float]],
+    cfg: AEUtilityCalibratorConfig,
+) -> Dict[str, float]:
+    candidate_by_unit = {
+        str(row.get("source_inner_pseudo_query_domain", idx)): row
+        for idx, row in enumerate(candidate_rows)
+    }
+    v1_by_unit = {
+        str(row.get("source_inner_pseudo_query_domain", idx)): row
+        for idx, row in enumerate(v1_rows)
+    }
+    common_units = [unit for unit in v1_by_unit if unit in candidate_by_unit]
+    gap_deltas: List[float] = []
+    top1_deltas: List[float] = []
+    spearman_deltas: List[float] = []
+    gap_degradations: List[float] = []
+    for unit in common_units:
+        base = v1_by_unit[unit]
+        cand = candidate_by_unit[unit]
+        base_gap = float(base.get("mean_oracle_gap_pct", float("nan")))
+        cand_gap = float(cand.get("mean_oracle_gap_pct", float("nan")))
+        base_top1 = float(base.get("top1_oracle_hit", float("nan")))
+        cand_top1 = float(cand.get("top1_oracle_hit", float("nan")))
+        base_spearman = float(base.get("raw_predicted_delta_spearman_non_anchor", float("nan")))
+        cand_spearman = float(cand.get("raw_predicted_delta_spearman_non_anchor", float("nan")))
+        if np.isfinite(base_gap) and np.isfinite(cand_gap):
+            gap_deltas.append(base_gap - cand_gap)
+            gap_degradations.append(cand_gap - base_gap)
+        if np.isfinite(base_top1) and np.isfinite(cand_top1):
+            top1_deltas.append(cand_top1 - base_top1)
+        if np.isfinite(base_spearman) and np.isfinite(cand_spearman):
+            spearman_deltas.append(cand_spearman - base_spearman)
+
+    gap_delta = _finite_mean(gap_deltas, default=float("nan"))
+    gap_delta_lcb = _bootstrap_lcb(
+        gap_deltas,
+        reps=int(cfg.precision_bootstrap_reps),
+        seed=int(cfg.precision_bootstrap_seed),
+    )
+    top1_delta = _finite_mean(top1_deltas, default=float("nan"))
+    spearman_delta = _finite_mean(spearman_deltas, default=float("nan"))
+    worst_gap_degradation = float(max(gap_degradations)) if gap_degradations else float("inf")
+    candidate_active_rate = _finite_mean(
+        [float(row.get("active_override_rate", 0.0)) for row in candidate_rows],
+        default=0.0,
+    )
+    v1_active_rate = _finite_mean(
+        [float(row.get("active_override_rate", 0.0)) for row in v1_rows],
+        default=0.0,
+    )
+    passes = bool(
+        np.isfinite(gap_delta_lcb)
+        and gap_delta_lcb >= float(cfg.v1_guard_min_gap_delta_vs_v1_lcb_pp)
+        and (not np.isfinite(top1_delta) or -top1_delta <= float(cfg.v1_guard_max_top1_drop_vs_v1_abs))
+        and (
+            not np.isfinite(spearman_delta)
+            or -spearman_delta <= float(cfg.v1_guard_max_spearman_drop_vs_v1_abs)
+        )
+        and worst_gap_degradation <= float(cfg.v1_guard_max_worst_pseudo_domain_gap_degradation_vs_v1_pp)
+    )
+    return {
+        "v1_guard_passed": int(passes),
+        "source_inner_gap_delta_vs_v1": gap_delta,
+        "source_inner_gap_delta_vs_v1_lcb": gap_delta_lcb,
+        "top1_delta_vs_v1_source_inner": top1_delta,
+        "spearman_delta_vs_v1_source_inner": spearman_delta,
+        "worst_pseudo_domain_gap_degradation_vs_v1_pp": worst_gap_degradation,
+        "v1_active_override_rate_source_inner": v1_active_rate,
+        "candidate_active_override_rate_source_inner": candidate_active_rate,
+        "paired_source_inner_unit_count_vs_v1": int(len(common_units)),
+    }
+
+
 def _material_degradation_vs_ae_argmin(summary: Mapping[str, float], cfg: AEUtilityCalibratorConfig) -> bool:
     top1_drop = float(summary["ae_argmin_top1_oracle_hit"]) - float(summary["top1_oracle_hit"])
     spearman_drop = float(summary["ae_delta_spearman_non_anchor"]) - float(
@@ -1142,6 +1218,8 @@ def _select_config_for_method(
                         ae_zscore_eval=ae_val,
                         neutral_gap_pct_band=float(cfg.neutral_override_gap_pct_band),
                     )
+                    summary = dict(summary)
+                    summary["source_inner_pseudo_query_domain"] = int(pseudo_domain)
                     threshold_domain_summaries.setdefault((float(delta_threshold), float(margin_threshold)), []).append(summary)
                     validation_rows.append(
                         {
@@ -1153,13 +1231,15 @@ def _select_config_for_method(
                             "delta_threshold": _threshold_label(float(delta_threshold)),
                             "margin_threshold": _threshold_label(float(margin_threshold)),
                             "threshold_selection_policy": (
-                                "source_inner_precision_lcb_then_gap_lcb"
+                                "source_inner_precision_lcb_v1_guarded"
+                                if str(method) == PRIMARY_METHOD_V12
+                                else "source_inner_precision_lcb_then_gap_lcb"
                                 if str(method) == PRIMARY_METHOD_V11
                                 else "source_inner_ae_argmin_noninferiority_then_gap"
                             ),
                             "selection_mode": (
                                 str(cfg.selection_mode)
-                                if str(method) == PRIMARY_METHOD_V11
+                                if str(method) in PRECISION_LCB_METHODS
                                 else ""
                             ),
                             "n_validation_samples": int(val_idx.shape[0]),
@@ -1187,11 +1267,12 @@ def _select_config_for_method(
                     "delta_threshold": float(delta_threshold),
                     "margin_threshold": float(margin_threshold),
                     "passes_source_inner_risk_gates": bool(passes),
+                    "source_inner_summary_rows": list(summaries),
                     **precision_metrics,
                     **macro,
                 }
             )
-            if str(method) == PRIMARY_METHOD_V11:
+            if str(method) in PRECISION_LCB_METHODS:
                 validation_rows.append(
                     {
                         "method": str(method),
@@ -1201,7 +1282,11 @@ def _select_config_for_method(
                         "source_inner_pseudo_query_domain": "source_inner_macro",
                         "delta_threshold": _threshold_label(float(delta_threshold)),
                         "margin_threshold": _threshold_label(float(margin_threshold)),
-                        "threshold_selection_policy": "source_inner_precision_lcb_then_gap_lcb",
+                        "threshold_selection_policy": (
+                            "source_inner_precision_lcb_v1_guarded"
+                            if str(method) == PRIMARY_METHOD_V12
+                            else "source_inner_precision_lcb_then_gap_lcb"
+                        ),
                         "selection_mode": str(cfg.selection_mode),
                         "n_validation_samples": int(
                             sum(int(row.get("active_override_count", 0.0)) for row in summaries)
@@ -1249,19 +1334,8 @@ def _select_config_for_method(
                 )
 
     passing = [row for row in config_summaries if bool(row.get("passes_source_inner_risk_gates", False))]
-    if not passing:
-        selected = _SelectedConfig(
-            str(method),
-            str(feature_sets[0]),
-            float("inf"),
-            0.0,
-            0,
-            selection_status="fallback_to_ae_argmin_no_v1_risk_safe_config"
-            if str(method) == PRIMARY_METHOD_V11
-            else "fallback_to_ae_argmin_no_source_inner_config",
-            fallback_reason="no_source_inner_risk_gate_config",
-        )
-    else:
+    v1_selected_row: Dict[str, Any] | None = None
+    if passing:
         v1_selected_row = sorted(
             passing,
             key=lambda row: (
@@ -1274,13 +1348,101 @@ def _select_config_for_method(
             ),
             reverse=True,
         )[0]
-        if str(method) == PRIMARY_METHOD_V11:
+    if str(method) == PRIMARY_METHOD_V12 and v1_selected_row is not None:
+        v1_rows = v1_selected_row.get("source_inner_summary_rows", [])
+        for row in config_summaries:
+            row.update(_v1_guard_metrics(row.get("source_inner_summary_rows", []), v1_rows, cfg))
+            row["v1_selected_delta_threshold"] = float(v1_selected_row["delta_threshold"])
+            row["v1_selected_margin_threshold"] = float(v1_selected_row["margin_threshold"])
+            row["v1_guarded_candidate_delta_threshold"] = float(row["delta_threshold"])
+            row["v1_guarded_candidate_margin_threshold"] = float(row["margin_threshold"])
+            if float(row.get("harmful_override_rate_ucb_source_inner", float("inf"))) > float(
+                cfg.v1_guard_max_harmful_override_rate_ucb
+            ):
+                row["v1_guard_passed"] = 0
+        for validation_row in validation_rows:
+            if str(validation_row.get("source_inner_pseudo_query_domain")) != "source_inner_macro":
+                continue
+            if str(validation_row.get("method")) != PRIMARY_METHOD_V12:
+                continue
+            for summary_row in config_summaries:
+                if (
+                    str(summary_row.get("feature_set")) == str(validation_row.get("feature_set"))
+                    and _threshold_label(float(summary_row.get("delta_threshold"))) == str(validation_row.get("delta_threshold"))
+                    and _threshold_label(float(summary_row.get("margin_threshold"))) == str(validation_row.get("margin_threshold"))
+                ):
+                    for key in [
+                        "v1_guard_passed",
+                        "v1_selected_delta_threshold",
+                        "v1_selected_margin_threshold",
+                        "v1_guarded_candidate_delta_threshold",
+                        "v1_guarded_candidate_margin_threshold",
+                        "source_inner_gap_delta_vs_v1",
+                        "source_inner_gap_delta_vs_v1_lcb",
+                        "top1_delta_vs_v1_source_inner",
+                        "spearman_delta_vs_v1_source_inner",
+                        "worst_pseudo_domain_gap_degradation_vs_v1_pp",
+                        "v1_active_override_rate_source_inner",
+                        "candidate_active_override_rate_source_inner",
+                        "paired_source_inner_unit_count_vs_v1",
+                    ]:
+                        validation_row[key] = summary_row.get(key, "")
+                    break
+    if not passing:
+        selected = _SelectedConfig(
+            str(method),
+            str(feature_sets[0]),
+            float("inf"),
+            0.0,
+            0,
+            selection_status="fallback_to_ae_argmin_no_v1_risk_safe_config"
+            if str(method) in PRECISION_LCB_METHODS
+            else "fallback_to_ae_argmin_no_source_inner_config",
+            fallback_reason="no_source_inner_risk_gate_config",
+        )
+    else:
+        assert v1_selected_row is not None
+        if str(method) in PRECISION_LCB_METHODS:
             precision_passing = [
                 row
                 for row in passing
                 if int(row.get("passes_precision_lcb_gates", 0)) == 1
             ]
-            if precision_passing:
+            if str(method) == PRIMARY_METHOD_V12:
+                guard_passing = [
+                    row
+                    for row in precision_passing
+                    if int(row.get("v1_guard_passed", 0)) == 1
+                ]
+                if guard_passing:
+                    selected_row = sorted(
+                        guard_passing,
+                        key=lambda row: (
+                            float(row.get("harmful_override_rate_ucb_source_inner", float("inf"))),
+                            -float(row.get("strict_improvement_precision_lcb_source_inner", float("-inf"))),
+                            -float(row.get("source_inner_gap_delta_vs_v1_lcb", float("-inf"))),
+                            -float(row.get("active_override_rate_source_inner", 0.0)),
+                            -float(row["delta_threshold"]),
+                            -float(row["margin_threshold"]),
+                        ),
+                    )[0]
+                    selected_by_source_inner = 1
+                    selection_status = "precision_lcb_v1_guarded_selected"
+                    fallback_reason = ""
+                else:
+                    selected_row = v1_selected_row
+                    selected_by_source_inner = 0
+                    selection_status = (
+                        "fallback_to_v1_no_precision_lcb_safe_config"
+                        if not precision_passing
+                        else "fallback_to_v1_no_v1_guard_safe_config"
+                    )
+                    fallback_reason = (
+                        "no_precision_lcb_safe_config"
+                        if not precision_passing
+                        else "no_v1_guard_safe_config"
+                    )
+            elif precision_passing:
                 selected_row = sorted(
                     precision_passing,
                     key=lambda row: (
@@ -1535,6 +1697,12 @@ def _method_feature_sets(cfg: AEUtilityCalibratorConfig) -> List[Tuple[str, Tupl
             (PRIMARY_METHOD, tuple(cfg.feature_sets_primary), "v1_baseline"),
             (PRIMARY_METHOD_V11, tuple(cfg.feature_sets_primary), "primary_metadata_free_precision_lcb"),
         ]
+    if str(cfg.primary_method) == PRIMARY_METHOD_V12:
+        return [
+            (PRIMARY_METHOD, tuple(cfg.feature_sets_primary), "v1_baseline"),
+            (PRIMARY_METHOD_V11, tuple(cfg.feature_sets_primary), "v1_1_precision_lcb_baseline"),
+            (PRIMARY_METHOD_V12, tuple(cfg.feature_sets_primary), "primary_metadata_free_precision_lcb_v1_guarded"),
+        ]
     methods = [(PRIMARY_METHOD, tuple(cfg.feature_sets_primary), "primary_metadata_free")]
     if "ae_metadata" in set(cfg.feature_sets_diagnostic):
         methods.append((HYBRID_METADATA_METHOD, ("ae_metadata",), "hybrid_metadata"))
@@ -1716,10 +1884,10 @@ def run_ae_utility_calibrator_methods_for_fold(
     if not bool(cfg.enabled):
         return AEUtilityCalibratorFoldOutputs([], [], [], [], [], [], [], [], [])
     is_v2 = str(cfg.primary_method) == PRIMARY_METHOD_V2
-    if str(cfg.primary_method) not in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V2}:
+    if str(cfg.primary_method) not in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V2}:
         raise ProtocolError(
             "AE utility calibrator primary_method must be "
-            f"{PRIMARY_METHOD}, {PRIMARY_METHOD_V11}, or {PRIMARY_METHOD_V2}"
+            f"{PRIMARY_METHOD}, {PRIMARY_METHOD_V11}, {PRIMARY_METHOD_V12}, or {PRIMARY_METHOD_V2}"
         )
     if is_v2:
         if str(cfg.primary_model_type) != "ridge_delta_consensus" or set(cfg.model_types) != {"ridge_delta_consensus"}:
@@ -1977,13 +2145,13 @@ def run_ae_utility_calibrator_methods_for_fold(
                     "source_inner_self_expert_excluded": 1,
                     "metadata_role": (
                         "not_used"
-                        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V2}
+                        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V2}
                         else "hybrid_auxiliary_feature"
                     ),
                     "proxy_claim_boundary": "AE reconstruction fit is a proxy for CVAE utility, not compatibility.",
                     "selection_status": selected_cfg.selection_status,
                     "fallback_reason": selected_cfg.fallback_reason,
-                    "heldout_precision_report_only": 1 if method == PRIMARY_METHOD_V11 else "",
+                    "heldout_precision_report_only": 1 if method in PRECISION_LCB_METHODS else "",
                     "net_gain_vs_ae_argmin": float(anchor_nelbo[local] - selected_nelbo[local]),
                     "net_gain_vs_metadata": float(row_metadata_nelbo - selected_nelbo[local]),
                     "active_override": row_active,
@@ -2057,7 +2225,7 @@ def run_ae_utility_calibrator_methods_for_fold(
                     "predicted_override_margin": float(override_margin[local]),
                     "selection_status": selected_cfg.selection_status,
                     "fallback_reason": selected_cfg.fallback_reason,
-                    "heldout_precision_report_only": 1 if method == PRIMARY_METHOD_V11 else "",
+                    "heldout_precision_report_only": 1 if method in PRECISION_LCB_METHODS else "",
                     "selected_consensus_threshold": (
                         float(selected_cfg.consensus_threshold)
                         if method in V2_METHODS
@@ -2082,7 +2250,7 @@ def run_ae_utility_calibrator_methods_for_fold(
             "selected_by_source_inner_validation": int(selected_cfg.selected_by_source_inner),
             "selection_status": selected_cfg.selection_status,
             "fallback_reason": selected_cfg.fallback_reason,
-            "selection_mode": str(cfg.selection_mode) if method == PRIMARY_METHOD_V11 else "",
+            "selection_mode": str(cfg.selection_mode) if method in PRECISION_LCB_METHODS else "",
             "selected_consensus_threshold": (
                 float(selected_cfg.consensus_threshold)
                 if method in V2_METHODS
@@ -2106,7 +2274,7 @@ def run_ae_utility_calibrator_methods_for_fold(
             "target_cvae_excluded": 1,
             "source_inner_self_ae_excluded": 1,
             "source_inner_self_expert_excluded": 1,
-            "heldout_precision_report_only": 1 if method == PRIMARY_METHOD_V11 else "",
+            "heldout_precision_report_only": 1 if method in PRECISION_LCB_METHODS else "",
             "active_override_count_heldout": int(summary["active_override_count"]),
             "active_override_rate_heldout": float(summary["active_override_rate"]),
             "active_override_count_source_inner": selected_source_inner_row.get(
@@ -2135,6 +2303,32 @@ def run_ae_utility_calibrator_methods_for_fold(
             ),
             "worst_pseudo_domain_gap_degradation_pp": selected_source_inner_row.get(
                 "worst_pseudo_domain_gap_degradation_pp", ""
+            ),
+            "v1_guard_passed": selected_source_inner_row.get("v1_guard_passed", ""),
+            "v1_selected_delta_threshold": selected_source_inner_row.get("v1_selected_delta_threshold", ""),
+            "v1_selected_margin_threshold": selected_source_inner_row.get("v1_selected_margin_threshold", ""),
+            "v1_guarded_candidate_delta_threshold": selected_source_inner_row.get(
+                "v1_guarded_candidate_delta_threshold", ""
+            ),
+            "v1_guarded_candidate_margin_threshold": selected_source_inner_row.get(
+                "v1_guarded_candidate_margin_threshold", ""
+            ),
+            "source_inner_gap_delta_vs_v1": selected_source_inner_row.get("source_inner_gap_delta_vs_v1", ""),
+            "source_inner_gap_delta_vs_v1_lcb": selected_source_inner_row.get(
+                "source_inner_gap_delta_vs_v1_lcb", ""
+            ),
+            "top1_delta_vs_v1_source_inner": selected_source_inner_row.get("top1_delta_vs_v1_source_inner", ""),
+            "spearman_delta_vs_v1_source_inner": selected_source_inner_row.get(
+                "spearman_delta_vs_v1_source_inner", ""
+            ),
+            "worst_pseudo_domain_gap_degradation_vs_v1_pp": selected_source_inner_row.get(
+                "worst_pseudo_domain_gap_degradation_vs_v1_pp", ""
+            ),
+            "v1_active_override_rate_source_inner": selected_source_inner_row.get(
+                "v1_active_override_rate_source_inner", ""
+            ),
+            "candidate_active_override_rate_source_inner": selected_source_inner_row.get(
+                "candidate_active_override_rate_source_inner", ""
             ),
             **summary,
         }
@@ -2170,10 +2364,19 @@ def run_ae_utility_calibrator_methods_for_fold(
                 "harmful_override_rate_ucb_source_inner": selected_source_inner_row.get(
                     "harmful_override_rate_ucb_source_inner", ""
                 ),
+                "v1_active_override_rate_source_inner": selected_source_inner_row.get(
+                    "v1_active_override_rate_source_inner", ""
+                ),
+                "candidate_active_override_rate_source_inner": selected_source_inner_row.get(
+                    "candidate_active_override_rate_source_inner", ""
+                ),
+                "source_inner_gap_delta_vs_v1_lcb": selected_source_inner_row.get(
+                    "source_inner_gap_delta_vs_v1_lcb", ""
+                ),
                 "active_override_rate": float(summary["active_override_rate"]),
                 "override_capture_rate": float(summary["override_capture_rate"]),
                 "captured_oracle_headroom_rate": float(summary["captured_oracle_headroom_rate"]),
-                "heldout_precision_report_only": 1 if method == PRIMARY_METHOD_V11 else "",
+                "heldout_precision_report_only": 1 if method in PRECISION_LCB_METHODS else "",
             }
         )
         override_diag_rows.append(
@@ -2223,9 +2426,27 @@ def run_ae_utility_calibrator_methods_for_fold(
                 "source_inner_macro_gap_reduction_lcb": selected_source_inner_row.get(
                     "source_inner_macro_gap_reduction_lcb", ""
                 ),
+                "v1_guard_passed": selected_source_inner_row.get("v1_guard_passed", ""),
+                "v1_selected_delta_threshold": selected_source_inner_row.get("v1_selected_delta_threshold", ""),
+                "v1_selected_margin_threshold": selected_source_inner_row.get("v1_selected_margin_threshold", ""),
+                "v1_guarded_candidate_delta_threshold": selected_source_inner_row.get(
+                    "v1_guarded_candidate_delta_threshold", ""
+                ),
+                "v1_guarded_candidate_margin_threshold": selected_source_inner_row.get(
+                    "v1_guarded_candidate_margin_threshold", ""
+                ),
+                "source_inner_gap_delta_vs_v1": selected_source_inner_row.get(
+                    "source_inner_gap_delta_vs_v1", ""
+                ),
+                "source_inner_gap_delta_vs_v1_lcb": selected_source_inner_row.get(
+                    "source_inner_gap_delta_vs_v1_lcb", ""
+                ),
+                "harmful_override_rate_ucb_source_inner": selected_source_inner_row.get(
+                    "harmful_override_rate_ucb_source_inner", ""
+                ),
             }
         )
-        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V2}:
+        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V2}:
             primary_anchor_idx = anchor_idx
             primary_selected_idx = selected_idx
 
@@ -2362,6 +2583,56 @@ def write_ae_utility_calibrator_artifacts(
                 ),
                 "ae_utility_calibrator_precision_v11_selection_status": (
                     "ae_utility_calibrator_precision_v11_selection_status.csv"
+                ),
+            }
+        )
+    v12_validation_rows = [row for row in source_inner_validation_rows if str(row.get("method")) == PRIMARY_METHOD_V12]
+    v12_policy_rows = [row for row in policy_audit_rows if str(row.get("method")) == PRIMARY_METHOD_V12]
+    v12_override_rows = [row for row in override_diagnostic_rows if str(row.get("method")) == PRIMARY_METHOD_V12]
+    v12_precision_rows = [row for row in override_precision_rows if str(row.get("method")) == PRIMARY_METHOD_V12]
+    v12_selected_rows = [row for row in selected_feature_rows if str(row.get("method")) == PRIMARY_METHOD_V12]
+    v12_tradeoff_rows = [
+        row
+        for row in v12_validation_rows
+        if str(row.get("source_inner_pseudo_query_domain")) == "source_inner_macro"
+    ]
+    if v12_validation_rows or v12_policy_rows:
+        _write_csv(
+            reports_dir / "ae_utility_calibrator_precision_v12_source_inner_validation.csv",
+            v12_validation_rows,
+        )
+        _write_csv(
+            reports_dir / "ae_utility_calibrator_precision_v12_policy_audit.csv",
+            v12_policy_rows,
+        )
+        _write_csv(
+            reports_dir / "ae_utility_calibrator_precision_v12_override_diagnostics.csv",
+            v12_override_rows,
+        )
+        _write_csv(
+            reports_dir / "ae_utility_calibrator_precision_v12_precision_tradeoff.csv",
+            v12_tradeoff_rows or v12_precision_rows,
+        )
+        _write_csv(
+            reports_dir / "ae_utility_calibrator_precision_v12_selection_status.csv",
+            v12_selected_rows,
+        )
+        artifacts.update(
+            {
+                "ae_utility_calibrator_precision_v12_source_inner_validation": (
+                    "ae_utility_calibrator_precision_v12_source_inner_validation.csv"
+                ),
+                "ae_utility_calibrator_precision_v12_policy_audit": (
+                    "ae_utility_calibrator_precision_v12_policy_audit.csv"
+                ),
+                "ae_utility_calibrator_precision_v12_override_diagnostics": (
+                    "ae_utility_calibrator_precision_v12_override_diagnostics.csv"
+                ),
+                "ae_utility_calibrator_precision_v12_precision_tradeoff": (
+                    "ae_utility_calibrator_precision_v12_precision_tradeoff.csv"
+                ),
+                "ae_utility_calibrator_precision_v12_selection_status": (
+                    "ae_utility_calibrator_precision_v12_selection_status.csv"
                 ),
             }
         )

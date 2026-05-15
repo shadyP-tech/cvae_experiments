@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import importlib.util
 from pathlib import Path
 import sys
 
@@ -348,6 +349,60 @@ def _ae_utility_precision_v11_cfg(
     return lu._parse_learned_utility_config(cfg).autoencoder.utility_calibrator
 
 
+def _ae_utility_precision_v12_cfg(
+    *,
+    delta_thresholds=None,
+    min_active_override_count=12,
+    min_strict_lcb=0.60,
+    max_worst_gap=1.0,
+    min_gap_delta_vs_v1_lcb=-0.25,
+    max_harm_ucb=0.30,
+):
+    cfg = _support_free_ae_cfg()
+    cfg["autoencoder_proxy"]["utility_calibrator"] = {
+        "enabled": True,
+        "primary_method": "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12",
+        "model_types": ["ridge_delta"],
+        "primary_model_type": "ridge_delta",
+        "diagnostic_model_types": ["pairwise_ranker"],
+        "fallback_policy": "ae_argmin_zscore",
+        "feature_sets_primary": ["ae_core", "ae_quality"],
+        "feature_sets_diagnostic": [],
+        "delta_thresholds": list(delta_thresholds if delta_thresholds is not None else [0.0, "__inf__"]),
+        "margin_thresholds": [0.0, 0.05],
+        "selection_mode": "precision_lcb_v1_guarded_v12",
+        "ridge_l2": 1.0e-4,
+        "precision_selection": {
+            "min_strict_improvement_precision": 0.75,
+            "min_strict_improvement_precision_lcb": float(min_strict_lcb),
+            "min_active_override_count": int(min_active_override_count),
+            "min_active_override_rate": 0.10,
+            "min_net_gain_vs_ae_argmin": 0.0,
+            "neutral_override_gap_pct_band": 0.25,
+            "max_worst_pseudo_domain_gap_degradation_pp": float(max_worst_gap),
+            "bootstrap_reps": 200,
+            "bootstrap_seed": 1337,
+            "diagnostic_precision_thresholds": [0.70, 0.75, 0.80, 0.85],
+            "v1_guard": {
+                "min_gap_delta_vs_v1_lcb_pp": float(min_gap_delta_vs_v1_lcb),
+                "max_top1_drop_vs_v1_abs": 0.02,
+                "max_spearman_drop_vs_v1_abs": 0.03,
+                "max_worst_pseudo_domain_gap_degradation_vs_v1_pp": 1.0,
+                "max_harmful_override_rate_ucb": float(max_harm_ucb),
+            },
+        },
+        "risk_gates": {
+            "max_top1_drop_vs_ae_argmin_abs": 0.02,
+            "max_spearman_drop_vs_ae_argmin_abs": 0.03,
+            "max_gap_pct_degradation_vs_ae_argmin": 1.0,
+            "max_top1_drop_vs_metadata_abs": 0.02,
+            "max_spearman_drop_vs_metadata_abs": 0.03,
+            "max_gap_pct_degradation_vs_metadata": 1.0,
+        },
+    }
+    return lu._parse_learned_utility_config(cfg).autoencoder.utility_calibrator
+
+
 def _ae_utility_consensus_v2_cfg(*, delta_thresholds=None, consensus_thresholds=None):
     cfg = _support_free_ae_cfg()
     cfg["autoencoder_proxy"]["utility_calibrator"] = {
@@ -462,6 +517,46 @@ def _run_ae_utility_precision_v11_direct(
             min_active_override_count=min_active_override_count,
             min_strict_lcb=min_strict_lcb,
             max_worst_gap=max_worst_gap,
+        ),
+        seed=7,
+        tie_policy="stable_expert_index",
+    )
+
+
+def _run_ae_utility_precision_v12_direct(
+    *,
+    delta_thresholds=None,
+    min_active_override_count=12,
+    min_strict_lcb=0.60,
+    max_worst_gap=1.0,
+    min_gap_delta_vs_v1_lcb=-0.25,
+    max_harm_ucb=0.30,
+):
+    sample_domains, expert_domains, true_nelbo, meta, ae_scores = _fake_payload_ae_first()
+    embeddings = np.stack([np.asarray([float(i), 0.0]) for i in range(len(sample_domains))])
+    fold = FoldCandidateSet.for_heldout_domain(heldout_domain=10, expert_domains=expert_domains)
+    test_idx = np.where(sample_domains == 10)[0]
+    train_idx = np.where(sample_domains != 10)[0]
+    return auc.run_ae_utility_calibrator_methods_for_fold(
+        embeddings=embeddings,
+        sample_domains=sample_domains,
+        expert_domains=expert_domains,
+        train_idx=train_idx,
+        test_idx=test_idx,
+        fold=fold,
+        true_nelbo=true_nelbo,
+        true_eval=fold.slice_nelbo(true_nelbo, test_idx),
+        global_eval=true_nelbo[test_idx],
+        metadata_similarity=meta,
+        metadata_similarity_eval=meta[test_idx][:, list(fold.candidate_col_indices)],
+        ae_scores=ae_scores,
+        cfg=_ae_utility_precision_v12_cfg(
+            delta_thresholds=delta_thresholds,
+            min_active_override_count=min_active_override_count,
+            min_strict_lcb=min_strict_lcb,
+            max_worst_gap=max_worst_gap,
+            min_gap_delta_vs_v1_lcb=min_gap_delta_vs_v1_lcb,
+            max_harm_ucb=max_harm_ucb,
         ),
         seed=7,
         tie_policy="stable_expert_index",
@@ -1528,6 +1623,237 @@ def test_ae_utility_precision_v11_inf_threshold_still_matches_ae_argmin() -> Non
     assert all(int(row["selected_expert"]) == int(row["ae_anchor_expert"]) for row in rows)
 
 
+def test_ae_utility_precision_v12_config_parses() -> None:
+    cfg = _ae_utility_precision_v12_cfg()
+    assert cfg.primary_method == "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12"
+    assert cfg.selection_mode == "precision_lcb_v1_guarded_v12"
+    assert cfg.min_active_override_count == 12
+    assert cfg.v1_guard_max_harmful_override_rate_ucb == 0.30
+
+
+def test_ae_utility_precision_v12_primary_is_metadata_free() -> None:
+    outputs = _run_ae_utility_precision_v12_direct(delta_thresholds=["__inf__"])
+    rows = [
+        row for row in outputs.sample_rows
+        if row["method"] == "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12"
+    ]
+    assert rows
+    assert all(row["metadata_role"] == "not_used" for row in rows)
+
+
+def test_ae_utility_precision_v12_keeps_v1_and_v11_reported() -> None:
+    outputs = _run_ae_utility_precision_v12_direct(delta_thresholds=["__inf__"])
+    methods = {row["method"] for row in outputs.policy_audit_rows}
+    assert "ae_utility_calibrated_safe_override_v1" in methods
+    assert "ae_utility_calibrated_precision_lcb_safe_override_v11" in methods
+    assert "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12" in methods
+
+
+def test_ae_utility_precision_v12_uses_v1_as_exact_fallback() -> None:
+    outputs = _run_ae_utility_precision_v12_direct(delta_thresholds=[0.0, "__inf__"], min_active_override_count=999)
+    v1 = [row for row in outputs.sample_rows if row["method"] == "ae_utility_calibrated_safe_override_v1"]
+    v12 = [
+        row for row in outputs.sample_rows
+        if row["method"] == "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12"
+    ]
+    assert v1 and v12
+    assert all(
+        int(a["selected_expert"]) == int(b["selected_expert"])
+        for a, b in zip(v1, v12)
+    )
+    assert any(str(row["selection_status"]).startswith("fallback_to_v1") for row in v12)
+
+
+def test_ae_utility_precision_v12_gap_delta_vs_v1_sign() -> None:
+    cfg = _ae_utility_precision_v12_cfg()
+    candidate = [
+        {"source_inner_pseudo_query_domain": 1, "mean_oracle_gap_pct": 3.0, "top1_oracle_hit": 0.7, "raw_predicted_delta_spearman_non_anchor": 0.2},
+    ]
+    v1 = [
+        {"source_inner_pseudo_query_domain": 1, "mean_oracle_gap_pct": 5.0, "top1_oracle_hit": 0.7, "raw_predicted_delta_spearman_non_anchor": 0.2},
+    ]
+    metrics = auc._v1_guard_metrics(candidate, v1, cfg)
+    assert metrics["source_inner_gap_delta_vs_v1"] > 0.0
+
+
+def test_ae_utility_precision_v12_gap_delta_lcb_bootstrap() -> None:
+    cfg = _ae_utility_precision_v12_cfg()
+    candidate = [
+        {"source_inner_pseudo_query_domain": i, "mean_oracle_gap_pct": 3.0, "top1_oracle_hit": 0.7, "raw_predicted_delta_spearman_non_anchor": 0.2}
+        for i in range(3)
+    ]
+    v1 = [
+        {"source_inner_pseudo_query_domain": i, "mean_oracle_gap_pct": 5.0, "top1_oracle_hit": 0.7, "raw_predicted_delta_spearman_non_anchor": 0.2}
+        for i in range(3)
+    ]
+    assert auc._v1_guard_metrics(candidate, v1, cfg)["source_inner_gap_delta_vs_v1_lcb"] > 0.0
+
+
+def test_ae_utility_precision_v12_bootstrap_uses_paired_units() -> None:
+    cfg = _ae_utility_precision_v12_cfg()
+    candidate = [
+        {"source_inner_pseudo_query_domain": "a", "mean_oracle_gap_pct": 4.0, "top1_oracle_hit": 0.7, "raw_predicted_delta_spearman_non_anchor": 0.2},
+        {"source_inner_pseudo_query_domain": "b", "mean_oracle_gap_pct": 2.0, "top1_oracle_hit": 0.7, "raw_predicted_delta_spearman_non_anchor": 0.2},
+        {"source_inner_pseudo_query_domain": "unpaired", "mean_oracle_gap_pct": 100.0, "top1_oracle_hit": 0.0, "raw_predicted_delta_spearman_non_anchor": -1.0},
+    ]
+    v1 = [
+        {"source_inner_pseudo_query_domain": "a", "mean_oracle_gap_pct": 5.0, "top1_oracle_hit": 0.7, "raw_predicted_delta_spearman_non_anchor": 0.2},
+        {"source_inner_pseudo_query_domain": "b", "mean_oracle_gap_pct": 5.0, "top1_oracle_hit": 0.7, "raw_predicted_delta_spearman_non_anchor": 0.2},
+    ]
+    metrics = auc._v1_guard_metrics(candidate, v1, cfg)
+    assert metrics["paired_source_inner_unit_count_vs_v1"] == 2
+    assert 1.0 <= metrics["source_inner_gap_delta_vs_v1"] <= 3.0
+
+
+def test_ae_utility_precision_v12_harm_ucb_gate_feasible_at_min_count() -> None:
+    _lcb, ucb = auc._wilson_bounds(0, 12)
+    assert ucb <= 0.30
+
+
+def test_ae_utility_precision_v12_rejects_candidate_with_low_gap_delta_lcb() -> None:
+    cfg = _ae_utility_precision_v12_cfg(min_gap_delta_vs_v1_lcb=999.0)
+    candidate = [
+        {"source_inner_pseudo_query_domain": i, "mean_oracle_gap_pct": 3.0, "top1_oracle_hit": 0.7, "raw_predicted_delta_spearman_non_anchor": 0.2}
+        for i in range(3)
+    ]
+    v1 = [
+        {"source_inner_pseudo_query_domain": i, "mean_oracle_gap_pct": 5.0, "top1_oracle_hit": 0.7, "raw_predicted_delta_spearman_non_anchor": 0.2}
+        for i in range(3)
+    ]
+    assert auc._v1_guard_metrics(candidate, v1, cfg)["v1_guard_passed"] == 0
+
+
+def test_ae_utility_precision_v12_rejects_high_harm_ucb() -> None:
+    outputs = _run_ae_utility_precision_v12_direct(
+        delta_thresholds=[0.0, "__inf__"],
+        min_active_override_count=1,
+        min_strict_lcb=0.0,
+        max_harm_ucb=0.0,
+    )
+    policy = [
+        row for row in outputs.policy_audit_rows
+        if row["method"] == "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12"
+    ][0]
+    assert str(policy["selection_status"]).startswith("fallback_to_v1")
+
+
+def test_ae_utility_precision_v12_rejects_worst_pseudo_domain_degradation_vs_v1() -> None:
+    cfg = _ae_utility_precision_v12_cfg()
+    candidate = [
+        {"source_inner_pseudo_query_domain": 1, "mean_oracle_gap_pct": 7.0, "top1_oracle_hit": 0.7, "raw_predicted_delta_spearman_non_anchor": 0.2},
+    ]
+    v1 = [
+        {"source_inner_pseudo_query_domain": 1, "mean_oracle_gap_pct": 5.0, "top1_oracle_hit": 0.7, "raw_predicted_delta_spearman_non_anchor": 0.2},
+    ]
+    assert auc._v1_guard_metrics(candidate, v1, cfg)["v1_guard_passed"] == 0
+
+
+def test_ae_utility_precision_v12_tiebreak_prefers_lower_harm_ucb() -> None:
+    rows = [
+        {"harmful_override_rate_ucb_source_inner": 0.2, "strict_improvement_precision_lcb_source_inner": 0.9, "source_inner_gap_delta_vs_v1_lcb": 0.0, "active_override_rate_source_inner": 0.1, "delta_threshold": 0.0, "margin_threshold": 0.0},
+        {"harmful_override_rate_ucb_source_inner": 0.1, "strict_improvement_precision_lcb_source_inner": 0.6, "source_inner_gap_delta_vs_v1_lcb": 0.0, "active_override_rate_source_inner": 0.1, "delta_threshold": 0.0, "margin_threshold": 0.0},
+    ]
+    chosen = sorted(
+        rows,
+        key=lambda row: (
+            float(row["harmful_override_rate_ucb_source_inner"]),
+            -float(row["strict_improvement_precision_lcb_source_inner"]),
+            -float(row["source_inner_gap_delta_vs_v1_lcb"]),
+            -float(row["active_override_rate_source_inner"]),
+            -float(row["delta_threshold"]),
+            -float(row["margin_threshold"]),
+        ),
+    )[0]
+    assert chosen["harmful_override_rate_ucb_source_inner"] == 0.1
+
+
+def test_ae_utility_precision_v12_selection_uses_no_target_nelbo() -> None:
+    outputs = _run_ae_utility_precision_v12_direct(delta_thresholds=["__inf__"])
+    rows = [
+        row for row in outputs.source_inner_validation_rows
+        if row["method"] == "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12"
+    ]
+    assert rows
+    assert all(int(row["heldout_target_nelbo_used_for_selection"]) == 0 for row in rows)
+
+
+def test_ae_utility_precision_v12_heldout_precision_is_report_only() -> None:
+    outputs = _run_ae_utility_precision_v12_direct(delta_thresholds=["__inf__"])
+    policy = [
+        row for row in outputs.policy_audit_rows
+        if row["method"] == "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12"
+    ][0]
+    assert int(policy["heldout_precision_report_only"]) == 1
+
+
+def test_ae_utility_precision_v12_reports_v1_guard_fields() -> None:
+    outputs = _run_ae_utility_precision_v12_direct(delta_thresholds=[0.0, "__inf__"])
+    rows = [
+        row for row in outputs.source_inner_validation_rows
+        if row["method"] == "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12"
+        and row["source_inner_pseudo_query_domain"] == "source_inner_macro"
+    ]
+    assert rows
+    for key in [
+        "v1_guard_passed",
+        "source_inner_gap_delta_vs_v1_lcb",
+        "worst_pseudo_domain_gap_degradation_vs_v1_pp",
+    ]:
+        assert key in rows[0]
+
+
+def test_ae_utility_precision_v12_reports_active_override_counts() -> None:
+    outputs = _run_ae_utility_precision_v12_direct(delta_thresholds=[0.0, "__inf__"])
+    policy = [
+        row for row in outputs.policy_audit_rows
+        if row["method"] == "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12"
+    ][0]
+    assert "active_override_count_source_inner" in policy
+    assert "active_override_count_heldout" in policy
+
+
+def test_ae_utility_precision_v12_decision_builder_requires_both_datasets_for_cross_dataset_verdict(tmp_path) -> None:
+    spec = importlib.util.spec_from_file_location(
+        "ae_decision_builder",
+        PROJECT_ROOT / "scripts" / "build_ae_utility_calibrator_decision_table.py",
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    rows = [
+        {
+            "dataset": "camelyon17",
+            "method": "ae_utility_calibrated_safe_override_v1",
+            "top1_oracle_hit": 0.5,
+            "raw_spearman": 0.5,
+            "mean_oracle_gap_pct": 4.0,
+        },
+        {
+            "dataset": "camelyon17",
+            "method": "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12",
+            "top1_oracle_hit": 0.5,
+            "raw_spearman": 0.5,
+            "mean_oracle_gap_pct": 4.0,
+        },
+        {
+            "dataset": "camelyon17",
+            "method": "ae_argmin_zscore",
+            "top1_oracle_hit": 0.4,
+            "raw_spearman": 0.4,
+            "mean_oracle_gap_pct": 5.0,
+        },
+        {
+            "dataset": "camelyon17",
+            "method": "metadata_routing",
+            "top1_oracle_hit": 0.4,
+            "raw_spearman": 0.4,
+            "mean_oracle_gap_pct": 5.0,
+        },
+    ]
+    _out, summary = module._aggregate(rows, [])
+    assert summary["verdicts"]["cross_dataset_local_ae_calibration_verdict"] == "NEEDS EVIDENCE"
+
+
 def test_ae_utility_consensus_v2_primary_is_metadata_free() -> None:
     outputs = _run_ae_utility_consensus_v2_direct(delta_thresholds=["__inf__"])
     rows = [row for row in outputs.sample_rows if row["method"] == "ae_utility_calibrated_consensus_safe_override_v2"]
@@ -1908,6 +2234,76 @@ def test_ae_utility_precision_v11_tiny_capped_smoke_run(tmp_path, monkeypatch) -
         == "ae_utility_calibrator_precision_v11_policy_audit.csv"
     )
     assert (tmp_path / "ae_utility_calibrator_precision_v11_precision_tradeoff.csv").exists()
+
+
+def test_ae_utility_precision_v12_tiny_capped_smoke_run(tmp_path, monkeypatch) -> None:
+    sample_domains, expert_domains, true_nelbo, _meta, ae_scores = _fake_payload_ae_first()
+
+    def fake_score(**kwargs):
+        _ = kwargs
+        embeddings = np.stack([np.asarray([float(i), 0.0]) for i in range(len(sample_domains))])
+        metadata = [{"magnification": int(domain), "sample_id": f"s{i}"} for i, domain in enumerate(sample_domains)]
+        return embeddings, sample_domains, true_nelbo, expert_domains, metadata
+
+    def fake_ae_scores(**kwargs):
+        _ = kwargs
+        return ae_scores
+
+    cfg = _support_free_ae_cfg()
+    cfg["autoencoder_proxy"]["utility_calibrator"] = {
+        "enabled": True,
+        "primary_method": "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12",
+        "model_types": ["ridge_delta"],
+        "primary_model_type": "ridge_delta",
+        "diagnostic_model_types": ["pairwise_ranker"],
+        "fallback_policy": "ae_argmin_zscore",
+        "feature_sets_primary": ["ae_core", "ae_quality"],
+        "feature_sets_diagnostic": [],
+        "delta_thresholds": ["__inf__"],
+        "margin_thresholds": [0.0],
+        "selection_mode": "precision_lcb_v1_guarded_v12",
+        "precision_selection": {
+            "min_strict_improvement_precision": 0.75,
+            "min_strict_improvement_precision_lcb": 0.60,
+            "min_active_override_count": 12,
+            "min_active_override_rate": 0.10,
+            "min_net_gain_vs_ae_argmin": 0.0,
+            "neutral_override_gap_pct_band": 0.25,
+            "max_worst_pseudo_domain_gap_degradation_pp": 1.0,
+            "bootstrap_reps": 10,
+            "bootstrap_seed": 1337,
+            "diagnostic_precision_thresholds": [0.70, 0.75, 0.80, 0.85],
+            "v1_guard": {
+                "min_gap_delta_vs_v1_lcb_pp": -0.25,
+                "max_top1_drop_vs_v1_abs": 0.02,
+                "max_spearman_drop_vs_v1_abs": 0.03,
+                "max_worst_pseudo_domain_gap_degradation_vs_v1_pp": 1.0,
+                "max_harmful_override_rate_ucb": 0.30,
+            },
+        },
+    }
+    monkeypatch.setattr(lu, "_score_experts_batched", fake_score)
+    monkeypatch.setattr(lu, "build_autoencoder_score_matrices", fake_ae_scores)
+    results = lu.evaluate_learned_utility_loqdo(
+        test_cache=tmp_path / "unused.pt",
+        expert_checkpoints={f"expert_{d}": "unused" for d in expert_domains},
+        hidden_dim=4,
+        latent_dim=2,
+        strategy="categorical_exact",
+        tau=1.0,
+        seed=7,
+        learned_cfg=cfg,
+        reports_dir=tmp_path,
+        autoencoder_artifacts={"dummy": True},
+    )
+
+    method = "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12"
+    assert method in results["metrics_by_method"]
+    assert (
+        results["artifacts"]["ae_utility_calibrator_precision_v12_policy_audit"]
+        == "ae_utility_calibrator_precision_v12_policy_audit.csv"
+    )
+    assert (tmp_path / "ae_utility_calibrator_precision_v12_precision_tradeoff.csv").exists()
 
 
 def test_safe_override_falls_back_to_metadata_with_tau_inf(tmp_path, monkeypatch) -> None:

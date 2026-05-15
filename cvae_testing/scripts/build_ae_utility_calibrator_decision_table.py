@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Sequence
 
 PRIMARY_METHOD = "ae_utility_calibrated_safe_override_v1"
 PRIMARY_METHOD_V11 = "ae_utility_calibrated_precision_lcb_safe_override_v11"
+PRIMARY_METHOD_V12 = "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12"
 PRIMARY_METHOD_V2 = "ae_utility_calibrated_consensus_safe_override_v2"
 AE_ARGMIN_METHOD = "ae_argmin_zscore"
 METADATA_METHOD = "metadata_routing"
@@ -24,6 +25,7 @@ GLOBAL_BASELINES = {
 REQUIRED_METHODS = set(GLOBAL_BASELINES) | {
     PRIMARY_METHOD,
     PRIMARY_METHOD_V11,
+    PRIMARY_METHOD_V12,
     PRIMARY_METHOD_V2,
     AE_ARGMIN_METHOD,
     "ae_metadata_utility_calibrated_safe_override_v1",
@@ -120,7 +122,7 @@ def _load_run_rows(path: Path) -> List[Dict[str, Any]]:
             "diagnostic_only": int(_float(metrics.get("diagnostic_only"))),
             "adoption_eligible": int(_float(metrics.get("adoption_eligible"))),
         }
-        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V2}:
+        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V2}:
             matching = [r for (m, _q), r in by_policy.items() if m == method]
             if matching:
                 row["raw_predicted_delta_spearman_non_anchor"] = _mean(
@@ -138,7 +140,17 @@ def _load_run_rows(path: Path) -> List[Dict[str, Any]]:
                 row["harmful_override_rate"] = _mean(matching, "harmful_override_rate", default=float("nan"))
                 row["active_override_rate_heldout"] = _mean(matching, "active_override_rate_heldout", default=float("nan"))
                 row["precision_lcb_selected_config_used"] = int(
-                    any(str(r.get("selection_status")) == "precision_lcb_selected" for r in matching)
+                    any(
+                        str(r.get("selection_status"))
+                        in {"precision_lcb_selected", "precision_lcb_v1_guarded_selected"}
+                        for r in matching
+                    )
+                )
+                row["v1_guarded_config_used"] = int(
+                    any(str(r.get("selection_status")) == "precision_lcb_v1_guarded_selected" for r in matching)
+                )
+                row["source_inner_gap_delta_vs_v1_lcb"] = _mean(
+                    matching, "source_inner_gap_delta_vs_v1_lcb", default=float("nan")
                 )
         rows.append(row)
     return rows
@@ -172,7 +184,9 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
     for dataset in sorted(set(str(r["dataset"]) for r in rows)):
         dataset_rows = [r for r in rows if str(r["dataset"]) == dataset]
         by_method = {method: [r for r in dataset_rows if r["method"] == method] for method in REQUIRED_METHODS}
-        if by_method.get(PRIMARY_METHOD_V11, []):
+        if by_method.get(PRIMARY_METHOD_V12, []):
+            primary_method = PRIMARY_METHOD_V12
+        elif by_method.get(PRIMARY_METHOD_V11, []):
             primary_method = PRIMARY_METHOD_V11
         elif by_method.get(PRIMARY_METHOD_V2, []):
             primary_method = PRIMARY_METHOD_V2
@@ -211,7 +225,7 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
             and p_gap - m_gap <= THRESHOLDS["gap_pct_degradation_pp_max"]
         )
         domain_ok = _domain_non_degradation_ok(paths, dataset=dataset, method=primary_method, baseline=AE_ARGMIN_METHOD)
-        if primary_method == PRIMARY_METHOD_V11:
+        if primary_method in {PRIMARY_METHOD_V11, PRIMARY_METHOD_V12}:
             v1_rows = by_method.get(PRIMARY_METHOD, [])
             if not v1_rows:
                 local_pass = False
@@ -225,10 +239,17 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
                 p_strict_precision = _mean(primary, "strict_improvement_precision", default=float("nan"))
                 p_harmful = _mean(primary, "harmful_override_rate", default=float("nan"))
                 precision_used = any(int(_float(row.get("precision_lcb_selected_config_used"))) == 1 for row in primary)
+                v1_guarded_used = any(int(_float(row.get("v1_guarded_config_used"))) == 1 for row in primary)
                 no_v1_degrade = (
                     v1_top1 - p_top1 <= THRESHOLDS["top1_drop_abs_max"]
                     and v1_spearman - p_spearman <= THRESHOLDS["spearman_drop_abs_max"]
                     and p_gap - v1_gap <= THRESHOLDS["gap_pct_degradation_pp_max"]
+                )
+                no_domain_degrade_vs_v1 = _domain_non_degradation_ok(
+                    paths,
+                    dataset=dataset,
+                    method=primary_method,
+                    baseline=PRIMARY_METHOD,
                 )
                 active_ok = active >= 0.05
                 precision_improved = (
@@ -241,22 +262,40 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
                 )
                 utility_ok = (p_gap < v1_gap) or ((p_gap - v1_gap) < 0.25 and harm_reduced)
                 seed_non_degrade_count = sum(1 for row in primary if _float(row.get("mean_oracle_gap_pct")) <= v1_gap + 1.0)
-                local_pass = (
-                    utility_ok
-                    and no_v1_degrade
-                    and precision_improved
-                    and harm_reduced
-                    and active_ok
-                    and seed_non_degrade_count >= 2
-                    and precision_used
-                )
-                local_weak = (
-                    no_v1_degrade
-                    and precision_improved
-                    and harm_reduced
-                    and active_ok
-                    and precision_used
-                )
+                if primary_method == PRIMARY_METHOD_V12:
+                    local_pass = (
+                        utility_ok
+                        and no_v1_degrade
+                        and precision_improved
+                        and harm_reduced
+                        and active_ok
+                        and no_domain_degrade_vs_v1
+                        and seed_non_degrade_count >= 2
+                        and v1_guarded_used
+                    )
+                    local_weak = (
+                        no_v1_degrade
+                        and (precision_improved or p_strict_precision >= v1_strict_precision)
+                        and harm_reduced
+                        and v1_guarded_used
+                    )
+                else:
+                    local_pass = (
+                        utility_ok
+                        and no_v1_degrade
+                        and precision_improved
+                        and harm_reduced
+                        and active_ok
+                        and seed_non_degrade_count >= 2
+                        and precision_used
+                    )
+                    local_weak = (
+                        no_v1_degrade
+                        and precision_improved
+                        and harm_reduced
+                        and active_ok
+                        and precision_used
+                    )
         elif primary_method == PRIMARY_METHOD_V2:
             v1_rows = by_method.get(PRIMARY_METHOD, [])
             v1_gap_reduction = a_gap - _mean(v1_rows, "mean_oracle_gap_pct") if v1_rows else 0.0
@@ -293,7 +332,7 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
                 and harmful <= improving
                 and domain_ok
             )
-        if primary_method != PRIMARY_METHOD_V11:
+        if primary_method not in {PRIMARY_METHOD_V11, PRIMARY_METHOD_V12}:
             local_weak = (
                 (p_gap < a_gap or p_top1 > a_top1)
                 and no_ae_degrade
@@ -334,6 +373,12 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
                     ),
                     "safe_override_precision": _mean(method_rows, "safe_override_precision", default=float("nan")),
                     "harmful_override_rate": _mean(method_rows, "harmful_override_rate", default=float("nan")),
+                    "v1_guarded_config_used": max(
+                        int(_float(row.get("v1_guarded_config_used"))) for row in method_rows
+                    ),
+                    "source_inner_gap_delta_vs_v1_lcb": _mean(
+                        method_rows, "source_inner_gap_delta_vs_v1_lcb", default=float("nan")
+                    ),
                     "net_gain_vs_ae_argmin": _mean(method_rows, "net_gain_vs_ae_argmin"),
                     "harmful_vs_ae_argmin_rate": _mean(method_rows, "harmful_vs_ae_argmin_rate"),
                     "improving_vs_ae_argmin_rate": _mean(method_rows, "improving_vs_ae_argmin_rate"),
@@ -344,17 +389,22 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
 
     local_values = [v for k, v in verdicts.items() if k.endswith("_local_ae_calibration_verdict")]
     global_values = [v for k, v in verdicts.items() if k.endswith("_global_adoption_verdict")]
-    verdicts["cross_dataset_local_ae_calibration_verdict"] = (
-        "PASS" if local_values and all(v == "PASS" for v in local_values)
-        else "WEAK PASS" if local_values and all(v in {"PASS", "WEAK PASS"} for v in local_values)
-        else "DIAGNOSTIC ONLY" if any(v in {"PASS", "WEAK PASS", "DIAGNOSTIC ONLY"} for v in local_values)
-        else "FAIL"
-    )
-    verdicts["cross_dataset_global_adoption_verdict"] = (
-        "PASS" if global_values and all(v == "PASS" for v in global_values)
-        else "DIAGNOSTIC ONLY" if any(v in {"PASS", "WEAK PASS", "DIAGNOSTIC ONLY"} for v in global_values)
-        else "FAIL"
-    )
+    datasets_present = {str(r["dataset"]) for r in rows}
+    if {"camelyon17", "breakhis"}.issubset(datasets_present):
+        verdicts["cross_dataset_local_ae_calibration_verdict"] = (
+            "PASS" if local_values and all(v == "PASS" for v in local_values)
+            else "WEAK PASS" if local_values and all(v in {"PASS", "WEAK PASS"} for v in local_values)
+            else "DIAGNOSTIC ONLY" if any(v in {"PASS", "WEAK PASS", "DIAGNOSTIC ONLY"} for v in local_values)
+            else "FAIL"
+        )
+        verdicts["cross_dataset_global_adoption_verdict"] = (
+            "PASS" if global_values and all(v == "PASS" for v in global_values)
+            else "DIAGNOSTIC ONLY" if any(v in {"PASS", "WEAK PASS", "DIAGNOSTIC ONLY"} for v in global_values)
+            else "FAIL"
+        )
+    else:
+        verdicts["cross_dataset_local_ae_calibration_verdict"] = "NEEDS EVIDENCE"
+        verdicts["cross_dataset_global_adoption_verdict"] = "NEEDS EVIDENCE"
     return out, {"thresholds": THRESHOLDS, "verdicts": verdicts}
 
 

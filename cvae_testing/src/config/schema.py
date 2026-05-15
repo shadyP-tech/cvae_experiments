@@ -56,6 +56,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_ae_utility_calibrator_v1",
         "learned_utility_ae_utility_calibrator_v2",
         "learned_utility_ae_utility_calibrator_precision_v11",
+        "learned_utility_ae_utility_calibrator_precision_v12",
         "learned_utility_source_reliability_v1",
         "learned_utility_pairwise_ae_combined_v2",
         "learned_utility_pairwise_ae_combined_v2_strict",
@@ -72,6 +73,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_ae_utility_calibrator_v1",
         "learned_utility_ae_utility_calibrator_v2",
         "learned_utility_ae_utility_calibrator_precision_v11",
+        "learned_utility_ae_utility_calibrator_precision_v12",
         "learned_utility_source_reliability_v1",
         "learned_utility_pairwise_ae_combined_v2",
         "learned_utility_pairwise_ae_combined_v2_strict",
@@ -1084,6 +1086,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                 allowed_primary_methods = {
                     "ae_utility_calibrated_safe_override_v1",
                     "ae_utility_calibrated_precision_lcb_safe_override_v11",
+                    "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12",
                     "ae_utility_calibrated_consensus_safe_override_v2",
                 }
                 if primary_method not in allowed_primary_methods:
@@ -1093,6 +1096,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                     )
                 is_consensus_v2 = primary_method == "ae_utility_calibrated_consensus_safe_override_v2"
                 is_precision_v11 = primary_method == "ae_utility_calibrated_precision_lcb_safe_override_v11"
+                is_precision_v12 = primary_method == "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12"
                 model_types = utility_calibrator_cfg.get("model_types", ["ridge_delta"])
                 if not isinstance(model_types, list) or not model_types:
                     raise ValueError(
@@ -1197,16 +1201,20 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                                 "learned_utility.autoencoder_proxy.utility_calibrator.consensus_thresholds "
                                 "must be in [0,1]"
                             )
-                if is_precision_v11:
+                if is_precision_v11 or is_precision_v12:
+                    expected_selection_mode = (
+                        "precision_lcb_v1_guarded_v12" if is_precision_v12 else "precision_lcb_selected_v11"
+                    )
                     if str(
                         utility_calibrator_cfg.get(
                             "selection_mode",
-                            "precision_lcb_selected_v11",
+                            expected_selection_mode,
                         )
-                    ).strip().lower() != "precision_lcb_selected_v11":
+                    ).strip().lower() != expected_selection_mode:
                         raise ValueError(
                             "learned_utility.autoencoder_proxy.utility_calibrator.selection_mode "
-                            "must be 'precision_lcb_selected_v11' for v1.1"
+                            f"must be '{expected_selection_mode}' for "
+                            f"{'v1.2' if is_precision_v12 else 'v1.1'}"
                         )
                     precision_selection = utility_calibrator_cfg.get("precision_selection", {})
                     if precision_selection is not None and not isinstance(precision_selection, dict):
@@ -1245,6 +1253,30 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                             raise ValueError(
                                 "learned_utility.autoencoder_proxy.utility_calibrator."
                                 f"precision_selection.{key} must be >= 0"
+                            )
+                    if is_precision_v12:
+                        v1_guard = precision_selection.get("v1_guard", {})
+                        if v1_guard is None or not isinstance(v1_guard, dict):
+                            raise ValueError(
+                                "learned_utility.autoencoder_proxy.utility_calibrator."
+                                "precision_selection.v1_guard must be a dictionary for v1.2"
+                            )
+                        float(v1_guard.get("min_gap_delta_vs_v1_lcb_pp", -0.25))
+                        for key in [
+                            "max_top1_drop_vs_v1_abs",
+                            "max_spearman_drop_vs_v1_abs",
+                            "max_worst_pseudo_domain_gap_degradation_vs_v1_pp",
+                        ]:
+                            if float(v1_guard.get(key, 0.0)) < 0.0:
+                                raise ValueError(
+                                    "learned_utility.autoencoder_proxy.utility_calibrator."
+                                    f"precision_selection.v1_guard.{key} must be >= 0"
+                                )
+                        harmful_ucb = float(v1_guard.get("max_harmful_override_rate_ucb", 0.30))
+                        if harmful_ucb < 0.0 or harmful_ucb > 1.0:
+                            raise ValueError(
+                                "learned_utility.autoencoder_proxy.utility_calibrator."
+                                "precision_selection.v1_guard.max_harmful_override_rate_ucb must be in [0,1]"
                             )
                 if is_consensus_v2:
                     if float(utility_calibrator_cfg.get("uncertainty_multiplier", 1.0)) < 0.0:

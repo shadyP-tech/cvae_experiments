@@ -140,6 +140,11 @@ class AEUtilityCalibratorConfig:
     precision_bootstrap_reps: int
     precision_bootstrap_seed: int
     diagnostic_precision_thresholds: Tuple[float, ...]
+    v1_guard_min_gap_delta_vs_v1_lcb_pp: float
+    v1_guard_max_top1_drop_vs_v1_abs: float
+    v1_guard_max_spearman_drop_vs_v1_abs: float
+    v1_guard_max_worst_pseudo_domain_gap_degradation_vs_v1_pp: float
+    v1_guard_max_harmful_override_rate_ucb: float
 
 
 @dataclass(frozen=True)
@@ -347,6 +352,7 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
     utility_calibrator_cfg = _as_dict((autoencoder_cfg or {}).get("utility_calibrator", {}))
     utility_calibrator_risk = _as_dict((utility_calibrator_cfg or {}).get("risk_gates", {}))
     precision_selection_cfg = _as_dict((utility_calibrator_cfg or {}).get("precision_selection", {}))
+    v1_guard_cfg = _as_dict((precision_selection_cfg or {}).get("v1_guard", {}))
     utility_calibrator = AEUtilityCalibratorConfig(
         enabled=bool((utility_calibrator_cfg or {}).get("enabled", False)),
         primary_method=str(
@@ -460,6 +466,13 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
                 [0.70, 0.75, 0.80, 0.85],
             )
         ),
+        v1_guard_min_gap_delta_vs_v1_lcb_pp=float((v1_guard_cfg or {}).get("min_gap_delta_vs_v1_lcb_pp", -0.25)),
+        v1_guard_max_top1_drop_vs_v1_abs=float((v1_guard_cfg or {}).get("max_top1_drop_vs_v1_abs", 0.02)),
+        v1_guard_max_spearman_drop_vs_v1_abs=float((v1_guard_cfg or {}).get("max_spearman_drop_vs_v1_abs", 0.03)),
+        v1_guard_max_worst_pseudo_domain_gap_degradation_vs_v1_pp=float(
+            (v1_guard_cfg or {}).get("max_worst_pseudo_domain_gap_degradation_vs_v1_pp", 1.0)
+        ),
+        v1_guard_max_harmful_override_rate_ucb=float((v1_guard_cfg or {}).get("max_harmful_override_rate_ucb", 0.30)),
     )
     autoencoder = AutoencoderProxyConfig(
         enabled=bool((autoencoder_cfg or {}).get("enabled", False)),
