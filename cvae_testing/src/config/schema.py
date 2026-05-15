@@ -56,6 +56,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_ae_utility_calibrator_v1",
         "learned_utility_ae_utility_calibrator_v2",
         "learned_utility_source_reliability_v1",
+        "learned_utility_pairwise_ae_combined_v2",
         "breakhis_support_free_ae_routing_v1",
         "camelyon17_support_free_ae_routing_v1",
     }
@@ -67,6 +68,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_ae_utility_calibrator_v1",
         "learned_utility_ae_utility_calibrator_v2",
         "learned_utility_source_reliability_v1",
+        "learned_utility_pairwise_ae_combined_v2",
         "breakhis_support_free_ae_routing_v1",
         "camelyon17_support_free_ae_routing_v1",
     }
@@ -512,6 +514,53 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                 (pairwise_params or {}).get("run_ablations", True),
                 "learned_utility.predictor_params.pairwise_ranker.run_ablations",
             )
+            _ensure_bool(
+                (pairwise_params or {}).get("run_utility_weighted_v2", False),
+                "learned_utility.predictor_params.pairwise_ranker.run_utility_weighted_v2",
+            )
+            utility_v2 = (pairwise_params or {}).get("utility_weighted_v2", {})
+            if utility_v2 is not None and not isinstance(utility_v2, dict):
+                raise ValueError(
+                    "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2 must be a dictionary"
+                )
+            utility_v2 = utility_v2 or {}
+            _ensure_bool(
+                utility_v2.get("enabled", False),
+                "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2.enabled",
+            )
+            if bool(utility_v2.get("enabled", False)):
+                primary_method = str(
+                    utility_v2.get("primary_method", "pairwise_ranker_ae_combined_inner_selected_v2")
+                ).strip()
+                if primary_method != "pairwise_ranker_ae_combined_inner_selected_v2":
+                    raise ValueError(
+                        "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2.primary_method "
+                        "must be 'pairwise_ranker_ae_combined_inner_selected_v2'"
+                    )
+                for key in ["hard_pair_fraction", "utility_pair_fraction", "random_pair_fraction"]:
+                    if float(utility_v2.get(key, 0.0)) < 0.0:
+                        raise ValueError(
+                            f"learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2.{key} must be >= 0"
+                        )
+                if (
+                    float(utility_v2.get("hard_pair_fraction", 0.40))
+                    + float(utility_v2.get("utility_pair_fraction", 0.40))
+                    + float(utility_v2.get("random_pair_fraction", 0.20))
+                ) <= 0.0:
+                    raise ValueError(
+                        "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2 pair fractions "
+                        "must sum to > 0"
+                    )
+                for key in ["pair_weight_alpha", "pair_weight_delta_clip", "pair_weight_min", "pair_weight_max"]:
+                    if float(utility_v2.get(key, 0.0)) < 0.0:
+                        raise ValueError(
+                            f"learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2.{key} must be >= 0"
+                        )
+                if float(utility_v2.get("pair_weight_max", 3.0)) < float(utility_v2.get("pair_weight_min", 1.0)):
+                    raise ValueError(
+                        "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2.pair_weight_max "
+                        "must be >= pair_weight_min"
+                    )
 
         hybrid_scoring = learned_cfg.get("hybrid_scoring", {})
         if hybrid_scoring is not None and not isinstance(hybrid_scoring, dict):

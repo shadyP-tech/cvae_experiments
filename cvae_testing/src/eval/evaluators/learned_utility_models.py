@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List, Sequence, Tuple
 
 import numpy as np
 import torch
@@ -86,7 +86,12 @@ class _PairwiseRanker:
     device: str = "auto"
     model: torch.nn.Module | None = None
 
-    def fit(self, x: np.ndarray, pairs: List[Tuple[int, int]]) -> None:
+    def fit(
+        self,
+        x: np.ndarray,
+        pairs: List[Tuple[int, int]],
+        pair_weights: Sequence[float] | np.ndarray | None = None,
+    ) -> None:
         if not pairs:
             raise RuntimeError("Pairwise ranker received zero training pairs")
 
@@ -105,6 +110,12 @@ class _PairwiseRanker:
 
         x_t = torch.from_numpy(x.astype(np.float32, copy=False)).to(run_device)
         pair_t = torch.tensor(pairs, dtype=torch.long, device=run_device)
+        weight_t = None
+        if pair_weights is not None:
+            weights_np = np.asarray(pair_weights, dtype=np.float32)
+            if weights_np.shape != (len(pairs),):
+                raise ValueError(f"pair_weights shape {weights_np.shape} does not match pairs length {len(pairs)}")
+            weight_t = torch.from_numpy(weights_np).to(run_device)
 
         n_pairs = int(pair_t.shape[0])
         for _ in range(int(self.epochs)):
@@ -119,7 +130,10 @@ class _PairwiseRanker:
                 pred_worse = net(worse_x).view(-1)
 
                 # Lower score means better expert; enforce pred_worse - pred_better >= margin.
-                loss = torch.relu(float(self.margin) - (pred_worse - pred_better)).mean()
+                losses = torch.relu(float(self.margin) - (pred_worse - pred_better))
+                if weight_t is not None:
+                    losses = losses * weight_t[idx]
+                loss = losses.mean()
 
                 opt.zero_grad(set_to_none=True)
                 loss.backward()

@@ -24,6 +24,9 @@ from src.eval.evaluators.learned_utility_protocol import (
     _protocol_row_fields,
 )
 from src.eval.evaluators.learned_utility_selection import _selection_metrics
+from src.eval.evaluators.pairwise_ae_combined_v2 import (
+    run_pairwise_ae_combined_v2_for_fold,
+)
 
 
 @dataclass(frozen=True)
@@ -31,6 +34,11 @@ class LearnedFoldOutputs:
     sample_rows: List[Dict[str, Any]]
     pair_rows: List[Dict[str, Any]]
     pair_training_rows: List[Dict[str, Any]]
+    pairwise_v2_training_rows: List[Dict[str, Any]]
+    pairwise_v2_feature_rows: List[Dict[str, Any]]
+    pairwise_v2_inner_selection_rows: List[Dict[str, Any]]
+    pairwise_v2_pair_prediction_rows: List[Dict[str, Any]]
+    pairwise_v2_decision_rows: List[Dict[str, Any]]
 
 
 def _run_learned_methods_for_fold(
@@ -283,8 +291,32 @@ def _run_learned_methods_for_fold(
                 }
             )
 
+    v2_outputs = run_pairwise_ae_combined_v2_for_fold(
+        embeddings=embeddings,
+        sample_domains=sample_domains,
+        true_nelbo=true_nelbo,
+        expert_domains=expert_domains,
+        domain_to_idx=domain_to_idx,
+        train_idx=train_idx,
+        test_idx=test_idx,
+        fold=fold,
+        global_eval=global_eval,
+        pairwise_cfg=pairwise_cfg,
+        seed=int(seed),
+        embedding_feature_dim=int(embedding_feature_dim),
+        expert_feature_dim=int(expert_feature_dim),
+        tie_policy=tie_policy,
+        ae_zscore_matrix=ae_zscore_matrix,
+    )
+    sample_rows.extend(v2_outputs.sample_rows)
+
     return LearnedFoldOutputs(
         sample_rows=sample_rows,
         pair_rows=pair_rows,
         pair_training_rows=pair_training_rows,
+        pairwise_v2_training_rows=v2_outputs.training_pair_rows,
+        pairwise_v2_feature_rows=v2_outputs.feature_diagnostic_rows,
+        pairwise_v2_inner_selection_rows=v2_outputs.inner_selection_rows,
+        pairwise_v2_pair_prediction_rows=v2_outputs.pair_rows,
+        pairwise_v2_decision_rows=v2_outputs.decision_rows,
     )

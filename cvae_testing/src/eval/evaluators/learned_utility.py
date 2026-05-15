@@ -26,6 +26,7 @@ from src.eval.evaluators.learned_utility_scoring import (
 from src.eval.evaluators.learned_utility_reporting import (
     _finalize_learned_utility_outputs,
 )
+from src.eval.evaluators.pairwise_ae_combined_v2 import write_pairwise_ae_combined_v2_artifacts
 from src.eval.evaluators.source_reliability import (
     run_source_reliability_for_fold,
     write_source_reliability_artifacts,
@@ -132,6 +133,11 @@ def evaluate_learned_utility_loqdo(
     source_reliability_policy_rows: List[Dict[str, Any]] = []
     source_reliability_predicted_rows: List[Dict[str, Any]] = []
     source_reliability_selected_method_rows: List[Dict[str, Any]] = []
+    pairwise_v2_training_rows: List[Dict[str, Any]] = []
+    pairwise_v2_feature_rows: List[Dict[str, Any]] = []
+    pairwise_v2_inner_selection_rows: List[Dict[str, Any]] = []
+    pairwise_v2_pair_prediction_rows: List[Dict[str, Any]] = []
+    pairwise_v2_decision_rows: List[Dict[str, Any]] = []
     hybrid_method_meta: Dict[str, Dict[str, Any]] = {}
     permutation_sample_rows: Dict[Tuple[str, int], List[Dict[str, Any]]] = {}
 
@@ -292,6 +298,11 @@ def evaluate_learned_utility_loqdo(
         sample_rows.extend(learned_outputs.sample_rows)
         pair_rows.extend(learned_outputs.pair_rows)
         pair_training_rows.extend(learned_outputs.pair_training_rows)
+        pairwise_v2_training_rows.extend(learned_outputs.pairwise_v2_training_rows)
+        pairwise_v2_feature_rows.extend(learned_outputs.pairwise_v2_feature_rows)
+        pairwise_v2_inner_selection_rows.extend(learned_outputs.pairwise_v2_inner_selection_rows)
+        pairwise_v2_pair_prediction_rows.extend(learned_outputs.pairwise_v2_pair_prediction_rows)
+        pairwise_v2_decision_rows.extend(learned_outputs.pairwise_v2_decision_rows)
 
         if eval_cfg.source_reliability.enabled:
             if ae_scores is None:
@@ -449,6 +460,16 @@ def evaluate_learned_utility_loqdo(
     )
     if source_reliability_artifacts:
         results.setdefault("artifacts", {}).update(source_reliability_artifacts)
+    pairwise_v2_artifacts = write_pairwise_ae_combined_v2_artifacts(
+        reports_dir=reports_dir,
+        training_rows=pairwise_v2_training_rows,
+        feature_rows=pairwise_v2_feature_rows,
+        inner_selection_rows=pairwise_v2_inner_selection_rows,
+        pair_prediction_rows=pairwise_v2_pair_prediction_rows,
+        decision_rows=pairwise_v2_decision_rows,
+    )
+    if pairwise_v2_artifacts:
+        results.setdefault("artifacts", {}).update(pairwise_v2_artifacts)
     if eval_cfg.support_response.enabled:
         print("[learned_utility] running candidate-specific support-response routing...")
         support_response_results = evaluate_support_response_routing_for_checkpoints(
