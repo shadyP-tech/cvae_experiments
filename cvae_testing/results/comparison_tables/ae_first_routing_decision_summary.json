@@ -1,0 +1,14 @@
+{
+  "thresholds": {
+    "top1_degradation_abs_max": 0.02,
+    "raw_spearman_degradation_abs_max": 0.03,
+    "mean_oracle_gap_pct_degradation_pp_max": 1.0,
+    "min_ae_coverage_rate_for_weak_pass": 0.1,
+    "min_ae_coverage_rate_for_pass": 0.2
+  },
+  "verdicts": {
+    "breakhis_ae_first_verdict": "DIAGNOSTIC ONLY",
+    "camelyon17_ae_first_verdict": "DIAGNOSTIC ONLY",
+    "cross_dataset_verdict": "DIAGNOSTIC ONLY"
+  }
+}

@@ -1,0 +1,16 @@
+dataset,seed,run_id,heldout_center,active_overrides,selected_override_precision,active_override_rate,override_capture_rate
+camelyon17,11,ae_utility_calibrator_seed11,0,123,0.8943089430894309,0.615,0.7913669064748201
+camelyon17,11,ae_utility_calibrator_seed11,1,89,0.7415730337078652,0.445,0.6804123711340206
+camelyon17,11,ae_utility_calibrator_seed11,2,115,0.6086956521739131,0.575,0.6140350877192983
+camelyon17,11,ae_utility_calibrator_seed11,3,124,0.9838709677419355,0.62,0.7973856209150327
+camelyon17,11,ae_utility_calibrator_seed11,4,123,0.7235772357723578,0.615,0.5973154362416108
+camelyon17,42,ae_utility_calibrator_seed42,0,107,0.5327102803738317,0.535,0.6867469879518072
+camelyon17,42,ae_utility_calibrator_seed42,1,94,0.5212765957446809,0.47,0.49
+camelyon17,42,ae_utility_calibrator_seed42,2,102,0.8725490196078431,0.51,0.6180555555555556
+camelyon17,42,ae_utility_calibrator_seed42,3,33,0.6060606060606061,0.165,0.39215686274509803
+camelyon17,42,ae_utility_calibrator_seed42,4,114,0.9473684210526315,0.57,0.631578947368421
+camelyon17,73,ae_utility_calibrator_seed73,0,68,0.7352941176470589,0.34,0.4716981132075472
+camelyon17,73,ae_utility_calibrator_seed73,1,79,0.9240506329113924,0.395,0.5069444444444444
+camelyon17,73,ae_utility_calibrator_seed73,2,74,0.8243243243243243,0.37,0.488
+camelyon17,73,ae_utility_calibrator_seed73,3,17,0.7647058823529411,0.085,0.2765957446808511
+camelyon17,73,ae_utility_calibrator_seed73,4,40,0.775,0.2,0.31313131313131315

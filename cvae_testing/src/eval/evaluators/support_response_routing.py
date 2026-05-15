@@ -446,6 +446,181 @@ def _gap_variance(rows: Sequence[Mapping[str, Any]]) -> float:
     return float(np.var(clean)) if clean else 0.0
 
 
+def _mean_finite(values: Iterable[object]) -> float:
+    clean: List[float] = []
+    for value in values:
+        try:
+            number = float(value)
+        except Exception:
+            continue
+        if np.isfinite(number):
+            clean.append(number)
+    return float(np.mean(clean)) if clean else float("nan")
+
+
+def _entropy_from_counts(counts: Mapping[int, int]) -> float:
+    total = int(sum(int(v) for v in counts.values()))
+    if total <= 0:
+        return 0.0
+    entropy = 0.0
+    for count in counts.values():
+        p = float(count) / float(total)
+        if p > 0:
+            entropy -= p * float(np.log2(p))
+    return float(entropy)
+
+
+def _support_size_monotonicity_rows(rows: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    by_key: Dict[Tuple[str, int], List[Mapping[str, Any]]] = {}
+    for row in rows:
+        by_key.setdefault((str(row.get("method", "")), int(row.get("support_size_requested", 0))), []).append(row)
+    out: List[Dict[str, Any]] = []
+    for (method, support_size), group in sorted(by_key.items(), key=lambda item: (item[0][0], item[0][1])):
+        out.append(
+            {
+                "method": method,
+                "support_size": int(support_size),
+                "n_rows": int(len(group)),
+                "top1_oracle_hit": _mean_finite(row.get("top1_oracle_hit", "") for row in group),
+                "spearman": _mean_finite(row.get("spearman", "") for row in group),
+                "mean_oracle_gap_pct": _mean_finite(row.get("oracle_gap_pct", "") for row in group),
+                "rank_agreement_spearman": _mean_finite(row.get("spearman", "") for row in group),
+                "selection_stability_unique_experts": int(
+                    len({int(row.get("selected_expert", -1)) for row in group})
+                ),
+                "support_margin": _mean_finite(row.get("support_margin", "") for row in group),
+                "eval_margin": _mean_finite(row.get("eval_margin", "") for row in group),
+            }
+        )
+    return out
+
+
+def _selection_entropy_rows(rows: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    by_key: Dict[Tuple[str, int, int], List[Mapping[str, Any]]] = {}
+    for row in rows:
+        by_key.setdefault(
+            (
+                str(row.get("method", "")),
+                int(row.get("query_domain", 0)),
+                int(row.get("support_size_requested", 0)),
+            ),
+            [],
+        ).append(row)
+    out: List[Dict[str, Any]] = []
+    for (method, query_domain, support_size), group in sorted(by_key.items(), key=lambda item: item[0]):
+        counts: Dict[int, int] = {}
+        for row in group:
+            selected = int(row.get("selected_expert", -1))
+            counts[selected] = counts.get(selected, 0) + 1
+        entropy = _entropy_from_counts(counts)
+        mean_gap = _mean_finite(row.get("oracle_gap_pct", "") for row in group)
+        if entropy <= 0.5 and mean_gap <= HIGH_REGRET_GAP_PCT_THRESHOLD:
+            interpretation = "reliable"
+        elif entropy > 0.5 and mean_gap <= HIGH_REGRET_GAP_PCT_THRESHOLD:
+            interpretation = "low_regret_ambiguity"
+        elif entropy > 0.5 and mean_gap > HIGH_REGRET_GAP_PCT_THRESHOLD:
+            interpretation = "unstable_router"
+        else:
+            interpretation = "systematically_wrong"
+        out.append(
+            {
+                "method": method,
+                "query_domain": int(query_domain),
+                "support_size": int(support_size),
+                "n_rows": int(len(group)),
+                "selection_entropy": float(entropy),
+                "selected_expert_counts_json": json.dumps(
+                    {str(k): int(v) for k, v in sorted(counts.items())},
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                "mean_oracle_gap_pct": float(mean_gap),
+                "interpretation": interpretation,
+            }
+        )
+    return out
+
+
+def _margin_diagnostic_rows(rows: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    eligible = [
+        row
+        for row in rows
+        if str(row.get("method", "")) in {"support_set_nelbo_top1", SUPPORT_CONSERVATIVE_METHOD}
+    ]
+    by_method_values: Dict[str, List[float]] = {}
+    for row in eligible:
+        by_method_values.setdefault(str(row.get("method", "")), []).append(float(row.get("support_margin", 0.0)))
+    quantiles = {
+        method: (
+            float(np.quantile(np.asarray(vals, dtype=np.float64), 1.0 / 3.0)),
+            float(np.quantile(np.asarray(vals, dtype=np.float64), 2.0 / 3.0)),
+        )
+        for method, vals in by_method_values.items()
+        if vals
+    }
+    out: List[Dict[str, Any]] = []
+    for row in eligible:
+        method = str(row.get("method", ""))
+        margin = float(row.get("support_margin", 0.0))
+        lo, hi = quantiles.get(method, (0.0, 0.0))
+        if margin <= lo:
+            bucket = "low"
+        elif margin <= hi:
+            bucket = "mid"
+        else:
+            bucket = "high"
+        out.append(
+            {
+                "method": method,
+                "seed": int(row.get("seed", 0)),
+                "query_domain": int(row.get("query_domain", 0)),
+                "support_seed": int(row.get("support_seed", 0)),
+                "support_size": int(row.get("support_size_requested", 0)),
+                "selected_expert": int(row.get("selected_expert", -1)),
+                "candidate_oracle_expert": int(row.get("candidate_oracle_expert", -1)),
+                "support_margin": margin,
+                "eval_margin": float(row.get("eval_margin", 0.0)),
+                "support_margin_quantile": bucket,
+                "oracle_gap_pct": float(row.get("oracle_gap_pct", 0.0)),
+                "top1_oracle_hit": int(float(row.get("top1_oracle_hit", 0))),
+            }
+        )
+    return out
+
+
+def _protocol_audit_rows(rows: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for row in rows:
+        candidates = [int(part) for part in str(row.get("candidate_experts", "")).split("|") if part]
+        heldout = int(row.get("fold_query_domain", row.get("query_domain", 0)))
+        predicted = json.loads(str(row.get("predicted_score_by_expert_json", "{}") or "{}"))
+        predicted_experts = {int(float(key)) for key in predicted.keys()}
+        routing_method = int(str(row.get("method", "")) != "support_candidate_oracle")
+        heldout_in_routing_scores = int(routing_method and heldout in predicted_experts)
+        audit = {
+            "method": str(row.get("method", "")),
+            "seed": int(row.get("seed", 0)),
+            "query_domain": int(row.get("query_domain", 0)),
+            "support_seed": int(row.get("support_seed", 0)),
+            "support_size_requested": int(row.get("support_size_requested", 0)),
+            "selected_expert_in_candidate_pool_ok": int(int(row.get("selected_expert", -1)) in candidates),
+            "candidate_oracle_in_candidate_pool_ok": int(int(row.get("candidate_oracle_expert", -1)) in candidates),
+            "target_expert_excluded_ok": int(heldout not in candidates),
+            "candidate_pool_excludes_target_expert_ok": int(heldout not in candidates),
+            "support_labels_unused_for_routing_ok": int(int(row.get("support_labels_used_for_routing", 0)) == 0),
+            "routing_uses_eval_nelbo_ok": int(int(float(row.get("routing_uses_eval_nelbo", 0))) == 0 or not routing_method),
+            "routing_time_scores_exclude_heldout_expert_ok": int(not heldout_in_routing_scores),
+            "heldout_expert_checkpoint_used_only_for_oracle_diagnostic": int(not heldout_in_routing_scores),
+        }
+        if not bool(audit["routing_time_scores_exclude_heldout_expert_ok"]):
+            raise ProtocolError(
+                "Held-out expert appeared in routing-time predicted scores for "
+                f"method={audit['method']} query_domain={audit['query_domain']}"
+            )
+        out.append(audit)
+    return out
+
+
 def _alpha_grid_label(values: Sequence[float]) -> str:
     return json.dumps([float(v) for v in values], separators=(",", ":"))
 
@@ -470,7 +645,8 @@ def _privacy_fields(data_cfg: Mapping[str, Any] | None) -> Dict[str, Any]:
 
 def _requires_patient_disjoint_support(data_cfg: Mapping[str, Any] | None) -> bool:
     data_cfg = data_cfg or {}
-    return str(data_cfg.get("dataset_domain_semantics", "")).strip().lower() == "breakhis_magnification"
+    semantics = str(data_cfg.get("dataset_domain_semantics", "")).strip().lower()
+    return semantics in {"breakhis_magnification", "midogpp_scanner"}
 
 
 def _patient_ids_by_index(metadata: Sequence[Mapping[str, object]]) -> Dict[int, str]:
@@ -478,6 +654,126 @@ def _patient_ids_by_index(metadata: Sequence[Mapping[str, object]]) -> Dict[int,
         int(idx): str(row.get("patient_id", "") or "").strip()
         for idx, row in enumerate(metadata)
     }
+
+
+def _is_midogpp_scanner(data_cfg: Mapping[str, Any] | None) -> bool:
+    data_cfg = data_cfg or {}
+    return str(data_cfg.get("dataset_domain_semantics", "")).strip().lower() == "midogpp_scanner"
+
+
+def _meta_text(meta: Mapping[str, object], *keys: str) -> str:
+    for key in keys:
+        value = str(meta.get(key, "") or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _most_common(values: Iterable[str]) -> str:
+    counts: Dict[str, int] = {}
+    for value in values:
+        text = str(value).strip()
+        if not text:
+            continue
+        counts[text] = counts.get(text, 0) + 1
+    if not counts:
+        return ""
+    return sorted(counts.items(), key=lambda item: (-int(item[1]), str(item[0])))[0][0]
+
+
+def _domain_profile(
+    *,
+    metadata: Sequence[Mapping[str, object]],
+    sample_domains: np.ndarray,
+    domain: int,
+    indices: Sequence[int] | None = None,
+) -> Dict[str, Any]:
+    if indices is None:
+        domain_indices = [int(i) for i, value in enumerate(sample_domains.tolist()) if int(value) == int(domain)]
+    else:
+        domain_indices = [int(i) for i in indices]
+    rows = [metadata[int(i)] for i in domain_indices]
+    scanner_models = [_meta_text(row, "scanner_model", "raw_scanner_label", "domain_name") for row in rows]
+    vendors = [_meta_text(row, "scanner_family", "scanner_vendor", "scanner_model", "raw_scanner_label") for row in rows]
+    resolutions = [_meta_text(row, "resolution_bin", "resolution") for row in rows]
+    return {
+        "domain": int(domain),
+        "scanner_model": _most_common(scanner_models),
+        "scanner_vendor_or_family": _most_common(vendors),
+        "resolution_bin": _most_common(resolutions),
+        "n_rows": int(len(rows)),
+    }
+
+
+def _midogpp_scanner_resolution_metadata_scores(
+    *,
+    metadata: Sequence[Mapping[str, object]],
+    sample_domains: np.ndarray,
+    support_indices: Sequence[int],
+    target_domain: int,
+    candidate_experts: Sequence[int],
+) -> Tuple[List[float], Dict[str, Any]]:
+    target_profile = _domain_profile(
+        metadata=metadata,
+        sample_domains=sample_domains,
+        domain=int(target_domain),
+        indices=support_indices,
+    )
+    scores: List[float] = []
+    candidate_profiles: Dict[int, Dict[str, Any]] = {}
+    missing_vendor_count = 0
+    resolution_only_count = 0
+    for expert in candidate_experts:
+        profile = _domain_profile(
+            metadata=metadata,
+            sample_domains=sample_domains,
+            domain=int(expert),
+        )
+        candidate_profiles[int(expert)] = profile
+        target_vendor = str(target_profile.get("scanner_vendor_or_family", "") or "")
+        candidate_vendor = str(profile.get("scanner_vendor_or_family", "") or "")
+        target_resolution = str(target_profile.get("resolution_bin", "") or "")
+        candidate_resolution = str(profile.get("resolution_bin", "") or "")
+        vendor_missing = not target_vendor or not candidate_vendor
+        resolution_missing = not target_resolution or not candidate_resolution
+        if vendor_missing:
+            missing_vendor_count += 1
+        if vendor_missing and not resolution_missing:
+            resolution_only_count += 1
+        vendor_mismatch = 1.0 if vendor_missing or target_vendor != candidate_vendor else 0.0
+        resolution_mismatch = 1.0 if resolution_missing or target_resolution != candidate_resolution else 0.0
+        scores.append(float(2.0 * vendor_mismatch + 1.0 * resolution_mismatch))
+    unique_scores = sorted({round(float(score), 12) for score in scores})
+    min_score = min(scores) if scores else float("inf")
+    n_min = sum(1 for score in scores if abs(float(score) - float(min_score)) <= 1.0e-12)
+    selected_expert = int(candidate_experts[_stable_argmin(scores, candidate_experts)]) if candidate_experts else -1
+    diag = {
+        "metadata_baseline_variant": "scanner_resolution_metadata_v1",
+        "metadata_baseline_limited": int(
+            bool(scores)
+            and (
+                n_min > 1
+                or missing_vendor_count / max(len(scores), 1) >= 0.50
+            )
+        ),
+        "metadata_baseline_tie_rate": float(n_min / max(len(scores), 1)),
+        "metadata_effective_candidate_count": int(len(unique_scores)),
+        "metadata_missing_vendor_rate": float(missing_vendor_count / max(len(scores), 1)),
+        "metadata_resolution_only_rate": float(resolution_only_count / max(len(scores), 1)),
+        "metadata_selected_expert": int(selected_expert),
+        "metadata_selected_expert_distribution": json.dumps({str(selected_expert): 1}, separators=(",", ":")),
+        "metadata_target_vendor_or_family": str(target_profile.get("scanner_vendor_or_family", "")),
+        "metadata_target_resolution_bin": str(target_profile.get("resolution_bin", "")),
+        "metadata_candidate_profiles_json": json.dumps(candidate_profiles, sort_keys=True, separators=(",", ":")),
+    }
+    return scores, diag
+
+
+def _score_margin(values: Sequence[float]) -> float:
+    vals = sorted(float(v) for v in values if np.isfinite(float(v)))
+    if len(vals) < 2:
+        return 0.0
+    return float(vals[1] - vals[0])
 
 
 def _block_terms(feature_name: str, *, allow_candidate_identity: bool) -> List[str]:
@@ -768,6 +1064,8 @@ def _score_method_row(
         "selected_rank": selected_rank,
         "spearman": float(spearman_corr((-rank_score).tolist(), (-true_nelbo).tolist())),
         "pairwise_auc": _pairwise_auc(rank_score, true_nelbo),
+        "support_margin": _score_margin(support_mean_arr),
+        "eval_margin": _score_margin(true_nelbo),
         "mean_support_nelbo": float(support_mean_arr[int(selected_idx)]),
         "stderr_support_nelbo": float(support_stderr_arr[int(selected_idx)]),
         "conservative_support_score": float(conservative_arr[int(selected_idx)]),
@@ -1874,6 +2172,7 @@ def evaluate_support_response_routing_from_arrays(
     risk_override_rows: List[Dict[str, Any]] = []
     risk_expert4_rows: List[Dict[str, Any]] = []
     support_utility_hyper_rows: List[Dict[str, Any]] = []
+    metadata_diagnostic_rows: List[Dict[str, Any]] = []
     sample_index_counter = 0
     run_id = str(reports_dir.parent.name)
 
@@ -2058,7 +2357,17 @@ def evaluate_support_response_routing_from_arrays(
                     )
 
                     # Matched non-learned baselines.
-                    metadata_scores = [float(row["metadata_distance"]) for row in target_rows]
+                    metadata_extra: Dict[str, Any] = {}
+                    if _is_midogpp_scanner(data_cfg):
+                        metadata_scores, metadata_extra = _midogpp_scanner_resolution_metadata_scores(
+                            metadata=metadata,
+                            sample_domains=sample_domains,
+                            support_indices=target_split.support_indices,
+                            target_domain=int(outer_target),
+                            candidate_experts=target_candidates,
+                        )
+                    else:
+                        metadata_scores = [float(row["metadata_distance"]) for row in target_rows]
                     sample_rows.append(
                         _score_method_row(
                             method="support_metadata_routing",
@@ -2078,8 +2387,21 @@ def evaluate_support_response_routing_from_arrays(
                             privacy_fields=privacy,
                             support_n=int(target_split.support_size_actual),
                             support_labels_used_for_routing=0,
+                            extra_fields=metadata_extra,
                         )
                     )
+                    if metadata_extra:
+                        metadata_diagnostic_rows.append(
+                            {
+                                **dict(privacy),
+                                "seed": int(seed),
+                                "query_domain": int(outer_target),
+                                "support_seed": int(support_seed),
+                                "support_size_requested": int(support_size),
+                                "candidate_experts": target_fold.label(),
+                                **metadata_extra,
+                            }
+                        )
                     sample_index_counter += 1
 
                     embedding_scores = [float(row["embedding_distance"]) for row in target_rows]
@@ -2591,6 +2913,10 @@ def evaluate_support_response_routing_from_arrays(
         {**dict(privacy), "method": method, **metrics}
         for method, metrics in sorted(method_metrics.items(), key=lambda item: item[0])
     ]
+    protocol_audit_rows = _protocol_audit_rows(sample_rows) if sample_rows else []
+    support_size_rows = _support_size_monotonicity_rows(sample_rows) if sample_rows else []
+    margin_rows = _margin_diagnostic_rows(sample_rows) if sample_rows else []
+    selection_entropy_rows = _selection_entropy_rows(sample_rows) if sample_rows else []
     artifacts = {
         "protocol_lock": "support_response_protocol_lock.json",
         "split_manifest": "support_response_split_manifest.csv",
@@ -2600,8 +2926,14 @@ def evaluate_support_response_routing_from_arrays(
         "sample_selections": "support_response_sample_selections.csv",
         "domain_breakdown": "support_response_domain_breakdown.csv",
         "method_summary": "support_response_method_summary.csv",
+        "protocol_audit": "support_response_protocol_audit.csv",
+        "support_size_monotonicity": "support_response_support_size_monotonicity.csv",
+        "margin_diagnostics": "support_response_margin_diagnostics.csv",
+        "selection_entropy": "support_response_selection_entropy.csv",
         "results": "support_response_results.json",
     }
+    if metadata_diagnostic_rows:
+        artifacts["metadata_baseline_diagnostics"] = "support_response_metadata_baseline_diagnostics.csv"
     if support_cfg.support_utility.enabled:
         artifacts["support_utility_selected_hyperparams"] = "support_utility_selected_hyperparams.csv"
     if support_cfg.risk_constrained.enabled:
@@ -2628,6 +2960,7 @@ def evaluate_support_response_routing_from_arrays(
         "support_raw_rows_contains_eval_nelbo": False,
         "support_raw_rows_contains_identity_fields": False,
         "support_bootstrap_posthoc_only": True,
+        "heldout_expert_checkpoint_used_only_for_oracle_diagnostic": True,
         "bootstrap_reps": SUPPORT_BOOTSTRAP_REPS_DEFAULT,
         "bootstrap_seed": SUPPORT_BOOTSTRAP_SEED_DEFAULT,
         "conservative_alpha_selection": "source_inner_fixed",
@@ -2682,6 +3015,11 @@ def evaluate_support_response_routing_from_arrays(
         "n_support_nelbo_raw_rows": int(len(support_nelbo_raw_rows)),
         "n_pairwise_training_comparisons": int(len(pair_rows)),
         "n_support_utility_hyperparameter_rows": int(len(support_utility_hyper_rows)),
+        "n_protocol_audit_rows": int(len(protocol_audit_rows)),
+        "n_support_size_monotonicity_rows": int(len(support_size_rows)),
+        "n_margin_diagnostic_rows": int(len(margin_rows)),
+        "n_selection_entropy_rows": int(len(selection_entropy_rows)),
+        "n_metadata_baseline_diagnostic_rows": int(len(metadata_diagnostic_rows)),
     }
     reports_dir.mkdir(parents=True, exist_ok=True)
     (reports_dir / artifacts["protocol_lock"]).write_text(json.dumps(protocol_lock, indent=2) + "\n", encoding="utf-8")
@@ -2692,6 +3030,12 @@ def evaluate_support_response_routing_from_arrays(
     _write_csv(reports_dir / artifacts["sample_selections"], sample_rows)
     _write_csv(reports_dir / artifacts["domain_breakdown"], domain_rows)
     _write_csv(reports_dir / artifacts["method_summary"], method_summary)
+    _write_csv(reports_dir / artifacts["protocol_audit"], protocol_audit_rows)
+    _write_csv(reports_dir / artifacts["support_size_monotonicity"], support_size_rows)
+    _write_csv(reports_dir / artifacts["margin_diagnostics"], margin_rows)
+    _write_csv(reports_dir / artifacts["selection_entropy"], selection_entropy_rows)
+    if metadata_diagnostic_rows:
+        _write_csv(reports_dir / artifacts["metadata_baseline_diagnostics"], metadata_diagnostic_rows)
     if support_cfg.support_utility.enabled:
         _write_csv(reports_dir / artifacts["support_utility_selected_hyperparams"], support_utility_hyper_rows)
     if support_cfg.risk_constrained.enabled:

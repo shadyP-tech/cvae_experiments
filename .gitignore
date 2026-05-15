@@ -43,12 +43,10 @@ cvae_testing/results/*
 !cvae_testing/results/comparison_tables/learned_utility_decision_summary_v2*.md
 !cvae_testing/results/comparison_tables/learned_utility_decision_summary_v2*.csv
 
-# Thesis outline
-cvae_testing/thesis_outline.txt
-
 # github agents
 .github/*
 .cache/
 .agents/
 
-Thesis_outline.pdf
+literature/
+outputs

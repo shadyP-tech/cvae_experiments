@@ -91,6 +91,27 @@ def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]], fieldnames: Sequen
             writer.writerow({name: row.get(name, "") for name in fieldnames})
 
 
+def _dynamic_fieldnames(rows: Sequence[Mapping[str, Any]]) -> List[str]:
+    fieldnames: List[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        for key in row.keys():
+            name = str(key)
+            if name in seen:
+                continue
+            seen.add(name)
+            fieldnames.append(name)
+    return fieldnames
+
+
+def _write_dynamic_csv(path: Path, rows: Sequence[Mapping[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not rows:
+        path.write_text("", encoding="utf-8")
+        return
+    _write_csv(path, rows, _dynamic_fieldnames(rows))
+
+
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -126,6 +147,31 @@ def _variance(values: Iterable[float]) -> float:
 
 def _std(values: Iterable[float]) -> float:
     return float(math.sqrt(_variance(values)))
+
+
+def _quantile(values: Sequence[float], q: float) -> float:
+    vals = sorted(float(value) for value in values if math.isfinite(float(value)))
+    if not vals:
+        return 0.0
+    pos = max(0.0, min(1.0, float(q))) * (len(vals) - 1)
+    lo = int(math.floor(pos))
+    hi = int(math.ceil(pos))
+    if lo == hi:
+        return float(vals[lo])
+    weight = pos - lo
+    return float(vals[lo] * (1.0 - weight) + vals[hi] * weight)
+
+
+def _entropy_from_counts(counts: Mapping[int, int]) -> float:
+    total = int(sum(int(value) for value in counts.values()))
+    if total <= 0:
+        return 0.0
+    entropy = 0.0
+    for count in counts.values():
+        p = float(count) / float(total)
+        if p > 0:
+            entropy -= p * math.log2(p)
+    return float(entropy)
 
 
 def _pct(count: int, total: int) -> float:
@@ -165,6 +211,22 @@ def _json_score_values(value: object) -> List[float]:
         if math.isfinite(val):
             vals.append(val)
     return vals
+
+
+def _json_score_keys(value: object) -> List[int]:
+    try:
+        payload = json.loads(str(value or "{}"))
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(payload, dict):
+        return []
+    out: List[int] = []
+    for key in payload.keys():
+        try:
+            out.append(int(float(key)))
+        except Exception:
+            continue
+    return out
 
 
 def _has_nonconstant_values(values: Sequence[float], *, tol: float = 1.0e-12) -> bool:
@@ -284,6 +346,29 @@ def _load_source_rows(experiment_root: Path) -> Tuple[List[dict], List[dict], Li
             f"Expected {EXPECTED_RAW_SUPPORT_ROWS} raw rows; found {raw_support_rows_observed}."
         )
     return selected_rows, alpha_rows, split_rows, raw_support_rows_observed
+
+
+def _load_run_artifact_rows(
+    experiment_root: Path,
+    filename: str,
+    *,
+    required: bool,
+) -> List[dict]:
+    out: List[dict] = []
+    for run_dir in _result_paths(experiment_root):
+        run_seed = _run_seed_from_run_dir(run_dir)
+        path = run_dir / "reports" / filename
+        if not path.exists():
+            if required:
+                raise FileNotFoundError(f"Missing required support-NELBO source artifact: {path}")
+            continue
+        for row in _read_csv(path):
+            row = dict(row)
+            row["run_seed"] = run_seed
+            row["run_id"] = run_dir.name
+            row["source_path"] = str(path)
+            out.append(row)
+    return out
 
 
 def _group_key(row: Mapping[str, Any]) -> Tuple[int, int, int, int, str]:
@@ -568,6 +653,135 @@ def build_seed_stability_rows(rows: Sequence[Mapping[str, Any]]) -> List[dict]:
     ]
 
 
+def build_support_size_monotonicity_rows(rows: Sequence[Mapping[str, Any]]) -> List[dict]:
+    groups: Dict[Tuple[str, int], List[Mapping[str, Any]]] = {}
+    for row in rows:
+        groups.setdefault(
+            (
+                str(row.get("method", "")),
+                _to_int(row.get("support_size_requested", row.get("support_size", 0))),
+            ),
+            [],
+        ).append(row)
+    out: List[dict] = []
+    for (method, support_size), vals in sorted(groups.items(), key=lambda item: item[0]):
+        spearman_vals = [_to_float(row.get("spearman", 0.0)) for row in vals if _spearman_valid(row)]
+        out.append(
+            {
+                "method": METHOD_LABELS.get(method, method),
+                "source_method": method,
+                "support_size": support_size,
+                "n_rows": len(vals),
+                "n_run_seeds": len({_to_int(row.get("run_seed", row.get("seed", 0))) for row in vals}),
+                "n_support_seeds": len({_to_int(row.get("support_seed", 0)) for row in vals}),
+                "top1_oracle_hit": _mean(_to_float(row.get("top1_oracle_hit", 0.0)) for row in vals),
+                "spearman": _mean(spearman_vals),
+                "spearman_valid_rows": len(spearman_vals),
+                "mean_oracle_gap_pct": _mean(
+                    _to_float(row.get("mean_oracle_gap_pct", row.get("oracle_gap_pct", 0.0))) for row in vals
+                ),
+                "rank_agreement_spearman": _mean(spearman_vals),
+                "selection_stability_unique_experts": len(
+                    {_to_int(row.get("selected_expert", -1)) for row in vals}
+                ),
+                "support_margin": _mean(_to_float(row.get("support_margin", 0.0)) for row in vals),
+                "eval_margin": _mean(_to_float(row.get("eval_margin", 0.0)) for row in vals),
+            }
+        )
+    return out
+
+
+def build_margin_diagnostic_rows(rows: Sequence[Mapping[str, Any]]) -> List[dict]:
+    eligible = _selected_rows(rows, [DIRECT_METHOD, CONSERVATIVE_METHOD])
+    margins_by_method: Dict[str, List[float]] = {}
+    for row in eligible:
+        method = str(row.get("method", ""))
+        margins_by_method.setdefault(method, []).append(_to_float(row.get("support_margin", 0.0)))
+    quantiles = {
+        method: (
+            _quantile(values, 1.0 / 3.0),
+            _quantile(values, 2.0 / 3.0),
+        )
+        for method, values in margins_by_method.items()
+        if values
+    }
+    out: List[dict] = []
+    for row in eligible:
+        method = str(row.get("method", ""))
+        margin = _to_float(row.get("support_margin", 0.0))
+        lo, hi = quantiles.get(method, (0.0, 0.0))
+        bucket = "low" if margin <= lo else ("mid" if margin <= hi else "high")
+        out.append(
+            {
+                "run_seed": _to_int(row.get("run_seed", row.get("seed", 0))),
+                "query_domain": _to_int(row.get("query_domain", 0)),
+                "support_seed": _to_int(row.get("support_seed", 0)),
+                "support_size": _to_int(row.get("support_size_requested", 0)),
+                "method": METHOD_LABELS.get(method, method),
+                "source_method": method,
+                "selected_expert": _to_int(row.get("selected_expert", -1)),
+                "candidate_oracle_expert": _to_int(row.get("candidate_oracle_expert", -1)),
+                "support_margin": margin,
+                "eval_margin": _to_float(row.get("eval_margin", 0.0)),
+                "support_margin_quantile": bucket,
+                "oracle_gap_pct": _to_float(row.get("mean_oracle_gap_pct", row.get("oracle_gap_pct", 0.0))),
+                "top1_oracle_hit": _to_int(row.get("top1_oracle_hit", 0)),
+            }
+        )
+    return out
+
+
+def build_selection_entropy_rows(rows: Sequence[Mapping[str, Any]]) -> List[dict]:
+    groups: Dict[Tuple[str, int, int], List[Mapping[str, Any]]] = {}
+    for row in rows:
+        groups.setdefault(
+            (
+                str(row.get("method", "")),
+                _to_int(row.get("query_domain", 0)),
+                _to_int(row.get("support_size_requested", 0)),
+            ),
+            [],
+        ).append(row)
+    out: List[dict] = []
+    for (method, query_domain, support_size), vals in sorted(groups.items(), key=lambda item: item[0]):
+        counts: Dict[int, int] = {}
+        for row in vals:
+            selected = _to_int(row.get("selected_expert", -1))
+            counts[selected] = counts.get(selected, 0) + 1
+        entropy = _entropy_from_counts(counts)
+        mean_gap = _mean(
+            _to_float(row.get("mean_oracle_gap_pct", row.get("oracle_gap_pct", 0.0))) for row in vals
+        )
+        if entropy <= 0.5 and mean_gap <= 5.0:
+            interpretation = "reliable"
+        elif entropy > 0.5 and mean_gap <= 5.0:
+            interpretation = "low_regret_ambiguity"
+        elif entropy > 0.5 and mean_gap > 5.0:
+            interpretation = "unstable_router"
+        else:
+            interpretation = "systematically_wrong"
+        out.append(
+            {
+                "method": METHOD_LABELS.get(method, method),
+                "source_method": method,
+                "query_domain": query_domain,
+                "support_size": support_size,
+                "n_rows": len(vals),
+                "n_run_seeds": len({_to_int(row.get("run_seed", row.get("seed", 0))) for row in vals}),
+                "n_support_seeds": len({_to_int(row.get("support_seed", 0)) for row in vals}),
+                "selection_entropy": entropy,
+                "selected_expert_counts_json": json.dumps(
+                    {str(k): int(v) for k, v in sorted(counts.items())},
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                "mean_oracle_gap_pct": mean_gap,
+                "interpretation": interpretation,
+            }
+        )
+    return out
+
+
 def build_pass_rule_summary(
     summary_rows: Sequence[Mapping[str, Any]],
     seed_stability_rows: Sequence[Mapping[str, Any]],
@@ -584,6 +798,7 @@ def build_pass_rule_summary(
     random_floor = by_source.get(RANDOM_METHOD, {})
 
     per_seed_top1 = []
+    per_seed_spearman = []
     per_seed_gap = []
     for seed in RUN_SEEDS:
         direct_seed = seed_by_method.get((int(seed), DIRECT_METHOD))
@@ -594,6 +809,8 @@ def build_pass_rule_summary(
         metadata_top1 = _to_float(metadata_seed.get("top1_oracle_hit_mean", 0.0))
         direct_gap = _to_float(direct_seed.get("oracle_gap_pct_mean", 0.0))
         metadata_gap = _to_float(metadata_seed.get("oracle_gap_pct_mean", 0.0))
+        direct_spearman_seed = _to_float(direct_seed.get("spearman_mean", 0.0))
+        metadata_spearman_seed = _to_float(metadata_seed.get("spearman_mean", 0.0))
         per_seed_top1.append(
             {
                 "seed": int(seed),
@@ -601,6 +818,15 @@ def build_pass_rule_summary(
                 "metadata_top1": metadata_top1,
                 "margin": direct_top1 - metadata_top1,
                 "pass": int(direct_top1 > metadata_top1 + SEED_TOP1_MARGIN),
+            }
+        )
+        per_seed_spearman.append(
+            {
+                "seed": int(seed),
+                "direct_spearman": direct_spearman_seed,
+                "metadata_spearman": metadata_spearman_seed,
+                "margin": direct_spearman_seed - metadata_spearman_seed,
+                "pass": int(direct_spearman_seed > metadata_spearman_seed),
             }
         )
         per_seed_gap.append(
@@ -632,6 +858,7 @@ def build_pass_rule_summary(
             "status": "pass" if direct_spearman > metadata_spearman and direct_spearman > 0.0 else "fail",
             "direct_spearman": direct_spearman,
             "metadata_spearman": metadata_spearman,
+            "per_seed": per_seed_spearman,
         },
         "oracle_gap_lower_than_metadata": {
             "status": "pass" if direct_gap < metadata_gap else "fail",
@@ -663,9 +890,57 @@ def build_pass_rule_summary(
             "direct_top1": direct_top1,
             "random_floor_top1": random_top1,
             "margin_required": RANDOM_FLOOR_TOP1_MARGIN,
-            "chance_level_note": "BreakHis LOQDO has three candidate experts per fold, so random top1 is approximately 1/3.",
+            "chance_level_note": (
+                "Random floor is matched to candidate count per held-out fold; aggregate top1 must exceed it."
+            ),
         },
     }
+    context = str(DATASET_CONTEXT).strip().lower()
+    if context == "midogpp_scanner":
+        gap_all = checks["no_seed_oracle_gap_sign_reversal_against_metadata"]["status"] == "pass"
+        top1_improving = sum(int(row["pass"]) for row in per_seed_top1)
+        spearman_improving = sum(int(row["pass"]) for row in per_seed_spearman)
+        n_seed_pairs = max(len(per_seed_gap), 1)
+        strong = (
+            gap_all
+            and top1_improving == n_seed_pairs
+            and spearman_improving == n_seed_pairs
+            and checks["top1_meaningfully_above_random_floor"]["status"] == "pass"
+        )
+        passed = (
+            gap_all
+            and (top1_improving >= 2 or spearman_improving >= 2)
+            and checks["top1_meaningfully_above_random_floor"]["status"] == "pass"
+        )
+        weak = (
+            direct_gap < metadata_gap
+            or (direct_spearman > metadata_spearman and direct_spearman > 0.0)
+        )
+        if strong:
+            verdict = "STRONG PASS"
+        elif passed:
+            verdict = "PASS"
+        elif weak:
+            verdict = "WEAK PASS"
+        else:
+            verdict = "FAIL"
+        return {
+            "verdict": verdict,
+            "checks": checks,
+            "metric_priority": ["mean_oracle_gap_pct", "spearman", "top1_oracle_hit"],
+            "decision_tiers": {
+                "STRONG PASS": "beats metadata on top1, Spearman, and oracle gap in all seeds",
+                "PASS": "beats metadata on oracle gap in all seeds, improves top1 or Spearman in at least 2/3 seeds, and clears random floor",
+                "WEAK PASS": "improves oracle gap or Spearman, but top1 or selection stability is weak",
+                "DIAGNOSTIC ONLY": "protocol passes but confounding, degeneracy, or fold instability limits claims",
+                "FAIL": "support-NELBO is worse than metadata on oracle gap",
+                "REJECTED": "missing preflight validity, utility matrix, protocol audit, or split validity",
+            },
+            "interpretation": (
+                "MIDOG++ scanner-indexed PASS is conditional on preflight fold validity and confounding diagnostics; "
+                "it is acquisition-domain evidence, not pure scanner-shift evidence."
+            ),
+        }
     first_five = [
         "top1_beats_metadata_consistent_seed_margin",
         "spearman_beats_metadata_and_positive",
@@ -881,6 +1156,8 @@ def build_protocol_audit_rows(rows: Sequence[Mapping[str, Any]], alpha_rows: Seq
         candidate_oracle = _to_int(row.get("candidate_oracle_expert", -999999))
         target = _to_int(row.get("fold_query_domain", row.get("target_domain", center)))
         method = str(row.get("method", ""))
+        routing_score_experts = set(_json_score_keys(row.get("predicted_score_by_expert_json", "{}")))
+        heldout_in_routing_scores = int(target in routing_score_experts)
         alpha_applicable = int(method == CONSERVATIVE_METHOD)
         alpha_selected_ok = (
             int(_to_int(row.get("selected_before_target_eval_scoring", 0)) == 1)
@@ -921,6 +1198,8 @@ def build_protocol_audit_rows(rows: Sequence[Mapping[str, Any]], alpha_rows: Seq
                 "routing_uses_eval_domain_statistics_ok": int(
                     _to_int(row.get("routing_uses_eval_domain_statistics", 1)) == 0
                 ),
+                "routing_time_scores_exclude_heldout_expert_ok": int(not heldout_in_routing_scores),
+                "heldout_expert_checkpoint_used_only_for_oracle_diagnostic": int(not heldout_in_routing_scores),
                 "alpha_selection_applicable": alpha_applicable,
                 "alpha_selected_before_target_eval_scoring_ok": alpha_selected_ok,
                 "alpha_hyperparam_selected_before_target_eval_scoring_ok": alpha_hyper_ok,
@@ -944,6 +1223,8 @@ def _audit_summary(audit_rows: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
         "candidate_oracle_in_candidate_pool_ok",
         "routing_uses_eval_nelbo_ok",
         "routing_uses_eval_domain_statistics_ok",
+        "routing_time_scores_exclude_heldout_expert_ok",
+        "heldout_expert_checkpoint_used_only_for_oracle_diagnostic",
     ]
     summary: Dict[str, Any] = {}
     for check in checks:
@@ -1254,9 +1535,13 @@ def build_outputs(experiment_root: Path, output_dir: Path, decision_table: Path)
     per_magnification_rows = build_per_magnification_decision_rows(all_rows)
     rank_consistency_rows = build_rank_consistency_rows(all_rows)
     seed_stability_rows = build_seed_stability_rows(all_rows)
+    support_size_monotonicity_rows = build_support_size_monotonicity_rows(all_rows)
+    margin_diagnostic_rows = build_margin_diagnostic_rows(all_rows)
+    selection_entropy_rows = build_selection_entropy_rows(all_rows)
+    context = str(DATASET_CONTEXT).strip().lower()
     pass_rule = (
         build_pass_rule_summary(summary_rows, seed_stability_rows)
-        if str(DATASET_CONTEXT).strip().lower() == "breakhis"
+        if context in {"breakhis", "midogpp_scanner"}
         else {
             "verdict": "NOT_APPLICABLE_CAMELYON17_DEFAULT",
             "checks": {},
@@ -1268,6 +1553,21 @@ def build_outputs(experiment_root: Path, output_dir: Path, decision_table: Path)
     audit_summary = _audit_summary(audit_rows)
     cross_check = _cross_check_decision_table(summary_rows, decision_table)
     alpha_summary = _alpha_degeneracy_summary(alpha_distribution)
+    consolidated_sample_rows = _load_run_artifact_rows(
+        experiment_root,
+        "support_response_sample_selections.csv",
+        required=True,
+    )
+    consolidated_raw_support_rows = _load_run_artifact_rows(
+        experiment_root,
+        "support_response_support_nelbo_rows.csv",
+        required=True,
+    )
+    consolidated_metadata_diag_rows = _load_run_artifact_rows(
+        experiment_root,
+        "support_response_metadata_baseline_diagnostics.csv",
+        required=False,
+    )
 
     if OUTPUT_PREFIX == "support_nelbo":
         outputs = {
@@ -1282,6 +1582,12 @@ def build_outputs(experiment_root: Path, output_dir: Path, decision_table: Path)
             "stability_by_k": output_dir / "support_nelbo_stability_by_k.csv",
             "seed_stability": output_dir / "support_nelbo_seed_stability.csv",
             "protocol_audit": output_dir / "support_nelbo_protocol_audit.csv",
+            "support_response_selections": output_dir / "support_nelbo_support_response_selections.csv",
+            "raw_support_nelbo_rows": output_dir / "support_nelbo_raw_support_nelbo_rows.csv",
+            "metadata_baseline_diagnostics": output_dir / "support_nelbo_metadata_baseline_diagnostics.csv",
+            "support_size_monotonicity": output_dir / "support_nelbo_support_size_monotonicity.csv",
+            "margin_diagnostics": output_dir / "support_nelbo_margin_diagnostics.csv",
+            "selection_entropy": output_dir / "support_nelbo_selection_entropy.csv",
         }
     else:
         outputs = {
@@ -1296,6 +1602,12 @@ def build_outputs(experiment_root: Path, output_dir: Path, decision_table: Path)
             "stability_by_k": output_dir / f"{OUTPUT_PREFIX}_stability_by_k.csv",
             "seed_stability": output_dir / f"{OUTPUT_PREFIX}_seed_stability.csv",
             "protocol_audit": output_dir / f"{OUTPUT_PREFIX}_protocol_audit.csv",
+            "support_response_selections": output_dir / f"{OUTPUT_PREFIX}_support_response_selections.csv",
+            "raw_support_nelbo_rows": output_dir / f"{OUTPUT_PREFIX}_raw_support_nelbo_rows.csv",
+            "metadata_baseline_diagnostics": output_dir / f"{OUTPUT_PREFIX}_metadata_baseline_diagnostics.csv",
+            "support_size_monotonicity": output_dir / f"{OUTPUT_PREFIX}_support_size_monotonicity.csv",
+            "margin_diagnostics": output_dir / f"{OUTPUT_PREFIX}_margin_diagnostics.csv",
+            "selection_entropy": output_dir / f"{OUTPUT_PREFIX}_selection_entropy.csv",
         }
 
     _write_csv(
@@ -1447,6 +1759,8 @@ def build_outputs(experiment_root: Path, output_dir: Path, decision_table: Path)
             "candidate_oracle_in_candidate_pool_ok",
             "routing_uses_eval_nelbo_ok",
             "routing_uses_eval_domain_statistics_ok",
+            "routing_time_scores_exclude_heldout_expert_ok",
+            "heldout_expert_checkpoint_used_only_for_oracle_diagnostic",
             "alpha_selection_applicable",
             "alpha_selected_before_target_eval_scoring_ok",
             "alpha_hyperparam_selected_before_target_eval_scoring_ok",
@@ -1456,32 +1770,49 @@ def build_outputs(experiment_root: Path, output_dir: Path, decision_table: Path)
             "source_alpha_path",
         ],
     )
+    _write_dynamic_csv(outputs["support_response_selections"], consolidated_sample_rows)
+    _write_dynamic_csv(outputs["raw_support_nelbo_rows"], consolidated_raw_support_rows)
+    _write_dynamic_csv(outputs["metadata_baseline_diagnostics"], consolidated_metadata_diag_rows)
+    _write_dynamic_csv(outputs["support_size_monotonicity"], support_size_monotonicity_rows)
+    _write_dynamic_csv(outputs["margin_diagnostics"], margin_diagnostic_rows)
+    _write_dynamic_csv(outputs["selection_entropy"], selection_entropy_rows)
 
-    is_breakhis = str(DATASET_CONTEXT).strip().lower() == "breakhis"
-    allowed_claim = (
-        "Direct support-set NELBO was stress-tested as a target-local utility estimator "
-        "under BreakHis leave-one-magnification-out routing, using an unlabeled "
-        "patient-disjoint target support set and held-out NELBO utility evaluation."
-        if is_breakhis
-        else (
-            "Direct support-set NELBO is the primary support-estimated utility router "
-            "and the strongest support-estimated utility variant in the current "
-            "Camelyon17 support experiment."
+    is_breakhis = context == "breakhis"
+    is_midogpp = context == "midogpp_scanner"
+    if is_breakhis:
+        allowed_claim = (
+            "Direct support-set NELBO was stress-tested as a target-local utility estimator "
+            "under BreakHis leave-one-magnification-out routing, using an unlabeled "
+            "patient-disjoint target support set and held-out NELBO utility evaluation."
         )
-    )
-    disallowed_claims = (
-        [
+        disallowed_claims = [
             "This experiment does not prove general support-NELBO robustness across all medical domain shifts.",
             "BreakHis magnification shift is equivalent to Camelyon17 hospital or site shift.",
             "A BreakHis failure invalidates the Camelyon17 support-NELBO result.",
         ]
-        if is_breakhis
-        else [
+    elif is_midogpp:
+        allowed_claim = (
+            "Direct support-set NELBO is stress-tested as a compatibility estimator under "
+            "scanner-indexed MIDOG++ acquisition-domain shift, using group-disjoint "
+            "unlabeled support/evaluation splits and held-out NELBO utility evaluation."
+        )
+        disallowed_claims = [
+            "Direct support-NELBO solves pure scanner shift.",
+            "Scanner identity is true compatibility rather than an acquisition-domain proxy.",
+            "A result is thesis-facing without the MIDOG++ preflight scanner/confounding gates.",
+            "Tumor, lab, species, or resolution confounding is absent unless the confounding table proves it.",
+        ]
+    else:
+        allowed_claim = (
+            "Direct support-set NELBO is the primary support-estimated utility router "
+            "and the strongest support-estimated utility variant in the current "
+            "Camelyon17 support experiment."
+        )
+        disallowed_claims = [
             "Conservative support NELBO improves small-k stability.",
             "Alpha regularization is meaningful when alpha collapses to zero in most selections.",
             "Direct support-set NELBO supports a broader overall router-ranking claim.",
         ]
-    )
 
     summary_payload = {
         "artifact_lineage": LINEAGE_NOTE,
@@ -1489,12 +1820,21 @@ def build_outputs(experiment_root: Path, output_dir: Path, decision_table: Path)
             "protocol_validity": audit_summary,
             "utility_performance": {
                 "summary_rows": summary_rows,
-                "metric_priority": [
-                    "top1_oracle_hit",
-                    "spearman",
-                    "oracle_gap_pct",
-                    "selected_heldout_eval_nelbo",
-                ],
+                "metric_priority": (
+                    [
+                        "mean_oracle_gap_pct",
+                        "spearman",
+                        "top1_oracle_hit",
+                        "margin_and_entropy_diagnostics",
+                    ]
+                    if is_midogpp
+                    else [
+                        "top1_oracle_hit",
+                        "spearman",
+                        "oracle_gap_pct",
+                        "selected_heldout_eval_nelbo",
+                    ]
+                ),
             },
             "stability_diagnostics": {
                 "rows": stability_rows,

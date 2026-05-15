@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass
 from pathlib import Path
 import random
 import re
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from src.data.shared_split import image_level_split_indices, split_groups
 
@@ -250,13 +251,44 @@ def leakage_report(records: List[BreakHisRecord]) -> Dict[str, object]:
 
 def write_manifest(records: List[BreakHisRecord], out_path: Path) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    with out_path.open("w", encoding="utf-8") as f:
-        f.write("sample_id,image_path,label,label_name,magnification,domain,patient_id,split\n")
+    base_fields = ["sample_id", "image_path", "label", "label_name", "magnification", "domain", "patient_id", "split"]
+    extra_fields = sorted(
+        {
+            key
+            for rec in records
+            for key in getattr(rec, "__dict__", {}).keys()
+            if key
+            not in {
+                "sample_id",
+                "image_path",
+                "label",
+                "label_name",
+                "magnification",
+                "domain_name",
+                "patient_id",
+                "split",
+            }
+        }
+    )
+    fieldnames = base_fields + extra_fields
+    with out_path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
         for rec in records:
-            f.write(
-                f"{rec.sample_id},{rec.image_path},{rec.label},{rec.label_name},{rec.magnification},"
-                f"{rec.domain_name},{rec.patient_id or ''},{rec.split}\n"
-            )
+            raw: Dict[str, Any] = dict(getattr(rec, "__dict__", {}))
+            row = {
+                "sample_id": raw.get("sample_id", ""),
+                "image_path": raw.get("image_path", ""),
+                "label": raw.get("label", ""),
+                "label_name": raw.get("label_name", ""),
+                "magnification": raw.get("magnification", ""),
+                "domain": raw.get("domain_name", ""),
+                "patient_id": raw.get("patient_id", "") or "",
+                "split": raw.get("split", ""),
+            }
+            for field in extra_fields:
+                row[field] = raw.get(field, "")
+            writer.writerow(row)
 
 
 def prepare_breakhis_records(

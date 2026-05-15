@@ -1,0 +1,4 @@
+dataset,seed,run_id,provenance_status,failed_checks,patient_train_test_overlap_zero,patient_val_test_overlap_zero,duplicate_paths_zero,target_support_used_zero,target_labels_used_zero,target_domain_normalization_statistics_used_zero,target_ae_excluded,source_inner_self_ae_excluded,policy_heldout_target_nelbo_not_used,policy_target_ae_excluded,policy_target_cvae_excluded,policy_pseudo_query_ae_excluded,policy_pseudo_query_cvae_excluded,overlap_audit_present,ae_train_query_overlap_zero,ae_val_query_overlap_zero
+camelyon17,11,ae_utility_calibrator_seed11,PASS,,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+camelyon17,42,ae_utility_calibrator_seed42,PASS,,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+camelyon17,73,ae_utility_calibrator_seed73,PASS,,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1

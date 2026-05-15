@@ -1,0 +1,36 @@
+{
+  "protocol_status": "PASS",
+  "aggregate_verdict": "PASS",
+  "stability_interpretation": "SEED-SENSITIVE PASS",
+  "thresholds": {
+    "top1_drop_vs_ae_argmin_abs_max": 0.02,
+    "spearman_drop_vs_ae_argmin_abs_max": 0.03,
+    "gap_pct_degradation_vs_ae_argmin_max": 1.0,
+    "center_dominance_share_max": 0.5,
+    "min_centers_improved_for_stable_pass": 4,
+    "min_seed_domain_units_improved_for_stable_pass": 12,
+    "min_selected_override_precision": 0.5,
+    "min_active_override_rate_for_pass": 0.2,
+    "min_active_override_rate_for_weak_pass": 0.1,
+    "seed_dominance_share_max": 0.5
+  },
+  "n_seed_domain_units": 15,
+  "n_seeds": 3,
+  "n_heldout_centers": 5,
+  "positive_seed_domain_units": 14,
+  "positive_centers": 5,
+  "positive_seeds": 3,
+  "max_center_positive_gap_reduction_share": 0.2894532819730137,
+  "max_seed_positive_gap_reduction_share": 0.5444311724712896,
+  "leave_one_center_fragile": 0,
+  "provenance_statuses": [
+    "PASS"
+  ],
+  "plot_artifacts": [
+    "ae_utility_calibrator_camelyon17_gap_reduction_by_seed_domain.png",
+    "ae_utility_calibrator_camelyon17_top1_delta_by_seed_domain.png",
+    "ae_utility_calibrator_camelyon17_headroom_capture_by_domain.png",
+    "ae_utility_calibrator_camelyon17_override_precision_by_domain.png",
+    "ae_utility_calibrator_camelyon17_threshold_selection_heatmap.png"
+  ]
+}

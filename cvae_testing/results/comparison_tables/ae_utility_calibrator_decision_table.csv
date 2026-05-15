@@ -1,0 +1,19 @@
+dataset,method,n_runs,top1_oracle_hit,raw_spearman,mean_oracle_gap_pct,active_override_rate,selected_override_precision,net_gain_vs_ae_argmin,harmful_vs_ae_argmin_rate,improving_vs_ae_argmin_rate,local_ae_calibration_verdict,global_adoption_verdict
+breakhis,ae_argmin_zscore,3,0.6966666666666667,0.4633333333333333,6.645644872474875,nan,nan,nan,nan,nan,,
+breakhis,ae_combined_utility_calibrated_safe_override_v1,3,0.6966666666666667,0.5755555555555556,6.645644872474875,0.0,nan,0.0,0.0,0.0,,
+breakhis,ae_first_margin_gated_v1,3,0.5977777777777779,0.4633333333333333,11.799488760307359,nan,nan,nan,nan,nan,,
+breakhis,ae_metadata_utility_calibrated_safe_override_v1,3,0.6966666666666667,0.7077777777777777,6.645644872474875,0.0,nan,0.0,0.0,0.0,,
+breakhis,ae_utility_calibrated_safe_override_v1,3,0.6966666666666667,0.7916666666666666,6.645644872474875,0.0,nan,0.0,0.0,0.0,FAIL,DIAGNOSTIC ONLY
+breakhis,ae_utility_pairwise_ranker_diagnostic_v1,3,0.5877777777777777,0.48277777777777775,10.599253826632552,nan,nan,nan,nan,nan,,
+breakhis,metadata_ae_residual_safe_override_v1,3,0.3333333333333333,0.33666666666666667,35.92528219010733,nan,nan,nan,nan,nan,,
+breakhis,metadata_routing,3,0.3422222222222222,0.0,35.697385260079294,nan,nan,nan,nan,nan,,
+breakhis,pairwise_ranker_ae_combined,3,0.47555555555555556,0.6372222222222222,10.915753012449931,nan,nan,nan,nan,nan,,
+camelyon17,ae_argmin_zscore,3,0.426,0.35913333333333336,8.917680328563938,nan,nan,nan,nan,nan,,
+camelyon17,ae_combined_utility_calibrated_safe_override_v1,3,0.43433333333333335,0.40526666666666666,8.728822129947092,0.14200000000000002,nan,1.0728570098876953,0.062,0.08,,
+camelyon17,ae_first_margin_gated_v1,3,0.394,0.35913333333333336,9.297447556516405,nan,nan,nan,nan,nan,,
+camelyon17,ae_metadata_utility_calibrated_safe_override_v1,3,0.565,0.6032666666666667,5.058292738300249,0.30933333333333335,0.7576449692751637,13.408890375773112,0.068,0.24133333333333334,,
+camelyon17,ae_utility_calibrated_safe_override_v1,3,0.629,0.6293333333333333,3.4761098701722726,0.434,0.7780296366855413,19.24697770690918,0.098,0.336,PASS,PASS
+camelyon17,ae_utility_pairwise_ranker_diagnostic_v1,3,0.4656666666666667,0.4462666666666667,7.658160570268175,nan,nan,nan,nan,nan,,
+camelyon17,metadata_ae_residual_safe_override_v1,3,0.38466666666666666,0.4370666666666667,9.851400573107929,nan,nan,nan,nan,nan,,
+camelyon17,metadata_routing,3,0.329,0.0,10.964938603365345,nan,nan,nan,nan,nan,,
+camelyon17,pairwise_ranker_ae_combined,3,0.5556666666666666,0.6134666666666667,4.929761899142892,nan,nan,nan,nan,nan,,
