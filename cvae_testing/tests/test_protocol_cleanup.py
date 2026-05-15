@@ -63,6 +63,27 @@ def test_support_estimated_utility_v2_config_is_unlabeled_and_grid_locked() -> N
         validate_config(invalid)
 
 
+def test_camelyon17_conformal_pairprob_config_is_protocol_locked() -> None:
+    path = (
+        PROJECT_ROOT
+        / "configs"
+        / "experiments"
+        / "camelyon17"
+        / "learned_utility_response_routing_conformal_pairprob_v1.yaml"
+    )
+    cfg = load_config(path)
+    validate_config(cfg)
+
+    pairprob_cfg = cfg["learned_utility"]["pairwise_tournament"]["pairprob_tournament"]
+    conformal_cfg = pairprob_cfg["conformal_regret_set"]
+    assert cfg["experiment"]["name"] == "learned_utility_response_routing_conformal_pairprob_v1"
+    assert pairprob_cfg["adoption_feature_set"] == "pairprob_latent_only_v1"
+    assert conformal_cfg["enabled"] is True
+    assert conformal_cfg["base_method"] == "pairwise_group_robust_pairprob_tournament_v1"
+    assert conformal_cfg["feature_set"] == "pairprob_latent_only_v1"
+    assert conformal_cfg["calibration_policy"] == "source_inner_oof_conformal_margin_v1"
+
+
 def test_breakhis_support_estimated_utility_config_is_protocol_locked() -> None:
     path = (
         PROJECT_ROOT

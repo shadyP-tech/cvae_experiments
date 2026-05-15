@@ -160,6 +160,7 @@ def evaluate_learned_utility_loqdo(
             test_idx=test_idx,
             fold=fold,
             global_eval=global_eval,
+            metadata_similarity_eval=metadata_similarity_eval,
             predictors=eval_cfg.predictors,
             mlp_cfg=eval_cfg.mlp_cfg,
             pairwise_cfg=eval_cfg.pairwise_cfg,

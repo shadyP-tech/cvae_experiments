@@ -244,12 +244,34 @@ def _method_protocol(method: str) -> MethodProtocol:
             diagnostic_only=0,
             routing_uses_query_features=1,
         )
+    if name == "conformal_pairprob_regret_set_router_v1":
+        return MethodProtocol(
+            method_role="learned",
+            adoption_eligible=1,
+            diagnostic_only=0,
+            routing_uses_query_features=1,
+        )
     if name in {"pairwise_direct_pairprob_tournament_v1", "pairwise_pairprob_combined_diagnostic_v1"}:
         return MethodProtocol(
             method_role="diagnostic",
             adoption_eligible=0,
             diagnostic_only=1,
             routing_uses_query_features=1,
+        )
+    if name == "conformal_pairprob_topwin_set_diagnostic_v1":
+        return MethodProtocol(
+            method_role="diagnostic",
+            adoption_eligible=0,
+            diagnostic_only=1,
+            routing_uses_query_features=1,
+        )
+    if name == "oracle_conformal_regret_set_diagnostic_v1":
+        return MethodProtocol(
+            method_role="diagnostic",
+            adoption_eligible=0,
+            diagnostic_only=1,
+            routing_uses_query_features=1,
+            routing_uses_eval_nelbo=1,
         )
     if name == "oracle_confidence_set_diagnostic":
         return MethodProtocol(
@@ -444,6 +466,17 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         "mean_pairwise_confidence": "mean_pairwise_confidence",
         "pairwise_calibration_brier": "pairwise_calibration_brier",
         "pairwise_auc_helpful_preferences": "pairwise_auc_helpful_preferences",
+        "conformal_set_size": "conformal_set_size",
+        "oracle_in_conformal_set": "oracle_in_conformal_set",
+        "primary_near_oracle_in_conformal_set": "primary_near_oracle_in_conformal_set",
+        "conformal_quantile_clipped": "conformal_quantile_clipped",
+        "regret_set_override_active": "regret_set_override_active",
+        "override_delta_gap_pct_vs_pairprob_top1": "override_delta_gap_pct_vs_pairprob_top1",
+        "paired_gap_delta_vs_pairprob_hard": "paired_gap_delta_vs_pairprob_hard",
+        "paired_gap_delta_vs_metadata": "paired_gap_delta_vs_metadata",
+        "relative_catastrophic_regression_vs_pairprob_hard_gt_5": (
+            "relative_catastrophic_regression_vs_pairprob_hard_gt_5"
+        ),
     }
     for method, vals in sorted(by_method.items()):
         metrics: Dict[str, float] = {}
@@ -461,6 +494,14 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         metrics["mean_rank"] = metrics["micro_selected_rank"]
         metrics["mean_oracle_gap"] = metrics["micro_oracle_gap"]
         metrics["mean_oracle_gap_pct"] = metrics["micro_oracle_gap_pct"]
+        oracle_gap_domain_means: List[float] = []
+        for domain in sorted(set(int(r["query_domain"]) for r in vals)):
+            oracle_gap_domain_means.append(
+                _finite_mean([float(r.get("oracle_gap_pct", float("nan"))) for r in vals if int(r["query_domain"]) == domain])
+            )
+        metrics["worst_heldout_domain_oracle_gap_pct"] = (
+            float(max(oracle_gap_domain_means)) if oracle_gap_domain_means else float("nan")
+        )
         metrics["spearman"] = metrics["micro_spearman"]
         metrics["pairwise_auc"] = metrics["micro_pairwise_auc"]
         metrics["selected_nelbo"] = metrics["micro_selected_nelbo"]
@@ -496,6 +537,55 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         metrics["mean_pairwise_confidence"] = metrics["micro_mean_pairwise_confidence"]
         metrics["pairwise_calibration_brier"] = metrics["micro_pairwise_calibration_brier"]
         metrics["pairwise_auc_helpful_preferences"] = metrics["micro_pairwise_auc_helpful_preferences"]
+        metrics["mean_conformal_set_size"] = metrics["micro_conformal_set_size"]
+        metrics["set_size_gt1_rate"] = float(
+            np.mean([1.0 if float(r.get("conformal_set_size", 0.0)) > 1.0 else 0.0 for r in vals])
+        ) if any("conformal_set_size" in r for r in vals) else float("nan")
+        metrics["set_size_gt3_rate"] = float(
+            np.mean([1.0 if float(r.get("conformal_set_size", 0.0)) > 3.0 else 0.0 for r in vals])
+        ) if any("conformal_set_size" in r for r in vals) else float("nan")
+        metrics["oracle_in_conformal_set_rate"] = metrics["micro_oracle_in_conformal_set"]
+        metrics["primary_near_oracle_in_conformal_set_rate"] = (
+            metrics["micro_primary_near_oracle_in_conformal_set"]
+        )
+        metrics["quantile_clipped_rate"] = metrics["micro_conformal_quantile_clipped"]
+        metrics["regret_set_override_rate"] = metrics["micro_regret_set_override_active"]
+        override_rows = [
+            r for r in vals
+            if int(float(r.get("regret_set_override_active", 0) or 0)) == 1
+        ]
+        metrics["regret_set_override_help_rate"] = _finite_mean(
+            [
+                1.0 if float(r.get("override_delta_gap_pct_vs_pairprob_top1", float("nan"))) < 0.0 else 0.0
+                for r in override_rows
+            ]
+        )
+        metrics["regret_set_override_harm_rate"] = _finite_mean(
+            [
+                1.0 if float(r.get("override_delta_gap_pct_vs_pairprob_top1", float("nan"))) > 0.0 else 0.0
+                for r in override_rows
+            ]
+        )
+        metrics["mean_override_delta_gap_pct"] = _finite_mean(
+            [float(r.get("override_delta_gap_pct_vs_pairprob_top1", float("nan"))) for r in override_rows]
+        )
+        metrics["mean_paired_gap_delta_vs_pairprob_hard"] = metrics["micro_paired_gap_delta_vs_pairprob_hard"]
+        metrics["median_paired_gap_delta_vs_pairprob_hard"] = _finite_median(
+            [float(r.get("paired_gap_delta_vs_pairprob_hard", float("nan"))) for r in vals]
+        )
+        metrics["paired_improvement_rate_vs_pairprob_hard"] = float(
+            np.mean([1.0 if float(r.get("paired_gap_delta_vs_pairprob_hard", float("nan"))) < 0.0 else 0.0 for r in vals])
+        ) if any("paired_gap_delta_vs_pairprob_hard" in r for r in vals) else float("nan")
+        metrics["mean_paired_gap_delta_vs_metadata"] = metrics["micro_paired_gap_delta_vs_metadata"]
+        metrics["median_paired_gap_delta_vs_metadata"] = _finite_median(
+            [float(r.get("paired_gap_delta_vs_metadata", float("nan"))) for r in vals]
+        )
+        metrics["paired_improvement_rate_vs_metadata"] = float(
+            np.mean([1.0 if float(r.get("paired_gap_delta_vs_metadata", float("nan"))) < 0.0 else 0.0 for r in vals])
+        ) if any("paired_gap_delta_vs_metadata" in r for r in vals) else float("nan")
+        metrics["relative_catastrophic_regression_vs_pairprob_hard_gt_5_rate"] = (
+            metrics["micro_relative_catastrophic_regression_vs_pairprob_hard_gt_5"]
+        )
 
         if any("delta_gate_active" in r for r in vals):
             active_rows = [
@@ -656,6 +746,12 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
             "std_oracle_gap_pct_across_inner_domains",
             "std_top1_across_inner_domains",
             "max_minus_min_oracle_gap_pct_across_inner_domains",
+            "conformal_alpha",
+            "conformal_tau",
+            "conformal_calibration_n",
+            "conformal_quantile_k",
+            "robust_lambda",
+            "normalized_source_inner_worst_regret_selected",
         ]:
             vals_for_key = sorted(set(str(r.get(key, "")) for r in vals if str(r.get(key, "")) != ""))
             if vals_for_key:

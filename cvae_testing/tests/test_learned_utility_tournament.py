@@ -10,12 +10,19 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.eval.evaluators.learned_utility_config import FallbackBenefitGateConfig, PairprobTournamentConfig
+from src.eval.evaluators.learned_utility_config import (
+    ConformalRegretSetConfig,
+    FallbackBenefitGateConfig,
+    PairprobTournamentConfig,
+)
 from src.eval.evaluators.learned_utility_models import _LogisticRidgePairprob
 from src.eval.evaluators.learned_utility_pairs import _build_fold_training_pair_features
 from src.eval.evaluators.learned_utility_pairprob import (
+    ConformalRegretSetSelection,
     PairprobPolicySelection,
     build_pairprob_training_data,
+    conformal_pairprob_route_rows,
+    conformal_quantile,
     fit_pairprob_model,
     pairprob_feature_names,
     pairprob_probability_matrix,
@@ -90,6 +97,34 @@ def _pairprob_cfg(**overrides: object) -> PairprobTournamentConfig:
     }
     values.update(overrides)
     return PairprobTournamentConfig(**values)
+
+
+def _conformal_cfg(**overrides: object) -> ConformalRegretSetConfig:
+    values = {
+        "enabled": True,
+        "method_name": "conformal_pairprob_regret_set_router_v1",
+        "base_method": "pairwise_group_robust_pairprob_tournament_v1",
+        "feature_set": "pairprob_latent_only_v1",
+        "calibration_policy": "source_inner_oof_conformal_margin_v1",
+        "alpha_values": (0.1,),
+        "robust_lambda_values": (0.0,),
+        "nonconformity": "top_win_minus_expert_win",
+        "selection_rule": "source_inner_worst_regret_penalized_selection_v1",
+        "near_oracle_gap_pct_values": (1.0, 2.0),
+        "primary_near_oracle_gap_pct": 2.0,
+        "target_primary_near_oracle_in_set_rate": 0.80,
+        "max_mean_set_size": 3.0,
+        "max_set_size_gt3_rate": 1.0,
+        "min_oracle_in_set_rate": 0.0,
+        "min_source_inner_regret_rows_per_expert": 1,
+        "max_quantile_clipped_fold_rate": 1.0,
+        "absolute_high_regret_gap_pct": 5.0,
+        "catastrophic_regression_vs_pairprob_hard_gap_pct": 5.0,
+        "topwin_diagnostic_method": "conformal_pairprob_topwin_set_diagnostic_v1",
+        "oracle_diagnostic_method": "oracle_conformal_regret_set_diagnostic_v1",
+    }
+    values.update(overrides)
+    return ConformalRegretSetConfig(**values)
 
 
 def test_tournament_win_scores_exclude_self_comparisons() -> None:
@@ -261,6 +296,122 @@ def test_pairprob_route_rows_use_win_tournament_and_cycle_na_for_two_candidates(
     assert row["route_experts"] == "1"
     assert np.isclose(row["pairprob_win_top1"], 0.8)
     assert np.isnan(row["pairwise_cycle_rate"])
+
+
+def test_conformal_quantile_reports_clipping() -> None:
+    tau, n, k, clipped = conformal_quantile([0.0, 0.1, 0.2], alpha=0.1)
+
+    assert n == 3
+    assert k == 4
+    assert clipped == 1
+    assert np.isclose(tau, 0.2)
+
+
+def test_conformal_route_can_override_top1_with_source_inner_penalty() -> None:
+    cfg = _conformal_cfg()
+    fold = FoldCandidateSet.for_heldout_domain(heldout_domain=0, expert_domains=[0, 1, 2, 3])
+    prob = np.asarray(
+        [
+            [
+                [0.5, 0.9, 0.7],
+                [0.1, 0.5, 0.6],
+                [0.3, 0.4, 0.5],
+            ]
+        ],
+        dtype=np.float64,
+    )
+    true = np.asarray([[11.0, 10.0, 10.1]], dtype=np.float64)
+    selection = ConformalRegretSetSelection(
+        method="conformal_pairprob_regret_set_router_v1",
+        base_method="pairwise_group_robust_pairprob_tournament_v1",
+        feature_set="pairprob_latent_only_v1",
+        ridge_l2=1.0e-3,
+        alpha=0.1,
+        robust_lambda=1.0,
+        tau=1.0,
+        selected_by_inner_validation=True,
+        conformal_calibration_n=3,
+        conformal_quantile_k=2,
+        conformal_quantile_clipped=0,
+        normalized_worst_regret_by_expert={1: 1.0, 2: 0.0, 3: 0.0},
+        mean_regret_by_expert={1: 1.0, 2: 0.0, 3: 1.0},
+    )
+
+    rows = conformal_pairprob_route_rows(
+        method="conformal_pairprob_regret_set_router_v1",
+        fold=fold,
+        query_domains=np.asarray([0], dtype=np.int64),
+        expert_domains=fold.candidate_expert_domains,
+        prob_matrix=prob,
+        true_nelbo_matrix=true,
+        global_true_nelbo_matrix=np.asarray([[50.0, 11.0, 10.0, 10.1]], dtype=np.float64),
+        global_expert_domains=[0, 1, 2, 3],
+        policy_name="conformal_pairprob_regret_set_router_v1",
+        selection=selection,
+        cfg=cfg,
+        pairprob_baseline_gap_pct=np.asarray([10.0], dtype=np.float64),
+        scalar_hard_oracle_gap_pct=np.asarray([10.0], dtype=np.float64),
+        metadata_oracle_gap_pct=np.asarray([20.0], dtype=np.float64),
+    )
+
+    row = rows[0]
+    assert row["selected_expert"] == 2
+    assert row["regret_set_override_active"] == 1
+    assert row["override_delta_gap_pct_vs_pairprob_top1"] < 0.0
+    assert row["paired_gap_delta_vs_pairprob_hard"] < 0.0
+    assert row["primary_near_oracle_in_conformal_set"] == 1
+
+
+def test_conformal_topwin_diagnostic_routes_only_top1_not_set() -> None:
+    cfg = _conformal_cfg()
+    fold = FoldCandidateSet.for_heldout_domain(heldout_domain=0, expert_domains=[0, 1, 2, 3])
+    prob = np.asarray(
+        [
+            [
+                [0.5, 0.9, 0.7],
+                [0.1, 0.5, 0.6],
+                [0.3, 0.4, 0.5],
+            ]
+        ],
+        dtype=np.float64,
+    )
+    true = np.asarray([[11.0, 10.0, 10.1]], dtype=np.float64)
+    selection = ConformalRegretSetSelection(
+        method="conformal_pairprob_regret_set_router_v1",
+        base_method="pairwise_group_robust_pairprob_tournament_v1",
+        feature_set="pairprob_latent_only_v1",
+        ridge_l2=1.0e-3,
+        alpha=0.1,
+        robust_lambda=1.0,
+        tau=1.0,
+        selected_by_inner_validation=True,
+        normalized_worst_regret_by_expert={1: 1.0, 2: 0.0, 3: 0.0},
+        mean_regret_by_expert={1: 1.0, 2: 0.0, 3: 1.0},
+    )
+
+    rows = conformal_pairprob_route_rows(
+        method="conformal_pairprob_topwin_set_diagnostic_v1",
+        fold=fold,
+        query_domains=np.asarray([0], dtype=np.int64),
+        expert_domains=fold.candidate_expert_domains,
+        prob_matrix=prob,
+        true_nelbo_matrix=true,
+        global_true_nelbo_matrix=np.asarray([[50.0, 11.0, 10.0, 10.1]], dtype=np.float64),
+        global_expert_domains=[0, 1, 2, 3],
+        policy_name="conformal_pairprob_regret_set_router_v1",
+        selection=selection,
+        cfg=cfg,
+        pairprob_baseline_gap_pct=np.asarray([10.0], dtype=np.float64),
+        scalar_hard_oracle_gap_pct=np.asarray([10.0], dtype=np.float64),
+        topwin_diagnostic=True,
+    )
+
+    row = rows[0]
+    assert row["selected_expert"] == 1
+    assert row["route_experts"] == "1"
+    assert row["conformal_set_experts"] == "1|2|3"
+    assert row["adoption_eligible"] == 0
+    assert row["diagnostic_only"] == 1
 
 
 def test_pairprob_group_robust_selection_prioritizes_worst_domain_gap() -> None:
@@ -611,6 +762,9 @@ def test_pairwise_tournament_protocol_flags() -> None:
     group_pairprob = _method_protocol("pairwise_group_robust_pairprob_tournament_v1")
     direct_pairprob = _method_protocol("pairwise_direct_pairprob_tournament_v1")
     combined_pairprob = _method_protocol("pairwise_pairprob_combined_diagnostic_v1")
+    conformal = _method_protocol("conformal_pairprob_regret_set_router_v1")
+    conformal_topwin = _method_protocol("conformal_pairprob_topwin_set_diagnostic_v1")
+    conformal_oracle = _method_protocol("oracle_conformal_regret_set_diagnostic_v1")
 
     assert learned.method_role == "learned"
     assert learned.adoption_eligible == 1
@@ -625,6 +779,14 @@ def test_pairwise_tournament_protocol_flags() -> None:
     assert combined_pairprob.method_role == "diagnostic"
     assert combined_pairprob.adoption_eligible == 0
     assert combined_pairprob.diagnostic_only == 1
+    assert conformal.method_role == "learned"
+    assert conformal.adoption_eligible == 1
+    assert conformal.routing_uses_eval_nelbo == 0
+    assert conformal_topwin.method_role == "diagnostic"
+    assert conformal_topwin.adoption_eligible == 0
+    assert conformal_oracle.method_role == "diagnostic"
+    assert conformal_oracle.adoption_eligible == 0
+    assert conformal_oracle.routing_uses_eval_nelbo == 1
     assert oracle.method_role == "diagnostic"
     assert oracle.adoption_eligible == 0
     assert oracle.diagnostic_only == 1
@@ -787,3 +949,81 @@ def test_learned_utility_eval_emits_tournament_methods(tmp_path, monkeypatch) ->
     assert delta_metrics["pairwise_tournament_delta_gated_sparse_mix_v1"]["routing_uses_eval_nelbo"] == 0.0
     assert delta_metrics["pairwise_tournament_delta_gated_sparse_mix_combined_diagnostic_v1"]["diagnostic_only"] == 1.0
     assert delta_metrics["oracle_confidence_set_diagnostic"]["routing_uses_eval_nelbo"] == 1.0
+
+    conformal_results = lu.evaluate_learned_utility_loqdo(
+        test_cache=tmp_path / "unused.pt",
+        expert_checkpoints={f"expert_{domain}": "unused" for domain in expert_domains},
+        hidden_dim=4,
+        latent_dim=2,
+        strategy="categorical_exact",
+        tau=1.0,
+        seed=7,
+        learned_cfg={
+            "predictors": ["pairwise_ranker"],
+            "pair_features": {"include_metadata_features": True},
+            "scoring": {"pair_batch_size": 2},
+            "predictor_params": {
+                "pairwise_ranker": {
+                    "hidden_dim": 8,
+                    "epochs": 1,
+                    "lr": 1.0e-3,
+                    "batch_size": 64,
+                    "device": "cpu",
+                    "margin": 1.0,
+                    "near_tie_delta": 0.0,
+                    "hard_pair_fraction": 1.0,
+                    "random_pair_fraction": 0.0,
+                    "max_pairs_per_sample": 6,
+                    "max_pairs_per_domain": 100,
+                    "run_ablations": True,
+                }
+            },
+            "pairwise_tournament": {
+                "enabled": True,
+                "policy_name": "conformal_pairprob_regret_set_router_v1",
+                "base_methods": ["pairwise_ranker_latent_only"],
+                "diagnostic_base_methods": ["pairwise_ranker_combined"],
+                "margin_thresholds": [0.0],
+                "sparse_mix_topk_values": [2],
+                "score_temperature": 1.0,
+                "pairprob_tournament": {
+                    "enabled": True,
+                    "ridge_l2_values": [1.0e-3],
+                    "min_pairwise_train_pairs": 1,
+                    "min_pairwise_validation_pairs": 1,
+                    "min_source_inner_validation_domains": 1,
+                    "min_non_tie_pairs_per_inner_domain": 1,
+                    "conformal_regret_set": {
+                        "enabled": True,
+                        "alpha_values": [0.1],
+                        "robust_lambda_values": [0.0, 1.0],
+                        "max_mean_set_size": 5.0,
+                        "max_set_size_gt3_rate": 1.0,
+                        "min_oracle_in_set_rate": 0.0,
+                        "min_source_inner_regret_rows_per_expert": 1,
+                        "max_quantile_clipped_fold_rate": 1.0,
+                    },
+                },
+            },
+            "hybrid_scoring": {"enabled": False, "tie_policy": "stable_expert_index"},
+            "compatibility_research": {
+                "floors": {"random_rank_floor": False, "random_score_floor": False},
+                "permutation_tests": {
+                    "expert_label_permutation": False,
+                    "metadata_permutation": False,
+                    "repeats": 1,
+                },
+                "diagnostics": {"save_distribution_plots": False},
+                "gate": {"uplift_reference_method": "metadata_routing"},
+            },
+        },
+        reports_dir=tmp_path / "conformal",
+    )
+    conformal_metrics = conformal_results["metrics_by_method"]
+    assert "pairwise_group_robust_pairprob_tournament_v1" in conformal_metrics
+    assert "conformal_pairprob_regret_set_router_v1" in conformal_metrics
+    assert "conformal_pairprob_topwin_set_diagnostic_v1" in conformal_metrics
+    assert "oracle_conformal_regret_set_diagnostic_v1" in conformal_metrics
+    assert conformal_metrics["conformal_pairprob_regret_set_router_v1"]["routing_uses_eval_nelbo"] == 0.0
+    assert conformal_metrics["conformal_pairprob_topwin_set_diagnostic_v1"]["diagnostic_only"] == 1.0
+    assert conformal_metrics["oracle_conformal_regret_set_diagnostic_v1"]["routing_uses_eval_nelbo"] == 1.0

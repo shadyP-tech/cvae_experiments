@@ -109,6 +109,31 @@ class PairwiseTournamentConfig:
 
 
 @dataclass(frozen=True)
+class ConformalRegretSetConfig:
+    enabled: bool = False
+    method_name: str = "conformal_pairprob_regret_set_router_v1"
+    base_method: str = "pairwise_group_robust_pairprob_tournament_v1"
+    feature_set: str = "pairprob_latent_only_v1"
+    calibration_policy: str = "source_inner_oof_conformal_margin_v1"
+    alpha_values: Tuple[float, ...] = (0.05, 0.10, 0.20)
+    robust_lambda_values: Tuple[float, ...] = (0.0, 0.25, 0.5, 1.0)
+    nonconformity: str = "top_win_minus_expert_win"
+    selection_rule: str = "source_inner_worst_regret_penalized_selection_v1"
+    near_oracle_gap_pct_values: Tuple[float, ...] = (1.0, 2.0)
+    primary_near_oracle_gap_pct: float = 2.0
+    target_primary_near_oracle_in_set_rate: float = 0.80
+    max_mean_set_size: float = 2.5
+    max_set_size_gt3_rate: float = 0.20
+    min_oracle_in_set_rate: float = 0.70
+    min_source_inner_regret_rows_per_expert: int = 3
+    max_quantile_clipped_fold_rate: float = 0.25
+    absolute_high_regret_gap_pct: float = 5.0
+    catastrophic_regression_vs_pairprob_hard_gap_pct: float = 5.0
+    topwin_diagnostic_method: str = "conformal_pairprob_topwin_set_diagnostic_v1"
+    oracle_diagnostic_method: str = "oracle_conformal_regret_set_diagnostic_v1"
+
+
+@dataclass(frozen=True)
 class PairprobTournamentConfig:
     enabled: bool
     policy_name: str
@@ -130,6 +155,7 @@ class PairprobTournamentConfig:
     absolute_high_regret_gap_pct: float
     catastrophic_regression_vs_hard_gap_pct: float
     selection_policy: str
+    conformal_regret_set: ConformalRegretSetConfig = ConformalRegretSetConfig()
 
 
 @dataclass(frozen=True)
@@ -338,11 +364,69 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
     )
     pairprob_cfg = _as_dict(tournament_cfg.get("pairprob_tournament", {}))
     pairprob_methods_cfg = _as_dict(pairprob_cfg.get("methods", {}))
+    conformal_cfg = _as_dict(pairprob_cfg.get("conformal_regret_set", {}))
     margin_clip_values = tuple(
         float(v) for v in pairprob_cfg.get("margin_weight_clip", [0.25, 3.0])
     )
     if len(margin_clip_values) != 2:
         raise ValueError("learned_utility.pairwise_tournament.pairprob_tournament.margin_weight_clip must have length 2")
+    conformal_regret_set = ConformalRegretSetConfig(
+        enabled=bool((conformal_cfg or {}).get("enabled", False)),
+        method_name=str(
+            (conformal_cfg or {}).get("method_name", "conformal_pairprob_regret_set_router_v1")
+        ),
+        base_method=str(
+            (conformal_cfg or {}).get("base_method", "pairwise_group_robust_pairprob_tournament_v1")
+        ),
+        feature_set=str((conformal_cfg or {}).get("feature_set", "pairprob_latent_only_v1")).strip(),
+        calibration_policy=str(
+            (conformal_cfg or {}).get("calibration_policy", "source_inner_oof_conformal_margin_v1")
+        ).strip().lower(),
+        alpha_values=tuple(float(v) for v in (conformal_cfg or {}).get("alpha_values", [0.05, 0.10, 0.20])),
+        robust_lambda_values=tuple(
+            float(v) for v in (conformal_cfg or {}).get("robust_lambda_values", [0.0, 0.25, 0.5, 1.0])
+        ),
+        nonconformity=str((conformal_cfg or {}).get("nonconformity", "top_win_minus_expert_win")).strip().lower(),
+        selection_rule=str(
+            (conformal_cfg or {}).get("selection_rule", "source_inner_worst_regret_penalized_selection_v1")
+        ).strip().lower(),
+        near_oracle_gap_pct_values=tuple(
+            float(v) for v in (conformal_cfg or {}).get("near_oracle_gap_pct_values", [1.0, 2.0])
+        ),
+        primary_near_oracle_gap_pct=float(
+            (conformal_cfg or {}).get("primary_near_oracle_gap_pct", 2.0)
+        ),
+        target_primary_near_oracle_in_set_rate=float(
+            (conformal_cfg or {}).get("target_primary_near_oracle_in_set_rate", 0.80)
+        ),
+        max_mean_set_size=float((conformal_cfg or {}).get("max_mean_set_size", 2.5)),
+        max_set_size_gt3_rate=float((conformal_cfg or {}).get("max_set_size_gt3_rate", 0.20)),
+        min_oracle_in_set_rate=float((conformal_cfg or {}).get("min_oracle_in_set_rate", 0.70)),
+        min_source_inner_regret_rows_per_expert=int(
+            (conformal_cfg or {}).get("min_source_inner_regret_rows_per_expert", 3)
+        ),
+        max_quantile_clipped_fold_rate=float(
+            (conformal_cfg or {}).get("max_quantile_clipped_fold_rate", 0.25)
+        ),
+        absolute_high_regret_gap_pct=float(
+            (conformal_cfg or {}).get("absolute_high_regret_gap_pct", 5.0)
+        ),
+        catastrophic_regression_vs_pairprob_hard_gap_pct=float(
+            (conformal_cfg or {}).get("catastrophic_regression_vs_pairprob_hard_gap_pct", 5.0)
+        ),
+        topwin_diagnostic_method=str(
+            (conformal_cfg or {}).get(
+                "topwin_diagnostic_method",
+                "conformal_pairprob_topwin_set_diagnostic_v1",
+            )
+        ),
+        oracle_diagnostic_method=str(
+            (conformal_cfg or {}).get(
+                "oracle_diagnostic_method",
+                "oracle_conformal_regret_set_diagnostic_v1",
+            )
+        ),
+    )
     pairprob_tournament = PairprobTournamentConfig(
         enabled=bool((pairprob_cfg or {}).get("enabled", False)),
         policy_name=str(
@@ -406,6 +490,7 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
                 "source_inner_group_robust_worst_gap_then_catastrophic_then_mean_gap_v1",
             )
         ).strip().lower(),
+        conformal_regret_set=conformal_regret_set,
     )
     tournament = PairwiseTournamentConfig(
         enabled=bool((tournament_cfg or {}).get("enabled", False)),
@@ -512,6 +597,53 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
                     "learned_utility.pairwise_tournament.pairprob_tournament.adoption_feature_set "
                     "must be 'pairprob_latent_only_v1'"
                 )
+            conformal = pairprob.conformal_regret_set
+            if conformal.enabled:
+                if conformal.base_method != pairprob.group_robust_method:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.conformal_regret_set."
+                        "base_method must match methods.group_robust"
+                    )
+                if conformal.feature_set != pairprob.adoption_feature_set:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.conformal_regret_set."
+                        "feature_set must match adoption_feature_set"
+                    )
+                if conformal.calibration_policy != "source_inner_oof_conformal_margin_v1":
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.conformal_regret_set."
+                        "calibration_policy must be 'source_inner_oof_conformal_margin_v1'"
+                    )
+                if conformal.nonconformity != "top_win_minus_expert_win":
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.conformal_regret_set."
+                        "nonconformity must be 'top_win_minus_expert_win'"
+                    )
+                if conformal.selection_rule != "source_inner_worst_regret_penalized_selection_v1":
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.conformal_regret_set."
+                        "selection_rule must be 'source_inner_worst_regret_penalized_selection_v1'"
+                    )
+                if not conformal.alpha_values or any(v <= 0.0 or v >= 1.0 for v in conformal.alpha_values):
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.conformal_regret_set."
+                        "alpha_values must be in (0, 1)"
+                    )
+                if not conformal.robust_lambda_values or any(v < 0.0 for v in conformal.robust_lambda_values):
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.conformal_regret_set."
+                        "robust_lambda_values must be non-negative"
+                    )
+                if not conformal.near_oracle_gap_pct_values:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.conformal_regret_set."
+                        "near_oracle_gap_pct_values must be non-empty"
+                    )
+                if conformal.max_mean_set_size < 1.0:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.conformal_regret_set."
+                        "max_mean_set_size must be >= 1"
+                    )
 
     return LearnedUtilityConfig(
         pair_batch_size=pair_batch_size,

@@ -396,6 +396,9 @@ def _build_hybrid_summary_rows(
                 "mean_rank": float(metrics.get("mean_rank", float("nan"))),
                 "mean_oracle_gap": float(metrics.get("mean_oracle_gap", float("nan"))),
                 "mean_oracle_gap_pct": float(metrics.get("mean_oracle_gap_pct", float("nan"))),
+                "worst_heldout_domain_oracle_gap_pct": float(
+                    metrics.get("worst_heldout_domain_oracle_gap_pct", float("nan"))
+                ),
                 "pairwise_auc": float(metrics.get("pairwise_auc", float("nan"))),
                 "spearman": float(metrics.get("spearman", float("nan"))),
             }
@@ -537,6 +540,52 @@ def _build_method_summary_rows(method_metrics: Dict[str, Dict[str, Any]]) -> Lis
                 ),
                 "pairwise_train_domains_after_filter": str(
                     metrics.get("pairwise_train_domains_after_filter", "")
+                ),
+                "conformal_alpha": str(metrics.get("conformal_alpha", "")),
+                "conformal_tau": str(metrics.get("conformal_tau", "")),
+                "conformal_calibration_n": str(metrics.get("conformal_calibration_n", "")),
+                "conformal_quantile_k": str(metrics.get("conformal_quantile_k", "")),
+                "robust_lambda": str(metrics.get("robust_lambda", "")),
+                "mean_conformal_set_size": float(metrics.get("mean_conformal_set_size", float("nan"))),
+                "set_size_gt1_rate": float(metrics.get("set_size_gt1_rate", float("nan"))),
+                "set_size_gt3_rate": float(metrics.get("set_size_gt3_rate", float("nan"))),
+                "oracle_in_conformal_set_rate": float(
+                    metrics.get("oracle_in_conformal_set_rate", float("nan"))
+                ),
+                "primary_near_oracle_in_conformal_set_rate": float(
+                    metrics.get("primary_near_oracle_in_conformal_set_rate", float("nan"))
+                ),
+                "quantile_clipped_rate": float(metrics.get("quantile_clipped_rate", float("nan"))),
+                "regret_set_override_rate": float(metrics.get("regret_set_override_rate", float("nan"))),
+                "regret_set_override_help_rate": float(
+                    metrics.get("regret_set_override_help_rate", float("nan"))
+                ),
+                "regret_set_override_harm_rate": float(
+                    metrics.get("regret_set_override_harm_rate", float("nan"))
+                ),
+                "mean_override_delta_gap_pct": float(
+                    metrics.get("mean_override_delta_gap_pct", float("nan"))
+                ),
+                "mean_paired_gap_delta_vs_pairprob_hard": float(
+                    metrics.get("mean_paired_gap_delta_vs_pairprob_hard", float("nan"))
+                ),
+                "median_paired_gap_delta_vs_pairprob_hard": float(
+                    metrics.get("median_paired_gap_delta_vs_pairprob_hard", float("nan"))
+                ),
+                "paired_improvement_rate_vs_pairprob_hard": float(
+                    metrics.get("paired_improvement_rate_vs_pairprob_hard", float("nan"))
+                ),
+                "mean_paired_gap_delta_vs_metadata": float(
+                    metrics.get("mean_paired_gap_delta_vs_metadata", float("nan"))
+                ),
+                "median_paired_gap_delta_vs_metadata": float(
+                    metrics.get("median_paired_gap_delta_vs_metadata", float("nan"))
+                ),
+                "paired_improvement_rate_vs_metadata": float(
+                    metrics.get("paired_improvement_rate_vs_metadata", float("nan"))
+                ),
+                "relative_catastrophic_regression_vs_pairprob_hard_gt_5_rate": float(
+                    metrics.get("relative_catastrophic_regression_vs_pairprob_hard_gt_5_rate", float("nan"))
                 ),
                 "std_oracle_gap_pct_across_inner_domains": str(
                     metrics.get("std_oracle_gap_pct_across_inner_domains", "")

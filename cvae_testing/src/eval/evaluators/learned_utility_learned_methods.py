@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Dict, List, Sequence, Tuple
 
 import numpy as np
@@ -19,14 +19,18 @@ from src.eval.evaluators.learned_utility_pairs import (
     _zscore_features,
 )
 from src.eval.evaluators.learned_utility_pairprob import (
+    ConformalCalibrationBlock,
+    ConformalRegretSetSelection,
     PairprobModelBundle,
     PairprobPolicySelection,
     build_pairprob_training_data,
+    conformal_pairprob_route_rows,
     fit_pairprob_model,
     pairprob_evidence_reason,
     pairprob_probability_matrix,
     pairprob_route_rows,
     select_pairprob_policy,
+    select_conformal_regret_set_policy,
 )
 from src.eval.evaluators.learned_utility_protocol import (
     FoldCandidateSet,
@@ -244,6 +248,30 @@ def _hard_gap_pct_for_score_matrix(
     return np.asarray([float(r["oracle_gap_pct"]) for r in rows], dtype=np.float64)
 
 
+def _metadata_gap_pct_for_similarity(
+    *,
+    metadata_similarity_eval: np.ndarray | None,
+    true_nelbo_matrix: np.ndarray,
+    expert_domains: Sequence[int],
+) -> np.ndarray:
+    if metadata_similarity_eval is None:
+        return np.full((true_nelbo_matrix.shape[0],), float("nan"), dtype=np.float64)
+    sim = np.asarray(metadata_similarity_eval, dtype=np.float64)
+    true = np.asarray(true_nelbo_matrix, dtype=np.float64)
+    if sim.shape != true.shape:
+        return np.full((true.shape[0],), float("nan"), dtype=np.float64)
+    experts = np.asarray([int(v) for v in expert_domains], dtype=np.int64)
+    selected = np.zeros((sim.shape[0],), dtype=np.int64)
+    oracle = np.zeros((true.shape[0],), dtype=np.int64)
+    tie = np.arange(true.shape[1], dtype=np.int64)
+    for i in range(sim.shape[0]):
+        selected[i] = int(np.lexsort((experts, -sim[i, :]))[0])
+        oracle[i] = int(np.lexsort((tie, true[i, :]))[0])
+    oracle_nelbo = true[np.arange(true.shape[0]), oracle]
+    selected_nelbo = true[np.arange(true.shape[0]), selected]
+    return ((selected_nelbo - oracle_nelbo) / np.maximum(np.abs(oracle_nelbo), 1e-12)) * 100.0
+
+
 def _fit_pairprob_bundle_from_rows(
     *,
     x_rows: np.ndarray,
@@ -313,15 +341,21 @@ def _calibrate_pairprob_tournament(
     embedding_feature_dim: int,
     expert_feature_dim: int,
     global_expert_domains: Sequence[int],
-) -> Tuple[PairprobPolicySelection | None, PairprobPolicySelection | None, PairprobPolicySelection | None]:
+) -> Tuple[
+    PairprobPolicySelection | None,
+    PairprobPolicySelection | None,
+    PairprobPolicySelection | None,
+    ConformalRegretSetSelection | None,
+]:
     cfg = tournament_cfg.pairprob_tournament
     source_domains = sorted(set(int(sample_domains[int(i)]) for i in np.asarray(train_idx, dtype=np.int64).tolist()))
     if len(source_domains) < int(cfg.min_source_inner_validation_domains):
-        return None, None, None
+        return None, None, None, None
 
     rows_by_key: Dict[Tuple[str, str, float], List[Dict[str, Any]]] = {}
     evidence_by_key: Dict[Tuple[str, str, float], Dict[str, float]] = {}
     validation_domains_by_key: Dict[Tuple[str, str, float], set[int]] = {}
+    conformal_blocks_by_key: Dict[Tuple[str, str, float], List[ConformalCalibrationBlock]] = {}
     feature_sets = [str(cfg.adoption_feature_set), *[str(v) for v in cfg.diagnostic_feature_sets]]
     device = str(pairwise_cfg.get("device", "auto"))
 
@@ -451,6 +485,23 @@ def _calibrate_pairprob_tournament(
                 )
                 for method_name in method_names:
                     key = (str(method_name), str(feature_set), float(l2))
+                    if (
+                        bool(cfg.conformal_regret_set.enabled)
+                        and str(method_name) == str(cfg.group_robust_method)
+                        and str(feature_set) == str(cfg.conformal_regret_set.feature_set)
+                    ):
+                        conformal_blocks_by_key.setdefault(key, []).append(
+                            ConformalCalibrationBlock(
+                                validation_domain=int(validation_domain),
+                                query_domains=np.asarray(sample_domains[validation_idx], dtype=np.int64),
+                                expert_domains=tuple(int(v) for v in validation_fold.candidate_expert_domains),
+                                prob_matrix=prob,
+                                true_nelbo_matrix=true_matrix,
+                                global_true_nelbo_matrix=global_eval,
+                                fold=validation_fold,
+                                scalar_hard_oracle_gap_pct=hard_gap,
+                            )
+                        )
                     total_pairs = max(int(train_data.total_pairs), 1)
                     ev = evidence_by_key.setdefault(
                         key,
@@ -540,7 +591,25 @@ def _calibrate_pairprob_tournament(
             combined,
             diagnostic_only_reason="diagnostic_only_combined_metadata_features",
         )
-    return direct, group, combined
+    outer_candidate_experts = FoldCandidateSet.for_heldout_domain(
+        heldout_domain=int(outer_heldout_domain),
+        expert_domains=expert_domains,
+    ).candidate_expert_domains
+    conformal_selection = None
+    if bool(cfg.conformal_regret_set.enabled):
+        conformal_key = (
+            str(cfg.group_robust_method),
+            str(cfg.conformal_regret_set.feature_set),
+            float(group.ridge_l2) if group is not None else float("nan"),
+        )
+        conformal_selection = select_conformal_regret_set_policy(
+            blocks=conformal_blocks_by_key.get(conformal_key, []),
+            base_selection=group,
+            outer_candidate_experts=outer_candidate_experts,
+            global_expert_domains=global_expert_domains,
+            cfg=cfg.conformal_regret_set,
+        )
+    return direct, group, combined, conformal_selection
 
 
 def _calibrate_pairwise_tournament(
@@ -947,11 +1016,13 @@ def _run_pairprob_tournament_for_fold(
     expert_domains: Sequence[int],
     global_expert_domains: Sequence[int],
     selections: Sequence[PairprobPolicySelection | None],
+    conformal_selection: ConformalRegretSetSelection | None,
     tournament_cfg: PairwiseTournamentConfig,
     pairwise_cfg: Dict[str, Any],
     embedding_feature_dim: int,
     expert_feature_dim: int,
     hard_oracle_gap_pct: np.ndarray | None,
+    metadata_oracle_gap_pct: np.ndarray | None,
 ) -> List[Dict[str, Any]]:
     cfg = tournament_cfg.pairprob_tournament
     rows: List[Dict[str, Any]] = []
@@ -1010,24 +1081,96 @@ def _run_pairprob_tournament_for_fold(
             embedding_dim=int(embedding_feature_dim),
             expert_feature_dim=int(expert_feature_dim),
         )
-        rows.extend(
-            pairprob_route_rows(
-                method=str(selection.method),
-                fold=fold,
-                query_domains=query_domains,
-                expert_domains=fold.candidate_expert_domains,
-                prob_matrix=prob,
-                true_nelbo_matrix=true_matrix,
-                global_true_nelbo_matrix=global_eval,
-                global_expert_domains=global_expert_domains,
-                policy_name=cfg.policy_name,
-                selection=selection_for_eval,
-                hard_oracle_gap_pct=hard_oracle_gap_pct,
-                diagnostic_only_reason=str(reason),
-                absolute_high_regret_gap_pct=float(cfg.absolute_high_regret_gap_pct),
-                catastrophic_regression_vs_hard_gap_pct=float(cfg.catastrophic_regression_vs_hard_gap_pct),
-            )
+        selection_rows = pairprob_route_rows(
+            method=str(selection.method),
+            fold=fold,
+            query_domains=query_domains,
+            expert_domains=fold.candidate_expert_domains,
+            prob_matrix=prob,
+            true_nelbo_matrix=true_matrix,
+            global_true_nelbo_matrix=global_eval,
+            global_expert_domains=global_expert_domains,
+            policy_name=cfg.policy_name,
+            selection=selection_for_eval,
+            hard_oracle_gap_pct=hard_oracle_gap_pct,
+            diagnostic_only_reason=str(reason),
+            absolute_high_regret_gap_pct=float(cfg.absolute_high_regret_gap_pct),
+            catastrophic_regression_vs_hard_gap_pct=float(cfg.catastrophic_regression_vs_hard_gap_pct),
         )
+        rows.extend(selection_rows)
+        if (
+            conformal_selection is not None
+            and bool(cfg.conformal_regret_set.enabled)
+            and str(selection.method) == str(cfg.group_robust_method)
+            and str(selection.feature_set) == str(cfg.conformal_regret_set.feature_set)
+            and abs(float(selection.ridge_l2) - float(conformal_selection.ridge_l2)) < 1e-18
+        ):
+            conformal_reason = "|".join(
+                part
+                for part in dict.fromkeys([str(conformal_selection.diagnostic_only_reason), str(reason)])
+                if part
+            )
+            conformal_selection_for_eval = replace(
+                conformal_selection,
+                diagnostic_only_reason=str(conformal_reason),
+            )
+            pairprob_gap = np.asarray([float(r["oracle_gap_pct"]) for r in selection_rows], dtype=np.float64)
+            rows.extend(
+                conformal_pairprob_route_rows(
+                    method=str(cfg.conformal_regret_set.topwin_diagnostic_method),
+                    fold=fold,
+                    query_domains=query_domains,
+                    expert_domains=fold.candidate_expert_domains,
+                    prob_matrix=prob,
+                    true_nelbo_matrix=true_matrix,
+                    global_true_nelbo_matrix=global_eval,
+                    global_expert_domains=global_expert_domains,
+                    policy_name=cfg.conformal_regret_set.method_name,
+                    selection=conformal_selection_for_eval,
+                    cfg=cfg.conformal_regret_set,
+                    pairprob_baseline_gap_pct=pairprob_gap,
+                    scalar_hard_oracle_gap_pct=hard_oracle_gap_pct,
+                    metadata_oracle_gap_pct=metadata_oracle_gap_pct,
+                    topwin_diagnostic=True,
+                )
+            )
+            rows.extend(
+                conformal_pairprob_route_rows(
+                    method=str(cfg.conformal_regret_set.method_name),
+                    fold=fold,
+                    query_domains=query_domains,
+                    expert_domains=fold.candidate_expert_domains,
+                    prob_matrix=prob,
+                    true_nelbo_matrix=true_matrix,
+                    global_true_nelbo_matrix=global_eval,
+                    global_expert_domains=global_expert_domains,
+                    policy_name=cfg.conformal_regret_set.method_name,
+                    selection=conformal_selection_for_eval,
+                    cfg=cfg.conformal_regret_set,
+                    pairprob_baseline_gap_pct=pairprob_gap,
+                    scalar_hard_oracle_gap_pct=hard_oracle_gap_pct,
+                    metadata_oracle_gap_pct=metadata_oracle_gap_pct,
+                )
+            )
+            rows.extend(
+                conformal_pairprob_route_rows(
+                    method=str(cfg.conformal_regret_set.oracle_diagnostic_method),
+                    fold=fold,
+                    query_domains=query_domains,
+                    expert_domains=fold.candidate_expert_domains,
+                    prob_matrix=prob,
+                    true_nelbo_matrix=true_matrix,
+                    global_true_nelbo_matrix=global_eval,
+                    global_expert_domains=global_expert_domains,
+                    policy_name=cfg.conformal_regret_set.method_name,
+                    selection=conformal_selection_for_eval,
+                    cfg=cfg.conformal_regret_set,
+                    pairprob_baseline_gap_pct=pairprob_gap,
+                    scalar_hard_oracle_gap_pct=hard_oracle_gap_pct,
+                    metadata_oracle_gap_pct=metadata_oracle_gap_pct,
+                    oracle_diagnostic=True,
+                )
+            )
     return rows
 
 
@@ -1042,6 +1185,7 @@ def _run_learned_methods_for_fold(
     test_idx: np.ndarray,
     fold: FoldCandidateSet,
     global_eval: np.ndarray,
+    metadata_similarity_eval: np.ndarray | None,
     predictors: Sequence[str],
     mlp_cfg: Dict[str, Any],
     pairwise_cfg: Dict[str, Any],
@@ -1179,6 +1323,7 @@ def _run_learned_methods_for_fold(
     pair_rows: List[Dict[str, Any]] = []
     pairwise_pred_matrices: Dict[str, np.ndarray] = {}
     true_matrix_for_tournament: np.ndarray | None = None
+    metadata_oracle_gap_pct_for_tournament: np.ndarray | None = None
     for method, model in models.items():
         if isinstance(model, tuple):
             reg, x_m = model
@@ -1197,6 +1342,11 @@ def _run_learned_methods_for_fold(
         if str(method).startswith("pairwise_ranker"):
             pairwise_pred_matrices[str(method)] = pred_matrix
             true_matrix_for_tournament = true_matrix
+            metadata_oracle_gap_pct_for_tournament = _metadata_gap_pct_for_similarity(
+                metadata_similarity_eval=metadata_similarity_eval,
+                true_nelbo_matrix=true_matrix,
+                expert_domains=fold.candidate_expert_domains,
+            )
 
         _metrics_unused, rows = _selection_metrics(
             method=method,
@@ -1493,7 +1643,7 @@ def _run_learned_methods_for_fold(
                 tournament_cfg=tournament_cfg,
                 base_method=pairprob_hard_base,
             )
-            direct_selection, group_selection, combined_selection = _calibrate_pairprob_tournament(
+            direct_selection, group_selection, combined_selection, conformal_selection = _calibrate_pairprob_tournament(
                 embeddings=embeddings,
                 sample_domains=sample_domains,
                 true_nelbo=true_nelbo,
@@ -1524,11 +1674,13 @@ def _run_learned_methods_for_fold(
                     expert_domains=fold.candidate_expert_domains,
                     global_expert_domains=expert_domains,
                     selections=[direct_selection, group_selection, combined_selection],
+                    conformal_selection=conformal_selection,
                     tournament_cfg=tournament_cfg,
                     pairwise_cfg=pairwise_cfg,
                     embedding_feature_dim=embedding_feature_dim,
                     expert_feature_dim=expert_feature_dim,
                     hard_oracle_gap_pct=pairprob_hard_gap,
+                    metadata_oracle_gap_pct=metadata_oracle_gap_pct_for_tournament,
                 )
             )
 
