@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 from typing import Any, Dict, List, Mapping, Sequence, Tuple
 
 import numpy as np
@@ -15,6 +16,150 @@ from src.eval.evaluators.learned_utility_protocol import FoldCandidateSet, Proto
 from src.eval.evaluators.learned_utility_selection import _selection_metrics
 from src.eval.evaluators.learned_utility_pairs import _zscore_features
 from src.eval.metrics import spearman_corr
+
+
+DIRECT_PAIRPROB_DIAGNOSTIC_METHOD = "pairwise_direct_pairprob_tournament_v1"
+DIRECT_PAIRPROB_ADOPTION_METHOD = "pairwise_direct_pairprob_adoption_v1"
+GROUP_ROBUST_PAIRPROB_METHOD = "pairwise_group_robust_pairprob_tournament_v1"
+COMBINED_PAIRPROB_DIAGNOSTIC_METHOD = "pairwise_pairprob_combined_diagnostic_v1"
+DIRECT_PAIRPROB_SELECTION_POLICY = "source_inner_mean_gap_then_catastrophic_then_top1_v1"
+GROUP_ROBUST_PAIRPROB_SELECTION_POLICY = (
+    "source_inner_group_robust_worst_gap_then_catastrophic_then_mean_gap_v1"
+)
+DIRECT_PAIRPROB_ADOPTION_FEATURE_FAMILY = "pairprob_latent_only_v1"
+DIRECT_ADOPTION_AUDIT_REASONS = {
+    "none",
+    "missing_diagnostic_direct_row",
+    "route_hash_mismatch",
+    "nelbo_metric_mismatch",
+    "source_only_audit_failed",
+    "target_leakage_audit_failed",
+    "invalid_feature_family",
+    "duplicate_sign_ci_candidate",
+}
+_DIRECT_ROUTE_HASH_FIELDS = (
+    "selected_expert",
+    "route_experts",
+    "route_weights",
+    "route_size",
+    "route_mode",
+    "selected_nelbo",
+    "oracle_nelbo",
+    "oracle_gap",
+    "oracle_gap_pct",
+    "top1_oracle_hit",
+    "selected_rank",
+    "spearman",
+    "pairwise_auc",
+)
+_DIRECT_ALIAS_MATCH_FIELDS = (
+    "selected_expert",
+    "route_experts",
+    "route_weights",
+    "selected_nelbo",
+    "oracle_gap_pct",
+    "top1_oracle_hit",
+    "spearman",
+    "selected_rank",
+)
+
+
+def _pairprob_selection_policy_for_method(method: str) -> str:
+    if str(method) in {DIRECT_PAIRPROB_DIAGNOSTIC_METHOD, DIRECT_PAIRPROB_ADOPTION_METHOD}:
+        return DIRECT_PAIRPROB_SELECTION_POLICY
+    return GROUP_ROBUST_PAIRPROB_SELECTION_POLICY
+
+
+def _direct_pairprob_route_hash(row: Mapping[str, Any]) -> str:
+    payload = "\x1f".join(str(row.get(field, "")) for field in _DIRECT_ROUTE_HASH_FIELDS)
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def _direct_adoption_audit_reason(
+    *,
+    diagnostic_hash: str,
+    adoption_hash: str,
+    metrics_match: bool,
+    source_only_audit_pass: bool,
+    target_leakage_audit_pass: bool,
+    feature_family: str,
+    duplicate_sign_ci_candidate: bool = False,
+) -> str:
+    if not str(diagnostic_hash):
+        return "missing_diagnostic_direct_row"
+    if str(diagnostic_hash) != str(adoption_hash):
+        return "route_hash_mismatch"
+    if not bool(metrics_match):
+        return "nelbo_metric_mismatch"
+    if str(feature_family) != DIRECT_PAIRPROB_ADOPTION_FEATURE_FAMILY:
+        return "invalid_feature_family"
+    if not bool(source_only_audit_pass):
+        return "source_only_audit_failed"
+    if not bool(target_leakage_audit_pass):
+        return "target_leakage_audit_failed"
+    if bool(duplicate_sign_ci_candidate):
+        return "duplicate_sign_ci_candidate"
+    return "none"
+
+
+def clone_direct_pairprob_adoption_rows(
+    direct_rows: Sequence[Mapping[str, Any]],
+    *,
+    adoption_method: str = DIRECT_PAIRPROB_ADOPTION_METHOD,
+) -> List[Dict[str, Any]]:
+    cloned: List[Dict[str, Any]] = []
+    for direct_row in direct_rows:
+        source = dict(direct_row)
+        diagnostic_hash = str(source.get("direct_diagnostic_route_hash", "")) or _direct_pairprob_route_hash(source)
+        adoption = dict(source)
+        adoption["method"] = str(adoption_method)
+        adoption["method_role"] = "learned"
+        adoption["adoption_eligible"] = 1
+        adoption["diagnostic_only"] = 0
+        adoption["diagnostic_only_reason"] = ""
+        adoption["base_method"] = DIRECT_PAIRPROB_DIAGNOSTIC_METHOD
+        adoption["adoption_feature_family"] = DIRECT_PAIRPROB_ADOPTION_FEATURE_FAMILY
+        adoption["direct_adoption_is_alias_of"] = DIRECT_PAIRPROB_DIAGNOSTIC_METHOD
+        adoption["direct_diagnostic_route_hash"] = diagnostic_hash
+        adoption_hash = _direct_pairprob_route_hash(adoption)
+        adoption["direct_adoption_route_hash"] = adoption_hash
+        metrics_match = all(str(adoption.get(field, "")) == str(source.get(field, "")) for field in _DIRECT_ALIAS_MATCH_FIELDS)
+        source_evidence_ok = not bool(str(source.get("diagnostic_only_reason", "")).strip())
+        same_route = bool(diagnostic_hash == adoption_hash and metrics_match)
+        source_only_pass = bool(
+            str(adoption.get("feature_set", "")) == DIRECT_PAIRPROB_ADOPTION_FEATURE_FAMILY
+            and str(adoption.get("pairprob_feature_set", "")) == DIRECT_PAIRPROB_ADOPTION_FEATURE_FAMILY
+            and str(adoption.get("adoption_feature_family", "")) == DIRECT_PAIRPROB_ADOPTION_FEATURE_FAMILY
+            and source_evidence_ok
+        )
+        target_pass = bool(
+            int(float(adoption.get("routing_uses_eval_nelbo", 0) or 0)) == 0
+            and int(float(adoption.get("routing_uses_eval_domain_statistics", 0) or 0)) == 0
+        )
+        adoption["direct_adoption_same_route_as_direct"] = int(same_route)
+        adoption["source_only_audit_pass"] = int(source_only_pass)
+        adoption["target_leakage_audit_pass"] = int(target_pass)
+        adoption["excluded_from_sign_ci_selection"] = 0
+        adoption["sign_ci_candidate"] = 1
+        adoption["direct_vs_group_robust_primary_comparator"] = 1
+        reason = _direct_adoption_audit_reason(
+            diagnostic_hash=diagnostic_hash,
+            adoption_hash=adoption_hash,
+            metrics_match=metrics_match,
+            source_only_audit_pass=source_only_pass,
+            target_leakage_audit_pass=target_pass,
+            feature_family=str(adoption.get("adoption_feature_family", "")),
+        )
+        adoption["direct_adoption_audit_failure_reason"] = reason
+        if reason != "none":
+            adoption["method_role"] = "diagnostic"
+            adoption["adoption_eligible"] = 0
+            adoption["diagnostic_only"] = 1
+            adoption["excluded_from_sign_ci_selection"] = 1
+            adoption["sign_ci_candidate"] = 0
+            adoption["diagnostic_only_reason"] = reason
+        cloned.append(adoption)
+    return cloned
 
 
 @dataclass(frozen=True)
@@ -1735,6 +1880,15 @@ def pairprob_route_rows(
     )
     if hard_gap.shape[0] != len(rows):
         hard_gap = np.full((len(rows),), float("nan"), dtype=np.float64)
+    selection_policy = _pairprob_selection_policy_for_method(method)
+    is_direct_diagnostic = str(method) == DIRECT_PAIRPROB_DIAGNOSTIC_METHOD
+    is_direct_adoption = str(method) == DIRECT_PAIRPROB_ADOPTION_METHOD
+    is_combined_diagnostic = str(method) == COMBINED_PAIRPROB_DIAGNOSTIC_METHOD
+    excluded_from_sign_ci = int(is_direct_diagnostic or is_combined_diagnostic)
+    sign_ci_candidate = int(
+        (not bool(excluded_from_sign_ci))
+        and str(method) in {DIRECT_PAIRPROB_ADOPTION_METHOD, GROUP_ROBUST_PAIRPROB_METHOD}
+    )
 
     for i, row in enumerate(rows):
         selected_col = int(selected_idx[i])
@@ -1747,7 +1901,7 @@ def pairprob_route_rows(
                 "feature_set": str(selection.feature_set),
                 "selected_tau": float(selection.ridge_l2),
                 "selected_by_inner_validation": int(bool(selection.selected_by_inner_validation)),
-                "threshold_selection_policy": "source_inner_group_robust_worst_gap_then_catastrophic_then_mean_gap_v1",
+                "threshold_selection_policy": str(selection_policy),
                 "route_experts": str(selected_expert),
                 "route_weights": "1",
                 "route_size": 1,
@@ -1756,7 +1910,7 @@ def pairprob_route_rows(
                 "pairprob_probability_calibration": "none_v1",
                 "pairprob_ridge_l2": float(selection.ridge_l2),
                 "pairprob_feature_set": str(selection.feature_set),
-                "pairprob_selection_policy": "source_inner_group_robust_worst_gap_then_catastrophic_then_mean_gap_v1",
+                "pairprob_selection_policy": str(selection_policy),
                 "pairprob_win_top1": float(win[i, selected_col]),
                 "top1_win_margin": float(margins[i]),
                 "tournament_margin": float(margins[i]),
@@ -1784,9 +1938,36 @@ def pairprob_route_rows(
                 "pairwise_validation_pairs_after_filter": int(selection.pairwise_validation_pairs_after_filter),
                 "pairwise_train_domains_after_filter": int(selection.pairwise_train_domains_after_filter),
                 "diagnostic_only_reason": str(reason),
+                "excluded_from_sign_ci_selection": int(excluded_from_sign_ci),
+                "sign_ci_candidate": int(sign_ci_candidate),
+                "adoption_feature_family": (
+                    DIRECT_PAIRPROB_ADOPTION_FEATURE_FAMILY if is_direct_adoption else ""
+                ),
+                "direct_adoption_is_alias_of": (
+                    DIRECT_PAIRPROB_DIAGNOSTIC_METHOD if is_direct_adoption else ""
+                ),
+                "direct_adoption_same_route_as_direct": int(0 if is_direct_adoption else 0),
+                "direct_adoption_audit_failure_reason": (
+                    "missing_diagnostic_direct_row" if is_direct_adoption else ""
+                ),
+                "source_only_audit_pass": int(
+                    str(selection.feature_set) == DIRECT_PAIRPROB_ADOPTION_FEATURE_FAMILY
+                ),
+                "target_leakage_audit_pass": 1,
+                "direct_vs_group_robust_primary_comparator": int(is_direct_adoption),
                 **pair_diag,
             }
         )
+        route_hash = _direct_pairprob_route_hash(row)
+        if is_direct_diagnostic:
+            row["direct_diagnostic_route_hash"] = route_hash
+            row["direct_adoption_route_hash"] = ""
+        elif is_direct_adoption:
+            row["direct_diagnostic_route_hash"] = ""
+            row["direct_adoption_route_hash"] = route_hash
+        else:
+            row["direct_diagnostic_route_hash"] = ""
+            row["direct_adoption_route_hash"] = ""
         if reason:
             row.update(
                 {

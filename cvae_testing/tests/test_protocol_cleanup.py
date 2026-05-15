@@ -106,6 +106,27 @@ def test_camelyon17_jackknife_pairprob_config_is_protocol_locked() -> None:
     assert 0.0 in [float(v) for v in jackknife_cfg["lambda_values"]]
 
 
+def test_camelyon17_direct_pairprob_adoption_config_is_protocol_locked() -> None:
+    path = (
+        PROJECT_ROOT
+        / "configs"
+        / "experiments"
+        / "camelyon17"
+        / "learned_utility_response_routing_pairprob_direct_adoption_v1.yaml"
+    )
+    cfg = load_config(path)
+    validate_config(cfg)
+
+    pairprob_cfg = cfg["learned_utility"]["pairwise_tournament"]["pairprob_tournament"]
+    methods = pairprob_cfg["methods"]
+    assert cfg["experiment"]["name"] == "learned_utility_response_routing_pairprob_direct_adoption_v1"
+    assert pairprob_cfg["adoption_feature_set"] == "pairprob_latent_only_v1"
+    assert methods["direct"] == "pairwise_direct_pairprob_tournament_v1"
+    assert methods["direct_adoption"] == "pairwise_direct_pairprob_adoption_v1"
+    assert methods["group_robust"] == "pairwise_group_robust_pairprob_tournament_v1"
+    assert methods["combined_diagnostic"] == "pairwise_pairprob_combined_diagnostic_v1"
+
+
 def test_breakhis_support_estimated_utility_config_is_protocol_locked() -> None:
     path = (
         PROJECT_ROOT

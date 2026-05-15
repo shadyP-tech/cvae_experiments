@@ -135,6 +135,15 @@ def _validate_method_policy_fields(path: Path, method: str, metrics: Dict[str, A
 def _is_selectable_method(row: Dict[str, Any], uplift_reference_method: str) -> bool:
     if str(row.get("method", "")) == str(uplift_reference_method):
         return False
+    if _to_int(row.get("excluded_from_sign_ci_selection", 0)) == 1:
+        return False
+    if "sign_ci_candidate" in row and _to_int(row.get("sign_ci_candidate", 1)) == 0:
+        return False
+    if (
+        str(row.get("method", "")) == "pairwise_direct_pairprob_adoption_v1"
+        and str(row.get("direct_adoption_audit_failure_reason", "none") or "none") != "none"
+    ):
+        return False
     return bool(
         _to_int(row.get("adoption_eligible", 0)) == 1
         and _to_int(row.get("diagnostic_only", 0)) == 0
@@ -281,6 +290,40 @@ def _read_rows(
                     "delta_gate_selection_status": str(mm.get("delta_gate_selection_status", "")),
                     "delta_gate_diagnostic_only_reason": str(
                         mm.get("delta_gate_diagnostic_only_reason", "")
+                    ),
+                    "excluded_from_sign_ci_selection": _to_int(
+                        mm.get("excluded_from_sign_ci_selection", 0)
+                    ),
+                    "sign_ci_candidate": _to_int(mm.get("sign_ci_candidate", 1)),
+                    "direct_adoption_is_alias_of": str(mm.get("direct_adoption_is_alias_of", "")),
+                    "direct_adoption_route_hash": str(mm.get("direct_adoption_route_hash", "")),
+                    "direct_diagnostic_route_hash": str(mm.get("direct_diagnostic_route_hash", "")),
+                    "direct_adoption_same_route_as_direct": _to_int(
+                        mm.get("direct_adoption_same_route_as_direct", 0)
+                    ),
+                    "direct_adoption_audit_failure_reason": str(
+                        mm.get("direct_adoption_audit_failure_reason", "")
+                    ),
+                    "source_only_audit_pass": _to_int(mm.get("source_only_audit_pass", 0)),
+                    "target_leakage_audit_pass": _to_int(mm.get("target_leakage_audit_pass", 0)),
+                    "adoption_feature_family": str(mm.get("adoption_feature_family", "")),
+                    "direct_vs_group_robust_primary_comparator": _to_int(
+                        mm.get("direct_vs_group_robust_primary_comparator", 0)
+                    ),
+                    "mean_gap_delta_vs_group_robust_pairprob": _to_float(
+                        mm.get("mean_gap_delta_vs_group_robust_pairprob", 0.0)
+                    ),
+                    "worst_domain_gap_delta_vs_group_robust_pairprob": _to_float(
+                        mm.get("worst_domain_gap_delta_vs_group_robust_pairprob", 0.0)
+                    ),
+                    "high_regret_delta_vs_group_robust_pairprob": _to_float(
+                        mm.get("high_regret_delta_vs_group_robust_pairprob", 0.0)
+                    ),
+                    "top1_delta_vs_group_robust_pairprob": _to_float(
+                        mm.get("top1_delta_vs_group_robust_pairprob", 0.0)
+                    ),
+                    "spearman_delta_vs_group_robust_pairprob": _to_float(
+                        mm.get("spearman_delta_vs_group_robust_pairprob", 0.0)
                     ),
                 }
             )
@@ -431,6 +474,10 @@ def _aggregate(
     by_method: Dict[str, List[Dict[str, Any]]] = {}
     for r in rows:
         by_method.setdefault(str(r["method"]), []).append(r)
+    direct_diagnostic_sign_ci_candidate = any(
+        _to_int(r.get("sign_ci_candidate", 0)) == 1
+        for r in by_method.get("pairwise_direct_pairprob_tournament_v1", [])
+    )
 
     out_rows: List[Dict[str, Any]] = []
     domain_cache: Dict[str, Tuple[List[Dict[str, Any]], bool]] = {}
@@ -503,6 +550,13 @@ def _aggregate(
             "routing_uses_eval_nelbo": int(aggregate_uses_eval_nelbo),
             "routing_uses_eval_domain_statistics": int(aggregate_uses_eval_stats),
         }
+        if method == "pairwise_direct_pairprob_adoption_v1" and direct_diagnostic_sign_ci_candidate:
+            aggregate_policy_row["direct_adoption_audit_failure_reason"] = _join_tokens(
+                [
+                    aggregate_policy_row.get("direct_adoption_audit_failure_reason", ""),
+                    "duplicate_sign_ci_candidate",
+                ]
+            )
         base_selectable = _is_selectable_method(
             aggregate_policy_row,
             uplift_reference_method=str(uplift_reference_method),
@@ -510,6 +564,21 @@ def _aggregate(
         selection_ineligible_reason = ""
         if delta_gate_guard_reason:
             selection_ineligible_reason = f"delta_gate_source_inner_guard_failed:{delta_gate_guard_reason}"
+        elif _to_int(aggregate_policy_row.get("excluded_from_sign_ci_selection", 0)) == 1:
+            selection_ineligible_reason = "excluded_from_sign_ci_selection"
+        elif "sign_ci_candidate" in aggregate_policy_row and _to_int(
+            aggregate_policy_row.get("sign_ci_candidate", 1)
+        ) == 0:
+            selection_ineligible_reason = "not_sign_ci_candidate"
+        elif (
+            method == "pairwise_direct_pairprob_adoption_v1"
+            and str(aggregate_policy_row.get("direct_adoption_audit_failure_reason", "none") or "none")
+            != "none"
+        ):
+            selection_ineligible_reason = (
+                "direct_adoption_audit_failed:"
+                + str(aggregate_policy_row.get("direct_adoption_audit_failure_reason", ""))
+            )
         elif not base_selectable and method != str(uplift_reference_method):
             selection_ineligible_reason = "method_policy_not_adoption_eligible"
 
@@ -628,6 +697,42 @@ def _aggregate(
                 ),
                 "delta_gate_diagnostic_only_reason": _join_tokens(
                     [r.get("delta_gate_diagnostic_only_reason", "") for r in method_rows]
+                ),
+                "excluded_from_sign_ci_selection": _to_int(
+                    aggregate_policy_row.get("excluded_from_sign_ci_selection", 0)
+                ),
+                "sign_ci_candidate": _to_int(aggregate_policy_row.get("sign_ci_candidate", 1)),
+                "direct_adoption_is_alias_of": str(
+                    aggregate_policy_row.get("direct_adoption_is_alias_of", "")
+                ),
+                "direct_adoption_same_route_as_direct": _to_int(
+                    aggregate_policy_row.get("direct_adoption_same_route_as_direct", 0)
+                ),
+                "direct_adoption_audit_failure_reason": str(
+                    aggregate_policy_row.get("direct_adoption_audit_failure_reason", "")
+                ),
+                "source_only_audit_pass": _to_int(aggregate_policy_row.get("source_only_audit_pass", 0)),
+                "target_leakage_audit_pass": _to_int(
+                    aggregate_policy_row.get("target_leakage_audit_pass", 0)
+                ),
+                "adoption_feature_family": str(aggregate_policy_row.get("adoption_feature_family", "")),
+                "direct_vs_group_robust_primary_comparator": _to_int(
+                    aggregate_policy_row.get("direct_vs_group_robust_primary_comparator", 0)
+                ),
+                "mean_gap_delta_vs_group_robust_pairprob": _to_float(
+                    base.get("mean_gap_delta_vs_group_robust_pairprob", 0.0)
+                ),
+                "worst_domain_gap_delta_vs_group_robust_pairprob": _to_float(
+                    base.get("worst_domain_gap_delta_vs_group_robust_pairprob", 0.0)
+                ),
+                "high_regret_delta_vs_group_robust_pairprob": _to_float(
+                    base.get("high_regret_delta_vs_group_robust_pairprob", 0.0)
+                ),
+                "top1_delta_vs_group_robust_pairprob": _to_float(
+                    base.get("top1_delta_vs_group_robust_pairprob", 0.0)
+                ),
+                "spearman_delta_vs_group_robust_pairprob": _to_float(
+                    base.get("spearman_delta_vs_group_robust_pairprob", 0.0)
                 ),
                 "n_seeds": int(len(seeds)),
                 "seeds": ",".join(str(s) for s in seeds),

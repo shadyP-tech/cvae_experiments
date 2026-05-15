@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 from typing import Any, Dict, List, Mapping, Sequence, Tuple
 
 import numpy as np
@@ -240,6 +241,13 @@ def _method_protocol(method: str) -> MethodProtocol:
             routing_uses_query_features=1,
         )
     if name == "pairwise_group_robust_pairprob_tournament_v1":
+        return MethodProtocol(
+            method_role="learned",
+            adoption_eligible=1,
+            diagnostic_only=0,
+            routing_uses_query_features=1,
+        )
+    if name == "pairwise_direct_pairprob_adoption_v1":
         return MethodProtocol(
             method_role="learned",
             adoption_eligible=1,
@@ -869,6 +877,19 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
             "robust_lambda",
             "normalized_source_inner_worst_regret_selected",
             "adoption_feature_family",
+            "direct_adoption_is_alias_of",
+            "direct_adoption_same_route_as_direct",
+            "direct_adoption_audit_failure_reason",
+            "excluded_from_sign_ci_selection",
+            "sign_ci_candidate",
+            "source_only_audit_pass",
+            "target_leakage_audit_pass",
+            "direct_vs_group_robust_primary_comparator",
+            "mean_gap_delta_vs_group_robust_pairprob",
+            "worst_domain_gap_delta_vs_group_robust_pairprob",
+            "high_regret_delta_vs_group_robust_pairprob",
+            "top1_delta_vs_group_robust_pairprob",
+            "spearman_delta_vs_group_robust_pairprob",
             "candidate_pool_consistent",
             "selected_lambda_is_zero_but_lcb_candidates_reported",
             "lambda_stability_status",
@@ -883,6 +904,12 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
             metrics["selected_by_inner_validation"] = float(
                 max(int(float(r.get("selected_by_inner_validation", 0) or 0)) for r in vals)
             )
+        if any(str(r.get("direct_adoption_route_hash", "")) for r in vals):
+            joined = "|".join(str(r.get("direct_adoption_route_hash", "")) for r in vals)
+            metrics["direct_adoption_route_hash"] = hashlib.sha1(joined.encode("utf-8")).hexdigest()[:16]
+        if any(str(r.get("direct_diagnostic_route_hash", "")) for r in vals):
+            joined = "|".join(str(r.get("direct_diagnostic_route_hash", "")) for r in vals)
+            metrics["direct_diagnostic_route_hash"] = hashlib.sha1(joined.encode("utf-8")).hexdigest()[:16]
         guard_reason = _delta_gate_guard_failure_reason(method, vals)
         metrics["delta_gate_source_inner_guard_pass"] = float(0 if guard_reason else 1)
         if guard_reason:

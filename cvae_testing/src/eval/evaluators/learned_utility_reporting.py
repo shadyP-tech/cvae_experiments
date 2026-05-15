@@ -374,6 +374,81 @@ def _select_best_methods_by_gap(
     return best_candidate_method, best_diagnostic_method
 
 
+def _append_reason(existing: str, reason: str) -> str:
+    values = [v for v in [str(existing or ""), str(reason or "")] if v]
+    seen: set[str] = set()
+    out: List[str] = []
+    for value in values:
+        for part in str(value).split("|"):
+            token = part.strip()
+            if token and token not in seen:
+                seen.add(token)
+                out.append(token)
+    return "|".join(out)
+
+
+def _annotate_direct_pairprob_adoption_audit(method_metrics: Dict[str, Dict[str, Any]]) -> None:
+    adoption = method_metrics.get("pairwise_direct_pairprob_adoption_v1")
+    if not adoption:
+        return
+    diagnostic = method_metrics.get("pairwise_direct_pairprob_tournament_v1", {})
+    group = method_metrics.get("pairwise_group_robust_pairprob_tournament_v1", {})
+
+    adoption["direct_adoption_is_alias_of"] = "pairwise_direct_pairprob_tournament_v1"
+    adoption.setdefault("adoption_feature_family", "pairprob_latent_only_v1")
+    diagnostic_sign = int(float(diagnostic.get("sign_ci_candidate", 0) or 0)) if diagnostic else 0
+    adoption_sign = int(float(adoption.get("sign_ci_candidate", 1) or 1))
+    duplicate_sign_candidate = bool(diagnostic_sign == 1 and adoption_sign == 1)
+    reason = str(adoption.get("direct_adoption_audit_failure_reason", "none") or "none")
+    if not diagnostic:
+        reason = _append_reason("" if reason == "none" else reason, "missing_diagnostic_direct_row")
+    elif (
+        str(adoption.get("direct_adoption_route_hash", ""))
+        and str(diagnostic.get("direct_diagnostic_route_hash", ""))
+        and str(adoption.get("direct_adoption_route_hash", ""))
+        != str(diagnostic.get("direct_diagnostic_route_hash", ""))
+    ):
+        reason = _append_reason("" if reason == "none" else reason, "route_hash_mismatch")
+    if duplicate_sign_candidate:
+        reason = _append_reason("" if reason == "none" else reason, "duplicate_sign_ci_candidate")
+    if str(adoption.get("adoption_feature_family", "")) != "pairprob_latent_only_v1":
+        reason = _append_reason("" if reason == "none" else reason, "invalid_feature_family")
+    if str(adoption.get("source_only_audit_pass", "1")) not in {"1", "1.0"}:
+        reason = _append_reason("" if reason == "none" else reason, "source_only_audit_failed")
+    if str(adoption.get("target_leakage_audit_pass", "1")) not in {"1", "1.0"}:
+        reason = _append_reason("" if reason == "none" else reason, "target_leakage_audit_failed")
+    if str(adoption.get("direct_adoption_same_route_as_direct", "1")) not in {"1", "1.0"}:
+        reason = _append_reason("" if reason == "none" else reason, "route_hash_mismatch")
+    adoption["direct_adoption_audit_failure_reason"] = reason or "none"
+    if reason and reason != "none":
+        adoption["method_role"] = "diagnostic"
+        adoption["adoption_eligible"] = 0.0
+        adoption["diagnostic_only"] = 1.0
+        adoption["excluded_from_sign_ci_selection"] = "1"
+        adoption["sign_ci_candidate"] = "0"
+        adoption["diagnostic_only_reason"] = _append_reason(
+            str(adoption.get("diagnostic_only_reason", "")),
+            str(reason),
+        )
+
+    if group:
+        adoption["mean_gap_delta_vs_group_robust_pairprob"] = float(
+            adoption.get("mean_oracle_gap_pct", float("nan"))
+        ) - float(group.get("mean_oracle_gap_pct", float("nan")))
+        adoption["worst_domain_gap_delta_vs_group_robust_pairprob"] = float(
+            adoption.get("worst_heldout_domain_oracle_gap_pct", float("nan"))
+        ) - float(group.get("worst_heldout_domain_oracle_gap_pct", float("nan")))
+        adoption["high_regret_delta_vs_group_robust_pairprob"] = float(
+            adoption.get("absolute_high_regret_rate_gap_gt_5", float("nan"))
+        ) - float(group.get("absolute_high_regret_rate_gap_gt_5", float("nan")))
+        adoption["top1_delta_vs_group_robust_pairprob"] = float(
+            adoption.get("top1_oracle_hit", float("nan"))
+        ) - float(group.get("top1_oracle_hit", float("nan")))
+        adoption["spearman_delta_vs_group_robust_pairprob"] = float(
+            adoption.get("spearman", float("nan"))
+        ) - float(group.get("spearman", float("nan")))
+
+
 def _build_hybrid_summary_rows(
     *,
     hybrid_method_meta: Dict[str, Dict[str, Any]],
@@ -513,6 +588,37 @@ def _build_method_summary_rows(method_metrics: Dict[str, Dict[str, Any]]) -> Lis
                 "pairprob_feature_set": str(metrics.get("pairprob_feature_set", "")),
                 "pairprob_selection_policy": str(metrics.get("pairprob_selection_policy", "")),
                 "adoption_feature_family": str(metrics.get("adoption_feature_family", "")),
+                "direct_adoption_is_alias_of": str(metrics.get("direct_adoption_is_alias_of", "")),
+                "direct_adoption_route_hash": str(metrics.get("direct_adoption_route_hash", "")),
+                "direct_diagnostic_route_hash": str(metrics.get("direct_diagnostic_route_hash", "")),
+                "direct_adoption_same_route_as_direct": str(
+                    metrics.get("direct_adoption_same_route_as_direct", "")
+                ),
+                "direct_adoption_audit_failure_reason": str(
+                    metrics.get("direct_adoption_audit_failure_reason", "")
+                ),
+                "excluded_from_sign_ci_selection": str(metrics.get("excluded_from_sign_ci_selection", "")),
+                "sign_ci_candidate": str(metrics.get("sign_ci_candidate", "")),
+                "source_only_audit_pass": str(metrics.get("source_only_audit_pass", "")),
+                "target_leakage_audit_pass": str(metrics.get("target_leakage_audit_pass", "")),
+                "direct_vs_group_robust_primary_comparator": str(
+                    metrics.get("direct_vs_group_robust_primary_comparator", "")
+                ),
+                "mean_gap_delta_vs_group_robust_pairprob": float(
+                    metrics.get("mean_gap_delta_vs_group_robust_pairprob", float("nan"))
+                ),
+                "worst_domain_gap_delta_vs_group_robust_pairprob": float(
+                    metrics.get("worst_domain_gap_delta_vs_group_robust_pairprob", float("nan"))
+                ),
+                "high_regret_delta_vs_group_robust_pairprob": float(
+                    metrics.get("high_regret_delta_vs_group_robust_pairprob", float("nan"))
+                ),
+                "top1_delta_vs_group_robust_pairprob": float(
+                    metrics.get("top1_delta_vs_group_robust_pairprob", float("nan"))
+                ),
+                "spearman_delta_vs_group_robust_pairprob": float(
+                    metrics.get("spearman_delta_vs_group_robust_pairprob", float("nan"))
+                ),
                 "mean_pairprob_win_top1": float(metrics.get("mean_pairprob_win_top1", float("nan"))),
                 "top1_win_margin": float(metrics.get("top1_win_margin", float("nan"))),
                 "absolute_high_regret_rate_gap_gt_5": float(
@@ -825,6 +931,7 @@ def _finalize_learned_utility_outputs(
     residual_confusion_rows = _with_decision_policy(residual_confusion_rows)
 
     method_metrics = _aggregate_metrics_from_sample_rows(sample_rows)
+    _annotate_direct_pairprob_adoption_audit(method_metrics)
     domain_rows = _domain_breakdown_rows(sample_rows)
 
     permutation_rows = _build_permutation_rows(

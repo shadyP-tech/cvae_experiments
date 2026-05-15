@@ -24,6 +24,7 @@ from src.eval.evaluators.learned_utility_pairprob import (
     JackknifeLCBSelection,
     PairprobPolicySelection,
     build_pairprob_training_data,
+    clone_direct_pairprob_adoption_rows,
     conformal_pairprob_route_rows,
     conformal_quantile,
     fit_pairprob_model,
@@ -87,6 +88,7 @@ def _pairprob_cfg(**overrides: object) -> PairprobTournamentConfig:
         "adoption_feature_set": "pairprob_latent_only_v1",
         "diagnostic_feature_sets": ("pairprob_combined_diagnostic_v1",),
         "direct_method": "pairwise_direct_pairprob_tournament_v1",
+        "direct_adoption_method": "pairwise_direct_pairprob_adoption_v1",
         "group_robust_method": "pairwise_group_robust_pairprob_tournament_v1",
         "combined_diagnostic_method": "pairwise_pairprob_combined_diagnostic_v1",
         "near_tie_delta_pct": 0.5,
@@ -324,6 +326,88 @@ def test_pairprob_route_rows_use_win_tournament_and_cycle_na_for_two_candidates(
     assert row["route_experts"] == "1"
     assert np.isclose(row["pairprob_win_top1"], 0.8)
     assert np.isnan(row["pairwise_cycle_rate"])
+
+
+def test_direct_pairprob_adoption_alias_clones_diagnostic_route() -> None:
+    fold = FoldCandidateSet.for_heldout_domain(heldout_domain=0, expert_domains=[0, 1, 2])
+    prob = np.asarray([[[0.5, 0.8], [0.2, 0.5]]], dtype=np.float64)
+    true = np.asarray([[10.0, 20.0]], dtype=np.float64)
+    selection = PairprobPolicySelection(
+        method="pairwise_direct_pairprob_tournament_v1",
+        feature_set="pairprob_latent_only_v1",
+        ridge_l2=1.0e-3,
+        selected_by_inner_validation=True,
+    )
+    direct_rows = pairprob_route_rows(
+        method="pairwise_direct_pairprob_tournament_v1",
+        fold=fold,
+        query_domains=np.asarray([0], dtype=np.int64),
+        expert_domains=fold.candidate_expert_domains,
+        prob_matrix=prob,
+        true_nelbo_matrix=true,
+        global_true_nelbo_matrix=np.asarray([[5.0, 10.0, 20.0]], dtype=np.float64),
+        global_expert_domains=[0, 1, 2],
+        policy_name="pairwise_direct_pairprob_adoption_v1",
+        selection=selection,
+        hard_oracle_gap_pct=np.asarray([0.0], dtype=np.float64),
+    )
+    adoption_rows = clone_direct_pairprob_adoption_rows(direct_rows)
+
+    direct = direct_rows[0]
+    adoption = adoption_rows[0]
+    assert direct["excluded_from_sign_ci_selection"] == 1
+    assert direct["sign_ci_candidate"] == 0
+    assert adoption["method"] == "pairwise_direct_pairprob_adoption_v1"
+    assert adoption["adoption_eligible"] == 1
+    assert adoption["diagnostic_only"] == 0
+    assert adoption["sign_ci_candidate"] == 1
+    assert adoption["direct_adoption_is_alias_of"] == "pairwise_direct_pairprob_tournament_v1"
+    assert adoption["direct_adoption_audit_failure_reason"] == "none"
+    assert adoption["direct_adoption_same_route_as_direct"] == 1
+    assert adoption["direct_adoption_route_hash"] == direct["direct_diagnostic_route_hash"]
+    for key in [
+        "selected_expert",
+        "route_experts",
+        "route_weights",
+        "selected_nelbo",
+        "oracle_gap_pct",
+        "top1_oracle_hit",
+        "spearman",
+        "selected_rank",
+    ]:
+        assert str(adoption[key]) == str(direct[key])
+
+
+def test_direct_pairprob_adoption_alias_fails_on_diagnostic_evidence_failure() -> None:
+    fold = FoldCandidateSet.for_heldout_domain(heldout_domain=0, expert_domains=[0, 1, 2])
+    prob = np.asarray([[[0.5, 0.8], [0.2, 0.5]]], dtype=np.float64)
+    true = np.asarray([[10.0, 20.0]], dtype=np.float64)
+    selection = PairprobPolicySelection(
+        method="pairwise_direct_pairprob_tournament_v1",
+        feature_set="pairprob_latent_only_v1",
+        ridge_l2=1.0e-3,
+        selected_by_inner_validation=True,
+        diagnostic_only_reason="insufficient_pairwise_evidence",
+    )
+    direct_rows = pairprob_route_rows(
+        method="pairwise_direct_pairprob_tournament_v1",
+        fold=fold,
+        query_domains=np.asarray([0], dtype=np.int64),
+        expert_domains=fold.candidate_expert_domains,
+        prob_matrix=prob,
+        true_nelbo_matrix=true,
+        global_true_nelbo_matrix=np.asarray([[5.0, 10.0, 20.0]], dtype=np.float64),
+        global_expert_domains=[0, 1, 2],
+        policy_name="pairwise_direct_pairprob_adoption_v1",
+        selection=selection,
+        hard_oracle_gap_pct=np.asarray([0.0], dtype=np.float64),
+    )
+    adoption = clone_direct_pairprob_adoption_rows(direct_rows)[0]
+
+    assert adoption["adoption_eligible"] == 0
+    assert adoption["diagnostic_only"] == 1
+    assert adoption["sign_ci_candidate"] == 0
+    assert adoption["direct_adoption_audit_failure_reason"] == "source_only_audit_failed"
 
 
 def test_jackknife_lambda_zero_routes_as_mean_ensemble_and_lcb_can_override() -> None:
@@ -950,6 +1034,7 @@ def test_pairwise_tournament_protocol_flags() -> None:
     oracle = _method_protocol("oracle_confidence_set_diagnostic")
     group_pairprob = _method_protocol("pairwise_group_robust_pairprob_tournament_v1")
     direct_pairprob = _method_protocol("pairwise_direct_pairprob_tournament_v1")
+    direct_adoption = _method_protocol("pairwise_direct_pairprob_adoption_v1")
     combined_pairprob = _method_protocol("pairwise_pairprob_combined_diagnostic_v1")
     conformal = _method_protocol("conformal_pairprob_regret_set_router_v1")
     conformal_topwin = _method_protocol("conformal_pairprob_topwin_set_diagnostic_v1")
@@ -967,6 +1052,10 @@ def test_pairwise_tournament_protocol_flags() -> None:
     assert direct_pairprob.method_role == "diagnostic"
     assert direct_pairprob.adoption_eligible == 0
     assert direct_pairprob.diagnostic_only == 1
+    assert direct_adoption.method_role == "learned"
+    assert direct_adoption.adoption_eligible == 1
+    assert direct_adoption.diagnostic_only == 0
+    assert direct_adoption.routing_uses_eval_nelbo == 0
     assert combined_pairprob.method_role == "diagnostic"
     assert combined_pairprob.adoption_eligible == 0
     assert combined_pairprob.diagnostic_only == 1
@@ -1184,6 +1273,12 @@ def test_learned_utility_eval_emits_tournament_methods(tmp_path, monkeypatch) ->
                 "score_temperature": 1.0,
                 "pairprob_tournament": {
                     "enabled": True,
+                    "methods": {
+                        "direct": "pairwise_direct_pairprob_tournament_v1",
+                        "direct_adoption": "pairwise_direct_pairprob_adoption_v1",
+                        "group_robust": "pairwise_group_robust_pairprob_tournament_v1",
+                        "combined_diagnostic": "pairwise_pairprob_combined_diagnostic_v1",
+                    },
                     "ridge_l2_values": [1.0e-3],
                     "min_pairwise_train_pairs": 1,
                     "min_pairwise_validation_pairs": 1,
@@ -1216,11 +1311,33 @@ def test_learned_utility_eval_emits_tournament_methods(tmp_path, monkeypatch) ->
         reports_dir=tmp_path / "conformal",
     )
     conformal_metrics = conformal_results["metrics_by_method"]
+    assert "pairwise_direct_pairprob_tournament_v1" in conformal_metrics
+    assert "pairwise_direct_pairprob_adoption_v1" in conformal_metrics
     assert "pairwise_group_robust_pairprob_tournament_v1" in conformal_metrics
     assert "conformal_pairprob_regret_set_router_v1" in conformal_metrics
     assert "conformal_pairprob_topwin_set_diagnostic_v1" in conformal_metrics
     assert "oracle_conformal_regret_set_diagnostic_v1" in conformal_metrics
     assert conformal_metrics["conformal_pairprob_regret_set_router_v1"]["routing_uses_eval_nelbo"] == 0.0
+    assert conformal_metrics["pairwise_direct_pairprob_tournament_v1"]["diagnostic_only"] == 1.0
+    assert conformal_metrics["pairwise_direct_pairprob_tournament_v1"]["excluded_from_sign_ci_selection"] == "1"
+    assert conformal_metrics["pairwise_direct_pairprob_adoption_v1"]["adoption_eligible"] == 1.0
+    assert conformal_metrics["pairwise_direct_pairprob_adoption_v1"]["diagnostic_only"] == 0.0
+    assert conformal_metrics["pairwise_direct_pairprob_adoption_v1"]["sign_ci_candidate"] == "1"
+    assert (
+        conformal_metrics["pairwise_direct_pairprob_adoption_v1"]["direct_adoption_same_route_as_direct"]
+        == "1"
+    )
+    assert (
+        conformal_metrics["pairwise_direct_pairprob_adoption_v1"]["direct_adoption_audit_failure_reason"]
+        == "none"
+    )
+    assert (
+        conformal_metrics["pairwise_direct_pairprob_adoption_v1"]["direct_adoption_route_hash"]
+        == conformal_metrics["pairwise_direct_pairprob_tournament_v1"]["direct_diagnostic_route_hash"]
+    )
+    assert "mean_gap_delta_vs_group_robust_pairprob" in conformal_metrics[
+        "pairwise_direct_pairprob_adoption_v1"
+    ]
     assert conformal_metrics["conformal_pairprob_topwin_set_diagnostic_v1"]["diagnostic_only"] == 1.0
     assert conformal_metrics["oracle_conformal_regret_set_diagnostic_v1"]["routing_uses_eval_nelbo"] == 1.0
 

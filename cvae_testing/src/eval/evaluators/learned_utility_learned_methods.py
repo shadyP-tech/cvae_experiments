@@ -27,6 +27,7 @@ from src.eval.evaluators.learned_utility_pairprob import (
     PairprobPolicySelection,
     _gap_pct_for_selected,
     build_pairprob_training_data,
+    clone_direct_pairprob_adoption_rows,
     conformal_pairprob_route_rows,
     fit_pairprob_model,
     jackknife_pairprob_route_rows,
@@ -434,13 +435,14 @@ def _calibrate_pairprob_tournament(
     PairprobPolicySelection | None,
     PairprobPolicySelection | None,
     PairprobPolicySelection | None,
+    PairprobPolicySelection | None,
     ConformalRegretSetSelection | None,
     JackknifeLCBSelection | None,
 ]:
     cfg = tournament_cfg.pairprob_tournament
     source_domains = sorted(set(int(sample_domains[int(i)]) for i in np.asarray(train_idx, dtype=np.int64).tolist()))
     if len(source_domains) < int(cfg.min_source_inner_validation_domains):
-        return None, None, None, None, None
+        return None, None, None, None, None, None
 
     rows_by_key: Dict[Tuple[str, str, float], List[Dict[str, Any]]] = {}
     evidence_by_key: Dict[Tuple[str, str, float], Dict[str, float]] = {}
@@ -713,6 +715,13 @@ def _calibrate_pairprob_tournament(
         selection_mode="direct",
         evidence_by_key=cleaned_evidence,
     )
+    direct_adoption = None
+    if direct is not None and str(cfg.direct_adoption_method):
+        direct_adoption = replace(
+            direct,
+            method=str(cfg.direct_adoption_method),
+            diagnostic_only_reason="",
+        )
     group = select_pairprob_policy(
         rows_by_key=rows_by_key,
         method=cfg.group_robust_method,
@@ -762,7 +771,7 @@ def _calibrate_pairprob_tournament(
             global_expert_domains=global_expert_domains,
             cfg=cfg.jackknife_lcb_tournament,
         )
-    return direct, group, combined, conformal_selection, jackknife_selection
+    return direct, direct_adoption, group, combined, conformal_selection, jackknife_selection
 
 
 def _calibrate_pairwise_tournament(
@@ -1181,8 +1190,18 @@ def _run_pairprob_tournament_for_fold(
     cfg = tournament_cfg.pairprob_tournament
     rows: List[Dict[str, Any]] = []
     device = str(pairwise_cfg.get("device", "auto"))
+    direct_diagnostic_rows: List[Dict[str, Any]] = []
     for selection in selections:
         if selection is None:
+            continue
+        if str(selection.method) == str(cfg.direct_adoption_method):
+            if direct_diagnostic_rows:
+                rows.extend(
+                    clone_direct_pairprob_adoption_rows(
+                        direct_diagnostic_rows,
+                        adoption_method=str(cfg.direct_adoption_method),
+                    )
+                )
             continue
         bundle, evidence, final_reason = _fit_pairprob_bundle_from_rows(
             x_rows=x_train,
@@ -1252,6 +1271,8 @@ def _run_pairprob_tournament_for_fold(
             catastrophic_regression_vs_hard_gap_pct=float(cfg.catastrophic_regression_vs_hard_gap_pct),
         )
         rows.extend(selection_rows)
+        if str(selection.method) == str(cfg.direct_method):
+            direct_diagnostic_rows = [dict(row) for row in selection_rows]
         if (
             jackknife_selection is not None
             and bool(cfg.jackknife_lcb_tournament.enabled)
@@ -1890,7 +1911,14 @@ def _run_learned_methods_for_fold(
                 tournament_cfg=tournament_cfg,
                 base_method=pairprob_hard_base,
             )
-            direct_selection, group_selection, combined_selection, conformal_selection, jackknife_selection = _calibrate_pairprob_tournament(
+            (
+                direct_selection,
+                direct_adoption_selection,
+                group_selection,
+                combined_selection,
+                conformal_selection,
+                jackknife_selection,
+            ) = _calibrate_pairprob_tournament(
                 embeddings=embeddings,
                 sample_domains=sample_domains,
                 true_nelbo=true_nelbo,
@@ -1920,7 +1948,12 @@ def _run_learned_methods_for_fold(
                     global_eval=global_eval,
                     expert_domains=fold.candidate_expert_domains,
                     global_expert_domains=expert_domains,
-                    selections=[direct_selection, group_selection, combined_selection],
+                    selections=[
+                        direct_selection,
+                        direct_adoption_selection,
+                        group_selection,
+                        combined_selection,
+                    ],
                     conformal_selection=conformal_selection,
                     jackknife_selection=jackknife_selection,
                     tournament_cfg=tournament_cfg,

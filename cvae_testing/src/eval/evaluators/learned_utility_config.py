@@ -163,6 +163,7 @@ class PairprobTournamentConfig:
     adoption_feature_set: str
     diagnostic_feature_sets: Tuple[str, ...]
     direct_method: str
+    direct_adoption_method: str
     group_robust_method: str
     combined_diagnostic_method: str
     near_tie_delta_pct: float
@@ -517,6 +518,12 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         direct_method=str(
             (pairprob_methods_cfg or {}).get("direct", "pairwise_direct_pairprob_tournament_v1")
         ),
+        direct_adoption_method=str(
+            (pairprob_methods_cfg or {}).get(
+                "direct_adoption",
+                "",
+            )
+        ),
         group_robust_method=str(
             (pairprob_methods_cfg or {}).get(
                 "group_robust",
@@ -638,6 +645,22 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
                     "learned_utility.pairwise_tournament.pairprob_tournament.predictor must be "
                     "'logistic_ridge_pairprob'"
                 )
+            if pairprob.direct_adoption_method:
+                if pairprob.direct_adoption_method != "pairwise_direct_pairprob_adoption_v1":
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.methods."
+                        "direct_adoption must be 'pairwise_direct_pairprob_adoption_v1'"
+                    )
+                if pairprob.direct_method != "pairwise_direct_pairprob_tournament_v1":
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.methods."
+                        "direct must be 'pairwise_direct_pairprob_tournament_v1' when direct_adoption is enabled"
+                    )
+                if pairprob.adoption_feature_set != "pairprob_latent_only_v1":
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.adoption_feature_set "
+                        "must be 'pairprob_latent_only_v1' when direct_adoption is enabled"
+                    )
             if pairprob.probability_calibration != "none_v1":
                 raise ValueError(
                     "learned_utility.pairwise_tournament.pairprob_tournament.probability_calibration "

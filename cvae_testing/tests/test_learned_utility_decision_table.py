@@ -294,6 +294,87 @@ def test_positive_threshold_four_or_more_runs_uses_ceiling_fraction() -> None:
     assert effective_positive_threshold(4, min_improving_runs=2, min_positive_fraction=0.67) == 3
 
 
+def test_direct_pairprob_diagnostic_alias_is_excluded_from_sign_ci_selection(tmp_path: Path) -> None:
+    direct_diag = _metric(
+        method_role="diagnostic",
+        adoption_eligible=0,
+        diagnostic_only=1,
+        top1=0.7,
+        spearman=0.75,
+        gap_pct=2.0,
+    )
+    direct_diag.update({"excluded_from_sign_ci_selection": 1, "sign_ci_candidate": 0})
+    direct_adoption = _metric(
+        method_role="learned",
+        adoption_eligible=1,
+        diagnostic_only=0,
+        top1=0.7,
+        spearman=0.75,
+        gap_pct=2.0,
+    )
+    direct_adoption.update(
+        {
+            "excluded_from_sign_ci_selection": 0,
+            "sign_ci_candidate": 1,
+            "direct_adoption_is_alias_of": "pairwise_direct_pairprob_tournament_v1",
+            "direct_adoption_same_route_as_direct": 1,
+            "direct_adoption_audit_failure_reason": "none",
+            "source_only_audit_pass": 1,
+            "target_leakage_audit_pass": 1,
+            "adoption_feature_family": "pairprob_latent_only_v1",
+        }
+    )
+    result = _write_result(
+        tmp_path / "run_seed42" / "learned_utility_results.json",
+        methods={
+            "metadata_routing": _metric(
+                method_role="baseline",
+                adoption_eligible=1,
+                diagnostic_only=0,
+                top1=0.2,
+                spearman=0.0,
+                gap_pct=12.0,
+            ),
+            "pairwise_direct_pairprob_tournament_v1": direct_diag,
+            "pairwise_direct_pairprob_adoption_v1": direct_adoption,
+            "pairwise_group_robust_pairprob_tournament_v1": _metric(
+                method_role="learned",
+                adoption_eligible=1,
+                diagnostic_only=0,
+                top1=0.68,
+                spearman=0.72,
+                gap_pct=2.3,
+            ),
+        },
+        domain_rows=_domain_rows(
+            query_domain=0,
+            baseline_top1=0.2,
+            baseline_spearman=0.0,
+            baseline_gap_pct=12.0,
+            candidate_method="pairwise_direct_pairprob_adoption_v1",
+            candidate_top1=0.7,
+            candidate_spearman=0.75,
+            candidate_gap_pct=2.0,
+        ),
+    )
+
+    by_method = {
+        row["method"]: row
+        for row in _decision_rows(
+            [result],
+            decision_policy_version=SIGN_CI_POLICY,
+            allow_missing_domain_breakdown_as_diagnostic=True,
+        )
+    }
+
+    assert by_method["pairwise_direct_pairprob_tournament_v1"]["selection_eligible"] == 0
+    assert (
+        by_method["pairwise_direct_pairprob_tournament_v1"]["selection_ineligible_reason"]
+        == "excluded_from_sign_ci_selection"
+    )
+    assert by_method["pairwise_direct_pairprob_adoption_v1"]["selection_eligible"] == 1
+
+
 def test_sign_ci_policy_vetoes_paired_domain_regression(tmp_path: Path) -> None:
     candidate = "pairwise_ranker_combined"
     result = _write_result(
