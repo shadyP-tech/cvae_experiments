@@ -261,6 +261,23 @@ def _method_protocol(method: str) -> MethodProtocol:
             diagnostic_only=0,
             routing_uses_query_features=1,
         )
+    if name == "pairwise_direct_group_oof_hardpair_boosted_pairprob_v1":
+        return MethodProtocol(
+            method_role="learned",
+            adoption_eligible=1,
+            diagnostic_only=0,
+            routing_uses_query_features=1,
+        )
+    if name in {
+        "pairwise_direct_group_oof_hardpair_miss_boosted_pairprob_v1_diagnostic",
+        "pairwise_direct_random_low_margin_boost_pairprob_v1_diagnostic",
+    }:
+        return MethodProtocol(
+            method_role="diagnostic",
+            adoption_eligible=0,
+            diagnostic_only=1,
+            routing_uses_query_features=1,
+        )
     if name == "oracle_top2_margin_reranker_diagnostic_v1":
         return MethodProtocol(
             method_role="diagnostic",
@@ -580,6 +597,13 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
             "top2_rerank_candidate_delta_gap_pct_vs_direct"
         ),
         "top2_rerank_top2_better_than_base": "top2_rerank_top2_better_than_base",
+        "boosted_selection_changed": "boosted_selection_changed",
+        "boosted_to_base_top2": "boosted_to_base_top2",
+        "boosted_delta_gap_pct_vs_direct_pairprob": "boosted_delta_gap_pct_vs_direct_pairprob",
+        "boosted_help": "boosted_help",
+        "boosted_harm": "boosted_harm",
+        "hardpair_weighted_pair_fraction": "hardpair_weighted_pair_fraction",
+        "hardpair_mean_pair_weight": "hardpair_mean_pair_weight",
     }
     for method, vals in sorted(by_method.items()):
         metrics: Dict[str, float] = {}
@@ -763,6 +787,23 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
                 ]
             )
         ) if any("top2_rerank_delta_gap_pct_vs_direct" in r for r in vals) else float("nan")
+        metrics["boosted_selection_change_rate"] = metrics["micro_boosted_selection_changed"]
+        metrics["boosted_to_base_top2_rate"] = metrics["micro_boosted_to_base_top2"]
+        boosted_changed_rows = [
+            r for r in vals
+            if int(float(r.get("boosted_selection_changed", 0) or 0)) == 1
+        ]
+        metrics["boosted_help_rate_changed_only"] = _finite_mean(
+            [float(r.get("boosted_help", float("nan"))) for r in boosted_changed_rows]
+        )
+        metrics["boosted_harm_rate_changed_only"] = _finite_mean(
+            [float(r.get("boosted_harm", float("nan"))) for r in boosted_changed_rows]
+        )
+        metrics["mean_paired_gap_delta_vs_direct_pairprob"] = metrics[
+            "micro_boosted_delta_gap_pct_vs_direct_pairprob"
+        ]
+        metrics["hardpair_weighted_pair_fraction"] = metrics["micro_hardpair_weighted_pair_fraction"]
+        metrics["hardpair_mean_pair_weight"] = metrics["micro_hardpair_mean_pair_weight"]
 
         if any("delta_gate_active" in r for r in vals):
             active_rows = [
@@ -974,6 +1015,31 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
             "oracle_top2_active_high_regret_reduction",
             "oracle_top2_recoverable_error_rate",
             "oracle_top2_recoverable_gap_mass_pct_points",
+            "hardpair_boost_margin_threshold",
+            "hardpair_miss_boost_weight",
+            "hardpair_confirm_boost_weight",
+            "hardpair_boost_guard_status",
+            "hardpair_boost_diagnostic_only_reason",
+            "group_oof_grouping_level",
+            "group_oof_grouping_warning",
+            "group_oof_unique_groups",
+            "group_oof_min_groups_per_fold",
+            "group_oof_folds_used",
+            "group_oof_train_domains_per_fold_min",
+            "group_oof_candidate_experts_per_fold_min",
+            "group_oof_same_slide_leakage_rate",
+            "hardpair_oof_low_margin_rows",
+            "hardpair_oof_switch_rows",
+            "hardpair_oof_keep_rows",
+            "hardpair_oof_active_domains",
+            "low_margin_high_regret_rows",
+            "low_margin_high_regret_oracle_in_base_top2_rate",
+            "low_margin_high_regret_oracle_is_base_top2_rate",
+            "low_margin_high_regret_oracle_is_not_base_top2_rate",
+            "source_inner_boost_gap_reduction_abs_pct_points",
+            "worst_source_inner_domain_regression_abs_pct_points",
+            "median_source_inner_domain_delta_gap",
+            "source_inner_domains_regressed_gt_threshold",
         ]:
             vals_for_key = sorted(set(str(r.get(key, "")) for r in vals if str(r.get(key, "")) != ""))
             if vals_for_key:

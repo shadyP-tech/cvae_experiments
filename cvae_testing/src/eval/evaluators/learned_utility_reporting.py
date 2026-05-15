@@ -821,6 +821,70 @@ def _build_method_summary_rows(method_metrics: Dict[str, Dict[str, Any]]) -> Lis
                 "oracle_top2_recoverable_gap_mass_pct_points": str(
                     metrics.get("oracle_top2_recoverable_gap_mass_pct_points", "")
                 ),
+                "hardpair_boost_margin_threshold": str(metrics.get("hardpair_boost_margin_threshold", "")),
+                "hardpair_miss_boost_weight": str(metrics.get("hardpair_miss_boost_weight", "")),
+                "hardpair_confirm_boost_weight": str(metrics.get("hardpair_confirm_boost_weight", "")),
+                "hardpair_boost_guard_status": str(metrics.get("hardpair_boost_guard_status", "")),
+                "hardpair_boost_diagnostic_only_reason": str(
+                    metrics.get("hardpair_boost_diagnostic_only_reason", "")
+                ),
+                "group_oof_grouping_level": str(metrics.get("group_oof_grouping_level", "")),
+                "group_oof_grouping_warning": str(metrics.get("group_oof_grouping_warning", "")),
+                "group_oof_unique_groups": str(metrics.get("group_oof_unique_groups", "")),
+                "group_oof_min_groups_per_fold": str(metrics.get("group_oof_min_groups_per_fold", "")),
+                "group_oof_folds_used": str(metrics.get("group_oof_folds_used", "")),
+                "group_oof_train_domains_per_fold_min": str(
+                    metrics.get("group_oof_train_domains_per_fold_min", "")
+                ),
+                "group_oof_candidate_experts_per_fold_min": str(
+                    metrics.get("group_oof_candidate_experts_per_fold_min", "")
+                ),
+                "group_oof_same_slide_leakage_rate": str(
+                    metrics.get("group_oof_same_slide_leakage_rate", "")
+                ),
+                "hardpair_oof_low_margin_rows": str(metrics.get("hardpair_oof_low_margin_rows", "")),
+                "hardpair_oof_switch_rows": str(metrics.get("hardpair_oof_switch_rows", "")),
+                "hardpair_oof_keep_rows": str(metrics.get("hardpair_oof_keep_rows", "")),
+                "hardpair_oof_active_domains": str(metrics.get("hardpair_oof_active_domains", "")),
+                "low_margin_high_regret_rows": str(metrics.get("low_margin_high_regret_rows", "")),
+                "low_margin_high_regret_oracle_in_base_top2_rate": str(
+                    metrics.get("low_margin_high_regret_oracle_in_base_top2_rate", "")
+                ),
+                "low_margin_high_regret_oracle_is_base_top2_rate": str(
+                    metrics.get("low_margin_high_regret_oracle_is_base_top2_rate", "")
+                ),
+                "low_margin_high_regret_oracle_is_not_base_top2_rate": str(
+                    metrics.get("low_margin_high_regret_oracle_is_not_base_top2_rate", "")
+                ),
+                "hardpair_weighted_pair_fraction": float(
+                    metrics.get("hardpair_weighted_pair_fraction", float("nan"))
+                ),
+                "hardpair_mean_pair_weight": float(metrics.get("hardpair_mean_pair_weight", float("nan"))),
+                "boosted_selection_change_rate": float(
+                    metrics.get("boosted_selection_change_rate", float("nan"))
+                ),
+                "boosted_to_base_top2_rate": float(metrics.get("boosted_to_base_top2_rate", float("nan"))),
+                "boosted_help_rate_changed_only": float(
+                    metrics.get("boosted_help_rate_changed_only", float("nan"))
+                ),
+                "boosted_harm_rate_changed_only": float(
+                    metrics.get("boosted_harm_rate_changed_only", float("nan"))
+                ),
+                "mean_paired_gap_delta_vs_direct_pairprob": float(
+                    metrics.get("mean_paired_gap_delta_vs_direct_pairprob", float("nan"))
+                ),
+                "source_inner_boost_gap_reduction_abs_pct_points": str(
+                    metrics.get("source_inner_boost_gap_reduction_abs_pct_points", "")
+                ),
+                "worst_source_inner_domain_regression_abs_pct_points": str(
+                    metrics.get("worst_source_inner_domain_regression_abs_pct_points", "")
+                ),
+                "median_source_inner_domain_delta_gap": str(
+                    metrics.get("median_source_inner_domain_delta_gap", "")
+                ),
+                "source_inner_domains_regressed_gt_threshold": str(
+                    metrics.get("source_inner_domains_regressed_gt_threshold", "")
+                ),
                 "std_oracle_gap_pct_across_inner_domains": str(
                     metrics.get("std_oracle_gap_pct_across_inner_domains", "")
                 ),

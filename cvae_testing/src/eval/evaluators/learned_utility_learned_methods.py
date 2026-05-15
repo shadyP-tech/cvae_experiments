@@ -21,6 +21,8 @@ from src.eval.evaluators.learned_utility_pairs import (
 from src.eval.evaluators.learned_utility_pairprob import (
     ConformalCalibrationBlock,
     ConformalRegretSetSelection,
+    GroupOOFHardpairBoostCalibrationBlock,
+    GroupOOFHardpairBoostSelection,
     JackknifeCalibrationBlock,
     JackknifeLCBSelection,
     PairprobModelBundle,
@@ -30,9 +32,12 @@ from src.eval.evaluators.learned_utility_pairprob import (
     Top2RerankSelection,
     _gap_pct_for_selected,
     build_pairprob_training_data,
+    build_group_oof_hardpair_observations,
     clone_direct_pairprob_adoption_rows,
     conformal_pairprob_route_rows,
     fit_pairprob_model,
+    hardpair_boost_route_rows,
+    hardpair_weight_multipliers_from_observations,
     jackknife_pairprob_route_rows,
     pairprob_evidence_reason,
     pairprob_probability_matrix,
@@ -41,6 +46,7 @@ from src.eval.evaluators.learned_utility_pairprob import (
     pairprob_win_scores,
     select_pairprob_policy,
     select_conformal_regret_set_policy,
+    select_group_oof_hardpair_boost_policy,
     select_jackknife_lcb_policy,
     select_top2_margin_reranker_policy,
     top2_rerank_route_rows,
@@ -298,6 +304,7 @@ def _fit_pairprob_bundle_from_rows(
     embedding_feature_dim: int,
     expert_feature_dim: int,
     device: str,
+    pair_weight_multipliers: Dict[Tuple[int, int, int], float] | None = None,
 ) -> Tuple[PairprobModelBundle | None, Dict[str, float], str]:
     cfg = tournament_cfg.pairprob_tournament
     train_data = build_pairprob_training_data(
@@ -312,6 +319,7 @@ def _fit_pairprob_bundle_from_rows(
         near_tie_delta_pct=float(cfg.near_tie_delta_pct),
         margin_weight_scale_pct=float(cfg.margin_weight_scale_pct),
         margin_weight_clip=cfg.margin_weight_clip,
+        pair_weight_multipliers=pair_weight_multipliers,
     )
     reason = pairprob_evidence_reason(
         train_data=train_data,
@@ -444,11 +452,12 @@ def _calibrate_pairprob_tournament(
     ConformalRegretSetSelection | None,
     JackknifeLCBSelection | None,
     Top2RerankSelection | None,
+    GroupOOFHardpairBoostSelection | None,
 ]:
     cfg = tournament_cfg.pairprob_tournament
     source_domains = sorted(set(int(sample_domains[int(i)]) for i in np.asarray(train_idx, dtype=np.int64).tolist()))
     if len(source_domains) < int(cfg.min_source_inner_validation_domains):
-        return None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None, None
 
     rows_by_key: Dict[Tuple[str, str, float], List[Dict[str, Any]]] = {}
     evidence_by_key: Dict[Tuple[str, str, float], Dict[str, float]] = {}
@@ -456,6 +465,7 @@ def _calibrate_pairprob_tournament(
     conformal_blocks_by_key: Dict[Tuple[str, str, float], List[ConformalCalibrationBlock]] = {}
     jackknife_blocks_by_key: Dict[Tuple[str, float], List[JackknifeCalibrationBlock]] = {}
     top2_blocks_by_key: Dict[Tuple[str, float], List[Top2RerankCalibrationBlock]] = {}
+    hardpair_boost_blocks_by_key: Dict[Tuple[str, float], List[GroupOOFHardpairBoostCalibrationBlock]] = {}
     feature_sets = [str(cfg.adoption_feature_set), *[str(v) for v in cfg.diagnostic_feature_sets]]
     device = str(pairwise_cfg.get("device", "auto"))
 
@@ -589,6 +599,31 @@ def _calibrate_pairprob_tournament(
                             expert_domains=tuple(int(v) for v in validation_fold.candidate_expert_domains),
                             x_rows=x_val,
                             prob_matrix=prob,
+                            true_nelbo_matrix=true_matrix,
+                            global_true_nelbo_matrix=global_eval,
+                            fold=validation_fold,
+                            pairprob_direct_gap_pct=_gap_pct_for_selected(
+                                true_matrix,
+                                pairprob_selected_indices(prob, validation_fold.candidate_expert_domains),
+                            ),
+                            )
+                        )
+                if (
+                    bool(cfg.group_oof_hardpair_boost.enabled)
+                    and str(feature_set) == str(cfg.group_oof_hardpair_boost.feature_set)
+                ):
+                    hardpair_boost_blocks_by_key.setdefault((str(feature_set), float(l2)), []).append(
+                        GroupOOFHardpairBoostCalibrationBlock(
+                            validation_domain=int(validation_domain),
+                            train_x_rows=x_inner,
+                            train_q_rows=q_inner,
+                            train_e_rows=e_inner,
+                            train_s_rows=s_inner,
+                            train_y_rows=y_inner,
+                            query_domains=np.asarray(sample_domains[validation_idx], dtype=np.int64),
+                            expert_domains=tuple(int(v) for v in validation_fold.candidate_expert_domains),
+                            x_rows=x_val,
+                            direct_prob_matrix=prob,
                             true_nelbo_matrix=true_matrix,
                             global_true_nelbo_matrix=global_eval,
                             fold=validation_fold,
@@ -813,7 +848,32 @@ def _calibrate_pairprob_tournament(
             expert_feature_dim=int(expert_feature_dim),
             device=device,
         )
-    return direct, direct_adoption, group, combined, conformal_selection, jackknife_selection, top2_selection
+    hardpair_boost_selection = None
+    if bool(cfg.group_oof_hardpair_boost.enabled):
+        hardpair_key = (
+            str(cfg.group_oof_hardpair_boost.feature_set),
+            float(direct.ridge_l2) if direct is not None else float("nan"),
+        )
+        hardpair_boost_selection = select_group_oof_hardpair_boost_policy(
+            blocks=hardpair_boost_blocks_by_key.get(hardpair_key, []),
+            base_selection=direct,
+            global_expert_domains=global_expert_domains,
+            cfg=cfg.group_oof_hardpair_boost,
+            embedding_dim=int(embedding_feature_dim),
+            expert_feature_dim=int(expert_feature_dim),
+            device=device,
+            seed=int(seed),
+        )
+    return (
+        direct,
+        direct_adoption,
+        group,
+        combined,
+        conformal_selection,
+        jackknife_selection,
+        top2_selection,
+        hardpair_boost_selection,
+    )
 
 
 def _calibrate_pairwise_tournament(
@@ -1223,6 +1283,7 @@ def _run_pairprob_tournament_for_fold(
     conformal_selection: ConformalRegretSetSelection | None,
     jackknife_selection: JackknifeLCBSelection | None,
     top2_selection: Top2RerankSelection | None,
+    hardpair_boost_selection: GroupOOFHardpairBoostSelection | None,
     tournament_cfg: PairwiseTournamentConfig,
     pairwise_cfg: Dict[str, Any],
     embedding_feature_dim: int,
@@ -1553,6 +1614,178 @@ def _run_pairprob_tournament_for_fold(
                 expert_feature_dim=int(expert_feature_dim),
                 cfg=cfg.top2_margin_reranker,
                 oracle_diagnostic=True,
+            )
+        )
+    if (
+        hardpair_boost_selection is not None
+        and bool(cfg.group_oof_hardpair_boost.enabled)
+        and direct_prob is not None
+        and direct_selection_for_eval is not None
+    ):
+        boost_cfg = cfg.group_oof_hardpair_boost
+        source_domains = sorted(set(int(v) for v in np.asarray(q_train, dtype=np.int64).tolist()))
+        observations, diag = build_group_oof_hardpair_observations(
+            x_rows=x_train,
+            q_rows=q_train,
+            e_rows=e_train,
+            s_rows=s_train,
+            y_rows=y_train,
+            source_domains=source_domains,
+            feature_set=str(boost_cfg.feature_set),
+            ridge_l2=float(hardpair_boost_selection.ridge_l2),
+            cfg=boost_cfg,
+            embedding_dim=int(embedding_feature_dim),
+            expert_feature_dim=int(expert_feature_dim),
+            device=device,
+        )
+        overrides, _override_stats = hardpair_weight_multipliers_from_observations(
+            observations,
+            margin_threshold=float(hardpair_boost_selection.margin_threshold),
+            miss_boost_weight=float(hardpair_boost_selection.miss_boost_weight),
+            confirm_boost_weight=float(hardpair_boost_selection.confirm_boost_weight),
+            max_pair_weight=float(boost_cfg.max_pair_weight),
+        )
+        final_reason = "|".join(
+            part
+            for part in dict.fromkeys([str(hardpair_boost_selection.diagnostic_only_reason), str(diag.reason)])
+            if part
+        )
+        boost_bundle: PairprobModelBundle | None = None
+        boost_prob = direct_prob
+        if not final_reason:
+            boost_bundle, _boost_evidence, fit_reason = _fit_pairprob_bundle_from_rows(
+                x_rows=x_train,
+                q_rows=q_train,
+                e_rows=e_train,
+                s_rows=s_train,
+                y_rows=y_train,
+                feature_set=str(boost_cfg.feature_set),
+                ridge_l2=float(hardpair_boost_selection.ridge_l2),
+                tournament_cfg=tournament_cfg,
+                embedding_feature_dim=int(embedding_feature_dim),
+                expert_feature_dim=int(expert_feature_dim),
+                device=device,
+                pair_weight_multipliers=overrides,
+            )
+            final_reason = "|".join(
+                part for part in dict.fromkeys([final_reason, str(fit_reason)]) if part
+            )
+        if boost_bundle is not None and not final_reason:
+            boost_prob = pairprob_probability_matrix(
+                bundle=boost_bundle,
+                x_rows=x_test,
+                expert_domains=fold.candidate_expert_domains,
+                embedding_dim=int(embedding_feature_dim),
+                expert_feature_dim=int(expert_feature_dim),
+            )
+        boost_selection_for_eval = replace(
+            hardpair_boost_selection,
+            diagnostic_only_reason=str(final_reason),
+            noop=bool(final_reason),
+            guard_status="selected" if not final_reason else "failed_guards_noop",
+        )
+        rows.extend(
+            hardpair_boost_route_rows(
+                method=str(boost_cfg.method_name),
+                fold=fold,
+                query_domains=query_domains,
+                expert_domains=fold.candidate_expert_domains,
+                prob_matrix=boost_prob,
+                direct_prob_matrix=direct_prob,
+                true_nelbo_matrix=true_matrix,
+                global_true_nelbo_matrix=global_eval,
+                global_expert_domains=global_expert_domains,
+                policy_name=str(boost_cfg.method_name),
+                selection=boost_selection_for_eval,
+                cfg=boost_cfg,
+                metadata_oracle_gap_pct=metadata_oracle_gap_pct,
+            )
+        )
+        rows.extend(
+            hardpair_boost_route_rows(
+                method=str(boost_cfg.miss_only_diagnostic_method_name),
+                fold=fold,
+                query_domains=query_domains,
+                expert_domains=fold.candidate_expert_domains,
+                prob_matrix=boost_prob,
+                direct_prob_matrix=direct_prob,
+                true_nelbo_matrix=true_matrix,
+                global_true_nelbo_matrix=global_eval,
+                global_expert_domains=global_expert_domains,
+                policy_name=str(boost_cfg.method_name),
+                selection=boost_selection_for_eval,
+                cfg=boost_cfg,
+                metadata_oracle_gap_pct=metadata_oracle_gap_pct,
+                diagnostic_reason="group_oof_hardpair_miss_only_diagnostic",
+            )
+        )
+        random_overrides, _random_stats = hardpair_weight_multipliers_from_observations(
+            observations,
+            margin_threshold=float(hardpair_boost_selection.margin_threshold),
+            miss_boost_weight=float(hardpair_boost_selection.miss_boost_weight),
+            confirm_boost_weight=1.0,
+            max_pair_weight=float(boost_cfg.max_pair_weight),
+            random_control=True,
+            seed=int(query_domains[0]) if len(query_domains) else 0,
+        )
+        random_prob = direct_prob
+        if not str(diag.reason):
+            random_bundle, _random_evidence, random_reason = _fit_pairprob_bundle_from_rows(
+                x_rows=x_train,
+                q_rows=q_train,
+                e_rows=e_train,
+                s_rows=s_train,
+                y_rows=y_train,
+                feature_set=str(boost_cfg.feature_set),
+                ridge_l2=float(hardpair_boost_selection.ridge_l2),
+                tournament_cfg=tournament_cfg,
+                embedding_feature_dim=int(embedding_feature_dim),
+                expert_feature_dim=int(expert_feature_dim),
+                device=device,
+                pair_weight_multipliers=random_overrides,
+            )
+            if random_bundle is not None and not random_reason:
+                random_prob = pairprob_probability_matrix(
+                    bundle=random_bundle,
+                    x_rows=x_test,
+                    expert_domains=fold.candidate_expert_domains,
+                    embedding_dim=int(embedding_feature_dim),
+                    expert_feature_dim=int(expert_feature_dim),
+                )
+        rows.extend(
+            hardpair_boost_route_rows(
+                method=str(boost_cfg.random_control_method_name),
+                fold=fold,
+                query_domains=query_domains,
+                expert_domains=fold.candidate_expert_domains,
+                prob_matrix=random_prob,
+                direct_prob_matrix=direct_prob,
+                true_nelbo_matrix=true_matrix,
+                global_true_nelbo_matrix=global_eval,
+                global_expert_domains=global_expert_domains,
+                policy_name=str(boost_cfg.method_name),
+                selection=boost_selection_for_eval,
+                cfg=boost_cfg,
+                metadata_oracle_gap_pct=metadata_oracle_gap_pct,
+                diagnostic_reason="random_low_margin_boost_diagnostic",
+            )
+        )
+        rows.extend(
+            hardpair_boost_route_rows(
+                method=str(boost_cfg.oracle_top2_diagnostic_method_name),
+                fold=fold,
+                query_domains=query_domains,
+                expert_domains=fold.candidate_expert_domains,
+                prob_matrix=direct_prob,
+                direct_prob_matrix=direct_prob,
+                true_nelbo_matrix=true_matrix,
+                global_true_nelbo_matrix=global_eval,
+                global_expert_domains=global_expert_domains,
+                policy_name=str(boost_cfg.method_name),
+                selection=boost_selection_for_eval,
+                cfg=boost_cfg,
+                metadata_oracle_gap_pct=metadata_oracle_gap_pct,
+                oracle_top2_diagnostic=True,
             )
         )
     return rows
@@ -2035,6 +2268,7 @@ def _run_learned_methods_for_fold(
                 conformal_selection,
                 jackknife_selection,
                 top2_selection,
+                hardpair_boost_selection,
             ) = _calibrate_pairprob_tournament(
                 embeddings=embeddings,
                 sample_domains=sample_domains,
@@ -2074,6 +2308,7 @@ def _run_learned_methods_for_fold(
                     conformal_selection=conformal_selection,
                     jackknife_selection=jackknife_selection,
                     top2_selection=top2_selection,
+                    hardpair_boost_selection=hardpair_boost_selection,
                     tournament_cfg=tournament_cfg,
                     pairwise_cfg=pairwise_cfg,
                     embedding_feature_dim=embedding_feature_dim,

@@ -149,6 +149,29 @@ def test_camelyon17_top2_pairprob_rerank_config_is_protocol_locked() -> None:
     assert top2_cfg["calibration_policy"] == "source_inner_oof_top2_margin_rerank_v1"
 
 
+def test_camelyon17_group_oof_hardpair_boost_config_is_protocol_locked() -> None:
+    path = (
+        PROJECT_ROOT
+        / "configs"
+        / "experiments"
+        / "camelyon17"
+        / "learned_utility_response_routing_pairprob_group_oof_hardpair_boost_v1.yaml"
+    )
+    cfg = load_config(path)
+    validate_config(cfg)
+
+    pairprob_cfg = cfg["learned_utility"]["pairwise_tournament"]["pairprob_tournament"]
+    boost_cfg = pairprob_cfg["group_oof_hardpair_boost"]
+    assert cfg["experiment"]["name"] == "learned_utility_response_routing_pairprob_group_oof_hardpair_boost_v1"
+    assert pairprob_cfg["adoption_feature_set"] == "pairprob_latent_only_v1"
+    assert boost_cfg["enabled"] is True
+    assert boost_cfg["base_method"] == "pairwise_direct_pairprob_adoption_v1"
+    assert boost_cfg["feature_set"] == "pairprob_latent_only_v1"
+    assert boost_cfg["calibration_policy"] == "source_inner_group_oof_hardpair_boost_v1"
+    assert boost_cfg["require_group_id_for_adoption"] is True
+    assert boost_cfg["hardpair_confirm_boost_weights"] == [1.0]
+
+
 def test_breakhis_support_estimated_utility_config_is_protocol_locked() -> None:
     path = (
         PROJECT_ROOT

@@ -13,6 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.eval.evaluators.learned_utility_config import (
     ConformalRegretSetConfig,
     FallbackBenefitGateConfig,
+    GroupOOFHardpairBoostConfig,
     JackknifeLCBTournamentConfig,
     PairprobTournamentConfig,
     Top2MarginRerankerConfig,
@@ -23,9 +24,12 @@ from src.eval.evaluators.learned_utility_pairprob import (
     ConformalRegretSetSelection,
     JackknifeCalibrationBlock,
     JackknifeLCBSelection,
+    GroupOOFHardpairBoostObservation,
+    GroupOOFHardpairBoostSelection,
     PairprobPolicySelection,
     Top2RerankSelection,
     build_pairprob_training_data,
+    build_group_oof_hardpair_observations,
     build_top2_rerank_training_data,
     clone_direct_pairprob_adoption_rows,
     conformal_pairprob_route_rows,
@@ -35,6 +39,8 @@ from src.eval.evaluators.learned_utility_pairprob import (
     pairprob_feature_names,
     pairprob_probability_matrix,
     pairprob_route_rows,
+    hardpair_weight_multipliers_from_observations,
+    hardpair_boost_route_rows,
     select_jackknife_lcb_policy,
     select_pairprob_policy,
     top2_rerank_feature_names,
@@ -195,6 +201,46 @@ def _top2_cfg(**overrides: object) -> Top2MarginRerankerConfig:
     }
     values.update(overrides)
     return Top2MarginRerankerConfig(**values)
+
+
+def _group_oof_cfg(**overrides: object) -> GroupOOFHardpairBoostConfig:
+    values = {
+        "enabled": True,
+        "method_name": "pairwise_direct_group_oof_hardpair_boosted_pairprob_v1",
+        "base_method": "pairwise_direct_pairprob_adoption_v1",
+        "miss_only_diagnostic_method_name": "pairwise_direct_group_oof_hardpair_miss_boosted_pairprob_v1_diagnostic",
+        "random_control_method_name": "pairwise_direct_random_low_margin_boost_pairprob_v1_diagnostic",
+        "oracle_top2_diagnostic_method_name": "oracle_top2_margin_reranker_diagnostic_v1",
+        "feature_set": "pairprob_latent_only_v1",
+        "calibration_policy": "source_inner_group_oof_hardpair_boost_v1",
+        "ridge_l2_values": (1.0e-3,),
+        "hardpair_margin_thresholds": (0.10,),
+        "hardpair_miss_boost_weights": (2.0,),
+        "hardpair_confirm_boost_weights": (1.0,),
+        "max_pair_weight": 8.0,
+        "group_oof_folds": 3,
+        "min_group_oof_folds": 3,
+        "min_group_oof_train_domains_per_fold": 3,
+        "min_group_oof_rows_per_domain": 1,
+        "require_group_id_for_adoption": True,
+        "max_group_oof_same_slide_leakage_rate": 0.0,
+        "near_tie_delta_pct": 0.0,
+        "margin_weight_scale_pct": 5.0,
+        "margin_weight_clip": (0.25, 3.0),
+        "min_source_inner_hardpair_rows": 1,
+        "min_source_inner_switch_rows": 0,
+        "min_source_inner_keep_rows": 0,
+        "min_source_inner_active_domains": 1,
+        "min_low_margin_high_regret_enrichment": 0.0,
+        "min_oracle_in_base_top2_rate_among_low_margin_high_regret_rows": 0.0,
+        "min_source_inner_gap_reduction_abs_pct_points": 0.0,
+        "max_source_inner_domain_regression_abs_pct_points": 1.0,
+        "tie_mean_gap_tolerance_pct_points": 0.05,
+        "absolute_high_regret_gap_pct": 5.0,
+        "catastrophic_regression_vs_direct_gap_pct": 5.0,
+    }
+    values.update(overrides)
+    return GroupOOFHardpairBoostConfig(**values)
 
 
 def test_tournament_win_scores_exclude_self_comparisons() -> None:
@@ -366,6 +412,153 @@ def test_pairprob_route_rows_use_win_tournament_and_cycle_na_for_two_candidates(
     assert row["route_experts"] == "1"
     assert np.isclose(row["pairprob_win_top1"], 0.8)
     assert np.isnan(row["pairwise_cycle_rate"])
+
+
+def test_group_oof_hardpair_marking_preserves_camelyon17_pairprob_geometry() -> None:
+    sample_domains = np.asarray([0, 0, 0, 1, 1, 1, 2, 2, 2], dtype=np.int64)
+    embeddings = np.eye(9, 2, dtype=np.float64)
+    expert_domains = [0, 1, 2, 3, 4]
+    train_idx = np.arange(9, dtype=np.int64)
+    x_rows, q_rows, e_rows, s_rows = _build_fold_training_pair_features(
+        sample_embeddings=embeddings,
+        sample_domains=sample_domains,
+        train_indices=train_idx,
+        expert_domains=expert_domains,
+        outer_heldout_domain=4,
+        include_metadata_features=False,
+        extra_excluded_domains=[3],
+    )
+    true_nelbo = np.asarray(
+        [
+            [5.0, 3.0, 4.0, 9.0, 9.0],
+            [5.0, 4.0, 3.0, 9.0, 9.0],
+            [5.0, 3.5, 4.0, 9.0, 9.0],
+            [3.0, 5.0, 4.0, 9.0, 9.0],
+            [4.0, 5.0, 3.0, 9.0, 9.0],
+            [3.5, 5.0, 4.0, 9.0, 9.0],
+            [3.0, 4.0, 5.0, 9.0, 9.0],
+            [4.0, 3.0, 5.0, 9.0, 9.0],
+            [3.5, 4.0, 5.0, 9.0, 9.0],
+        ],
+        dtype=np.float64,
+    )
+    y_rows = true_nelbo[s_rows, e_rows]
+    observations, diag = build_group_oof_hardpair_observations(
+        x_rows=x_rows,
+        q_rows=q_rows,
+        e_rows=e_rows,
+        s_rows=s_rows,
+        y_rows=y_rows,
+        source_domains=[0, 1, 2],
+        feature_set="pairprob_latent_only_v1",
+        ridge_l2=1.0e-3,
+        cfg=_group_oof_cfg(min_source_inner_hardpair_rows=1),
+        embedding_dim=2,
+        expert_feature_dim=5,
+        device="cpu",
+    )
+
+    assert diag.reason == ""
+    assert diag.grouping_level == "sample"
+    assert diag.folds_used == 3
+    assert diag.train_domains_per_fold_min == 3
+    assert diag.candidate_experts_per_fold_min >= 2
+    assert observations
+    assert all(obs.base_top1_domain != obs.base_top2_domain for obs in observations)
+
+
+def test_hardpair_weight_overrides_apply_only_low_margin_top1_top2_pairs() -> None:
+    obs = [
+        # Low-margin miss: canonical pair gets the miss multiplier.
+        dict(
+            sample_index=1,
+            query_domain=0,
+            domain_a=1,
+            domain_b=2,
+            base_top1_domain=1,
+            base_top2_domain=2,
+            margin=0.04,
+            delta_pct=2.0,
+            top2_better=True,
+            base_top1_better=False,
+            direct_gap_pct=6.0,
+            direct_high_regret=True,
+            oracle_in_base_top2=True,
+            oracle_is_base_top2=True,
+        ),
+        # High-margin pair is outside the boost region.
+        dict(
+            sample_index=2,
+            query_domain=0,
+            domain_a=1,
+            domain_b=2,
+            base_top1_domain=1,
+            base_top2_domain=2,
+            margin=0.30,
+            delta_pct=2.0,
+            top2_better=True,
+            base_top1_better=False,
+            direct_gap_pct=6.0,
+            direct_high_regret=True,
+            oracle_in_base_top2=True,
+            oracle_is_base_top2=True,
+        ),
+    ]
+    observations = [GroupOOFHardpairBoostObservation(**item) for item in obs]
+    multipliers, stats = hardpair_weight_multipliers_from_observations(
+        observations,
+        margin_threshold=0.10,
+        miss_boost_weight=4.0,
+        confirm_boost_weight=1.0,
+        max_pair_weight=8.0,
+    )
+
+    assert multipliers == {(1, 1, 2): 4.0}
+    assert stats["hardpair_oof_low_margin_rows"] == 1.0
+    assert stats["hardpair_oof_switch_rows"] == 1.0
+    assert stats["low_margin_high_regret_oracle_in_base_top2_rate"] == 1.0
+
+
+def test_hardpair_boost_guard_failure_routes_exactly_as_direct_pairprob() -> None:
+    fold = FoldCandidateSet.for_heldout_domain(heldout_domain=0, expert_domains=[0, 1, 2])
+    direct_prob = np.asarray([[[0.5, 0.8], [0.2, 0.5]]], dtype=np.float64)
+    boosted_prob = np.asarray([[[0.5, 0.1], [0.9, 0.5]]], dtype=np.float64)
+    true = np.asarray([[10.0, 20.0]], dtype=np.float64)
+    selection = GroupOOFHardpairBoostSelection(
+        method="pairwise_direct_group_oof_hardpair_boosted_pairprob_v1",
+        base_method="pairwise_direct_pairprob_adoption_v1",
+        feature_set="pairprob_latent_only_v1",
+        ridge_l2=1.0e-3,
+        margin_threshold=0.10,
+        miss_boost_weight=2.0,
+        confirm_boost_weight=1.0,
+        selected_by_inner_validation=True,
+        diagnostic_only_reason="insufficient_source_inner_hardpair_rows",
+        noop=True,
+        guard_status="failed_guards_noop",
+    )
+
+    rows = hardpair_boost_route_rows(
+        method="pairwise_direct_group_oof_hardpair_boosted_pairprob_v1",
+        fold=fold,
+        query_domains=np.asarray([0], dtype=np.int64),
+        expert_domains=fold.candidate_expert_domains,
+        prob_matrix=boosted_prob,
+        direct_prob_matrix=direct_prob,
+        true_nelbo_matrix=true,
+        global_true_nelbo_matrix=np.asarray([[5.0, 10.0, 20.0]], dtype=np.float64),
+        global_expert_domains=[0, 1, 2],
+        policy_name="pairwise_direct_group_oof_hardpair_boosted_pairprob_v1",
+        selection=selection,
+        cfg=_group_oof_cfg(),
+    )
+
+    row = rows[0]
+    assert row["selected_expert"] == 1
+    assert row["route_experts"] == "1"
+    assert row["diagnostic_only"] == 1
+    assert row["sign_ci_candidate"] == 0
+    assert row["hardpair_boost_guard_status"] == "failed_guards_noop"
 
 
 def test_direct_pairprob_adoption_alias_clones_diagnostic_route() -> None:
@@ -1224,6 +1417,11 @@ def test_pairwise_tournament_protocol_flags() -> None:
     jackknife_mean = _method_protocol("pairwise_jackknife_mean_pairprob_tournament_v1")
     top2_rerank = _method_protocol("pairwise_direct_top2_margin_reranker_v1")
     top2_oracle = _method_protocol("oracle_top2_margin_reranker_diagnostic_v1")
+    hardpair_boost = _method_protocol("pairwise_direct_group_oof_hardpair_boosted_pairprob_v1")
+    hardpair_miss_only = _method_protocol(
+        "pairwise_direct_group_oof_hardpair_miss_boosted_pairprob_v1_diagnostic"
+    )
+    random_low_margin = _method_protocol("pairwise_direct_random_low_margin_boost_pairprob_v1_diagnostic")
 
     assert learned.method_role == "learned"
     assert learned.adoption_eligible == 1
@@ -1261,6 +1459,13 @@ def test_pairwise_tournament_protocol_flags() -> None:
     assert top2_oracle.method_role == "diagnostic"
     assert top2_oracle.adoption_eligible == 0
     assert top2_oracle.routing_uses_eval_nelbo == 1
+    assert hardpair_boost.method_role == "learned"
+    assert hardpair_boost.adoption_eligible == 1
+    assert hardpair_boost.routing_uses_eval_nelbo == 0
+    assert hardpair_miss_only.method_role == "diagnostic"
+    assert hardpair_miss_only.adoption_eligible == 0
+    assert random_low_margin.method_role == "diagnostic"
+    assert random_low_margin.adoption_eligible == 0
     assert oracle.method_role == "diagnostic"
     assert oracle.adoption_eligible == 0
     assert oracle.diagnostic_only == 1

@@ -186,6 +186,43 @@ class Top2MarginRerankerConfig:
 
 
 @dataclass(frozen=True)
+class GroupOOFHardpairBoostConfig:
+    enabled: bool = False
+    method_name: str = "pairwise_direct_group_oof_hardpair_boosted_pairprob_v1"
+    base_method: str = "pairwise_direct_pairprob_adoption_v1"
+    miss_only_diagnostic_method_name: str = "pairwise_direct_group_oof_hardpair_miss_boosted_pairprob_v1_diagnostic"
+    random_control_method_name: str = "pairwise_direct_random_low_margin_boost_pairprob_v1_diagnostic"
+    oracle_top2_diagnostic_method_name: str = "oracle_top2_margin_reranker_diagnostic_v1"
+    feature_set: str = "pairprob_latent_only_v1"
+    calibration_policy: str = "source_inner_group_oof_hardpair_boost_v1"
+    ridge_l2_values: Tuple[float, ...] = (1.0e-3, 1.0e-2)
+    hardpair_margin_thresholds: Tuple[float, ...] = (0.05, 0.075, 0.10)
+    hardpair_miss_boost_weights: Tuple[float, ...] = (2.0, 4.0)
+    hardpair_confirm_boost_weights: Tuple[float, ...] = (1.0,)
+    max_pair_weight: float = 8.0
+    group_oof_folds: int = 3
+    min_group_oof_folds: int = 3
+    min_group_oof_train_domains_per_fold: int = 3
+    min_group_oof_rows_per_domain: int = 20
+    require_group_id_for_adoption: bool = True
+    max_group_oof_same_slide_leakage_rate: float = 0.0
+    near_tie_delta_pct: float = 0.5
+    margin_weight_scale_pct: float = 5.0
+    margin_weight_clip: Tuple[float, float] = (0.25, 3.0)
+    min_source_inner_hardpair_rows: int = 40
+    min_source_inner_switch_rows: int = 10
+    min_source_inner_keep_rows: int = 10
+    min_source_inner_active_domains: int = 2
+    min_low_margin_high_regret_enrichment: float = 1.25
+    min_oracle_in_base_top2_rate_among_low_margin_high_regret_rows: float = 0.60
+    min_source_inner_gap_reduction_abs_pct_points: float = 0.25
+    max_source_inner_domain_regression_abs_pct_points: float = 1.0
+    tie_mean_gap_tolerance_pct_points: float = 0.05
+    absolute_high_regret_gap_pct: float = 5.0
+    catastrophic_regression_vs_direct_gap_pct: float = 5.0
+
+
+@dataclass(frozen=True)
 class PairprobTournamentConfig:
     enabled: bool
     policy_name: str
@@ -211,6 +248,7 @@ class PairprobTournamentConfig:
     conformal_regret_set: ConformalRegretSetConfig = ConformalRegretSetConfig()
     jackknife_lcb_tournament: JackknifeLCBTournamentConfig = JackknifeLCBTournamentConfig()
     top2_margin_reranker: Top2MarginRerankerConfig = Top2MarginRerankerConfig()
+    group_oof_hardpair_boost: GroupOOFHardpairBoostConfig = GroupOOFHardpairBoostConfig()
 
 
 @dataclass(frozen=True)
@@ -422,6 +460,7 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
     conformal_cfg = _as_dict(pairprob_cfg.get("conformal_regret_set", {}))
     jackknife_cfg = _as_dict(pairprob_cfg.get("jackknife_lcb_tournament", {}))
     top2_cfg = _as_dict(pairprob_cfg.get("top2_margin_reranker", {}))
+    group_oof_cfg = _as_dict(pairprob_cfg.get("group_oof_hardpair_boost", {}))
     margin_clip_values = tuple(
         float(v) for v in pairprob_cfg.get("margin_weight_clip", [0.25, 3.0])
     )
@@ -584,6 +623,87 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
             (top2_cfg or {}).get("catastrophic_regression_vs_direct_gap_pct", 5.0)
         ),
     )
+    group_oof_margin_clip_values = tuple(
+        float(v) for v in (group_oof_cfg or {}).get("margin_weight_clip", [0.25, 3.0])
+    )
+    if len(group_oof_margin_clip_values) != 2:
+        raise ValueError(
+            "learned_utility.pairwise_tournament.pairprob_tournament."
+            "group_oof_hardpair_boost.margin_weight_clip must have length 2"
+        )
+    group_oof_hardpair_boost = GroupOOFHardpairBoostConfig(
+        enabled=bool((group_oof_cfg or {}).get("enabled", False)),
+        method_name=str(
+            (group_oof_cfg or {}).get("method_name", "pairwise_direct_group_oof_hardpair_boosted_pairprob_v1")
+        ),
+        base_method=str((group_oof_cfg or {}).get("base_method", "pairwise_direct_pairprob_adoption_v1")),
+        miss_only_diagnostic_method_name=str(
+            (group_oof_cfg or {}).get(
+                "miss_only_diagnostic_method_name",
+                "pairwise_direct_group_oof_hardpair_miss_boosted_pairprob_v1_diagnostic",
+            )
+        ),
+        random_control_method_name=str(
+            (group_oof_cfg or {}).get(
+                "random_control_method_name",
+                "pairwise_direct_random_low_margin_boost_pairprob_v1_diagnostic",
+            )
+        ),
+        oracle_top2_diagnostic_method_name=str(
+            (group_oof_cfg or {}).get("oracle_top2_diagnostic_method_name", "oracle_top2_margin_reranker_diagnostic_v1")
+        ),
+        feature_set=str((group_oof_cfg or {}).get("feature_set", "pairprob_latent_only_v1")).strip(),
+        calibration_policy=str(
+            (group_oof_cfg or {}).get("calibration_policy", "source_inner_group_oof_hardpair_boost_v1")
+        ).strip().lower(),
+        ridge_l2_values=tuple(float(v) for v in (group_oof_cfg or {}).get("ridge_l2_values", [1.0e-3, 1.0e-2])),
+        hardpair_margin_thresholds=tuple(
+            float(v) for v in (group_oof_cfg or {}).get("hardpair_margin_thresholds", [0.05, 0.075, 0.10])
+        ),
+        hardpair_miss_boost_weights=tuple(
+            float(v) for v in (group_oof_cfg or {}).get("hardpair_miss_boost_weights", [2.0, 4.0])
+        ),
+        hardpair_confirm_boost_weights=tuple(
+            float(v) for v in (group_oof_cfg or {}).get("hardpair_confirm_boost_weights", [1.0])
+        ),
+        max_pair_weight=float((group_oof_cfg or {}).get("max_pair_weight", 8.0)),
+        group_oof_folds=int((group_oof_cfg or {}).get("group_oof_folds", 3)),
+        min_group_oof_folds=int((group_oof_cfg or {}).get("min_group_oof_folds", 3)),
+        min_group_oof_train_domains_per_fold=int(
+            (group_oof_cfg or {}).get("min_group_oof_train_domains_per_fold", 3)
+        ),
+        min_group_oof_rows_per_domain=int((group_oof_cfg or {}).get("min_group_oof_rows_per_domain", 20)),
+        require_group_id_for_adoption=bool((group_oof_cfg or {}).get("require_group_id_for_adoption", True)),
+        max_group_oof_same_slide_leakage_rate=float(
+            (group_oof_cfg or {}).get("max_group_oof_same_slide_leakage_rate", 0.0)
+        ),
+        near_tie_delta_pct=float((group_oof_cfg or {}).get("near_tie_delta_pct", 0.5)),
+        margin_weight_scale_pct=float((group_oof_cfg or {}).get("margin_weight_scale_pct", 5.0)),
+        margin_weight_clip=(float(group_oof_margin_clip_values[0]), float(group_oof_margin_clip_values[1])),
+        min_source_inner_hardpair_rows=int((group_oof_cfg or {}).get("min_source_inner_hardpair_rows", 40)),
+        min_source_inner_switch_rows=int((group_oof_cfg or {}).get("min_source_inner_switch_rows", 10)),
+        min_source_inner_keep_rows=int((group_oof_cfg or {}).get("min_source_inner_keep_rows", 10)),
+        min_source_inner_active_domains=int((group_oof_cfg or {}).get("min_source_inner_active_domains", 2)),
+        min_low_margin_high_regret_enrichment=float(
+            (group_oof_cfg or {}).get("min_low_margin_high_regret_enrichment", 1.25)
+        ),
+        min_oracle_in_base_top2_rate_among_low_margin_high_regret_rows=float(
+            (group_oof_cfg or {}).get("min_oracle_in_base_top2_rate_among_low_margin_high_regret_rows", 0.60)
+        ),
+        min_source_inner_gap_reduction_abs_pct_points=float(
+            (group_oof_cfg or {}).get("min_source_inner_gap_reduction_abs_pct_points", 0.25)
+        ),
+        max_source_inner_domain_regression_abs_pct_points=float(
+            (group_oof_cfg or {}).get("max_source_inner_domain_regression_abs_pct_points", 1.0)
+        ),
+        tie_mean_gap_tolerance_pct_points=float(
+            (group_oof_cfg or {}).get("tie_mean_gap_tolerance_pct_points", 0.05)
+        ),
+        absolute_high_regret_gap_pct=float((group_oof_cfg or {}).get("absolute_high_regret_gap_pct", 5.0)),
+        catastrophic_regression_vs_direct_gap_pct=float(
+            (group_oof_cfg or {}).get("catastrophic_regression_vs_direct_gap_pct", 5.0)
+        ),
+    )
     pairprob_tournament = PairprobTournamentConfig(
         enabled=bool((pairprob_cfg or {}).get("enabled", False)),
         policy_name=str(
@@ -656,6 +776,7 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         conformal_regret_set=conformal_regret_set,
         jackknife_lcb_tournament=jackknife_lcb_tournament,
         top2_margin_reranker=top2_margin_reranker,
+        group_oof_hardpair_boost=group_oof_hardpair_boost,
     )
     tournament = PairwiseTournamentConfig(
         enabled=bool((tournament_cfg or {}).get("enabled", False)),
@@ -917,6 +1038,68 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
                 if top2.margin_weight_clip[0] <= 0.0 or top2.margin_weight_clip[0] > top2.margin_weight_clip[1]:
                     raise ValueError(
                         "learned_utility.pairwise_tournament.pairprob_tournament.top2_margin_reranker."
+                        "margin_weight_clip must be positive and ordered"
+                    )
+            group_oof = pairprob.group_oof_hardpair_boost
+            if group_oof.enabled:
+                if group_oof.base_method != pairprob.direct_adoption_method:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.group_oof_hardpair_boost."
+                        "base_method must match methods.direct_adoption"
+                    )
+                if group_oof.feature_set != pairprob.adoption_feature_set:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.group_oof_hardpair_boost."
+                        "feature_set must match adoption_feature_set"
+                    )
+                if group_oof.feature_set != "pairprob_latent_only_v1":
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.group_oof_hardpair_boost."
+                        "feature_set must be 'pairprob_latent_only_v1'"
+                    )
+                if group_oof.calibration_policy != "source_inner_group_oof_hardpair_boost_v1":
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.group_oof_hardpair_boost."
+                        "calibration_policy must be 'source_inner_group_oof_hardpair_boost_v1'"
+                    )
+                if not group_oof.ridge_l2_values or any(v <= 0.0 for v in group_oof.ridge_l2_values):
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.group_oof_hardpair_boost."
+                        "ridge_l2_values must be non-empty and positive"
+                    )
+                if not group_oof.hardpair_margin_thresholds or any(v < 0.0 for v in group_oof.hardpair_margin_thresholds):
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.group_oof_hardpair_boost."
+                        "hardpair_margin_thresholds must be non-empty and non-negative"
+                    )
+                if not group_oof.hardpair_miss_boost_weights or any(v < 1.0 for v in group_oof.hardpair_miss_boost_weights):
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.group_oof_hardpair_boost."
+                        "hardpair_miss_boost_weights must be >= 1"
+                    )
+                if tuple(float(v) for v in group_oof.hardpair_confirm_boost_weights) != (1.0,):
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.group_oof_hardpair_boost."
+                        "hardpair_confirm_boost_weights must be [1.0] in v1"
+                    )
+                if group_oof.group_oof_folds < group_oof.min_group_oof_folds:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.group_oof_hardpair_boost."
+                        "group_oof_folds must be >= min_group_oof_folds"
+                    )
+                if group_oof.min_group_oof_train_domains_per_fold < 2:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.group_oof_hardpair_boost."
+                        "min_group_oof_train_domains_per_fold must be >= 2"
+                    )
+                if group_oof.margin_weight_scale_pct <= 0.0:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.group_oof_hardpair_boost."
+                        "margin_weight_scale_pct must be > 0"
+                    )
+                if group_oof.margin_weight_clip[0] <= 0.0 or group_oof.margin_weight_clip[0] > group_oof.margin_weight_clip[1]:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.group_oof_hardpair_boost."
                         "margin_weight_clip must be positive and ordered"
                     )
 

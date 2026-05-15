@@ -42,6 +42,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_response_routing_pairprob_tournament_v1",
         "learned_utility_response_routing_pairprob_direct_adoption_v1",
         "learned_utility_response_routing_pairprob_top2_rerank_v1",
+        "learned_utility_response_routing_pairprob_group_oof_hardpair_boost_v1",
         "learned_utility_response_routing_conformal_pairprob_v1",
         "learned_utility_response_routing_jackknife_pairprob_v1",
     }

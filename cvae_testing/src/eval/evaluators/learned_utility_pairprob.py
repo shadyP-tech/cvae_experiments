@@ -8,6 +8,7 @@ import numpy as np
 
 from src.eval.evaluators.learned_utility_config import (
     ConformalRegretSetConfig,
+    GroupOOFHardpairBoostConfig,
     JackknifeLCBTournamentConfig,
     PairprobTournamentConfig,
     Top2MarginRerankerConfig,
@@ -26,11 +27,32 @@ COMBINED_PAIRPROB_DIAGNOSTIC_METHOD = "pairwise_pairprob_combined_diagnostic_v1"
 TOP2_RERANK_METHOD = "pairwise_direct_top2_margin_reranker_v1"
 ORACLE_TOP2_RERANK_DIAGNOSTIC_METHOD = "oracle_top2_margin_reranker_diagnostic_v1"
 TOP2_RERANK_FEATURE_SET = "top2_rerank_latent_context_v1"
+GROUP_OOF_HARDPAIR_BOOST_METHOD = "pairwise_direct_group_oof_hardpair_boosted_pairprob_v1"
+GROUP_OOF_HARDPAIR_MISS_ONLY_DIAGNOSTIC_METHOD = (
+    "pairwise_direct_group_oof_hardpair_miss_boosted_pairprob_v1_diagnostic"
+)
+RANDOM_LOW_MARGIN_BOOST_DIAGNOSTIC_METHOD = "pairwise_direct_random_low_margin_boost_pairprob_v1_diagnostic"
 DIRECT_PAIRPROB_SELECTION_POLICY = "source_inner_mean_gap_then_catastrophic_then_top1_v1"
 GROUP_ROBUST_PAIRPROB_SELECTION_POLICY = (
     "source_inner_group_robust_worst_gap_then_catastrophic_then_mean_gap_v1"
 )
 DIRECT_PAIRPROB_ADOPTION_FEATURE_FAMILY = "pairprob_latent_only_v1"
+GROUP_OOF_HARDPAIR_GUARD_PRIORITY = (
+    "insufficient_group_oof_pairprob_geometry",
+    "insufficient_group_oof_groups",
+    "insufficient_group_oof_train_domains",
+    "insufficient_group_oof_candidate_experts",
+    "weak_grouping_diagnostic_only",
+    "insufficient_source_inner_hardpair_rows",
+    "insufficient_source_inner_switch_rows",
+    "insufficient_source_inner_keep_rows",
+    "insufficient_source_inner_active_domains",
+    "low_margin_not_high_regret_enriched",
+    "oracle_not_concentrated_in_base_top2",
+    "insufficient_source_inner_gap_reduction",
+    "source_inner_domain_regression",
+    "worsens_direct_pairprob",
+)
 TOP2_RERANK_GUARD_PRIORITY = (
     "insufficient_source_inner_rerank_rows",
     "insufficient_source_inner_positive_rows",
@@ -309,6 +331,105 @@ class Top2RerankSelection:
 
 
 @dataclass(frozen=True)
+class GroupOOFHardpairBoostObservation:
+    sample_index: int
+    query_domain: int
+    domain_a: int
+    domain_b: int
+    base_top1_domain: int
+    base_top2_domain: int
+    margin: float
+    delta_pct: float
+    top2_better: bool
+    base_top1_better: bool
+    direct_gap_pct: float
+    direct_high_regret: bool
+    oracle_in_base_top2: bool
+    oracle_is_base_top2: bool
+
+
+@dataclass(frozen=True)
+class GroupOOFHardpairBoostDiagnostics:
+    reason: str = ""
+    grouping_level: str = "sample"
+    grouping_warning: str = ""
+    unique_groups: int = 0
+    min_groups_per_fold: int = 0
+    folds_used: int = 0
+    train_domains_per_fold_min: int = 0
+    candidate_experts_per_fold_min: int = 0
+    same_slide_leakage_rate: float = 0.0
+
+
+@dataclass(frozen=True)
+class GroupOOFHardpairBoostCalibrationBlock:
+    validation_domain: int
+    train_x_rows: np.ndarray
+    train_q_rows: np.ndarray
+    train_e_rows: np.ndarray
+    train_s_rows: np.ndarray
+    train_y_rows: np.ndarray
+    query_domains: np.ndarray
+    expert_domains: Tuple[int, ...]
+    x_rows: np.ndarray
+    direct_prob_matrix: np.ndarray
+    true_nelbo_matrix: np.ndarray
+    global_true_nelbo_matrix: np.ndarray
+    fold: FoldCandidateSet
+    pairprob_direct_gap_pct: np.ndarray
+
+
+@dataclass(frozen=True)
+class GroupOOFHardpairBoostSelection:
+    method: str
+    base_method: str
+    feature_set: str
+    ridge_l2: float
+    margin_threshold: float
+    miss_boost_weight: float
+    confirm_boost_weight: float
+    selected_by_inner_validation: bool
+    diagnostic_only_reason: str = ""
+    noop: bool = False
+    guard_status: str = "selected"
+    source_inner_validation_domains: int = 0
+    source_inner_rows: int = 0
+    source_inner_mean_oracle_gap_pct: float = float("nan")
+    source_inner_high_regret_rate: float = float("nan")
+    source_inner_top1: float = float("nan")
+    source_inner_spearman: float = float("nan")
+    source_inner_boost_gap_reduction_abs_pct_points: float = float("nan")
+    source_inner_high_regret_reduction: float = float("nan")
+    worst_source_inner_domain_regression_abs_pct_points: float = float("nan")
+    median_source_inner_domain_delta_gap: float = float("nan")
+    source_inner_domains_regressed_gt_threshold: int = 0
+    group_oof_grouping_level: str = "sample"
+    group_oof_grouping_warning: str = ""
+    group_oof_unique_groups: int = 0
+    group_oof_min_groups_per_fold: int = 0
+    group_oof_folds_used: int = 0
+    group_oof_train_domains_per_fold_min: int = 0
+    group_oof_candidate_experts_per_fold_min: int = 0
+    group_oof_same_slide_leakage_rate: float = 0.0
+    hardpair_oof_low_margin_rows: int = 0
+    hardpair_oof_switch_rows: int = 0
+    hardpair_oof_keep_rows: int = 0
+    hardpair_oof_active_domains: int = 0
+    low_margin_high_regret_rows: int = 0
+    low_margin_high_regret_oracle_in_base_top2_rate: float = float("nan")
+    low_margin_high_regret_oracle_is_base_top2_rate: float = float("nan")
+    low_margin_high_regret_oracle_is_not_base_top2_rate: float = float("nan")
+    low_margin_high_regret_enrichment: float = float("nan")
+    hardpair_weighted_pair_fraction: float = float("nan")
+    hardpair_mean_pair_weight: float = float("nan")
+    boosted_selection_change_rate: float = float("nan")
+    boosted_to_base_top2_rate: float = float("nan")
+    boosted_help_rate_changed_only: float = float("nan")
+    boosted_harm_rate_changed_only: float = float("nan")
+    mean_paired_gap_delta_vs_direct_pairprob: float = float("nan")
+
+
+@dataclass(frozen=True)
 class ConformalCalibrationBlock:
     validation_domain: int
     query_domains: np.ndarray
@@ -526,6 +647,7 @@ def build_pairprob_training_data(
     near_tie_delta_pct: float,
     margin_weight_scale_pct: float,
     margin_weight_clip: Tuple[float, float],
+    pair_weight_multipliers: Mapping[Tuple[int, int, int], float] | None = None,
 ) -> PairprobTrainingData:
     features: List[np.ndarray] = []
     labels: List[float] = []
@@ -568,7 +690,17 @@ def build_pairprob_training_data(
                 )
                 labels.append(1.0 if ya < yb else 0.0)
                 low, high = float(margin_weight_clip[0]), float(margin_weight_clip[1])
-                weights.append(float(np.clip(delta_pct / float(margin_weight_scale_pct), low, high)))
+                weight = float(np.clip(delta_pct / float(margin_weight_scale_pct), low, high))
+                if pair_weight_multipliers is not None:
+                    mult = float(
+                        pair_weight_multipliers.get(
+                            (int(sample_index), int(domain_a), int(domain_b)),
+                            1.0,
+                        )
+                    )
+                    if np.isfinite(mult) and mult > 0.0:
+                        weight *= mult
+                weights.append(float(weight))
                 query_domains.append(int(query_domain))
                 kept_by_domain[query_domain] = int(kept_by_domain.get(query_domain, 0)) + 1
 
@@ -872,6 +1004,284 @@ def build_top2_rerank_training_data(
         kept_by_domain=kept_by_domain,
         switch_candidate_rate=float(switch_candidates / total_active) if total_active > 0 else float("nan"),
     )
+
+
+def _pair_key(sample_index: int, domain_a: int, domain_b: int) -> Tuple[int, int, int]:
+    a, b = sorted((int(domain_a), int(domain_b)))
+    return int(sample_index), int(a), int(b)
+
+
+def _candidate_experts_per_sample_min(s_rows: np.ndarray, e_rows: np.ndarray) -> int:
+    mins: List[int] = []
+    s_arr = np.asarray(s_rows, dtype=np.int64)
+    e_arr = np.asarray(e_rows, dtype=np.int64)
+    for sample_index in sorted(set(int(v) for v in s_arr.tolist())):
+        experts = {int(v) for v in e_arr[s_arr == int(sample_index)].tolist()}
+        if experts:
+            mins.append(len(experts))
+    return int(min(mins)) if mins else 0
+
+
+def _group_oof_fold_ids(sample_ids: Sequence[int], n_folds: int) -> Dict[int, int]:
+    unique = sorted(set(int(v) for v in sample_ids))
+    folds = max(int(n_folds), 1)
+    return {int(sample): int(pos % folds) for pos, sample in enumerate(unique)}
+
+
+def _group_oof_hardpair_reason(diag: GroupOOFHardpairBoostDiagnostics, cfg: GroupOOFHardpairBoostConfig) -> str:
+    if str(diag.reason):
+        return str(diag.reason)
+    if int(diag.folds_used) < int(cfg.min_group_oof_folds):
+        return "insufficient_group_oof_groups"
+    if int(diag.train_domains_per_fold_min) < int(cfg.min_group_oof_train_domains_per_fold):
+        return "insufficient_group_oof_train_domains"
+    if int(diag.candidate_experts_per_fold_min) < 2:
+        return "insufficient_group_oof_candidate_experts"
+    if str(diag.grouping_level) == "row" and bool(cfg.require_group_id_for_adoption):
+        return "weak_grouping_diagnostic_only"
+    if float(diag.same_slide_leakage_rate) > float(cfg.max_group_oof_same_slide_leakage_rate):
+        return "insufficient_group_oof_groups"
+    return ""
+
+
+def build_group_oof_hardpair_observations(
+    *,
+    x_rows: np.ndarray,
+    q_rows: np.ndarray,
+    e_rows: np.ndarray,
+    s_rows: np.ndarray,
+    y_rows: np.ndarray,
+    source_domains: Sequence[int],
+    feature_set: str,
+    ridge_l2: float,
+    cfg: GroupOOFHardpairBoostConfig,
+    embedding_dim: int,
+    expert_feature_dim: int,
+    device: str,
+) -> Tuple[List[GroupOOFHardpairBoostObservation], GroupOOFHardpairBoostDiagnostics]:
+    s_arr = np.asarray(s_rows, dtype=np.int64)
+    q_arr = np.asarray(q_rows, dtype=np.int64)
+    e_arr = np.asarray(e_rows, dtype=np.int64)
+    y_arr = np.asarray(y_rows, dtype=np.float64)
+    unique_samples = sorted(set(int(v) for v in s_arr.tolist()))
+    if len(unique_samples) < int(cfg.min_group_oof_folds):
+        return [], GroupOOFHardpairBoostDiagnostics(
+            reason="insufficient_group_oof_groups",
+            grouping_level="sample",
+            unique_groups=len(unique_samples),
+        )
+
+    if _candidate_experts_per_sample_min(s_arr, e_arr) < 2:
+        return [], GroupOOFHardpairBoostDiagnostics(
+            reason="insufficient_group_oof_candidate_experts",
+            grouping_level="sample",
+            unique_groups=len(unique_samples),
+        )
+    fold_by_sample = _group_oof_fold_ids(unique_samples, int(cfg.group_oof_folds))
+    observations: List[GroupOOFHardpairBoostObservation] = []
+    folds_used = 0
+    min_groups_per_fold: int | None = None
+    min_train_domains: int | None = None
+    min_candidate_experts: int | None = None
+
+    for fold_id in range(int(cfg.group_oof_folds)):
+        heldout_samples = {sample for sample, fid in fold_by_sample.items() if int(fid) == int(fold_id)}
+        if not heldout_samples:
+            continue
+        heldout_mask = np.asarray([int(v) in heldout_samples for v in s_arr.tolist()], dtype=bool)
+        train_mask = ~heldout_mask
+        train_domains = sorted(set(int(v) for v in q_arr[train_mask].tolist()))
+        min_groups_per_fold = (
+            len(heldout_samples)
+            if min_groups_per_fold is None
+            else min(min_groups_per_fold, len(heldout_samples))
+        )
+        min_train_domains = len(train_domains) if min_train_domains is None else min(min_train_domains, len(train_domains))
+        train_candidate_min = _candidate_experts_per_sample_min(s_arr[train_mask], e_arr[train_mask])
+        min_candidate_experts = (
+            train_candidate_min
+            if min_candidate_experts is None
+            else min(min_candidate_experts, train_candidate_min)
+        )
+        if len(train_domains) < int(cfg.min_group_oof_train_domains_per_fold) or train_candidate_min < 2:
+            continue
+        train_data = build_pairprob_training_data(
+            x_rows=x_rows[train_mask],
+            q_rows=q_arr[train_mask],
+            e_rows=e_arr[train_mask],
+            s_rows=s_arr[train_mask],
+            y_rows=y_arr[train_mask],
+            embedding_dim=int(embedding_dim),
+            expert_feature_dim=int(expert_feature_dim),
+            feature_set=str(feature_set),
+            near_tie_delta_pct=float(cfg.near_tie_delta_pct),
+            margin_weight_scale_pct=float(cfg.margin_weight_scale_pct),
+            margin_weight_clip=cfg.margin_weight_clip,
+        )
+        if train_data.x.shape[0] <= 0:
+            continue
+        try:
+            bundle = fit_pairprob_model(
+                train_data=train_data,
+                feature_set=str(feature_set),
+                ridge_l2=float(ridge_l2),
+                device=str(device),
+            )
+        except (ProtocolError, ValueError):
+            continue
+        folds_used += 1
+        for query_domain in sorted(set(int(v) for v in q_arr[heldout_mask].tolist())):
+            heldout_q_mask = heldout_mask & (q_arr == int(query_domain))
+            candidate_domains = tuple(sorted(set(int(v) for v in e_arr[heldout_q_mask].tolist())))
+            k = len(candidate_domains)
+            if k < 2 or int(np.sum(heldout_q_mask)) % k != 0:
+                continue
+            try:
+                prob = pairprob_probability_matrix(
+                    bundle=bundle,
+                    x_rows=x_rows[heldout_q_mask],
+                    expert_domains=candidate_domains,
+                    embedding_dim=int(embedding_dim),
+                    expert_feature_dim=int(expert_feature_dim),
+                )
+            except (ProtocolError, ValueError):
+                continue
+            win, orders, margins = pairprob_order_and_margin(prob, expert_domains=candidate_domains)
+            y_matrix = y_arr[heldout_q_mask].reshape(-1, k)
+            s_matrix = s_arr[heldout_q_mask].reshape(-1, k)
+            oracle_idx = _stable_true_oracle_indices(y_matrix)
+            direct_idx = orders[:, 0].astype(np.int64, copy=False)
+            direct_gap = _gap_pct_for_selected(y_matrix, direct_idx)
+            for row_idx in range(y_matrix.shape[0]):
+                top1 = int(orders[row_idx, 0])
+                top2 = int(orders[row_idx, 1])
+                top1_nelbo = float(y_matrix[row_idx, top1])
+                top2_nelbo = float(y_matrix[row_idx, top2])
+                denom = max(abs(min(top1_nelbo, top2_nelbo)), 1e-12)
+                delta_pct = 100.0 * abs(top1_nelbo - top2_nelbo) / denom
+                if delta_pct < float(cfg.near_tie_delta_pct):
+                    continue
+                sample_index = int(s_matrix[row_idx, 0])
+                top1_domain = int(candidate_domains[top1])
+                top2_domain = int(candidate_domains[top2])
+                oracle_domain = int(candidate_domains[int(oracle_idx[row_idx])])
+                observations.append(
+                    GroupOOFHardpairBoostObservation(
+                        sample_index=int(sample_index),
+                        query_domain=int(query_domain),
+                        domain_a=min(top1_domain, top2_domain),
+                        domain_b=max(top1_domain, top2_domain),
+                        base_top1_domain=top1_domain,
+                        base_top2_domain=top2_domain,
+                        margin=float(margins[row_idx]),
+                        delta_pct=float(delta_pct),
+                        top2_better=bool(top2_nelbo < top1_nelbo),
+                        base_top1_better=bool(top1_nelbo < top2_nelbo),
+                        direct_gap_pct=float(direct_gap[row_idx]),
+                        direct_high_regret=bool(float(direct_gap[row_idx]) > float(cfg.absolute_high_regret_gap_pct)),
+                        oracle_in_base_top2=bool(oracle_domain in {top1_domain, top2_domain}),
+                        oracle_is_base_top2=bool(oracle_domain == top2_domain),
+                    )
+                )
+
+    diag = GroupOOFHardpairBoostDiagnostics(
+        reason="",
+        grouping_level="sample",
+        grouping_warning="",
+        unique_groups=len(unique_samples),
+        min_groups_per_fold=int(min_groups_per_fold or 0),
+        folds_used=int(folds_used),
+        train_domains_per_fold_min=int(min_train_domains or 0),
+        candidate_experts_per_fold_min=int(min_candidate_experts or 0),
+        same_slide_leakage_rate=0.0,
+    )
+    reason = _group_oof_hardpair_reason(diag, cfg)
+    if reason:
+        diag = GroupOOFHardpairBoostDiagnostics(
+            reason=reason,
+            grouping_level=diag.grouping_level,
+            grouping_warning=diag.grouping_warning,
+            unique_groups=diag.unique_groups,
+            min_groups_per_fold=diag.min_groups_per_fold,
+            folds_used=diag.folds_used,
+            train_domains_per_fold_min=diag.train_domains_per_fold_min,
+            candidate_experts_per_fold_min=diag.candidate_experts_per_fold_min,
+            same_slide_leakage_rate=diag.same_slide_leakage_rate,
+        )
+    return observations, diag
+
+
+def hardpair_weight_multipliers_from_observations(
+    observations: Sequence[GroupOOFHardpairBoostObservation],
+    *,
+    margin_threshold: float,
+    miss_boost_weight: float,
+    confirm_boost_weight: float,
+    max_pair_weight: float,
+    random_control: bool = False,
+    seed: int = 0,
+) -> Tuple[Dict[Tuple[int, int, int], float], Dict[str, float]]:
+    low_margin = [obs for obs in observations if float(obs.margin) <= float(margin_threshold)]
+    selected = list(low_margin)
+    if random_control and low_margin:
+        rng = np.random.default_rng(int(seed))
+        n_boost = int(sum(1 for obs in low_margin if bool(obs.top2_better)))
+        n_boost = min(max(n_boost, 0), len(low_margin))
+        indices = sorted(rng.choice(np.arange(len(low_margin)), size=n_boost, replace=False).tolist()) if n_boost > 0 else []
+        selected = [low_margin[int(i)] for i in indices]
+    multipliers: Dict[Tuple[int, int, int], float] = {}
+    weights: List[float] = []
+    switch_rows = 0
+    keep_rows = 0
+    active_domains = set()
+    low_high = [obs for obs in low_margin if bool(obs.direct_high_regret)]
+    for obs in selected:
+        active_domains.add(int(obs.query_domain))
+        if random_control:
+            mult = float(miss_boost_weight)
+            switch_rows += 1
+        elif bool(obs.top2_better):
+            mult = float(miss_boost_weight)
+            switch_rows += 1
+        else:
+            mult = float(confirm_boost_weight)
+            keep_rows += 1
+        mult = float(np.clip(mult, 1.0, float(max_pair_weight)))
+        key = _pair_key(obs.sample_index, obs.domain_a, obs.domain_b)
+        multipliers[key] = max(float(multipliers.get(key, 1.0)), mult)
+        weights.append(mult)
+    high_regret_rate_all = float(np.mean([1.0 if obs.direct_high_regret else 0.0 for obs in observations])) if observations else float("nan")
+    high_regret_rate_low = float(np.mean([1.0 if obs.direct_high_regret else 0.0 for obs in low_margin])) if low_margin else float("nan")
+    oracle_in_top2 = (
+        float(np.mean([1.0 if obs.oracle_in_base_top2 else 0.0 for obs in low_high]))
+        if low_high
+        else float("nan")
+    )
+    oracle_is_top2 = (
+        float(np.mean([1.0 if obs.oracle_is_base_top2 else 0.0 for obs in low_high]))
+        if low_high
+        else float("nan")
+    )
+    stats = {
+        "hardpair_oof_low_margin_rows": float(len(low_margin)),
+        "hardpair_oof_switch_rows": float(switch_rows),
+        "hardpair_oof_keep_rows": float(keep_rows),
+        "hardpair_oof_active_domains": float(len(active_domains)),
+        "low_margin_high_regret_rows": float(len(low_high)),
+        "low_margin_high_regret_oracle_in_base_top2_rate": float(oracle_in_top2),
+        "low_margin_high_regret_oracle_is_base_top2_rate": float(oracle_is_top2),
+        "low_margin_high_regret_oracle_is_not_base_top2_rate": (
+            float(1.0 - oracle_is_top2) if np.isfinite(float(oracle_is_top2)) else float("nan")
+        ),
+        "low_margin_high_regret_enrichment": (
+            float(high_regret_rate_low / high_regret_rate_all)
+            if np.isfinite(high_regret_rate_low) and np.isfinite(high_regret_rate_all) and high_regret_rate_all > 0.0
+            else float("nan")
+        ),
+        "hardpair_weighted_pair_fraction": float(np.mean([1.0 if w > 1.0 else 0.0 for w in weights])) if weights else 0.0,
+        "hardpair_mean_pair_weight": float(np.mean(weights)) if weights else 1.0,
+    }
+    return multipliers, stats
 
 
 def _pairprob_cycle_rate_for_row(prob: np.ndarray) -> float:
@@ -2338,6 +2748,258 @@ def summarize_pairprob_rows(rows: Sequence[Mapping[str, Any]]) -> Dict[str, floa
     }
 
 
+def hardpair_boost_route_rows(
+    *,
+    method: str,
+    fold: FoldCandidateSet,
+    query_domains: np.ndarray,
+    expert_domains: Sequence[int],
+    prob_matrix: np.ndarray,
+    direct_prob_matrix: np.ndarray,
+    true_nelbo_matrix: np.ndarray,
+    global_true_nelbo_matrix: np.ndarray,
+    global_expert_domains: Sequence[int],
+    policy_name: str,
+    selection: GroupOOFHardpairBoostSelection,
+    cfg: GroupOOFHardpairBoostConfig,
+    metadata_oracle_gap_pct: np.ndarray | None = None,
+    oracle_top2_diagnostic: bool = False,
+    diagnostic_reason: str = "",
+) -> List[Dict[str, Any]]:
+    experts = [int(v) for v in expert_domains]
+    direct_win, direct_orders, direct_margins = pairprob_order_and_margin(
+        direct_prob_matrix,
+        expert_domains=experts,
+    )
+    if bool(selection.noop) and not bool(oracle_top2_diagnostic):
+        route_prob = direct_prob_matrix
+    else:
+        route_prob = prob_matrix
+    win, orders, margins = pairprob_order_and_margin(route_prob, expert_domains=experts)
+    direct_top1 = direct_orders[:, 0].astype(np.int64, copy=False)
+    direct_top2 = direct_orders[:, 1].astype(np.int64, copy=False) if direct_orders.shape[1] > 1 else direct_top1
+    selected_idx = orders[:, 0].astype(np.int64, copy=False)
+    true = np.asarray(true_nelbo_matrix, dtype=np.float64)
+    top2_better = true[np.arange(true.shape[0]), direct_top2] < true[np.arange(true.shape[0]), direct_top1]
+    active = direct_margins <= (float(selection.margin_threshold) + 1e-12)
+    if bool(oracle_top2_diagnostic):
+        selected_idx = np.where(active & top2_better, direct_top2, direct_top1).astype(np.int64, copy=False)
+        win = direct_win
+        margins = direct_margins
+    elif bool(selection.noop):
+        selected_idx = direct_top1.astype(np.int64, copy=True)
+        win = direct_win
+        margins = direct_margins
+
+    ranking_score = -win
+    _metrics, rows = _selection_metrics(
+        method=method,
+        query_domains=query_domains,
+        expert_domains=experts,
+        score_matrix=ranking_score,
+        true_nelbo_matrix=true_nelbo_matrix,
+        fold=fold,
+        global_true_nelbo_matrix=global_true_nelbo_matrix,
+        global_expert_domains=global_expert_domains,
+        selected_idx_override=selected_idx,
+        ranking_score_matrix=ranking_score,
+    )
+    direct_gap = _gap_pct_for_selected(true_nelbo_matrix, direct_top1)
+    metadata_gap = (
+        np.asarray(metadata_oracle_gap_pct, dtype=np.float64)
+        if metadata_oracle_gap_pct is not None
+        else np.full((len(rows),), float("nan"), dtype=np.float64)
+    )
+    if metadata_gap.shape[0] != len(rows):
+        metadata_gap = np.full((len(rows),), float("nan"), dtype=np.float64)
+    base_reason = str(diagnostic_reason or selection.diagnostic_only_reason)
+    is_main = str(method) == str(selection.method)
+    is_oracle = bool(oracle_top2_diagnostic)
+    if is_oracle:
+        base_reason = "oracle_top2_margin_reranker_diagnostic"
+    if str(method) in {GROUP_OOF_HARDPAIR_MISS_ONLY_DIAGNOSTIC_METHOD, RANDOM_LOW_MARGIN_BOOST_DIAGNOSTIC_METHOD}:
+        base_reason = "|".join(
+            part
+            for part in dict.fromkeys(
+                [
+                    base_reason,
+                    "group_oof_hardpair_boost_diagnostic_control",
+                ]
+            )
+            if part
+        )
+
+    for i, row in enumerate(rows):
+        selected_col = int(selected_idx[i])
+        selected_expert = int(experts[selected_col])
+        direct_col = int(direct_top1[i])
+        direct_top2_col = int(direct_top2[i])
+        paired_delta = float(row["oracle_gap_pct"]) - float(direct_gap[i])
+        paired_delta_metadata = (
+            float(row["oracle_gap_pct"]) - float(metadata_gap[i])
+            if np.isfinite(float(metadata_gap[i]))
+            else float("nan")
+        )
+        changed = int(selected_col != direct_col)
+        pair_diag = _pair_diagnostics_for_row(route_prob[i, :, :], true_nelbo_matrix[i, :])
+        reason = str(base_reason)
+        row.update(
+            {
+                "policy_name": str(policy_name),
+                "base_method": str(selection.base_method),
+                "feature_set": str(selection.feature_set),
+                "selected_tau": float(selection.ridge_l2),
+                "selected_by_inner_validation": int(bool(selection.selected_by_inner_validation)),
+                "threshold_selection_policy": str(cfg.calibration_policy),
+                "route_experts": str(selected_expert),
+                "route_weights": "1",
+                "route_size": 1,
+                "route_mode": "oracle_top2_margin_reranker_diagnostic"
+                if is_oracle
+                else "group_oof_hardpair_boost_top1",
+                "pairprob_predictor": "logistic_ridge_pairprob",
+                "pairprob_probability_calibration": "none_v1",
+                "pairprob_ridge_l2": float(selection.ridge_l2),
+                "pairprob_feature_set": str(selection.feature_set),
+                "pairprob_selection_policy": str(cfg.calibration_policy),
+                "adoption_feature_family": DIRECT_PAIRPROB_ADOPTION_FEATURE_FAMILY if is_main and not reason else "",
+                "base_direct_selected_expert": int(experts[direct_col]),
+                "base_direct_top2_expert": int(experts[direct_top2_col]),
+                "base_direct_top1_win": float(direct_win[i, direct_col]),
+                "base_direct_top2_win": float(direct_win[i, direct_top2_col]),
+                "base_direct_top2_margin": float(direct_margins[i]),
+                "hardpair_boost_margin_threshold": float(selection.margin_threshold),
+                "hardpair_miss_boost_weight": float(selection.miss_boost_weight),
+                "hardpair_confirm_boost_weight": float(selection.confirm_boost_weight),
+                "group_oof_grouping_level": str(selection.group_oof_grouping_level),
+                "group_oof_grouping_warning": str(selection.group_oof_grouping_warning),
+                "group_oof_unique_groups": int(selection.group_oof_unique_groups),
+                "group_oof_min_groups_per_fold": int(selection.group_oof_min_groups_per_fold),
+                "group_oof_folds_used": int(selection.group_oof_folds_used),
+                "group_oof_train_domains_per_fold_min": int(selection.group_oof_train_domains_per_fold_min),
+                "group_oof_candidate_experts_per_fold_min": int(selection.group_oof_candidate_experts_per_fold_min),
+                "group_oof_same_slide_leakage_rate": float(selection.group_oof_same_slide_leakage_rate),
+                "hardpair_oof_low_margin_rows": int(selection.hardpair_oof_low_margin_rows),
+                "hardpair_oof_switch_rows": int(selection.hardpair_oof_switch_rows),
+                "hardpair_oof_keep_rows": int(selection.hardpair_oof_keep_rows),
+                "hardpair_oof_active_domains": int(selection.hardpair_oof_active_domains),
+                "low_margin_high_regret_rows": int(selection.low_margin_high_regret_rows),
+                "low_margin_high_regret_oracle_in_base_top2_rate": float(
+                    selection.low_margin_high_regret_oracle_in_base_top2_rate
+                ),
+                "low_margin_high_regret_oracle_is_base_top2_rate": float(
+                    selection.low_margin_high_regret_oracle_is_base_top2_rate
+                ),
+                "low_margin_high_regret_oracle_is_not_base_top2_rate": float(
+                    selection.low_margin_high_regret_oracle_is_not_base_top2_rate
+                ),
+                "low_margin_high_regret_enrichment": float(selection.low_margin_high_regret_enrichment),
+                "hardpair_weighted_pair_fraction": float(selection.hardpair_weighted_pair_fraction),
+                "hardpair_mean_pair_weight": float(selection.hardpair_mean_pair_weight),
+                "boosted_selection_changed": int(changed),
+                "boosted_to_base_top2": int(changed and selected_col == direct_top2_col),
+                "boosted_selection_change_rate": float(selection.boosted_selection_change_rate),
+                "boosted_to_base_top2_rate": float(selection.boosted_to_base_top2_rate),
+                "boosted_help_rate_changed_only": float(selection.boosted_help_rate_changed_only),
+                "boosted_harm_rate_changed_only": float(selection.boosted_harm_rate_changed_only),
+                "boosted_delta_gap_pct_vs_direct_pairprob": float(paired_delta),
+                "boosted_help": int(changed and paired_delta < 0.0),
+                "boosted_harm": int(changed and paired_delta > 0.0),
+                "mean_paired_gap_delta_vs_direct_pairprob": float(
+                    selection.mean_paired_gap_delta_vs_direct_pairprob
+                ),
+                "source_inner_boost_gap_reduction_abs_pct_points": float(
+                    selection.source_inner_boost_gap_reduction_abs_pct_points
+                ),
+                "worst_source_inner_domain_regression_abs_pct_points": float(
+                    selection.worst_source_inner_domain_regression_abs_pct_points
+                ),
+                "median_source_inner_domain_delta_gap": float(selection.median_source_inner_domain_delta_gap),
+                "source_inner_domains_regressed_gt_threshold": int(
+                    selection.source_inner_domains_regressed_gt_threshold
+                ),
+                "hardpair_boost_guard_status": str(selection.guard_status),
+                "hardpair_boost_diagnostic_only_reason": str(reason),
+                "paired_gap_delta_vs_pairprob_hard": float(paired_delta),
+                "paired_gap_delta_vs_metadata": float(paired_delta_metadata),
+                "pairprob_hard_oracle_gap_pct": float(direct_gap[i]),
+                "metadata_oracle_gap_pct": float(metadata_gap[i]),
+                "absolute_high_regret_gap_gt_5": int(
+                    float(row["oracle_gap_pct"]) > float(cfg.absolute_high_regret_gap_pct)
+                ),
+                "relative_catastrophic_regression_vs_pairprob_hard_gt_5": int(
+                    float(paired_delta) > float(cfg.catastrophic_regression_vs_direct_gap_pct)
+                ),
+                "diagnostic_only_reason": str(reason),
+                "excluded_from_sign_ci_selection": int(not (is_main and not reason)),
+                "sign_ci_candidate": int(is_main and not reason),
+                "source_only_audit_pass": int(str(selection.feature_set) == DIRECT_PAIRPROB_ADOPTION_FEATURE_FAMILY),
+                "target_leakage_audit_pass": 1,
+                **pair_diag,
+            }
+        )
+        if reason:
+            row.update({"method_role": "diagnostic", "adoption_eligible": 0, "diagnostic_only": 1})
+    return rows
+
+
+def summarize_hardpair_boost_rows(rows: Sequence[Mapping[str, Any]]) -> Dict[str, float]:
+    if not rows:
+        return {
+            "n_rows": 0.0,
+            "validation_domains": 0.0,
+            "mean_oracle_gap_pct": float("nan"),
+            "high_regret_rate": float("nan"),
+            "top1_oracle_hit": float("nan"),
+            "spearman": float("nan"),
+            "boosted_selection_change_rate": float("nan"),
+            "boosted_to_base_top2_rate": float("nan"),
+            "boosted_help_rate_changed_only": float("nan"),
+            "boosted_harm_rate_changed_only": float("nan"),
+            "mean_paired_gap_delta_vs_direct_pairprob": float("nan"),
+            "source_inner_boost_gap_reduction_abs_pct_points": float("nan"),
+            "worst_source_inner_domain_regression_abs_pct_points": float("nan"),
+            "median_source_inner_domain_delta_gap": float("nan"),
+            "source_inner_domains_regressed_gt_threshold": 0.0,
+        }
+    by_domain: Dict[int, List[Mapping[str, Any]]] = {}
+    for row in rows:
+        by_domain.setdefault(int(row["query_domain"]), []).append(row)
+    domain_delta: List[float] = []
+    for domain_rows in by_domain.values():
+        boosted = float(np.mean([float(r["oracle_gap_pct"]) for r in domain_rows]))
+        direct = float(np.mean([float(r.get("pairprob_hard_oracle_gap_pct", float("nan"))) for r in domain_rows]))
+        domain_delta.append(boosted - direct)
+    changed = [r for r in rows if int(float(r.get("boosted_selection_changed", 0) or 0)) == 1]
+    deltas = [float(r.get("boosted_delta_gap_pct_vs_direct_pairprob", float("nan"))) for r in rows]
+    changed_deltas = [float(r.get("boosted_delta_gap_pct_vs_direct_pairprob", float("nan"))) for r in changed]
+    direct_gaps = [float(r.get("pairprob_hard_oracle_gap_pct", float("nan"))) for r in rows]
+    spearman_vals = [float(r["spearman"]) for r in rows if np.isfinite(float(r["spearman"]))]
+    return {
+        "n_rows": float(len(rows)),
+        "validation_domains": float(len(by_domain)),
+        "mean_oracle_gap_pct": float(np.mean([float(r["oracle_gap_pct"]) for r in rows])),
+        "high_regret_rate": float(np.mean([float(r.get("absolute_high_regret_gap_gt_5", 0.0)) for r in rows])),
+        "top1_oracle_hit": float(np.mean([float(r["top1_oracle_hit"]) for r in rows])),
+        "spearman": float(np.mean(spearman_vals)) if spearman_vals else float("nan"),
+        "direct_mean_oracle_gap_pct": float(np.mean(direct_gaps)) if direct_gaps else float("nan"),
+        "direct_high_regret_rate": float(
+            np.mean([1.0 if float(v) > 5.0 else 0.0 for v in direct_gaps])
+        ) if direct_gaps else float("nan"),
+        "boosted_selection_change_rate": float(np.mean([float(r.get("boosted_selection_changed", 0.0)) for r in rows])),
+        "boosted_to_base_top2_rate": float(np.mean([float(r.get("boosted_to_base_top2", 0.0)) for r in rows])),
+        "boosted_help_rate_changed_only": float(np.mean([1.0 if v < 0.0 else 0.0 for v in changed_deltas])) if changed_deltas else float("nan"),
+        "boosted_harm_rate_changed_only": float(np.mean([1.0 if v > 0.0 else 0.0 for v in changed_deltas])) if changed_deltas else float("nan"),
+        "mean_paired_gap_delta_vs_direct_pairprob": float(np.mean(deltas)) if deltas else float("nan"),
+        "source_inner_boost_gap_reduction_abs_pct_points": (
+            float(np.mean(direct_gaps) - np.mean([float(r["oracle_gap_pct"]) for r in rows])) if direct_gaps else float("nan")
+        ),
+        "worst_source_inner_domain_regression_abs_pct_points": float(max([0.0, *domain_delta])) if domain_delta else float("nan"),
+        "median_source_inner_domain_delta_gap": float(np.median(domain_delta)) if domain_delta else float("nan"),
+        "source_inner_domains_regressed_gt_threshold": float(sum(1 for v in domain_delta if v > 1.0)),
+    }
+
+
 def _top2_rerank_features_for_rows(
     *,
     x_rows: np.ndarray,
@@ -3064,4 +3726,396 @@ def select_top2_margin_reranker_policy(
         oracle_top2_recoverable_error_rate=float(headroom["oracle_top2_recoverable_error_rate"]),
         oracle_top2_recoverable_gap_mass_pct_points=float(headroom["oracle_top2_recoverable_gap_mass_pct_points"]),
         model=model,
+    )
+
+
+def _hardpair_reason_from_summary(
+    *,
+    summary: Mapping[str, float],
+    stats: Mapping[str, float],
+    diag_reason: str,
+    cfg: GroupOOFHardpairBoostConfig,
+) -> str:
+    if str(diag_reason):
+        return str(diag_reason)
+    if int(stats.get("hardpair_oof_low_margin_rows", 0.0)) < int(cfg.min_source_inner_hardpair_rows):
+        return "insufficient_source_inner_hardpair_rows"
+    if int(stats.get("hardpair_oof_switch_rows", 0.0)) < int(cfg.min_source_inner_switch_rows):
+        return "insufficient_source_inner_switch_rows"
+    if int(stats.get("hardpair_oof_keep_rows", 0.0)) < int(cfg.min_source_inner_keep_rows):
+        return "insufficient_source_inner_keep_rows"
+    if int(stats.get("hardpair_oof_active_domains", 0.0)) < int(cfg.min_source_inner_active_domains):
+        return "insufficient_source_inner_active_domains"
+    enrichment = float(stats.get("low_margin_high_regret_enrichment", float("nan")))
+    if not np.isfinite(enrichment) or enrichment < float(cfg.min_low_margin_high_regret_enrichment):
+        return "low_margin_not_high_regret_enriched"
+    oracle_in_top2 = float(stats.get("low_margin_high_regret_oracle_in_base_top2_rate", float("nan")))
+    if not np.isfinite(oracle_in_top2) or oracle_in_top2 < float(cfg.min_oracle_in_base_top2_rate_among_low_margin_high_regret_rows):
+        return "oracle_not_concentrated_in_base_top2"
+    gap_reduction = float(summary.get("source_inner_boost_gap_reduction_abs_pct_points", 0.0))
+    if gap_reduction < float(cfg.min_source_inner_gap_reduction_abs_pct_points):
+        return "insufficient_source_inner_gap_reduction"
+    worst_regression = float(summary.get("worst_source_inner_domain_regression_abs_pct_points", 0.0))
+    median_delta = float(summary.get("median_source_inner_domain_delta_gap", float("nan")))
+    regress_count = int(float(summary.get("source_inner_domains_regressed_gt_threshold", 0.0)))
+    if (
+        (np.isfinite(median_delta) and median_delta >= 0.0)
+        or worst_regression > float(cfg.max_source_inner_domain_regression_abs_pct_points)
+        or regress_count > 1
+    ):
+        return "source_inner_domain_regression"
+    if float(summary.get("mean_paired_gap_delta_vs_direct_pairprob", 0.0)) > 0.0:
+        return "worsens_direct_pairprob"
+    return ""
+
+
+def _aggregate_hardpair_observation_stats(
+    observations: Sequence[GroupOOFHardpairBoostObservation],
+    *,
+    margin_threshold: float,
+) -> Dict[str, float]:
+    low_margin = [obs for obs in observations if float(obs.margin) <= float(margin_threshold)]
+    low_high = [obs for obs in low_margin if bool(obs.direct_high_regret)]
+    all_high_rate = float(np.mean([1.0 if obs.direct_high_regret else 0.0 for obs in observations])) if observations else float("nan")
+    low_high_rate = float(np.mean([1.0 if obs.direct_high_regret else 0.0 for obs in low_margin])) if low_margin else float("nan")
+    oracle_in_top2 = (
+        float(np.mean([1.0 if obs.oracle_in_base_top2 else 0.0 for obs in low_high]))
+        if low_high
+        else float("nan")
+    )
+    oracle_is_top2 = (
+        float(np.mean([1.0 if obs.oracle_is_base_top2 else 0.0 for obs in low_high]))
+        if low_high
+        else float("nan")
+    )
+    return {
+        "hardpair_oof_low_margin_rows": float(len(low_margin)),
+        "hardpair_oof_switch_rows": float(sum(1 for obs in low_margin if bool(obs.top2_better))),
+        "hardpair_oof_keep_rows": float(sum(1 for obs in low_margin if not bool(obs.top2_better))),
+        "hardpair_oof_active_domains": float(len({int(obs.query_domain) for obs in low_margin})),
+        "low_margin_high_regret_rows": float(len(low_high)),
+        "low_margin_high_regret_oracle_in_base_top2_rate": float(oracle_in_top2),
+        "low_margin_high_regret_oracle_is_base_top2_rate": float(oracle_is_top2),
+        "low_margin_high_regret_oracle_is_not_base_top2_rate": (
+            float(1.0 - oracle_is_top2) if np.isfinite(float(oracle_is_top2)) else float("nan")
+        ),
+        "low_margin_high_regret_enrichment": (
+            float(low_high_rate / all_high_rate)
+            if np.isfinite(low_high_rate) and np.isfinite(all_high_rate) and all_high_rate > 0.0
+            else float("nan")
+        ),
+    }
+
+
+def _merge_group_oof_diagnostics(
+    diagnostics: Sequence[GroupOOFHardpairBoostDiagnostics],
+) -> GroupOOFHardpairBoostDiagnostics:
+    if not diagnostics:
+        return GroupOOFHardpairBoostDiagnostics(reason="insufficient_group_oof_groups")
+    reason = ""
+    for candidate in GROUP_OOF_HARDPAIR_GUARD_PRIORITY:
+        if any(str(diag.reason) == str(candidate) for diag in diagnostics):
+            reason = str(candidate)
+            break
+    return GroupOOFHardpairBoostDiagnostics(
+        reason=reason,
+        grouping_level="sample",
+        grouping_warning="",
+        unique_groups=int(sum(int(diag.unique_groups) for diag in diagnostics)),
+        min_groups_per_fold=int(min(int(diag.min_groups_per_fold) for diag in diagnostics)),
+        folds_used=int(min(int(diag.folds_used) for diag in diagnostics)),
+        train_domains_per_fold_min=int(min(int(diag.train_domains_per_fold_min) for diag in diagnostics)),
+        candidate_experts_per_fold_min=int(min(int(diag.candidate_experts_per_fold_min) for diag in diagnostics)),
+        same_slide_leakage_rate=float(max(float(diag.same_slide_leakage_rate) for diag in diagnostics)),
+    )
+
+
+def select_group_oof_hardpair_boost_policy(
+    *,
+    blocks: Sequence[GroupOOFHardpairBoostCalibrationBlock],
+    base_selection: PairprobPolicySelection | None,
+    global_expert_domains: Sequence[int],
+    cfg: GroupOOFHardpairBoostConfig,
+    embedding_dim: int,
+    expert_feature_dim: int,
+    device: str,
+    seed: int,
+) -> GroupOOFHardpairBoostSelection | None:
+    if not bool(cfg.enabled):
+        return None
+    if base_selection is None or not blocks:
+        return GroupOOFHardpairBoostSelection(
+            method=cfg.method_name,
+            base_method=cfg.base_method,
+            feature_set=cfg.feature_set,
+            ridge_l2=float("nan"),
+            margin_threshold=float(cfg.hardpair_margin_thresholds[0]),
+            miss_boost_weight=float(cfg.hardpair_miss_boost_weights[0]),
+            confirm_boost_weight=1.0,
+            selected_by_inner_validation=False,
+            diagnostic_only_reason="insufficient_source_inner_hardpair_rows",
+            noop=True,
+            guard_status="failed_guards_noop",
+        )
+
+    observation_cache: Dict[Tuple[int, float], Tuple[List[GroupOOFHardpairBoostObservation], GroupOOFHardpairBoostDiagnostics]] = {}
+    candidates: List[Tuple[Tuple[float, ...], float, float, float, float, Dict[str, float], Dict[str, float], str, GroupOOFHardpairBoostDiagnostics]] = []
+    invalid: List[Tuple[Tuple[float, ...], float, float, float, float, Dict[str, float], Dict[str, float], str, GroupOOFHardpairBoostDiagnostics]] = []
+    source_domains = sorted({int(block.validation_domain) for block in blocks})
+
+    for l2 in cfg.ridge_l2_values:
+        all_observations_for_l2: List[GroupOOFHardpairBoostObservation] = []
+        diagnostics_for_l2: List[GroupOOFHardpairBoostDiagnostics] = []
+        for block_idx, block in enumerate(blocks):
+            obs, diag = build_group_oof_hardpair_observations(
+                x_rows=block.train_x_rows,
+                q_rows=block.train_q_rows,
+                e_rows=block.train_e_rows,
+                s_rows=block.train_s_rows,
+                y_rows=block.train_y_rows,
+                source_domains=sorted(set(int(v) for v in block.train_q_rows.tolist())),
+                feature_set=str(cfg.feature_set),
+                ridge_l2=float(l2),
+                cfg=cfg,
+                embedding_dim=int(embedding_dim),
+                expert_feature_dim=int(expert_feature_dim),
+                device=str(device),
+            )
+            observation_cache[(block_idx, float(l2))] = (obs, diag)
+            all_observations_for_l2.extend(obs)
+            diagnostics_for_l2.append(diag)
+        merged_diag = _merge_group_oof_diagnostics(diagnostics_for_l2)
+        for threshold in cfg.hardpair_margin_thresholds:
+            stats = _aggregate_hardpair_observation_stats(all_observations_for_l2, margin_threshold=float(threshold))
+            for miss_weight in cfg.hardpair_miss_boost_weights:
+                for confirm_weight in cfg.hardpair_confirm_boost_weights:
+                    rows: List[Dict[str, Any]] = []
+                    weight_values: List[float] = []
+                    diag_reason = str(merged_diag.reason)
+                    for block_idx, block in enumerate(blocks):
+                        obs, diag = observation_cache[(block_idx, float(l2))]
+                        if str(diag.reason) and not diag_reason:
+                            diag_reason = str(diag.reason)
+                        overrides, override_stats = hardpair_weight_multipliers_from_observations(
+                            obs,
+                            margin_threshold=float(threshold),
+                            miss_boost_weight=float(miss_weight),
+                            confirm_boost_weight=float(confirm_weight),
+                            max_pair_weight=float(cfg.max_pair_weight),
+                        )
+                        if overrides:
+                            weight_values.extend(float(v) for v in overrides.values())
+                        bundle: PairprobModelBundle | None = None
+                        if not str(diag_reason):
+                            train_data = build_pairprob_training_data(
+                                x_rows=block.train_x_rows,
+                                q_rows=block.train_q_rows,
+                                e_rows=block.train_e_rows,
+                                s_rows=block.train_s_rows,
+                                y_rows=block.train_y_rows,
+                                embedding_dim=int(embedding_dim),
+                                expert_feature_dim=int(expert_feature_dim),
+                                feature_set=str(cfg.feature_set),
+                                near_tie_delta_pct=float(cfg.near_tie_delta_pct),
+                                margin_weight_scale_pct=float(cfg.margin_weight_scale_pct),
+                                margin_weight_clip=cfg.margin_weight_clip,
+                                pair_weight_multipliers=overrides,
+                            )
+                            if train_data.x.shape[0] > 0:
+                                try:
+                                    bundle = fit_pairprob_model(
+                                        train_data=train_data,
+                                        feature_set=str(cfg.feature_set),
+                                        ridge_l2=float(l2),
+                                        device=str(device),
+                                    )
+                                except (ProtocolError, ValueError):
+                                    diag_reason = "insufficient_group_oof_pairprob_geometry"
+                        if bundle is not None and not str(diag_reason):
+                            prob = pairprob_probability_matrix(
+                                bundle=bundle,
+                                x_rows=block.x_rows,
+                                expert_domains=block.expert_domains,
+                                embedding_dim=int(embedding_dim),
+                                expert_feature_dim=int(expert_feature_dim),
+                            )
+                        else:
+                            prob = block.direct_prob_matrix
+                        selection_tmp = GroupOOFHardpairBoostSelection(
+                            method=cfg.method_name,
+                            base_method=cfg.base_method,
+                            feature_set=cfg.feature_set,
+                            ridge_l2=float(l2),
+                            margin_threshold=float(threshold),
+                            miss_boost_weight=float(miss_weight),
+                            confirm_boost_weight=float(confirm_weight),
+                            selected_by_inner_validation=True,
+                            diagnostic_only_reason=str(diag_reason),
+                            noop=bool(diag_reason),
+                            guard_status="failed_guards_noop" if diag_reason else "selected",
+                            group_oof_grouping_level=merged_diag.grouping_level,
+                            group_oof_grouping_warning=merged_diag.grouping_warning,
+                            group_oof_unique_groups=merged_diag.unique_groups,
+                            group_oof_min_groups_per_fold=merged_diag.min_groups_per_fold,
+                            group_oof_folds_used=merged_diag.folds_used,
+                            group_oof_train_domains_per_fold_min=merged_diag.train_domains_per_fold_min,
+                            group_oof_candidate_experts_per_fold_min=merged_diag.candidate_experts_per_fold_min,
+                            group_oof_same_slide_leakage_rate=merged_diag.same_slide_leakage_rate,
+                            hardpair_oof_low_margin_rows=int(stats["hardpair_oof_low_margin_rows"]),
+                            hardpair_oof_switch_rows=int(stats["hardpair_oof_switch_rows"]),
+                            hardpair_oof_keep_rows=int(stats["hardpair_oof_keep_rows"]),
+                            hardpair_oof_active_domains=int(stats["hardpair_oof_active_domains"]),
+                            low_margin_high_regret_rows=int(stats["low_margin_high_regret_rows"]),
+                            low_margin_high_regret_oracle_in_base_top2_rate=float(
+                                stats["low_margin_high_regret_oracle_in_base_top2_rate"]
+                            ),
+                            low_margin_high_regret_oracle_is_base_top2_rate=float(
+                                stats["low_margin_high_regret_oracle_is_base_top2_rate"]
+                            ),
+                            low_margin_high_regret_oracle_is_not_base_top2_rate=float(
+                                stats["low_margin_high_regret_oracle_is_not_base_top2_rate"]
+                            ),
+                            low_margin_high_regret_enrichment=float(stats["low_margin_high_regret_enrichment"]),
+                            hardpair_weighted_pair_fraction=float(
+                                np.mean([1.0 if w > 1.0 else 0.0 for w in weight_values])
+                            )
+                            if weight_values
+                            else 0.0,
+                            hardpair_mean_pair_weight=float(np.mean(weight_values)) if weight_values else 1.0,
+                        )
+                        rows.extend(
+                            hardpair_boost_route_rows(
+                                method=cfg.method_name,
+                                fold=block.fold,
+                                query_domains=block.query_domains,
+                                expert_domains=block.expert_domains,
+                                prob_matrix=prob,
+                                direct_prob_matrix=block.direct_prob_matrix,
+                                true_nelbo_matrix=block.true_nelbo_matrix,
+                                global_true_nelbo_matrix=block.global_true_nelbo_matrix,
+                                global_expert_domains=global_expert_domains,
+                                policy_name=cfg.method_name,
+                                selection=selection_tmp,
+                                cfg=cfg,
+                            )
+                        )
+                    summary = summarize_hardpair_boost_rows(rows)
+                    if weight_values:
+                        stats["hardpair_weighted_pair_fraction"] = float(np.mean([1.0 if w > 1.0 else 0.0 for w in weight_values]))
+                        stats["hardpair_mean_pair_weight"] = float(np.mean(weight_values))
+                    else:
+                        stats["hardpair_weighted_pair_fraction"] = 0.0
+                        stats["hardpair_mean_pair_weight"] = 1.0
+                    reason = _hardpair_reason_from_summary(
+                        summary=summary,
+                        stats=stats,
+                        diag_reason=str(diag_reason),
+                        cfg=cfg,
+                    )
+                    tol = max(float(cfg.tie_mean_gap_tolerance_pct_points), 1e-12)
+                    mean_bucket = -float(np.floor(float(summary["mean_oracle_gap_pct"]) / tol))
+                    score = (
+                        mean_bucket,
+                        -float(summary["mean_oracle_gap_pct"]),
+                        -float(summary["high_regret_rate"]),
+                        float(summary["source_inner_boost_gap_reduction_abs_pct_points"]),
+                        -float(summary["worst_source_inner_domain_regression_abs_pct_points"]),
+                        float(summary["top1_oracle_hit"]),
+                        float(summary["spearman"]) if np.isfinite(float(summary["spearman"])) else -1e9,
+                        -float(miss_weight),
+                        -float(threshold),
+                        float(l2),
+                    )
+                    item = (
+                        score,
+                        float(l2),
+                        float(threshold),
+                        float(miss_weight),
+                        float(confirm_weight),
+                        summary,
+                        stats,
+                        reason,
+                        merged_diag,
+                    )
+                    (invalid if reason else candidates).append(item)
+
+    pool = candidates if candidates else invalid
+    if not pool:
+        return GroupOOFHardpairBoostSelection(
+            method=cfg.method_name,
+            base_method=cfg.base_method,
+            feature_set=cfg.feature_set,
+            ridge_l2=float(cfg.ridge_l2_values[0]),
+            margin_threshold=float(cfg.hardpair_margin_thresholds[0]),
+            miss_boost_weight=float(cfg.hardpair_miss_boost_weights[0]),
+            confirm_boost_weight=1.0,
+            selected_by_inner_validation=False,
+            diagnostic_only_reason="insufficient_source_inner_hardpair_rows",
+            noop=True,
+            guard_status="failed_guards_noop",
+        )
+    _score, l2, threshold, miss_weight, confirm_weight, summary, stats, reason, diag = sorted(
+        pool,
+        key=lambda item: item[0],
+        reverse=True,
+    )[0]
+    return GroupOOFHardpairBoostSelection(
+        method=cfg.method_name,
+        base_method=cfg.base_method,
+        feature_set=cfg.feature_set,
+        ridge_l2=float(l2),
+        margin_threshold=float(threshold),
+        miss_boost_weight=float(miss_weight),
+        confirm_boost_weight=float(confirm_weight),
+        selected_by_inner_validation=True,
+        diagnostic_only_reason=str(reason),
+        noop=bool(reason),
+        guard_status="selected" if not reason else "failed_guards_noop",
+        source_inner_validation_domains=len(source_domains),
+        source_inner_rows=int(summary.get("n_rows", 0.0)),
+        source_inner_mean_oracle_gap_pct=float(summary["mean_oracle_gap_pct"]),
+        source_inner_high_regret_rate=float(summary["high_regret_rate"]),
+        source_inner_top1=float(summary["top1_oracle_hit"]),
+        source_inner_spearman=float(summary["spearman"]),
+        source_inner_boost_gap_reduction_abs_pct_points=float(
+            summary["source_inner_boost_gap_reduction_abs_pct_points"]
+        ),
+        source_inner_high_regret_reduction=float(
+            float(summary.get("direct_high_regret_rate", float("nan"))) - float(summary["high_regret_rate"])
+        ),
+        worst_source_inner_domain_regression_abs_pct_points=float(
+            summary["worst_source_inner_domain_regression_abs_pct_points"]
+        ),
+        median_source_inner_domain_delta_gap=float(summary["median_source_inner_domain_delta_gap"]),
+        source_inner_domains_regressed_gt_threshold=int(summary["source_inner_domains_regressed_gt_threshold"]),
+        group_oof_grouping_level=str(diag.grouping_level),
+        group_oof_grouping_warning=str(diag.grouping_warning),
+        group_oof_unique_groups=int(diag.unique_groups),
+        group_oof_min_groups_per_fold=int(diag.min_groups_per_fold),
+        group_oof_folds_used=int(diag.folds_used),
+        group_oof_train_domains_per_fold_min=int(diag.train_domains_per_fold_min),
+        group_oof_candidate_experts_per_fold_min=int(diag.candidate_experts_per_fold_min),
+        group_oof_same_slide_leakage_rate=float(diag.same_slide_leakage_rate),
+        hardpair_oof_low_margin_rows=int(stats["hardpair_oof_low_margin_rows"]),
+        hardpair_oof_switch_rows=int(stats["hardpair_oof_switch_rows"]),
+        hardpair_oof_keep_rows=int(stats["hardpair_oof_keep_rows"]),
+        hardpair_oof_active_domains=int(stats["hardpair_oof_active_domains"]),
+        low_margin_high_regret_rows=int(stats["low_margin_high_regret_rows"]),
+        low_margin_high_regret_oracle_in_base_top2_rate=float(
+            stats["low_margin_high_regret_oracle_in_base_top2_rate"]
+        ),
+        low_margin_high_regret_oracle_is_base_top2_rate=float(
+            stats["low_margin_high_regret_oracle_is_base_top2_rate"]
+        ),
+        low_margin_high_regret_oracle_is_not_base_top2_rate=float(
+            stats["low_margin_high_regret_oracle_is_not_base_top2_rate"]
+        ),
+        low_margin_high_regret_enrichment=float(stats["low_margin_high_regret_enrichment"]),
+        hardpair_weighted_pair_fraction=float(stats["hardpair_weighted_pair_fraction"]),
+        hardpair_mean_pair_weight=float(stats["hardpair_mean_pair_weight"]),
+        boosted_selection_change_rate=float(summary["boosted_selection_change_rate"]),
+        boosted_to_base_top2_rate=float(summary["boosted_to_base_top2_rate"]),
+        boosted_help_rate_changed_only=float(summary["boosted_help_rate_changed_only"]),
+        boosted_harm_rate_changed_only=float(summary["boosted_harm_rate_changed_only"]),
+        mean_paired_gap_delta_vs_direct_pairprob=float(summary["mean_paired_gap_delta_vs_direct_pairprob"]),
     )
