@@ -132,6 +132,36 @@ class AEUtilityCalibratorConfig:
 
 
 @dataclass(frozen=True)
+class SourceReliabilityConfig:
+    enabled: bool
+    primary_method: str
+    fallback_method: str
+    candidate_methods: Tuple[str, ...]
+    group_key_candidates: Tuple[str, ...]
+    pseudo_domain_strategy: str
+    n_pseudo_domains_per_source: int
+    min_pseudo_domains_per_source: int
+    min_groups_per_pseudo_domain: int
+    min_samples_per_pseudo_domain: int
+    min_candidate_pool_size: int
+    pca_dim: int
+    kmeans_iterations: int
+    aggregation_unit: str
+    min_source_inner_units: int
+    min_parent_domains: int
+    min_units_per_parent_for_gain_share: int
+    max_top1_drop_abs: float
+    max_spearman_drop_abs: float
+    max_gap_pct_degradation: float
+    max_worst_unit_gap_degradation: float
+    min_gap_reduction_vs_fallback: float
+    min_positive_unit_rate: float
+    min_positive_parent_rate: float
+    max_positive_gain_share: float
+    require_parent_holdout_guard: bool
+
+
+@dataclass(frozen=True)
 class LearnedUtilityConfig:
     pair_batch_size: int
     include_metadata_features: bool
@@ -142,6 +172,7 @@ class LearnedUtilityConfig:
     compatibility: CompatibilityResearchConfig
     residual: ResidualRoutingConfig
     autoencoder: AutoencoderProxyConfig
+    source_reliability: SourceReliabilityConfig
     support_response: SupportResponseConfig
 
 
@@ -411,6 +442,72 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         utility_calibrator=utility_calibrator,
     )
 
+    source_reliability_cfg = _as_dict(learned_cfg.get("source_reliability", {}))
+    reliability_selection_cfg = _as_dict((source_reliability_cfg or {}).get("reliability_selection", {}))
+    source_reliability = SourceReliabilityConfig(
+        enabled=bool((source_reliability_cfg or {}).get("enabled", False)),
+        primary_method=str(
+            (source_reliability_cfg or {}).get(
+                "primary_method",
+                "source_subdomain_reliability_selected_router_v1",
+            )
+        ),
+        fallback_method=str((source_reliability_cfg or {}).get("fallback_method", "ae_argmin_zscore")),
+        candidate_methods=tuple(
+            str(v).strip()
+            for v in (source_reliability_cfg or {}).get(
+                "candidate_methods",
+                ["pairwise_ranker_ae_only", "pairwise_ranker_ae_combined"],
+            )
+        ),
+        group_key_candidates=tuple(
+            str(v).strip()
+            for v in (source_reliability_cfg or {}).get(
+                "group_key_candidates",
+                ["patient_id", "slide_id", "case_id"],
+            )
+        ),
+        pseudo_domain_strategy=str(
+            (source_reliability_cfg or {}).get(
+                "pseudo_domain_strategy",
+                "per_parent_group_embedding_kmeans",
+            )
+        ).strip().lower(),
+        n_pseudo_domains_per_source=int((source_reliability_cfg or {}).get("n_pseudo_domains_per_source", 4)),
+        min_pseudo_domains_per_source=int((source_reliability_cfg or {}).get("min_pseudo_domains_per_source", 2)),
+        min_groups_per_pseudo_domain=int((source_reliability_cfg or {}).get("min_groups_per_pseudo_domain", 3)),
+        min_samples_per_pseudo_domain=int((source_reliability_cfg or {}).get("min_samples_per_pseudo_domain", 25)),
+        min_candidate_pool_size=int((source_reliability_cfg or {}).get("min_candidate_pool_size", 2)),
+        pca_dim=int((source_reliability_cfg or {}).get("pca_dim", 16)),
+        kmeans_iterations=int((source_reliability_cfg or {}).get("kmeans_iterations", 50)),
+        aggregation_unit=str(
+            (reliability_selection_cfg or {}).get(
+                "aggregation_unit",
+                "parent_domain_x_pseudo_domain_macro",
+            )
+        ).strip().lower(),
+        min_source_inner_units=int((reliability_selection_cfg or {}).get("min_source_inner_units", 6)),
+        min_parent_domains=int((reliability_selection_cfg or {}).get("min_parent_domains", 2)),
+        min_units_per_parent_for_gain_share=int(
+            (reliability_selection_cfg or {}).get("min_units_per_parent_for_gain_share", 2)
+        ),
+        max_top1_drop_abs=float((reliability_selection_cfg or {}).get("max_top1_drop_abs", 0.02)),
+        max_spearman_drop_abs=float((reliability_selection_cfg or {}).get("max_spearman_drop_abs", 0.03)),
+        max_gap_pct_degradation=float((reliability_selection_cfg or {}).get("max_gap_pct_degradation", 1.0)),
+        max_worst_unit_gap_degradation=float(
+            (reliability_selection_cfg or {}).get("max_worst_unit_gap_degradation", 2.0)
+        ),
+        min_gap_reduction_vs_fallback=float(
+            (reliability_selection_cfg or {}).get("min_gap_reduction_vs_fallback", 0.0)
+        ),
+        min_positive_unit_rate=float((reliability_selection_cfg or {}).get("min_positive_unit_rate", 0.60)),
+        min_positive_parent_rate=float((reliability_selection_cfg or {}).get("min_positive_parent_rate", 0.50)),
+        max_positive_gain_share=float((reliability_selection_cfg or {}).get("max_positive_gain_share", 0.60)),
+        require_parent_holdout_guard=bool(
+            (reliability_selection_cfg or {}).get("require_parent_holdout_guard", True)
+        ),
+    )
+
     return LearnedUtilityConfig(
         pair_batch_size=pair_batch_size,
         include_metadata_features=include_metadata_features,
@@ -421,5 +518,6 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         compatibility=compatibility,
         residual=residual,
         autoencoder=autoencoder,
+        source_reliability=source_reliability,
         support_response=parse_support_response_config(learned_cfg),
     )

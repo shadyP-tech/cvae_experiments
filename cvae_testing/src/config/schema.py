@@ -55,6 +55,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_ae_first_routing_v1",
         "learned_utility_ae_utility_calibrator_v1",
         "learned_utility_ae_utility_calibrator_v2",
+        "learned_utility_source_reliability_v1",
         "breakhis_support_free_ae_routing_v1",
         "camelyon17_support_free_ae_routing_v1",
     }
@@ -65,6 +66,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_ae_first_routing_v1",
         "learned_utility_ae_utility_calibrator_v1",
         "learned_utility_ae_utility_calibrator_v2",
+        "learned_utility_source_reliability_v1",
         "breakhis_support_free_ae_routing_v1",
         "camelyon17_support_free_ae_routing_v1",
     }
@@ -594,6 +596,97 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             raise ValueError("learned_utility.pair_features.expert_id_encoding must be 'one_hot'")
         for key in ["include_metadata_features", "include_domain_stats"]:
             _ensure_bool((pair_features or {}).get(key, False), f"learned_utility.pair_features.{key}")
+
+        source_reliability = learned_cfg.get("source_reliability", {})
+        if source_reliability is not None and not isinstance(source_reliability, dict):
+            raise ValueError("learned_utility.source_reliability must be a dictionary when provided")
+        source_reliability = source_reliability or {}
+        _ensure_bool(
+            source_reliability.get("enabled", False),
+            "learned_utility.source_reliability.enabled",
+        )
+        if bool(source_reliability.get("enabled", False)):
+            primary_method = str(
+                source_reliability.get(
+                    "primary_method",
+                    "source_subdomain_reliability_selected_router_v1",
+                )
+            ).strip()
+            if primary_method != "source_subdomain_reliability_selected_router_v1":
+                raise ValueError(
+                    "learned_utility.source_reliability.primary_method must be "
+                    "'source_subdomain_reliability_selected_router_v1'"
+                )
+            fallback_method = str(source_reliability.get("fallback_method", "ae_argmin_zscore")).strip()
+            if fallback_method != "ae_argmin_zscore":
+                raise ValueError("learned_utility.source_reliability.fallback_method must be 'ae_argmin_zscore'")
+            candidate_methods = source_reliability.get(
+                "candidate_methods",
+                ["pairwise_ranker_ae_only", "pairwise_ranker_ae_combined"],
+            )
+            if not isinstance(candidate_methods, list) or not candidate_methods:
+                raise ValueError("learned_utility.source_reliability.candidate_methods must be a non-empty list")
+            allowed_source_reliability_candidates = {"pairwise_ranker_ae_only", "pairwise_ranker_ae_combined"}
+            bad_candidates = sorted(set(str(v) for v in candidate_methods) - allowed_source_reliability_candidates)
+            if bad_candidates:
+                raise ValueError(
+                    "learned_utility.source_reliability.candidate_methods must be subset of "
+                    f"{sorted(allowed_source_reliability_candidates)}, got unknown {bad_candidates}"
+                )
+            group_keys = source_reliability.get("group_key_candidates", ["patient_id", "slide_id", "case_id"])
+            if not isinstance(group_keys, list) or not group_keys or any(not str(v).strip() for v in group_keys):
+                raise ValueError("learned_utility.source_reliability.group_key_candidates must be a non-empty list")
+            strategy_name = str(
+                source_reliability.get("pseudo_domain_strategy", "per_parent_group_embedding_kmeans")
+            ).strip().lower()
+            if strategy_name != "per_parent_group_embedding_kmeans":
+                raise ValueError(
+                    "learned_utility.source_reliability.pseudo_domain_strategy must be "
+                    "'per_parent_group_embedding_kmeans'"
+                )
+            positive_int_fields = [
+                "n_pseudo_domains_per_source",
+                "min_pseudo_domains_per_source",
+                "min_groups_per_pseudo_domain",
+                "min_samples_per_pseudo_domain",
+                "min_candidate_pool_size",
+                "pca_dim",
+                "kmeans_iterations",
+            ]
+            for key in positive_int_fields:
+                if int(source_reliability.get(key, 1)) <= 0:
+                    raise ValueError(f"learned_utility.source_reliability.{key} must be > 0")
+            reliability_selection = source_reliability.get("reliability_selection", {})
+            if reliability_selection is not None and not isinstance(reliability_selection, dict):
+                raise ValueError("learned_utility.source_reliability.reliability_selection must be a dictionary")
+            reliability_selection = reliability_selection or {}
+            if str(
+                reliability_selection.get("aggregation_unit", "parent_domain_x_pseudo_domain_macro")
+            ).strip().lower() != "parent_domain_x_pseudo_domain_macro":
+                raise ValueError(
+                    "learned_utility.source_reliability.reliability_selection.aggregation_unit must be "
+                    "'parent_domain_x_pseudo_domain_macro'"
+                )
+            for key in ["min_source_inner_units", "min_parent_domains", "min_units_per_parent_for_gain_share"]:
+                if int(reliability_selection.get(key, 1)) <= 0:
+                    raise ValueError(f"learned_utility.source_reliability.reliability_selection.{key} must be > 0")
+            for key in [
+                "max_top1_drop_abs",
+                "max_spearman_drop_abs",
+                "max_gap_pct_degradation",
+                "max_worst_unit_gap_degradation",
+                "min_gap_reduction_vs_fallback",
+                "min_positive_unit_rate",
+                "min_positive_parent_rate",
+                "max_positive_gain_share",
+            ]:
+                value = float(reliability_selection.get(key, 0.0))
+                if value < 0.0:
+                    raise ValueError(f"learned_utility.source_reliability.reliability_selection.{key} must be >= 0")
+            _ensure_bool(
+                reliability_selection.get("require_parent_holdout_guard", True),
+                "learned_utility.source_reliability.reliability_selection.require_parent_holdout_guard",
+            )
 
         residual_cfg = learned_cfg.get("residual_routing", {})
         if residual_cfg is not None and not isinstance(residual_cfg, dict):

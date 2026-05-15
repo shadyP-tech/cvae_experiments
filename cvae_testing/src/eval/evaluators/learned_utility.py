@@ -26,6 +26,10 @@ from src.eval.evaluators.learned_utility_scoring import (
 from src.eval.evaluators.learned_utility_reporting import (
     _finalize_learned_utility_outputs,
 )
+from src.eval.evaluators.source_reliability import (
+    run_source_reliability_for_fold,
+    write_source_reliability_artifacts,
+)
 from src.eval.evaluators.support_free_ae import (
     AutoencoderScoreMatrices,
     build_autoencoder_score_matrices,
@@ -120,6 +124,14 @@ def evaluate_learned_utility_loqdo(
     ae_utility_selected_feature_rows: List[Dict[str, Any]] = []
     ae_utility_precision_rows: List[Dict[str, Any]] = []
     ae_utility_anchor_rank_rows: List[Dict[str, Any]] = []
+    source_reliability_pseudo_rows: List[Dict[str, Any]] = []
+    source_reliability_unit_rows: List[Dict[str, Any]] = []
+    source_reliability_candidate_rows: List[Dict[str, Any]] = []
+    source_reliability_parent_guard_rows: List[Dict[str, Any]] = []
+    source_reliability_selection_rows: List[Dict[str, Any]] = []
+    source_reliability_policy_rows: List[Dict[str, Any]] = []
+    source_reliability_predicted_rows: List[Dict[str, Any]] = []
+    source_reliability_selected_method_rows: List[Dict[str, Any]] = []
     hybrid_method_meta: Dict[str, Dict[str, Any]] = {}
     permutation_sample_rows: Dict[Tuple[str, int], List[Dict[str, Any]]] = {}
 
@@ -281,6 +293,37 @@ def evaluate_learned_utility_loqdo(
         pair_rows.extend(learned_outputs.pair_rows)
         pair_training_rows.extend(learned_outputs.pair_training_rows)
 
+        if eval_cfg.source_reliability.enabled:
+            if ae_scores is None:
+                raise ValueError("learned_utility.source_reliability.enabled requires autoencoder_proxy.enabled")
+            source_reliability_outputs = run_source_reliability_for_fold(
+                embeddings=embeddings,
+                sample_domains=sample_domains,
+                metadata=metadata,
+                true_nelbo=true_nelbo,
+                expert_domains=expert_domains,
+                train_idx=train_idx,
+                test_idx=test_idx,
+                fold=fold,
+                true_eval=true_eval,
+                global_eval=global_eval,
+                ae_zscore_matrix=ae_scores.zscore_matrix,
+                learned_sample_rows=learned_outputs.sample_rows,
+                pairwise_cfg=eval_cfg.pairwise_cfg,
+                cfg=eval_cfg.source_reliability,
+                seed=int(seed),
+                tie_policy=hybrid_cfg.tie_policy,
+            )
+            sample_rows.extend(source_reliability_outputs.sample_rows)
+            source_reliability_pseudo_rows.extend(source_reliability_outputs.pseudo_domain_rows)
+            source_reliability_unit_rows.extend(source_reliability_outputs.source_inner_unit_rows)
+            source_reliability_candidate_rows.extend(source_reliability_outputs.candidate_metric_rows)
+            source_reliability_parent_guard_rows.extend(source_reliability_outputs.parent_guard_rows)
+            source_reliability_selection_rows.extend(source_reliability_outputs.selection_policy_rows)
+            source_reliability_policy_rows.extend(source_reliability_outputs.policy_audit_rows)
+            source_reliability_predicted_rows.extend(source_reliability_outputs.predicted_vs_realized_rows)
+            source_reliability_selected_method_rows.extend(source_reliability_outputs.selected_method_rows)
+
         residual_outputs = run_residual_methods_for_fold(
             embeddings=embeddings,
             sample_domains=sample_domains,
@@ -393,6 +436,19 @@ def evaluate_learned_utility_loqdo(
     )
     if ae_utility_artifacts:
         results.setdefault("artifacts", {}).update(ae_utility_artifacts)
+    source_reliability_artifacts = write_source_reliability_artifacts(
+        reports_dir=reports_dir,
+        pseudo_domain_rows=source_reliability_pseudo_rows,
+        source_inner_unit_rows=source_reliability_unit_rows,
+        candidate_metric_rows=source_reliability_candidate_rows,
+        parent_guard_rows=source_reliability_parent_guard_rows,
+        selection_policy_rows=source_reliability_selection_rows,
+        policy_audit_rows=source_reliability_policy_rows,
+        predicted_vs_realized_rows=source_reliability_predicted_rows,
+        selected_method_rows=source_reliability_selected_method_rows,
+    )
+    if source_reliability_artifacts:
+        results.setdefault("artifacts", {}).update(source_reliability_artifacts)
     if eval_cfg.support_response.enabled:
         print("[learned_utility] running candidate-specific support-response routing...")
         support_response_results = evaluate_support_response_routing_for_checkpoints(
