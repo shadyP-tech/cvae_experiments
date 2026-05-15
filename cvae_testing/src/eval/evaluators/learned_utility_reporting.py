@@ -512,6 +512,7 @@ def _build_method_summary_rows(method_metrics: Dict[str, Dict[str, Any]]) -> Lis
                 "pairprob_probability_calibration": str(metrics.get("pairprob_probability_calibration", "")),
                 "pairprob_feature_set": str(metrics.get("pairprob_feature_set", "")),
                 "pairprob_selection_policy": str(metrics.get("pairprob_selection_policy", "")),
+                "adoption_feature_family": str(metrics.get("adoption_feature_family", "")),
                 "mean_pairprob_win_top1": float(metrics.get("mean_pairprob_win_top1", float("nan"))),
                 "top1_win_margin": float(metrics.get("top1_win_margin", float("nan"))),
                 "absolute_high_regret_rate_gap_gt_5": float(
@@ -586,6 +587,62 @@ def _build_method_summary_rows(method_metrics: Dict[str, Dict[str, Any]]) -> Lis
                 ),
                 "relative_catastrophic_regression_vs_pairprob_hard_gt_5_rate": float(
                     metrics.get("relative_catastrophic_regression_vs_pairprob_hard_gt_5_rate", float("nan"))
+                ),
+                "candidate_pool_consistent": str(metrics.get("candidate_pool_consistent", "")),
+                "selected_lambda_is_zero_but_lcb_candidates_reported": str(
+                    metrics.get("selected_lambda_is_zero_but_lcb_candidates_reported", "")
+                ),
+                "lambda_stability_status": str(metrics.get("lambda_stability_status", "")),
+                "jackknife_lambda": str(metrics.get("jackknife_lambda", "")),
+                "jackknife_n_models": str(metrics.get("jackknife_n_models", "")),
+                "jackknife_mean_win_selected": float(
+                    metrics.get("jackknife_mean_win_selected", float("nan"))
+                ),
+                "jackknife_std_win_selected": float(
+                    metrics.get("jackknife_std_win_selected", float("nan"))
+                ),
+                "jackknife_mean_win_margin_top1_top2": float(
+                    metrics.get("jackknife_mean_win_margin_top1_top2", float("nan"))
+                ),
+                "jackknife_lcb_margin_top1_top2": float(
+                    metrics.get("jackknife_lcb_margin_top1_top2", float("nan"))
+                ),
+                "jackknife_mean_vs_pairprob_hard_selection_change_rate": float(
+                    metrics.get("jackknife_mean_vs_pairprob_hard_selection_change_rate", float("nan"))
+                ),
+                "mean_ensemble_override_rate_vs_pairprob_hard": float(
+                    metrics.get("mean_ensemble_override_rate_vs_pairprob_hard", float("nan"))
+                ),
+                "lcb_override_rate_vs_jackknife_mean": float(
+                    metrics.get("lcb_override_rate_vs_jackknife_mean", float("nan"))
+                ),
+                "lcb_override_rate_vs_pairprob_hard": float(
+                    metrics.get("lcb_override_rate_vs_pairprob_hard", float("nan"))
+                ),
+                "jackknife_uncertainty_auc_for_pairprob_top1_error": float(
+                    metrics.get("jackknife_uncertainty_auc_for_pairprob_top1_error", float("nan"))
+                ),
+                "jackknife_uncertainty_auc_for_pairprob_high_regret": float(
+                    metrics.get("jackknife_uncertainty_auc_for_pairprob_high_regret", float("nan"))
+                ),
+                "uncertainty_error_spearman_source_inner": str(
+                    metrics.get("uncertainty_error_spearman_source_inner", "")
+                ),
+                "uncertainty_error_spearman_outer_eval": float(
+                    metrics.get("uncertainty_error_spearman_outer_eval", float("nan"))
+                ),
+                "jackknife_override_rate": float(metrics.get("jackknife_override_rate", float("nan"))),
+                "jackknife_override_help_rate": float(
+                    metrics.get("jackknife_override_help_rate", float("nan"))
+                ),
+                "jackknife_override_harm_rate": float(
+                    metrics.get("jackknife_override_harm_rate", float("nan"))
+                ),
+                "total_override_help_gap_reduction": float(
+                    metrics.get("total_override_help_gap_reduction", float("nan"))
+                ),
+                "total_override_harm_gap_increase": float(
+                    metrics.get("total_override_harm_gap_increase", float("nan"))
                 ),
                 "std_oracle_gap_pct_across_inner_domains": str(
                     metrics.get("std_oracle_gap_pct_across_inner_domains", "")

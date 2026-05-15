@@ -134,6 +134,26 @@ class ConformalRegretSetConfig:
 
 
 @dataclass(frozen=True)
+class JackknifeLCBTournamentConfig:
+    enabled: bool = False
+    method_name: str = "pairwise_jackknife_lcb_pairprob_tournament_v1"
+    mean_method_name: str = "pairwise_jackknife_mean_pairprob_tournament_v1"
+    base_method: str = "pairwise_group_robust_pairprob_tournament_v1"
+    adoption_feature_family: str = "pairprob_latent_only_v1"
+    calibration_policy: str = "source_inner_oof_jackknife_lcb_v1"
+    lambda_values: Tuple[float, ...] = (0.0, 0.25, 0.5, 1.0)
+    uncertainty_stat: str = "std_win_across_source_jackknife"
+    score_rule: str = "mean_win_minus_lambda_std_win"
+    allow_lcb_penalty_auc_min: float = 0.60
+    allow_lcb_penalty_spearman_min: float = 0.20
+    min_jackknife_models: int = 3
+    min_source_inner_validation_domains: int = 2
+    max_override_rate: float = 0.20
+    absolute_high_regret_gap_pct: float = 5.0
+    catastrophic_regression_vs_pairprob_hard_gap_pct: float = 5.0
+
+
+@dataclass(frozen=True)
 class PairprobTournamentConfig:
     enabled: bool
     policy_name: str
@@ -156,6 +176,7 @@ class PairprobTournamentConfig:
     catastrophic_regression_vs_hard_gap_pct: float
     selection_policy: str
     conformal_regret_set: ConformalRegretSetConfig = ConformalRegretSetConfig()
+    jackknife_lcb_tournament: JackknifeLCBTournamentConfig = JackknifeLCBTournamentConfig()
 
 
 @dataclass(frozen=True)
@@ -365,6 +386,7 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
     pairprob_cfg = _as_dict(tournament_cfg.get("pairprob_tournament", {}))
     pairprob_methods_cfg = _as_dict(pairprob_cfg.get("methods", {}))
     conformal_cfg = _as_dict(pairprob_cfg.get("conformal_regret_set", {}))
+    jackknife_cfg = _as_dict(pairprob_cfg.get("jackknife_lcb_tournament", {}))
     margin_clip_values = tuple(
         float(v) for v in pairprob_cfg.get("margin_weight_clip", [0.25, 3.0])
     )
@@ -425,6 +447,46 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
                 "oracle_diagnostic_method",
                 "oracle_conformal_regret_set_diagnostic_v1",
             )
+        ),
+    )
+    jackknife_lcb_tournament = JackknifeLCBTournamentConfig(
+        enabled=bool((jackknife_cfg or {}).get("enabled", False)),
+        method_name=str(
+            (jackknife_cfg or {}).get("method_name", "pairwise_jackknife_lcb_pairprob_tournament_v1")
+        ),
+        mean_method_name=str(
+            (jackknife_cfg or {}).get("mean_method_name", "pairwise_jackknife_mean_pairprob_tournament_v1")
+        ),
+        base_method=str(
+            (jackknife_cfg or {}).get("base_method", "pairwise_group_robust_pairprob_tournament_v1")
+        ),
+        adoption_feature_family=str(
+            (jackknife_cfg or {}).get("adoption_feature_family", "pairprob_latent_only_v1")
+        ).strip(),
+        calibration_policy=str(
+            (jackknife_cfg or {}).get("calibration_policy", "source_inner_oof_jackknife_lcb_v1")
+        ).strip().lower(),
+        lambda_values=tuple(float(v) for v in (jackknife_cfg or {}).get("lambda_values", [0.0, 0.25, 0.5, 1.0])),
+        uncertainty_stat=str(
+            (jackknife_cfg or {}).get("uncertainty_stat", "std_win_across_source_jackknife")
+        ).strip().lower(),
+        score_rule=str(
+            (jackknife_cfg or {}).get("score_rule", "mean_win_minus_lambda_std_win")
+        ).strip().lower(),
+        allow_lcb_penalty_auc_min=float((jackknife_cfg or {}).get("allow_lcb_penalty_auc_min", 0.60)),
+        allow_lcb_penalty_spearman_min=float(
+            (jackknife_cfg or {}).get("allow_lcb_penalty_spearman_min", 0.20)
+        ),
+        min_jackknife_models=int((jackknife_cfg or {}).get("min_jackknife_models", 3)),
+        min_source_inner_validation_domains=int(
+            (jackknife_cfg or {}).get("min_source_inner_validation_domains", 2)
+        ),
+        max_override_rate=float((jackknife_cfg or {}).get("max_override_rate", 0.20)),
+        absolute_high_regret_gap_pct=float(
+            (jackknife_cfg or {}).get("absolute_high_regret_gap_pct", 5.0)
+        ),
+        catastrophic_regression_vs_pairprob_hard_gap_pct=float(
+            (jackknife_cfg or {}).get("catastrophic_regression_vs_pairprob_hard_gap_pct", 5.0)
         ),
     )
     pairprob_tournament = PairprobTournamentConfig(
@@ -491,6 +553,7 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
             )
         ).strip().lower(),
         conformal_regret_set=conformal_regret_set,
+        jackknife_lcb_tournament=jackknife_lcb_tournament,
     )
     tournament = PairwiseTournamentConfig(
         enabled=bool((tournament_cfg or {}).get("enabled", False)),
@@ -643,6 +706,53 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
                     raise ValueError(
                         "learned_utility.pairwise_tournament.pairprob_tournament.conformal_regret_set."
                         "max_mean_set_size must be >= 1"
+                    )
+            jackknife = pairprob.jackknife_lcb_tournament
+            if jackknife.enabled:
+                if jackknife.base_method != pairprob.group_robust_method:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.jackknife_lcb_tournament."
+                        "base_method must match methods.group_robust"
+                    )
+                if jackknife.adoption_feature_family != pairprob.adoption_feature_set:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.jackknife_lcb_tournament."
+                        "adoption_feature_family must match adoption_feature_set"
+                    )
+                if jackknife.adoption_feature_family != "pairprob_latent_only_v1":
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.jackknife_lcb_tournament."
+                        "adoption_feature_family must be 'pairprob_latent_only_v1'"
+                    )
+                if jackknife.calibration_policy != "source_inner_oof_jackknife_lcb_v1":
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.jackknife_lcb_tournament."
+                        "calibration_policy must be 'source_inner_oof_jackknife_lcb_v1'"
+                    )
+                if jackknife.uncertainty_stat != "std_win_across_source_jackknife":
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.jackknife_lcb_tournament."
+                        "uncertainty_stat must be 'std_win_across_source_jackknife'"
+                    )
+                if jackknife.score_rule != "mean_win_minus_lambda_std_win":
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.jackknife_lcb_tournament."
+                        "score_rule must be 'mean_win_minus_lambda_std_win'"
+                    )
+                if not jackknife.lambda_values or any(v < 0.0 for v in jackknife.lambda_values):
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.jackknife_lcb_tournament."
+                        "lambda_values must be non-empty and non-negative"
+                    )
+                if 0.0 not in {float(v) for v in jackknife.lambda_values}:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.jackknife_lcb_tournament."
+                        "lambda_values must include 0.0"
+                    )
+                if jackknife.min_jackknife_models < 2:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.jackknife_lcb_tournament."
+                        "min_jackknife_models must be >= 2"
                     )
 
     return LearnedUtilityConfig(

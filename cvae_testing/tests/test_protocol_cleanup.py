@@ -84,6 +84,28 @@ def test_camelyon17_conformal_pairprob_config_is_protocol_locked() -> None:
     assert conformal_cfg["calibration_policy"] == "source_inner_oof_conformal_margin_v1"
 
 
+def test_camelyon17_jackknife_pairprob_config_is_protocol_locked() -> None:
+    path = (
+        PROJECT_ROOT
+        / "configs"
+        / "experiments"
+        / "camelyon17"
+        / "learned_utility_response_routing_jackknife_pairprob_v1.yaml"
+    )
+    cfg = load_config(path)
+    validate_config(cfg)
+
+    pairprob_cfg = cfg["learned_utility"]["pairwise_tournament"]["pairprob_tournament"]
+    jackknife_cfg = pairprob_cfg["jackknife_lcb_tournament"]
+    assert cfg["experiment"]["name"] == "learned_utility_response_routing_jackknife_pairprob_v1"
+    assert pairprob_cfg["adoption_feature_set"] == "pairprob_latent_only_v1"
+    assert jackknife_cfg["enabled"] is True
+    assert jackknife_cfg["base_method"] == "pairwise_group_robust_pairprob_tournament_v1"
+    assert jackknife_cfg["adoption_feature_family"] == "pairprob_latent_only_v1"
+    assert jackknife_cfg["calibration_policy"] == "source_inner_oof_jackknife_lcb_v1"
+    assert 0.0 in [float(v) for v in jackknife_cfg["lambda_values"]]
+
+
 def test_breakhis_support_estimated_utility_config_is_protocol_locked() -> None:
     path = (
         PROJECT_ROOT

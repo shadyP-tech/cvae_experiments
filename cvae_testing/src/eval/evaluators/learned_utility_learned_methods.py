@@ -21,16 +21,23 @@ from src.eval.evaluators.learned_utility_pairs import (
 from src.eval.evaluators.learned_utility_pairprob import (
     ConformalCalibrationBlock,
     ConformalRegretSetSelection,
+    JackknifeCalibrationBlock,
+    JackknifeLCBSelection,
     PairprobModelBundle,
     PairprobPolicySelection,
+    _gap_pct_for_selected,
     build_pairprob_training_data,
     conformal_pairprob_route_rows,
     fit_pairprob_model,
+    jackknife_pairprob_route_rows,
     pairprob_evidence_reason,
     pairprob_probability_matrix,
     pairprob_route_rows,
+    pairprob_selected_indices,
+    pairprob_win_scores,
     select_pairprob_policy,
     select_conformal_regret_set_policy,
+    select_jackknife_lcb_policy,
 )
 from src.eval.evaluators.learned_utility_protocol import (
     FoldCandidateSet,
@@ -325,6 +332,88 @@ def _fit_pairprob_bundle_from_rows(
     return bundle, evidence, reason
 
 
+def _fit_pairprob_jackknife_win_summary(
+    *,
+    x_rows: np.ndarray,
+    q_rows: np.ndarray,
+    e_rows: np.ndarray,
+    s_rows: np.ndarray,
+    y_rows: np.ndarray,
+    x_eval: np.ndarray,
+    eval_expert_domains: Sequence[int],
+    source_domains: Sequence[int],
+    feature_set: str,
+    ridge_l2: float,
+    tournament_cfg: PairwiseTournamentConfig,
+    embedding_feature_dim: int,
+    expert_feature_dim: int,
+    device: str,
+) -> Tuple[np.ndarray | None, np.ndarray | None, int, bool, str]:
+    cfg = tournament_cfg.pairprob_tournament
+    wins: List[np.ndarray] = []
+    reasons: List[str] = []
+    expected_shape: Tuple[int, int] | None = None
+    for leaveout_domain in [int(v) for v in source_domains]:
+        mask = np.asarray(q_rows, dtype=np.int64) != int(leaveout_domain)
+        if int(np.sum(mask)) <= 0:
+            reasons.append("source_inner_evidence_insufficient")
+            continue
+        train_data = build_pairprob_training_data(
+            x_rows=x_rows[mask],
+            q_rows=q_rows[mask],
+            e_rows=e_rows[mask],
+            s_rows=s_rows[mask],
+            y_rows=y_rows[mask],
+            embedding_dim=int(embedding_feature_dim),
+            expert_feature_dim=int(expert_feature_dim),
+            feature_set=str(feature_set),
+            near_tie_delta_pct=float(cfg.near_tie_delta_pct),
+            margin_weight_scale_pct=float(cfg.margin_weight_scale_pct),
+            margin_weight_clip=cfg.margin_weight_clip,
+        )
+        reason = pairprob_evidence_reason(
+            train_data=train_data,
+            validation_data=None,
+            validation_domains=max(1, len(train_data.kept_by_domain)),
+            cfg=cfg,
+        )
+        if reason or train_data.x.shape[0] <= 0:
+            reasons.append(reason or "source_inner_evidence_insufficient")
+            continue
+        bundle = fit_pairprob_model(
+            train_data=train_data,
+            feature_set=str(feature_set),
+            ridge_l2=float(ridge_l2),
+            device=str(device),
+        )
+        prob = pairprob_probability_matrix(
+            bundle=bundle,
+            x_rows=x_eval,
+            expert_domains=eval_expert_domains,
+            embedding_dim=int(embedding_feature_dim),
+            expert_feature_dim=int(expert_feature_dim),
+        )
+        win = pairprob_win_scores(prob)
+        if expected_shape is None:
+            expected_shape = tuple(int(v) for v in win.shape)
+        elif tuple(int(v) for v in win.shape) != expected_shape:
+            reasons.append("candidate_pool_inconsistent")
+            continue
+        wins.append(win)
+    if not wins:
+        return None, None, 0, False, "source_inner_evidence_insufficient"
+    stack = np.stack(wins, axis=0)
+    consistent = expected_shape is not None and all(tuple(int(v) for v in win.shape) == expected_shape for win in wins)
+    reason_out = "|".join(part for part in dict.fromkeys(reasons) if part)
+    return (
+        np.mean(stack, axis=0),
+        np.std(stack, axis=0),
+        int(stack.shape[0]),
+        bool(consistent),
+        str(reason_out),
+    )
+
+
 def _calibrate_pairprob_tournament(
     *,
     embeddings: np.ndarray,
@@ -346,16 +435,18 @@ def _calibrate_pairprob_tournament(
     PairprobPolicySelection | None,
     PairprobPolicySelection | None,
     ConformalRegretSetSelection | None,
+    JackknifeLCBSelection | None,
 ]:
     cfg = tournament_cfg.pairprob_tournament
     source_domains = sorted(set(int(sample_domains[int(i)]) for i in np.asarray(train_idx, dtype=np.int64).tolist()))
     if len(source_domains) < int(cfg.min_source_inner_validation_domains):
-        return None, None, None, None
+        return None, None, None, None, None
 
     rows_by_key: Dict[Tuple[str, str, float], List[Dict[str, Any]]] = {}
     evidence_by_key: Dict[Tuple[str, str, float], Dict[str, float]] = {}
     validation_domains_by_key: Dict[Tuple[str, str, float], set[int]] = {}
     conformal_blocks_by_key: Dict[Tuple[str, str, float], List[ConformalCalibrationBlock]] = {}
+    jackknife_blocks_by_key: Dict[Tuple[str, float], List[JackknifeCalibrationBlock]] = {}
     feature_sets = [str(cfg.adoption_feature_set), *[str(v) for v in cfg.diagnostic_feature_sets]]
     device = str(pairwise_cfg.get("device", "auto"))
 
@@ -478,6 +569,56 @@ def _calibrate_pairprob_tournament(
                     embedding_dim=int(embedding_feature_dim),
                     expert_feature_dim=int(expert_feature_dim),
                 )
+                if (
+                    bool(cfg.jackknife_lcb_tournament.enabled)
+                    and str(feature_set) == str(cfg.adoption_feature_set)
+                ):
+                    inner_source_domains = sorted(
+                        set(int(sample_domains[int(i)]) for i in np.asarray(inner_train_idx, dtype=np.int64).tolist())
+                    )
+                    mean_win, std_win, n_models, candidate_pool_consistent, _jk_reason = (
+                        _fit_pairprob_jackknife_win_summary(
+                            x_rows=x_inner,
+                            q_rows=q_inner,
+                            e_rows=e_inner,
+                            s_rows=s_inner,
+                            y_rows=y_inner,
+                            x_eval=x_val,
+                            eval_expert_domains=validation_fold.candidate_expert_domains,
+                            source_domains=inner_source_domains,
+                            feature_set=str(feature_set),
+                            ridge_l2=float(l2),
+                            tournament_cfg=tournament_cfg,
+                            embedding_feature_dim=int(embedding_feature_dim),
+                            expert_feature_dim=int(expert_feature_dim),
+                            device=device,
+                        )
+                    )
+                    if mean_win is not None and std_win is not None:
+                        hard_win = pairprob_win_scores(prob)
+                        jackknife_blocks_by_key.setdefault((str(feature_set), float(l2)), []).append(
+                            JackknifeCalibrationBlock(
+                                validation_domain=int(validation_domain),
+                                query_domains=np.asarray(sample_domains[validation_idx], dtype=np.int64),
+                                expert_domains=tuple(int(v) for v in validation_fold.candidate_expert_domains),
+                                mean_win=mean_win,
+                                std_win=std_win,
+                                n_models=int(n_models),
+                                candidate_pool_consistent=bool(candidate_pool_consistent),
+                                true_nelbo_matrix=true_matrix,
+                                global_true_nelbo_matrix=global_eval,
+                                fold=validation_fold,
+                                pairprob_hard_win=hard_win,
+                                pairprob_hard_selected_idx=pairprob_selected_indices(
+                                    prob,
+                                    validation_fold.candidate_expert_domains,
+                                ),
+                                pairprob_hard_oracle_gap_pct=_gap_pct_for_selected(
+                                    true_matrix,
+                                    pairprob_selected_indices(prob, validation_fold.candidate_expert_domains),
+                                ),
+                            )
+                        )
                 method_names = (
                     [cfg.direct_method, cfg.group_robust_method]
                     if str(feature_set) == str(cfg.adoption_feature_set)
@@ -609,7 +750,19 @@ def _calibrate_pairprob_tournament(
             global_expert_domains=global_expert_domains,
             cfg=cfg.conformal_regret_set,
         )
-    return direct, group, combined, conformal_selection
+    jackknife_selection = None
+    if bool(cfg.jackknife_lcb_tournament.enabled):
+        jackknife_key = (
+            str(cfg.jackknife_lcb_tournament.adoption_feature_family),
+            float(group.ridge_l2) if group is not None else float("nan"),
+        )
+        jackknife_selection = select_jackknife_lcb_policy(
+            blocks=jackknife_blocks_by_key.get(jackknife_key, []),
+            base_selection=group,
+            global_expert_domains=global_expert_domains,
+            cfg=cfg.jackknife_lcb_tournament,
+        )
+    return direct, group, combined, conformal_selection, jackknife_selection
 
 
 def _calibrate_pairwise_tournament(
@@ -1017,6 +1170,7 @@ def _run_pairprob_tournament_for_fold(
     global_expert_domains: Sequence[int],
     selections: Sequence[PairprobPolicySelection | None],
     conformal_selection: ConformalRegretSetSelection | None,
+    jackknife_selection: JackknifeLCBSelection | None,
     tournament_cfg: PairwiseTournamentConfig,
     pairwise_cfg: Dict[str, Any],
     embedding_feature_dim: int,
@@ -1098,6 +1252,99 @@ def _run_pairprob_tournament_for_fold(
             catastrophic_regression_vs_hard_gap_pct=float(cfg.catastrophic_regression_vs_hard_gap_pct),
         )
         rows.extend(selection_rows)
+        if (
+            jackknife_selection is not None
+            and bool(cfg.jackknife_lcb_tournament.enabled)
+            and str(selection.method) == str(cfg.group_robust_method)
+            and str(selection.feature_set) == str(cfg.jackknife_lcb_tournament.adoption_feature_family)
+            and abs(float(selection.ridge_l2) - float(jackknife_selection.ridge_l2)) < 1e-18
+        ):
+            source_domains = sorted(set(int(v) for v in np.asarray(q_train, dtype=np.int64).tolist()))
+            mean_win, std_win, n_models, candidate_pool_consistent, jackknife_reason = (
+                _fit_pairprob_jackknife_win_summary(
+                    x_rows=x_train,
+                    q_rows=q_train,
+                    e_rows=e_train,
+                    s_rows=s_train,
+                    y_rows=y_train,
+                    x_eval=x_test,
+                    eval_expert_domains=fold.candidate_expert_domains,
+                    source_domains=source_domains,
+                    feature_set=str(selection.feature_set),
+                    ridge_l2=float(selection.ridge_l2),
+                    tournament_cfg=tournament_cfg,
+                    embedding_feature_dim=int(embedding_feature_dim),
+                    expert_feature_dim=int(expert_feature_dim),
+                    device=device,
+                )
+            )
+            if mean_win is not None and std_win is not None:
+                pairprob_gap = np.asarray([float(r["oracle_gap_pct"]) for r in selection_rows], dtype=np.float64)
+                pairprob_hard_win = pairprob_win_scores(prob)
+                pairprob_hard_selected_idx = pairprob_selected_indices(prob, fold.candidate_expert_domains)
+                jackknife_reason_all = "|".join(
+                    part
+                    for part in dict.fromkeys(
+                        [
+                            str(jackknife_selection.diagnostic_only_reason),
+                            str(jackknife_reason),
+                            "" if bool(candidate_pool_consistent) else "candidate_pool_inconsistent",
+                        ]
+                    )
+                    if part
+                )
+                jackknife_selection_for_eval = replace(
+                    jackknife_selection,
+                    diagnostic_only_reason=str(jackknife_reason_all),
+                    candidate_pool_consistent=bool(
+                        jackknife_selection.candidate_pool_consistent and candidate_pool_consistent
+                    ),
+                )
+                rows.extend(
+                    jackknife_pairprob_route_rows(
+                        method=str(cfg.jackknife_lcb_tournament.mean_method_name),
+                        fold=fold,
+                        query_domains=query_domains,
+                        expert_domains=fold.candidate_expert_domains,
+                        mean_win=mean_win,
+                        std_win=std_win,
+                        n_models=int(n_models),
+                        candidate_pool_consistent=bool(candidate_pool_consistent),
+                        true_nelbo_matrix=true_matrix,
+                        global_true_nelbo_matrix=global_eval,
+                        global_expert_domains=global_expert_domains,
+                        policy_name=cfg.jackknife_lcb_tournament.method_name,
+                        selection=jackknife_selection_for_eval,
+                        pairprob_hard_win=pairprob_hard_win,
+                        pairprob_hard_selected_idx=pairprob_hard_selected_idx,
+                        pairprob_hard_oracle_gap_pct=pairprob_gap,
+                        metadata_oracle_gap_pct=metadata_oracle_gap_pct,
+                        cfg=cfg.jackknife_lcb_tournament,
+                        force_lambda=0.0,
+                    )
+                )
+                rows.extend(
+                    jackknife_pairprob_route_rows(
+                        method=str(cfg.jackknife_lcb_tournament.method_name),
+                        fold=fold,
+                        query_domains=query_domains,
+                        expert_domains=fold.candidate_expert_domains,
+                        mean_win=mean_win,
+                        std_win=std_win,
+                        n_models=int(n_models),
+                        candidate_pool_consistent=bool(candidate_pool_consistent),
+                        true_nelbo_matrix=true_matrix,
+                        global_true_nelbo_matrix=global_eval,
+                        global_expert_domains=global_expert_domains,
+                        policy_name=cfg.jackknife_lcb_tournament.method_name,
+                        selection=jackknife_selection_for_eval,
+                        pairprob_hard_win=pairprob_hard_win,
+                        pairprob_hard_selected_idx=pairprob_hard_selected_idx,
+                        pairprob_hard_oracle_gap_pct=pairprob_gap,
+                        metadata_oracle_gap_pct=metadata_oracle_gap_pct,
+                        cfg=cfg.jackknife_lcb_tournament,
+                    )
+                )
         if (
             conformal_selection is not None
             and bool(cfg.conformal_regret_set.enabled)
@@ -1643,7 +1890,7 @@ def _run_learned_methods_for_fold(
                 tournament_cfg=tournament_cfg,
                 base_method=pairprob_hard_base,
             )
-            direct_selection, group_selection, combined_selection, conformal_selection = _calibrate_pairprob_tournament(
+            direct_selection, group_selection, combined_selection, conformal_selection, jackknife_selection = _calibrate_pairprob_tournament(
                 embeddings=embeddings,
                 sample_domains=sample_domains,
                 true_nelbo=true_nelbo,
@@ -1675,6 +1922,7 @@ def _run_learned_methods_for_fold(
                     global_expert_domains=expert_domains,
                     selections=[direct_selection, group_selection, combined_selection],
                     conformal_selection=conformal_selection,
+                    jackknife_selection=jackknife_selection,
                     tournament_cfg=tournament_cfg,
                     pairwise_cfg=pairwise_cfg,
                     embedding_feature_dim=embedding_feature_dim,

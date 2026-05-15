@@ -13,20 +13,25 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.eval.evaluators.learned_utility_config import (
     ConformalRegretSetConfig,
     FallbackBenefitGateConfig,
+    JackknifeLCBTournamentConfig,
     PairprobTournamentConfig,
 )
 from src.eval.evaluators.learned_utility_models import _LogisticRidgePairprob
 from src.eval.evaluators.learned_utility_pairs import _build_fold_training_pair_features
 from src.eval.evaluators.learned_utility_pairprob import (
     ConformalRegretSetSelection,
+    JackknifeCalibrationBlock,
+    JackknifeLCBSelection,
     PairprobPolicySelection,
     build_pairprob_training_data,
     conformal_pairprob_route_rows,
     conformal_quantile,
     fit_pairprob_model,
+    jackknife_pairprob_route_rows,
     pairprob_feature_names,
     pairprob_probability_matrix,
     pairprob_route_rows,
+    select_jackknife_lcb_policy,
     select_pairprob_policy,
 )
 from src.eval.evaluators import learned_utility as lu
@@ -125,6 +130,29 @@ def _conformal_cfg(**overrides: object) -> ConformalRegretSetConfig:
     }
     values.update(overrides)
     return ConformalRegretSetConfig(**values)
+
+
+def _jackknife_cfg(**overrides: object) -> JackknifeLCBTournamentConfig:
+    values = {
+        "enabled": True,
+        "method_name": "pairwise_jackknife_lcb_pairprob_tournament_v1",
+        "mean_method_name": "pairwise_jackknife_mean_pairprob_tournament_v1",
+        "base_method": "pairwise_group_robust_pairprob_tournament_v1",
+        "adoption_feature_family": "pairprob_latent_only_v1",
+        "calibration_policy": "source_inner_oof_jackknife_lcb_v1",
+        "lambda_values": (0.0, 0.5),
+        "uncertainty_stat": "std_win_across_source_jackknife",
+        "score_rule": "mean_win_minus_lambda_std_win",
+        "allow_lcb_penalty_auc_min": 0.60,
+        "allow_lcb_penalty_spearman_min": 0.20,
+        "min_jackknife_models": 2,
+        "min_source_inner_validation_domains": 1,
+        "max_override_rate": 1.0,
+        "absolute_high_regret_gap_pct": 5.0,
+        "catastrophic_regression_vs_pairprob_hard_gap_pct": 5.0,
+    }
+    values.update(overrides)
+    return JackknifeLCBTournamentConfig(**values)
 
 
 def test_tournament_win_scores_exclude_self_comparisons() -> None:
@@ -296,6 +324,167 @@ def test_pairprob_route_rows_use_win_tournament_and_cycle_na_for_two_candidates(
     assert row["route_experts"] == "1"
     assert np.isclose(row["pairprob_win_top1"], 0.8)
     assert np.isnan(row["pairwise_cycle_rate"])
+
+
+def test_jackknife_lambda_zero_routes_as_mean_ensemble_and_lcb_can_override() -> None:
+    cfg = _jackknife_cfg()
+    fold = FoldCandidateSet.for_heldout_domain(heldout_domain=0, expert_domains=[0, 1, 2, 3])
+    mean_win = np.asarray([[0.60, 0.59, 0.10]], dtype=np.float64)
+    std_win = np.asarray([[0.50, 0.00, 0.01]], dtype=np.float64)
+    true = np.asarray([[10.0, 9.0, 30.0]], dtype=np.float64)
+    selection = JackknifeLCBSelection(
+        method="pairwise_jackknife_lcb_pairprob_tournament_v1",
+        mean_method="pairwise_jackknife_mean_pairprob_tournament_v1",
+        base_method="pairwise_group_robust_pairprob_tournament_v1",
+        feature_set="pairprob_latent_only_v1",
+        ridge_l2=1.0e-3,
+        jackknife_lambda=0.5,
+        selected_by_inner_validation=True,
+    )
+
+    mean_rows = jackknife_pairprob_route_rows(
+        method="pairwise_jackknife_mean_pairprob_tournament_v1",
+        fold=fold,
+        query_domains=np.asarray([0], dtype=np.int64),
+        expert_domains=fold.candidate_expert_domains,
+        mean_win=mean_win,
+        std_win=std_win,
+        n_models=3,
+        candidate_pool_consistent=True,
+        true_nelbo_matrix=true,
+        global_true_nelbo_matrix=np.asarray([[99.0, 10.0, 9.0, 30.0]], dtype=np.float64),
+        global_expert_domains=[0, 1, 2, 3],
+        policy_name="pairwise_jackknife_lcb_pairprob_tournament_v1",
+        selection=selection,
+        pairprob_hard_win=mean_win,
+        pairprob_hard_selected_idx=np.asarray([0], dtype=np.int64),
+        pairprob_hard_oracle_gap_pct=np.asarray([100.0 / 9.0], dtype=np.float64),
+        metadata_oracle_gap_pct=np.asarray([0.0], dtype=np.float64),
+        cfg=cfg,
+        force_lambda=0.0,
+    )
+    lcb_rows = jackknife_pairprob_route_rows(
+        method="pairwise_jackknife_lcb_pairprob_tournament_v1",
+        fold=fold,
+        query_domains=np.asarray([0], dtype=np.int64),
+        expert_domains=fold.candidate_expert_domains,
+        mean_win=mean_win,
+        std_win=std_win,
+        n_models=3,
+        candidate_pool_consistent=True,
+        true_nelbo_matrix=true,
+        global_true_nelbo_matrix=np.asarray([[99.0, 10.0, 9.0, 30.0]], dtype=np.float64),
+        global_expert_domains=[0, 1, 2, 3],
+        policy_name="pairwise_jackknife_lcb_pairprob_tournament_v1",
+        selection=selection,
+        pairprob_hard_win=mean_win,
+        pairprob_hard_selected_idx=np.asarray([0], dtype=np.int64),
+        pairprob_hard_oracle_gap_pct=np.asarray([100.0 / 9.0], dtype=np.float64),
+        metadata_oracle_gap_pct=np.asarray([0.0], dtype=np.float64),
+        cfg=cfg,
+    )
+
+    assert mean_rows[0]["selected_expert"] == 1
+    assert mean_rows[0]["diagnostic_only"] == 1
+    assert lcb_rows[0]["selected_expert"] == 2
+    assert lcb_rows[0]["lcb_override_vs_jackknife_mean"] == 1
+    assert lcb_rows[0]["paired_gap_delta_vs_pairprob_hard"] < 0.0
+
+
+def test_jackknife_selection_forces_zero_when_uncertainty_precondition_fails() -> None:
+    cfg = _jackknife_cfg(lambda_values=(0.0, 0.5), allow_lcb_penalty_auc_min=0.60)
+    fold = FoldCandidateSet.for_heldout_domain(heldout_domain=0, expert_domains=[0, 1, 2])
+    base = PairprobPolicySelection(
+        method="pairwise_group_robust_pairprob_tournament_v1",
+        feature_set="pairprob_latent_only_v1",
+        ridge_l2=1.0e-3,
+        selected_by_inner_validation=True,
+    )
+    blocks = [
+        JackknifeCalibrationBlock(
+            validation_domain=1,
+            query_domains=np.asarray([1], dtype=np.int64),
+            expert_domains=fold.candidate_expert_domains,
+            mean_win=np.asarray([[0.60, 0.40]], dtype=np.float64),
+            std_win=np.asarray([[0.50, 0.10]], dtype=np.float64),
+            n_models=2,
+            candidate_pool_consistent=True,
+            true_nelbo_matrix=np.asarray([[10.0, 20.0]], dtype=np.float64),
+            global_true_nelbo_matrix=np.asarray([[99.0, 10.0, 20.0]], dtype=np.float64),
+            fold=fold,
+            pairprob_hard_win=np.asarray([[0.60, 0.40]], dtype=np.float64),
+            pairprob_hard_selected_idx=np.asarray([0], dtype=np.int64),
+            pairprob_hard_oracle_gap_pct=np.asarray([0.0], dtype=np.float64),
+        ),
+        JackknifeCalibrationBlock(
+            validation_domain=2,
+            query_domains=np.asarray([2], dtype=np.int64),
+            expert_domains=fold.candidate_expert_domains,
+            mean_win=np.asarray([[0.51, 0.49]], dtype=np.float64),
+            std_win=np.asarray([[0.10, 0.00]], dtype=np.float64),
+            n_models=2,
+            candidate_pool_consistent=True,
+            true_nelbo_matrix=np.asarray([[20.0, 10.0]], dtype=np.float64),
+            global_true_nelbo_matrix=np.asarray([[99.0, 20.0, 10.0]], dtype=np.float64),
+            fold=fold,
+            pairprob_hard_win=np.asarray([[0.51, 0.49]], dtype=np.float64),
+            pairprob_hard_selected_idx=np.asarray([0], dtype=np.int64),
+            pairprob_hard_oracle_gap_pct=np.asarray([100.0], dtype=np.float64),
+        ),
+    ]
+
+    selected = select_jackknife_lcb_policy(
+        blocks=blocks,
+        base_selection=base,
+        global_expert_domains=[0, 1, 2],
+        cfg=cfg,
+    )
+
+    assert selected is not None
+    assert selected.jackknife_lambda == 0.0
+    assert selected.lambda_stability_status == "forced_zero_uncertainty_failed"
+    assert "forced_zero_uncertainty_failed" in selected.diagnostic_only_reason
+
+
+def test_jackknife_noop_routes_exactly_as_pairprob_hard() -> None:
+    cfg = _jackknife_cfg()
+    fold = FoldCandidateSet.for_heldout_domain(heldout_domain=0, expert_domains=[0, 1, 2, 3])
+    selection = JackknifeLCBSelection(
+        method="pairwise_jackknife_lcb_pairprob_tournament_v1",
+        mean_method="pairwise_jackknife_mean_pairprob_tournament_v1",
+        base_method="pairwise_group_robust_pairprob_tournament_v1",
+        feature_set="pairprob_latent_only_v1",
+        ridge_l2=1.0e-3,
+        jackknife_lambda=1.0,
+        selected_by_inner_validation=False,
+        diagnostic_only_reason="source_inner_evidence_insufficient",
+        noop=True,
+    )
+
+    rows = jackknife_pairprob_route_rows(
+        method="pairwise_jackknife_lcb_pairprob_tournament_v1",
+        fold=fold,
+        query_domains=np.asarray([0], dtype=np.int64),
+        expert_domains=fold.candidate_expert_domains,
+        mean_win=np.asarray([[0.60, 0.59, 0.10]], dtype=np.float64),
+        std_win=np.asarray([[0.90, 0.00, 0.00]], dtype=np.float64),
+        n_models=1,
+        candidate_pool_consistent=False,
+        true_nelbo_matrix=np.asarray([[10.0, 9.0, 30.0]], dtype=np.float64),
+        global_true_nelbo_matrix=np.asarray([[99.0, 10.0, 9.0, 30.0]], dtype=np.float64),
+        global_expert_domains=[0, 1, 2, 3],
+        policy_name="pairwise_jackknife_lcb_pairprob_tournament_v1",
+        selection=selection,
+        pairprob_hard_win=np.asarray([[0.60, 0.59, 0.10]], dtype=np.float64),
+        pairprob_hard_selected_idx=np.asarray([0], dtype=np.int64),
+        pairprob_hard_oracle_gap_pct=np.asarray([100.0 / 9.0], dtype=np.float64),
+        metadata_oracle_gap_pct=None,
+        cfg=cfg,
+    )
+
+    assert rows[0]["selected_expert"] == 1
+    assert rows[0]["lcb_override_vs_pairprob_hard"] == 0
+    assert rows[0]["diagnostic_only"] == 1
 
 
 def test_conformal_quantile_reports_clipping() -> None:
@@ -765,6 +954,8 @@ def test_pairwise_tournament_protocol_flags() -> None:
     conformal = _method_protocol("conformal_pairprob_regret_set_router_v1")
     conformal_topwin = _method_protocol("conformal_pairprob_topwin_set_diagnostic_v1")
     conformal_oracle = _method_protocol("oracle_conformal_regret_set_diagnostic_v1")
+    jackknife_lcb = _method_protocol("pairwise_jackknife_lcb_pairprob_tournament_v1")
+    jackknife_mean = _method_protocol("pairwise_jackknife_mean_pairprob_tournament_v1")
 
     assert learned.method_role == "learned"
     assert learned.adoption_eligible == 1
@@ -782,6 +973,11 @@ def test_pairwise_tournament_protocol_flags() -> None:
     assert conformal.method_role == "learned"
     assert conformal.adoption_eligible == 1
     assert conformal.routing_uses_eval_nelbo == 0
+    assert jackknife_lcb.method_role == "learned"
+    assert jackknife_lcb.adoption_eligible == 1
+    assert jackknife_lcb.routing_uses_eval_nelbo == 0
+    assert jackknife_mean.method_role == "diagnostic"
+    assert jackknife_mean.adoption_eligible == 0
     assert conformal_topwin.method_role == "diagnostic"
     assert conformal_topwin.adoption_eligible == 0
     assert conformal_oracle.method_role == "diagnostic"
@@ -1027,3 +1223,79 @@ def test_learned_utility_eval_emits_tournament_methods(tmp_path, monkeypatch) ->
     assert conformal_metrics["conformal_pairprob_regret_set_router_v1"]["routing_uses_eval_nelbo"] == 0.0
     assert conformal_metrics["conformal_pairprob_topwin_set_diagnostic_v1"]["diagnostic_only"] == 1.0
     assert conformal_metrics["oracle_conformal_regret_set_diagnostic_v1"]["routing_uses_eval_nelbo"] == 1.0
+
+    jackknife_results = lu.evaluate_learned_utility_loqdo(
+        test_cache=tmp_path / "unused.pt",
+        expert_checkpoints={f"expert_{domain}": "unused" for domain in expert_domains},
+        hidden_dim=4,
+        latent_dim=2,
+        strategy="categorical_exact",
+        tau=1.0,
+        seed=7,
+        learned_cfg={
+            "predictors": ["pairwise_ranker"],
+            "pair_features": {"include_metadata_features": True},
+            "scoring": {"pair_batch_size": 2},
+            "predictor_params": {
+                "pairwise_ranker": {
+                    "hidden_dim": 8,
+                    "epochs": 1,
+                    "lr": 1.0e-3,
+                    "batch_size": 64,
+                    "device": "cpu",
+                    "margin": 1.0,
+                    "near_tie_delta": 0.0,
+                    "hard_pair_fraction": 1.0,
+                    "random_pair_fraction": 0.0,
+                    "max_pairs_per_sample": 6,
+                    "max_pairs_per_domain": 100,
+                    "run_ablations": True,
+                }
+            },
+            "pairwise_tournament": {
+                "enabled": True,
+                "policy_name": "pairwise_jackknife_lcb_pairprob_tournament_v1",
+                "base_methods": ["pairwise_ranker_latent_only"],
+                "diagnostic_base_methods": ["pairwise_ranker_combined"],
+                "margin_thresholds": [0.0],
+                "sparse_mix_topk_values": [2],
+                "score_temperature": 1.0,
+                "pairprob_tournament": {
+                    "enabled": True,
+                    "ridge_l2_values": [1.0e-3],
+                    "min_pairwise_train_pairs": 1,
+                    "min_pairwise_validation_pairs": 1,
+                    "min_source_inner_validation_domains": 1,
+                    "min_non_tie_pairs_per_inner_domain": 1,
+                    "jackknife_lcb_tournament": {
+                        "enabled": True,
+                        "lambda_values": [0.0, 0.5],
+                        "min_jackknife_models": 2,
+                        "min_source_inner_validation_domains": 1,
+                    },
+                },
+            },
+            "hybrid_scoring": {"enabled": False, "tie_policy": "stable_expert_index"},
+            "compatibility_research": {
+                "floors": {"random_rank_floor": False, "random_score_floor": False},
+                "permutation_tests": {
+                    "expert_label_permutation": False,
+                    "metadata_permutation": False,
+                    "repeats": 1,
+                },
+                "diagnostics": {"save_distribution_plots": False},
+                "gate": {"uplift_reference_method": "metadata_routing"},
+            },
+        },
+        reports_dir=tmp_path / "jackknife",
+    )
+    jackknife_metrics = jackknife_results["metrics_by_method"]
+    assert "pairwise_group_robust_pairprob_tournament_v1" in jackknife_metrics
+    assert "pairwise_jackknife_mean_pairprob_tournament_v1" in jackknife_metrics
+    assert "pairwise_jackknife_lcb_pairprob_tournament_v1" in jackknife_metrics
+    assert jackknife_metrics["pairwise_jackknife_mean_pairprob_tournament_v1"]["diagnostic_only"] == 1.0
+    assert jackknife_metrics["pairwise_jackknife_lcb_pairprob_tournament_v1"]["routing_uses_eval_nelbo"] == 0.0
+    assert (
+        jackknife_metrics["pairwise_jackknife_lcb_pairprob_tournament_v1"]["adoption_feature_family"]
+        == "pairprob_latent_only_v1"
+    )

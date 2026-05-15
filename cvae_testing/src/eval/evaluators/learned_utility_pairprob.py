@@ -5,11 +5,16 @@ from typing import Any, Dict, List, Mapping, Sequence, Tuple
 
 import numpy as np
 
-from src.eval.evaluators.learned_utility_config import ConformalRegretSetConfig, PairprobTournamentConfig
+from src.eval.evaluators.learned_utility_config import (
+    ConformalRegretSetConfig,
+    JackknifeLCBTournamentConfig,
+    PairprobTournamentConfig,
+)
 from src.eval.evaluators.learned_utility_models import _LogisticRidgePairprob
 from src.eval.evaluators.learned_utility_protocol import FoldCandidateSet, ProtocolError
 from src.eval.evaluators.learned_utility_selection import _selection_metrics
 from src.eval.evaluators.learned_utility_pairs import _zscore_features
+from src.eval.metrics import spearman_corr
 
 
 @dataclass(frozen=True)
@@ -69,6 +74,24 @@ class ConformalCalibrationBlock:
 
 
 @dataclass(frozen=True)
+class JackknifeCalibrationBlock:
+    validation_domain: int
+    query_domains: np.ndarray
+    expert_domains: Tuple[int, ...]
+    mean_win: np.ndarray
+    std_win: np.ndarray
+    n_models: int
+    candidate_pool_consistent: bool
+    true_nelbo_matrix: np.ndarray
+    global_true_nelbo_matrix: np.ndarray
+    fold: FoldCandidateSet
+    pairprob_hard_win: np.ndarray
+    pairprob_hard_selected_idx: np.ndarray
+    pairprob_hard_oracle_gap_pct: np.ndarray
+    metadata_oracle_gap_pct: np.ndarray | None = None
+
+
+@dataclass(frozen=True)
 class ConformalRegretSetSelection:
     method: str
     base_method: str
@@ -106,6 +129,43 @@ class ConformalRegretSetSelection:
     paired_improvement_rate_vs_pairprob_hard: float = float("nan")
     normalized_worst_regret_by_expert: Dict[int, float] | None = None
     mean_regret_by_expert: Dict[int, float] | None = None
+
+
+@dataclass(frozen=True)
+class JackknifeLCBSelection:
+    method: str
+    mean_method: str
+    base_method: str
+    feature_set: str
+    ridge_l2: float
+    jackknife_lambda: float
+    selected_by_inner_validation: bool
+    diagnostic_only_reason: str = ""
+    noop: bool = False
+    source_inner_validation_domains: int = 0
+    source_inner_rows: int = 0
+    source_inner_mean_oracle_gap_pct: float = float("nan")
+    source_inner_worst_domain_oracle_gap_pct: float = float("nan")
+    source_inner_relative_catastrophic_rate: float = float("nan")
+    source_inner_absolute_high_regret_rate: float = float("nan")
+    source_inner_top1: float = float("nan")
+    source_inner_spearman: float = float("nan")
+    jackknife_uncertainty_auc_for_pairprob_top1_error: float = float("nan")
+    jackknife_uncertainty_auc_for_pairprob_high_regret: float = float("nan")
+    uncertainty_error_spearman_source_inner: float = float("nan")
+    lambda_stability_status: str = "stable_zero"
+    candidate_pool_consistent: bool = True
+    selected_lambda_is_zero_but_lcb_candidates_reported: bool = False
+    jackknife_mean_vs_pairprob_hard_selection_change_rate: float = float("nan")
+    mean_ensemble_override_rate_vs_pairprob_hard: float = float("nan")
+    lcb_override_rate_vs_jackknife_mean: float = float("nan")
+    lcb_override_rate_vs_pairprob_hard: float = float("nan")
+    jackknife_override_help_rate: float = float("nan")
+    jackknife_override_harm_rate: float = float("nan")
+    total_override_help_gap_reduction: float = float("nan")
+    total_override_harm_gap_increase: float = float("nan")
+    mean_paired_gap_delta_vs_pairprob_hard: float = float("nan")
+    paired_improvement_rate_vs_pairprob_hard: float = float("nan")
 
 
 def pairprob_feature_names(feature_set: str, *, embedding_dim: int, expert_feature_dim: int, metadata_dim: int) -> Tuple[str, ...]:
@@ -477,6 +537,10 @@ def _top_indices_from_win(win: np.ndarray, expert_domains: Sequence[int]) -> np.
     for i in range(win.shape[0]):
         out[i] = int(np.lexsort((experts, -win[i, :]))[0])
     return out
+
+
+def pairprob_selected_indices(prob_matrix: np.ndarray, expert_domains: Sequence[int]) -> np.ndarray:
+    return _top_indices_from_win(pairprob_win_scores(prob_matrix), expert_domains)
 
 
 def _select_indices_from_conformal_set(
@@ -1086,6 +1150,548 @@ def select_conformal_regret_set_policy(
         paired_improvement_rate_vs_pairprob_hard=float(summary["paired_improvement_rate_vs_pairprob_hard"]),
         normalized_worst_regret_by_expert=penalties,
         mean_regret_by_expert=mean_regret,
+    )
+
+
+def _stable_argmax_indices(score: np.ndarray, expert_domains: Sequence[int]) -> np.ndarray:
+    arr = np.asarray(score, dtype=np.float64)
+    experts = np.asarray([int(v) for v in expert_domains], dtype=np.int64)
+    out = np.zeros((arr.shape[0],), dtype=np.int64)
+    for i in range(arr.shape[0]):
+        out[i] = int(np.lexsort((experts, -arr[i, :]))[0])
+    return out
+
+
+def _rank_of_indices_desc(score: np.ndarray, selected_idx: np.ndarray, expert_domains: Sequence[int]) -> np.ndarray:
+    arr = np.asarray(score, dtype=np.float64)
+    experts = np.asarray([int(v) for v in expert_domains], dtype=np.int64)
+    selected = np.asarray(selected_idx, dtype=np.int64)
+    ranks = np.full((arr.shape[0],), float("nan"), dtype=np.float64)
+    for i in range(arr.shape[0]):
+        order = np.lexsort((experts, -arr[i, :]))
+        inv = np.empty((arr.shape[1],), dtype=np.int64)
+        inv[order] = np.arange(1, arr.shape[1] + 1, dtype=np.int64)
+        ranks[i] = float(inv[int(selected[i])])
+    return ranks
+
+
+def _finite_spearman(x: Sequence[float], y: Sequence[float]) -> float:
+    pairs = [
+        (float(a), float(b))
+        for a, b in zip(x, y)
+        if np.isfinite(float(a)) and np.isfinite(float(b))
+    ]
+    if len(pairs) < 2:
+        return float("nan")
+    xs = [p[0] for p in pairs]
+    ys = [p[1] for p in pairs]
+    if max(xs) - min(xs) < 1e-12 or max(ys) - min(ys) < 1e-12:
+        return float("nan")
+    return float(spearman_corr(xs, ys))
+
+
+def jackknife_pairprob_route_rows(
+    *,
+    method: str,
+    fold: FoldCandidateSet,
+    query_domains: np.ndarray,
+    expert_domains: Sequence[int],
+    mean_win: np.ndarray,
+    std_win: np.ndarray,
+    n_models: int,
+    candidate_pool_consistent: bool,
+    true_nelbo_matrix: np.ndarray,
+    global_true_nelbo_matrix: np.ndarray,
+    global_expert_domains: Sequence[int],
+    policy_name: str,
+    selection: JackknifeLCBSelection,
+    pairprob_hard_win: np.ndarray,
+    pairprob_hard_selected_idx: np.ndarray,
+    pairprob_hard_oracle_gap_pct: np.ndarray,
+    metadata_oracle_gap_pct: np.ndarray | None,
+    cfg: JackknifeLCBTournamentConfig,
+    force_lambda: float | None = None,
+) -> List[Dict[str, Any]]:
+    experts = [int(v) for v in expert_domains]
+    mean = np.asarray(mean_win, dtype=np.float64)
+    std = np.asarray(std_win, dtype=np.float64)
+    if mean.shape != std.shape:
+        raise ProtocolError("Jackknife mean/std win matrices must have matching shapes")
+    lam = float(selection.jackknife_lambda if force_lambda is None else force_lambda)
+    lcb = mean - (lam * std)
+    selected_idx = _stable_argmax_indices(lcb, experts)
+    mean_idx = _stable_argmax_indices(mean, experts)
+    hard_idx = np.asarray(pairprob_hard_selected_idx, dtype=np.int64)
+    hard_win = np.asarray(pairprob_hard_win, dtype=np.float64)
+    if hard_idx.shape != selected_idx.shape:
+        raise ProtocolError("Pairprob hard selected index shape mismatch for jackknife routing")
+    if str(method) == str(selection.method) and (bool(selection.noop) or not bool(candidate_pool_consistent)):
+        selected_idx = hard_idx.astype(np.int64, copy=True)
+
+    ranking_score = -lcb
+    _metrics, rows = _selection_metrics(
+        method=method,
+        query_domains=query_domains,
+        expert_domains=experts,
+        score_matrix=ranking_score,
+        true_nelbo_matrix=true_nelbo_matrix,
+        fold=fold,
+        global_true_nelbo_matrix=global_true_nelbo_matrix,
+        global_expert_domains=global_expert_domains,
+        selected_idx_override=selected_idx,
+        ranking_score_matrix=ranking_score,
+    )
+    hard_gap = np.asarray(pairprob_hard_oracle_gap_pct, dtype=np.float64)
+    if hard_gap.shape[0] != len(rows):
+        hard_gap = _gap_pct_for_selected(true_nelbo_matrix, hard_idx)
+    metadata_gap = (
+        np.asarray(metadata_oracle_gap_pct, dtype=np.float64)
+        if metadata_oracle_gap_pct is not None
+        else np.full((len(rows),), float("nan"), dtype=np.float64)
+    )
+    if metadata_gap.shape[0] != len(rows):
+        metadata_gap = np.full((len(rows),), float("nan"), dtype=np.float64)
+
+    mean_order = np.zeros_like(mean, dtype=np.int64)
+    lcb_order = np.zeros_like(lcb, dtype=np.int64)
+    for i in range(mean.shape[0]):
+        mean_order[i, :] = np.lexsort((np.asarray(experts, dtype=np.int64), -mean[i, :]))
+        lcb_order[i, :] = np.lexsort((np.asarray(experts, dtype=np.int64), -lcb[i, :]))
+    mean_margin = (
+        mean[np.arange(mean.shape[0]), mean_order[:, 0]] - mean[np.arange(mean.shape[0]), mean_order[:, 1]]
+        if mean.shape[1] > 1
+        else np.full((mean.shape[0],), float("inf"), dtype=np.float64)
+    )
+    lcb_margin = (
+        lcb[np.arange(lcb.shape[0]), lcb_order[:, 0]] - lcb[np.arange(lcb.shape[0]), lcb_order[:, 1]]
+        if lcb.shape[1] > 1
+        else np.full((lcb.shape[0],), float("inf"), dtype=np.float64)
+    )
+    std_winner_minus_runnerup = (
+        std[np.arange(std.shape[0]), mean_order[:, 0]] - std[np.arange(std.shape[0]), mean_order[:, 1]]
+        if std.shape[1] > 1
+        else np.full((std.shape[0],), float("nan"), dtype=np.float64)
+    )
+    std_rank = _rank_of_indices_desc(std, selected_idx, experts)
+    hard_rank_of_selected = _rank_of_indices_desc(hard_win, selected_idx, experts)
+    lcb_rank_of_hard = _rank_of_indices_desc(lcb, hard_idx, experts)
+    oracle_idx = _stable_true_oracle_indices(true_nelbo_matrix)
+
+    base_reason = str(selection.diagnostic_only_reason)
+    if str(method) == str(selection.mean_method):
+        base_reason = "|".join(
+            part for part in dict.fromkeys([base_reason, "jackknife_mean_ensemble_diagnostic"]) if part
+        )
+
+    for i, row in enumerate(rows):
+        selected_col = int(selected_idx[i])
+        selected_expert = int(experts[selected_col])
+        paired_delta = float(row["oracle_gap_pct"]) - float(hard_gap[i])
+        paired_delta_metadata = (
+            float(row["oracle_gap_pct"]) - float(metadata_gap[i])
+            if np.isfinite(float(metadata_gap[i]))
+            else float("nan")
+        )
+        override_vs_hard = int(int(selected_idx[i]) != int(hard_idx[i]))
+        override_vs_mean = int(int(selected_idx[i]) != int(mean_idx[i]))
+        mean_override_vs_hard = int(int(mean_idx[i]) != int(hard_idx[i]))
+        hard_gap_i = float(hard_gap[i])
+        row.update(
+            {
+                "policy_name": str(policy_name),
+                "base_method": str(selection.base_method),
+                "feature_set": str(selection.feature_set),
+                "selected_tau": float(selection.ridge_l2),
+                "selected_by_inner_validation": int(bool(selection.selected_by_inner_validation)),
+                "threshold_selection_policy": str(cfg.calibration_policy),
+                "route_experts": str(selected_expert),
+                "route_weights": "1",
+                "route_size": 1,
+                "route_mode": "jackknife_lcb_top1" if str(method) == str(selection.method) else "jackknife_mean_top1",
+                "pairprob_predictor": "logistic_ridge_pairprob",
+                "pairprob_probability_calibration": "none_v1",
+                "pairprob_ridge_l2": float(selection.ridge_l2),
+                "pairprob_feature_set": str(selection.feature_set),
+                "pairprob_selection_policy": str(cfg.calibration_policy),
+                "adoption_feature_family": str(cfg.adoption_feature_family),
+                "candidate_pool_consistent": int(bool(candidate_pool_consistent)),
+                "selected_lambda_is_zero_but_lcb_candidates_reported": int(
+                    bool(selection.selected_lambda_is_zero_but_lcb_candidates_reported)
+                ),
+                "lambda_stability_status": str(selection.lambda_stability_status),
+                "jackknife_lambda": float(lam),
+                "jackknife_n_models": int(n_models),
+                "jackknife_mean_win_selected": float(mean[i, selected_col]),
+                "jackknife_std_win_selected": float(std[i, selected_col]),
+                "jackknife_std_pairprob_hard_selected": float(std[i, int(hard_idx[i])]),
+                "jackknife_std_selected_rank": float(std_rank[i]),
+                "jackknife_mean_win_margin_top1_top2": float(mean_margin[i]),
+                "jackknife_std_winner_minus_runnerup": float(std_winner_minus_runnerup[i]),
+                "jackknife_lcb_margin_top1_top2": float(lcb_margin[i]),
+                "jackknife_override_active": int(override_vs_hard),
+                "override_from_pairprob_hard_expert": int(experts[int(hard_idx[i])]) if override_vs_hard else "",
+                "override_to_lcb_expert": int(selected_expert) if override_vs_hard else "",
+                "pairprob_hard_rank_of_lcb_expert": float(hard_rank_of_selected[i]),
+                "lcb_rank_of_pairprob_hard_expert": float(lcb_rank_of_hard[i]),
+                "jackknife_mean_vs_pairprob_hard_selection_change": int(mean_override_vs_hard),
+                "mean_ensemble_override_vs_pairprob_hard": int(mean_override_vs_hard),
+                "lcb_override_vs_jackknife_mean": int(override_vs_mean),
+                "lcb_override_vs_pairprob_hard": int(override_vs_hard),
+                "paired_gap_delta_vs_pairprob_hard": float(paired_delta),
+                "paired_gap_delta_vs_metadata": float(paired_delta_metadata),
+                "pairprob_hard_oracle_gap_pct": float(hard_gap_i),
+                "metadata_oracle_gap_pct": float(metadata_gap[i]),
+                "pairprob_top1_error": int(int(hard_idx[i]) != int(oracle_idx[i])),
+                "pairprob_high_regret_error": int(hard_gap_i > float(cfg.absolute_high_regret_gap_pct)),
+                "absolute_high_regret_gap_gt_5": int(
+                    float(row["oracle_gap_pct"]) > float(cfg.absolute_high_regret_gap_pct)
+                ),
+                "relative_catastrophic_regression_vs_pairprob_hard_gt_5": int(
+                    float(paired_delta) > float(cfg.catastrophic_regression_vs_pairprob_hard_gap_pct)
+                ),
+                "diagnostic_only_reason": str(base_reason),
+                "jackknife_uncertainty_auc_for_pairprob_top1_error": float(
+                    selection.jackknife_uncertainty_auc_for_pairprob_top1_error
+                ),
+                "jackknife_uncertainty_auc_for_pairprob_high_regret": float(
+                    selection.jackknife_uncertainty_auc_for_pairprob_high_regret
+                ),
+                "uncertainty_error_spearman_source_inner": float(
+                    selection.uncertainty_error_spearman_source_inner
+                ),
+            }
+        )
+        if base_reason:
+            row.update(
+                {
+                    "method_role": "diagnostic",
+                    "adoption_eligible": 0,
+                    "diagnostic_only": 1,
+                }
+            )
+    return rows
+
+
+def summarize_jackknife_rows(rows: Sequence[Mapping[str, Any]]) -> Dict[str, float]:
+    if not rows:
+        return {
+            "n_rows": 0.0,
+            "validation_domains": 0.0,
+            "mean_oracle_gap_pct": float("nan"),
+            "worst_inner_domain_oracle_gap_pct": float("nan"),
+            "relative_catastrophic_regression_vs_pairprob_hard_gt_5_rate": float("nan"),
+            "absolute_high_regret_rate_gap_gt_5": float("nan"),
+            "top1_oracle_hit": float("nan"),
+            "spearman": float("nan"),
+            "jackknife_uncertainty_auc_for_pairprob_top1_error": float("nan"),
+            "jackknife_uncertainty_auc_for_pairprob_high_regret": float("nan"),
+            "uncertainty_error_spearman_source_inner": float("nan"),
+            "jackknife_override_rate": float("nan"),
+            "jackknife_override_help_rate": float("nan"),
+            "jackknife_override_harm_rate": float("nan"),
+            "total_override_help_gap_reduction": float("nan"),
+            "total_override_harm_gap_increase": float("nan"),
+            "mean_paired_gap_delta_vs_pairprob_hard": float("nan"),
+            "paired_improvement_rate_vs_pairprob_hard": float("nan"),
+            "jackknife_mean_vs_pairprob_hard_selection_change_rate": float("nan"),
+            "mean_ensemble_override_rate_vs_pairprob_hard": float("nan"),
+            "lcb_override_rate_vs_jackknife_mean": float("nan"),
+            "lcb_override_rate_vs_pairprob_hard": float("nan"),
+            "candidate_pool_consistent": 0.0,
+        }
+    by_domain: Dict[int, List[Mapping[str, Any]]] = {}
+    for row in rows:
+        by_domain.setdefault(int(row["query_domain"]), []).append(row)
+    domain_gap = [
+        float(np.mean([float(r["oracle_gap_pct"]) for r in domain_rows]))
+        for domain_rows in by_domain.values()
+    ]
+    spearman_vals = [float(r["spearman"]) for r in rows if np.isfinite(float(r["spearman"]))]
+    paired_delta = [float(r.get("paired_gap_delta_vs_pairprob_hard", float("nan"))) for r in rows]
+    override_rows = [r for r in rows if int(float(r.get("jackknife_override_active", 0) or 0)) == 1]
+    override_delta = [float(r.get("paired_gap_delta_vs_pairprob_hard", float("nan"))) for r in override_rows]
+    uncertainty = [float(r.get("jackknife_std_pairprob_hard_selected", float("nan"))) for r in rows]
+    top1_error = [int(float(r.get("pairprob_top1_error", 0) or 0)) for r in rows]
+    high_regret = [int(float(r.get("pairprob_high_regret_error", 0) or 0)) for r in rows]
+    hard_gap = [float(r.get("pairprob_hard_oracle_gap_pct", float("nan"))) for r in rows]
+    help_delta = [abs(float(v)) for v in override_delta if np.isfinite(float(v)) and float(v) < 0.0]
+    harm_delta = [float(v) for v in override_delta if np.isfinite(float(v)) and float(v) > 0.0]
+    return {
+        "n_rows": float(len(rows)),
+        "validation_domains": float(len(by_domain)),
+        "mean_oracle_gap_pct": float(np.mean([float(r["oracle_gap_pct"]) for r in rows])),
+        "worst_inner_domain_oracle_gap_pct": float(max(domain_gap)) if domain_gap else float("nan"),
+        "relative_catastrophic_regression_vs_pairprob_hard_gt_5_rate": float(
+            np.mean([float(r.get("relative_catastrophic_regression_vs_pairprob_hard_gt_5", 0.0)) for r in rows])
+        ),
+        "absolute_high_regret_rate_gap_gt_5": float(
+            np.mean([float(r.get("absolute_high_regret_gap_gt_5", 0.0)) for r in rows])
+        ),
+        "top1_oracle_hit": float(np.mean([float(r["top1_oracle_hit"]) for r in rows])),
+        "spearman": float(np.mean(spearman_vals)) if spearman_vals else float("nan"),
+        "jackknife_uncertainty_auc_for_pairprob_top1_error": _binary_auc(uncertainty, top1_error),
+        "jackknife_uncertainty_auc_for_pairprob_high_regret": _binary_auc(uncertainty, high_regret),
+        "uncertainty_error_spearman_source_inner": _finite_spearman(uncertainty, hard_gap),
+        "jackknife_override_rate": float(np.mean([float(r.get("jackknife_override_active", 0.0)) for r in rows])),
+        "jackknife_override_help_rate": float(np.mean([1.0 if float(v) < 0.0 else 0.0 for v in override_delta]))
+        if override_delta
+        else float("nan"),
+        "jackknife_override_harm_rate": float(np.mean([1.0 if float(v) > 0.0 else 0.0 for v in override_delta]))
+        if override_delta
+        else float("nan"),
+        "total_override_help_gap_reduction": float(np.sum(help_delta)) if help_delta else 0.0,
+        "total_override_harm_gap_increase": float(np.sum(harm_delta)) if harm_delta else 0.0,
+        "mean_paired_gap_delta_vs_pairprob_hard": float(np.mean(paired_delta)) if paired_delta else float("nan"),
+        "paired_improvement_rate_vs_pairprob_hard": float(
+            np.mean([1.0 if float(v) < 0.0 else 0.0 for v in paired_delta])
+        )
+        if paired_delta
+        else float("nan"),
+        "jackknife_mean_vs_pairprob_hard_selection_change_rate": float(
+            np.mean([float(r.get("jackknife_mean_vs_pairprob_hard_selection_change", 0.0)) for r in rows])
+        ),
+        "mean_ensemble_override_rate_vs_pairprob_hard": float(
+            np.mean([float(r.get("mean_ensemble_override_vs_pairprob_hard", 0.0)) for r in rows])
+        ),
+        "lcb_override_rate_vs_jackknife_mean": float(
+            np.mean([float(r.get("lcb_override_vs_jackknife_mean", 0.0)) for r in rows])
+        ),
+        "lcb_override_rate_vs_pairprob_hard": float(
+            np.mean([float(r.get("lcb_override_vs_pairprob_hard", 0.0)) for r in rows])
+        ),
+        "candidate_pool_consistent": float(
+            min(int(float(r.get("candidate_pool_consistent", 0) or 0)) for r in rows)
+        ),
+    }
+
+
+def _lambda_domain_preferences(
+    rows_by_lambda: Mapping[float, Sequence[Mapping[str, Any]]],
+) -> Dict[int, float]:
+    domains = sorted({int(row["query_domain"]) for rows in rows_by_lambda.values() for row in rows})
+    out: Dict[int, float] = {}
+    for domain in domains:
+        scored: List[Tuple[float, float]] = []
+        for lam, rows in rows_by_lambda.items():
+            vals = [float(r["oracle_gap_pct"]) for r in rows if int(r["query_domain"]) == int(domain)]
+            if vals:
+                scored.append((float(np.mean(vals)), float(lam)))
+        if scored:
+            out[int(domain)] = sorted(scored, key=lambda item: (item[0], item[1]))[0][1]
+    return out
+
+
+def select_jackknife_lcb_policy(
+    *,
+    blocks: Sequence[JackknifeCalibrationBlock],
+    base_selection: PairprobPolicySelection | None,
+    global_expert_domains: Sequence[int],
+    cfg: JackknifeLCBTournamentConfig,
+) -> JackknifeLCBSelection | None:
+    if not bool(cfg.enabled):
+        return None
+    if base_selection is None or not blocks:
+        return JackknifeLCBSelection(
+            method=cfg.method_name,
+            mean_method=cfg.mean_method_name,
+            base_method=cfg.base_method,
+            feature_set=cfg.adoption_feature_family,
+            ridge_l2=float("nan"),
+            jackknife_lambda=0.0,
+            selected_by_inner_validation=False,
+            diagnostic_only_reason="source_inner_evidence_insufficient",
+            noop=True,
+            lambda_stability_status="forced_zero_uncertainty_failed",
+            candidate_pool_consistent=False,
+            selected_lambda_is_zero_but_lcb_candidates_reported=True,
+        )
+
+    if len({int(block.validation_domain) for block in blocks}) < int(cfg.min_source_inner_validation_domains):
+        evidence_reason = "source_inner_evidence_insufficient"
+    elif any(int(block.n_models) < int(cfg.min_jackknife_models) for block in blocks):
+        evidence_reason = "source_inner_evidence_insufficient"
+    elif not all(bool(block.candidate_pool_consistent) for block in blocks):
+        evidence_reason = "candidate_pool_inconsistent"
+    else:
+        evidence_reason = ""
+
+    rows_by_lambda: Dict[float, List[Dict[str, Any]]] = {}
+    for lam in cfg.lambda_values:
+        rows: List[Dict[str, Any]] = []
+        selection = JackknifeLCBSelection(
+            method=cfg.method_name,
+            mean_method=cfg.mean_method_name,
+            base_method=cfg.base_method,
+            feature_set=base_selection.feature_set,
+            ridge_l2=base_selection.ridge_l2,
+            jackknife_lambda=float(lam),
+            selected_by_inner_validation=True,
+            candidate_pool_consistent=not bool(evidence_reason),
+        )
+        for block in blocks:
+            rows.extend(
+                jackknife_pairprob_route_rows(
+                    method=cfg.method_name,
+                    fold=block.fold,
+                    query_domains=block.query_domains,
+                    expert_domains=block.expert_domains,
+                    mean_win=block.mean_win,
+                    std_win=block.std_win,
+                    n_models=block.n_models,
+                    candidate_pool_consistent=block.candidate_pool_consistent,
+                    true_nelbo_matrix=block.true_nelbo_matrix,
+                    global_true_nelbo_matrix=block.global_true_nelbo_matrix,
+                    global_expert_domains=global_expert_domains,
+                    policy_name=cfg.method_name,
+                    selection=selection,
+                    pairprob_hard_win=block.pairprob_hard_win,
+                    pairprob_hard_selected_idx=block.pairprob_hard_selected_idx,
+                    pairprob_hard_oracle_gap_pct=block.pairprob_hard_oracle_gap_pct,
+                    metadata_oracle_gap_pct=block.metadata_oracle_gap_pct,
+                    cfg=cfg,
+                )
+            )
+        rows_by_lambda[float(lam)] = rows
+
+    zero_rows = rows_by_lambda.get(0.0, next(iter(rows_by_lambda.values()), []))
+    zero_summary = summarize_jackknife_rows(zero_rows)
+    auc_high = float(zero_summary["jackknife_uncertainty_auc_for_pairprob_high_regret"])
+    spearman_uncertainty = float(zero_summary["uncertainty_error_spearman_source_inner"])
+    allow_positive = (
+        np.isfinite(auc_high)
+        and auc_high >= float(cfg.allow_lcb_penalty_auc_min)
+    ) or (
+        np.isfinite(spearman_uncertainty)
+        and spearman_uncertainty >= float(cfg.allow_lcb_penalty_spearman_min)
+    )
+    allowed_lambdas = [float(v) for v in cfg.lambda_values if float(v) == 0.0 or allow_positive]
+    candidates: List[Tuple[Tuple[float, ...], float, Dict[str, float]]] = []
+    for lam in allowed_lambdas:
+        summary = summarize_jackknife_rows(rows_by_lambda.get(float(lam), []))
+        if int(summary.get("n_rows", 0.0)) <= 0:
+            continue
+        candidates.append(
+            (
+                (
+                    -float(summary["worst_inner_domain_oracle_gap_pct"]),
+                    -float(summary["relative_catastrophic_regression_vs_pairprob_hard_gt_5_rate"]),
+                    -float(summary["mean_oracle_gap_pct"]),
+                    float(summary["top1_oracle_hit"]),
+                    float(summary["spearman"]) if np.isfinite(float(summary["spearman"])) else -1e9,
+                    -float(summary["jackknife_override_rate"]),
+                    -float(lam),
+                ),
+                float(lam),
+                summary,
+            )
+        )
+    if not candidates:
+        return JackknifeLCBSelection(
+            method=cfg.method_name,
+            mean_method=cfg.mean_method_name,
+            base_method=cfg.base_method,
+            feature_set=base_selection.feature_set,
+            ridge_l2=base_selection.ridge_l2,
+            jackknife_lambda=0.0,
+            selected_by_inner_validation=False,
+            diagnostic_only_reason="source_inner_evidence_insufficient",
+            noop=True,
+            lambda_stability_status="forced_zero_uncertainty_failed",
+            candidate_pool_consistent=False,
+            selected_lambda_is_zero_but_lcb_candidates_reported=True,
+        )
+
+    _score, selected_lambda, selected_summary = sorted(candidates, key=lambda item: item[0], reverse=True)[0]
+    domain_pref = _lambda_domain_preferences(rows_by_lambda)
+    lambda_status = "stable_zero" if abs(float(selected_lambda)) < 1e-12 else "stable_nonzero"
+    reason_parts = [evidence_reason]
+    if not allow_positive and any(float(v) > 0.0 for v in cfg.lambda_values):
+        if float(selected_lambda) > 0.0:
+            selected_lambda = 0.0
+            selected_summary = zero_summary
+        lambda_status = "forced_zero_uncertainty_failed"
+        reason_parts.append("forced_zero_uncertainty_failed")
+
+    if float(selected_lambda) > 0.0:
+        zero_by_domain: Dict[int, float] = {}
+        selected_by_domain: Dict[int, float] = {}
+        for domain in sorted({int(row["query_domain"]) for row in rows_by_lambda.get(0.0, [])}):
+            zero_vals = [float(r["oracle_gap_pct"]) for r in rows_by_lambda.get(0.0, []) if int(r["query_domain"]) == domain]
+            selected_vals = [
+                float(r["oracle_gap_pct"])
+                for r in rows_by_lambda.get(float(selected_lambda), [])
+                if int(r["query_domain"]) == domain
+            ]
+            if zero_vals:
+                zero_by_domain[int(domain)] = float(np.mean(zero_vals))
+            if selected_vals:
+                selected_by_domain[int(domain)] = float(np.mean(selected_vals))
+        catastrophic_domain_harm = any(
+            float(selected_by_domain[d]) - float(zero_by_domain[d])
+            > float(cfg.catastrophic_regression_vs_pairprob_hard_gap_pct)
+            for d in selected_by_domain
+            if d in zero_by_domain
+        )
+        pref_values = set(float(v) for v in domain_pref.values())
+        contradictory = 0.0 in pref_values and any(v > 0.0 for v in pref_values)
+        if catastrophic_domain_harm or contradictory:
+            selected_lambda = 0.0
+            selected_summary = zero_summary
+            lambda_status = "unstable"
+            reason_parts.append("lambda_unstable_forced_zero")
+
+    if abs(float(selected_lambda)) < 1e-12 and lambda_status == "stable_zero":
+        reason_parts.append("selected_lambda_zero_mean_ensemble")
+    if float(selected_summary.get("jackknife_override_rate", 0.0)) > float(cfg.max_override_rate):
+        reason_parts.append("jackknife_override_rate_too_high")
+    if float(selected_summary.get("candidate_pool_consistent", 0.0)) < 1.0:
+        reason_parts.append("candidate_pool_inconsistent")
+
+    reason = "|".join(part for part in dict.fromkeys(str(v) for v in reason_parts if str(v)) if part)
+    return JackknifeLCBSelection(
+        method=cfg.method_name,
+        mean_method=cfg.mean_method_name,
+        base_method=cfg.base_method,
+        feature_set=base_selection.feature_set,
+        ridge_l2=base_selection.ridge_l2,
+        jackknife_lambda=float(selected_lambda),
+        selected_by_inner_validation=True,
+        diagnostic_only_reason=str(reason),
+        noop=bool(evidence_reason),
+        source_inner_validation_domains=int(selected_summary.get("validation_domains", 0.0)),
+        source_inner_rows=int(selected_summary.get("n_rows", 0.0)),
+        source_inner_mean_oracle_gap_pct=float(selected_summary["mean_oracle_gap_pct"]),
+        source_inner_worst_domain_oracle_gap_pct=float(selected_summary["worst_inner_domain_oracle_gap_pct"]),
+        source_inner_relative_catastrophic_rate=float(
+            selected_summary["relative_catastrophic_regression_vs_pairprob_hard_gt_5_rate"]
+        ),
+        source_inner_absolute_high_regret_rate=float(selected_summary["absolute_high_regret_rate_gap_gt_5"]),
+        source_inner_top1=float(selected_summary["top1_oracle_hit"]),
+        source_inner_spearman=float(selected_summary["spearman"]),
+        jackknife_uncertainty_auc_for_pairprob_top1_error=float(
+            zero_summary["jackknife_uncertainty_auc_for_pairprob_top1_error"]
+        ),
+        jackknife_uncertainty_auc_for_pairprob_high_regret=float(
+            zero_summary["jackknife_uncertainty_auc_for_pairprob_high_regret"]
+        ),
+        uncertainty_error_spearman_source_inner=float(zero_summary["uncertainty_error_spearman_source_inner"]),
+        lambda_stability_status=str(lambda_status),
+        candidate_pool_consistent=bool(float(selected_summary.get("candidate_pool_consistent", 0.0)) >= 1.0),
+        selected_lambda_is_zero_but_lcb_candidates_reported=bool(abs(float(selected_lambda)) < 1e-12),
+        jackknife_mean_vs_pairprob_hard_selection_change_rate=float(
+            selected_summary["jackknife_mean_vs_pairprob_hard_selection_change_rate"]
+        ),
+        mean_ensemble_override_rate_vs_pairprob_hard=float(
+            selected_summary["mean_ensemble_override_rate_vs_pairprob_hard"]
+        ),
+        lcb_override_rate_vs_jackknife_mean=float(selected_summary["lcb_override_rate_vs_jackknife_mean"]),
+        lcb_override_rate_vs_pairprob_hard=float(selected_summary["lcb_override_rate_vs_pairprob_hard"]),
+        jackknife_override_help_rate=float(selected_summary["jackknife_override_help_rate"]),
+        jackknife_override_harm_rate=float(selected_summary["jackknife_override_harm_rate"]),
+        total_override_help_gap_reduction=float(selected_summary["total_override_help_gap_reduction"]),
+        total_override_harm_gap_increase=float(selected_summary["total_override_harm_gap_increase"]),
+        mean_paired_gap_delta_vs_pairprob_hard=float(selected_summary["mean_paired_gap_delta_vs_pairprob_hard"]),
+        paired_improvement_rate_vs_pairprob_hard=float(selected_summary["paired_improvement_rate_vs_pairprob_hard"]),
     )
 
 

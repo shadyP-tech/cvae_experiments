@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Mapping, Sequence, Tuple
 
 import numpy as np
 
+from src.eval.metrics import spearman_corr
+
 
 _PROTOCOL_VERSION = "learned_utility_loqdo_candidate_exclusion_v2"
 _CANDIDATE_POLICY = "exclude_outer_target_expert"
@@ -244,6 +246,20 @@ def _method_protocol(method: str) -> MethodProtocol:
             diagnostic_only=0,
             routing_uses_query_features=1,
         )
+    if name == "pairwise_jackknife_lcb_pairprob_tournament_v1":
+        return MethodProtocol(
+            method_role="learned",
+            adoption_eligible=1,
+            diagnostic_only=0,
+            routing_uses_query_features=1,
+        )
+    if name == "pairwise_jackknife_mean_pairprob_tournament_v1":
+        return MethodProtocol(
+            method_role="diagnostic",
+            adoption_eligible=0,
+            diagnostic_only=1,
+            routing_uses_query_features=1,
+        )
     if name == "conformal_pairprob_regret_set_router_v1":
         return MethodProtocol(
             method_role="learned",
@@ -357,6 +373,43 @@ def _finite_mean(values: Sequence[float]) -> float:
 def _finite_median(values: Sequence[float]) -> float:
     vals = [float(v) for v in values if np.isfinite(float(v))]
     return float(np.median(vals)) if vals else float("nan")
+
+
+def _binary_auc(score: Sequence[float], label: Sequence[int]) -> float:
+    pairs = [
+        (float(s), int(y))
+        for s, y in zip(score, label)
+        if np.isfinite(float(s)) and int(y) in {0, 1}
+    ]
+    positives = [s for s, y in pairs if y == 1]
+    negatives = [s for s, y in pairs if y == 0]
+    if not positives or not negatives:
+        return float("nan")
+    total = 0.0
+    correct = 0.0
+    for p in positives:
+        for n in negatives:
+            total += 1.0
+            if p > n:
+                correct += 1.0
+            elif abs(p - n) < 1e-12:
+                correct += 0.5
+    return float(correct / total)
+
+
+def _finite_spearman(x: Sequence[float], y: Sequence[float]) -> float:
+    pairs = [
+        (float(a), float(b))
+        for a, b in zip(x, y)
+        if np.isfinite(float(a)) and np.isfinite(float(b))
+    ]
+    if len(pairs) < 2:
+        return float("nan")
+    xs = [p[0] for p in pairs]
+    ys = [p[1] for p in pairs]
+    if max(xs) - min(xs) < 1e-12 or max(ys) - min(ys) < 1e-12:
+        return float("nan")
+    return float(spearman_corr(xs, ys))
 
 
 def _pipe_tokens(value: object) -> List[str]:
@@ -477,6 +530,22 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         "relative_catastrophic_regression_vs_pairprob_hard_gt_5": (
             "relative_catastrophic_regression_vs_pairprob_hard_gt_5"
         ),
+        "jackknife_mean_win_selected": "jackknife_mean_win_selected",
+        "jackknife_std_win_selected": "jackknife_std_win_selected",
+        "jackknife_std_pairprob_hard_selected": "jackknife_std_pairprob_hard_selected",
+        "jackknife_std_selected_rank": "jackknife_std_selected_rank",
+        "jackknife_mean_win_margin_top1_top2": "jackknife_mean_win_margin_top1_top2",
+        "jackknife_std_winner_minus_runnerup": "jackknife_std_winner_minus_runnerup",
+        "jackknife_lcb_margin_top1_top2": "jackknife_lcb_margin_top1_top2",
+        "jackknife_override_active": "jackknife_override_active",
+        "jackknife_mean_vs_pairprob_hard_selection_change": (
+            "jackknife_mean_vs_pairprob_hard_selection_change"
+        ),
+        "mean_ensemble_override_vs_pairprob_hard": "mean_ensemble_override_vs_pairprob_hard",
+        "lcb_override_vs_jackknife_mean": "lcb_override_vs_jackknife_mean",
+        "lcb_override_vs_pairprob_hard": "lcb_override_vs_pairprob_hard",
+        "pairprob_top1_error": "pairprob_top1_error",
+        "pairprob_high_regret_error": "pairprob_high_regret_error",
     }
     for method, vals in sorted(by_method.items()):
         metrics: Dict[str, float] = {}
@@ -585,6 +654,53 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         ) if any("paired_gap_delta_vs_metadata" in r for r in vals) else float("nan")
         metrics["relative_catastrophic_regression_vs_pairprob_hard_gt_5_rate"] = (
             metrics["micro_relative_catastrophic_regression_vs_pairprob_hard_gt_5"]
+        )
+        metrics["jackknife_mean_win_selected"] = metrics["micro_jackknife_mean_win_selected"]
+        metrics["jackknife_std_win_selected"] = metrics["micro_jackknife_std_win_selected"]
+        metrics["jackknife_mean_win_margin_top1_top2"] = metrics[
+            "micro_jackknife_mean_win_margin_top1_top2"
+        ]
+        metrics["jackknife_lcb_margin_top1_top2"] = metrics["micro_jackknife_lcb_margin_top1_top2"]
+        metrics["jackknife_mean_vs_pairprob_hard_selection_change_rate"] = metrics[
+            "micro_jackknife_mean_vs_pairprob_hard_selection_change"
+        ]
+        metrics["mean_ensemble_override_rate_vs_pairprob_hard"] = metrics[
+            "micro_mean_ensemble_override_vs_pairprob_hard"
+        ]
+        metrics["lcb_override_rate_vs_jackknife_mean"] = metrics["micro_lcb_override_vs_jackknife_mean"]
+        metrics["lcb_override_rate_vs_pairprob_hard"] = metrics["micro_lcb_override_vs_pairprob_hard"]
+        metrics["jackknife_override_rate"] = metrics["micro_jackknife_override_active"]
+        jackknife_override_rows = [
+            r for r in vals
+            if int(float(r.get("jackknife_override_active", 0) or 0)) == 1
+        ]
+        jackknife_override_delta = [
+            float(r.get("paired_gap_delta_vs_pairprob_hard", float("nan")))
+            for r in jackknife_override_rows
+        ]
+        metrics["jackknife_override_help_rate"] = _finite_mean(
+            [1.0 if float(v) < 0.0 else 0.0 for v in jackknife_override_delta]
+        )
+        metrics["jackknife_override_harm_rate"] = _finite_mean(
+            [1.0 if float(v) > 0.0 else 0.0 for v in jackknife_override_delta]
+        )
+        metrics["total_override_help_gap_reduction"] = float(
+            np.sum([abs(float(v)) for v in jackknife_override_delta if np.isfinite(float(v)) and float(v) < 0.0])
+        )
+        metrics["total_override_harm_gap_increase"] = float(
+            np.sum([float(v) for v in jackknife_override_delta if np.isfinite(float(v)) and float(v) > 0.0])
+        )
+        metrics["jackknife_uncertainty_auc_for_pairprob_top1_error"] = _binary_auc(
+            [float(r.get("jackknife_std_pairprob_hard_selected", float("nan"))) for r in vals],
+            [int(float(r.get("pairprob_top1_error", 0) or 0)) for r in vals],
+        )
+        metrics["jackknife_uncertainty_auc_for_pairprob_high_regret"] = _binary_auc(
+            [float(r.get("jackknife_std_pairprob_hard_selected", float("nan"))) for r in vals],
+            [int(float(r.get("pairprob_high_regret_error", 0) or 0)) for r in vals],
+        )
+        metrics["uncertainty_error_spearman_outer_eval"] = _finite_spearman(
+            [float(r.get("jackknife_std_pairprob_hard_selected", float("nan"))) for r in vals],
+            [float(r.get("pairprob_hard_oracle_gap_pct", float("nan"))) for r in vals],
         )
 
         if any("delta_gate_active" in r for r in vals):
@@ -752,6 +868,13 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
             "conformal_quantile_k",
             "robust_lambda",
             "normalized_source_inner_worst_regret_selected",
+            "adoption_feature_family",
+            "candidate_pool_consistent",
+            "selected_lambda_is_zero_but_lcb_candidates_reported",
+            "lambda_stability_status",
+            "jackknife_lambda",
+            "jackknife_n_models",
+            "uncertainty_error_spearman_source_inner",
         ]:
             vals_for_key = sorted(set(str(r.get(key, "")) for r in vals if str(r.get(key, "")) != ""))
             if vals_for_key:
