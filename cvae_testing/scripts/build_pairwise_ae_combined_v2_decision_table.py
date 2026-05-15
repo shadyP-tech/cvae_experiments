@@ -15,6 +15,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Sequence
 PRIMARY_METHOD = "pairwise_ranker_ae_combined_inner_selected_v2"
 STRICT_PRIMARY_METHOD = "pairwise_ranker_ae_combined_strict_inner_selected_v2"
 TARGET_BATCH_AGREEMENT_PRIMARY_METHOD = "pairwise_ranker_ae_combined_target_batch_agreement_gated_v3"
+TARGET_BATCH_AGREEMENT_V31_PRIMARY_METHOD = "pairwise_ranker_ae_combined_target_batch_agreement_gated_v31"
 BASELINE_METHOD = "pairwise_ranker_ae_combined"
 AE_ARGMIN_METHOD = "ae_argmin_zscore"
 METADATA_METHOD = "metadata_routing"
@@ -105,6 +106,9 @@ def _method_domain_summary(rows: Sequence[Mapping[str, str]]) -> Dict[tuple[str,
 
 
 def _decision_file(reports: Path) -> tuple[Path, str, bool]:
+    v31 = reports / "pairwise_ae_combined_v31_decision_table.csv"
+    if v31.exists():
+        return v31, TARGET_BATCH_AGREEMENT_V31_PRIMARY_METHOD, True
     v3 = reports / "pairwise_ae_combined_v3_decision_table.csv"
     if v3.exists():
         return v3, TARGET_BATCH_AGREEMENT_PRIMARY_METHOD, True
@@ -252,21 +256,58 @@ def _v3_summary(decision_rows: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
         if int(float(row.get("agreement_gate_applied", 0) or 0)) == 1
         and int(float(row.get("agreement_gate_passed", 0) or 0)) == 0
     )
+    deployed_nonbaseline_rows = [
+        row for row in decision_rows if str(row.get("deployed_method", row.get("selected_method", ""))) != BASELINE_METHOD
+    ]
+    gated_deployed_nonbaseline_rows = [
+        row for row in deployed_nonbaseline_rows if int(float(row.get("agreement_gate_applied", 0) or 0)) == 1
+    ]
+    ungated_deployed_nonbaseline_rows = [
+        row for row in deployed_nonbaseline_rows if int(float(row.get("agreement_gate_applied", 0) or 0)) != 1
+    ]
+    gate_pass_by_method: Dict[str, int] = {}
+    gate_block_by_method: Dict[str, int] = {}
+    for row in unit_rows:
+        method = str(row.get("source_inner_selected_method", ""))
+        if not method or int(float(row.get("agreement_gate_applied", 0) or 0)) != 1:
+            continue
+        if int(float(row.get("agreement_gate_passed", 0) or 0)) == 1:
+            gate_pass_by_method[method] = int(gate_pass_by_method.get(method, 0) + 1)
+        else:
+            gate_block_by_method[method] = int(gate_block_by_method.get(method, 0) + 1)
     return {
         "gate_activation_count": int(gate_activation),
         "gate_pass_count": int(gate_pass),
         "gate_block_count": int(gate_block),
         "false_veto_count": int(
-            sum(1 for row in unit_rows if int(float(row.get("false_veto", 0) or 0)) == 1)
+            sum(
+                1
+                for row in unit_rows
+                if int(float(row.get("agreement_gate_applied", 0) or 0)) == 1
+                and int(float(row.get("false_veto", 0) or 0)) == 1
+            )
         ),
         "false_allow_count": int(
-            sum(1 for row in unit_rows if int(float(row.get("false_allow", 0) or 0)) == 1)
+            sum(
+                1
+                for row in unit_rows
+                if int(float(row.get("agreement_gate_applied", 0) or 0)) == 1
+                and int(float(row.get("false_allow", 0) or 0)) == 1
+            )
         ),
         "blocked_harmful_count": int(
             sum(1 for row in unit_rows if int(float(row.get("blocked_harmful_deployment", 0) or 0)) == 1)
         ),
         "allowed_beneficial_count": int(
             sum(1 for row in unit_rows if int(float(row.get("allowed_beneficial_deployment", 0) or 0)) == 1)
+        ),
+        "nonbaseline_deployment_count": int(len(deployed_nonbaseline_rows)),
+        "gated_nonbaseline_count": int(len(gated_deployed_nonbaseline_rows)),
+        "ungated_nonbaseline_count": int(len(ungated_deployed_nonbaseline_rows)),
+        "gate_pass_count_by_selected_method": gate_pass_by_method,
+        "gate_block_count_by_selected_method": gate_block_by_method,
+        "harmful_nonbaseline_bypass": int(
+            sum(1 for row in unit_rows if int(float(row.get("harmful_nonbaseline_bypass", 0) or 0)) == 1)
         ),
         "mean_blocked_v2_delta_gap_vs_baseline": _mean(
             [_float(row.get("blocked_v2_delta_gap_vs_baseline")) for row in decision_rows],
@@ -286,13 +327,36 @@ def _v3_summary(decision_rows: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
         "used_target_fitting_for_gate": 0,
         "used_target_normalization_for_gate": 0,
         "heldout_target_nelbo_used_for_selection": 0,
+        "delta_gap_v31_vs_v3": _mean(
+            [_float(row.get("delta_gap_v31_vs_v3")) for row in decision_rows],
+            float("nan"),
+        ),
+        "delta_top1_v31_vs_v3": _mean(
+            [_float(row.get("delta_top1_v31_vs_v3")) for row in decision_rows],
+            float("nan"),
+        ),
+        "delta_spearman_v31_vs_v3": _mean(
+            [_float(row.get("delta_spearman_v31_vs_v3")) for row in decision_rows],
+            float("nan"),
+        ),
+        "v31_additional_blocks_over_v3": int(
+            sum(1 for row in unit_rows if int(float(row.get("v31_additional_blocks_over_v3", 0) or 0)) == 1)
+        ),
+        "v31_additional_false_vetoes_over_v3": int(
+            sum(1 for row in unit_rows if int(float(row.get("v31_additional_false_vetoes_over_v3", 0) or 0)) == 1)
+        ),
+        "v31_additional_harm_prevented_over_v3": int(
+            sum(1 for row in unit_rows if int(float(row.get("v31_additional_harm_prevented_over_v3", 0) or 0)) == 1)
+        ),
     }
 
 
-def _write_markdown(path: Path, summary: Mapping[str, Any], seed_domain_rows: Sequence[Mapping[str, Any]], *, strict: bool, v3: bool = False) -> None:
+def _write_markdown(path: Path, summary: Mapping[str, Any], seed_domain_rows: Sequence[Mapping[str, Any]], *, strict: bool, v3: bool = False, v31: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        "# Pairwise AE-Combined Target-Batch Agreement-Gated v3"
+        "# Pairwise AE-Combined Target-Batch Agreement-Gated v3.1"
+        if v31
+        else "# Pairwise AE-Combined Target-Batch Agreement-Gated v3"
         if v3
         else "# Pairwise AE-Combined Strict Inner-Selected v2"
         if strict
@@ -336,8 +400,9 @@ def main() -> None:
     paths = _load_runs(args.manifest, args.dataset)
     decisions, seed_domain_rows, any_strict = _aggregate_decisions(paths)
     any_v3 = any(str(row.get("primary_method", "")) == TARGET_BATCH_AGREEMENT_PRIMARY_METHOD for row in decisions)
+    any_v31 = any(str(row.get("primary_method", "")) == TARGET_BATCH_AGREEMENT_V31_PRIMARY_METHOD for row in decisions)
     summary = _verdict(seed_domain_rows)
-    if any_v3:
+    if any_v3 or any_v31:
         summary.update(_v3_summary(decisions))
     summary.update(
         {
@@ -345,12 +410,12 @@ def main() -> None:
             "n_runs": len(paths),
             "n_decision_rows": len(decisions),
             "n_seed_domain_rows": len(seed_domain_rows),
-            "primary_method": TARGET_BATCH_AGREEMENT_PRIMARY_METHOD if any_v3 else STRICT_PRIMARY_METHOD if any_strict else PRIMARY_METHOD,
+            "primary_method": TARGET_BATCH_AGREEMENT_V31_PRIMARY_METHOD if any_v31 else TARGET_BATCH_AGREEMENT_PRIMARY_METHOD if any_v3 else STRICT_PRIMARY_METHOD if any_strict else PRIMARY_METHOD,
         }
     )
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    prefix = "pairwise_ae_combined_v3" if any_v3 else "pairwise_ae_combined_v2_strict" if any_strict else "pairwise_ae_combined_v2"
+    prefix = "pairwise_ae_combined_v31" if any_v31 else "pairwise_ae_combined_v3" if any_v3 else "pairwise_ae_combined_v2_strict" if any_strict else "pairwise_ae_combined_v2"
     _write_csv(args.output_dir / f"{prefix}_decision_table.csv", decisions)
     _write_csv(args.output_dir / f"{prefix}_seed_domain_summary.csv", seed_domain_rows)
     (args.output_dir / f"{prefix}_decision_summary.json").write_text(
@@ -358,7 +423,7 @@ def main() -> None:
         encoding="utf-8",
     )
     summaries_dir = args.output_dir.parent.parent / "summaries"
-    _write_markdown(summaries_dir / f"{prefix}_decision_table.md", summary, seed_domain_rows, strict=any_strict, v3=any_v3)
+    _write_markdown(summaries_dir / f"{prefix}_decision_table.md", summary, seed_domain_rows, strict=any_strict, v3=any_v3, v31=any_v31)
 
 
 if __name__ == "__main__":

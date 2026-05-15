@@ -1,0 +1,192 @@
+seed: 101
+
+experiment:
+  dataset_name: camelyon17
+  name: learned_utility_pairwise_ae_combined_v31_target_batch_agreement
+  mode: learned_utility_routing
+  default_seeds: [101, 202, 303]
+
+data:
+  dataset_type: camelyon17
+  root: data/Camelyon17/data/camelyon17_v1.0
+  metadata_file: metadata.csv
+  domain_field: center
+  legacy_domain_field_alias: magnification
+  dataset_domain_semantics: camelyon17_center
+  use_metadata_split: false
+  image_extensions: [".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"]
+  magnifications: [0, 1, 2, 3, 4]
+  split:
+    train: 0.70
+    val: 0.15
+    test: 0.15
+  require_patient_ids: true
+  split_cap_profile: development
+  split_domain_caps:
+    train: 250
+    val: 100
+    test: 200
+  max_samples_per_domain: 1000
+
+features:
+  image_size: 224
+  extraction_batch_size: 16
+  backbone_type: dinov2_vitb14
+  feature_extractor_name: dinov2_vitb14
+  feature_extractor_checkpoint: facebook/dinov2-base
+  feature_extractor_layer: final_norm_cls
+  embedding_pooling: cls_token
+  embedding_dim: 768
+
+model:
+  hidden_dim: 256
+  latent_dim: 16
+
+training:
+  batch_size: 128
+  learning_rate: 0.001
+  epochs: 25
+  patience: 5
+
+routing:
+  strategy: categorical_exact
+  tau: 1.0
+  temperature: 1.0
+
+learned_utility:
+  split_protocol: loqdo_query_domain
+  query_domain_field: magnification
+  splits: [test]
+  predictors: [pairwise_ranker]
+
+  autoencoder_proxy:
+    enabled: true
+    hidden_dim: 256
+    latent_dim: 32
+    learning_rate: 1.0e-3
+    epochs: 25
+    patience: 5
+    batch_size: 512
+    score_normalization: source_val_zscore
+    score_normalization_eps: 1.0e-6
+    margin_threshold: 0.0
+    run_diagnostics: true
+    ae_first_routing:
+      enabled: false
+    utility_calibrator:
+      enabled: false
+
+  source_reliability:
+    enabled: false
+
+  predictor_params:
+    pairwise_ranker:
+      hidden_dim: 128
+      epochs: 40
+      lr: 1.0e-3
+      batch_size: 2048
+      device: auto
+      loss_type: hinge
+      margin: 1.0
+      near_tie_delta: 0.01
+      hard_pair_fraction: 0.5
+      random_pair_fraction: 0.5
+      max_pairs_per_sample: 12
+      max_pairs_per_domain: 5000
+      run_ablations: true
+      run_utility_weighted_v2: true
+      utility_weighted_v2:
+        enabled: true
+        primary_method: pairwise_ranker_ae_combined_target_batch_agreement_gated_v31
+        selection_mode: target_batch_agreement_gated
+        fallback_method: pairwise_ranker_ae_combined
+        hard_pair_fraction: 0.40
+        utility_pair_fraction: 0.40
+        random_pair_fraction: 0.20
+        pair_weight_alpha: 4.0
+        pair_weight_delta_clip: 0.50
+        pair_weight_min: 1.0
+        pair_weight_max: 3.0
+        strict_adoption:
+          min_macro_gap_reduction_pp: 0.5
+          max_top1_drop_abs: 0.02
+          max_spearman_drop_abs: 0.03
+          max_worst_inner_center_gap_degradation_pp: 0.25
+          min_positive_inner_center_rate: 0.75
+          min_non_degrading_inner_center_rate: 1.0
+          min_passing_inner_centers: 2
+        target_batch_agreement:
+          gate_scope: all_nonbaseline
+          agreement_threshold: 0.60
+          agreement_threshold_source: predeclared_development_seed_diagnostic
+          development_seeds: [11, 42, 73]
+          confirmation_seeds: [101, 202, 303]
+          reference_method: pairwise_ranker_ae_combined_raw_ae_weighted_v2
+          group_key_candidates: [patient_id, slide_id, case_id]
+          min_query_count: 100
+          min_group_count: 2
+
+  target:
+    name: nelbo
+    normalization: per_query_domain_zscore
+    normalization_stats_source: train_fold_only
+    eval_scale: raw_nelbo
+
+  pair_features:
+    include_sample_embedding: true
+    expert_id_encoding: one_hot
+    include_metadata_features: true
+    include_domain_stats: false
+
+  residual_routing:
+    enabled: false
+
+  support_response_routing:
+    enabled: false
+
+  scoring:
+    granularity: sample_expert_pair
+    enforce_full_expert_scoring: true
+    pair_batch_size: 4096
+
+  latent_comparator:
+    primary: wasserstein
+    diagnostics: [centroid, gaussian_kl]
+
+  hybrid_scoring:
+    enabled: false
+    alphas: [0.0, 1.0]
+    latent_metric: wasserstein
+    normalization_primary: per_query_zscore
+    normalization_sensitivity: per_query_minmax
+    run_sensitivity: false
+    tie_policy: stable_expert_index
+
+  compatibility_research:
+    floors:
+      random_rank_floor: true
+      random_score_floor: true
+    permutation_tests:
+      expert_label_permutation: true
+      metadata_permutation: true
+      repeats: 200
+    diagnostics:
+      save_distribution_plots: true
+    gate:
+      uplift_reference_method: metadata_routing
+
+  leakage_guards:
+    require_zero_query_domain_overlap: true
+    forbid_heldout_oracle_labels_in_training: true
+
+  winner_rule:
+    primary_metric: mean_oracle_gap_pct
+    tie_breakers: [top1_oracle_hit, spearman_with_oracle]
+    mlp_min_improvement_abs_pct: 1.0
+    max_allowed_seed_regression_pct: 5.0
+
+  artifacts:
+    save_pair_predictions_csv: true
+    save_sample_selection_csv: true
+    save_domain_breakdown_csv: true
+    save_training_fold_manifest_json: true

@@ -59,6 +59,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_pairwise_ae_combined_v2",
         "learned_utility_pairwise_ae_combined_v2_strict",
         "learned_utility_pairwise_ae_combined_v3_target_batch_agreement",
+        "learned_utility_pairwise_ae_combined_v31_target_batch_agreement",
         "breakhis_support_free_ae_routing_v1",
         "camelyon17_support_free_ae_routing_v1",
     }
@@ -73,6 +74,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_pairwise_ae_combined_v2",
         "learned_utility_pairwise_ae_combined_v2_strict",
         "learned_utility_pairwise_ae_combined_v3_target_batch_agreement",
+        "learned_utility_pairwise_ae_combined_v31_target_batch_agreement",
         "breakhis_support_free_ae_routing_v1",
         "camelyon17_support_free_ae_routing_v1",
     }
@@ -539,8 +541,16 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                         "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2.selection_mode "
                         "must be one of ['standard', 'strict_adoption', 'target_batch_agreement_gated']"
                     )
+                target_batch_for_primary = utility_v2.get("target_batch_agreement", {}) or {}
+                if not isinstance(target_batch_for_primary, dict):
+                    target_batch_for_primary = {}
+                gate_scope = str(target_batch_for_primary.get("gate_scope", "rank_margin_only")).strip().lower()
                 if selection_mode == "target_batch_agreement_gated":
-                    expected_primary = "pairwise_ranker_ae_combined_target_batch_agreement_gated_v3"
+                    expected_primary = (
+                        "pairwise_ranker_ae_combined_target_batch_agreement_gated_v31"
+                        if gate_scope == "all_nonbaseline"
+                        else "pairwise_ranker_ae_combined_target_batch_agreement_gated_v3"
+                    )
                 elif selection_mode == "strict_adoption":
                     expected_primary = "pairwise_ranker_ae_combined_strict_inner_selected_v2"
                 else:
@@ -622,6 +632,12 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                     )
                 target_batch = target_batch or {}
                 if selection_mode == "target_batch_agreement_gated":
+                    gate_scope = str(target_batch.get("gate_scope", "rank_margin_only")).strip().lower()
+                    if gate_scope not in {"rank_margin_only", "all_nonbaseline"}:
+                        raise ValueError(
+                            "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2."
+                            "target_batch_agreement.gate_scope must be one of ['rank_margin_only', 'all_nonbaseline']"
+                        )
                     threshold = float(target_batch.get("agreement_threshold", 0.60))
                     if threshold < 0.0 or threshold > 1.0:
                         raise ValueError(
