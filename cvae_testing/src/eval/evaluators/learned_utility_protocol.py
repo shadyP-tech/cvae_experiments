@@ -232,6 +232,7 @@ def _method_protocol(method: str) -> MethodProtocol:
         )
     if name in {
         "ae_utility_calibrated_safe_override_v1",
+        "ae_utility_calibrated_precision_lcb_safe_override_v11",
         "ae_metadata_utility_calibrated_safe_override_v1",
         "ae_combined_utility_calibrated_safe_override_v1",
         "ae_utility_calibrated_consensus_safe_override_v2",

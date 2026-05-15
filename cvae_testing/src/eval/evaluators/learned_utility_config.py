@@ -129,6 +129,17 @@ class AEUtilityCalibratorConfig:
     max_spearman_drop_vs_metadata_abs: float
     max_gap_pct_degradation_vs_metadata: float
     ridge_l2: float
+    selection_mode: str
+    min_strict_improvement_precision: float
+    min_strict_improvement_precision_lcb: float
+    min_active_override_count: int
+    min_active_override_rate: float
+    min_net_gain_vs_ae_argmin: float
+    neutral_override_gap_pct_band: float
+    max_worst_pseudo_domain_gap_degradation_pp: float
+    precision_bootstrap_reps: int
+    precision_bootstrap_seed: int
+    diagnostic_precision_thresholds: Tuple[float, ...]
 
 
 @dataclass(frozen=True)
@@ -335,6 +346,7 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
     )
     utility_calibrator_cfg = _as_dict((autoencoder_cfg or {}).get("utility_calibrator", {}))
     utility_calibrator_risk = _as_dict((utility_calibrator_cfg or {}).get("risk_gates", {}))
+    precision_selection_cfg = _as_dict((utility_calibrator_cfg or {}).get("precision_selection", {}))
     utility_calibrator = AEUtilityCalibratorConfig(
         enabled=bool((utility_calibrator_cfg or {}).get("enabled", False)),
         primary_method=str(
@@ -423,6 +435,31 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
             (utility_calibrator_risk or {}).get("max_gap_pct_degradation_vs_metadata", 1.0)
         ),
         ridge_l2=float((utility_calibrator_cfg or {}).get("ridge_l2", 1e-4)),
+        selection_mode=str((utility_calibrator_cfg or {}).get("selection_mode", "")).strip().lower(),
+        min_strict_improvement_precision=float(
+            (precision_selection_cfg or {}).get("min_strict_improvement_precision", 0.75)
+        ),
+        min_strict_improvement_precision_lcb=float(
+            (precision_selection_cfg or {}).get("min_strict_improvement_precision_lcb", 0.60)
+        ),
+        min_active_override_count=int((precision_selection_cfg or {}).get("min_active_override_count", 10)),
+        min_active_override_rate=float((precision_selection_cfg or {}).get("min_active_override_rate", 0.10)),
+        min_net_gain_vs_ae_argmin=float((precision_selection_cfg or {}).get("min_net_gain_vs_ae_argmin", 0.0)),
+        neutral_override_gap_pct_band=float(
+            (precision_selection_cfg or {}).get("neutral_override_gap_pct_band", 0.25)
+        ),
+        max_worst_pseudo_domain_gap_degradation_pp=float(
+            (precision_selection_cfg or {}).get("max_worst_pseudo_domain_gap_degradation_pp", 1.0)
+        ),
+        precision_bootstrap_reps=int((precision_selection_cfg or {}).get("bootstrap_reps", 2000)),
+        precision_bootstrap_seed=int((precision_selection_cfg or {}).get("bootstrap_seed", 1337)),
+        diagnostic_precision_thresholds=tuple(
+            float(v)
+            for v in (precision_selection_cfg or {}).get(
+                "diagnostic_precision_thresholds",
+                [0.70, 0.75, 0.80, 0.85],
+            )
+        ),
     )
     autoencoder = AutoencoderProxyConfig(
         enabled=bool((autoencoder_cfg or {}).get("enabled", False)),

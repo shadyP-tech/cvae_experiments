@@ -55,6 +55,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_ae_first_routing_v1",
         "learned_utility_ae_utility_calibrator_v1",
         "learned_utility_ae_utility_calibrator_v2",
+        "learned_utility_ae_utility_calibrator_precision_v11",
         "learned_utility_source_reliability_v1",
         "learned_utility_pairwise_ae_combined_v2",
         "learned_utility_pairwise_ae_combined_v2_strict",
@@ -70,6 +71,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_ae_first_routing_v1",
         "learned_utility_ae_utility_calibrator_v1",
         "learned_utility_ae_utility_calibrator_v2",
+        "learned_utility_ae_utility_calibrator_precision_v11",
         "learned_utility_source_reliability_v1",
         "learned_utility_pairwise_ae_combined_v2",
         "learned_utility_pairwise_ae_combined_v2_strict",
@@ -1081,6 +1083,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                 ).strip()
                 allowed_primary_methods = {
                     "ae_utility_calibrated_safe_override_v1",
+                    "ae_utility_calibrated_precision_lcb_safe_override_v11",
                     "ae_utility_calibrated_consensus_safe_override_v2",
                 }
                 if primary_method not in allowed_primary_methods:
@@ -1089,6 +1092,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                         f"must be one of {sorted(allowed_primary_methods)}"
                     )
                 is_consensus_v2 = primary_method == "ae_utility_calibrated_consensus_safe_override_v2"
+                is_precision_v11 = primary_method == "ae_utility_calibrated_precision_lcb_safe_override_v11"
                 model_types = utility_calibrator_cfg.get("model_types", ["ridge_delta"])
                 if not isinstance(model_types, list) or not model_types:
                     raise ValueError(
@@ -1139,9 +1143,10 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                     "feature_sets_primary": primary_features,
                     "feature_sets_diagnostic": diagnostic_features,
                 }.items():
-                    if not isinstance(values, list) or not values:
+                    if not isinstance(values, list) or (key == "feature_sets_primary" and not values):
+                        requirement = "must be a non-empty list" if key == "feature_sets_primary" else "must be a list"
                         raise ValueError(
-                            f"learned_utility.autoencoder_proxy.utility_calibrator.{key} must be a non-empty list"
+                            f"learned_utility.autoencoder_proxy.utility_calibrator.{key} {requirement}"
                         )
                     bad = sorted(set(str(v).strip().lower() for v in values) - allowed_feature_sets)
                     if bad:
@@ -1192,6 +1197,56 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                                 "learned_utility.autoencoder_proxy.utility_calibrator.consensus_thresholds "
                                 "must be in [0,1]"
                             )
+                if is_precision_v11:
+                    if str(
+                        utility_calibrator_cfg.get(
+                            "selection_mode",
+                            "precision_lcb_selected_v11",
+                        )
+                    ).strip().lower() != "precision_lcb_selected_v11":
+                        raise ValueError(
+                            "learned_utility.autoencoder_proxy.utility_calibrator.selection_mode "
+                            "must be 'precision_lcb_selected_v11' for v1.1"
+                        )
+                    precision_selection = utility_calibrator_cfg.get("precision_selection", {})
+                    if precision_selection is not None and not isinstance(precision_selection, dict):
+                        raise ValueError(
+                            "learned_utility.autoencoder_proxy.utility_calibrator.precision_selection "
+                            "must be a dictionary"
+                        )
+                    precision_selection = precision_selection or {}
+                    for key in [
+                        "min_strict_improvement_precision",
+                        "min_strict_improvement_precision_lcb",
+                        "min_active_override_rate",
+                    ]:
+                        value = float(precision_selection.get(key, 0.0))
+                        if value < 0.0 or value > 1.0:
+                            raise ValueError(
+                                "learned_utility.autoencoder_proxy.utility_calibrator."
+                                f"precision_selection.{key} must be in [0,1]"
+                            )
+                    for key in [
+                        "min_active_override_count",
+                        "bootstrap_reps",
+                        "bootstrap_seed",
+                    ]:
+                        if int(precision_selection.get(key, 1)) < 0:
+                            raise ValueError(
+                                "learned_utility.autoencoder_proxy.utility_calibrator."
+                                f"precision_selection.{key} must be >= 0"
+                            )
+                    for key in [
+                        "min_net_gain_vs_ae_argmin",
+                        "neutral_override_gap_pct_band",
+                        "max_worst_pseudo_domain_gap_degradation_pp",
+                    ]:
+                        if float(precision_selection.get(key, 0.0)) < 0.0:
+                            raise ValueError(
+                                "learned_utility.autoencoder_proxy.utility_calibrator."
+                                f"precision_selection.{key} must be >= 0"
+                            )
+                if is_consensus_v2:
                     if float(utility_calibrator_cfg.get("uncertainty_multiplier", 1.0)) < 0.0:
                         raise ValueError(
                             "learned_utility.autoencoder_proxy.utility_calibrator.uncertainty_multiplier must be >= 0"

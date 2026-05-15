@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Sequence
 
 
 PRIMARY_METHOD = "ae_utility_calibrated_safe_override_v1"
+PRIMARY_METHOD_V11 = "ae_utility_calibrated_precision_lcb_safe_override_v11"
 PRIMARY_METHOD_V2 = "ae_utility_calibrated_consensus_safe_override_v2"
 AE_ARGMIN_METHOD = "ae_argmin_zscore"
 METADATA_METHOD = "metadata_routing"
@@ -22,6 +23,7 @@ GLOBAL_BASELINES = {
 }
 REQUIRED_METHODS = set(GLOBAL_BASELINES) | {
     PRIMARY_METHOD,
+    PRIMARY_METHOD_V11,
     PRIMARY_METHOD_V2,
     AE_ARGMIN_METHOD,
     "ae_metadata_utility_calibrated_safe_override_v1",
@@ -118,7 +120,7 @@ def _load_run_rows(path: Path) -> List[Dict[str, Any]]:
             "diagnostic_only": int(_float(metrics.get("diagnostic_only"))),
             "adoption_eligible": int(_float(metrics.get("adoption_eligible"))),
         }
-        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V2}:
+        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V2}:
             matching = [r for (m, _q), r in by_policy.items() if m == method]
             if matching:
                 row["raw_predicted_delta_spearman_non_anchor"] = _mean(
@@ -129,6 +131,15 @@ def _load_run_rows(path: Path) -> List[Dict[str, Any]]:
                 row["captured_oracle_headroom_rate"] = _mean(matching, "captured_oracle_headroom_rate", default=float("nan"))
                 row["abstention_rate"] = _mean(matching, "abstention_rate", default=float("nan"))
                 row["abstention_correct_rate"] = _mean(matching, "abstention_correct_rate", default=float("nan"))
+                row["strict_improvement_precision"] = _mean(
+                    matching, "strict_improvement_precision", default=float("nan")
+                )
+                row["safe_override_precision"] = _mean(matching, "safe_override_precision", default=float("nan"))
+                row["harmful_override_rate"] = _mean(matching, "harmful_override_rate", default=float("nan"))
+                row["active_override_rate_heldout"] = _mean(matching, "active_override_rate_heldout", default=float("nan"))
+                row["precision_lcb_selected_config_used"] = int(
+                    any(str(r.get("selection_status")) == "precision_lcb_selected" for r in matching)
+                )
         rows.append(row)
     return rows
 
@@ -161,7 +172,12 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
     for dataset in sorted(set(str(r["dataset"]) for r in rows)):
         dataset_rows = [r for r in rows if str(r["dataset"]) == dataset]
         by_method = {method: [r for r in dataset_rows if r["method"] == method] for method in REQUIRED_METHODS}
-        primary_method = PRIMARY_METHOD_V2 if by_method.get(PRIMARY_METHOD_V2, []) else PRIMARY_METHOD
+        if by_method.get(PRIMARY_METHOD_V11, []):
+            primary_method = PRIMARY_METHOD_V11
+        elif by_method.get(PRIMARY_METHOD_V2, []):
+            primary_method = PRIMARY_METHOD_V2
+        else:
+            primary_method = PRIMARY_METHOD
         primary = by_method.get(primary_method, [])
         ae_argmin = by_method.get(AE_ARGMIN_METHOD, [])
         metadata = by_method.get(METADATA_METHOD, [])
@@ -195,7 +211,53 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
             and p_gap - m_gap <= THRESHOLDS["gap_pct_degradation_pp_max"]
         )
         domain_ok = _domain_non_degradation_ok(paths, dataset=dataset, method=primary_method, baseline=AE_ARGMIN_METHOD)
-        if primary_method == PRIMARY_METHOD_V2:
+        if primary_method == PRIMARY_METHOD_V11:
+            v1_rows = by_method.get(PRIMARY_METHOD, [])
+            if not v1_rows:
+                local_pass = False
+                local_weak = False
+            else:
+                v1_gap = _mean(v1_rows, "mean_oracle_gap_pct")
+                v1_top1 = _mean(v1_rows, "top1_oracle_hit")
+                v1_spearman = _mean(v1_rows, "raw_spearman")
+                v1_strict_precision = _mean(v1_rows, "strict_improvement_precision", default=float("nan"))
+                v1_harmful = _mean(v1_rows, "harmful_override_rate", default=float("nan"))
+                p_strict_precision = _mean(primary, "strict_improvement_precision", default=float("nan"))
+                p_harmful = _mean(primary, "harmful_override_rate", default=float("nan"))
+                precision_used = any(int(_float(row.get("precision_lcb_selected_config_used"))) == 1 for row in primary)
+                no_v1_degrade = (
+                    v1_top1 - p_top1 <= THRESHOLDS["top1_drop_abs_max"]
+                    and v1_spearman - p_spearman <= THRESHOLDS["spearman_drop_abs_max"]
+                    and p_gap - v1_gap <= THRESHOLDS["gap_pct_degradation_pp_max"]
+                )
+                active_ok = active >= 0.05
+                precision_improved = (
+                    math.isfinite(p_strict_precision)
+                    and (not math.isfinite(v1_strict_precision) or p_strict_precision > v1_strict_precision)
+                )
+                harm_reduced = (
+                    math.isfinite(p_harmful)
+                    and (not math.isfinite(v1_harmful) or p_harmful < v1_harmful)
+                )
+                utility_ok = (p_gap < v1_gap) or ((p_gap - v1_gap) < 0.25 and harm_reduced)
+                seed_non_degrade_count = sum(1 for row in primary if _float(row.get("mean_oracle_gap_pct")) <= v1_gap + 1.0)
+                local_pass = (
+                    utility_ok
+                    and no_v1_degrade
+                    and precision_improved
+                    and harm_reduced
+                    and active_ok
+                    and seed_non_degrade_count >= 2
+                    and precision_used
+                )
+                local_weak = (
+                    no_v1_degrade
+                    and precision_improved
+                    and harm_reduced
+                    and active_ok
+                    and precision_used
+                )
+        elif primary_method == PRIMARY_METHOD_V2:
             v1_rows = by_method.get(PRIMARY_METHOD, [])
             v1_gap_reduction = a_gap - _mean(v1_rows, "mean_oracle_gap_pct") if v1_rows else 0.0
             v2_gap_reduction = a_gap - p_gap
@@ -222,24 +284,25 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
             )
         else:
             local_pass = (
-            p_gap < a_gap
-            and p_top1 >= a_top1
-            and p_spearman >= a_spearman
-            and p_gap < m_gap
-            and active >= THRESHOLDS["min_active_override_rate_for_pass"]
-            and precision > THRESHOLDS["min_selected_override_precision_for_pass"]
-            and harmful <= improving
-            and domain_ok
+                p_gap < a_gap
+                and p_top1 >= a_top1
+                and p_spearman >= a_spearman
+                and p_gap < m_gap
+                and active >= THRESHOLDS["min_active_override_rate_for_pass"]
+                and precision > THRESHOLDS["min_selected_override_precision_for_pass"]
+                and harmful <= improving
+                and domain_ok
             )
-        local_weak = (
-            (p_gap < a_gap or p_top1 > a_top1)
-            and no_ae_degrade
-            and no_meta_degrade
-            and net_gain > 0.0
-            and active >= THRESHOLDS["min_active_override_rate_for_weak_pass"]
-            and precision >= THRESHOLDS["min_selected_override_precision_for_weak_pass"]
-            and harmful <= improving
-        )
+        if primary_method != PRIMARY_METHOD_V11:
+            local_weak = (
+                (p_gap < a_gap or p_top1 > a_top1)
+                and no_ae_degrade
+                and no_meta_degrade
+                and net_gain > 0.0
+                and active >= THRESHOLDS["min_active_override_rate_for_weak_pass"]
+                and precision >= THRESHOLDS["min_selected_override_precision_for_weak_pass"]
+                and harmful <= improving
+            )
         if local_pass:
             local_verdict = "PASS"
         elif local_weak:
@@ -266,6 +329,11 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
                     "mean_oracle_gap_pct": _mean(method_rows, "mean_oracle_gap_pct"),
                     "active_override_rate": _mean(method_rows, "active_override_rate"),
                     "selected_override_precision": _mean(method_rows, "selected_override_precision", default=float("nan")),
+                    "strict_improvement_precision": _mean(
+                        method_rows, "strict_improvement_precision", default=float("nan")
+                    ),
+                    "safe_override_precision": _mean(method_rows, "safe_override_precision", default=float("nan")),
+                    "harmful_override_rate": _mean(method_rows, "harmful_override_rate", default=float("nan")),
                     "net_gain_vs_ae_argmin": _mean(method_rows, "net_gain_vs_ae_argmin"),
                     "harmful_vs_ae_argmin_rate": _mean(method_rows, "harmful_vs_ae_argmin_rate"),
                     "improving_vs_ae_argmin_rate": _mean(method_rows, "improving_vs_ae_argmin_rate"),
