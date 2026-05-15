@@ -750,6 +750,77 @@ def _build_method_summary_rows(method_metrics: Dict[str, Dict[str, Any]]) -> Lis
                 "total_override_harm_gap_increase": float(
                     metrics.get("total_override_harm_gap_increase", float("nan"))
                 ),
+                "top2_rerank_activation_rate": float(
+                    metrics.get("top2_rerank_activation_rate", float("nan"))
+                ),
+                "top2_rerank_switch_rate": float(metrics.get("top2_rerank_switch_rate", float("nan"))),
+                "top2_rerank_help_rate_active_only": float(
+                    metrics.get("top2_rerank_help_rate_active_only", float("nan"))
+                ),
+                "top2_rerank_harm_rate_active_only": float(
+                    metrics.get("top2_rerank_harm_rate_active_only", float("nan"))
+                ),
+                "mean_top2_rerank_delta_gap_pct_vs_direct": float(
+                    metrics.get("mean_top2_rerank_delta_gap_pct_vs_direct", float("nan"))
+                ),
+                "median_top2_rerank_delta_gap_pct_vs_direct": float(
+                    metrics.get("median_top2_rerank_delta_gap_pct_vs_direct", float("nan"))
+                ),
+                "paired_improvement_rate_vs_direct_pairprob": float(
+                    metrics.get("paired_improvement_rate_vs_direct_pairprob", float("nan"))
+                ),
+                "source_inner_top2_rerank_gap_reduction_abs_pct_points": str(
+                    metrics.get("source_inner_top2_rerank_gap_reduction_abs_pct_points", "")
+                ),
+                "source_inner_top2_rerank_high_regret_reduction": str(
+                    metrics.get("source_inner_top2_rerank_high_regret_reduction", "")
+                ),
+                "source_inner_top2_rerank_rows": str(metrics.get("source_inner_top2_rerank_rows", "")),
+                "source_inner_top2_rerank_positive_rows": str(
+                    metrics.get("source_inner_top2_rerank_positive_rows", "")
+                ),
+                "source_inner_top2_rerank_negative_rows": str(
+                    metrics.get("source_inner_top2_rerank_negative_rows", "")
+                ),
+                "source_inner_top2_rerank_active_domains": str(
+                    metrics.get("source_inner_top2_rerank_active_domains", "")
+                ),
+                "source_inner_switch_candidate_rate": str(
+                    metrics.get("source_inner_switch_candidate_rate", "")
+                ),
+                "top2_rerank_guard_status": str(metrics.get("top2_rerank_guard_status", "")),
+                "top2_rerank_diagnostic_only_reason": str(
+                    metrics.get("top2_rerank_diagnostic_only_reason", "")
+                ),
+                "top2_rerank_selection_stability_status": str(
+                    metrics.get("top2_rerank_selection_stability_status", "")
+                ),
+                "base_top2_margin_auc_for_high_regret": str(
+                    metrics.get("base_top2_margin_auc_for_high_regret", "")
+                ),
+                "base_top2_margin_spearman_with_oracle_gap": str(
+                    metrics.get("base_top2_margin_spearman_with_oracle_gap", "")
+                ),
+                "overall_high_regret_rate_direct": str(metrics.get("overall_high_regret_rate_direct", "")),
+                "low_margin_active_high_regret_rate": str(
+                    metrics.get("low_margin_active_high_regret_rate", "")
+                ),
+                "low_margin_high_regret_enrichment": str(metrics.get("low_margin_high_regret_enrichment", "")),
+                "top2_rerank_auc_source_inner": str(metrics.get("top2_rerank_auc_source_inner", "")),
+                "top2_rerank_brier_source_inner": str(metrics.get("top2_rerank_brier_source_inner", "")),
+                "top2_rerank_calibration_status": str(metrics.get("top2_rerank_calibration_status", "")),
+                "oracle_top2_active_gap_reduction_pct": str(
+                    metrics.get("oracle_top2_active_gap_reduction_pct", "")
+                ),
+                "oracle_top2_active_high_regret_reduction": str(
+                    metrics.get("oracle_top2_active_high_regret_reduction", "")
+                ),
+                "oracle_top2_recoverable_error_rate": str(
+                    metrics.get("oracle_top2_recoverable_error_rate", "")
+                ),
+                "oracle_top2_recoverable_gap_mass_pct_points": str(
+                    metrics.get("oracle_top2_recoverable_gap_mass_pct_points", "")
+                ),
                 "std_oracle_gap_pct_across_inner_domains": str(
                     metrics.get("std_oracle_gap_pct_across_inner_domains", "")
                 ),

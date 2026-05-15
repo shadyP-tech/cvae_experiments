@@ -15,6 +15,7 @@ from src.eval.evaluators.learned_utility_config import (
     FallbackBenefitGateConfig,
     JackknifeLCBTournamentConfig,
     PairprobTournamentConfig,
+    Top2MarginRerankerConfig,
 )
 from src.eval.evaluators.learned_utility_models import _LogisticRidgePairprob
 from src.eval.evaluators.learned_utility_pairs import _build_fold_training_pair_features
@@ -23,7 +24,9 @@ from src.eval.evaluators.learned_utility_pairprob import (
     JackknifeCalibrationBlock,
     JackknifeLCBSelection,
     PairprobPolicySelection,
+    Top2RerankSelection,
     build_pairprob_training_data,
+    build_top2_rerank_training_data,
     clone_direct_pairprob_adoption_rows,
     conformal_pairprob_route_rows,
     conformal_quantile,
@@ -34,6 +37,8 @@ from src.eval.evaluators.learned_utility_pairprob import (
     pairprob_route_rows,
     select_jackknife_lcb_policy,
     select_pairprob_policy,
+    top2_rerank_feature_names,
+    top2_rerank_route_rows,
 )
 from src.eval.evaluators import learned_utility as lu
 from src.eval.evaluators.learned_utility_protocol import (
@@ -155,6 +160,41 @@ def _jackknife_cfg(**overrides: object) -> JackknifeLCBTournamentConfig:
     }
     values.update(overrides)
     return JackknifeLCBTournamentConfig(**values)
+
+
+def _top2_cfg(**overrides: object) -> Top2MarginRerankerConfig:
+    values = {
+        "enabled": True,
+        "method_name": "pairwise_direct_top2_margin_reranker_v1",
+        "base_method": "pairwise_direct_pairprob_adoption_v1",
+        "diagnostic_oracle_method_name": "oracle_top2_margin_reranker_diagnostic_v1",
+        "feature_set": "top2_rerank_latent_context_v1",
+        "base_feature_set": "pairprob_latent_only_v1",
+        "predictor": "logistic_ridge_pairprob",
+        "calibration_policy": "source_inner_oof_top2_margin_rerank_v1",
+        "margin_thresholds": (0.20,),
+        "reranker_l2_values": (1.0e-3,),
+        "decision_threshold": 0.50,
+        "near_tie_delta_pct": 0.5,
+        "margin_weight_scale_pct": 5.0,
+        "margin_weight_clip": (0.25, 3.0),
+        "max_rerank_activation_rate": 1.0,
+        "max_rerank_switch_rate": 1.0,
+        "min_source_inner_rerank_rows": 1,
+        "min_source_inner_positive_rows": 1,
+        "min_source_inner_negative_rows": 1,
+        "min_source_inner_active_domains": 1,
+        "min_source_inner_validation_domains": 1,
+        "min_source_inner_gap_reduction_abs_pct_points": 0.0,
+        "min_low_margin_high_regret_enrichment": 0.0,
+        "max_switch_harm_rate_active_only": 1.0,
+        "min_oracle_top2_recoverable_error_rate": 0.0,
+        "min_oracle_top2_recoverable_gap_mass_pct_points": 0.0,
+        "absolute_high_regret_gap_pct": 5.0,
+        "catastrophic_regression_vs_direct_gap_pct": 5.0,
+    }
+    values.update(overrides)
+    return Top2MarginRerankerConfig(**values)
 
 
 def test_tournament_win_scores_exclude_self_comparisons() -> None:
@@ -408,6 +448,147 @@ def test_direct_pairprob_adoption_alias_fails_on_diagnostic_evidence_failure() -
     assert adoption["diagnostic_only"] == 1
     assert adoption["sign_ci_candidate"] == 0
     assert adoption["direct_adoption_audit_failure_reason"] == "source_only_audit_failed"
+
+
+def test_top2_rerank_features_are_metadata_free_and_oriented() -> None:
+    names = top2_rerank_feature_names(embedding_dim=2, expert_feature_dim=3)
+
+    assert not any("metadata" in name for name in names)
+    assert "top1_minus_top2_0" in names
+    assert names[-1] == "p_top1_beats_top2"
+
+
+def test_top2_rerank_training_data_orients_keep_label_and_class_counts() -> None:
+    x_rows = np.asarray(
+        [
+            [1.0, 0.0, 1.0, 0.0],
+            [1.0, 0.0, 0.0, 1.0],
+            [0.0, 1.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
+    prob = np.asarray(
+        [
+            [[0.5, 0.8], [0.2, 0.5]],
+            [[0.5, 0.7], [0.3, 0.5]],
+        ],
+        dtype=np.float64,
+    )
+    true = np.asarray([[10.0, 20.0], [20.0, 10.0]], dtype=np.float64)
+    data = build_top2_rerank_training_data(
+        x_rows=x_rows,
+        query_domains=np.asarray([0, 1], dtype=np.int64),
+        expert_domains=[1, 2],
+        prob_matrix=prob,
+        true_nelbo_matrix=true,
+        embedding_dim=2,
+        expert_feature_dim=2,
+        margin_threshold=1.0,
+        near_tie_delta_pct=0.0,
+        margin_weight_scale_pct=5.0,
+        margin_weight_clip=(0.25, 3.0),
+    )
+
+    assert data.x.shape[0] == 2
+    assert data.positive_rows == 1
+    assert data.negative_rows == 1
+    assert data.y.tolist() == [1.0, 0.0]
+    assert np.isclose(data.switch_candidate_rate, 0.5)
+
+
+def test_top2_rerank_noop_routes_exactly_as_direct_pairprob() -> None:
+    fold = FoldCandidateSet.for_heldout_domain(heldout_domain=0, expert_domains=[0, 1, 2])
+    x_rows = np.asarray([[1.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 1.0]], dtype=np.float64)
+    prob = np.asarray([[[0.5, 0.9], [0.1, 0.5]]], dtype=np.float64)
+    true = np.asarray([[20.0, 10.0]], dtype=np.float64)
+    selection = Top2RerankSelection(
+        method="pairwise_direct_top2_margin_reranker_v1",
+        oracle_method="oracle_top2_margin_reranker_diagnostic_v1",
+        base_method="pairwise_direct_pairprob_adoption_v1",
+        feature_set="top2_rerank_latent_context_v1",
+        base_feature_set="pairprob_latent_only_v1",
+        base_ridge_l2=1.0e-3,
+        reranker_l2=1.0e-3,
+        margin_threshold=1.0,
+        decision_threshold=0.5,
+        selected_by_inner_validation=True,
+        diagnostic_only_reason="insufficient_source_inner_rerank_rows",
+        noop=True,
+        guard_status="failed_guards_noop",
+    )
+
+    rows = top2_rerank_route_rows(
+        method="pairwise_direct_top2_margin_reranker_v1",
+        fold=fold,
+        query_domains=np.asarray([0], dtype=np.int64),
+        expert_domains=fold.candidate_expert_domains,
+        x_rows=x_rows,
+        prob_matrix=prob,
+        true_nelbo_matrix=true,
+        global_true_nelbo_matrix=np.asarray([[5.0, 20.0, 10.0]], dtype=np.float64),
+        global_expert_domains=[0, 1, 2],
+        policy_name="pairwise_direct_top2_margin_reranker_v1",
+        selection=selection,
+        reranker_bundle=None,
+        pairprob_direct_gap_pct=np.asarray([100.0], dtype=np.float64),
+        metadata_oracle_gap_pct=None,
+        embedding_dim=2,
+        expert_feature_dim=2,
+        cfg=_top2_cfg(),
+        keep_prob_override=np.asarray([0.0], dtype=np.float64),
+    )
+
+    assert rows[0]["selected_expert"] == 1
+    assert rows[0]["top2_rerank_active"] == 0
+    assert rows[0]["top2_rerank_switched"] == 0
+    assert rows[0]["diagnostic_only"] == 1
+
+
+def test_oracle_top2_rerank_diagnostic_uses_eval_nelbo_and_is_not_adoption_eligible() -> None:
+    fold = FoldCandidateSet.for_heldout_domain(heldout_domain=0, expert_domains=[0, 1, 2])
+    x_rows = np.asarray([[1.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 1.0]], dtype=np.float64)
+    prob = np.asarray([[[0.5, 0.51], [0.49, 0.5]]], dtype=np.float64)
+    true = np.asarray([[20.0, 10.0]], dtype=np.float64)
+    selection = Top2RerankSelection(
+        method="pairwise_direct_top2_margin_reranker_v1",
+        oracle_method="oracle_top2_margin_reranker_diagnostic_v1",
+        base_method="pairwise_direct_pairprob_adoption_v1",
+        feature_set="top2_rerank_latent_context_v1",
+        base_feature_set="pairprob_latent_only_v1",
+        base_ridge_l2=1.0e-3,
+        reranker_l2=1.0e-3,
+        margin_threshold=0.1,
+        decision_threshold=0.5,
+        selected_by_inner_validation=True,
+    )
+
+    rows = top2_rerank_route_rows(
+        method="oracle_top2_margin_reranker_diagnostic_v1",
+        fold=fold,
+        query_domains=np.asarray([0], dtype=np.int64),
+        expert_domains=fold.candidate_expert_domains,
+        x_rows=x_rows,
+        prob_matrix=prob,
+        true_nelbo_matrix=true,
+        global_true_nelbo_matrix=np.asarray([[5.0, 20.0, 10.0]], dtype=np.float64),
+        global_expert_domains=[0, 1, 2],
+        policy_name="pairwise_direct_top2_margin_reranker_v1",
+        selection=selection,
+        reranker_bundle=None,
+        pairprob_direct_gap_pct=np.asarray([100.0], dtype=np.float64),
+        metadata_oracle_gap_pct=None,
+        embedding_dim=2,
+        expert_feature_dim=2,
+        cfg=_top2_cfg(),
+        oracle_diagnostic=True,
+    )
+    protocol = _method_protocol("oracle_top2_margin_reranker_diagnostic_v1")
+
+    assert rows[0]["selected_expert"] == 2
+    assert rows[0]["routing_uses_eval_nelbo"] == 1
+    assert rows[0]["adoption_eligible"] == 0
+    assert protocol.routing_uses_eval_nelbo == 1
 
 
 def test_jackknife_lambda_zero_routes_as_mean_ensemble_and_lcb_can_override() -> None:
@@ -1041,6 +1222,8 @@ def test_pairwise_tournament_protocol_flags() -> None:
     conformal_oracle = _method_protocol("oracle_conformal_regret_set_diagnostic_v1")
     jackknife_lcb = _method_protocol("pairwise_jackknife_lcb_pairprob_tournament_v1")
     jackknife_mean = _method_protocol("pairwise_jackknife_mean_pairprob_tournament_v1")
+    top2_rerank = _method_protocol("pairwise_direct_top2_margin_reranker_v1")
+    top2_oracle = _method_protocol("oracle_top2_margin_reranker_diagnostic_v1")
 
     assert learned.method_role == "learned"
     assert learned.adoption_eligible == 1
@@ -1072,6 +1255,12 @@ def test_pairwise_tournament_protocol_flags() -> None:
     assert conformal_oracle.method_role == "diagnostic"
     assert conformal_oracle.adoption_eligible == 0
     assert conformal_oracle.routing_uses_eval_nelbo == 1
+    assert top2_rerank.method_role == "learned"
+    assert top2_rerank.adoption_eligible == 1
+    assert top2_rerank.routing_uses_eval_nelbo == 0
+    assert top2_oracle.method_role == "diagnostic"
+    assert top2_oracle.adoption_eligible == 0
+    assert top2_oracle.routing_uses_eval_nelbo == 1
     assert oracle.method_role == "diagnostic"
     assert oracle.adoption_eligible == 0
     assert oracle.diagnostic_only == 1

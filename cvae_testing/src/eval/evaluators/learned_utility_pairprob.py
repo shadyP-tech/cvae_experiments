@@ -10,6 +10,7 @@ from src.eval.evaluators.learned_utility_config import (
     ConformalRegretSetConfig,
     JackknifeLCBTournamentConfig,
     PairprobTournamentConfig,
+    Top2MarginRerankerConfig,
 )
 from src.eval.evaluators.learned_utility_models import _LogisticRidgePairprob
 from src.eval.evaluators.learned_utility_protocol import FoldCandidateSet, ProtocolError
@@ -22,11 +23,28 @@ DIRECT_PAIRPROB_DIAGNOSTIC_METHOD = "pairwise_direct_pairprob_tournament_v1"
 DIRECT_PAIRPROB_ADOPTION_METHOD = "pairwise_direct_pairprob_adoption_v1"
 GROUP_ROBUST_PAIRPROB_METHOD = "pairwise_group_robust_pairprob_tournament_v1"
 COMBINED_PAIRPROB_DIAGNOSTIC_METHOD = "pairwise_pairprob_combined_diagnostic_v1"
+TOP2_RERANK_METHOD = "pairwise_direct_top2_margin_reranker_v1"
+ORACLE_TOP2_RERANK_DIAGNOSTIC_METHOD = "oracle_top2_margin_reranker_diagnostic_v1"
+TOP2_RERANK_FEATURE_SET = "top2_rerank_latent_context_v1"
 DIRECT_PAIRPROB_SELECTION_POLICY = "source_inner_mean_gap_then_catastrophic_then_top1_v1"
 GROUP_ROBUST_PAIRPROB_SELECTION_POLICY = (
     "source_inner_group_robust_worst_gap_then_catastrophic_then_mean_gap_v1"
 )
 DIRECT_PAIRPROB_ADOPTION_FEATURE_FAMILY = "pairprob_latent_only_v1"
+TOP2_RERANK_GUARD_PRIORITY = (
+    "insufficient_source_inner_rerank_rows",
+    "insufficient_source_inner_positive_rows",
+    "insufficient_source_inner_negative_rows",
+    "insufficient_source_inner_active_domains",
+    "low_margin_not_high_regret_enriched",
+    "activation_rate_too_high",
+    "switch_rate_too_high",
+    "harm_rate_too_high",
+    "insufficient_gap_reduction",
+    "unstable_source_inner_selection",
+    "weak_reranker_auc_or_calibration",
+    "worsens_direct_pairprob",
+)
 DIRECT_ADOPTION_AUDIT_REASONS = {
     "none",
     "missing_diagnostic_direct_row",
@@ -207,6 +225,90 @@ class PairprobPolicySelection:
 
 
 @dataclass(frozen=True)
+class Top2RerankTrainingData:
+    x: np.ndarray
+    y: np.ndarray
+    weight: np.ndarray
+    query_domains: np.ndarray
+    total_active_rows: int
+    dropped_near_tie: int
+    positive_rows: int
+    negative_rows: int
+    kept_by_domain: Dict[int, int]
+    switch_candidate_rate: float
+
+
+@dataclass(frozen=True)
+class Top2RerankModelBundle:
+    feature_set: str
+    ridge_l2: float
+    feature_mean: np.ndarray
+    feature_scale: np.ndarray
+    model: _LogisticRidgePairprob
+
+
+@dataclass(frozen=True)
+class Top2RerankCalibrationBlock:
+    validation_domain: int
+    query_domains: np.ndarray
+    expert_domains: Tuple[int, ...]
+    x_rows: np.ndarray
+    prob_matrix: np.ndarray
+    true_nelbo_matrix: np.ndarray
+    global_true_nelbo_matrix: np.ndarray
+    fold: FoldCandidateSet
+    pairprob_direct_gap_pct: np.ndarray
+    metadata_oracle_gap_pct: np.ndarray | None = None
+
+
+@dataclass(frozen=True)
+class Top2RerankSelection:
+    method: str
+    oracle_method: str
+    base_method: str
+    feature_set: str
+    base_feature_set: str
+    base_ridge_l2: float
+    reranker_l2: float
+    margin_threshold: float
+    decision_threshold: float
+    selected_by_inner_validation: bool
+    diagnostic_only_reason: str = ""
+    noop: bool = False
+    guard_status: str = "selected"
+    selection_stability_status: str = "stable"
+    source_inner_validation_domains: int = 0
+    source_inner_top2_rerank_rows: int = 0
+    source_inner_top2_rerank_positive_rows: int = 0
+    source_inner_top2_rerank_negative_rows: int = 0
+    source_inner_top2_rerank_active_domains: int = 0
+    source_inner_switch_candidate_rate: float = float("nan")
+    source_inner_gap_reduction_abs_pct_points: float = float("nan")
+    source_inner_high_regret_reduction: float = float("nan")
+    source_inner_activation_rate: float = float("nan")
+    source_inner_switch_rate: float = float("nan")
+    source_inner_help_rate_active_only: float = float("nan")
+    source_inner_harm_rate_active_only: float = float("nan")
+    source_inner_mean_oracle_gap_pct: float = float("nan")
+    source_inner_high_regret_rate: float = float("nan")
+    source_inner_top1: float = float("nan")
+    source_inner_spearman: float = float("nan")
+    base_top2_margin_auc_for_high_regret: float = float("nan")
+    base_top2_margin_spearman_with_oracle_gap: float = float("nan")
+    overall_high_regret_rate_direct: float = float("nan")
+    low_margin_active_high_regret_rate: float = float("nan")
+    low_margin_high_regret_enrichment: float = float("nan")
+    top2_rerank_auc_source_inner: float = float("nan")
+    top2_rerank_brier_source_inner: float = float("nan")
+    top2_rerank_calibration_status: str = ""
+    oracle_top2_active_gap_reduction_pct: float = float("nan")
+    oracle_top2_active_high_regret_reduction: float = float("nan")
+    oracle_top2_recoverable_error_rate: float = float("nan")
+    oracle_top2_recoverable_gap_mass_pct_points: float = float("nan")
+    model: Top2RerankModelBundle | None = None
+
+
+@dataclass(frozen=True)
 class ConformalCalibrationBlock:
     validation_domain: int
     query_domains: np.ndarray
@@ -334,6 +436,18 @@ def pairprob_feature_names(feature_set: str, *, embedding_dim: int, expert_featu
     return tuple(names)
 
 
+def top2_rerank_feature_names(*, embedding_dim: int, expert_feature_dim: int) -> Tuple[str, ...]:
+    names: List[str] = []
+    names.extend(f"query_embedding_{i}" for i in range(int(embedding_dim)))
+    names.extend(f"top1_expert_identity_{i}" for i in range(int(expert_feature_dim)))
+    names.extend(f"top2_expert_identity_{i}" for i in range(int(expert_feature_dim)))
+    names.extend(f"query_by_top1_{i}_{j}" for i in range(int(embedding_dim)) for j in range(int(expert_feature_dim)))
+    names.extend(f"query_by_top2_{i}_{j}" for i in range(int(embedding_dim)) for j in range(int(expert_feature_dim)))
+    names.extend(f"top1_minus_top2_{i}" for i in range(int(expert_feature_dim)))
+    names.extend(["base_top1_win", "base_top2_win", "top2_margin", "p_top1_beats_top2"])
+    return tuple(names)
+
+
 def _pair_feature(
     row_a: np.ndarray,
     row_b: np.ndarray,
@@ -364,6 +478,39 @@ def _pair_feature(
     elif name != "pairprob_latent_only_v1":
         raise ValueError(f"Unknown pairprob feature_set={feature_set!r}")
     return np.concatenate(parts, axis=0).astype(np.float64, copy=False)
+
+
+def _top2_rerank_feature(
+    row_top1: np.ndarray,
+    row_top2: np.ndarray,
+    *,
+    embedding_dim: int,
+    expert_feature_dim: int,
+    base_top1_win: float,
+    base_top2_win: float,
+    top2_margin: float,
+    p_top1_beats_top2: float,
+) -> np.ndarray:
+    query = np.asarray(row_top1[:embedding_dim], dtype=np.float64)
+    top1 = np.asarray(row_top1[embedding_dim : embedding_dim + expert_feature_dim], dtype=np.float64)
+    top2 = np.asarray(row_top2[embedding_dim : embedding_dim + expert_feature_dim], dtype=np.float64)
+    interaction_top1 = (query[:, None] * top1[None, :]).reshape(-1)
+    interaction_top2 = (query[:, None] * top2[None, :]).reshape(-1)
+    return np.concatenate(
+        [
+            query,
+            top1,
+            top2,
+            interaction_top1,
+            interaction_top2,
+            top1 - top2,
+            np.asarray(
+                [float(base_top1_win), float(base_top2_win), float(top2_margin), float(p_top1_beats_top2)],
+                dtype=np.float64,
+            ),
+        ],
+        axis=0,
+    ).astype(np.float64, copy=False)
 
 
 def build_pairprob_training_data(
@@ -481,8 +628,82 @@ def fit_pairprob_model(
     )
 
 
+def fit_top2_rerank_model(
+    *,
+    train_data: Top2RerankTrainingData,
+    ridge_l2: float,
+    device: str,
+) -> Top2RerankModelBundle:
+    if train_data.x.shape[0] <= 0:
+        raise ProtocolError("Cannot fit top-2 reranker without training rows")
+    x_z, _x_unused = _zscore_features(train_data.x, train_data.x)
+    mean = train_data.x.mean(axis=0)
+    scale = train_data.x.std(axis=0)
+    scale[scale < 1e-8] = 1.0
+    clf = _LogisticRidgePairprob(l2=float(ridge_l2), device=str(device))
+    clf.fit(x_z, train_data.y, train_data.weight)
+    return Top2RerankModelBundle(
+        feature_set=TOP2_RERANK_FEATURE_SET,
+        ridge_l2=float(ridge_l2),
+        feature_mean=mean.astype(np.float64, copy=False),
+        feature_scale=scale.astype(np.float64, copy=False),
+        model=clf,
+    )
+
+
+def _concat_top2_training_data(parts: Sequence[Top2RerankTrainingData]) -> Top2RerankTrainingData:
+    non_empty = [p for p in parts if p.x.shape[0] > 0]
+    if not non_empty:
+        return Top2RerankTrainingData(
+            x=np.zeros((0, 0), dtype=np.float64),
+            y=np.zeros((0,), dtype=np.float64),
+            weight=np.zeros((0,), dtype=np.float64),
+            query_domains=np.zeros((0,), dtype=np.int64),
+            total_active_rows=int(sum(int(p.total_active_rows) for p in parts)),
+            dropped_near_tie=int(sum(int(p.dropped_near_tie) for p in parts)),
+            positive_rows=0,
+            negative_rows=0,
+            kept_by_domain={},
+            switch_candidate_rate=float("nan"),
+        )
+    kept: Dict[int, int] = {}
+    total_active = 0
+    dropped = 0
+    switch_rates_num = 0.0
+    switch_rates_den = 0.0
+    for part in parts:
+        total_active += int(part.total_active_rows)
+        dropped += int(part.dropped_near_tie)
+        if np.isfinite(float(part.switch_candidate_rate)) and int(part.total_active_rows) > 0:
+            switch_rates_num += float(part.switch_candidate_rate) * float(part.total_active_rows)
+            switch_rates_den += float(part.total_active_rows)
+        for domain, count in part.kept_by_domain.items():
+            kept[int(domain)] = int(kept.get(int(domain), 0)) + int(count)
+    y = np.concatenate([part.y for part in non_empty], axis=0)
+    return Top2RerankTrainingData(
+        x=np.vstack([part.x for part in non_empty]).astype(np.float64, copy=False),
+        y=y.astype(np.float64, copy=False),
+        weight=np.concatenate([part.weight for part in non_empty], axis=0).astype(np.float64, copy=False),
+        query_domains=np.concatenate([part.query_domains for part in non_empty], axis=0).astype(np.int64, copy=False),
+        total_active_rows=int(total_active),
+        dropped_near_tie=int(dropped),
+        positive_rows=int(np.sum(y >= 0.5)),
+        negative_rows=int(np.sum(y < 0.5)),
+        kept_by_domain=kept,
+        switch_candidate_rate=float(switch_rates_num / switch_rates_den) if switch_rates_den > 0.0 else float("nan"),
+    )
+
+
 def _apply_pairprob_model(bundle: PairprobModelBundle, x: np.ndarray) -> np.ndarray:
     arr = np.asarray(x, dtype=np.float64)
+    z = (arr - bundle.feature_mean) / bundle.feature_scale
+    return bundle.model.predict_proba(z)
+
+
+def _apply_top2_rerank_model(bundle: Top2RerankModelBundle, x: np.ndarray) -> np.ndarray:
+    arr = np.asarray(x, dtype=np.float64)
+    if arr.shape[0] <= 0:
+        return np.zeros((0,), dtype=np.float64)
     z = (arr - bundle.feature_mean) / bundle.feature_scale
     return bundle.model.predict_proba(z)
 
@@ -559,6 +780,98 @@ def pairprob_order_and_margin(
         orders[i, :] = order
         margins[i] = float(win[i, order[0]] - win[i, order[1]]) if win.shape[1] > 1 else float("inf")
     return win, orders, margins
+
+
+def build_top2_rerank_training_data(
+    *,
+    x_rows: np.ndarray,
+    query_domains: np.ndarray,
+    expert_domains: Sequence[int],
+    prob_matrix: np.ndarray,
+    true_nelbo_matrix: np.ndarray,
+    embedding_dim: int,
+    expert_feature_dim: int,
+    margin_threshold: float,
+    near_tie_delta_pct: float,
+    margin_weight_scale_pct: float,
+    margin_weight_clip: Tuple[float, float],
+) -> Top2RerankTrainingData:
+    win, orders, margins = pairprob_order_and_margin(prob_matrix, expert_domains=expert_domains)
+    k = int(win.shape[1])
+    if k < 2:
+        return Top2RerankTrainingData(
+            x=np.zeros((0, 0), dtype=np.float64),
+            y=np.zeros((0,), dtype=np.float64),
+            weight=np.zeros((0,), dtype=np.float64),
+            query_domains=np.zeros((0,), dtype=np.int64),
+            total_active_rows=0,
+            dropped_near_tie=0,
+            positive_rows=0,
+            negative_rows=0,
+            kept_by_domain={},
+            switch_candidate_rate=float("nan"),
+        )
+    if x_rows.shape[0] % k != 0:
+        raise ProtocolError("Top-2 reranker feature rows are not divisible by candidate expert count")
+
+    features: List[np.ndarray] = []
+    labels: List[float] = []
+    weights: List[float] = []
+    domains: List[int] = []
+    kept_by_domain: Dict[int, int] = {}
+    total_active = 0
+    dropped = 0
+    switch_candidates = 0
+    true = np.asarray(true_nelbo_matrix, dtype=np.float64)
+    low, high = float(margin_weight_clip[0]), float(margin_weight_clip[1])
+    for row_idx in range(win.shape[0]):
+        if float(margins[row_idx]) > float(margin_threshold):
+            continue
+        total_active += 1
+        top1 = int(orders[row_idx, 0])
+        top2 = int(orders[row_idx, 1])
+        top1_nelbo = float(true[row_idx, top1])
+        top2_nelbo = float(true[row_idx, top2])
+        denom = max(abs(min(top1_nelbo, top2_nelbo)), 1e-12)
+        delta_pct = 100.0 * abs(top1_nelbo - top2_nelbo) / denom
+        if top2_nelbo < top1_nelbo:
+            switch_candidates += 1
+        if delta_pct < float(near_tie_delta_pct):
+            dropped += 1
+            continue
+        base = int(row_idx * k)
+        feature = _top2_rerank_feature(
+            np.asarray(x_rows[base + top1], dtype=np.float64),
+            np.asarray(x_rows[base + top2], dtype=np.float64),
+            embedding_dim=int(embedding_dim),
+            expert_feature_dim=int(expert_feature_dim),
+            base_top1_win=float(win[row_idx, top1]),
+            base_top2_win=float(win[row_idx, top2]),
+            top2_margin=float(margins[row_idx]),
+            p_top1_beats_top2=float(prob_matrix[row_idx, top1, top2]),
+        )
+        label = 1.0 if top1_nelbo < top2_nelbo else 0.0
+        features.append(feature)
+        labels.append(float(label))
+        weights.append(float(np.clip(delta_pct / float(margin_weight_scale_pct), low, high)))
+        domain = int(query_domains[row_idx])
+        domains.append(domain)
+        kept_by_domain[domain] = int(kept_by_domain.get(domain, 0)) + 1
+
+    y = np.asarray(labels, dtype=np.float64)
+    x = np.vstack(features).astype(np.float64, copy=False) if features else np.zeros((0, 0), dtype=np.float64)
+    return Top2RerankTrainingData(
+        x=x,
+        y=y,
+        weight=np.asarray(weights, dtype=np.float64),
+        query_domains=np.asarray(domains, dtype=np.int64),
+        total_active_rows=int(total_active),
+        dropped_near_tie=int(dropped),
+        positive_rows=int(np.sum(y >= 0.5)) if y.size else 0,
+        negative_rows=int(np.sum(y < 0.5)) if y.size else 0,
+        kept_by_domain=kept_by_domain,
+        switch_candidate_rate=float(switch_candidates / total_active) if total_active > 0 else float("nan"),
+    )
 
 
 def _pairprob_cycle_rate_for_row(prob: np.ndarray) -> float:
@@ -2025,6 +2338,311 @@ def summarize_pairprob_rows(rows: Sequence[Mapping[str, Any]]) -> Dict[str, floa
     }
 
 
+def _top2_rerank_features_for_rows(
+    *,
+    x_rows: np.ndarray,
+    expert_domains: Sequence[int],
+    prob_matrix: np.ndarray,
+    embedding_dim: int,
+    expert_feature_dim: int,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    win, orders, margins = pairprob_order_and_margin(prob_matrix, expert_domains=expert_domains)
+    k = int(win.shape[1])
+    if x_rows.shape[0] % k != 0:
+        raise ProtocolError("Top-2 reranker feature rows are not divisible by candidate expert count")
+    features: List[np.ndarray] = []
+    top1 = orders[:, 0].astype(np.int64, copy=False)
+    top2 = orders[:, 1].astype(np.int64, copy=False) if k > 1 else orders[:, 0].astype(np.int64, copy=False)
+    p_top1_top2 = np.zeros((win.shape[0],), dtype=np.float64)
+    for row_idx in range(win.shape[0]):
+        base = int(row_idx * k)
+        p = float(prob_matrix[row_idx, int(top1[row_idx]), int(top2[row_idx])]) if k > 1 else 0.5
+        p_top1_top2[row_idx] = p
+        features.append(
+            _top2_rerank_feature(
+                np.asarray(x_rows[base + int(top1[row_idx])], dtype=np.float64),
+                np.asarray(x_rows[base + int(top2[row_idx])], dtype=np.float64),
+                embedding_dim=int(embedding_dim),
+                expert_feature_dim=int(expert_feature_dim),
+                base_top1_win=float(win[row_idx, int(top1[row_idx])]),
+                base_top2_win=float(win[row_idx, int(top2[row_idx])]),
+                top2_margin=float(margins[row_idx]),
+                p_top1_beats_top2=p,
+            )
+        )
+    return (
+        np.vstack(features).astype(np.float64, copy=False) if features else np.zeros((0, 0), dtype=np.float64),
+        win,
+        orders,
+        margins,
+        top1,
+        top2,
+    )
+
+
+def top2_rerank_route_rows(
+    *,
+    method: str,
+    fold: FoldCandidateSet,
+    query_domains: np.ndarray,
+    expert_domains: Sequence[int],
+    x_rows: np.ndarray,
+    prob_matrix: np.ndarray,
+    true_nelbo_matrix: np.ndarray,
+    global_true_nelbo_matrix: np.ndarray,
+    global_expert_domains: Sequence[int],
+    policy_name: str,
+    selection: Top2RerankSelection,
+    reranker_bundle: Top2RerankModelBundle | None,
+    pairprob_direct_gap_pct: np.ndarray,
+    metadata_oracle_gap_pct: np.ndarray | None,
+    embedding_dim: int,
+    expert_feature_dim: int,
+    cfg: Top2MarginRerankerConfig,
+    keep_prob_override: np.ndarray | None = None,
+    oracle_diagnostic: bool = False,
+) -> List[Dict[str, Any]]:
+    features, win, orders, margins, top1_idx, top2_idx = _top2_rerank_features_for_rows(
+        x_rows=x_rows,
+        expert_domains=expert_domains,
+        prob_matrix=prob_matrix,
+        embedding_dim=int(embedding_dim),
+        expert_feature_dim=int(expert_feature_dim),
+    )
+    n = int(win.shape[0])
+    direct_gap = np.asarray(pairprob_direct_gap_pct, dtype=np.float64)
+    if direct_gap.shape[0] != n:
+        direct_gap = _gap_pct_for_selected(true_nelbo_matrix, top1_idx)
+    metadata_gap = (
+        np.asarray(metadata_oracle_gap_pct, dtype=np.float64)
+        if metadata_oracle_gap_pct is not None
+        else np.full((n,), float("nan"), dtype=np.float64)
+    )
+    if metadata_gap.shape[0] != n:
+        metadata_gap = np.full((n,), float("nan"), dtype=np.float64)
+
+    active = margins <= (float(selection.margin_threshold) + 1e-12)
+    if bool(selection.noop) and not bool(oracle_diagnostic):
+        active = np.zeros_like(active, dtype=bool)
+    if keep_prob_override is not None:
+        keep_prob = np.asarray(keep_prob_override, dtype=np.float64)
+    elif reranker_bundle is not None:
+        keep_prob = _apply_top2_rerank_model(reranker_bundle, features)
+    else:
+        keep_prob = np.ones((n,), dtype=np.float64)
+    if keep_prob.shape[0] != n:
+        keep_prob = np.ones((n,), dtype=np.float64)
+
+    true = np.asarray(true_nelbo_matrix, dtype=np.float64)
+    top2_better = true[np.arange(n), top2_idx] < true[np.arange(n), top1_idx]
+    if bool(oracle_diagnostic):
+        switched = active & top2_better
+    else:
+        switched = active & (keep_prob < float(selection.decision_threshold))
+    selected_idx = np.where(switched, top2_idx, top1_idx).astype(np.int64, copy=False)
+    ranking_score = -win
+    _metrics, rows = _selection_metrics(
+        method=method,
+        query_domains=query_domains,
+        expert_domains=expert_domains,
+        score_matrix=ranking_score,
+        true_nelbo_matrix=true_nelbo_matrix,
+        fold=fold,
+        global_true_nelbo_matrix=global_true_nelbo_matrix,
+        global_expert_domains=global_expert_domains,
+        selected_idx_override=selected_idx,
+        ranking_score_matrix=ranking_score,
+    )
+    reason = str(selection.diagnostic_only_reason)
+    if bool(oracle_diagnostic):
+        reason = str(selection.oracle_method)
+
+    top2_gap = _gap_pct_for_selected(true_nelbo_matrix, top2_idx)
+    for i, row in enumerate(rows):
+        selected_col = int(selected_idx[i])
+        selected_expert = int(expert_domains[selected_col])
+        paired_delta = float(row["oracle_gap_pct"]) - float(direct_gap[i])
+        paired_delta_metadata = (
+            float(row["oracle_gap_pct"]) - float(metadata_gap[i])
+            if np.isfinite(float(metadata_gap[i]))
+            else float("nan")
+        )
+        pair_diag = _pair_diagnostics_for_row(prob_matrix[i, :, :], true_nelbo_matrix[i, :])
+        row.update(
+            {
+                "policy_name": str(policy_name),
+                "base_method": str(selection.base_method),
+                "feature_set": str(selection.feature_set),
+                "selected_tau": float(selection.base_ridge_l2),
+                "selected_by_inner_validation": int(bool(selection.selected_by_inner_validation)),
+                "threshold_selection_policy": str(cfg.calibration_policy),
+                "route_experts": str(selected_expert),
+                "route_weights": "1",
+                "route_size": 1,
+                "route_mode": "oracle_top2_margin_reranker_diagnostic" if oracle_diagnostic else "top2_margin_rerank",
+                "pairprob_predictor": "logistic_ridge_pairprob",
+                "pairprob_probability_calibration": "none_v1",
+                "pairprob_ridge_l2": float(selection.base_ridge_l2),
+                "pairprob_feature_set": str(selection.base_feature_set),
+                "pairprob_selection_policy": str(cfg.calibration_policy),
+                "adoption_feature_family": DIRECT_PAIRPROB_ADOPTION_FEATURE_FAMILY if not oracle_diagnostic else "",
+                "base_direct_selected_expert": int(expert_domains[int(top1_idx[i])]),
+                "base_direct_top2_expert": int(expert_domains[int(top2_idx[i])]),
+                "base_direct_top1_win": float(win[i, int(top1_idx[i])]),
+                "base_direct_top2_win": float(win[i, int(top2_idx[i])]),
+                "base_direct_top2_margin": float(margins[i]),
+                "top2_rerank_active": int(bool(active[i])),
+                "top2_rerank_switched": int(bool(switched[i])),
+                "top2_rerank_keep_top1_prob": float(keep_prob[i]),
+                "top2_rerank_threshold": float(selection.margin_threshold),
+                "top2_rerank_l2": float(selection.reranker_l2),
+                "top2_rerank_delta_gap_pct_vs_direct": float(paired_delta),
+                "top2_rerank_help": int(bool(switched[i]) and paired_delta < 0.0),
+                "top2_rerank_harm": int(bool(switched[i]) and paired_delta > 0.0),
+                "top2_rerank_candidate_delta_gap_pct_vs_direct": float(top2_gap[i] - direct_gap[i]),
+                "top2_rerank_top2_better_than_base": int(bool(top2_better[i])),
+                "top2_rerank_guard_status": str(selection.guard_status),
+                "top2_rerank_diagnostic_only_reason": str(reason),
+                "top2_rerank_selection_stability_status": str(selection.selection_stability_status),
+                "source_inner_top2_rerank_gap_reduction_abs_pct_points": float(
+                    selection.source_inner_gap_reduction_abs_pct_points
+                ),
+                "source_inner_top2_rerank_high_regret_reduction": float(
+                    selection.source_inner_high_regret_reduction
+                ),
+                "source_inner_top2_rerank_rows": int(selection.source_inner_top2_rerank_rows),
+                "source_inner_top2_rerank_positive_rows": int(selection.source_inner_top2_rerank_positive_rows),
+                "source_inner_top2_rerank_negative_rows": int(selection.source_inner_top2_rerank_negative_rows),
+                "source_inner_top2_rerank_active_domains": int(selection.source_inner_top2_rerank_active_domains),
+                "source_inner_switch_candidate_rate": float(selection.source_inner_switch_candidate_rate),
+                "reranker_selection_stability_status": str(selection.selection_stability_status),
+                "base_top2_margin_auc_for_high_regret": float(selection.base_top2_margin_auc_for_high_regret),
+                "base_top2_margin_spearman_with_oracle_gap": float(
+                    selection.base_top2_margin_spearman_with_oracle_gap
+                ),
+                "overall_high_regret_rate_direct": float(selection.overall_high_regret_rate_direct),
+                "low_margin_active_high_regret_rate": float(selection.low_margin_active_high_regret_rate),
+                "low_margin_high_regret_enrichment": float(selection.low_margin_high_regret_enrichment),
+                "top2_rerank_auc_source_inner": float(selection.top2_rerank_auc_source_inner),
+                "top2_rerank_brier_source_inner": float(selection.top2_rerank_brier_source_inner),
+                "top2_rerank_calibration_status": str(selection.top2_rerank_calibration_status),
+                "oracle_top2_active_gap_reduction_pct": float(selection.oracle_top2_active_gap_reduction_pct),
+                "oracle_top2_active_high_regret_reduction": float(
+                    selection.oracle_top2_active_high_regret_reduction
+                ),
+                "oracle_top2_recoverable_error_rate": float(selection.oracle_top2_recoverable_error_rate),
+                "oracle_top2_recoverable_gap_mass_pct_points": float(
+                    selection.oracle_top2_recoverable_gap_mass_pct_points
+                ),
+                "paired_gap_delta_vs_pairprob_hard": float(paired_delta),
+                "paired_gap_delta_vs_metadata": float(paired_delta_metadata),
+                "pairprob_hard_oracle_gap_pct": float(direct_gap[i]),
+                "metadata_oracle_gap_pct": float(metadata_gap[i]),
+                "absolute_high_regret_gap_gt_5": int(float(row["oracle_gap_pct"]) > float(cfg.absolute_high_regret_gap_pct)),
+                "relative_catastrophic_regression_vs_pairprob_hard_gt_5": int(
+                    float(paired_delta) > float(cfg.catastrophic_regression_vs_direct_gap_pct)
+                ),
+                "diagnostic_only_reason": str(reason),
+                **pair_diag,
+            }
+        )
+        if reason:
+            row.update({"method_role": "diagnostic", "adoption_eligible": 0, "diagnostic_only": 1})
+    return rows
+
+
+def summarize_top2_rerank_rows(rows: Sequence[Mapping[str, Any]]) -> Dict[str, float]:
+    if not rows:
+        return {
+            "n_rows": 0.0,
+            "validation_domains": 0.0,
+            "mean_oracle_gap_pct": float("nan"),
+            "high_regret_rate": float("nan"),
+            "top1_oracle_hit": float("nan"),
+            "spearman": float("nan"),
+            "top2_rerank_activation_rate": float("nan"),
+            "top2_rerank_switch_rate": float("nan"),
+            "top2_rerank_help_rate_active_only": float("nan"),
+            "top2_rerank_harm_rate_active_only": float("nan"),
+            "mean_top2_rerank_delta_gap_pct_vs_direct": float("nan"),
+            "median_top2_rerank_delta_gap_pct_vs_direct": float("nan"),
+            "paired_improvement_rate_vs_direct_pairprob": float("nan"),
+            "base_top2_margin_auc_for_high_regret": float("nan"),
+            "base_top2_margin_spearman_with_oracle_gap": float("nan"),
+            "overall_high_regret_rate_direct": float("nan"),
+            "low_margin_active_high_regret_rate": float("nan"),
+            "low_margin_high_regret_enrichment": float("nan"),
+            "top2_rerank_auc_source_inner": float("nan"),
+            "top2_rerank_brier_source_inner": float("nan"),
+        }
+    by_domain: Dict[int, List[Mapping[str, Any]]] = {}
+    for row in rows:
+        by_domain.setdefault(int(row["query_domain"]), []).append(row)
+    spearman_vals = [float(r["spearman"]) for r in rows if np.isfinite(float(r["spearman"]))]
+    active_rows = [r for r in rows if int(float(r.get("top2_rerank_active", 0) or 0)) == 1]
+    switched_rows = [r for r in rows if int(float(r.get("top2_rerank_switched", 0) or 0)) == 1]
+    deltas = [float(r.get("top2_rerank_delta_gap_pct_vs_direct", float("nan"))) for r in rows]
+    keep_probs = [
+        float(r.get("top2_rerank_keep_top1_prob", float("nan")))
+        for r in active_rows
+        if np.isfinite(float(r.get("top2_rerank_keep_top1_prob", float("nan"))))
+    ]
+    keep_labels = [int(float(r.get("top2_rerank_top2_better_than_base", 0) or 0)) == 0 for r in active_rows]
+    brier_vals = [
+        (float(prob) - (1.0 if bool(label) else 0.0)) ** 2
+        for prob, label in zip(keep_probs, keep_labels)
+        if np.isfinite(float(prob))
+    ]
+    direct_gaps = [float(r.get("pairprob_hard_oracle_gap_pct", float("nan"))) for r in rows]
+    margins = [float(r.get("base_direct_top2_margin", float("nan"))) for r in rows]
+    high_regret_direct = [
+        int(float(r.get("pairprob_hard_oracle_gap_pct", 0.0) or 0.0) > float(r.get("absolute_high_regret_gap_pct", 5.0)))
+        for r in rows
+    ]
+    overall_high = float(np.mean(high_regret_direct)) if high_regret_direct else float("nan")
+    active_high = float(
+        np.mean(
+            [
+                1.0 if float(r.get("pairprob_hard_oracle_gap_pct", 0.0) or 0.0) > 5.0 else 0.0
+                for r in active_rows
+            ]
+        )
+    ) if active_rows else float("nan")
+    return {
+        "n_rows": float(len(rows)),
+        "validation_domains": float(len(by_domain)),
+        "mean_oracle_gap_pct": float(np.mean([float(r["oracle_gap_pct"]) for r in rows])),
+        "high_regret_rate": float(np.mean([float(r.get("absolute_high_regret_gap_gt_5", 0.0)) for r in rows])),
+        "top1_oracle_hit": float(np.mean([float(r["top1_oracle_hit"]) for r in rows])),
+        "spearman": float(np.mean(spearman_vals)) if spearman_vals else float("nan"),
+        "top2_rerank_activation_rate": float(np.mean([float(r.get("top2_rerank_active", 0.0)) for r in rows])),
+        "top2_rerank_switch_rate": float(np.mean([float(r.get("top2_rerank_switched", 0.0)) for r in rows])),
+        "top2_rerank_help_rate_active_only": float(
+            np.mean([float(r.get("top2_rerank_help", 0.0)) for r in active_rows])
+        ) if active_rows else float("nan"),
+        "top2_rerank_harm_rate_active_only": float(
+            np.mean([float(r.get("top2_rerank_harm", 0.0)) for r in active_rows])
+        ) if active_rows else float("nan"),
+        "top2_rerank_switch_harm_rate": float(
+            np.mean([1.0 if float(r.get("top2_rerank_delta_gap_pct_vs_direct", 0.0)) > 0.0 else 0.0 for r in switched_rows])
+        ) if switched_rows else 0.0,
+        "mean_top2_rerank_delta_gap_pct_vs_direct": float(np.mean(deltas)) if deltas else float("nan"),
+        "median_top2_rerank_delta_gap_pct_vs_direct": float(np.median(deltas)) if deltas else float("nan"),
+        "paired_improvement_rate_vs_direct_pairprob": float(
+            np.mean([1.0 if float(v) < 0.0 else 0.0 for v in deltas])
+        ) if deltas else float("nan"),
+        "base_top2_margin_auc_for_high_regret": _binary_auc([-m for m in margins], high_regret_direct),
+        "base_top2_margin_spearman_with_oracle_gap": _finite_spearman([-m for m in margins], direct_gaps),
+        "overall_high_regret_rate_direct": float(overall_high),
+        "low_margin_active_high_regret_rate": float(active_high),
+        "low_margin_high_regret_enrichment": (
+            float(active_high / overall_high) if np.isfinite(active_high) and overall_high > 0.0 else float("nan")
+        ),
+        "top2_rerank_auc_source_inner": _binary_auc(keep_probs, [1 if label else 0 for label in keep_labels]),
+        "top2_rerank_brier_source_inner": float(np.mean(brier_vals)) if brier_vals else float("nan"),
+    }
+
+
 def select_pairprob_policy(
     *,
     rows_by_key: Dict[Tuple[str, str, float], List[Dict[str, Any]]],
@@ -2097,4 +2715,353 @@ def select_pairprob_policy(
         pairwise_train_pairs_after_filter=int(evidence.get("pairwise_train_pairs_after_filter", 0.0)),
         pairwise_validation_pairs_after_filter=int(evidence.get("pairwise_validation_pairs_after_filter", 0.0)),
         pairwise_train_domains_after_filter=int(evidence.get("pairwise_train_domains_after_filter", 0.0)),
+    )
+
+
+def top2_rerank_evidence_reason(
+    *,
+    train_data: Top2RerankTrainingData,
+    validation_domains: int,
+    cfg: Top2MarginRerankerConfig,
+) -> str:
+    if int(validation_domains) < int(cfg.min_source_inner_validation_domains):
+        return "insufficient_source_inner_rerank_rows"
+    if int(train_data.x.shape[0]) < int(cfg.min_source_inner_rerank_rows):
+        return "insufficient_source_inner_rerank_rows"
+    if int(train_data.positive_rows) < int(cfg.min_source_inner_positive_rows):
+        return "insufficient_source_inner_positive_rows"
+    if int(train_data.negative_rows) < int(cfg.min_source_inner_negative_rows):
+        return "insufficient_source_inner_negative_rows"
+    if len(train_data.kept_by_domain) < int(cfg.min_source_inner_active_domains):
+        return "insufficient_source_inner_active_domains"
+    return ""
+
+
+def _top2_reason_from_summary(
+    *,
+    summary: Mapping[str, float],
+    train_data: Top2RerankTrainingData,
+    cfg: Top2MarginRerankerConfig,
+    stability_status: str,
+) -> str:
+    if int(train_data.x.shape[0]) < int(cfg.min_source_inner_rerank_rows):
+        return "insufficient_source_inner_rerank_rows"
+    if int(train_data.positive_rows) < int(cfg.min_source_inner_positive_rows):
+        return "insufficient_source_inner_positive_rows"
+    if int(train_data.negative_rows) < int(cfg.min_source_inner_negative_rows):
+        return "insufficient_source_inner_negative_rows"
+    if len(train_data.kept_by_domain) < int(cfg.min_source_inner_active_domains):
+        return "insufficient_source_inner_active_domains"
+    enrichment = float(summary.get("low_margin_high_regret_enrichment", float("nan")))
+    if not np.isfinite(enrichment) or enrichment < float(cfg.min_low_margin_high_regret_enrichment):
+        return "low_margin_not_high_regret_enriched"
+    if float(summary.get("top2_rerank_activation_rate", 0.0)) > float(cfg.max_rerank_activation_rate):
+        return "activation_rate_too_high"
+    if float(summary.get("top2_rerank_switch_rate", 0.0)) > float(cfg.max_rerank_switch_rate):
+        return "switch_rate_too_high"
+    if float(summary.get("top2_rerank_switch_harm_rate", 0.0)) > float(cfg.max_switch_harm_rate_active_only):
+        return "harm_rate_too_high"
+    if float(summary.get("source_inner_gap_reduction_abs_pct_points", 0.0)) < float(
+        cfg.min_source_inner_gap_reduction_abs_pct_points
+    ):
+        return "insufficient_gap_reduction"
+    if str(stability_status) == "unstable":
+        return "unstable_source_inner_selection"
+    auc = float(summary.get("top2_rerank_auc_source_inner", float("nan")))
+    if np.isfinite(auc) and auc < 0.50:
+        return "weak_reranker_auc_or_calibration"
+    if float(summary.get("mean_top2_rerank_delta_gap_pct_vs_direct", 0.0)) > 0.0:
+        return "worsens_direct_pairprob"
+    return ""
+
+
+def _source_inner_oracle_top2_headroom(rows: Sequence[Mapping[str, Any]]) -> Dict[str, float]:
+    active = [r for r in rows if int(float(r.get("top2_rerank_active", 0) or 0)) == 1]
+    if not active:
+        return {
+            "oracle_top2_active_gap_reduction_pct": float("nan"),
+            "oracle_top2_active_high_regret_reduction": float("nan"),
+            "oracle_top2_recoverable_error_rate": float("nan"),
+            "oracle_top2_recoverable_gap_mass_pct_points": 0.0,
+        }
+    direct_gap = [float(r.get("pairprob_hard_oracle_gap_pct", float("nan"))) for r in active]
+    oracle_gap = [float(r.get("oracle_gap_pct", float("nan"))) for r in active]
+    recoverable_delta = [
+        max(0.0, float(r.get("pairprob_hard_oracle_gap_pct", 0.0)) - float(r.get("oracle_gap_pct", 0.0)))
+        for r in active
+    ]
+    return {
+        "oracle_top2_active_gap_reduction_pct": float(np.nanmean(direct_gap) - np.nanmean(oracle_gap)),
+        "oracle_top2_active_high_regret_reduction": float(
+            np.mean([1.0 if v > 5.0 else 0.0 for v in direct_gap])
+            - np.mean([1.0 if v > 5.0 else 0.0 for v in oracle_gap])
+        ),
+        "oracle_top2_recoverable_error_rate": float(
+            np.mean([1.0 if float(v) > 0.0 else 0.0 for v in recoverable_delta])
+        ),
+        "oracle_top2_recoverable_gap_mass_pct_points": float(np.mean(recoverable_delta)),
+    }
+
+
+def select_top2_margin_reranker_policy(
+    *,
+    blocks: Sequence[Top2RerankCalibrationBlock],
+    base_selection: PairprobPolicySelection | None,
+    global_expert_domains: Sequence[int],
+    cfg: Top2MarginRerankerConfig,
+    embedding_dim: int,
+    expert_feature_dim: int,
+    device: str,
+) -> Top2RerankSelection | None:
+    if not bool(cfg.enabled):
+        return None
+    if base_selection is None or not blocks:
+        return Top2RerankSelection(
+            method=cfg.method_name,
+            oracle_method=cfg.diagnostic_oracle_method_name,
+            base_method=cfg.base_method,
+            feature_set=cfg.feature_set,
+            base_feature_set=cfg.base_feature_set,
+            base_ridge_l2=float("nan"),
+            reranker_l2=float(cfg.reranker_l2_values[0]),
+            margin_threshold=float(cfg.margin_thresholds[0]),
+            decision_threshold=float(cfg.decision_threshold),
+            selected_by_inner_validation=False,
+            diagnostic_only_reason="insufficient_source_inner_rerank_rows",
+            noop=True,
+            guard_status="failed_guards_noop",
+            selection_stability_status="forced_direct_pairprob",
+        )
+
+    candidates: List[Tuple[Tuple[float, ...], float, float, Dict[str, float], Top2RerankTrainingData, str, List[Dict[str, Any]]]] = []
+    invalid: List[Tuple[Tuple[float, ...], float, float, Dict[str, float], Top2RerankTrainingData, str, List[Dict[str, Any]]]] = []
+    source_domains = sorted({int(block.validation_domain) for block in blocks})
+    for threshold in cfg.margin_thresholds:
+        training_by_domain: Dict[int, Top2RerankTrainingData] = {}
+        for block in blocks:
+            training_by_domain[int(block.validation_domain)] = build_top2_rerank_training_data(
+                x_rows=block.x_rows,
+                query_domains=block.query_domains,
+                expert_domains=block.expert_domains,
+                prob_matrix=block.prob_matrix,
+                true_nelbo_matrix=block.true_nelbo_matrix,
+                embedding_dim=int(embedding_dim),
+                expert_feature_dim=int(expert_feature_dim),
+                margin_threshold=float(threshold),
+                near_tie_delta_pct=float(cfg.near_tie_delta_pct),
+                margin_weight_scale_pct=float(cfg.margin_weight_scale_pct),
+                margin_weight_clip=cfg.margin_weight_clip,
+            )
+        full_train_data = _concat_top2_training_data(list(training_by_domain.values()))
+        for l2 in cfg.reranker_l2_values:
+            rows: List[Dict[str, Any]] = []
+            keep_probs_all: List[float] = []
+            keep_labels_all: List[int] = []
+            for block in blocks:
+                train_parts = [
+                    data for domain, data in training_by_domain.items() if int(domain) != int(block.validation_domain)
+                ]
+                train_data = _concat_top2_training_data(train_parts)
+                reason = top2_rerank_evidence_reason(
+                    train_data=train_data,
+                    validation_domains=len(train_parts),
+                    cfg=cfg,
+                )
+                bundle: Top2RerankModelBundle | None = None
+                if not reason:
+                    bundle = fit_top2_rerank_model(train_data=train_data, ridge_l2=float(l2), device=str(device))
+                validation_rows = top2_rerank_route_rows(
+                    method=cfg.method_name,
+                    fold=block.fold,
+                    query_domains=block.query_domains,
+                    expert_domains=block.expert_domains,
+                    x_rows=block.x_rows,
+                    prob_matrix=block.prob_matrix,
+                    true_nelbo_matrix=block.true_nelbo_matrix,
+                    global_true_nelbo_matrix=block.global_true_nelbo_matrix,
+                    global_expert_domains=global_expert_domains,
+                    policy_name=cfg.method_name,
+                    selection=Top2RerankSelection(
+                        method=cfg.method_name,
+                        oracle_method=cfg.diagnostic_oracle_method_name,
+                        base_method=cfg.base_method,
+                        feature_set=cfg.feature_set,
+                        base_feature_set=cfg.base_feature_set,
+                        base_ridge_l2=base_selection.ridge_l2,
+                        reranker_l2=float(l2),
+                        margin_threshold=float(threshold),
+                        decision_threshold=float(cfg.decision_threshold),
+                        selected_by_inner_validation=True,
+                        diagnostic_only_reason=str(reason),
+                        noop=bool(reason),
+                    ),
+                    reranker_bundle=bundle,
+                    pairprob_direct_gap_pct=block.pairprob_direct_gap_pct,
+                    metadata_oracle_gap_pct=block.metadata_oracle_gap_pct,
+                    embedding_dim=int(embedding_dim),
+                    expert_feature_dim=int(expert_feature_dim),
+                    cfg=cfg,
+                )
+                rows.extend(validation_rows)
+                for row in validation_rows:
+                    if int(float(row.get("top2_rerank_active", 0) or 0)) == 1:
+                        keep_probs_all.append(float(row.get("top2_rerank_keep_top1_prob", float("nan"))))
+                        keep_labels_all.append(0 if int(float(row.get("top2_rerank_top2_better_than_base", 0) or 0)) == 1 else 1)
+
+            summary = summarize_top2_rerank_rows(rows)
+            direct_mean_gap = float(np.mean([float(r.get("pairprob_hard_oracle_gap_pct", float("nan"))) for r in rows]))
+            direct_high = float(
+                np.mean([1.0 if float(r.get("pairprob_hard_oracle_gap_pct", 0.0)) > float(cfg.absolute_high_regret_gap_pct) else 0.0 for r in rows])
+            ) if rows else float("nan")
+            summary["source_inner_gap_reduction_abs_pct_points"] = float(direct_mean_gap - summary["mean_oracle_gap_pct"])
+            summary["source_inner_high_regret_reduction"] = float(direct_high - summary["high_regret_rate"])
+            if keep_probs_all and len(set(keep_labels_all)) == 2:
+                summary["top2_rerank_auc_source_inner"] = _binary_auc(keep_probs_all, keep_labels_all)
+                summary["top2_rerank_brier_source_inner"] = float(
+                    np.mean([(float(p) - float(y)) ** 2 for p, y in zip(keep_probs_all, keep_labels_all)])
+                )
+            summary["top2_rerank_calibration_status"] = "ok" if float(summary.get("top2_rerank_auc_source_inner", 0.0)) >= 0.50 else "weak"
+
+            domain_harm = False
+            for domain in sorted({int(row["query_domain"]) for row in rows}):
+                selected_vals = [float(r["oracle_gap_pct"]) for r in rows if int(r["query_domain"]) == domain]
+                direct_vals = [float(r.get("pairprob_hard_oracle_gap_pct", float("nan"))) for r in rows if int(r["query_domain"]) == domain]
+                if selected_vals and direct_vals and float(np.mean(selected_vals)) - float(np.mean(direct_vals)) > float(cfg.catastrophic_regression_vs_direct_gap_pct):
+                    domain_harm = True
+                    break
+            stability = "unstable" if domain_harm else "stable"
+            reason = _top2_reason_from_summary(
+                summary=summary,
+                train_data=full_train_data,
+                cfg=cfg,
+                stability_status=stability,
+            )
+            score = (
+                -float(summary["mean_oracle_gap_pct"]),
+                -float(summary["high_regret_rate"]),
+                float(summary["source_inner_gap_reduction_abs_pct_points"]),
+                float(summary["top1_oracle_hit"]),
+                -float(summary["top2_rerank_harm_rate_active_only"])
+                if np.isfinite(float(summary["top2_rerank_harm_rate_active_only"]))
+                else -1e9,
+                -float(summary["top2_rerank_activation_rate"]),
+                -float(l2),
+                -float(threshold),
+            )
+            item = (score, float(threshold), float(l2), summary, full_train_data, stability, rows)
+            (invalid if reason else candidates).append(item)
+
+    pool = candidates if candidates else invalid
+    if not pool:
+        return Top2RerankSelection(
+            method=cfg.method_name,
+            oracle_method=cfg.diagnostic_oracle_method_name,
+            base_method=cfg.base_method,
+            feature_set=cfg.feature_set,
+            base_feature_set=cfg.base_feature_set,
+            base_ridge_l2=base_selection.ridge_l2,
+            reranker_l2=float(cfg.reranker_l2_values[0]),
+            margin_threshold=float(cfg.margin_thresholds[0]),
+            decision_threshold=float(cfg.decision_threshold),
+            selected_by_inner_validation=False,
+            diagnostic_only_reason="insufficient_source_inner_rerank_rows",
+            noop=True,
+            guard_status="failed_guards_noop",
+            selection_stability_status="forced_direct_pairprob",
+        )
+    _score, threshold, l2, summary, train_data, stability, selected_rows = sorted(
+        pool,
+        key=lambda item: item[0],
+        reverse=True,
+    )[0]
+    reason = _top2_reason_from_summary(summary=summary, train_data=train_data, cfg=cfg, stability_status=stability)
+    if str(base_selection.diagnostic_only_reason):
+        reason = "|".join(
+            part for part in dict.fromkeys([str(base_selection.diagnostic_only_reason), str(reason)]) if part
+        )
+    model: Top2RerankModelBundle | None = None
+    if not reason:
+        model = fit_top2_rerank_model(train_data=train_data, ridge_l2=float(l2), device=str(device))
+    headroom_rows: List[Dict[str, Any]] = []
+    headroom_selection = Top2RerankSelection(
+        method=cfg.method_name,
+        oracle_method=cfg.diagnostic_oracle_method_name,
+        base_method=cfg.base_method,
+        feature_set=cfg.feature_set,
+        base_feature_set=cfg.base_feature_set,
+        base_ridge_l2=base_selection.ridge_l2,
+        reranker_l2=float(l2),
+        margin_threshold=float(threshold),
+        decision_threshold=float(cfg.decision_threshold),
+        selected_by_inner_validation=True,
+    )
+    for block in blocks:
+        headroom_rows.extend(
+            top2_rerank_route_rows(
+                method=cfg.diagnostic_oracle_method_name,
+                fold=block.fold,
+                query_domains=block.query_domains,
+                expert_domains=block.expert_domains,
+                x_rows=block.x_rows,
+                prob_matrix=block.prob_matrix,
+                true_nelbo_matrix=block.true_nelbo_matrix,
+                global_true_nelbo_matrix=block.global_true_nelbo_matrix,
+                global_expert_domains=global_expert_domains,
+                policy_name=cfg.method_name,
+                selection=headroom_selection,
+                reranker_bundle=None,
+                pairprob_direct_gap_pct=block.pairprob_direct_gap_pct,
+                metadata_oracle_gap_pct=block.metadata_oracle_gap_pct,
+                embedding_dim=int(embedding_dim),
+                expert_feature_dim=int(expert_feature_dim),
+                cfg=cfg,
+                oracle_diagnostic=True,
+            )
+        )
+    headroom = _source_inner_oracle_top2_headroom(headroom_rows)
+    guard_status = "selected" if not reason else "failed_guards_noop"
+    return Top2RerankSelection(
+        method=cfg.method_name,
+        oracle_method=cfg.diagnostic_oracle_method_name,
+        base_method=cfg.base_method,
+        feature_set=cfg.feature_set,
+        base_feature_set=cfg.base_feature_set,
+        base_ridge_l2=base_selection.ridge_l2,
+        reranker_l2=float(l2),
+        margin_threshold=float(threshold),
+        decision_threshold=float(cfg.decision_threshold),
+        selected_by_inner_validation=True,
+        diagnostic_only_reason=str(reason),
+        noop=bool(reason),
+        guard_status=str(guard_status),
+        selection_stability_status=str(stability if not reason else "forced_direct_pairprob"),
+        source_inner_validation_domains=len(source_domains),
+        source_inner_top2_rerank_rows=int(train_data.x.shape[0]),
+        source_inner_top2_rerank_positive_rows=int(train_data.positive_rows),
+        source_inner_top2_rerank_negative_rows=int(train_data.negative_rows),
+        source_inner_top2_rerank_active_domains=int(len(train_data.kept_by_domain)),
+        source_inner_switch_candidate_rate=float(train_data.switch_candidate_rate),
+        source_inner_gap_reduction_abs_pct_points=float(summary["source_inner_gap_reduction_abs_pct_points"]),
+        source_inner_high_regret_reduction=float(summary["source_inner_high_regret_reduction"]),
+        source_inner_activation_rate=float(summary["top2_rerank_activation_rate"]),
+        source_inner_switch_rate=float(summary["top2_rerank_switch_rate"]),
+        source_inner_help_rate_active_only=float(summary["top2_rerank_help_rate_active_only"]),
+        source_inner_harm_rate_active_only=float(summary["top2_rerank_harm_rate_active_only"]),
+        source_inner_mean_oracle_gap_pct=float(summary["mean_oracle_gap_pct"]),
+        source_inner_high_regret_rate=float(summary["high_regret_rate"]),
+        source_inner_top1=float(summary["top1_oracle_hit"]),
+        source_inner_spearman=float(summary["spearman"]),
+        base_top2_margin_auc_for_high_regret=float(summary["base_top2_margin_auc_for_high_regret"]),
+        base_top2_margin_spearman_with_oracle_gap=float(summary["base_top2_margin_spearman_with_oracle_gap"]),
+        overall_high_regret_rate_direct=float(summary["overall_high_regret_rate_direct"]),
+        low_margin_active_high_regret_rate=float(summary["low_margin_active_high_regret_rate"]),
+        low_margin_high_regret_enrichment=float(summary["low_margin_high_regret_enrichment"]),
+        top2_rerank_auc_source_inner=float(summary["top2_rerank_auc_source_inner"]),
+        top2_rerank_brier_source_inner=float(summary["top2_rerank_brier_source_inner"]),
+        top2_rerank_calibration_status=str(summary["top2_rerank_calibration_status"]),
+        oracle_top2_active_gap_reduction_pct=float(headroom["oracle_top2_active_gap_reduction_pct"]),
+        oracle_top2_active_high_regret_reduction=float(headroom["oracle_top2_active_high_regret_reduction"]),
+        oracle_top2_recoverable_error_rate=float(headroom["oracle_top2_recoverable_error_rate"]),
+        oracle_top2_recoverable_gap_mass_pct_points=float(headroom["oracle_top2_recoverable_gap_mass_pct_points"]),
+        model=model,
     )

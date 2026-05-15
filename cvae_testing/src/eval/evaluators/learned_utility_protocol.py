@@ -254,6 +254,21 @@ def _method_protocol(method: str) -> MethodProtocol:
             diagnostic_only=0,
             routing_uses_query_features=1,
         )
+    if name == "pairwise_direct_top2_margin_reranker_v1":
+        return MethodProtocol(
+            method_role="learned",
+            adoption_eligible=1,
+            diagnostic_only=0,
+            routing_uses_query_features=1,
+        )
+    if name == "oracle_top2_margin_reranker_diagnostic_v1":
+        return MethodProtocol(
+            method_role="diagnostic",
+            adoption_eligible=0,
+            diagnostic_only=1,
+            routing_uses_query_features=1,
+            routing_uses_eval_nelbo=1,
+        )
     if name == "pairwise_jackknife_lcb_pairprob_tournament_v1":
         return MethodProtocol(
             method_role="learned",
@@ -554,6 +569,17 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
         "lcb_override_vs_pairprob_hard": "lcb_override_vs_pairprob_hard",
         "pairprob_top1_error": "pairprob_top1_error",
         "pairprob_high_regret_error": "pairprob_high_regret_error",
+        "base_direct_top2_margin": "base_direct_top2_margin",
+        "top2_rerank_active": "top2_rerank_active",
+        "top2_rerank_switched": "top2_rerank_switched",
+        "top2_rerank_keep_top1_prob": "top2_rerank_keep_top1_prob",
+        "top2_rerank_delta_gap_pct_vs_direct": "top2_rerank_delta_gap_pct_vs_direct",
+        "top2_rerank_help": "top2_rerank_help",
+        "top2_rerank_harm": "top2_rerank_harm",
+        "top2_rerank_candidate_delta_gap_pct_vs_direct": (
+            "top2_rerank_candidate_delta_gap_pct_vs_direct"
+        ),
+        "top2_rerank_top2_better_than_base": "top2_rerank_top2_better_than_base",
     }
     for method, vals in sorted(by_method.items()):
         metrics: Dict[str, float] = {}
@@ -710,6 +736,33 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
             [float(r.get("jackknife_std_pairprob_hard_selected", float("nan"))) for r in vals],
             [float(r.get("pairprob_hard_oracle_gap_pct", float("nan"))) for r in vals],
         )
+        metrics["top2_rerank_activation_rate"] = metrics["micro_top2_rerank_active"]
+        metrics["top2_rerank_switch_rate"] = metrics["micro_top2_rerank_switched"]
+        top2_active_rows = [
+            r for r in vals
+            if int(float(r.get("top2_rerank_active", 0) or 0)) == 1
+        ]
+        metrics["top2_rerank_help_rate_active_only"] = _finite_mean(
+            [float(r.get("top2_rerank_help", float("nan"))) for r in top2_active_rows]
+        )
+        metrics["top2_rerank_harm_rate_active_only"] = _finite_mean(
+            [float(r.get("top2_rerank_harm", float("nan"))) for r in top2_active_rows]
+        )
+        metrics["mean_top2_rerank_delta_gap_pct_vs_direct"] = (
+            metrics["micro_top2_rerank_delta_gap_pct_vs_direct"]
+        )
+        metrics["median_top2_rerank_delta_gap_pct_vs_direct"] = _finite_median(
+            [float(r.get("top2_rerank_delta_gap_pct_vs_direct", float("nan"))) for r in vals]
+        )
+        metrics["paired_improvement_rate_vs_direct_pairprob"] = float(
+            np.mean(
+                [
+                    1.0 if float(r.get("top2_rerank_delta_gap_pct_vs_direct", float("nan"))) < 0.0 else 0.0
+                    for r in vals
+                    if "top2_rerank_delta_gap_pct_vs_direct" in r
+                ]
+            )
+        ) if any("top2_rerank_delta_gap_pct_vs_direct" in r for r in vals) else float("nan")
 
         if any("delta_gate_active" in r for r in vals):
             active_rows = [
@@ -896,6 +949,31 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
             "jackknife_lambda",
             "jackknife_n_models",
             "uncertainty_error_spearman_source_inner",
+            "top2_rerank_threshold",
+            "top2_rerank_l2",
+            "top2_rerank_guard_status",
+            "top2_rerank_diagnostic_only_reason",
+            "top2_rerank_selection_stability_status",
+            "source_inner_top2_rerank_gap_reduction_abs_pct_points",
+            "source_inner_top2_rerank_high_regret_reduction",
+            "source_inner_top2_rerank_rows",
+            "source_inner_top2_rerank_positive_rows",
+            "source_inner_top2_rerank_negative_rows",
+            "source_inner_top2_rerank_active_domains",
+            "source_inner_switch_candidate_rate",
+            "reranker_selection_stability_status",
+            "base_top2_margin_auc_for_high_regret",
+            "base_top2_margin_spearman_with_oracle_gap",
+            "overall_high_regret_rate_direct",
+            "low_margin_active_high_regret_rate",
+            "low_margin_high_regret_enrichment",
+            "top2_rerank_auc_source_inner",
+            "top2_rerank_brier_source_inner",
+            "top2_rerank_calibration_status",
+            "oracle_top2_active_gap_reduction_pct",
+            "oracle_top2_active_high_regret_reduction",
+            "oracle_top2_recoverable_error_rate",
+            "oracle_top2_recoverable_gap_mass_pct_points",
         ]:
             vals_for_key = sorted(set(str(r.get(key, "")) for r in vals if str(r.get(key, "")) != ""))
             if vals_for_key:

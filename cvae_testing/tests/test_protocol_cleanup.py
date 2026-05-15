@@ -127,6 +127,28 @@ def test_camelyon17_direct_pairprob_adoption_config_is_protocol_locked() -> None
     assert methods["combined_diagnostic"] == "pairwise_pairprob_combined_diagnostic_v1"
 
 
+def test_camelyon17_top2_pairprob_rerank_config_is_protocol_locked() -> None:
+    path = (
+        PROJECT_ROOT
+        / "configs"
+        / "experiments"
+        / "camelyon17"
+        / "learned_utility_response_routing_pairprob_top2_rerank_v1.yaml"
+    )
+    cfg = load_config(path)
+    validate_config(cfg)
+
+    pairprob_cfg = cfg["learned_utility"]["pairwise_tournament"]["pairprob_tournament"]
+    top2_cfg = pairprob_cfg["top2_margin_reranker"]
+    assert cfg["experiment"]["name"] == "learned_utility_response_routing_pairprob_top2_rerank_v1"
+    assert pairprob_cfg["adoption_feature_set"] == "pairprob_latent_only_v1"
+    assert top2_cfg["enabled"] is True
+    assert top2_cfg["base_method"] == "pairwise_direct_pairprob_adoption_v1"
+    assert top2_cfg["base_feature_set"] == "pairprob_latent_only_v1"
+    assert top2_cfg["feature_set"] == "top2_rerank_latent_context_v1"
+    assert top2_cfg["calibration_policy"] == "source_inner_oof_top2_margin_rerank_v1"
+
+
 def test_breakhis_support_estimated_utility_config_is_protocol_locked() -> None:
     path = (
         PROJECT_ROOT

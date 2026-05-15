@@ -154,6 +154,38 @@ class JackknifeLCBTournamentConfig:
 
 
 @dataclass(frozen=True)
+class Top2MarginRerankerConfig:
+    enabled: bool = False
+    method_name: str = "pairwise_direct_top2_margin_reranker_v1"
+    base_method: str = "pairwise_direct_pairprob_adoption_v1"
+    diagnostic_oracle_method_name: str = "oracle_top2_margin_reranker_diagnostic_v1"
+    feature_set: str = "top2_rerank_latent_context_v1"
+    base_feature_set: str = "pairprob_latent_only_v1"
+    predictor: str = "logistic_ridge_pairprob"
+    calibration_policy: str = "source_inner_oof_top2_margin_rerank_v1"
+    margin_thresholds: Tuple[float, ...] = (0.10, 0.20, 0.30)
+    reranker_l2_values: Tuple[float, ...] = (1.0e-4, 1.0e-3, 1.0e-2)
+    decision_threshold: float = 0.50
+    near_tie_delta_pct: float = 0.5
+    margin_weight_scale_pct: float = 5.0
+    margin_weight_clip: Tuple[float, float] = (0.25, 3.0)
+    max_rerank_activation_rate: float = 0.30
+    max_rerank_switch_rate: float = 0.20
+    min_source_inner_rerank_rows: int = 40
+    min_source_inner_positive_rows: int = 10
+    min_source_inner_negative_rows: int = 10
+    min_source_inner_active_domains: int = 2
+    min_source_inner_validation_domains: int = 2
+    min_source_inner_gap_reduction_abs_pct_points: float = 0.5
+    min_low_margin_high_regret_enrichment: float = 1.25
+    max_switch_harm_rate_active_only: float = 0.45
+    min_oracle_top2_recoverable_error_rate: float = 0.05
+    min_oracle_top2_recoverable_gap_mass_pct_points: float = 0.5
+    absolute_high_regret_gap_pct: float = 5.0
+    catastrophic_regression_vs_direct_gap_pct: float = 5.0
+
+
+@dataclass(frozen=True)
 class PairprobTournamentConfig:
     enabled: bool
     policy_name: str
@@ -178,6 +210,7 @@ class PairprobTournamentConfig:
     selection_policy: str
     conformal_regret_set: ConformalRegretSetConfig = ConformalRegretSetConfig()
     jackknife_lcb_tournament: JackknifeLCBTournamentConfig = JackknifeLCBTournamentConfig()
+    top2_margin_reranker: Top2MarginRerankerConfig = Top2MarginRerankerConfig()
 
 
 @dataclass(frozen=True)
@@ -388,6 +421,7 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
     pairprob_methods_cfg = _as_dict(pairprob_cfg.get("methods", {}))
     conformal_cfg = _as_dict(pairprob_cfg.get("conformal_regret_set", {}))
     jackknife_cfg = _as_dict(pairprob_cfg.get("jackknife_lcb_tournament", {}))
+    top2_cfg = _as_dict(pairprob_cfg.get("top2_margin_reranker", {}))
     margin_clip_values = tuple(
         float(v) for v in pairprob_cfg.get("margin_weight_clip", [0.25, 3.0])
     )
@@ -490,6 +524,66 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
             (jackknife_cfg or {}).get("catastrophic_regression_vs_pairprob_hard_gap_pct", 5.0)
         ),
     )
+    top2_margin_clip_values = tuple(
+        float(v) for v in (top2_cfg or {}).get("margin_weight_clip", [0.25, 3.0])
+    )
+    if len(top2_margin_clip_values) != 2:
+        raise ValueError(
+            "learned_utility.pairwise_tournament.pairprob_tournament."
+            "top2_margin_reranker.margin_weight_clip must have length 2"
+        )
+    top2_margin_reranker = Top2MarginRerankerConfig(
+        enabled=bool((top2_cfg or {}).get("enabled", False)),
+        method_name=str((top2_cfg or {}).get("method_name", "pairwise_direct_top2_margin_reranker_v1")),
+        base_method=str((top2_cfg or {}).get("base_method", "pairwise_direct_pairprob_adoption_v1")),
+        diagnostic_oracle_method_name=str(
+            (top2_cfg or {}).get("diagnostic_oracle_method_name", "oracle_top2_margin_reranker_diagnostic_v1")
+        ),
+        feature_set=str((top2_cfg or {}).get("feature_set", "top2_rerank_latent_context_v1")).strip(),
+        base_feature_set=str((top2_cfg or {}).get("base_feature_set", "pairprob_latent_only_v1")).strip(),
+        predictor=str((top2_cfg or {}).get("predictor", "logistic_ridge_pairprob")).strip().lower(),
+        calibration_policy=str(
+            (top2_cfg or {}).get("calibration_policy", "source_inner_oof_top2_margin_rerank_v1")
+        ).strip().lower(),
+        margin_thresholds=tuple(
+            float(v) for v in (top2_cfg or {}).get("margin_thresholds", [0.10, 0.20, 0.30])
+        ),
+        reranker_l2_values=tuple(
+            float(v) for v in (top2_cfg or {}).get("reranker_l2_values", [1.0e-4, 1.0e-3, 1.0e-2])
+        ),
+        decision_threshold=float((top2_cfg or {}).get("decision_threshold", 0.50)),
+        near_tie_delta_pct=float((top2_cfg or {}).get("near_tie_delta_pct", 0.5)),
+        margin_weight_scale_pct=float((top2_cfg or {}).get("margin_weight_scale_pct", 5.0)),
+        margin_weight_clip=(float(top2_margin_clip_values[0]), float(top2_margin_clip_values[1])),
+        max_rerank_activation_rate=float((top2_cfg or {}).get("max_rerank_activation_rate", 0.30)),
+        max_rerank_switch_rate=float((top2_cfg or {}).get("max_rerank_switch_rate", 0.20)),
+        min_source_inner_rerank_rows=int((top2_cfg or {}).get("min_source_inner_rerank_rows", 40)),
+        min_source_inner_positive_rows=int((top2_cfg or {}).get("min_source_inner_positive_rows", 10)),
+        min_source_inner_negative_rows=int((top2_cfg or {}).get("min_source_inner_negative_rows", 10)),
+        min_source_inner_active_domains=int((top2_cfg or {}).get("min_source_inner_active_domains", 2)),
+        min_source_inner_validation_domains=int(
+            (top2_cfg or {}).get("min_source_inner_validation_domains", 2)
+        ),
+        min_source_inner_gap_reduction_abs_pct_points=float(
+            (top2_cfg or {}).get("min_source_inner_gap_reduction_abs_pct_points", 0.5)
+        ),
+        min_low_margin_high_regret_enrichment=float(
+            (top2_cfg or {}).get("min_low_margin_high_regret_enrichment", 1.25)
+        ),
+        max_switch_harm_rate_active_only=float(
+            (top2_cfg or {}).get("max_switch_harm_rate_active_only", 0.45)
+        ),
+        min_oracle_top2_recoverable_error_rate=float(
+            (top2_cfg or {}).get("min_oracle_top2_recoverable_error_rate", 0.05)
+        ),
+        min_oracle_top2_recoverable_gap_mass_pct_points=float(
+            (top2_cfg or {}).get("min_oracle_top2_recoverable_gap_mass_pct_points", 0.5)
+        ),
+        absolute_high_regret_gap_pct=float((top2_cfg or {}).get("absolute_high_regret_gap_pct", 5.0)),
+        catastrophic_regression_vs_direct_gap_pct=float(
+            (top2_cfg or {}).get("catastrophic_regression_vs_direct_gap_pct", 5.0)
+        ),
+    )
     pairprob_tournament = PairprobTournamentConfig(
         enabled=bool((pairprob_cfg or {}).get("enabled", False)),
         policy_name=str(
@@ -561,6 +655,7 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         ).strip().lower(),
         conformal_regret_set=conformal_regret_set,
         jackknife_lcb_tournament=jackknife_lcb_tournament,
+        top2_margin_reranker=top2_margin_reranker,
     )
     tournament = PairwiseTournamentConfig(
         enabled=bool((tournament_cfg or {}).get("enabled", False)),
@@ -776,6 +871,53 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
                     raise ValueError(
                         "learned_utility.pairwise_tournament.pairprob_tournament.jackknife_lcb_tournament."
                         "min_jackknife_models must be >= 2"
+                    )
+            top2 = pairprob.top2_margin_reranker
+            if top2.enabled:
+                if top2.base_method != pairprob.direct_adoption_method:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_margin_reranker."
+                        "base_method must match methods.direct_adoption"
+                    )
+                if top2.base_feature_set != pairprob.adoption_feature_set:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_margin_reranker."
+                        "base_feature_set must match adoption_feature_set"
+                    )
+                if top2.feature_set != "top2_rerank_latent_context_v1":
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_margin_reranker."
+                        "feature_set must be 'top2_rerank_latent_context_v1'"
+                    )
+                if top2.predictor != "logistic_ridge_pairprob":
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_margin_reranker."
+                        "predictor must be 'logistic_ridge_pairprob'"
+                    )
+                if top2.calibration_policy != "source_inner_oof_top2_margin_rerank_v1":
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_margin_reranker."
+                        "calibration_policy must be 'source_inner_oof_top2_margin_rerank_v1'"
+                    )
+                if not top2.margin_thresholds or any(v < 0.0 for v in top2.margin_thresholds):
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_margin_reranker."
+                        "margin_thresholds must be non-empty and non-negative"
+                    )
+                if not top2.reranker_l2_values or any(v < 0.0 for v in top2.reranker_l2_values):
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_margin_reranker."
+                        "reranker_l2_values must be non-empty and non-negative"
+                    )
+                if top2.margin_weight_scale_pct <= 0.0:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_margin_reranker."
+                        "margin_weight_scale_pct must be > 0"
+                    )
+                if top2.margin_weight_clip[0] <= 0.0 or top2.margin_weight_clip[0] > top2.margin_weight_clip[1]:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_margin_reranker."
+                        "margin_weight_clip must be positive and ordered"
                     )
 
     return LearnedUtilityConfig(

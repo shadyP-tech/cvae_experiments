@@ -25,6 +25,9 @@ from src.eval.evaluators.learned_utility_pairprob import (
     JackknifeLCBSelection,
     PairprobModelBundle,
     PairprobPolicySelection,
+    Top2RerankCalibrationBlock,
+    Top2RerankModelBundle,
+    Top2RerankSelection,
     _gap_pct_for_selected,
     build_pairprob_training_data,
     clone_direct_pairprob_adoption_rows,
@@ -39,6 +42,8 @@ from src.eval.evaluators.learned_utility_pairprob import (
     select_pairprob_policy,
     select_conformal_regret_set_policy,
     select_jackknife_lcb_policy,
+    select_top2_margin_reranker_policy,
+    top2_rerank_route_rows,
 )
 from src.eval.evaluators.learned_utility_protocol import (
     FoldCandidateSet,
@@ -438,17 +443,19 @@ def _calibrate_pairprob_tournament(
     PairprobPolicySelection | None,
     ConformalRegretSetSelection | None,
     JackknifeLCBSelection | None,
+    Top2RerankSelection | None,
 ]:
     cfg = tournament_cfg.pairprob_tournament
     source_domains = sorted(set(int(sample_domains[int(i)]) for i in np.asarray(train_idx, dtype=np.int64).tolist()))
     if len(source_domains) < int(cfg.min_source_inner_validation_domains):
-        return None, None, None, None, None, None
+        return None, None, None, None, None, None, None
 
     rows_by_key: Dict[Tuple[str, str, float], List[Dict[str, Any]]] = {}
     evidence_by_key: Dict[Tuple[str, str, float], Dict[str, float]] = {}
     validation_domains_by_key: Dict[Tuple[str, str, float], set[int]] = {}
     conformal_blocks_by_key: Dict[Tuple[str, str, float], List[ConformalCalibrationBlock]] = {}
     jackknife_blocks_by_key: Dict[Tuple[str, float], List[JackknifeCalibrationBlock]] = {}
+    top2_blocks_by_key: Dict[Tuple[str, float], List[Top2RerankCalibrationBlock]] = {}
     feature_sets = [str(cfg.adoption_feature_set), *[str(v) for v in cfg.diagnostic_feature_sets]]
     device = str(pairwise_cfg.get("device", "auto"))
 
@@ -571,6 +578,26 @@ def _calibrate_pairprob_tournament(
                     embedding_dim=int(embedding_feature_dim),
                     expert_feature_dim=int(expert_feature_dim),
                 )
+                if (
+                    bool(cfg.top2_margin_reranker.enabled)
+                    and str(feature_set) == str(cfg.top2_margin_reranker.base_feature_set)
+                ):
+                    top2_blocks_by_key.setdefault((str(feature_set), float(l2)), []).append(
+                        Top2RerankCalibrationBlock(
+                            validation_domain=int(validation_domain),
+                            query_domains=np.asarray(sample_domains[validation_idx], dtype=np.int64),
+                            expert_domains=tuple(int(v) for v in validation_fold.candidate_expert_domains),
+                            x_rows=x_val,
+                            prob_matrix=prob,
+                            true_nelbo_matrix=true_matrix,
+                            global_true_nelbo_matrix=global_eval,
+                            fold=validation_fold,
+                            pairprob_direct_gap_pct=_gap_pct_for_selected(
+                                true_matrix,
+                                pairprob_selected_indices(prob, validation_fold.candidate_expert_domains),
+                            ),
+                        )
+                    )
                 if (
                     bool(cfg.jackknife_lcb_tournament.enabled)
                     and str(feature_set) == str(cfg.adoption_feature_set)
@@ -771,7 +798,22 @@ def _calibrate_pairprob_tournament(
             global_expert_domains=global_expert_domains,
             cfg=cfg.jackknife_lcb_tournament,
         )
-    return direct, direct_adoption, group, combined, conformal_selection, jackknife_selection
+    top2_selection = None
+    if bool(cfg.top2_margin_reranker.enabled):
+        top2_key = (
+            str(cfg.top2_margin_reranker.base_feature_set),
+            float(direct.ridge_l2) if direct is not None else float("nan"),
+        )
+        top2_selection = select_top2_margin_reranker_policy(
+            blocks=top2_blocks_by_key.get(top2_key, []),
+            base_selection=direct,
+            global_expert_domains=global_expert_domains,
+            cfg=cfg.top2_margin_reranker,
+            embedding_dim=int(embedding_feature_dim),
+            expert_feature_dim=int(expert_feature_dim),
+            device=device,
+        )
+    return direct, direct_adoption, group, combined, conformal_selection, jackknife_selection, top2_selection
 
 
 def _calibrate_pairwise_tournament(
@@ -1180,6 +1222,7 @@ def _run_pairprob_tournament_for_fold(
     selections: Sequence[PairprobPolicySelection | None],
     conformal_selection: ConformalRegretSetSelection | None,
     jackknife_selection: JackknifeLCBSelection | None,
+    top2_selection: Top2RerankSelection | None,
     tournament_cfg: PairwiseTournamentConfig,
     pairwise_cfg: Dict[str, Any],
     embedding_feature_dim: int,
@@ -1191,6 +1234,8 @@ def _run_pairprob_tournament_for_fold(
     rows: List[Dict[str, Any]] = []
     device = str(pairwise_cfg.get("device", "auto"))
     direct_diagnostic_rows: List[Dict[str, Any]] = []
+    direct_prob: np.ndarray | None = None
+    direct_selection_for_eval: PairprobPolicySelection | None = None
     for selection in selections:
         if selection is None:
             continue
@@ -1273,6 +1318,8 @@ def _run_pairprob_tournament_for_fold(
         rows.extend(selection_rows)
         if str(selection.method) == str(cfg.direct_method):
             direct_diagnostic_rows = [dict(row) for row in selection_rows]
+            direct_prob = prob
+            direct_selection_for_eval = selection_for_eval
         if (
             jackknife_selection is not None
             and bool(cfg.jackknife_lcb_tournament.enabled)
@@ -1439,6 +1486,75 @@ def _run_pairprob_tournament_for_fold(
                     oracle_diagnostic=True,
                 )
             )
+    if (
+        top2_selection is not None
+        and bool(cfg.top2_margin_reranker.enabled)
+        and direct_prob is not None
+        and direct_selection_for_eval is not None
+    ):
+        pairprob_gap = np.asarray([float(r["oracle_gap_pct"]) for r in direct_diagnostic_rows], dtype=np.float64)
+        top2_reason_parts = [str(top2_selection.diagnostic_only_reason)]
+        reranker_bundle: Top2RerankModelBundle | None = top2_selection.model
+        top2_selection_for_eval = top2_selection
+        if not bool(top2_selection.noop) and reranker_bundle is None:
+            top2_reason_parts.append("insufficient_source_inner_rerank_rows")
+        top2_reason = "|".join(part for part in dict.fromkeys(top2_reason_parts) if part)
+        if top2_reason:
+            top2_selection_for_eval = replace(
+                top2_selection,
+                diagnostic_only_reason=str(top2_reason),
+                noop=True,
+                guard_status="failed_guards_noop",
+                selection_stability_status=(
+                    top2_selection.selection_stability_status
+                    if top2_selection.selection_stability_status == "unstable"
+                    else "forced_direct_pairprob"
+                ),
+            )
+            reranker_bundle = None
+        rows.extend(
+            top2_rerank_route_rows(
+                method=str(cfg.top2_margin_reranker.method_name),
+                fold=fold,
+                query_domains=query_domains,
+                expert_domains=fold.candidate_expert_domains,
+                x_rows=x_test,
+                prob_matrix=direct_prob,
+                true_nelbo_matrix=true_matrix,
+                global_true_nelbo_matrix=global_eval,
+                global_expert_domains=global_expert_domains,
+                policy_name=cfg.top2_margin_reranker.method_name,
+                selection=top2_selection_for_eval,
+                reranker_bundle=reranker_bundle,
+                pairprob_direct_gap_pct=pairprob_gap,
+                metadata_oracle_gap_pct=metadata_oracle_gap_pct,
+                embedding_dim=int(embedding_feature_dim),
+                expert_feature_dim=int(expert_feature_dim),
+                cfg=cfg.top2_margin_reranker,
+            )
+        )
+        rows.extend(
+            top2_rerank_route_rows(
+                method=str(cfg.top2_margin_reranker.diagnostic_oracle_method_name),
+                fold=fold,
+                query_domains=query_domains,
+                expert_domains=fold.candidate_expert_domains,
+                x_rows=x_test,
+                prob_matrix=direct_prob,
+                true_nelbo_matrix=true_matrix,
+                global_true_nelbo_matrix=global_eval,
+                global_expert_domains=global_expert_domains,
+                policy_name=cfg.top2_margin_reranker.method_name,
+                selection=top2_selection_for_eval,
+                reranker_bundle=None,
+                pairprob_direct_gap_pct=pairprob_gap,
+                metadata_oracle_gap_pct=metadata_oracle_gap_pct,
+                embedding_dim=int(embedding_feature_dim),
+                expert_feature_dim=int(expert_feature_dim),
+                cfg=cfg.top2_margin_reranker,
+                oracle_diagnostic=True,
+            )
+        )
     return rows
 
 
@@ -1918,6 +2034,7 @@ def _run_learned_methods_for_fold(
                 combined_selection,
                 conformal_selection,
                 jackknife_selection,
+                top2_selection,
             ) = _calibrate_pairprob_tournament(
                 embeddings=embeddings,
                 sample_domains=sample_domains,
@@ -1956,6 +2073,7 @@ def _run_learned_methods_for_fold(
                     ],
                     conformal_selection=conformal_selection,
                     jackknife_selection=jackknife_selection,
+                    top2_selection=top2_selection,
                     tournament_cfg=tournament_cfg,
                     pairwise_cfg=pairwise_cfg,
                     embedding_feature_dim=embedding_feature_dim,
