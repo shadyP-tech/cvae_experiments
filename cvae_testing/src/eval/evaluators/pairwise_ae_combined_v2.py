@@ -25,6 +25,7 @@ from src.eval.evaluators.learned_utility_selection import _pairwise_auc_single, 
 
 BASELINE_METHOD = "pairwise_ranker_ae_combined"
 PRIMARY_METHOD = "pairwise_ranker_ae_combined_inner_selected_v2"
+STRICT_PRIMARY_METHOD = "pairwise_ranker_ae_combined_strict_inner_selected_v2"
 RANK_MARGIN_UNWEIGHTED = "pairwise_ranker_ae_combined_rank_margin_unweighted_v2"
 RAW_AE_WEIGHTED = "pairwise_ranker_ae_combined_raw_ae_weighted_v2"
 RANK_MARGIN_WEIGHTED = "pairwise_ranker_ae_combined_rank_margin_weighted_v2"
@@ -35,6 +36,46 @@ V2_CANDIDATE_METHODS = (
     RANK_MARGIN_WEIGHTED,
 )
 _SIMPLER_METHOD_ORDER = {method: idx for idx, method in enumerate(V2_CANDIDATE_METHODS)}
+_STRICT_METHOD_ORDER = {
+    RANK_MARGIN_UNWEIGHTED: 0,
+    RAW_AE_WEIGHTED: 1,
+    RANK_MARGIN_WEIGHTED: 2,
+}
+
+
+def _v2_cfg(pairwise_cfg: Mapping[str, Any]) -> Dict[str, Any]:
+    return dict((pairwise_cfg.get("utility_weighted_v2", {}) or {}))
+
+
+def _selection_mode(pairwise_cfg: Mapping[str, Any]) -> str:
+    return str(_v2_cfg(pairwise_cfg).get("selection_mode", "standard")).strip().lower()
+
+
+def _is_strict_mode(pairwise_cfg: Mapping[str, Any]) -> bool:
+    return _selection_mode(pairwise_cfg) == "strict_adoption"
+
+
+def _primary_method(pairwise_cfg: Mapping[str, Any]) -> str:
+    cfg = _v2_cfg(pairwise_cfg)
+    default = STRICT_PRIMARY_METHOD if _is_strict_mode(pairwise_cfg) else PRIMARY_METHOD
+    primary = str(cfg.get("primary_method", default)).strip() or default
+    expected = STRICT_PRIMARY_METHOD if _is_strict_mode(pairwise_cfg) else PRIMARY_METHOD
+    if primary != expected:
+        raise ProtocolError(f"utility_weighted_v2.primary_method must be {expected!r} for selection_mode={_selection_mode(pairwise_cfg)!r}")
+    return primary
+
+
+def _strict_cfg(pairwise_cfg: Mapping[str, Any]) -> Dict[str, float]:
+    cfg = dict((_v2_cfg(pairwise_cfg).get("strict_adoption", {}) or {}))
+    return {
+        "min_macro_gap_reduction_pp": float(cfg.get("min_macro_gap_reduction_pp", 0.5)),
+        "max_top1_drop_abs": float(cfg.get("max_top1_drop_abs", 0.02)),
+        "max_spearman_drop_abs": float(cfg.get("max_spearman_drop_abs", 0.03)),
+        "max_worst_inner_center_gap_degradation_pp": float(cfg.get("max_worst_inner_center_gap_degradation_pp", 0.25)),
+        "min_positive_inner_center_rate": float(cfg.get("min_positive_inner_center_rate", 0.75)),
+        "min_non_degrading_inner_center_rate": float(cfg.get("min_non_degrading_inner_center_rate", 1.0)),
+        "min_passing_inner_centers": float(cfg.get("min_passing_inner_centers", 2)),
+    }
 
 
 @dataclass(frozen=True)
@@ -661,6 +702,8 @@ def _source_inner_selection(
     seed: int,
     tie_policy: str,
 ) -> Tuple[str, List[Dict[str, Any]]]:
+    strict_mode = _is_strict_mode(pairwise_cfg)
+    strict = _strict_cfg(pairwise_cfg)
     source_domains = sorted(set(int(sample_domains[int(i)]) for i in np.asarray(train_idx, dtype=np.int64).tolist()))
     inner_rows: List[Dict[str, Any]] = []
     per_method_by_inner: Dict[str, List[Tuple[int, Dict[str, float]]]] = {method: [] for method in V2_CANDIDATE_METHODS}
@@ -735,6 +778,7 @@ def _source_inner_selection(
                     "inner_gap_delta": float(baseline["mean_oracle_gap_pct"] - candidate["mean_oracle_gap_pct"]),
                     "inner_top1_delta": float(candidate["top1_oracle_hit"] - baseline["top1_oracle_hit"]),
                     "inner_spearman_delta": float(candidate["spearman"] - baseline["spearman"]),
+                    "inner_center_gap_degradation_pp": float(candidate["mean_oracle_gap_pct"] - baseline["mean_oracle_gap_pct"]),
                     "heldout_target_nelbo_used_for_selection": 0,
                 }
             )
@@ -742,8 +786,9 @@ def _source_inner_selection(
     baseline_units = per_method_by_inner.get(BASELINE_METHOD, [])
     if not baseline_units:
         selected = BASELINE_METHOD
-    else:
         scored: List[Dict[str, Any]] = []
+    else:
+        scored = []
         baseline_by_inner = {inner: metrics for inner, metrics in baseline_units}
         for method in V2_CANDIDATE_METHODS:
             units = per_method_by_inner.get(method, [])
@@ -753,6 +798,12 @@ def _source_inner_selection(
             top1_deltas = []
             spearman_deltas = []
             degradations = []
+            baseline_gaps = []
+            candidate_gaps = []
+            baseline_top1s = []
+            candidate_top1s = []
+            baseline_spearmans = []
+            candidate_spearmans = []
             for inner, metrics in units:
                 base = baseline_by_inner.get(inner)
                 if not base:
@@ -762,16 +813,48 @@ def _source_inner_selection(
                 top1_deltas.append(float(metrics["top1_oracle_hit"] - base["top1_oracle_hit"]))
                 spearman_deltas.append(float(metrics["spearman"] - base["spearman"]))
                 degradations.append(float(metrics["mean_oracle_gap_pct"] - base["mean_oracle_gap_pct"]))
+                baseline_gaps.append(float(base["mean_oracle_gap_pct"]))
+                candidate_gaps.append(float(metrics["mean_oracle_gap_pct"]))
+                baseline_top1s.append(float(base["top1_oracle_hit"]))
+                candidate_top1s.append(float(metrics["top1_oracle_hit"]))
+                baseline_spearmans.append(float(base["spearman"]))
+                candidate_spearmans.append(float(metrics["spearman"]))
             macro_gap = _finite_mean(gap_deltas, 0.0)
             macro_top1 = _finite_mean(top1_deltas, 0.0)
             macro_spearman = _finite_mean(spearman_deltas, 0.0)
             worst_degradation = max(degradations) if degradations else float("inf")
-            passed = bool(
-                macro_gap >= 0.0
-                and macro_top1 >= -0.02
-                and macro_spearman >= -0.03
-                and worst_degradation <= 1.0
-            )
+            positive_count = sum(1 for v in gap_deltas if float(v) > 0.0)
+            non_degrading_count = sum(1 for v in degradations if float(v) <= 0.0)
+            unit_count = max(len(gap_deltas), 1)
+            positive_rate = float(positive_count / unit_count)
+            non_degrading_rate = float(non_degrading_count / unit_count)
+            if strict_mode:
+                passed_macro = macro_gap >= float(strict["min_macro_gap_reduction_pp"])
+                passed_top1 = macro_top1 >= -float(strict["max_top1_drop_abs"])
+                passed_spearman = macro_spearman >= -float(strict["max_spearman_drop_abs"])
+                passed_worst = worst_degradation <= float(strict["max_worst_inner_center_gap_degradation_pp"])
+                passed_positive = positive_rate >= float(strict["min_positive_inner_center_rate"])
+                passed_non_degrading = non_degrading_rate >= float(strict["min_non_degrading_inner_center_rate"])
+                passed_min_centers = positive_count >= int(strict["min_passing_inner_centers"])
+                passed = bool(
+                    method != BASELINE_METHOD
+                    and passed_macro
+                    and passed_top1
+                    and passed_spearman
+                    and passed_worst
+                    and passed_positive
+                    and passed_non_degrading
+                    and passed_min_centers
+                )
+            else:
+                passed_macro = macro_gap >= 0.0
+                passed_top1 = macro_top1 >= -0.02
+                passed_spearman = macro_spearman >= -0.03
+                passed_worst = worst_degradation <= 1.0
+                passed_positive = True
+                passed_non_degrading = True
+                passed_min_centers = True
+                passed = bool(passed_macro and passed_top1 and passed_spearman and passed_worst)
             scored.append(
                 {
                     "method": str(method),
@@ -779,13 +862,32 @@ def _source_inner_selection(
                     "macro_top1": float(macro_top1),
                     "macro_spearman": float(macro_spearman),
                     "worst_degradation": float(worst_degradation),
+                    "baseline_inner_macro_oracle_gap_pct": _finite_mean(baseline_gaps, float("nan")),
+                    "candidate_inner_macro_oracle_gap_pct": _finite_mean(candidate_gaps, float("nan")),
+                    "baseline_inner_macro_top1": _finite_mean(baseline_top1s, float("nan")),
+                    "candidate_inner_macro_top1": _finite_mean(candidate_top1s, float("nan")),
+                    "baseline_inner_macro_spearman": _finite_mean(baseline_spearmans, float("nan")),
+                    "candidate_inner_macro_spearman": _finite_mean(candidate_spearmans, float("nan")),
+                    "positive_inner_center_rate": float(positive_rate),
+                    "non_degrading_inner_center_rate": float(non_degrading_rate),
+                    "positive_inner_center_count": int(positive_count),
+                    "inner_center_count": int(len(gap_deltas)),
+                    "passed_macro_gap_gate": int(passed_macro),
+                    "passed_top1_gate": int(passed_top1),
+                    "passed_spearman_gate": int(passed_spearman),
+                    "passed_worst_center_gate": int(passed_worst),
+                    "passed_positive_center_rate_gate": int(passed_positive),
+                    "passed_non_degrading_center_rate_gate": int(passed_non_degrading),
+                    "passed_min_passing_inner_centers_gate": int(passed_min_centers),
                     "passed": int(passed),
+                    "candidate_passed_strict_gate": int(passed) if strict_mode else 0,
                 }
             )
         passing = [row for row in scored if int(row["passed"]) == 1]
         if not passing:
             selected = BASELINE_METHOD
         else:
+            order = _STRICT_METHOD_ORDER if strict_mode else _SIMPLER_METHOD_ORDER
             selected = str(
                 sorted(
                     passing,
@@ -793,35 +895,57 @@ def _source_inner_selection(
                         float(row["macro_gap"]),
                         float(row["macro_top1"]),
                         float(row["macro_spearman"]),
-                        -float(_SIMPLER_METHOD_ORDER.get(str(row["method"]), 10**6)),
+                        -float(order.get(str(row["method"]), 10**6)),
                     ),
                     reverse=True,
                 )[0]["method"]
             )
 
     selected_score_by_method = {row["candidate_method"]: [] for row in inner_rows}
+    scored_by_method = {str(row["method"]): row for row in scored}
     for row in inner_rows:
         selected_score_by_method.setdefault(str(row["candidate_method"]), []).append(row)
     for method, rows in selected_score_by_method.items():
         base_rows = [r for r in rows if str(r["candidate_method"]) == str(method)]
         if not base_rows:
             continue
-        gap_deltas = [float(r["inner_gap_delta"]) for r in base_rows]
-        top1_deltas = [float(r["inner_top1_delta"]) for r in base_rows]
-        spearman_deltas = [float(r["inner_spearman_delta"]) for r in base_rows]
-        worst = max(float(r["source_inner_macro_gap_candidate"]) - float(r["source_inner_macro_gap_baseline"]) for r in base_rows)
-        passed = bool(
-            _finite_mean(gap_deltas, 0.0) >= 0.0
-            and _finite_mean(top1_deltas, 0.0) >= -0.02
-            and _finite_mean(spearman_deltas, 0.0) >= -0.03
-            and worst <= 1.0
-        )
+        score = scored_by_method.get(str(method), {})
+        worst = float(score.get("worst_degradation", float("nan")))
+        passed = bool(int(score.get("passed", 0)))
         for row in base_rows:
             row["selected_method"] = str(selected)
-            row["selection_reason"] = "selected_by_source_inner_policy" if str(method) == str(selected) else "not_selected"
+            row["selected_variant"] = str(selected)
+            row["selection_mode"] = "strict_adoption" if strict_mode else "standard"
+            row["selection_reason"] = (
+                "selected_by_strict_source_inner_policy"
+                if strict_mode and str(method) == str(selected) and str(selected) != BASELINE_METHOD
+                else "fallback_to_pairwise_ae_combined"
+                if strict_mode and str(selected) == BASELINE_METHOD
+                else "selected_by_source_inner_policy"
+                if str(method) == str(selected)
+                else "not_selected"
+            )
             row["inner_worst_center_gap_degradation"] = float(worst)
+            row["gap_reduction_pp"] = float(score.get("macro_gap", float("nan")))
+            row["baseline_inner_macro_oracle_gap_pct"] = float(score.get("baseline_inner_macro_oracle_gap_pct", float("nan")))
+            row["candidate_inner_macro_oracle_gap_pct"] = float(score.get("candidate_inner_macro_oracle_gap_pct", float("nan")))
+            row["baseline_inner_macro_top1"] = float(score.get("baseline_inner_macro_top1", float("nan")))
+            row["candidate_inner_macro_top1"] = float(score.get("candidate_inner_macro_top1", float("nan")))
+            row["baseline_inner_macro_spearman"] = float(score.get("baseline_inner_macro_spearman", float("nan")))
+            row["candidate_inner_macro_spearman"] = float(score.get("candidate_inner_macro_spearman", float("nan")))
+            row["positive_inner_center_rate"] = float(score.get("positive_inner_center_rate", float("nan")))
+            row["non_degrading_inner_center_rate"] = float(score.get("non_degrading_inner_center_rate", float("nan")))
+            row["passed_macro_gap_gate"] = int(score.get("passed_macro_gap_gate", 0))
+            row["passed_top1_gate"] = int(score.get("passed_top1_gate", 0))
+            row["passed_spearman_gate"] = int(score.get("passed_spearman_gate", 0))
+            row["passed_worst_center_gate"] = int(score.get("passed_worst_center_gate", 0))
+            row["passed_positive_center_rate_gate"] = int(score.get("passed_positive_center_rate_gate", 0))
+            row["passed_non_degrading_center_rate_gate"] = int(score.get("passed_non_degrading_center_rate_gate", 0))
+            row["passed_min_passing_inner_centers_gate"] = int(score.get("passed_min_passing_inner_centers_gate", 0))
             row["candidate_passed_no_harm_gate"] = int(passed)
+            row["candidate_passed_strict_gate"] = int(score.get("candidate_passed_strict_gate", 0))
             row["fallback_to_baseline"] = int(str(selected) == BASELINE_METHOD)
+            row["fallback_used"] = int(str(selected) == BASELINE_METHOD)
             row["selected_by_inner_policy"] = int(str(method) == str(selected))
     return selected, inner_rows
 
@@ -844,11 +968,13 @@ def run_pairwise_ae_combined_v2_for_fold(
     tie_policy: str,
     ae_zscore_matrix: np.ndarray | None,
 ) -> PairwiseAECombinedV2FoldOutputs:
-    v2_cfg = dict((pairwise_cfg.get("utility_weighted_v2", {}) or {}))
+    v2_cfg = _v2_cfg(pairwise_cfg)
     if not bool(pairwise_cfg.get("run_utility_weighted_v2", False)) or not bool(v2_cfg.get("enabled", False)):
         return PairwiseAECombinedV2FoldOutputs([], [], [], [], [], [])
     if ae_zscore_matrix is None:
         raise ProtocolError("pairwise AE-combined v2 requires autoencoder_proxy AE z-score matrix")
+    primary_method = _primary_method(pairwise_cfg)
+    strict_mode = _is_strict_mode(pairwise_cfg)
 
     selected_method, inner_rows = _source_inner_selection(
         embeddings=embeddings,
@@ -908,6 +1034,8 @@ def run_pairwise_ae_combined_v2_for_fold(
         for row in rows:
             row["sample_index"] = int(test_idx[int(row["sample_index"])])
             row["source_inner_selected_method"] = str(selected_method)
+            row["posthoc_diagnostic_only"] = int(method != BASELINE_METHOD)
+            row["used_for_selection"] = 0
         method_sample_rows[method] = rows
         if method != BASELINE_METHOD:
             sample_rows.extend(rows)
@@ -931,12 +1059,14 @@ def run_pairwise_ae_combined_v2_for_fold(
                     "predicted_score": float(pred_flat[k]),
                     "true_nelbo": float(true_flat[k]),
                     "source_inner_selected_method": str(selected_method),
+                    "posthoc_diagnostic_only": int(method != BASELINE_METHOD),
+                    "used_for_selection": 0,
                 }
             )
 
     selected_pred = method_predictions.get(str(selected_method), method_predictions[BASELINE_METHOD])
     selected_metrics, selected_rows = _selection_metrics(
-        method=PRIMARY_METHOD,
+        method=primary_method,
         query_domains=sample_domains[test_idx],
         expert_domains=fold.candidate_expert_domains,
         score_matrix=selected_pred,
@@ -956,6 +1086,12 @@ def run_pairwise_ae_combined_v2_for_fold(
         row["sample_index"] = sample_index
         row["source_inner_selected_method"] = str(selected_method)
         row["fallback_to_baseline"] = int(str(selected_method) == BASELINE_METHOD)
+        row["fallback_used"] = int(str(selected_method) == BASELINE_METHOD)
+        row["deployed_method"] = str(selected_method)
+        row["selected_variant"] = str(selected_method)
+        row["selection_mode"] = "strict_adoption" if strict_mode else "standard"
+        row["used_for_selection"] = 1
+        row["posthoc_diagnostic_only"] = 0
         sample_rows.append(row)
         base = baseline_by_sample.get(sample_index, {})
         ae_order = np.lexsort((np.arange(ae_scores.shape[1], dtype=np.int64), ae_scores[int(local_i), :]))
@@ -974,15 +1110,23 @@ def run_pairwise_ae_combined_v2_for_fold(
                 "seed": int(seed),
                 "outer_heldout_center": int(fold.heldout_domain),
                 "sample_index": int(sample_index),
+                "primary_method": str(primary_method),
+                "selection_mode": "strict_adoption" if strict_mode else "standard",
                 "selected_method": str(selected_method),
+                "selected_variant": str(selected_method),
+                "deployed_method": str(selected_method),
+                "fallback_used": int(str(selected_method) == BASELINE_METHOD),
                 "selected_expert": int(row["selected_expert"]),
                 "oracle_expert": int(row["oracle_expert"]),
                 "selected_nelbo": float(row["selected_nelbo"]),
                 "oracle_nelbo": float(row["oracle_nelbo"]),
                 "oracle_gap_pct": float(row["oracle_gap_pct"]),
+                "selected_oracle_gap_pct": float(row["oracle_gap_pct"]),
                 "baseline_selected_expert": int(base.get("selected_expert", -1)),
                 "baseline_oracle_gap_pct": float(base.get("oracle_gap_pct", float("nan"))),
+                "baseline_top1_oracle_hit": int(int(base.get("selected_expert", -1)) == int(base.get("oracle_expert", -2))),
                 "delta_gap_vs_baseline": float(base.get("oracle_gap_pct", float("nan"))) - float(row["oracle_gap_pct"]),
+                "delta_gap_vs_baseline_pp": float(base.get("oracle_gap_pct", float("nan"))) - float(row["oracle_gap_pct"]),
                 "ae_best_expert": int(ae_best),
                 "ae_best_vs_second_margin": float(ae_margin),
                 "metadata_selected_expert": int(metadata_selected),
@@ -1066,6 +1210,37 @@ def _top1_when_low_ae_margin(rows: Sequence[Mapping[str, Any]]) -> float:
     return _finite_mean([hit for margin, hit in vals if float(margin) <= threshold], float("nan"))
 
 
+def _gap_delta(row: Mapping[str, Any]) -> float:
+    if "delta_gap_vs_baseline_pp" in row:
+        return float(row.get("delta_gap_vs_baseline_pp", float("nan")))
+    return float(row.get("delta_gap_vs_baseline", float("nan")))
+
+
+def _seed_gap_improved_count(rows: Sequence[Mapping[str, Any]]) -> int:
+    by_seed: Dict[str, List[float]] = {}
+    for row in rows:
+        by_seed.setdefault(str(row.get("seed", "")), []).append(_gap_delta(row))
+    return int(sum(1 for vals in by_seed.values() if _finite_mean(vals, 0.0) > 0.0))
+
+
+def _seed_top1_nondegrading_count(rows: Sequence[Mapping[str, Any]]) -> int:
+    by_seed: Dict[str, List[float]] = {}
+    for row in rows:
+        selected_top1 = float(row.get("top1_oracle_hit", float("nan")))
+        baseline_top1 = float(row.get("baseline_top1_oracle_hit", float("nan")))
+        by_seed.setdefault(str(row.get("seed", "")), []).append(selected_top1 - baseline_top1)
+    return int(sum(1 for vals in by_seed.values() if _finite_mean(vals, 0.0) >= -0.02))
+
+
+def _worst_center_gap_degradation(rows: Sequence[Mapping[str, Any]]) -> float:
+    by_unit: Dict[Tuple[str, str], List[float]] = {}
+    for row in rows:
+        key = (str(row.get("seed", "")), str(row.get("outer_heldout_center", "")))
+        by_unit.setdefault(key, []).append(_gap_delta(row))
+    degradations = [-_finite_mean(vals, 0.0) for vals in by_unit.values()]
+    return float(max(degradations)) if degradations else 0.0
+
+
 def write_pairwise_ae_combined_v2_artifacts(
     *,
     reports_dir: Path,
@@ -1077,19 +1252,23 @@ def write_pairwise_ae_combined_v2_artifacts(
 ) -> Dict[str, Any]:
     if not (training_rows or feature_rows or inner_selection_rows or pair_prediction_rows or decision_rows):
         return {}
+    has_strict = any(str(row.get("primary_method", "")) == STRICT_PRIMARY_METHOD for row in decision_rows)
     _write_csv(reports_dir / "pairwise_ae_combined_v2_training_pairs.csv", training_rows)
     _write_csv(reports_dir / "pairwise_ae_combined_v2_feature_diagnostics.csv", feature_rows)
     _write_csv(reports_dir / "pairwise_ae_combined_v2_inner_selection_table.csv", inner_selection_rows)
     _write_csv(reports_dir / "pairwise_ae_combined_v2_pair_predictions.csv", pair_prediction_rows)
     _write_csv(reports_dir / "pairwise_ae_combined_v2_decision_table.csv", decision_rows)
+    if has_strict:
+        _write_csv(reports_dir / "pairwise_ae_combined_v2_strict_inner_selection_table.csv", inner_selection_rows)
+        _write_csv(reports_dir / "pairwise_ae_combined_v2_strict_decision_table.csv", decision_rows)
 
     selected_methods = [str(r.get("selected_method", "")) for r in decision_rows]
     n = max(len(selected_methods), 1)
     fallback_count = sum(1 for method in selected_methods if method == BASELINE_METHOD)
     selected_counts = {method: selected_methods.count(method) for method in sorted(set(selected_methods)) if method}
-    gap_deltas = [float(r.get("delta_gap_vs_baseline", float("nan"))) for r in decision_rows]
+    gap_deltas = [_gap_delta(r) for r in decision_rows]
     summary = {
-        "method": PRIMARY_METHOD,
+        "method": STRICT_PRIMARY_METHOD if has_strict else PRIMARY_METHOD,
         "selected_method_count_total": selected_counts,
         "selected_method_count_by_seed": _nested_counts(decision_rows, key_field="seed"),
         "selected_method_count_by_outer_center": _nested_counts(decision_rows, key_field="outer_heldout_center"),
@@ -1111,12 +1290,30 @@ def write_pairwise_ae_combined_v2_artifacts(
         ),
         "heldout_target_nelbo_used_for_selection": 0,
     }
+    if has_strict:
+        summary.update(
+            {
+                "strict_v2_adoption_rate": float((n - fallback_count) / n),
+                "fallback_to_pairwise_ae_combined_rate": float(fallback_count / n),
+                "mean_gap_reduction_vs_pairwise_ae_combined": _finite_mean(gap_deltas, 0.0),
+                "worst_center_gap_degradation": _worst_center_gap_degradation(decision_rows),
+                "seed_gap_improved_count": _seed_gap_improved_count(decision_rows),
+                "seed_top1_nondegrading_count": _seed_top1_nondegrading_count(decision_rows),
+                "always_baseline_fallback": bool(fallback_count == len(selected_methods)),
+            }
+        )
     _write_csv(reports_dir / "pairwise_ae_combined_v2_decision_summary.csv", [summary])
     (reports_dir / "pairwise_ae_combined_v2_decision_summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True, allow_nan=True),
         encoding="utf-8",
     )
-    return {
+    if has_strict:
+        _write_csv(reports_dir / "pairwise_ae_combined_v2_strict_decision_summary.csv", [summary])
+        (reports_dir / "pairwise_ae_combined_v2_strict_decision_summary.json").write_text(
+            json.dumps(summary, indent=2, sort_keys=True, allow_nan=True),
+            encoding="utf-8",
+        )
+    artifacts = {
         "pairwise_ae_combined_v2_training_pairs": "pairwise_ae_combined_v2_training_pairs.csv",
         "pairwise_ae_combined_v2_feature_diagnostics": "pairwise_ae_combined_v2_feature_diagnostics.csv",
         "pairwise_ae_combined_v2_inner_selection_table": "pairwise_ae_combined_v2_inner_selection_table.csv",
@@ -1124,3 +1321,12 @@ def write_pairwise_ae_combined_v2_artifacts(
         "pairwise_ae_combined_v2_decision_table": "pairwise_ae_combined_v2_decision_table.csv",
         "pairwise_ae_combined_v2_decision_summary": "pairwise_ae_combined_v2_decision_summary.json",
     }
+    if has_strict:
+        artifacts.update(
+            {
+                "pairwise_ae_combined_v2_strict_inner_selection_table": "pairwise_ae_combined_v2_strict_inner_selection_table.csv",
+                "pairwise_ae_combined_v2_strict_decision_table": "pairwise_ae_combined_v2_strict_decision_table.csv",
+                "pairwise_ae_combined_v2_strict_decision_summary": "pairwise_ae_combined_v2_strict_decision_summary.json",
+            }
+        )
+    return artifacts

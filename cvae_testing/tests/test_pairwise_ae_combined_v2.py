@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import importlib.util
 import json
 from pathlib import Path
 import sys
@@ -16,6 +17,15 @@ from src.config.load_config import load_config  # noqa: E402
 from src.config.schema import validate_config  # noqa: E402
 from src.eval.evaluators.learned_utility_protocol import FoldCandidateSet, _method_protocol  # noqa: E402
 from src.eval.evaluators import pairwise_ae_combined_v2 as v2  # noqa: E402
+
+
+def _load_decision_builder():
+    path = PROJECT_ROOT / "scripts" / "build_pairwise_ae_combined_v2_decision_table.py"
+    spec = importlib.util.spec_from_file_location("build_pairwise_ae_combined_v2_decision_table", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _payload() -> dict:
@@ -51,7 +61,36 @@ def _payload() -> dict:
     }
 
 
-def _pairwise_cfg() -> dict:
+def _pairwise_cfg(*, strict: bool = False, strict_overrides: dict | None = None) -> dict:
+    utility = {
+        "enabled": True,
+        "primary_method": v2.STRICT_PRIMARY_METHOD if strict else v2.PRIMARY_METHOD,
+        "hard_pair_fraction": 0.40,
+        "utility_pair_fraction": 0.40,
+        "random_pair_fraction": 0.20,
+        "pair_weight_alpha": 4.0,
+        "pair_weight_delta_clip": 0.50,
+        "pair_weight_min": 1.0,
+        "pair_weight_max": 3.0,
+    }
+    if strict:
+        strict_cfg = {
+            "min_macro_gap_reduction_pp": 0.5,
+            "max_top1_drop_abs": 0.02,
+            "max_spearman_drop_abs": 0.03,
+            "max_worst_inner_center_gap_degradation_pp": 0.25,
+            "min_positive_inner_center_rate": 0.75,
+            "min_non_degrading_inner_center_rate": 1.0,
+            "min_passing_inner_centers": 2,
+        }
+        strict_cfg.update(strict_overrides or {})
+        utility.update(
+            {
+                "selection_mode": "strict_adoption",
+                "fallback_method": v2.BASELINE_METHOD,
+                "strict_adoption": strict_cfg,
+            }
+        )
     return {
         "hidden_dim": 4,
         "epochs": 1,
@@ -65,17 +104,7 @@ def _pairwise_cfg() -> dict:
         "max_pairs_per_sample": 8,
         "max_pairs_per_domain": 500,
         "run_utility_weighted_v2": True,
-        "utility_weighted_v2": {
-            "enabled": True,
-            "primary_method": v2.PRIMARY_METHOD,
-            "hard_pair_fraction": 0.40,
-            "utility_pair_fraction": 0.40,
-            "random_pair_fraction": 0.20,
-            "pair_weight_alpha": 4.0,
-            "pair_weight_delta_clip": 0.50,
-            "pair_weight_min": 1.0,
-            "pair_weight_max": 3.0,
-        },
+        "utility_weighted_v2": utility,
     }
 
 
@@ -93,6 +122,200 @@ def test_pairwise_ae_combined_v2_config_validates() -> None:
     pairwise = cfg["learned_utility"]["predictor_params"]["pairwise_ranker"]
     assert pairwise["run_utility_weighted_v2"] is True
     assert pairwise["utility_weighted_v2"]["primary_method"] == v2.PRIMARY_METHOD
+
+
+def test_pairwise_ae_combined_v2_strict_config_validates() -> None:
+    cfg = load_config(
+        PROJECT_ROOT
+        / "configs"
+        / "experiments"
+        / "camelyon17"
+        / "learned_utility_pairwise_ae_combined_v2_strict.yaml"
+    )
+    validate_config(cfg)
+    pairwise = cfg["learned_utility"]["predictor_params"]["pairwise_ranker"]
+    utility = pairwise["utility_weighted_v2"]
+    assert utility["primary_method"] == v2.STRICT_PRIMARY_METHOD
+    assert utility["selection_mode"] == "strict_adoption"
+    assert utility["fallback_method"] == v2.BASELINE_METHOD
+
+
+def _run_strict_selection(monkeypatch, payload, metric_fn, *, strict_overrides: dict | None = None):
+    def fake_eval(**kwargs):
+        inner_domain = int(payload["sample_domains"][kwargs["eval_idx"][0]])
+        return metric_fn(str(kwargs["method"]), inner_domain), []
+
+    monkeypatch.setattr(v2, "_evaluate_variant_on_indices", fake_eval)
+    return v2._source_inner_selection(
+        embeddings=payload["embeddings"],
+        sample_domains=payload["sample_domains"],
+        true_nelbo=payload["true_nelbo"],
+        expert_domains=payload["expert_domains"],
+        domain_to_idx=payload["domain_to_idx"],
+        train_idx=payload["train_idx"],
+        outer_fold=payload["fold"],
+        embedding_feature_dim=3,
+        expert_feature_dim=5,
+        ae_zscore_matrix=payload["ae_z"],
+        pairwise_cfg=_pairwise_cfg(strict=True, strict_overrides=strict_overrides),
+        seed=11,
+        tie_policy="stable_expert_index",
+    )
+
+
+def test_pairwise_ae_combined_v2_strict_uses_pairwise_ae_combined_fallback(monkeypatch) -> None:
+    payload = _payload()
+
+    def metrics(method: str, _inner: int) -> dict:
+        gap = 1.0 if method == v2.BASELINE_METHOD else 1.25
+        return {"mean_oracle_gap_pct": gap, "top1_oracle_hit": 0.8, "spearman": 0.7}
+
+    selected, rows = _run_strict_selection(monkeypatch, payload, metrics)
+    assert selected == v2.BASELINE_METHOD
+    assert rows
+    assert all(int(row["fallback_used"]) == 1 for row in rows)
+
+
+def test_pairwise_ae_combined_v2_strict_rejects_worst_inner_center_degradation(monkeypatch) -> None:
+    payload = _payload()
+
+    def metrics(method: str, inner: int) -> dict:
+        if method == v2.BASELINE_METHOD:
+            return {"mean_oracle_gap_pct": 1.0, "top1_oracle_hit": 0.8, "spearman": 0.7}
+        gap = 0.3 if inner != 1 else 1.4
+        return {"mean_oracle_gap_pct": gap, "top1_oracle_hit": 0.8, "spearman": 0.7}
+
+    selected, rows = _run_strict_selection(monkeypatch, payload, metrics)
+    assert selected == v2.BASELINE_METHOD
+    candidate_rows = [row for row in rows if row["candidate_method"] == v2.RANK_MARGIN_UNWEIGHTED]
+    assert candidate_rows
+    assert all(int(row["passed_worst_center_gate"]) == 0 for row in candidate_rows)
+
+
+def test_pairwise_ae_combined_v2_strict_requires_positive_inner_center_rate(monkeypatch) -> None:
+    payload = _payload()
+
+    def metrics(method: str, inner: int) -> dict:
+        if method == v2.BASELINE_METHOD:
+            return {"mean_oracle_gap_pct": 1.0, "top1_oracle_hit": 0.8, "spearman": 0.7}
+        gap = 0.4 if inner in {1, 2} else 1.0
+        return {"mean_oracle_gap_pct": gap, "top1_oracle_hit": 0.8, "spearman": 0.7}
+
+    selected, rows = _run_strict_selection(monkeypatch, payload, metrics)
+    assert selected == v2.BASELINE_METHOD
+    assert any(float(row["positive_inner_center_rate"]) == 0.5 for row in rows if row["candidate_method"] != v2.BASELINE_METHOD)
+
+
+def test_pairwise_ae_combined_v2_strict_requires_min_macro_gap_reduction(monkeypatch) -> None:
+    payload = _payload()
+
+    def metrics(method: str, _inner: int) -> dict:
+        gap = 1.0 if method == v2.BASELINE_METHOD else 0.75
+        return {"mean_oracle_gap_pct": gap, "top1_oracle_hit": 0.8, "spearman": 0.7}
+
+    selected, rows = _run_strict_selection(monkeypatch, payload, metrics)
+    assert selected == v2.BASELINE_METHOD
+    assert all(int(row["passed_macro_gap_gate"]) == 0 for row in rows if row["candidate_method"] != v2.BASELINE_METHOD)
+
+
+def test_pairwise_ae_combined_v2_strict_gap_reduction_sign_is_baseline_minus_candidate(monkeypatch) -> None:
+    payload = _payload()
+
+    def metrics(method: str, _inner: int) -> dict:
+        gap = 2.0 if method == v2.BASELINE_METHOD else 1.0
+        return {"mean_oracle_gap_pct": gap, "top1_oracle_hit": 0.8, "spearman": 0.7}
+
+    selected, rows = _run_strict_selection(monkeypatch, payload, metrics)
+    assert selected in {v2.RANK_MARGIN_UNWEIGHTED, v2.RAW_AE_WEIGHTED, v2.RANK_MARGIN_WEIGHTED}
+    candidate_row = next(row for row in rows if row["candidate_method"] == selected)
+    assert float(candidate_row["gap_reduction_pp"]) == 1.0
+    assert float(candidate_row["inner_center_gap_degradation_pp"]) == -1.0
+
+
+def test_pairwise_ae_combined_v2_strict_tiebreak_prefers_simpler_method(monkeypatch) -> None:
+    payload = _payload()
+
+    def metrics(method: str, _inner: int) -> dict:
+        gap = 2.0 if method == v2.BASELINE_METHOD else 1.0
+        return {"mean_oracle_gap_pct": gap, "top1_oracle_hit": 0.8, "spearman": 0.7}
+
+    selected, _rows = _run_strict_selection(monkeypatch, payload, metrics)
+    assert selected == v2.RANK_MARGIN_UNWEIGHTED
+
+
+def test_pairwise_ae_combined_v2_strict_selection_uses_no_target_nelbo(monkeypatch) -> None:
+    payload = _payload()
+
+    def metrics(method: str, _inner: int) -> dict:
+        gap = 2.0 if method == v2.BASELINE_METHOD else 1.0
+        return {"mean_oracle_gap_pct": gap, "top1_oracle_hit": 0.8, "spearman": 0.7}
+
+    _selected, rows = _run_strict_selection(monkeypatch, payload, metrics)
+    assert rows
+    assert all(int(row["heldout_target_nelbo_used_for_selection"]) == 0 for row in rows)
+
+
+def test_pairwise_ae_combined_v2_strict_recomputes_inner_fold_feature_normalization(monkeypatch) -> None:
+    payload = _payload()
+    seen_train_domains: list[set[int]] = []
+
+    def fake_train_predict(**kwargs):
+        seen_train_domains.append(set(payload["sample_domains"][kwargs["train_idx"]].tolist()))
+        n_eval = int(kwargs["eval_idx"].shape[0])
+        n_candidates = len(kwargs["eval_candidate_domains"])
+        return np.zeros((n_eval, n_candidates), dtype=np.float64), np.ones(1), [], [], []
+
+    monkeypatch.setattr(v2, "_train_predict_variant", fake_train_predict)
+    v2._evaluate_variant_on_indices(
+        method=v2.RANK_MARGIN_WEIGHTED,
+        embeddings=payload["embeddings"],
+        sample_domains=payload["sample_domains"],
+        true_nelbo=payload["true_nelbo"],
+        expert_domains=payload["expert_domains"],
+        domain_to_idx=payload["domain_to_idx"],
+        train_idx=payload["train_idx"][payload["sample_domains"][payload["train_idx"]] != 1],
+        eval_idx=payload["train_idx"][payload["sample_domains"][payload["train_idx"]] == 1],
+        outer_heldout_domain=0,
+        globally_excluded_domains=[1],
+        eval_fold=FoldCandidateSet.for_heldout_domain(heldout_domain=0, expert_domains=payload["expert_domains"], excluded_domains=[1]),
+        global_eval=payload["true_nelbo"][payload["train_idx"][payload["sample_domains"][payload["train_idx"]] == 1]],
+        embedding_feature_dim=3,
+        expert_feature_dim=5,
+        ae_zscore_matrix=payload["ae_z"],
+        pairwise_cfg=_pairwise_cfg(strict=True),
+        seed=11,
+        tie_policy="stable_expert_index",
+    )
+    assert seen_train_domains
+    assert all(0 not in domains and 1 not in domains for domains in seen_train_domains)
+
+
+def test_pairwise_ae_combined_v2_strict_inner_candidate_pool_excludes_outer_target_and_query_self(monkeypatch) -> None:
+    payload = _payload()
+
+    def fake_eval(**kwargs):
+        fold = kwargs["eval_fold"]
+        inner_domain = int(payload["sample_domains"][kwargs["eval_idx"][0]])
+        assert 0 not in set(fold.candidate_expert_domains)
+        assert inner_domain not in set(fold.candidate_expert_domains)
+        return {"mean_oracle_gap_pct": 1.0, "top1_oracle_hit": 0.8, "spearman": 0.7}, []
+
+    monkeypatch.setattr(v2, "_evaluate_variant_on_indices", fake_eval)
+    v2._source_inner_selection(
+        embeddings=payload["embeddings"],
+        sample_domains=payload["sample_domains"],
+        true_nelbo=payload["true_nelbo"],
+        expert_domains=payload["expert_domains"],
+        domain_to_idx=payload["domain_to_idx"],
+        train_idx=payload["train_idx"],
+        outer_fold=payload["fold"],
+        embedding_feature_dim=3,
+        expert_feature_dim=5,
+        ae_zscore_matrix=payload["ae_z"],
+        pairwise_cfg=_pairwise_cfg(strict=True),
+        seed=11,
+        tie_policy="stable_expert_index",
+    )
 
 
 def test_pairwise_ae_combined_v2_selection_is_per_seed_outer_center(monkeypatch) -> None:
@@ -394,6 +617,124 @@ def test_pairwise_ae_combined_v2_reports_fallback_and_adoption_rates(tmp_path: P
     assert summary["v2_adoption_rate"] == 0.5
 
 
+def test_pairwise_ae_combined_v2_strict_fallback_rows_match_baseline(monkeypatch) -> None:
+    payload = _payload()
+
+    def fake_selection(**_kwargs):
+        return v2.BASELINE_METHOD, [
+            {
+                "seed": 11,
+                "outer_heldout_center": 0,
+                "candidate_method": v2.BASELINE_METHOD,
+                "selected_method": v2.BASELINE_METHOD,
+                "selected_variant": v2.BASELINE_METHOD,
+                "fallback_used": 1,
+                "heldout_target_nelbo_used_for_selection": 0,
+            }
+        ]
+
+    def fake_train_predict(**kwargs):
+        n_eval = int(kwargs["eval_idx"].shape[0])
+        n_candidates = len(kwargs["eval_candidate_domains"])
+        pred = np.tile(np.arange(n_candidates, dtype=np.float64), (n_eval, 1))
+        if kwargs["method"] != v2.BASELINE_METHOD:
+            pred = pred[:, ::-1]
+        return pred, np.ones(1), [], [], []
+
+    monkeypatch.setattr(v2, "_source_inner_selection", fake_selection)
+    monkeypatch.setattr(v2, "_train_predict_variant", fake_train_predict)
+    out = v2.run_pairwise_ae_combined_v2_for_fold(
+        embeddings=payload["embeddings"],
+        sample_domains=payload["sample_domains"],
+        true_nelbo=payload["true_nelbo"],
+        expert_domains=payload["expert_domains"],
+        domain_to_idx=payload["domain_to_idx"],
+        train_idx=payload["train_idx"],
+        test_idx=payload["test_idx"],
+        fold=payload["fold"],
+        global_eval=payload["global_eval"],
+        pairwise_cfg=_pairwise_cfg(strict=True),
+        seed=11,
+        embedding_feature_dim=3,
+        expert_feature_dim=5,
+        tie_policy="stable_expert_index",
+        ae_zscore_matrix=payload["ae_z"],
+    )
+    assert out.decision_rows
+    assert all(row["selected_expert"] == row["baseline_selected_expert"] for row in out.decision_rows)
+    assert all(row["primary_method"] == v2.STRICT_PRIMARY_METHOD for row in out.decision_rows)
+    assert all(int(row["fallback_used"]) == 1 for row in out.decision_rows)
+
+
+def test_pairwise_ae_combined_v2_strict_reports_adoption_and_fallback_rates(tmp_path: Path) -> None:
+    decision_rows = [
+        {
+            "primary_method": v2.STRICT_PRIMARY_METHOD,
+            "selected_method": v2.BASELINE_METHOD,
+            "seed": 11,
+            "outer_heldout_center": 0,
+            "delta_gap_vs_baseline_pp": 0.0,
+            "top1_oracle_hit": 1,
+            "baseline_top1_oracle_hit": 1,
+        },
+        {
+            "primary_method": v2.STRICT_PRIMARY_METHOD,
+            "selected_method": v2.RANK_MARGIN_UNWEIGHTED,
+            "seed": 11,
+            "outer_heldout_center": 1,
+            "delta_gap_vs_baseline_pp": 0.5,
+            "top1_oracle_hit": 1,
+            "baseline_top1_oracle_hit": 1,
+        },
+    ]
+    artifacts = v2.write_pairwise_ae_combined_v2_artifacts(
+        reports_dir=tmp_path,
+        training_rows=[],
+        feature_rows=[],
+        inner_selection_rows=[],
+        pair_prediction_rows=[],
+        decision_rows=decision_rows,
+    )
+    summary = json.loads((tmp_path / "pairwise_ae_combined_v2_strict_decision_summary.json").read_text(encoding="utf-8"))
+    assert artifacts["pairwise_ae_combined_v2_strict_decision_table"] == "pairwise_ae_combined_v2_strict_decision_table.csv"
+    assert summary["strict_v2_adoption_rate"] == 0.5
+    assert summary["fallback_to_pairwise_ae_combined_rate"] == 0.5
+    assert summary["always_baseline_fallback"] is False
+
+
+def test_pairwise_ae_combined_v2_strict_decision_table_builder(tmp_path: Path) -> None:
+    builder = _load_decision_builder()
+    reports = tmp_path / "outputs" / "camelyon17" / "learned_utility_pairwise_ae_combined_v2_strict" / "run_seed11" / "reports"
+    reports.mkdir(parents=True)
+    result_path = reports / "learned_utility_results.json"
+    result_path.write_text("{}", encoding="utf-8")
+    v2._write_csv(
+        reports / "pairwise_ae_combined_v2_strict_decision_table.csv",
+        [
+            {
+                "seed": 11,
+                "outer_heldout_center": 0,
+                "selected_method": v2.RANK_MARGIN_UNWEIGHTED,
+                "delta_gap_vs_baseline_pp": 0.5,
+            }
+        ],
+    )
+    v2._write_csv(
+        reports / "learned_utility_domain_breakdown.csv",
+        [
+            {"method": v2.STRICT_PRIMARY_METHOD, "query_domain": 0, "mean_oracle_gap_pct": 1.0, "top1_oracle_hit": 0.8, "spearman": 0.7},
+            {"method": v2.BASELINE_METHOD, "query_domain": 0, "mean_oracle_gap_pct": 1.5, "top1_oracle_hit": 0.8, "spearman": 0.7},
+            {"method": "ae_argmin_zscore", "query_domain": 0, "mean_oracle_gap_pct": 2.0, "top1_oracle_hit": 0.7, "spearman": 0.6},
+            {"method": "metadata_routing", "query_domain": 0, "mean_oracle_gap_pct": 2.5, "top1_oracle_hit": 0.6, "spearman": 0.5},
+        ],
+    )
+    decisions, seed_domain_rows, any_strict = builder._aggregate_decisions([result_path])
+    summary = builder._verdict(seed_domain_rows)
+    assert any_strict is True
+    assert decisions[0]["decision_artifact"].endswith("pairwise_ae_combined_v2_strict_decision_table.csv")
+    assert summary["selected_nonbaseline_v2_at_least_once"] is True
+
+
 def test_pairwise_ae_combined_v2_tiny_capped_smoke_run(monkeypatch) -> None:
     payload = _payload()
 
@@ -436,6 +777,51 @@ def test_pairwise_ae_combined_v2_tiny_capped_smoke_run(monkeypatch) -> None:
     assert out.sample_rows
     assert any(row["method"] == v2.PRIMARY_METHOD for row in out.sample_rows)
     assert out.decision_rows
+
+
+def test_pairwise_ae_combined_v2_strict_tiny_capped_smoke_run(monkeypatch) -> None:
+    payload = _payload()
+
+    def fake_selection(**_kwargs):
+        return v2.RAW_AE_WEIGHTED, [
+            {
+                "seed": 11,
+                "outer_heldout_center": 0,
+                "candidate_method": v2.RAW_AE_WEIGHTED,
+                "selected_method": v2.RAW_AE_WEIGHTED,
+                "selected_variant": v2.RAW_AE_WEIGHTED,
+                "fallback_used": 0,
+                "heldout_target_nelbo_used_for_selection": 0,
+            }
+        ]
+
+    def fake_train_predict(**kwargs):
+        n_eval = int(kwargs["eval_idx"].shape[0])
+        n_candidates = len(kwargs["eval_candidate_domains"])
+        pred = np.tile(np.arange(n_candidates, dtype=np.float64), (n_eval, 1))
+        return pred, np.ones(1), [], [], []
+
+    monkeypatch.setattr(v2, "_source_inner_selection", fake_selection)
+    monkeypatch.setattr(v2, "_train_predict_variant", fake_train_predict)
+    out = v2.run_pairwise_ae_combined_v2_for_fold(
+        embeddings=payload["embeddings"],
+        sample_domains=payload["sample_domains"],
+        true_nelbo=payload["true_nelbo"],
+        expert_domains=payload["expert_domains"],
+        domain_to_idx=payload["domain_to_idx"],
+        train_idx=payload["train_idx"],
+        test_idx=payload["test_idx"],
+        fold=payload["fold"],
+        global_eval=payload["global_eval"],
+        pairwise_cfg=_pairwise_cfg(strict=True),
+        seed=11,
+        embedding_feature_dim=3,
+        expert_feature_dim=5,
+        tie_policy="stable_expert_index",
+        ae_zscore_matrix=payload["ae_z"],
+    )
+    assert any(row["method"] == v2.STRICT_PRIMARY_METHOD for row in out.sample_rows)
+    assert all(row["primary_method"] == v2.STRICT_PRIMARY_METHOD for row in out.decision_rows)
 
 
 def test_pairwise_ae_combined_v2_required_artifact_csv_is_readable(tmp_path: Path) -> None:

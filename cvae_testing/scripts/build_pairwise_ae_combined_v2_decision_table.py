@@ -13,6 +13,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Sequence
 
 
 PRIMARY_METHOD = "pairwise_ranker_ae_combined_inner_selected_v2"
+STRICT_PRIMARY_METHOD = "pairwise_ranker_ae_combined_strict_inner_selected_v2"
 BASELINE_METHOD = "pairwise_ranker_ae_combined"
 AE_ARGMIN_METHOD = "ae_argmin_zscore"
 METADATA_METHOD = "metadata_routing"
@@ -102,14 +103,30 @@ def _method_domain_summary(rows: Sequence[Mapping[str, str]]) -> Dict[tuple[str,
     return {(str(row.get("method", "")), str(row.get("query_domain", ""))): row for row in rows}
 
 
-def _aggregate_decisions(paths: Sequence[Path]) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+def _decision_file(reports: Path) -> tuple[Path, str, bool]:
+    strict = reports / "pairwise_ae_combined_v2_strict_decision_table.csv"
+    if strict.exists():
+        return strict, STRICT_PRIMARY_METHOD, True
+    return reports / "pairwise_ae_combined_v2_decision_table.csv", PRIMARY_METHOD, False
+
+
+def _delta_gap(row: Mapping[str, Any]) -> float:
+    if "delta_gap_vs_baseline_pp" in row:
+        return _float(row.get("delta_gap_vs_baseline_pp"))
+    return _float(row.get("delta_gap_vs_baseline"))
+
+
+def _aggregate_decisions(paths: Sequence[Path]) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]], bool]:
     decision_rows: List[Dict[str, Any]] = []
     seed_domain_rows: List[Dict[str, Any]] = []
+    any_strict = False
     for result_path in paths:
         reports = _reports_dir(result_path)
         seed = _seed_from_path(result_path)
         run_id = _run_id_from_path(result_path)
-        decisions = _read_csv(reports / "pairwise_ae_combined_v2_decision_table.csv")
+        decision_path, primary_method, is_strict = _decision_file(reports)
+        any_strict = any_strict or bool(is_strict)
+        decisions = _read_csv(decision_path)
         domain_rows = _read_csv(reports / "learned_utility_domain_breakdown.csv", required=False)
         domain_by_key = _method_domain_summary(domain_rows)
         for row in decisions:
@@ -117,13 +134,14 @@ def _aggregate_decisions(paths: Sequence[Path]) -> tuple[List[Dict[str, Any]], L
                 "seed": row.get("seed", seed),
                 "run_id": run_id,
                 "result_path": str(result_path),
+                "decision_artifact": str(decision_path),
                 **row,
             }
             decision_rows.append(enriched)
         centers = sorted({str(row.get("outer_heldout_center", "")) for row in decisions if str(row.get("outer_heldout_center", ""))})
         for center in centers:
             subset = [row for row in decisions if str(row.get("outer_heldout_center", "")) == str(center)]
-            primary = domain_by_key.get((PRIMARY_METHOD, str(center)), {})
+            primary = domain_by_key.get((primary_method, str(center)), {})
             baseline = domain_by_key.get((BASELINE_METHOD, str(center)), {})
             ae = domain_by_key.get((AE_ARGMIN_METHOD, str(center)), {})
             metadata = domain_by_key.get((METADATA_METHOD, str(center)), {})
@@ -137,8 +155,9 @@ def _aggregate_decisions(paths: Sequence[Path]) -> tuple[List[Dict[str, Any]], L
                     "selected_method_counts": dict(selected_methods),
                     "fallback_to_baseline_rate": float(selected_methods.get(BASELINE_METHOD, 0) / max(len(subset), 1)),
                     "v2_adoption_rate": float((len(subset) - selected_methods.get(BASELINE_METHOD, 0)) / max(len(subset), 1)),
+                    "strict_v2_adoption_rate": float((len(subset) - selected_methods.get(BASELINE_METHOD, 0)) / max(len(subset), 1)),
                     "mean_delta_gap_vs_baseline": _mean(
-                        [_float(row.get("delta_gap_vs_baseline")) for row in subset],
+                        [_delta_gap(row) for row in subset],
                         0.0,
                     ),
                     "primary_mean_oracle_gap_pct": _float(primary.get("mean_oracle_gap_pct")),
@@ -151,7 +170,7 @@ def _aggregate_decisions(paths: Sequence[Path]) -> tuple[List[Dict[str, Any]], L
                     "baseline_spearman": _float(baseline.get("spearman")),
                 }
             )
-    return decision_rows, seed_domain_rows
+    return decision_rows, seed_domain_rows, any_strict
 
 
 def _verdict(seed_domain_rows: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
@@ -207,13 +226,14 @@ def _verdict(seed_domain_rows: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
         "selected_nonbaseline_v2_at_least_once": bool(selected_nonbaseline),
         "beats_ae_argmin_zscore": bool(beats_ae_argmin),
         "beats_metadata_routing": bool(beats_metadata),
+        "always_baseline_fallback": bool(not selected_nonbaseline),
     }
 
 
-def _write_markdown(path: Path, summary: Mapping[str, Any], seed_domain_rows: Sequence[Mapping[str, Any]]) -> None:
+def _write_markdown(path: Path, summary: Mapping[str, Any], seed_domain_rows: Sequence[Mapping[str, Any]], *, strict: bool) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        "# Pairwise AE-Combined Inner-Selected v2",
+        "# Pairwise AE-Combined Strict Inner-Selected v2" if strict else "# Pairwise AE-Combined Inner-Selected v2",
         "",
         f"Verdict: **{summary.get('verdict')}**",
         "",
@@ -251,7 +271,7 @@ def main() -> None:
     args = parser.parse_args()
 
     paths = _load_runs(args.manifest, args.dataset)
-    decisions, seed_domain_rows = _aggregate_decisions(paths)
+    decisions, seed_domain_rows, any_strict = _aggregate_decisions(paths)
     summary = _verdict(seed_domain_rows)
     summary.update(
         {
@@ -259,18 +279,20 @@ def main() -> None:
             "n_runs": len(paths),
             "n_decision_rows": len(decisions),
             "n_seed_domain_rows": len(seed_domain_rows),
+            "primary_method": STRICT_PRIMARY_METHOD if any_strict else PRIMARY_METHOD,
         }
     )
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    _write_csv(args.output_dir / "pairwise_ae_combined_v2_decision_table.csv", decisions)
-    _write_csv(args.output_dir / "pairwise_ae_combined_v2_seed_domain_summary.csv", seed_domain_rows)
-    (args.output_dir / "pairwise_ae_combined_v2_decision_summary.json").write_text(
+    prefix = "pairwise_ae_combined_v2_strict" if any_strict else "pairwise_ae_combined_v2"
+    _write_csv(args.output_dir / f"{prefix}_decision_table.csv", decisions)
+    _write_csv(args.output_dir / f"{prefix}_seed_domain_summary.csv", seed_domain_rows)
+    (args.output_dir / f"{prefix}_decision_summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True, allow_nan=True),
         encoding="utf-8",
     )
     summaries_dir = args.output_dir.parent.parent / "summaries"
-    _write_markdown(summaries_dir / "pairwise_ae_combined_v2_decision_table.md", summary, seed_domain_rows)
+    _write_markdown(summaries_dir / f"{prefix}_decision_table.md", summary, seed_domain_rows, strict=any_strict)
 
 
 if __name__ == "__main__":

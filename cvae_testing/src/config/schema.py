@@ -57,6 +57,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_ae_utility_calibrator_v2",
         "learned_utility_source_reliability_v1",
         "learned_utility_pairwise_ae_combined_v2",
+        "learned_utility_pairwise_ae_combined_v2_strict",
         "breakhis_support_free_ae_routing_v1",
         "camelyon17_support_free_ae_routing_v1",
     }
@@ -69,6 +70,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_ae_utility_calibrator_v2",
         "learned_utility_source_reliability_v1",
         "learned_utility_pairwise_ae_combined_v2",
+        "learned_utility_pairwise_ae_combined_v2_strict",
         "breakhis_support_free_ae_routing_v1",
         "camelyon17_support_free_ae_routing_v1",
     }
@@ -529,13 +531,28 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                 "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2.enabled",
             )
             if bool(utility_v2.get("enabled", False)):
-                primary_method = str(
-                    utility_v2.get("primary_method", "pairwise_ranker_ae_combined_inner_selected_v2")
-                ).strip()
-                if primary_method != "pairwise_ranker_ae_combined_inner_selected_v2":
+                selection_mode = str(utility_v2.get("selection_mode", "standard")).strip().lower()
+                if selection_mode not in {"standard", "strict_adoption"}:
+                    raise ValueError(
+                        "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2.selection_mode "
+                        "must be one of ['standard', 'strict_adoption']"
+                    )
+                expected_primary = (
+                    "pairwise_ranker_ae_combined_strict_inner_selected_v2"
+                    if selection_mode == "strict_adoption"
+                    else "pairwise_ranker_ae_combined_inner_selected_v2"
+                )
+                primary_method = str(utility_v2.get("primary_method", expected_primary)).strip()
+                if primary_method != expected_primary:
                     raise ValueError(
                         "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2.primary_method "
-                        "must be 'pairwise_ranker_ae_combined_inner_selected_v2'"
+                        f"must be '{expected_primary}' for selection_mode='{selection_mode}'"
+                    )
+                fallback_method = str(utility_v2.get("fallback_method", "pairwise_ranker_ae_combined")).strip()
+                if fallback_method != "pairwise_ranker_ae_combined":
+                    raise ValueError(
+                        "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2.fallback_method "
+                        "must be 'pairwise_ranker_ae_combined'"
                     )
                 for key in ["hard_pair_fraction", "utility_pair_fraction", "random_pair_fraction"]:
                     if float(utility_v2.get(key, 0.0)) < 0.0:
@@ -561,6 +578,39 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                         "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2.pair_weight_max "
                         "must be >= pair_weight_min"
                     )
+                strict_adoption = utility_v2.get("strict_adoption", {})
+                if strict_adoption is not None and not isinstance(strict_adoption, dict):
+                    raise ValueError(
+                        "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2.strict_adoption "
+                        "must be a dictionary"
+                    )
+                strict_adoption = strict_adoption or {}
+                if selection_mode == "strict_adoption":
+                    for key in [
+                        "min_macro_gap_reduction_pp",
+                        "max_top1_drop_abs",
+                        "max_spearman_drop_abs",
+                        "max_worst_inner_center_gap_degradation_pp",
+                        "min_positive_inner_center_rate",
+                        "min_non_degrading_inner_center_rate",
+                    ]:
+                        if float(strict_adoption.get(key, 0.0)) < 0.0:
+                            raise ValueError(
+                                "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2."
+                                f"strict_adoption.{key} must be >= 0"
+                            )
+                    for key in ["min_positive_inner_center_rate", "min_non_degrading_inner_center_rate"]:
+                        value = float(strict_adoption.get(key, 0.0))
+                        if value > 1.0:
+                            raise ValueError(
+                                "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2."
+                                f"strict_adoption.{key} must be <= 1"
+                            )
+                    if int(strict_adoption.get("min_passing_inner_centers", 1)) <= 0:
+                        raise ValueError(
+                            "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2."
+                            "strict_adoption.min_passing_inner_centers must be > 0"
+                        )
 
         hybrid_scoring = learned_cfg.get("hybrid_scoring", {})
         if hybrid_scoring is not None and not isinstance(hybrid_scoring, dict):
