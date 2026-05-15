@@ -1,0 +1,16 @@
+{
+  "beats_ae_argmin_zscore": true,
+  "beats_metadata_routing": true,
+  "dataset": "camelyon17",
+  "mean_gap_reduction_vs_pairwise_ae_combined": -0.0006772571759324552,
+  "mean_spearman_delta_vs_pairwise_ae_combined": -0.003866666666666676,
+  "mean_top1_delta_vs_pairwise_ae_combined": -0.00033333333333333733,
+  "n_decision_rows": 3000,
+  "n_runs": 3,
+  "n_seed_domain_rows": 15,
+  "seed_gap_improved_count": 1,
+  "seed_top1_nondegrading_count": 3,
+  "selected_nonbaseline_v2_at_least_once": true,
+  "verdict": "DIAGNOSTIC ONLY",
+  "worst_center_gap_degradation": 1.0292817700300194
+}

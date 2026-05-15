@@ -54,6 +54,11 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
         )
         residual_routing_cfg = learned_cfg.get("residual_routing", {}) or {}
         support_response_cfg = learned_cfg.get("support_response_routing", {}) or {}
+        support_response_pool_scope = (
+            "all_splits"
+            if str(cfg.get("data", {}).get("dataset_domain_semantics", "")).strip().lower() == "midogpp_scanner"
+            else "test_split"
+        )
 
         protocol_lock = {
             "experiment_mode": "learned_utility_routing",
@@ -224,6 +229,13 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
                 "scaler_fit_scope": "source_training_pairs_only",
                 "ranker_model_selection_scope": "source_only_fixed_config",
                 "score_direction": "predicted_mean_nelbo_lower_is_better",
+                "evaluation_pool_scope": support_response_pool_scope,
+                "evaluation_pool_note": (
+                    "MIDOG++ scanner runs use an all-split support/eval pool while held-out scanner "
+                    "experts remain excluded from routing and candidate scoring."
+                    if support_response_pool_scope == "all_splits"
+                    else "Support-response routing uses the test embedding split."
+                ),
             },
             "winner_rule": {
                 "primary_metric": str(
@@ -416,6 +428,7 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
 
         results = evaluate_learned_utility_loqdo(
             test_cache=cache_paths["test"],
+            cache_paths=cache_paths,
             expert_checkpoints=experts,
             hidden_dim=int(cfg["model"]["hidden_dim"]),
             latent_dim=int(cfg["model"]["latent_dim"]),
