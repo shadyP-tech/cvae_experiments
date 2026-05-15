@@ -26,6 +26,7 @@ from src.eval.evaluators.learned_utility_selection import _pairwise_auc_single, 
 BASELINE_METHOD = "pairwise_ranker_ae_combined"
 PRIMARY_METHOD = "pairwise_ranker_ae_combined_inner_selected_v2"
 STRICT_PRIMARY_METHOD = "pairwise_ranker_ae_combined_strict_inner_selected_v2"
+TARGET_BATCH_AGREEMENT_PRIMARY_METHOD = "pairwise_ranker_ae_combined_target_batch_agreement_gated_v3"
 RANK_MARGIN_UNWEIGHTED = "pairwise_ranker_ae_combined_rank_margin_unweighted_v2"
 RAW_AE_WEIGHTED = "pairwise_ranker_ae_combined_raw_ae_weighted_v2"
 RANK_MARGIN_WEIGHTED = "pairwise_ranker_ae_combined_rank_margin_weighted_v2"
@@ -55,11 +56,24 @@ def _is_strict_mode(pairwise_cfg: Mapping[str, Any]) -> bool:
     return _selection_mode(pairwise_cfg) == "strict_adoption"
 
 
+def _is_target_batch_agreement_mode(pairwise_cfg: Mapping[str, Any]) -> bool:
+    return _selection_mode(pairwise_cfg) == "target_batch_agreement_gated"
+
+
+def _uses_strict_source_inner_gates(pairwise_cfg: Mapping[str, Any]) -> bool:
+    return _is_strict_mode(pairwise_cfg) or _is_target_batch_agreement_mode(pairwise_cfg)
+
+
 def _primary_method(pairwise_cfg: Mapping[str, Any]) -> str:
     cfg = _v2_cfg(pairwise_cfg)
-    default = STRICT_PRIMARY_METHOD if _is_strict_mode(pairwise_cfg) else PRIMARY_METHOD
+    if _is_target_batch_agreement_mode(pairwise_cfg):
+        default = TARGET_BATCH_AGREEMENT_PRIMARY_METHOD
+    elif _is_strict_mode(pairwise_cfg):
+        default = STRICT_PRIMARY_METHOD
+    else:
+        default = PRIMARY_METHOD
     primary = str(cfg.get("primary_method", default)).strip() or default
-    expected = STRICT_PRIMARY_METHOD if _is_strict_mode(pairwise_cfg) else PRIMARY_METHOD
+    expected = default
     if primary != expected:
         raise ProtocolError(f"utility_weighted_v2.primary_method must be {expected!r} for selection_mode={_selection_mode(pairwise_cfg)!r}")
     return primary
@@ -75,6 +89,18 @@ def _strict_cfg(pairwise_cfg: Mapping[str, Any]) -> Dict[str, float]:
         "min_positive_inner_center_rate": float(cfg.get("min_positive_inner_center_rate", 0.75)),
         "min_non_degrading_inner_center_rate": float(cfg.get("min_non_degrading_inner_center_rate", 1.0)),
         "min_passing_inner_centers": float(cfg.get("min_passing_inner_centers", 2)),
+    }
+
+
+def _target_batch_agreement_cfg(pairwise_cfg: Mapping[str, Any]) -> Dict[str, Any]:
+    cfg = dict((_v2_cfg(pairwise_cfg).get("target_batch_agreement", {}) or {}))
+    return {
+        "agreement_threshold": float(cfg.get("agreement_threshold", 0.60)),
+        "agreement_threshold_source": str(cfg.get("agreement_threshold_source", "predeclared_development_seed_diagnostic")),
+        "reference_method": str(cfg.get("reference_method", RAW_AE_WEIGHTED)),
+        "min_query_count": int(cfg.get("min_query_count", 100)),
+        "min_group_count": int(cfg.get("min_group_count", 2)),
+        "group_key_candidates": list(cfg.get("group_key_candidates", ["patient_id", "slide_id", "case_id"]) or []),
     }
 
 
@@ -115,6 +141,132 @@ def _finite_mean(values: Sequence[float], default: float = float("nan")) -> floa
 def _stable_argmin(row: np.ndarray) -> int:
     order = np.lexsort((np.arange(row.shape[0], dtype=np.int64), row))
     return int(order[0])
+
+
+def _selected_experts_from_scores(score_matrix: np.ndarray, candidate_domains: Sequence[int]) -> np.ndarray:
+    candidates = np.asarray([int(v) for v in candidate_domains], dtype=np.int64)
+    selected = [int(candidates[_stable_argmin(np.asarray(row, dtype=np.float64))]) for row in np.asarray(score_matrix)]
+    return np.asarray(selected, dtype=np.int64)
+
+
+def _resolve_group_ids(
+    *,
+    sample_metadata: Sequence[Mapping[str, Any]] | None,
+    sample_indices: np.ndarray,
+    group_key_candidates: Sequence[str],
+) -> Tuple[List[str], str, int]:
+    if sample_metadata is None:
+        return [], "", 0
+    indices = [int(v) for v in np.asarray(sample_indices, dtype=np.int64).tolist()]
+    for key in group_key_candidates:
+        key_s = str(key).strip()
+        if not key_s:
+            continue
+        values: List[str] = []
+        valid = True
+        for idx in indices:
+            if idx < 0 or idx >= len(sample_metadata):
+                valid = False
+                break
+            value = sample_metadata[idx].get(key_s, "")
+            text = str(value).strip()
+            if not text or text.lower() == "nan":
+                valid = False
+                break
+            values.append(text)
+        if valid and values:
+            return values, key_s, len(set(values))
+    return [], "", 0
+
+
+def _group_macro_agreement(selected: np.ndarray, reference: np.ndarray, group_ids: Sequence[str]) -> Tuple[float, int]:
+    if not group_ids:
+        return float("nan"), 0
+    by_group: Dict[str, List[float]] = {}
+    for idx, group in enumerate(group_ids):
+        if int(idx) >= int(selected.shape[0]) or int(idx) >= int(reference.shape[0]):
+            continue
+        by_group.setdefault(str(group), []).append(float(int(selected[int(idx)] == reference[int(idx)])))
+    if not by_group:
+        return float("nan"), 0
+    return _finite_mean([_finite_mean(vals, float("nan")) for vals in by_group.values()], float("nan")), len(by_group)
+
+
+def _target_batch_agreement_policy(
+    *,
+    source_inner_selected_method: str,
+    method_predictions: Mapping[str, np.ndarray],
+    candidate_domains: Sequence[int],
+    test_idx: np.ndarray,
+    sample_metadata: Sequence[Mapping[str, Any]] | None,
+    pairwise_cfg: Mapping[str, Any],
+) -> Tuple[str, Dict[str, Any]]:
+    cfg = _target_batch_agreement_cfg(pairwise_cfg)
+    threshold = float(cfg["agreement_threshold"])
+    reference_method = str(cfg["reference_method"])
+    min_query_count = int(cfg["min_query_count"])
+    min_group_count = int(cfg["min_group_count"])
+    gate_base = {
+        "agreement_threshold": float(threshold),
+        "agreement_threshold_source": str(cfg["agreement_threshold_source"]),
+        "agreement_gate_applied": 0,
+        "agreement_gate_passed": 0,
+        "agreement_gate_skipped_due_to_small_batch": 0,
+        "gate_num_queries": int(np.asarray(test_idx).shape[0]),
+        "gate_num_groups": 0,
+        "gate_group_key": "",
+        "selected_vs_raw_agreement_rate_query_weighted": float("nan"),
+        "selected_vs_raw_agreement_rate_group_macro": float("nan"),
+        "used_target_embeddings_for_gate": 1,
+        "used_target_group_ids_for_gate": 0,
+        "used_target_labels_for_gate": 0,
+        "used_target_nelbo_for_gate": 0,
+        "used_target_support_for_gate": 0,
+        "used_target_fitting_for_gate": 0,
+        "used_target_normalization_for_gate": 0,
+        "heldout_target_nelbo_used_for_selection": 0,
+        "agreement_gate_reason": "",
+    }
+    selected = str(source_inner_selected_method)
+    if selected == BASELINE_METHOD:
+        gate_base["agreement_gate_reason"] = "source_inner_selected_baseline"
+        return BASELINE_METHOD, gate_base
+    if selected not in {RANK_MARGIN_UNWEIGHTED, RANK_MARGIN_WEIGHTED}:
+        gate_base["agreement_gate_reason"] = "selected_variant_not_rank_margin_gate_not_required"
+        gate_base["agreement_gate_passed"] = 1
+        return selected, gate_base
+    if selected not in method_predictions or reference_method not in method_predictions:
+        gate_base["agreement_gate_reason"] = "missing_selected_or_reference_predictions"
+        return BASELINE_METHOD, gate_base
+
+    selected_experts = _selected_experts_from_scores(method_predictions[selected], candidate_domains)
+    reference_experts = _selected_experts_from_scores(method_predictions[reference_method], candidate_domains)
+    query_agreement = float(np.mean(selected_experts == reference_experts)) if selected_experts.size else float("nan")
+    group_ids, group_key, group_count = _resolve_group_ids(
+        sample_metadata=sample_metadata,
+        sample_indices=np.asarray(test_idx, dtype=np.int64),
+        group_key_candidates=cfg["group_key_candidates"],
+    )
+    group_macro, resolved_group_count = _group_macro_agreement(selected_experts, reference_experts, group_ids)
+    group_count = int(resolved_group_count or group_count)
+    gate_base.update(
+        {
+            "agreement_gate_applied": 1,
+            "gate_num_groups": int(group_count),
+            "gate_group_key": str(group_key),
+            "selected_vs_raw_agreement_rate_query_weighted": float(query_agreement),
+            "selected_vs_raw_agreement_rate_group_macro": float(group_macro),
+            "used_target_group_ids_for_gate": int(group_count > 0),
+        }
+    )
+    if int(selected_experts.size) < min_query_count or group_count < min_group_count:
+        gate_base["agreement_gate_skipped_due_to_small_batch"] = 1
+        gate_base["agreement_gate_reason"] = "agreement_gate_skipped_due_to_small_batch"
+        return BASELINE_METHOD, gate_base
+    passed = bool(float(query_agreement) >= threshold and float(group_macro) >= threshold)
+    gate_base["agreement_gate_passed"] = int(passed)
+    gate_base["agreement_gate_reason"] = "agreement_gate_passed" if passed else "agreement_gate_blocked_low_agreement"
+    return selected if passed else BASELINE_METHOD, gate_base
 
 
 def _metadata_selected_expert(query_domain: int, candidate_domains: Sequence[int]) -> int:
@@ -702,7 +854,7 @@ def _source_inner_selection(
     seed: int,
     tie_policy: str,
 ) -> Tuple[str, List[Dict[str, Any]]]:
-    strict_mode = _is_strict_mode(pairwise_cfg)
+    strict_mode = _uses_strict_source_inner_gates(pairwise_cfg)
     strict = _strict_cfg(pairwise_cfg)
     source_domains = sorted(set(int(sample_domains[int(i)]) for i in np.asarray(train_idx, dtype=np.int64).tolist()))
     inner_rows: List[Dict[str, Any]] = []
@@ -915,7 +1067,7 @@ def _source_inner_selection(
         for row in base_rows:
             row["selected_method"] = str(selected)
             row["selected_variant"] = str(selected)
-            row["selection_mode"] = "strict_adoption" if strict_mode else "standard"
+            row["selection_mode"] = _selection_mode(pairwise_cfg)
             row["selection_reason"] = (
                 "selected_by_strict_source_inner_policy"
                 if strict_mode and str(method) == str(selected) and str(selected) != BASELINE_METHOD
@@ -967,6 +1119,7 @@ def run_pairwise_ae_combined_v2_for_fold(
     expert_feature_dim: int,
     tie_policy: str,
     ae_zscore_matrix: np.ndarray | None,
+    sample_metadata: Sequence[Mapping[str, Any]] | None = None,
 ) -> PairwiseAECombinedV2FoldOutputs:
     v2_cfg = _v2_cfg(pairwise_cfg)
     if not bool(pairwise_cfg.get("run_utility_weighted_v2", False)) or not bool(v2_cfg.get("enabled", False)):
@@ -974,9 +1127,9 @@ def run_pairwise_ae_combined_v2_for_fold(
     if ae_zscore_matrix is None:
         raise ProtocolError("pairwise AE-combined v2 requires autoencoder_proxy AE z-score matrix")
     primary_method = _primary_method(pairwise_cfg)
-    strict_mode = _is_strict_mode(pairwise_cfg)
+    selection_mode = _selection_mode(pairwise_cfg)
 
-    selected_method, inner_rows = _source_inner_selection(
+    source_inner_selected_method, inner_rows = _source_inner_selection(
         embeddings=embeddings,
         sample_domains=sample_domains,
         true_nelbo=true_nelbo,
@@ -1033,7 +1186,7 @@ def run_pairwise_ae_combined_v2_for_fold(
         _ = metrics
         for row in rows:
             row["sample_index"] = int(test_idx[int(row["sample_index"])])
-            row["source_inner_selected_method"] = str(selected_method)
+            row["source_inner_selected_method"] = str(source_inner_selected_method)
             row["posthoc_diagnostic_only"] = int(method != BASELINE_METHOD)
             row["used_for_selection"] = 0
         method_sample_rows[method] = rows
@@ -1058,13 +1211,24 @@ def run_pairwise_ae_combined_v2_for_fold(
                     "expert_domain": int(e_rep[k]),
                     "predicted_score": float(pred_flat[k]),
                     "true_nelbo": float(true_flat[k]),
-                    "source_inner_selected_method": str(selected_method),
+                    "source_inner_selected_method": str(source_inner_selected_method),
                     "posthoc_diagnostic_only": int(method != BASELINE_METHOD),
                     "used_for_selection": 0,
                 }
             )
 
-    selected_pred = method_predictions.get(str(selected_method), method_predictions[BASELINE_METHOD])
+    gate_fields: Dict[str, Any] = {}
+    deployed_method = str(source_inner_selected_method)
+    if _is_target_batch_agreement_mode(pairwise_cfg):
+        deployed_method, gate_fields = _target_batch_agreement_policy(
+            source_inner_selected_method=str(source_inner_selected_method),
+            method_predictions=method_predictions,
+            candidate_domains=fold.candidate_expert_domains,
+            test_idx=test_idx,
+            sample_metadata=sample_metadata,
+            pairwise_cfg=pairwise_cfg,
+        )
+    selected_pred = method_predictions.get(str(deployed_method), method_predictions[BASELINE_METHOD])
     selected_metrics, selected_rows = _selection_metrics(
         method=primary_method,
         query_domains=sample_domains[test_idx],
@@ -1079,21 +1243,39 @@ def run_pairwise_ae_combined_v2_for_fold(
     _ = selected_metrics
     baseline_rows = method_sample_rows[BASELINE_METHOD]
     baseline_by_sample = {int(r["sample_index"]): r for r in baseline_rows}
+    source_inner_rows_by_sample = {
+        int(r["sample_index"]): r
+        for r in method_sample_rows.get(str(source_inner_selected_method), method_sample_rows[BASELINE_METHOD])
+    }
     ae_scores = ae_zscore_matrix[np.asarray(test_idx, dtype=np.int64)][:, list(fold.candidate_col_indices)]
     decision_rows: List[Dict[str, Any]] = []
     for local_i, row in enumerate(selected_rows):
         sample_index = int(test_idx[int(row["sample_index"])])
         row["sample_index"] = sample_index
-        row["source_inner_selected_method"] = str(selected_method)
-        row["fallback_to_baseline"] = int(str(selected_method) == BASELINE_METHOD)
-        row["fallback_used"] = int(str(selected_method) == BASELINE_METHOD)
-        row["deployed_method"] = str(selected_method)
-        row["selected_variant"] = str(selected_method)
-        row["selection_mode"] = "strict_adoption" if strict_mode else "standard"
+        row["source_inner_selected_method"] = str(source_inner_selected_method)
+        row["fallback_to_baseline"] = int(str(deployed_method) == BASELINE_METHOD)
+        row["fallback_used"] = int(str(deployed_method) == BASELINE_METHOD)
+        row["deployed_method"] = str(deployed_method)
+        row["selected_variant"] = str(source_inner_selected_method)
+        row["selection_mode"] = str(selection_mode)
         row["used_for_selection"] = 1
         row["posthoc_diagnostic_only"] = 0
         sample_rows.append(row)
         base = baseline_by_sample.get(sample_index, {})
+        source_inner_row = source_inner_rows_by_sample.get(sample_index, base)
+        source_inner_gap = float(source_inner_row.get("oracle_gap_pct", float("nan")))
+        baseline_gap = float(base.get("oracle_gap_pct", float("nan")))
+        v2_delta_gap_vs_baseline = source_inner_gap - baseline_gap
+        gate_blocked = int(
+            _is_target_batch_agreement_mode(pairwise_cfg)
+            and str(source_inner_selected_method) != BASELINE_METHOD
+            and str(deployed_method) == BASELINE_METHOD
+        )
+        gate_allowed = int(
+            _is_target_batch_agreement_mode(pairwise_cfg)
+            and str(source_inner_selected_method) != BASELINE_METHOD
+            and str(deployed_method) != BASELINE_METHOD
+        )
         ae_order = np.lexsort((np.arange(ae_scores.shape[1], dtype=np.int64), ae_scores[int(local_i), :]))
         ae_best = int(fold.candidate_expert_domains[int(ae_order[0])])
         ae_margin = (
@@ -1111,26 +1293,39 @@ def run_pairwise_ae_combined_v2_for_fold(
                 "outer_heldout_center": int(fold.heldout_domain),
                 "sample_index": int(sample_index),
                 "primary_method": str(primary_method),
-                "selection_mode": "strict_adoption" if strict_mode else "standard",
-                "selected_method": str(selected_method),
-                "selected_variant": str(selected_method),
-                "deployed_method": str(selected_method),
-                "fallback_used": int(str(selected_method) == BASELINE_METHOD),
+                "selection_mode": str(selection_mode),
+                "source_inner_selected_method": str(source_inner_selected_method),
+                "selected_method": str(deployed_method),
+                "selected_variant": str(source_inner_selected_method),
+                "deployed_method": str(deployed_method),
+                "fallback_used": int(str(deployed_method) == BASELINE_METHOD),
                 "selected_expert": int(row["selected_expert"]),
                 "oracle_expert": int(row["oracle_expert"]),
                 "selected_nelbo": float(row["selected_nelbo"]),
                 "oracle_nelbo": float(row["oracle_nelbo"]),
                 "oracle_gap_pct": float(row["oracle_gap_pct"]),
                 "selected_oracle_gap_pct": float(row["oracle_gap_pct"]),
+                "source_inner_selected_expert": int(source_inner_row.get("selected_expert", -1)),
+                "source_inner_selected_oracle_gap_pct": float(source_inner_gap),
                 "baseline_selected_expert": int(base.get("selected_expert", -1)),
                 "baseline_oracle_gap_pct": float(base.get("oracle_gap_pct", float("nan"))),
                 "baseline_top1_oracle_hit": int(int(base.get("selected_expert", -1)) == int(base.get("oracle_expert", -2))),
                 "delta_gap_vs_baseline": float(base.get("oracle_gap_pct", float("nan"))) - float(row["oracle_gap_pct"]),
                 "delta_gap_vs_baseline_pp": float(base.get("oracle_gap_pct", float("nan"))) - float(row["oracle_gap_pct"]),
+                "v2_delta_gap_vs_baseline": float(v2_delta_gap_vs_baseline),
+                "posthoc_target_nelbo_diagnostic": int(_is_target_batch_agreement_mode(pairwise_cfg)),
+                "posthoc_diagnostics_used_for_selection": 0,
+                "false_veto": int(gate_blocked and v2_delta_gap_vs_baseline < 0.0),
+                "false_allow": int(gate_allowed and v2_delta_gap_vs_baseline > 0.0),
+                "blocked_harmful_deployment": int(gate_blocked and v2_delta_gap_vs_baseline > 0.0),
+                "allowed_beneficial_deployment": int(gate_allowed and v2_delta_gap_vs_baseline < 0.0),
+                "blocked_v2_delta_gap_vs_baseline": float(v2_delta_gap_vs_baseline) if gate_blocked else float("nan"),
+                "allowed_v2_delta_gap_vs_baseline": float(v2_delta_gap_vs_baseline) if gate_allowed else float("nan"),
                 "ae_best_expert": int(ae_best),
                 "ae_best_vs_second_margin": float(ae_margin),
                 "metadata_selected_expert": int(metadata_selected),
                 "top1_oracle_hit": int(row["selected_expert"] == row["oracle_expert"]),
+                **gate_fields,
             }
         )
     return PairwiseAECombinedV2FoldOutputs(
@@ -1241,6 +1436,105 @@ def _worst_center_gap_degradation(rows: Sequence[Mapping[str, Any]]) -> float:
     return float(max(degradations)) if degradations else 0.0
 
 
+def _policy_unit_rows(rows: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    by_unit: Dict[Tuple[str, str], List[Mapping[str, Any]]] = {}
+    for row in rows:
+        by_unit.setdefault((str(row.get("seed", "")), str(row.get("outer_heldout_center", ""))), []).append(row)
+    out: List[Dict[str, Any]] = []
+    policy_fields = [
+        "seed",
+        "outer_heldout_center",
+        "primary_method",
+        "selection_mode",
+        "source_inner_selected_method",
+        "selected_method",
+        "selected_variant",
+        "deployed_method",
+        "fallback_used",
+        "gate_num_queries",
+        "gate_num_groups",
+        "gate_group_key",
+        "selected_vs_raw_agreement_rate_query_weighted",
+        "selected_vs_raw_agreement_rate_group_macro",
+        "agreement_threshold",
+        "agreement_threshold_source",
+        "agreement_gate_applied",
+        "agreement_gate_passed",
+        "agreement_gate_skipped_due_to_small_batch",
+        "agreement_gate_reason",
+        "used_target_embeddings_for_gate",
+        "used_target_group_ids_for_gate",
+        "used_target_labels_for_gate",
+        "used_target_nelbo_for_gate",
+        "used_target_support_for_gate",
+        "used_target_fitting_for_gate",
+        "used_target_normalization_for_gate",
+        "heldout_target_nelbo_used_for_selection",
+    ]
+    for _key, unit_rows in sorted(by_unit.items()):
+        first = dict(unit_rows[0])
+        row = {field: first.get(field, "") for field in policy_fields}
+        row["n_queries"] = int(len(unit_rows))
+        row["posthoc_target_nelbo_diagnostic"] = 1
+        row["posthoc_diagnostics_used_for_selection"] = 0
+        row["mean_blocked_v2_delta_gap_vs_baseline"] = _finite_mean(
+            [float(r.get("blocked_v2_delta_gap_vs_baseline", float("nan"))) for r in unit_rows],
+            float("nan"),
+        )
+        row["mean_allowed_v2_delta_gap_vs_baseline"] = _finite_mean(
+            [float(r.get("allowed_v2_delta_gap_vs_baseline", float("nan"))) for r in unit_rows],
+            float("nan"),
+        )
+        row["false_veto"] = int(
+            int(first.get("agreement_gate_applied", 0)) == 1
+            and int(first.get("agreement_gate_passed", 0)) == 0
+            and np.isfinite(float(row["mean_blocked_v2_delta_gap_vs_baseline"]))
+            and float(row["mean_blocked_v2_delta_gap_vs_baseline"]) < 0.0
+        )
+        row["false_allow"] = int(
+            int(first.get("agreement_gate_applied", 0)) == 1
+            and int(first.get("agreement_gate_passed", 0)) == 1
+            and np.isfinite(float(row["mean_allowed_v2_delta_gap_vs_baseline"]))
+            and float(row["mean_allowed_v2_delta_gap_vs_baseline"]) > 0.0
+        )
+        row["blocked_harmful_deployment"] = int(
+            int(first.get("agreement_gate_applied", 0)) == 1
+            and int(first.get("agreement_gate_passed", 0)) == 0
+            and np.isfinite(float(row["mean_blocked_v2_delta_gap_vs_baseline"]))
+            and float(row["mean_blocked_v2_delta_gap_vs_baseline"]) > 0.0
+        )
+        row["allowed_beneficial_deployment"] = int(
+            int(first.get("agreement_gate_applied", 0)) == 1
+            and int(first.get("agreement_gate_passed", 0)) == 1
+            and np.isfinite(float(row["mean_allowed_v2_delta_gap_vs_baseline"]))
+            and float(row["mean_allowed_v2_delta_gap_vs_baseline"]) < 0.0
+        )
+        out.append(row)
+    return out
+
+
+def _threshold_sensitivity_rows(policy_rows: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    thresholds = [0.50, 0.60, 0.70, 0.80, 0.90]
+    out: List[Dict[str, Any]] = []
+    for row in policy_rows:
+        if int(row.get("agreement_gate_applied", 0) or 0) != 1:
+            continue
+        q = float(row.get("selected_vs_raw_agreement_rate_query_weighted", float("nan")))
+        g = float(row.get("selected_vs_raw_agreement_rate_group_macro", float("nan")))
+        for threshold in thresholds:
+            out.append(
+                {
+                    "seed": row.get("seed", ""),
+                    "outer_heldout_center": row.get("outer_heldout_center", ""),
+                    "candidate_threshold": float(threshold),
+                    "would_pass_threshold": int(np.isfinite(q) and np.isfinite(g) and q >= threshold and g >= threshold),
+                    "posthoc_diagnostic_only": 1,
+                    "used_for_selection": 0,
+                }
+            )
+    return out
+
+
 def write_pairwise_ae_combined_v2_artifacts(
     *,
     reports_dir: Path,
@@ -1253,6 +1547,7 @@ def write_pairwise_ae_combined_v2_artifacts(
     if not (training_rows or feature_rows or inner_selection_rows or pair_prediction_rows or decision_rows):
         return {}
     has_strict = any(str(row.get("primary_method", "")) == STRICT_PRIMARY_METHOD for row in decision_rows)
+    has_v3 = any(str(row.get("primary_method", "")) == TARGET_BATCH_AGREEMENT_PRIMARY_METHOD for row in decision_rows)
     _write_csv(reports_dir / "pairwise_ae_combined_v2_training_pairs.csv", training_rows)
     _write_csv(reports_dir / "pairwise_ae_combined_v2_feature_diagnostics.csv", feature_rows)
     _write_csv(reports_dir / "pairwise_ae_combined_v2_inner_selection_table.csv", inner_selection_rows)
@@ -1261,6 +1556,14 @@ def write_pairwise_ae_combined_v2_artifacts(
     if has_strict:
         _write_csv(reports_dir / "pairwise_ae_combined_v2_strict_inner_selection_table.csv", inner_selection_rows)
         _write_csv(reports_dir / "pairwise_ae_combined_v2_strict_decision_table.csv", decision_rows)
+    if has_v3:
+        v3_policy_rows = _policy_unit_rows(decision_rows)
+        _write_csv(reports_dir / "pairwise_ae_combined_v3_inner_selection_table.csv", inner_selection_rows)
+        _write_csv(reports_dir / "pairwise_ae_combined_v3_agreement_policy.csv", v3_policy_rows)
+        _write_csv(reports_dir / "pairwise_ae_combined_v3_threshold_sensitivity.csv", _threshold_sensitivity_rows(v3_policy_rows))
+        _write_csv(reports_dir / "pairwise_ae_combined_v3_decision_table.csv", decision_rows)
+    else:
+        v3_policy_rows = []
 
     selected_methods = [str(r.get("selected_method", "")) for r in decision_rows]
     n = max(len(selected_methods), 1)
@@ -1268,7 +1571,7 @@ def write_pairwise_ae_combined_v2_artifacts(
     selected_counts = {method: selected_methods.count(method) for method in sorted(set(selected_methods)) if method}
     gap_deltas = [_gap_delta(r) for r in decision_rows]
     summary = {
-        "method": STRICT_PRIMARY_METHOD if has_strict else PRIMARY_METHOD,
+        "method": TARGET_BATCH_AGREEMENT_PRIMARY_METHOD if has_v3 else STRICT_PRIMARY_METHOD if has_strict else PRIMARY_METHOD,
         "selected_method_count_total": selected_counts,
         "selected_method_count_by_seed": _nested_counts(decision_rows, key_field="seed"),
         "selected_method_count_by_outer_center": _nested_counts(decision_rows, key_field="outer_heldout_center"),
@@ -1302,6 +1605,57 @@ def write_pairwise_ae_combined_v2_artifacts(
                 "always_baseline_fallback": bool(fallback_count == len(selected_methods)),
             }
         )
+    if has_v3:
+        gate_activation = sum(1 for row in v3_policy_rows if int(row.get("agreement_gate_applied", 0) or 0) == 1)
+        gate_pass = sum(1 for row in v3_policy_rows if int(row.get("agreement_gate_applied", 0) or 0) == 1 and int(row.get("agreement_gate_passed", 0) or 0) == 1)
+        gate_block = sum(1 for row in v3_policy_rows if int(row.get("agreement_gate_applied", 0) or 0) == 1 and int(row.get("agreement_gate_passed", 0) or 0) == 0)
+        summary.update(
+            {
+                "gate_activation_count": int(gate_activation),
+                "gate_pass_count": int(gate_pass),
+                "gate_block_count": int(gate_block),
+                "false_veto_count": int(sum(int(row.get("false_veto", 0) or 0) for row in v3_policy_rows)),
+                "false_allow_count": int(sum(int(row.get("false_allow", 0) or 0) for row in v3_policy_rows)),
+                "blocked_harmful_count": int(sum(int(row.get("blocked_harmful_deployment", 0) or 0) for row in v3_policy_rows)),
+                "allowed_beneficial_count": int(sum(int(row.get("allowed_beneficial_deployment", 0) or 0) for row in v3_policy_rows)),
+                "mean_blocked_v2_delta_gap_vs_baseline": _finite_mean(
+                    [float(row.get("blocked_v2_delta_gap_vs_baseline", float("nan"))) for row in decision_rows],
+                    float("nan"),
+                ),
+                "mean_allowed_v2_delta_gap_vs_baseline": _finite_mean(
+                    [float(row.get("allowed_v2_delta_gap_vs_baseline", float("nan"))) for row in decision_rows],
+                    float("nan"),
+                ),
+                "target_batch_agreement_threshold": float(
+                    next(
+                        (
+                            float(row.get("agreement_threshold"))
+                            for row in decision_rows
+                            if np.isfinite(float(row.get("agreement_threshold", float("nan"))))
+                        ),
+                        0.60,
+                    )
+                ),
+                "agreement_threshold_source": str(
+                    next(
+                        (
+                            str(row.get("agreement_threshold_source"))
+                            for row in decision_rows
+                            if str(row.get("agreement_threshold_source", "")).strip()
+                        ),
+                        "predeclared_development_seed_diagnostic",
+                    )
+                ),
+                "used_target_embeddings_for_gate": 1,
+                "used_target_group_ids_for_gate": int(any(int(row.get("used_target_group_ids_for_gate", 0) or 0) == 1 for row in v3_policy_rows)),
+                "used_target_labels_for_gate": 0,
+                "used_target_nelbo_for_gate": 0,
+                "used_target_support_for_gate": 0,
+                "used_target_fitting_for_gate": 0,
+                "used_target_normalization_for_gate": 0,
+                "heldout_target_nelbo_used_for_selection": 0,
+            }
+        )
     _write_csv(reports_dir / "pairwise_ae_combined_v2_decision_summary.csv", [summary])
     (reports_dir / "pairwise_ae_combined_v2_decision_summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True, allow_nan=True),
@@ -1310,6 +1664,12 @@ def write_pairwise_ae_combined_v2_artifacts(
     if has_strict:
         _write_csv(reports_dir / "pairwise_ae_combined_v2_strict_decision_summary.csv", [summary])
         (reports_dir / "pairwise_ae_combined_v2_strict_decision_summary.json").write_text(
+            json.dumps(summary, indent=2, sort_keys=True, allow_nan=True),
+            encoding="utf-8",
+        )
+    if has_v3:
+        _write_csv(reports_dir / "pairwise_ae_combined_v3_decision_summary.csv", [summary])
+        (reports_dir / "pairwise_ae_combined_v3_decision_summary.json").write_text(
             json.dumps(summary, indent=2, sort_keys=True, allow_nan=True),
             encoding="utf-8",
         )
@@ -1327,6 +1687,16 @@ def write_pairwise_ae_combined_v2_artifacts(
                 "pairwise_ae_combined_v2_strict_inner_selection_table": "pairwise_ae_combined_v2_strict_inner_selection_table.csv",
                 "pairwise_ae_combined_v2_strict_decision_table": "pairwise_ae_combined_v2_strict_decision_table.csv",
                 "pairwise_ae_combined_v2_strict_decision_summary": "pairwise_ae_combined_v2_strict_decision_summary.json",
+            }
+        )
+    if has_v3:
+        artifacts.update(
+            {
+                "pairwise_ae_combined_v3_inner_selection_table": "pairwise_ae_combined_v3_inner_selection_table.csv",
+                "pairwise_ae_combined_v3_agreement_policy": "pairwise_ae_combined_v3_agreement_policy.csv",
+                "pairwise_ae_combined_v3_threshold_sensitivity": "pairwise_ae_combined_v3_threshold_sensitivity.csv",
+                "pairwise_ae_combined_v3_decision_table": "pairwise_ae_combined_v3_decision_table.csv",
+                "pairwise_ae_combined_v3_decision_summary": "pairwise_ae_combined_v3_decision_summary.json",
             }
         )
     return artifacts

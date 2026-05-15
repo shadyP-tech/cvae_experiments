@@ -61,10 +61,20 @@ def _payload() -> dict:
     }
 
 
-def _pairwise_cfg(*, strict: bool = False, strict_overrides: dict | None = None) -> dict:
+def _pairwise_cfg(
+    *,
+    strict: bool = False,
+    target_batch: bool = False,
+    strict_overrides: dict | None = None,
+    target_batch_overrides: dict | None = None,
+) -> dict:
     utility = {
         "enabled": True,
-        "primary_method": v2.STRICT_PRIMARY_METHOD if strict else v2.PRIMARY_METHOD,
+        "primary_method": v2.TARGET_BATCH_AGREEMENT_PRIMARY_METHOD
+        if target_batch
+        else v2.STRICT_PRIMARY_METHOD
+        if strict
+        else v2.PRIMARY_METHOD,
         "hard_pair_fraction": 0.40,
         "utility_pair_fraction": 0.40,
         "random_pair_fraction": 0.20,
@@ -73,7 +83,7 @@ def _pairwise_cfg(*, strict: bool = False, strict_overrides: dict | None = None)
         "pair_weight_min": 1.0,
         "pair_weight_max": 3.0,
     }
-    if strict:
+    if strict or target_batch:
         strict_cfg = {
             "min_macro_gap_reduction_pp": 0.5,
             "max_top1_drop_abs": 0.02,
@@ -86,11 +96,22 @@ def _pairwise_cfg(*, strict: bool = False, strict_overrides: dict | None = None)
         strict_cfg.update(strict_overrides or {})
         utility.update(
             {
-                "selection_mode": "strict_adoption",
+                "selection_mode": "target_batch_agreement_gated" if target_batch else "strict_adoption",
                 "fallback_method": v2.BASELINE_METHOD,
                 "strict_adoption": strict_cfg,
             }
         )
+        if target_batch:
+            agreement = {
+                "agreement_threshold": 0.60,
+                "agreement_threshold_source": "predeclared_development_seed_diagnostic",
+                "reference_method": v2.RAW_AE_WEIGHTED,
+                "group_key_candidates": ["patient_id", "slide_id", "case_id"],
+                "min_query_count": 1,
+                "min_group_count": 1,
+            }
+            agreement.update(target_batch_overrides or {})
+            utility["target_batch_agreement"] = agreement
     return {
         "hidden_dim": 4,
         "epochs": 1,
@@ -138,6 +159,32 @@ def test_pairwise_ae_combined_v2_strict_config_validates() -> None:
     assert utility["primary_method"] == v2.STRICT_PRIMARY_METHOD
     assert utility["selection_mode"] == "strict_adoption"
     assert utility["fallback_method"] == v2.BASELINE_METHOD
+
+
+def test_pairwise_ae_combined_v3_target_batch_config_validates() -> None:
+    cfg = load_config(
+        PROJECT_ROOT
+        / "configs"
+        / "experiments"
+        / "camelyon17"
+        / "learned_utility_pairwise_ae_combined_v3_target_batch_agreement.yaml"
+    )
+    validate_config(cfg)
+    utility = cfg["learned_utility"]["predictor_params"]["pairwise_ranker"]["utility_weighted_v2"]
+    assert utility["primary_method"] == v2.TARGET_BATCH_AGREEMENT_PRIMARY_METHOD
+    assert utility["selection_mode"] == "target_batch_agreement_gated"
+    assert utility["target_batch_agreement"]["agreement_threshold"] == 0.60
+
+
+def test_pairwise_ae_combined_v3_primary_method_must_match_mode() -> None:
+    cfg = _pairwise_cfg(target_batch=True)
+    cfg["utility_weighted_v2"]["primary_method"] = v2.STRICT_PRIMARY_METHOD
+    try:
+        v2._primary_method(cfg)
+    except Exception as exc:
+        assert v2.TARGET_BATCH_AGREEMENT_PRIMARY_METHOD in str(exc)
+    else:
+        raise AssertionError("target_batch_agreement_gated accepted the wrong primary method")
 
 
 def _run_strict_selection(monkeypatch, payload, metric_fn, *, strict_overrides: dict | None = None):
@@ -822,6 +869,235 @@ def test_pairwise_ae_combined_v2_strict_tiny_capped_smoke_run(monkeypatch) -> No
     )
     assert any(row["method"] == v2.STRICT_PRIMARY_METHOD for row in out.sample_rows)
     assert all(row["primary_method"] == v2.STRICT_PRIMARY_METHOD for row in out.decision_rows)
+
+
+def test_pairwise_ae_combined_v3_gate_records_target_batch_usage() -> None:
+    payload = _payload()
+    n = int(payload["test_idx"].shape[0])
+    preds = {
+        v2.RANK_MARGIN_WEIGHTED: np.tile(np.asarray([0.0, 1.0, 2.0, 3.0], dtype=np.float64), (n, 1)),
+        v2.RAW_AE_WEIGHTED: np.tile(np.asarray([0.0, 1.0, 2.0, 3.0], dtype=np.float64), (n, 1)),
+    }
+    metadata = [{"patient_id": f"p{i % 2}"} for i in range(len(payload["sample_domains"]))]
+    deployed, fields = v2._target_batch_agreement_policy(
+        source_inner_selected_method=v2.RANK_MARGIN_WEIGHTED,
+        method_predictions=preds,
+        candidate_domains=payload["fold"].candidate_expert_domains,
+        test_idx=payload["test_idx"],
+        sample_metadata=metadata,
+        pairwise_cfg=_pairwise_cfg(target_batch=True),
+    )
+    assert deployed == v2.RANK_MARGIN_WEIGHTED
+    assert int(fields["used_target_embeddings_for_gate"]) == 1
+    assert int(fields["used_target_group_ids_for_gate"]) == 1
+    assert int(fields["used_target_labels_for_gate"]) == 0
+    assert int(fields["used_target_nelbo_for_gate"]) == 0
+    assert int(fields["used_target_support_for_gate"]) == 0
+    assert int(fields["used_target_fitting_for_gate"]) == 0
+    assert int(fields["heldout_target_nelbo_used_for_selection"]) == 0
+
+
+def test_pairwise_ae_combined_v3_low_agreement_falls_back_exactly_to_baseline(monkeypatch) -> None:
+    payload = _payload()
+    metadata = [{"patient_id": f"p{i % 2}"} for i in range(len(payload["sample_domains"]))]
+
+    def fake_selection(**_kwargs):
+        return v2.RANK_MARGIN_WEIGHTED, [
+            {
+                "seed": 11,
+                "outer_heldout_center": 0,
+                "candidate_method": v2.RANK_MARGIN_WEIGHTED,
+                "selected_method": v2.RANK_MARGIN_WEIGHTED,
+                "heldout_target_nelbo_used_for_selection": 0,
+            }
+        ]
+
+    def fake_train_predict(**kwargs):
+        n_eval = int(kwargs["eval_idx"].shape[0])
+        n_candidates = len(kwargs["eval_candidate_domains"])
+        if kwargs["method"] == v2.BASELINE_METHOD:
+            pred = np.tile(np.arange(n_candidates, dtype=np.float64), (n_eval, 1))
+        elif kwargs["method"] == v2.RANK_MARGIN_WEIGHTED:
+            pred = np.tile(np.arange(n_candidates, dtype=np.float64), (n_eval, 1))
+        elif kwargs["method"] == v2.RAW_AE_WEIGHTED:
+            pred = np.tile(np.arange(n_candidates, dtype=np.float64)[::-1], (n_eval, 1))
+        else:
+            pred = np.tile(np.arange(n_candidates, dtype=np.float64), (n_eval, 1))
+        return pred, np.ones(1), [], [], []
+
+    monkeypatch.setattr(v2, "_source_inner_selection", fake_selection)
+    monkeypatch.setattr(v2, "_train_predict_variant", fake_train_predict)
+    out = v2.run_pairwise_ae_combined_v2_for_fold(
+        embeddings=payload["embeddings"],
+        sample_domains=payload["sample_domains"],
+        true_nelbo=payload["true_nelbo"],
+        expert_domains=payload["expert_domains"],
+        domain_to_idx=payload["domain_to_idx"],
+        train_idx=payload["train_idx"],
+        test_idx=payload["test_idx"],
+        fold=payload["fold"],
+        global_eval=payload["global_eval"],
+        pairwise_cfg=_pairwise_cfg(target_batch=True),
+        seed=101,
+        embedding_feature_dim=3,
+        expert_feature_dim=5,
+        tie_policy="stable_expert_index",
+        ae_zscore_matrix=payload["ae_z"],
+        sample_metadata=metadata,
+    )
+    assert out.decision_rows
+    assert all(row["deployed_method"] == v2.BASELINE_METHOD for row in out.decision_rows)
+    assert all(row["selected_expert"] == row["baseline_selected_expert"] for row in out.decision_rows)
+    assert all(int(row["agreement_gate_applied"]) == 1 for row in out.decision_rows)
+    assert all(int(row["agreement_gate_passed"]) == 0 for row in out.decision_rows)
+
+
+def test_pairwise_ae_combined_v3_high_agreement_deploys_selected_v2(monkeypatch) -> None:
+    payload = _payload()
+    metadata = [{"patient_id": f"p{i % 2}"} for i in range(len(payload["sample_domains"]))]
+
+    def fake_selection(**_kwargs):
+        return v2.RANK_MARGIN_UNWEIGHTED, []
+
+    def fake_train_predict(**kwargs):
+        n_eval = int(kwargs["eval_idx"].shape[0])
+        n_candidates = len(kwargs["eval_candidate_domains"])
+        base = np.tile(np.arange(n_candidates, dtype=np.float64), (n_eval, 1))
+        if kwargs["method"] == v2.BASELINE_METHOD:
+            return base[:, ::-1], np.ones(1), [], [], []
+        return base, np.ones(1), [], [], []
+
+    monkeypatch.setattr(v2, "_source_inner_selection", fake_selection)
+    monkeypatch.setattr(v2, "_train_predict_variant", fake_train_predict)
+    out = v2.run_pairwise_ae_combined_v2_for_fold(
+        embeddings=payload["embeddings"],
+        sample_domains=payload["sample_domains"],
+        true_nelbo=payload["true_nelbo"],
+        expert_domains=payload["expert_domains"],
+        domain_to_idx=payload["domain_to_idx"],
+        train_idx=payload["train_idx"],
+        test_idx=payload["test_idx"],
+        fold=payload["fold"],
+        global_eval=payload["global_eval"],
+        pairwise_cfg=_pairwise_cfg(target_batch=True),
+        seed=101,
+        embedding_feature_dim=3,
+        expert_feature_dim=5,
+        tie_policy="stable_expert_index",
+        ae_zscore_matrix=payload["ae_z"],
+        sample_metadata=metadata,
+    )
+    assert out.decision_rows
+    assert all(row["deployed_method"] == v2.RANK_MARGIN_UNWEIGHTED for row in out.decision_rows)
+    assert all(int(row["agreement_gate_passed"]) == 1 for row in out.decision_rows)
+
+
+def test_pairwise_ae_combined_v3_group_macro_agreement_enforced() -> None:
+    payload = _payload()
+    preds = {
+        v2.RANK_MARGIN_WEIGHTED: np.asarray([[0.0, 1.0, 2.0, 3.0], [0.0, 1.0, 2.0, 3.0], [0.0, 1.0, 2.0, 3.0]]),
+        v2.RAW_AE_WEIGHTED: np.asarray([[0.0, 1.0, 2.0, 3.0], [3.0, 2.0, 1.0, 0.0], [3.0, 2.0, 1.0, 0.0]]),
+    }
+    metadata = [{"patient_id": "a"} for _ in range(len(payload["sample_domains"]))]
+    for idx in payload["test_idx"][1:]:
+        metadata[int(idx)] = {"patient_id": "b"}
+    deployed, fields = v2._target_batch_agreement_policy(
+        source_inner_selected_method=v2.RANK_MARGIN_WEIGHTED,
+        method_predictions=preds,
+        candidate_domains=payload["fold"].candidate_expert_domains,
+        test_idx=payload["test_idx"],
+        sample_metadata=metadata,
+        pairwise_cfg=_pairwise_cfg(target_batch=True, target_batch_overrides={"agreement_threshold": 0.60}),
+    )
+    assert deployed == v2.BASELINE_METHOD
+    assert float(fields["selected_vs_raw_agreement_rate_query_weighted"]) >= 0.0
+    assert float(fields["selected_vs_raw_agreement_rate_group_macro"]) < 0.60
+
+
+def test_pairwise_ae_combined_v3_small_batches_fallback_to_baseline() -> None:
+    payload = _payload()
+    n = int(payload["test_idx"].shape[0])
+    pred = np.tile(np.arange(len(payload["fold"].candidate_expert_domains), dtype=np.float64), (n, 1))
+    metadata = [{"patient_id": f"p{i % 2}"} for i in range(len(payload["sample_domains"]))]
+    deployed, fields = v2._target_batch_agreement_policy(
+        source_inner_selected_method=v2.RANK_MARGIN_WEIGHTED,
+        method_predictions={v2.RANK_MARGIN_WEIGHTED: pred, v2.RAW_AE_WEIGHTED: pred},
+        candidate_domains=payload["fold"].candidate_expert_domains,
+        test_idx=payload["test_idx"],
+        sample_metadata=metadata,
+        pairwise_cfg=_pairwise_cfg(target_batch=True, target_batch_overrides={"min_query_count": 100}),
+    )
+    assert deployed == v2.BASELINE_METHOD
+    assert int(fields["agreement_gate_skipped_due_to_small_batch"]) == 1
+
+
+def test_pairwise_ae_combined_v3_threshold_sweep_rows_are_diagnostic_only(tmp_path: Path) -> None:
+    decision_rows = [
+        {
+            "primary_method": v2.TARGET_BATCH_AGREEMENT_PRIMARY_METHOD,
+            "selected_method": v2.RANK_MARGIN_WEIGHTED,
+            "source_inner_selected_method": v2.RANK_MARGIN_WEIGHTED,
+            "seed": 101,
+            "outer_heldout_center": 0,
+            "delta_gap_vs_baseline_pp": 0.3,
+            "top1_oracle_hit": 1,
+            "baseline_top1_oracle_hit": 1,
+            "agreement_gate_applied": 1,
+            "agreement_gate_passed": 1,
+            "selected_vs_raw_agreement_rate_query_weighted": 0.75,
+            "selected_vs_raw_agreement_rate_group_macro": 0.75,
+        }
+    ]
+    v2.write_pairwise_ae_combined_v2_artifacts(
+        reports_dir=tmp_path,
+        training_rows=[],
+        feature_rows=[],
+        inner_selection_rows=[],
+        pair_prediction_rows=[],
+        decision_rows=decision_rows,
+    )
+    with (tmp_path / "pairwise_ae_combined_v3_threshold_sensitivity.csv").open("r", encoding="utf-8", newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert rows
+    assert all(int(row["posthoc_diagnostic_only"]) == 1 for row in rows)
+    assert all(int(row["used_for_selection"]) == 0 for row in rows)
+
+
+def test_pairwise_ae_combined_v3_decision_table_builder(tmp_path: Path) -> None:
+    builder = _load_decision_builder()
+    reports = tmp_path / "outputs" / "camelyon17" / "learned_utility_pairwise_ae_combined_v3" / "run_seed101" / "reports"
+    reports.mkdir(parents=True)
+    result_path = reports / "learned_utility_results.json"
+    result_path.write_text("{}", encoding="utf-8")
+    v2._write_csv(
+        reports / "pairwise_ae_combined_v3_decision_table.csv",
+        [
+            {
+                "seed": 101,
+                "outer_heldout_center": 0,
+                "primary_method": v2.TARGET_BATCH_AGREEMENT_PRIMARY_METHOD,
+                "selected_method": v2.RANK_MARGIN_UNWEIGHTED,
+                "delta_gap_vs_baseline_pp": 0.3,
+                "agreement_gate_applied": 1,
+                "agreement_gate_passed": 1,
+            }
+        ],
+    )
+    v2._write_csv(
+        reports / "learned_utility_domain_breakdown.csv",
+        [
+            {"method": v2.TARGET_BATCH_AGREEMENT_PRIMARY_METHOD, "query_domain": 0, "mean_oracle_gap_pct": 1.0, "top1_oracle_hit": 0.8, "spearman": 0.7},
+            {"method": v2.BASELINE_METHOD, "query_domain": 0, "mean_oracle_gap_pct": 1.3, "top1_oracle_hit": 0.8, "spearman": 0.7},
+            {"method": "ae_argmin_zscore", "query_domain": 0, "mean_oracle_gap_pct": 2.0, "top1_oracle_hit": 0.7, "spearman": 0.6},
+            {"method": "metadata_routing", "query_domain": 0, "mean_oracle_gap_pct": 2.5, "top1_oracle_hit": 0.6, "spearman": 0.5},
+        ],
+    )
+    decisions, seed_domain_rows, any_special = builder._aggregate_decisions([result_path])
+    summary = builder._verdict(seed_domain_rows)
+    summary.update(builder._v3_summary(decisions))
+    assert any_special is True
+    assert decisions[0]["decision_artifact"].endswith("pairwise_ae_combined_v3_decision_table.csv")
+    assert summary["gate_activation_count"] == 1
 
 
 def test_pairwise_ae_combined_v2_required_artifact_csv_is_readable(tmp_path: Path) -> None:

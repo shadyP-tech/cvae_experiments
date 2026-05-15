@@ -58,6 +58,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_source_reliability_v1",
         "learned_utility_pairwise_ae_combined_v2",
         "learned_utility_pairwise_ae_combined_v2_strict",
+        "learned_utility_pairwise_ae_combined_v3_target_batch_agreement",
         "breakhis_support_free_ae_routing_v1",
         "camelyon17_support_free_ae_routing_v1",
     }
@@ -71,6 +72,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_source_reliability_v1",
         "learned_utility_pairwise_ae_combined_v2",
         "learned_utility_pairwise_ae_combined_v2_strict",
+        "learned_utility_pairwise_ae_combined_v3_target_batch_agreement",
         "breakhis_support_free_ae_routing_v1",
         "camelyon17_support_free_ae_routing_v1",
     }
@@ -532,16 +534,17 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             )
             if bool(utility_v2.get("enabled", False)):
                 selection_mode = str(utility_v2.get("selection_mode", "standard")).strip().lower()
-                if selection_mode not in {"standard", "strict_adoption"}:
+                if selection_mode not in {"standard", "strict_adoption", "target_batch_agreement_gated"}:
                     raise ValueError(
                         "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2.selection_mode "
-                        "must be one of ['standard', 'strict_adoption']"
+                        "must be one of ['standard', 'strict_adoption', 'target_batch_agreement_gated']"
                     )
-                expected_primary = (
-                    "pairwise_ranker_ae_combined_strict_inner_selected_v2"
-                    if selection_mode == "strict_adoption"
-                    else "pairwise_ranker_ae_combined_inner_selected_v2"
-                )
+                if selection_mode == "target_batch_agreement_gated":
+                    expected_primary = "pairwise_ranker_ae_combined_target_batch_agreement_gated_v3"
+                elif selection_mode == "strict_adoption":
+                    expected_primary = "pairwise_ranker_ae_combined_strict_inner_selected_v2"
+                else:
+                    expected_primary = "pairwise_ranker_ae_combined_inner_selected_v2"
                 primary_method = str(utility_v2.get("primary_method", expected_primary)).strip()
                 if primary_method != expected_primary:
                     raise ValueError(
@@ -585,7 +588,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                         "must be a dictionary"
                     )
                 strict_adoption = strict_adoption or {}
-                if selection_mode == "strict_adoption":
+                if selection_mode in {"strict_adoption", "target_batch_agreement_gated"}:
                     for key in [
                         "min_macro_gap_reduction_pp",
                         "max_top1_drop_abs",
@@ -610,6 +613,45 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                         raise ValueError(
                             "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2."
                             "strict_adoption.min_passing_inner_centers must be > 0"
+                        )
+                target_batch = utility_v2.get("target_batch_agreement", {})
+                if target_batch is not None and not isinstance(target_batch, dict):
+                    raise ValueError(
+                        "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2."
+                        "target_batch_agreement must be a dictionary"
+                    )
+                target_batch = target_batch or {}
+                if selection_mode == "target_batch_agreement_gated":
+                    threshold = float(target_batch.get("agreement_threshold", 0.60))
+                    if threshold < 0.0 or threshold > 1.0:
+                        raise ValueError(
+                            "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2."
+                            "target_batch_agreement.agreement_threshold must be in [0, 1]"
+                        )
+                    if int(target_batch.get("min_query_count", 100)) <= 0:
+                        raise ValueError(
+                            "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2."
+                            "target_batch_agreement.min_query_count must be > 0"
+                        )
+                    if int(target_batch.get("min_group_count", 2)) <= 0:
+                        raise ValueError(
+                            "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2."
+                            "target_batch_agreement.min_group_count must be > 0"
+                        )
+                    reference = str(
+                        target_batch.get("reference_method", "pairwise_ranker_ae_combined_raw_ae_weighted_v2")
+                    ).strip()
+                    if reference != "pairwise_ranker_ae_combined_raw_ae_weighted_v2":
+                        raise ValueError(
+                            "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2."
+                            "target_batch_agreement.reference_method must be "
+                            "'pairwise_ranker_ae_combined_raw_ae_weighted_v2'"
+                        )
+                    group_keys = target_batch.get("group_key_candidates", ["patient_id", "slide_id", "case_id"])
+                    if not isinstance(group_keys, list) or not group_keys or not all(str(v).strip() for v in group_keys):
+                        raise ValueError(
+                            "learned_utility.predictor_params.pairwise_ranker.utility_weighted_v2."
+                            "target_batch_agreement.group_key_candidates must be a non-empty list"
                         )
 
         hybrid_scoring = learned_cfg.get("hybrid_scoring", {})

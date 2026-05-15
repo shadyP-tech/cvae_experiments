@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Sequence, Tuple
 
 import numpy as np
 
@@ -61,6 +61,7 @@ def _run_learned_methods_for_fold(
     expert_feature_dim: int,
     tie_policy: str,
     ae_zscore_matrix: np.ndarray | None = None,
+    sample_metadata: Sequence[Mapping[str, Any]] | None = None,
 ) -> LearnedFoldOutputs:
     x_train, q_train, e_train, s_train = _build_fold_training_pair_features(
         sample_embeddings=embeddings,
@@ -307,6 +308,7 @@ def _run_learned_methods_for_fold(
         expert_feature_dim=int(expert_feature_dim),
         tie_policy=tie_policy,
         ae_zscore_matrix=ae_zscore_matrix,
+        sample_metadata=sample_metadata,
     )
     sample_rows.extend(v2_outputs.sample_rows)
 

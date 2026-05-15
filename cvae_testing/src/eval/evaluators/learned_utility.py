@@ -294,6 +294,7 @@ def evaluate_learned_utility_loqdo(
             expert_feature_dim=expert_feature_dim,
             tie_policy=hybrid_cfg.tie_policy,
             ae_zscore_matrix=None if ae_scores is None else ae_scores.zscore_matrix,
+            sample_metadata=metadata,
         )
         sample_rows.extend(learned_outputs.sample_rows)
         pair_rows.extend(learned_outputs.pair_rows)

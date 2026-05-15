@@ -14,6 +14,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Sequence
 
 PRIMARY_METHOD = "pairwise_ranker_ae_combined_inner_selected_v2"
 STRICT_PRIMARY_METHOD = "pairwise_ranker_ae_combined_strict_inner_selected_v2"
+TARGET_BATCH_AGREEMENT_PRIMARY_METHOD = "pairwise_ranker_ae_combined_target_batch_agreement_gated_v3"
 BASELINE_METHOD = "pairwise_ranker_ae_combined"
 AE_ARGMIN_METHOD = "ae_argmin_zscore"
 METADATA_METHOD = "metadata_routing"
@@ -104,6 +105,9 @@ def _method_domain_summary(rows: Sequence[Mapping[str, str]]) -> Dict[tuple[str,
 
 
 def _decision_file(reports: Path) -> tuple[Path, str, bool]:
+    v3 = reports / "pairwise_ae_combined_v3_decision_table.csv"
+    if v3.exists():
+        return v3, TARGET_BATCH_AGREEMENT_PRIMARY_METHOD, True
     strict = reports / "pairwise_ae_combined_v2_strict_decision_table.csv"
     if strict.exists():
         return strict, STRICT_PRIMARY_METHOD, True
@@ -230,10 +234,69 @@ def _verdict(seed_domain_rows: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
     }
 
 
-def _write_markdown(path: Path, summary: Mapping[str, Any], seed_domain_rows: Sequence[Mapping[str, Any]], *, strict: bool) -> None:
+def _v3_summary(decision_rows: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+    by_unit: Dict[tuple[str, str], List[Mapping[str, Any]]] = defaultdict(list)
+    for row in decision_rows:
+        by_unit[(str(row.get("seed", "")), str(row.get("outer_heldout_center", "")))].append(row)
+    unit_rows: List[Mapping[str, Any]] = [rows[0] for rows in by_unit.values() if rows]
+    gate_activation = sum(1 for row in unit_rows if int(float(row.get("agreement_gate_applied", 0) or 0)) == 1)
+    gate_pass = sum(
+        1
+        for row in unit_rows
+        if int(float(row.get("agreement_gate_applied", 0) or 0)) == 1
+        and int(float(row.get("agreement_gate_passed", 0) or 0)) == 1
+    )
+    gate_block = sum(
+        1
+        for row in unit_rows
+        if int(float(row.get("agreement_gate_applied", 0) or 0)) == 1
+        and int(float(row.get("agreement_gate_passed", 0) or 0)) == 0
+    )
+    return {
+        "gate_activation_count": int(gate_activation),
+        "gate_pass_count": int(gate_pass),
+        "gate_block_count": int(gate_block),
+        "false_veto_count": int(
+            sum(1 for row in unit_rows if int(float(row.get("false_veto", 0) or 0)) == 1)
+        ),
+        "false_allow_count": int(
+            sum(1 for row in unit_rows if int(float(row.get("false_allow", 0) or 0)) == 1)
+        ),
+        "blocked_harmful_count": int(
+            sum(1 for row in unit_rows if int(float(row.get("blocked_harmful_deployment", 0) or 0)) == 1)
+        ),
+        "allowed_beneficial_count": int(
+            sum(1 for row in unit_rows if int(float(row.get("allowed_beneficial_deployment", 0) or 0)) == 1)
+        ),
+        "mean_blocked_v2_delta_gap_vs_baseline": _mean(
+            [_float(row.get("blocked_v2_delta_gap_vs_baseline")) for row in decision_rows],
+            float("nan"),
+        ),
+        "mean_allowed_v2_delta_gap_vs_baseline": _mean(
+            [_float(row.get("allowed_v2_delta_gap_vs_baseline")) for row in decision_rows],
+            float("nan"),
+        ),
+        "used_target_embeddings_for_gate": 1,
+        "used_target_group_ids_for_gate": int(
+            any(int(float(row.get("used_target_group_ids_for_gate", 0) or 0)) == 1 for row in unit_rows)
+        ),
+        "used_target_labels_for_gate": 0,
+        "used_target_nelbo_for_gate": 0,
+        "used_target_support_for_gate": 0,
+        "used_target_fitting_for_gate": 0,
+        "used_target_normalization_for_gate": 0,
+        "heldout_target_nelbo_used_for_selection": 0,
+    }
+
+
+def _write_markdown(path: Path, summary: Mapping[str, Any], seed_domain_rows: Sequence[Mapping[str, Any]], *, strict: bool, v3: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        "# Pairwise AE-Combined Strict Inner-Selected v2" if strict else "# Pairwise AE-Combined Inner-Selected v2",
+        "# Pairwise AE-Combined Target-Batch Agreement-Gated v3"
+        if v3
+        else "# Pairwise AE-Combined Strict Inner-Selected v2"
+        if strict
+        else "# Pairwise AE-Combined Inner-Selected v2",
         "",
         f"Verdict: **{summary.get('verdict')}**",
         "",
@@ -272,19 +335,22 @@ def main() -> None:
 
     paths = _load_runs(args.manifest, args.dataset)
     decisions, seed_domain_rows, any_strict = _aggregate_decisions(paths)
+    any_v3 = any(str(row.get("primary_method", "")) == TARGET_BATCH_AGREEMENT_PRIMARY_METHOD for row in decisions)
     summary = _verdict(seed_domain_rows)
+    if any_v3:
+        summary.update(_v3_summary(decisions))
     summary.update(
         {
             "dataset": args.dataset,
             "n_runs": len(paths),
             "n_decision_rows": len(decisions),
             "n_seed_domain_rows": len(seed_domain_rows),
-            "primary_method": STRICT_PRIMARY_METHOD if any_strict else PRIMARY_METHOD,
+            "primary_method": TARGET_BATCH_AGREEMENT_PRIMARY_METHOD if any_v3 else STRICT_PRIMARY_METHOD if any_strict else PRIMARY_METHOD,
         }
     )
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    prefix = "pairwise_ae_combined_v2_strict" if any_strict else "pairwise_ae_combined_v2"
+    prefix = "pairwise_ae_combined_v3" if any_v3 else "pairwise_ae_combined_v2_strict" if any_strict else "pairwise_ae_combined_v2"
     _write_csv(args.output_dir / f"{prefix}_decision_table.csv", decisions)
     _write_csv(args.output_dir / f"{prefix}_seed_domain_summary.csv", seed_domain_rows)
     (args.output_dir / f"{prefix}_decision_summary.json").write_text(
@@ -292,7 +358,7 @@ def main() -> None:
         encoding="utf-8",
     )
     summaries_dir = args.output_dir.parent.parent / "summaries"
-    _write_markdown(summaries_dir / f"{prefix}_decision_table.md", summary, seed_domain_rows, strict=any_strict)
+    _write_markdown(summaries_dir / f"{prefix}_decision_table.md", summary, seed_domain_rows, strict=any_strict, v3=any_v3)
 
 
 if __name__ == "__main__":
