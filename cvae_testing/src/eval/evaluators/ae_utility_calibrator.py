@@ -416,6 +416,23 @@ def _sigmoid(values: np.ndarray) -> np.ndarray:
     return 1.0 / (1.0 + np.exp(-clipped))
 
 
+def _sanitize_harm_score_features(train_x: np.ndarray, eval_x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    train = np.asarray(train_x, dtype=np.float64)
+    eval_ = np.asarray(eval_x, dtype=np.float64)
+    if train.ndim != 2 or eval_.ndim != 2 or train.shape[1] != eval_.shape[1]:
+        return train, eval_
+    finite_train = np.isfinite(train)
+    valid_counts = finite_train.sum(axis=0)
+    safe_train = np.where(finite_train, train, 0.0)
+    col_means = safe_train.sum(axis=0) / np.maximum(valid_counts, 1)
+    col_means = np.where(valid_counts > 0, col_means, 0.0)
+    train_clean = np.where(finite_train, train, col_means)
+    eval_clean = np.where(np.isfinite(eval_), eval_, col_means)
+    train_clean = np.nan_to_num(train_clean, nan=0.0, posinf=1.0e6, neginf=-1.0e6)
+    eval_clean = np.nan_to_num(eval_clean, nan=0.0, posinf=1.0e6, neginf=-1.0e6)
+    return np.clip(train_clean, -1.0e6, 1.0e6), np.clip(eval_clean, -1.0e6, 1.0e6)
+
+
 def _fit_predict_logistic_harm_score(
     *,
     train_x: np.ndarray,
@@ -429,11 +446,16 @@ def _fit_predict_logistic_harm_score(
     labels = np.asarray(train_y, dtype=np.float64)
     if len(set(int(v) for v in labels.tolist())) < 2:
         return np.full((int(eval_x.shape[0]),), float("nan"), dtype=np.float64)
-    x_train_z, x_eval_z = _zscore_features(np.asarray(train_x, dtype=np.float64), np.asarray(eval_x, dtype=np.float64))
+    train_clean, eval_clean = _sanitize_harm_score_features(train_x, eval_x)
+    x_train_z, x_eval_z = _zscore_features(train_clean, eval_clean)
+    x_train_z = np.nan_to_num(x_train_z, nan=0.0, posinf=0.0, neginf=0.0)
+    x_eval_z = np.nan_to_num(x_eval_z, nan=0.0, posinf=0.0, neginf=0.0)
     x_aug = np.concatenate([x_train_z, np.ones((x_train_z.shape[0], 1), dtype=np.float64)], axis=1)
     x_eval_aug = np.concatenate([x_eval_z, np.ones((x_eval_z.shape[0], 1), dtype=np.float64)], axis=1)
     w = np.zeros((x_aug.shape[1],), dtype=np.float64)
-    lipschitz = 0.25 * float(np.linalg.norm(x_aug, ord=2) ** 2) / max(float(x_aug.shape[0]), 1.0) + float(l2)
+    # Frobenius norm upper-bounds the spectral norm and avoids brittle SVD calls
+    # on sparse source-inner harm-veto feature matrices.
+    lipschitz = 0.25 * float(np.sum(x_aug * x_aug)) / max(float(x_aug.shape[0]), 1.0) + float(l2)
     lr = 1.0 / max(lipschitz, 1e-6)
     reg_mask = np.ones_like(w)
     reg_mask[-1] = 0.0
