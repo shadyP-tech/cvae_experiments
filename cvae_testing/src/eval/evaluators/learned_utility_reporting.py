@@ -821,6 +821,71 @@ def _build_method_summary_rows(method_metrics: Dict[str, Dict[str, Any]]) -> Lis
                 "oracle_top2_recoverable_gap_mass_pct_points": str(
                     metrics.get("oracle_top2_recoverable_gap_mass_pct_points", "")
                 ),
+                "top2_delta_gate_activation_rate": float(
+                    metrics.get("top2_delta_gate_activation_rate", float("nan"))
+                ),
+                "top2_delta_gate_switch_rate": float(
+                    metrics.get("top2_delta_gate_switch_rate", float("nan"))
+                ),
+                "top2_delta_gate_help_rate_changed_only": float(
+                    metrics.get("top2_delta_gate_help_rate_changed_only", float("nan"))
+                ),
+                "top2_delta_gate_harm_rate_changed_only": float(
+                    metrics.get("top2_delta_gate_harm_rate_changed_only", float("nan"))
+                ),
+                "mean_top2_delta_gate_delta_gap_pct_vs_direct": float(
+                    metrics.get("mean_top2_delta_gate_delta_gap_pct_vs_direct", float("nan"))
+                ),
+                "median_top2_delta_gate_delta_gap_pct_vs_direct": float(
+                    metrics.get("median_top2_delta_gate_delta_gap_pct_vs_direct", float("nan"))
+                ),
+                "source_inner_top2_delta_gate_gap_reduction_abs_pct_points": str(
+                    metrics.get("source_inner_top2_delta_gate_gap_reduction_abs_pct_points", "")
+                ),
+                "source_inner_top2_delta_gate_high_regret_reduction": str(
+                    metrics.get("source_inner_top2_delta_gate_high_regret_reduction", "")
+                ),
+                "source_inner_top2_delta_gate_rows": str(
+                    metrics.get("source_inner_top2_delta_gate_rows", "")
+                ),
+                "source_inner_top2_delta_gate_switch_rows": str(
+                    metrics.get("source_inner_top2_delta_gate_switch_rows", "")
+                ),
+                "source_inner_top2_delta_gate_keep_rows": str(
+                    metrics.get("source_inner_top2_delta_gate_keep_rows", "")
+                ),
+                "source_inner_top2_delta_gate_helpful_switch_rows": str(
+                    metrics.get("source_inner_top2_delta_gate_helpful_switch_rows", "")
+                ),
+                "source_inner_top2_delta_gate_harmful_switch_rows": str(
+                    metrics.get("source_inner_top2_delta_gate_harmful_switch_rows", "")
+                ),
+                "source_inner_top2_delta_gate_active_domains": str(
+                    metrics.get("source_inner_top2_delta_gate_active_domains", "")
+                ),
+                "top2_delta_gate_guard_status": str(metrics.get("top2_delta_gate_guard_status", "")),
+                "top2_delta_gate_diagnostic_only_reason": str(
+                    metrics.get("top2_delta_gate_diagnostic_only_reason", "")
+                ),
+                "top2_delta_gate_selection_stability_status": str(
+                    metrics.get("top2_delta_gate_selection_stability_status", "")
+                ),
+                "delta_gate_spearman_pred_vs_true_source_inner": str(
+                    metrics.get("delta_gate_spearman_pred_vs_true_source_inner", "")
+                ),
+                "delta_gate_auc_switch_help_source_inner": str(
+                    metrics.get("delta_gate_auc_switch_help_source_inner", "")
+                ),
+                "delta_gate_mae_source_inner": str(metrics.get("delta_gate_mae_source_inner", "")),
+                "active_low_margin_oracle_is_top2_rate": str(
+                    metrics.get("active_low_margin_oracle_is_top2_rate", "")
+                ),
+                "active_low_margin_oracle_in_top2_rate": str(
+                    metrics.get("active_low_margin_oracle_in_top2_rate", "")
+                ),
+                "active_low_margin_high_regret_oracle_is_top2_rate": str(
+                    metrics.get("active_low_margin_high_regret_oracle_is_top2_rate", "")
+                ),
                 "hardpair_boost_margin_threshold": str(metrics.get("hardpair_boost_margin_threshold", "")),
                 "hardpair_miss_boost_weight": str(metrics.get("hardpair_miss_boost_weight", "")),
                 "hardpair_confirm_boost_weight": str(metrics.get("hardpair_confirm_boost_weight", "")),
@@ -841,6 +906,9 @@ def _build_method_summary_rows(method_metrics: Dict[str, Dict[str, Any]]) -> Lis
                 ),
                 "group_oof_same_slide_leakage_rate": str(
                     metrics.get("group_oof_same_slide_leakage_rate", "")
+                ),
+                "group_oof_same_group_leakage_rate": str(
+                    metrics.get("group_oof_same_group_leakage_rate", "")
                 ),
                 "hardpair_oof_low_margin_rows": str(metrics.get("hardpair_oof_low_margin_rows", "")),
                 "hardpair_oof_switch_rows": str(metrics.get("hardpair_oof_switch_rows", "")),

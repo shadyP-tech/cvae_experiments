@@ -172,6 +172,31 @@ def test_camelyon17_group_oof_hardpair_boost_config_is_protocol_locked() -> None
     assert boost_cfg["hardpair_confirm_boost_weights"] == [1.0]
 
 
+def test_camelyon17_precision_top2_delta_gate_config_is_protocol_locked() -> None:
+    path = (
+        PROJECT_ROOT
+        / "configs"
+        / "experiments"
+        / "camelyon17"
+        / "learned_utility_response_routing_pairprob_precision_top2_delta_gate_v1.yaml"
+    )
+    cfg = load_config(path)
+    validate_config(cfg)
+
+    pairprob_cfg = cfg["learned_utility"]["pairwise_tournament"]["pairprob_tournament"]
+    gate_cfg = pairprob_cfg["top2_delta_gate"]
+    assert cfg["experiment"]["name"] == "learned_utility_response_routing_pairprob_precision_top2_delta_gate_v1"
+    assert pairprob_cfg["adoption_feature_set"] == "pairprob_latent_only_v1"
+    assert gate_cfg["enabled"] is True
+    assert gate_cfg["base_method"] == "pairwise_direct_pairprob_adoption_v1"
+    assert gate_cfg["base_feature_set"] == "pairprob_latent_only_v1"
+    assert gate_cfg["feature_set"] == "top2_delta_gate_latent_context_v1"
+    assert gate_cfg["predictor"] == "ridge_delta_pct"
+    assert gate_cfg["calibration_policy"] == "source_inner_group_oof_top2_delta_gate_v1"
+    assert gate_cfg["delta_gate_oof_mode"] == "group_oof"
+    assert gate_cfg["require_group_id_for_adoption"] is True
+
+
 def test_breakhis_support_estimated_utility_config_is_protocol_locked() -> None:
     path = (
         PROJECT_ROOT

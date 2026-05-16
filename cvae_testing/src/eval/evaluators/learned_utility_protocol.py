@@ -261,6 +261,13 @@ def _method_protocol(method: str) -> MethodProtocol:
             diagnostic_only=0,
             routing_uses_query_features=1,
         )
+    if name == "pairwise_direct_precision_top2_delta_gate_v1":
+        return MethodProtocol(
+            method_role="learned",
+            adoption_eligible=1,
+            diagnostic_only=0,
+            routing_uses_query_features=1,
+        )
     if name == "pairwise_direct_group_oof_hardpair_boosted_pairprob_v1":
         return MethodProtocol(
             method_role="learned",
@@ -279,6 +286,14 @@ def _method_protocol(method: str) -> MethodProtocol:
             routing_uses_query_features=1,
         )
     if name == "oracle_top2_margin_reranker_diagnostic_v1":
+        return MethodProtocol(
+            method_role="diagnostic",
+            adoption_eligible=0,
+            diagnostic_only=1,
+            routing_uses_query_features=1,
+            routing_uses_eval_nelbo=1,
+        )
+    if name == "oracle_top2_delta_gate_diagnostic_v1":
         return MethodProtocol(
             method_role="diagnostic",
             adoption_eligible=0,

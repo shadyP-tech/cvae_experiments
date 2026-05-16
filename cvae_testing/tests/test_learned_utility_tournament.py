@@ -16,6 +16,7 @@ from src.eval.evaluators.learned_utility_config import (
     GroupOOFHardpairBoostConfig,
     JackknifeLCBTournamentConfig,
     PairprobTournamentConfig,
+    Top2DeltaGateConfig,
     Top2MarginRerankerConfig,
 )
 from src.eval.evaluators.learned_utility_models import _LogisticRidgePairprob
@@ -27,9 +28,12 @@ from src.eval.evaluators.learned_utility_pairprob import (
     GroupOOFHardpairBoostObservation,
     GroupOOFHardpairBoostSelection,
     PairprobPolicySelection,
+    Top2DeltaGateSelection,
     Top2RerankSelection,
     build_pairprob_training_data,
     build_group_oof_hardpair_observations,
+    build_group_oof_top2_delta_gate_training_data,
+    build_top2_delta_gate_training_data_from_predictions,
     build_top2_rerank_training_data,
     clone_direct_pairprob_adoption_rows,
     conformal_pairprob_route_rows,
@@ -43,6 +47,7 @@ from src.eval.evaluators.learned_utility_pairprob import (
     hardpair_boost_route_rows,
     select_jackknife_lcb_policy,
     select_pairprob_policy,
+    top2_delta_gate_route_rows,
     top2_rerank_feature_names,
     top2_rerank_route_rows,
 )
@@ -201,6 +206,52 @@ def _top2_cfg(**overrides: object) -> Top2MarginRerankerConfig:
     }
     values.update(overrides)
     return Top2MarginRerankerConfig(**values)
+
+
+def _top2_delta_cfg(**overrides: object) -> Top2DeltaGateConfig:
+    values = {
+        "enabled": True,
+        "method_name": "pairwise_direct_precision_top2_delta_gate_v1",
+        "base_method": "pairwise_direct_pairprob_adoption_v1",
+        "oracle_diagnostic_method_name": "oracle_top2_delta_gate_diagnostic_v1",
+        "feature_set": "top2_delta_gate_latent_context_v1",
+        "base_feature_set": "pairprob_latent_only_v1",
+        "predictor": "ridge_delta_pct",
+        "calibration_policy": "source_inner_group_oof_top2_delta_gate_v1",
+        "delta_gate_oof_mode": "group_oof",
+        "margin_thresholds": (0.10,),
+        "ridge_l2_values": (1.0e-1,),
+        "predicted_delta_thresholds": (-0.5,),
+        "target_clip_delta_pct": (-20.0, 20.0),
+        "near_tie_delta_pct": 0.5,
+        "group_oof_folds": 3,
+        "min_group_oof_train_domains_per_fold": 2,
+        "min_group_oof_candidate_experts_per_fold": 2,
+        "require_group_id_for_adoption": True,
+        "max_group_oof_same_group_leakage_rate": 0.0,
+        "max_activation_rate": 1.0,
+        "max_switch_rate": 1.0,
+        "min_source_inner_delta_rows": 1,
+        "min_source_inner_switch_rows": 0,
+        "min_source_inner_keep_rows": 0,
+        "min_source_inner_helpful_switch_rows": 0,
+        "min_source_inner_harmful_switch_rows": 0,
+        "min_source_inner_active_domains": 1,
+        "min_source_inner_validation_domains": 1,
+        "min_low_margin_high_regret_enrichment": 0.0,
+        "min_source_inner_gap_reduction_abs_pct_points_for_diagnostic": 0.0,
+        "min_source_inner_gap_reduction_abs_pct_points_for_adoption": 0.0,
+        "min_switch_help_rate_changed_only": 0.0,
+        "max_switch_harm_rate_changed_only": 1.0,
+        "max_top1_drop_for_pass": 0.0,
+        "max_spearman_drop_for_pass": 0.0,
+        "max_top1_drop_for_weak_pass": 0.02,
+        "max_spearman_drop_for_weak_pass": 0.02,
+        "absolute_high_regret_gap_pct": 5.0,
+        "catastrophic_regression_vs_direct_gap_pct": 5.0,
+    }
+    values.update(overrides)
+    return Top2DeltaGateConfig(**values)
 
 
 def _group_oof_cfg(**overrides: object) -> GroupOOFHardpairBoostConfig:
@@ -777,6 +828,198 @@ def test_oracle_top2_rerank_diagnostic_uses_eval_nelbo_and_is_not_adoption_eligi
         oracle_diagnostic=True,
     )
     protocol = _method_protocol("oracle_top2_margin_reranker_diagnostic_v1")
+
+    assert rows[0]["selected_expert"] == 2
+    assert rows[0]["routing_uses_eval_nelbo"] == 1
+    assert rows[0]["adoption_eligible"] == 0
+    assert protocol.routing_uses_eval_nelbo == 1
+
+
+def test_top2_delta_gate_target_sign_and_near_tie_definitions() -> None:
+    x_rows = np.asarray(
+        [
+            [1.0, 0.0, 1.0, 0.0],
+            [1.0, 0.0, 0.0, 1.0],
+            [0.0, 1.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0, 1.0],
+            [0.5, 0.5, 1.0, 0.0],
+            [0.5, 0.5, 0.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
+    prob = np.asarray(
+        [
+            [[0.5, 0.51], [0.49, 0.5]],
+            [[0.5, 0.51], [0.49, 0.5]],
+            [[0.5, 0.51], [0.49, 0.5]],
+        ],
+        dtype=np.float64,
+    )
+    true = np.asarray(
+        [
+            [20.0, 10.0],
+            [10.0, 20.0],
+            [10.0, 10.03],
+        ],
+        dtype=np.float64,
+    )
+
+    data = build_top2_delta_gate_training_data_from_predictions(
+        x_rows=x_rows,
+        query_domains=np.asarray([0, 0, 0], dtype=np.int64),
+        expert_domains=[1, 2],
+        prob_matrix=prob,
+        true_nelbo_matrix=true,
+        embedding_dim=2,
+        expert_feature_dim=2,
+        margin_threshold=1.0,
+        near_tie_delta_pct=0.5,
+        target_clip_delta_pct=(-20.0, 20.0),
+    )
+
+    assert data.x.shape[0] == 2
+    assert data.helpful_switch_rows == 1
+    assert data.harmful_switch_rows == 1
+    assert data.dropped_near_tie == 1
+    assert data.y_raw[0] < 0.0
+    assert data.y_raw[1] > 0.0
+
+
+def test_group_oof_top2_delta_gate_preserves_candidate_geometry() -> None:
+    rows = []
+    q_rows = []
+    e_rows = []
+    s_rows = []
+    y_rows = []
+    sample_id = 0
+    for repeat in range(3):
+        for query_domain in [0, 1, 2]:
+            candidates = [d for d in [0, 1, 2] if d != query_domain]
+            for expert_domain in candidates:
+                query_feature = float(query_domain + 1) / 10.0
+                expert_one_hot = [1.0 if i == expert_domain else 0.0 for i in [0, 1, 2]]
+                rows.append([query_feature, *expert_one_hot])
+                q_rows.append(query_domain)
+                e_rows.append(expert_domain)
+                s_rows.append(sample_id)
+                y_rows.append(10.0 + abs(expert_domain - query_domain) + repeat)
+            sample_id += 1
+
+    cfg = _top2_delta_cfg(
+        group_oof_folds=3,
+        min_group_oof_train_domains_per_fold=2,
+        min_group_oof_candidate_experts_per_fold=2,
+        near_tie_delta_pct=0.0,
+    )
+    data = build_group_oof_top2_delta_gate_training_data(
+        x_rows=np.asarray(rows, dtype=np.float64),
+        q_rows=np.asarray(q_rows, dtype=np.int64),
+        e_rows=np.asarray(e_rows, dtype=np.int64),
+        s_rows=np.asarray(s_rows, dtype=np.int64),
+        y_rows=np.asarray(y_rows, dtype=np.float64),
+        feature_set="pairprob_latent_only_v1",
+        ridge_l2=1.0e-3,
+        pairprob_cfg=_pairprob_cfg(near_tie_delta_pct=0.0),
+        delta_cfg=cfg,
+        embedding_dim=1,
+        expert_feature_dim=3,
+        margin_threshold=1.0,
+        device="cpu",
+    )
+
+    assert data.group_oof_grouping_level == "sample"
+    assert data.group_oof_folds_used == 3
+    assert data.group_oof_candidate_experts_per_fold_min >= 2
+    assert data.group_oof_same_group_leakage_rate == 0.0
+    assert data.x.shape[0] > 0
+
+
+def test_top2_delta_gate_noop_routes_exactly_as_direct_pairprob() -> None:
+    fold = FoldCandidateSet.for_heldout_domain(heldout_domain=0, expert_domains=[0, 1, 2])
+    x_rows = np.asarray([[1.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 1.0]], dtype=np.float64)
+    prob = np.asarray([[[0.5, 0.51], [0.49, 0.5]]], dtype=np.float64)
+    true = np.asarray([[20.0, 10.0]], dtype=np.float64)
+    selection = Top2DeltaGateSelection(
+        method="pairwise_direct_precision_top2_delta_gate_v1",
+        oracle_method="oracle_top2_delta_gate_diagnostic_v1",
+        base_method="pairwise_direct_pairprob_adoption_v1",
+        feature_set="top2_delta_gate_latent_context_v1",
+        base_feature_set="pairprob_latent_only_v1",
+        base_ridge_l2=1.0e-3,
+        ridge_l2=1.0e-1,
+        margin_threshold=0.1,
+        predicted_delta_threshold=-0.5,
+        selected_by_inner_validation=True,
+        diagnostic_only_reason="insufficient_source_inner_delta_rows",
+        noop=True,
+        guard_status="failed_guards_noop",
+    )
+
+    rows = top2_delta_gate_route_rows(
+        method="pairwise_direct_precision_top2_delta_gate_v1",
+        fold=fold,
+        query_domains=np.asarray([0], dtype=np.int64),
+        expert_domains=fold.candidate_expert_domains,
+        x_rows=x_rows,
+        prob_matrix=prob,
+        true_nelbo_matrix=true,
+        global_true_nelbo_matrix=np.asarray([[5.0, 20.0, 10.0]], dtype=np.float64),
+        global_expert_domains=[0, 1, 2],
+        policy_name="pairwise_direct_precision_top2_delta_gate_v1",
+        selection=selection,
+        delta_bundle=None,
+        pairprob_direct_gap_pct=np.asarray([100.0], dtype=np.float64),
+        metadata_oracle_gap_pct=None,
+        embedding_dim=2,
+        expert_feature_dim=2,
+        cfg=_top2_delta_cfg(),
+    )
+
+    assert rows[0]["selected_expert"] == 1
+    assert rows[0]["top2_delta_gate_active"] == 0
+    assert rows[0]["top2_delta_gate_switched"] == 0
+    assert rows[0]["diagnostic_only"] == 1
+
+
+def test_oracle_top2_delta_gate_diagnostic_uses_eval_nelbo_and_is_not_adoption_eligible() -> None:
+    fold = FoldCandidateSet.for_heldout_domain(heldout_domain=0, expert_domains=[0, 1, 2])
+    x_rows = np.asarray([[1.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 1.0]], dtype=np.float64)
+    prob = np.asarray([[[0.5, 0.51], [0.49, 0.5]]], dtype=np.float64)
+    true = np.asarray([[20.0, 10.0]], dtype=np.float64)
+    selection = Top2DeltaGateSelection(
+        method="pairwise_direct_precision_top2_delta_gate_v1",
+        oracle_method="oracle_top2_delta_gate_diagnostic_v1",
+        base_method="pairwise_direct_pairprob_adoption_v1",
+        feature_set="top2_delta_gate_latent_context_v1",
+        base_feature_set="pairprob_latent_only_v1",
+        base_ridge_l2=1.0e-3,
+        ridge_l2=1.0e-1,
+        margin_threshold=0.1,
+        predicted_delta_threshold=-0.5,
+        selected_by_inner_validation=True,
+    )
+
+    rows = top2_delta_gate_route_rows(
+        method="oracle_top2_delta_gate_diagnostic_v1",
+        fold=fold,
+        query_domains=np.asarray([0], dtype=np.int64),
+        expert_domains=fold.candidate_expert_domains,
+        x_rows=x_rows,
+        prob_matrix=prob,
+        true_nelbo_matrix=true,
+        global_true_nelbo_matrix=np.asarray([[5.0, 20.0, 10.0]], dtype=np.float64),
+        global_expert_domains=[0, 1, 2],
+        policy_name="pairwise_direct_precision_top2_delta_gate_v1",
+        selection=selection,
+        delta_bundle=None,
+        pairprob_direct_gap_pct=np.asarray([100.0], dtype=np.float64),
+        metadata_oracle_gap_pct=None,
+        embedding_dim=2,
+        expert_feature_dim=2,
+        cfg=_top2_delta_cfg(),
+        oracle_diagnostic=True,
+    )
+    protocol = _method_protocol("oracle_top2_delta_gate_diagnostic_v1")
 
     assert rows[0]["selected_expert"] == 2
     assert rows[0]["routing_uses_eval_nelbo"] == 1

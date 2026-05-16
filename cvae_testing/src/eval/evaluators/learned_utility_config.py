@@ -186,6 +186,49 @@ class Top2MarginRerankerConfig:
 
 
 @dataclass(frozen=True)
+class Top2DeltaGateConfig:
+    enabled: bool = False
+    method_name: str = "pairwise_direct_precision_top2_delta_gate_v1"
+    base_method: str = "pairwise_direct_pairprob_adoption_v1"
+    oracle_diagnostic_method_name: str = "oracle_top2_delta_gate_diagnostic_v1"
+    feature_set: str = "top2_delta_gate_latent_context_v1"
+    base_feature_set: str = "pairprob_latent_only_v1"
+    predictor: str = "ridge_delta_pct"
+    calibration_policy: str = "source_inner_group_oof_top2_delta_gate_v1"
+    delta_gate_oof_mode: str = "group_oof"
+    margin_thresholds: Tuple[float, ...] = (0.05, 0.075, 0.10)
+    ridge_l2_values: Tuple[float, ...] = (1.0e-2, 1.0e-1, 1.0)
+    predicted_delta_thresholds: Tuple[float, ...] = (-3.0, -2.0, -1.0, -0.5)
+    target_clip_delta_pct: Tuple[float, float] = (-20.0, 20.0)
+    near_tie_delta_pct: float = 0.5
+    group_oof_folds: int = 3
+    min_group_oof_train_domains_per_fold: int = 3
+    min_group_oof_candidate_experts_per_fold: int = 2
+    require_group_id_for_adoption: bool = True
+    max_group_oof_same_group_leakage_rate: float = 0.0
+    max_activation_rate: float = 0.12
+    max_switch_rate: float = 0.08
+    min_source_inner_delta_rows: int = 40
+    min_source_inner_switch_rows: int = 10
+    min_source_inner_keep_rows: int = 10
+    min_source_inner_helpful_switch_rows: int = 8
+    min_source_inner_harmful_switch_rows: int = 5
+    min_source_inner_active_domains: int = 2
+    min_source_inner_validation_domains: int = 2
+    min_low_margin_high_regret_enrichment: float = 1.50
+    min_source_inner_gap_reduction_abs_pct_points_for_diagnostic: float = 0.05
+    min_source_inner_gap_reduction_abs_pct_points_for_adoption: float = 0.25
+    min_switch_help_rate_changed_only: float = 0.60
+    max_switch_harm_rate_changed_only: float = 0.25
+    max_top1_drop_for_pass: float = 0.0
+    max_spearman_drop_for_pass: float = 0.0
+    max_top1_drop_for_weak_pass: float = 0.02
+    max_spearman_drop_for_weak_pass: float = 0.02
+    absolute_high_regret_gap_pct: float = 5.0
+    catastrophic_regression_vs_direct_gap_pct: float = 5.0
+
+
+@dataclass(frozen=True)
 class GroupOOFHardpairBoostConfig:
     enabled: bool = False
     method_name: str = "pairwise_direct_group_oof_hardpair_boosted_pairprob_v1"
@@ -248,6 +291,7 @@ class PairprobTournamentConfig:
     conformal_regret_set: ConformalRegretSetConfig = ConformalRegretSetConfig()
     jackknife_lcb_tournament: JackknifeLCBTournamentConfig = JackknifeLCBTournamentConfig()
     top2_margin_reranker: Top2MarginRerankerConfig = Top2MarginRerankerConfig()
+    top2_delta_gate: Top2DeltaGateConfig = Top2DeltaGateConfig()
     group_oof_hardpair_boost: GroupOOFHardpairBoostConfig = GroupOOFHardpairBoostConfig()
 
 
@@ -460,6 +504,7 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
     conformal_cfg = _as_dict(pairprob_cfg.get("conformal_regret_set", {}))
     jackknife_cfg = _as_dict(pairprob_cfg.get("jackknife_lcb_tournament", {}))
     top2_cfg = _as_dict(pairprob_cfg.get("top2_margin_reranker", {}))
+    top2_delta_cfg = _as_dict(pairprob_cfg.get("top2_delta_gate", {}))
     group_oof_cfg = _as_dict(pairprob_cfg.get("group_oof_hardpair_boost", {}))
     margin_clip_values = tuple(
         float(v) for v in pairprob_cfg.get("margin_weight_clip", [0.25, 3.0])
@@ -623,6 +668,92 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
             (top2_cfg or {}).get("catastrophic_regression_vs_direct_gap_pct", 5.0)
         ),
     )
+    top2_delta_clip_values = tuple(
+        float(v) for v in (top2_delta_cfg or {}).get("target_clip_delta_pct", [-20.0, 20.0])
+    )
+    if len(top2_delta_clip_values) != 2:
+        raise ValueError(
+            "learned_utility.pairwise_tournament.pairprob_tournament."
+            "top2_delta_gate.target_clip_delta_pct must have length 2"
+        )
+    top2_delta_gate = Top2DeltaGateConfig(
+        enabled=bool((top2_delta_cfg or {}).get("enabled", False)),
+        method_name=str(
+            (top2_delta_cfg or {}).get("method_name", "pairwise_direct_precision_top2_delta_gate_v1")
+        ),
+        base_method=str((top2_delta_cfg or {}).get("base_method", "pairwise_direct_pairprob_adoption_v1")),
+        oracle_diagnostic_method_name=str(
+            (top2_delta_cfg or {}).get("oracle_diagnostic_method_name", "oracle_top2_delta_gate_diagnostic_v1")
+        ),
+        feature_set=str((top2_delta_cfg or {}).get("feature_set", "top2_delta_gate_latent_context_v1")).strip(),
+        base_feature_set=str((top2_delta_cfg or {}).get("base_feature_set", "pairprob_latent_only_v1")).strip(),
+        predictor=str((top2_delta_cfg or {}).get("predictor", "ridge_delta_pct")).strip().lower(),
+        calibration_policy=str(
+            (top2_delta_cfg or {}).get("calibration_policy", "source_inner_group_oof_top2_delta_gate_v1")
+        ).strip().lower(),
+        delta_gate_oof_mode=str((top2_delta_cfg or {}).get("delta_gate_oof_mode", "group_oof")).strip().lower(),
+        margin_thresholds=tuple(
+            float(v) for v in (top2_delta_cfg or {}).get("margin_thresholds", [0.05, 0.075, 0.10])
+        ),
+        ridge_l2_values=tuple(
+            float(v) for v in (top2_delta_cfg or {}).get("ridge_l2_values", [1.0e-2, 1.0e-1, 1.0])
+        ),
+        predicted_delta_thresholds=tuple(
+            float(v)
+            for v in (top2_delta_cfg or {}).get("predicted_delta_thresholds", [-3.0, -2.0, -1.0, -0.5])
+        ),
+        target_clip_delta_pct=(float(top2_delta_clip_values[0]), float(top2_delta_clip_values[1])),
+        near_tie_delta_pct=float((top2_delta_cfg or {}).get("near_tie_delta_pct", 0.5)),
+        group_oof_folds=int((top2_delta_cfg or {}).get("group_oof_folds", 3)),
+        min_group_oof_train_domains_per_fold=int(
+            (top2_delta_cfg or {}).get("min_group_oof_train_domains_per_fold", 3)
+        ),
+        min_group_oof_candidate_experts_per_fold=int(
+            (top2_delta_cfg or {}).get("min_group_oof_candidate_experts_per_fold", 2)
+        ),
+        require_group_id_for_adoption=bool((top2_delta_cfg or {}).get("require_group_id_for_adoption", True)),
+        max_group_oof_same_group_leakage_rate=float(
+            (top2_delta_cfg or {}).get("max_group_oof_same_group_leakage_rate", 0.0)
+        ),
+        max_activation_rate=float((top2_delta_cfg or {}).get("max_activation_rate", 0.12)),
+        max_switch_rate=float((top2_delta_cfg or {}).get("max_switch_rate", 0.08)),
+        min_source_inner_delta_rows=int((top2_delta_cfg or {}).get("min_source_inner_delta_rows", 40)),
+        min_source_inner_switch_rows=int((top2_delta_cfg or {}).get("min_source_inner_switch_rows", 10)),
+        min_source_inner_keep_rows=int((top2_delta_cfg or {}).get("min_source_inner_keep_rows", 10)),
+        min_source_inner_helpful_switch_rows=int(
+            (top2_delta_cfg or {}).get("min_source_inner_helpful_switch_rows", 8)
+        ),
+        min_source_inner_harmful_switch_rows=int(
+            (top2_delta_cfg or {}).get("min_source_inner_harmful_switch_rows", 5)
+        ),
+        min_source_inner_active_domains=int((top2_delta_cfg or {}).get("min_source_inner_active_domains", 2)),
+        min_source_inner_validation_domains=int(
+            (top2_delta_cfg or {}).get("min_source_inner_validation_domains", 2)
+        ),
+        min_low_margin_high_regret_enrichment=float(
+            (top2_delta_cfg or {}).get("min_low_margin_high_regret_enrichment", 1.50)
+        ),
+        min_source_inner_gap_reduction_abs_pct_points_for_diagnostic=float(
+            (top2_delta_cfg or {}).get("min_source_inner_gap_reduction_abs_pct_points_for_diagnostic", 0.05)
+        ),
+        min_source_inner_gap_reduction_abs_pct_points_for_adoption=float(
+            (top2_delta_cfg or {}).get("min_source_inner_gap_reduction_abs_pct_points_for_adoption", 0.25)
+        ),
+        min_switch_help_rate_changed_only=float(
+            (top2_delta_cfg or {}).get("min_switch_help_rate_changed_only", 0.60)
+        ),
+        max_switch_harm_rate_changed_only=float(
+            (top2_delta_cfg or {}).get("max_switch_harm_rate_changed_only", 0.25)
+        ),
+        max_top1_drop_for_pass=float((top2_delta_cfg or {}).get("max_top1_drop_for_pass", 0.0)),
+        max_spearman_drop_for_pass=float((top2_delta_cfg or {}).get("max_spearman_drop_for_pass", 0.0)),
+        max_top1_drop_for_weak_pass=float((top2_delta_cfg or {}).get("max_top1_drop_for_weak_pass", 0.02)),
+        max_spearman_drop_for_weak_pass=float((top2_delta_cfg or {}).get("max_spearman_drop_for_weak_pass", 0.02)),
+        absolute_high_regret_gap_pct=float((top2_delta_cfg or {}).get("absolute_high_regret_gap_pct", 5.0)),
+        catastrophic_regression_vs_direct_gap_pct=float(
+            (top2_delta_cfg or {}).get("catastrophic_regression_vs_direct_gap_pct", 5.0)
+        ),
+    )
     group_oof_margin_clip_values = tuple(
         float(v) for v in (group_oof_cfg or {}).get("margin_weight_clip", [0.25, 3.0])
     )
@@ -776,6 +907,7 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         conformal_regret_set=conformal_regret_set,
         jackknife_lcb_tournament=jackknife_lcb_tournament,
         top2_margin_reranker=top2_margin_reranker,
+        top2_delta_gate=top2_delta_gate,
         group_oof_hardpair_boost=group_oof_hardpair_boost,
     )
     tournament = PairwiseTournamentConfig(
@@ -1039,6 +1171,71 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
                     raise ValueError(
                         "learned_utility.pairwise_tournament.pairprob_tournament.top2_margin_reranker."
                         "margin_weight_clip must be positive and ordered"
+                    )
+            top2_delta = pairprob.top2_delta_gate
+            if top2_delta.enabled:
+                if top2_delta.base_method != pairprob.direct_adoption_method:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_delta_gate."
+                        "base_method must match methods.direct_adoption"
+                    )
+                if top2_delta.base_feature_set != pairprob.adoption_feature_set:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_delta_gate."
+                        "base_feature_set must match adoption_feature_set"
+                    )
+                if top2_delta.feature_set != "top2_delta_gate_latent_context_v1":
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_delta_gate."
+                        "feature_set must be 'top2_delta_gate_latent_context_v1'"
+                    )
+                if top2_delta.predictor != "ridge_delta_pct":
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_delta_gate."
+                        "predictor must be 'ridge_delta_pct'"
+                    )
+                if top2_delta.calibration_policy != "source_inner_group_oof_top2_delta_gate_v1":
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_delta_gate."
+                        "calibration_policy must be 'source_inner_group_oof_top2_delta_gate_v1'"
+                    )
+                if top2_delta.delta_gate_oof_mode != "group_oof":
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_delta_gate."
+                        "delta_gate_oof_mode must be 'group_oof'"
+                    )
+                if not top2_delta.margin_thresholds or any(v < 0.0 for v in top2_delta.margin_thresholds):
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_delta_gate."
+                        "margin_thresholds must be non-empty and non-negative"
+                    )
+                if not top2_delta.ridge_l2_values or any(v <= 0.0 for v in top2_delta.ridge_l2_values):
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_delta_gate."
+                        "ridge_l2_values must be non-empty and positive"
+                    )
+                if (
+                    not top2_delta.predicted_delta_thresholds
+                    or any(v >= 0.0 for v in top2_delta.predicted_delta_thresholds)
+                ):
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_delta_gate."
+                        "predicted_delta_thresholds must be non-empty and negative"
+                    )
+                if top2_delta.target_clip_delta_pct[0] >= top2_delta.target_clip_delta_pct[1]:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_delta_gate."
+                        "target_clip_delta_pct must be ordered [low, high]"
+                    )
+                if top2_delta.group_oof_folds < 2:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_delta_gate."
+                        "group_oof_folds must be >= 2"
+                    )
+                if top2_delta.min_group_oof_train_domains_per_fold < 2:
+                    raise ValueError(
+                        "learned_utility.pairwise_tournament.pairprob_tournament.top2_delta_gate."
+                        "min_group_oof_train_domains_per_fold must be >= 2"
                     )
             group_oof = pairprob.group_oof_hardpair_boost
             if group_oof.enabled:
