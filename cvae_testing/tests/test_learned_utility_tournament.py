@@ -942,9 +942,9 @@ def test_top2_delta_gate_target_sign_and_near_tie_definitions() -> None:
 def test_allpair_delta_gate_uses_all_pairs_but_routes_top1_top2_only() -> None:
     x_rows = np.asarray(
         [
-            [1.0, 0.0, 1.0, 0.0],
-            [1.0, 0.0, 0.0, 1.0],
-            [1.0, 0.0, 0.5, 0.5],
+            [1.0, 0.0, 1.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0, 1.0, 0.0],
+            [1.0, 0.0, 0.0, 0.0, 1.0],
         ],
         dtype=np.float64,
     )
@@ -967,7 +967,7 @@ def test_allpair_delta_gate_uses_all_pairs_but_routes_top1_top2_only() -> None:
         prob_matrix=prob,
         true_nelbo_matrix=true,
         embedding_dim=2,
-        expert_feature_dim=2,
+        expert_feature_dim=3,
         margin_threshold=1.0,
         near_tie_delta_pct=0.5,
         target_clip_delta_pct=(-20.0, 20.0),
@@ -1014,7 +1014,7 @@ def test_allpair_delta_gate_uses_all_pairs_but_routes_top1_top2_only() -> None:
         pairprob_direct_gap_pct=np.asarray([100.0], dtype=np.float64),
         metadata_oracle_gap_pct=None,
         embedding_dim=2,
-        expert_feature_dim=2,
+        expert_feature_dim=3,
         cfg=_allpair_delta_cfg(),
         oracle_diagnostic=True,
     )

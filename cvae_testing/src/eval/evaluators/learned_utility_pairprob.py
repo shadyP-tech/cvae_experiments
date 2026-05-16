@@ -1427,14 +1427,17 @@ def _allpair_delta_feature(
     query = np.asarray(row_a[:embedding_dim], dtype=np.float64)
     expert_a = np.asarray(row_a[embedding_dim : embedding_dim + expert_feature_dim], dtype=np.float64)
     expert_b = np.asarray(row_b[embedding_dim : embedding_dim + expert_feature_dim], dtype=np.float64)
+    interaction_a = (query[:, None] * expert_a[None, :]).reshape(-1)
+    interaction_b = (query[:, None] * expert_b[None, :]).reshape(-1)
     return np.concatenate(
         [
             query,
             expert_a,
             expert_b,
-            query - expert_a,
-            query - expert_b,
+            interaction_a,
+            interaction_b,
             expert_a - expert_b,
+            np.abs(expert_a - expert_b),
             np.asarray(
                 [
                     float(win_a),
