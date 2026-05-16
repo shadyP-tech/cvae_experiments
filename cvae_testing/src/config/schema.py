@@ -1238,6 +1238,50 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                                 "learned_utility.autoencoder_proxy.utility_calibrator."
                                 f"precision_selection.{key} must be in [0,1]"
                             )
+                    for key in [
+                        "min_active_override_count",
+                        "bootstrap_reps",
+                        "bootstrap_seed",
+                    ]:
+                        if int(precision_selection.get(key, 1)) < 0:
+                            raise ValueError(
+                                "learned_utility.autoencoder_proxy.utility_calibrator."
+                                f"precision_selection.{key} must be >= 0"
+                            )
+                    for key in [
+                        "min_net_gain_vs_ae_argmin",
+                        "neutral_override_gap_pct_band",
+                        "max_worst_pseudo_domain_gap_degradation_pp",
+                    ]:
+                        if float(precision_selection.get(key, 0.0)) < 0.0:
+                            raise ValueError(
+                                "learned_utility.autoencoder_proxy.utility_calibrator."
+                                f"precision_selection.{key} must be >= 0"
+                            )
+                    if is_precision_v12:
+                        v1_guard = precision_selection.get("v1_guard", {})
+                        if v1_guard is None or not isinstance(v1_guard, dict):
+                            raise ValueError(
+                                "learned_utility.autoencoder_proxy.utility_calibrator."
+                                "precision_selection.v1_guard must be a dictionary for v1.2"
+                            )
+                        float(v1_guard.get("min_gap_delta_vs_v1_lcb_pp", -0.25))
+                        for key in [
+                            "max_top1_drop_vs_v1_abs",
+                            "max_spearman_drop_vs_v1_abs",
+                            "max_worst_pseudo_domain_gap_degradation_vs_v1_pp",
+                        ]:
+                            if float(v1_guard.get(key, 0.0)) < 0.0:
+                                raise ValueError(
+                                    "learned_utility.autoencoder_proxy.utility_calibrator."
+                                    f"precision_selection.v1_guard.{key} must be >= 0"
+                                )
+                        harmful_ucb = float(v1_guard.get("max_harmful_override_rate_ucb", 0.30))
+                        if harmful_ucb < 0.0 or harmful_ucb > 1.0:
+                            raise ValueError(
+                                "learned_utility.autoencoder_proxy.utility_calibrator."
+                                "precision_selection.v1_guard.max_harmful_override_rate_ucb must be in [0,1]"
+                            )
                 if is_harm_veto_v13:
                     if str(
                         utility_calibrator_cfg.get("selection_mode", "v1_harm_veto_v13")
@@ -1309,50 +1353,6 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                             "learned_utility.autoencoder_proxy.utility_calibrator.harm_veto."
                             "neutral_override_gap_pct_band must be >= 0"
                         )
-                    for key in [
-                        "min_active_override_count",
-                        "bootstrap_reps",
-                        "bootstrap_seed",
-                    ]:
-                        if int(precision_selection.get(key, 1)) < 0:
-                            raise ValueError(
-                                "learned_utility.autoencoder_proxy.utility_calibrator."
-                                f"precision_selection.{key} must be >= 0"
-                            )
-                    for key in [
-                        "min_net_gain_vs_ae_argmin",
-                        "neutral_override_gap_pct_band",
-                        "max_worst_pseudo_domain_gap_degradation_pp",
-                    ]:
-                        if float(precision_selection.get(key, 0.0)) < 0.0:
-                            raise ValueError(
-                                "learned_utility.autoencoder_proxy.utility_calibrator."
-                                f"precision_selection.{key} must be >= 0"
-                            )
-                    if is_precision_v12:
-                        v1_guard = precision_selection.get("v1_guard", {})
-                        if v1_guard is None or not isinstance(v1_guard, dict):
-                            raise ValueError(
-                                "learned_utility.autoencoder_proxy.utility_calibrator."
-                                "precision_selection.v1_guard must be a dictionary for v1.2"
-                            )
-                        float(v1_guard.get("min_gap_delta_vs_v1_lcb_pp", -0.25))
-                        for key in [
-                            "max_top1_drop_vs_v1_abs",
-                            "max_spearman_drop_vs_v1_abs",
-                            "max_worst_pseudo_domain_gap_degradation_vs_v1_pp",
-                        ]:
-                            if float(v1_guard.get(key, 0.0)) < 0.0:
-                                raise ValueError(
-                                    "learned_utility.autoencoder_proxy.utility_calibrator."
-                                    f"precision_selection.v1_guard.{key} must be >= 0"
-                                )
-                        harmful_ucb = float(v1_guard.get("max_harmful_override_rate_ucb", 0.30))
-                        if harmful_ucb < 0.0 or harmful_ucb > 1.0:
-                            raise ValueError(
-                                "learned_utility.autoencoder_proxy.utility_calibrator."
-                                "precision_selection.v1_guard.max_harmful_override_rate_ucb must be in [0,1]"
-                            )
                 if is_consensus_v2:
                     if float(utility_calibrator_cfg.get("uncertainty_multiplier", 1.0)) < 0.0:
                         raise ValueError(
