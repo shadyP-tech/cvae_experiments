@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import hashlib
 from typing import Any, Dict, List, Mapping, Sequence, Tuple
 
 import numpy as np
 
 from src.eval.evaluators.learned_utility_config import (
+    AllPairDeltaGateConfig,
     ConformalRegretSetConfig,
     GroupOOFHardpairBoostConfig,
     JackknifeLCBTournamentConfig,
@@ -31,6 +32,9 @@ TOP2_RERANK_FEATURE_SET = "top2_rerank_latent_context_v1"
 TOP2_DELTA_GATE_METHOD = "pairwise_direct_precision_top2_delta_gate_v1"
 ORACLE_TOP2_DELTA_GATE_DIAGNOSTIC_METHOD = "oracle_top2_delta_gate_diagnostic_v1"
 TOP2_DELTA_GATE_FEATURE_SET = "top2_delta_gate_latent_context_v1"
+ALLPAIR_DELTA_GATE_METHOD = "pairwise_direct_allpair_utility_delta_gate_v1"
+ORACLE_ALLPAIR_DELTA_GATE_DIAGNOSTIC_METHOD = "oracle_allpair_top2_delta_gate_diagnostic_v1"
+ALLPAIR_DELTA_GATE_FEATURE_SET = "allpair_delta_latent_context_v1"
 GROUP_OOF_HARDPAIR_BOOST_METHOD = "pairwise_direct_group_oof_hardpair_boosted_pairprob_v1"
 GROUP_OOF_HARDPAIR_MISS_ONLY_DIAGNOSTIC_METHOD = (
     "pairwise_direct_group_oof_hardpair_miss_boosted_pairprob_v1_diagnostic"
@@ -83,6 +87,26 @@ TOP2_DELTA_GATE_GUARD_PRIORITY = (
     "switch_rate_too_high",
     "harm_rate_too_high",
     "insufficient_switch_precision",
+    "insufficient_source_inner_gap_reduction",
+    "unstable_source_inner_selection",
+    "worsens_direct_pairprob",
+)
+ALLPAIR_DELTA_GATE_GUARD_PRIORITY = (
+    "insufficient_source_inner_delta_rows",
+    "insufficient_source_inner_unique_queries",
+    "insufficient_source_inner_unique_query_domains",
+    "insufficient_source_inner_unique_base_top2_events",
+    "insufficient_source_inner_helpful_pair_rows",
+    "insufficient_source_inner_harmful_pair_rows",
+    "insufficient_source_inner_top2_candidate_rows",
+    "insufficient_source_inner_top2_switch_rows",
+    "low_margin_not_high_regret_enriched",
+    "activation_rate_too_high",
+    "switch_rate_too_high",
+    "harm_rate_too_high",
+    "insufficient_switch_precision",
+    "top1_drop",
+    "spearman_drop",
     "insufficient_source_inner_gap_reduction",
     "unstable_source_inner_selection",
     "worsens_direct_pairprob",
@@ -335,6 +359,8 @@ class Top2RerankSelection:
     source_inner_high_regret_rate: float = float("nan")
     source_inner_top1: float = float("nan")
     source_inner_spearman: float = float("nan")
+    source_inner_top1_delta_vs_direct: float = float("nan")
+    source_inner_spearman_delta_vs_direct: float = float("nan")
     base_top2_margin_auc_for_high_regret: float = float("nan")
     base_top2_margin_spearman_with_oracle_gap: float = float("nan")
     overall_high_regret_rate_direct: float = float("nan")
@@ -364,6 +390,11 @@ class Top2DeltaGateTrainingData:
     helpful_switch_rows: int
     harmful_switch_rows: int
     kept_by_domain: Dict[int, int]
+    unique_queries: int = 0
+    unique_query_domains: int = 0
+    unique_base_top2_events: int = 0
+    helpful_pair_rows: int = 0
+    harmful_pair_rows: int = 0
     group_oof_grouping_level: str = "sample"
     group_oof_unique_groups: int = 0
     group_oof_min_groups_per_fold: int = 0
@@ -438,6 +469,12 @@ class Top2DeltaGateSelection:
     source_inner_helpful_switch_rows: int = 0
     source_inner_harmful_switch_rows: int = 0
     source_inner_active_domains: int = 0
+    source_inner_unique_queries: int = 0
+    source_inner_unique_query_domains: int = 0
+    source_inner_unique_base_top2_events: int = 0
+    source_inner_helpful_pair_rows: int = 0
+    source_inner_harmful_pair_rows: int = 0
+    source_inner_top2_candidate_rows: int = 0
     source_inner_gap_reduction_abs_pct_points: float = float("nan")
     source_inner_high_regret_reduction: float = float("nan")
     source_inner_activation_rate: float = float("nan")
@@ -448,6 +485,8 @@ class Top2DeltaGateSelection:
     source_inner_high_regret_rate: float = float("nan")
     source_inner_top1: float = float("nan")
     source_inner_spearman: float = float("nan")
+    source_inner_top1_delta_vs_direct: float = float("nan")
+    source_inner_spearman_delta_vs_direct: float = float("nan")
     low_margin_high_regret_enrichment: float = float("nan")
     delta_gate_spearman_pred_vs_true_source_inner: float = float("nan")
     delta_gate_auc_switch_help_source_inner: float = float("nan")
@@ -464,6 +503,7 @@ class Top2DeltaGateSelection:
     active_low_margin_high_regret_oracle_is_top2_rate: float = float("nan")
     oracle_top2_recoverable_error_rate: float = float("nan")
     oracle_top2_recoverable_gap_mass_pct_points: float = float("nan")
+    selected_reason: str = ""
     model: Top2DeltaGateModelBundle | None = None
 
 
@@ -956,6 +996,21 @@ def fit_top2_delta_gate_model(
     )
 
 
+def fit_allpair_delta_gate_model(
+    *,
+    train_data: Top2DeltaGateTrainingData,
+    ridge_l2: float,
+) -> Top2DeltaGateModelBundle:
+    bundle = fit_top2_delta_gate_model(train_data=train_data, ridge_l2=float(ridge_l2))
+    return Top2DeltaGateModelBundle(
+        feature_set=ALLPAIR_DELTA_GATE_FEATURE_SET,
+        ridge_l2=bundle.ridge_l2,
+        feature_mean=bundle.feature_mean,
+        feature_scale=bundle.feature_scale,
+        model=bundle.model,
+    )
+
+
 def _concat_top2_training_data(parts: Sequence[Top2RerankTrainingData]) -> Top2RerankTrainingData:
     non_empty = [p for p in parts if p.x.shape[0] > 0]
     if not non_empty:
@@ -1036,6 +1091,11 @@ def _concat_top2_delta_gate_training_data(parts: Sequence[Top2DeltaGateTrainingD
         helpful_switch_rows=int(sum(int(p.helpful_switch_rows) for p in parts)),
         harmful_switch_rows=int(sum(int(p.harmful_switch_rows) for p in parts)),
         kept_by_domain=kept,
+        unique_queries=int(sum(int(p.unique_queries) for p in parts)),
+        unique_query_domains=int(len(kept)) if kept else int(sum(int(p.unique_query_domains) for p in parts)),
+        unique_base_top2_events=int(sum(int(p.unique_base_top2_events) for p in parts)),
+        helpful_pair_rows=int(sum(int(p.helpful_pair_rows) for p in parts)),
+        harmful_pair_rows=int(sum(int(p.harmful_pair_rows) for p in parts)),
         group_oof_grouping_level="sample",
         group_oof_unique_groups=int(sum(int(p.group_oof_unique_groups) for p in parts)),
         group_oof_min_groups_per_fold=int(min((int(p.group_oof_min_groups_per_fold) for p in parts), default=0)),
@@ -1340,6 +1400,198 @@ def build_top2_delta_gate_training_data_from_predictions(
         helpful_switch_rows=int(helpful),
         harmful_switch_rows=int(harmful),
         kept_by_domain=kept_by_domain,
+    )
+
+
+def _rank_positions_from_orders(orders: np.ndarray) -> np.ndarray:
+    ranks = np.zeros_like(orders, dtype=np.int64)
+    for row_idx in range(orders.shape[0]):
+        ranks[row_idx, orders[row_idx, :]] = np.arange(1, orders.shape[1] + 1, dtype=np.int64)
+    return ranks
+
+
+def _allpair_delta_feature(
+    row_a: np.ndarray,
+    row_b: np.ndarray,
+    *,
+    embedding_dim: int,
+    expert_feature_dim: int,
+    win_a: float,
+    win_b: float,
+    p_a_beats_b: float,
+    p_b_beats_a: float,
+    pairprob_margin: float,
+    rank_a: int,
+    rank_b: int,
+) -> np.ndarray:
+    query = np.asarray(row_a[:embedding_dim], dtype=np.float64)
+    expert_a = np.asarray(row_a[embedding_dim : embedding_dim + expert_feature_dim], dtype=np.float64)
+    expert_b = np.asarray(row_b[embedding_dim : embedding_dim + expert_feature_dim], dtype=np.float64)
+    return np.concatenate(
+        [
+            query,
+            expert_a,
+            expert_b,
+            query - expert_a,
+            query - expert_b,
+            expert_a - expert_b,
+            np.asarray(
+                [
+                    float(win_a),
+                    float(win_b),
+                    float(win_a) - float(win_b),
+                    float(p_a_beats_b),
+                    float(p_b_beats_a),
+                    float(pairprob_margin),
+                    float(rank_a),
+                    float(rank_b),
+                ],
+                dtype=np.float64,
+            ),
+        ],
+        axis=0,
+    ).astype(np.float64, copy=False)
+
+
+def build_allpair_delta_gate_training_data_from_predictions(
+    *,
+    x_rows: np.ndarray,
+    query_domains: np.ndarray,
+    expert_domains: Sequence[int],
+    prob_matrix: np.ndarray,
+    true_nelbo_matrix: np.ndarray,
+    embedding_dim: int,
+    expert_feature_dim: int,
+    margin_threshold: float,
+    near_tie_delta_pct: float,
+    target_clip_delta_pct: Tuple[float, float],
+    sample_ids: np.ndarray | None = None,
+) -> Top2DeltaGateTrainingData:
+    win, orders, margins = pairprob_order_and_margin(prob_matrix, expert_domains=expert_domains)
+    k = int(win.shape[1])
+    if k < 2:
+        return Top2DeltaGateTrainingData(
+            x=np.zeros((0, 0), dtype=np.float64),
+            y_raw=np.zeros((0,), dtype=np.float64),
+            y_clipped=np.zeros((0,), dtype=np.float64),
+            weight=np.zeros((0,), dtype=np.float64),
+            query_domains=np.zeros((0,), dtype=np.int64),
+            total_active_rows=0,
+            dropped_near_tie=0,
+            switch_rows=0,
+            keep_rows=0,
+            helpful_switch_rows=0,
+            harmful_switch_rows=0,
+            kept_by_domain={},
+        )
+    if x_rows.shape[0] % k != 0:
+        raise ProtocolError("All-pair delta gate feature rows are not divisible by candidate expert count")
+
+    true = np.asarray(true_nelbo_matrix, dtype=np.float64)
+    gap_matrix = _oracle_gap_pct_matrix(true)
+    ranks = _rank_positions_from_orders(orders)
+    samples = (
+        np.asarray(sample_ids, dtype=np.int64).reshape(-1)
+        if sample_ids is not None
+        else np.arange(win.shape[0], dtype=np.int64)
+    )
+    if samples.shape[0] != win.shape[0]:
+        samples = np.arange(win.shape[0], dtype=np.int64)
+
+    features: List[np.ndarray] = []
+    raw_targets: List[float] = []
+    clipped_targets: List[float] = []
+    weights: List[float] = []
+    domains: List[int] = []
+    kept_by_domain: Dict[int, int] = {}
+    query_keys: set[Tuple[int, int]] = set()
+    top2_events: set[Tuple[int, int, int, int]] = set()
+    low_clip, high_clip = float(target_clip_delta_pct[0]), float(target_clip_delta_pct[1])
+    helpful_pairs = 0
+    harmful_pairs = 0
+    total_active = 0
+    dropped = 0
+    switch_rows = 0
+    keep_rows = 0
+    helpful_top2 = 0
+    harmful_top2 = 0
+
+    for row_idx in range(win.shape[0]):
+        domain = int(query_domains[row_idx])
+        sample_id = int(samples[row_idx])
+        query_keys.add((domain, sample_id))
+        top1 = int(orders[row_idx, 0])
+        top2 = int(orders[row_idx, 1])
+        top2_delta = float(gap_matrix[row_idx, top2] - gap_matrix[row_idx, top1])
+        if float(margins[row_idx]) <= float(margin_threshold):
+            total_active += 1
+            top2_events.add(
+                (
+                    domain,
+                    sample_id,
+                    int(expert_domains[top1]),
+                    int(expert_domains[top2]),
+                )
+            )
+            if top2_delta < -float(near_tie_delta_pct):
+                switch_rows += 1
+                helpful_top2 += 1
+            elif top2_delta > float(near_tie_delta_pct):
+                keep_rows += 1
+                harmful_top2 += 1
+            else:
+                dropped += 1
+        base = int(row_idx * k)
+        for left in range(k):
+            for right in range(left + 1, k):
+                if int(ranks[row_idx, left]) <= int(ranks[row_idx, right]):
+                    a, b = int(left), int(right)
+                else:
+                    a, b = int(right), int(left)
+                raw_delta = float(gap_matrix[row_idx, b] - gap_matrix[row_idx, a])
+                if raw_delta < -float(near_tie_delta_pct):
+                    helpful_pairs += 1
+                elif raw_delta > float(near_tie_delta_pct):
+                    harmful_pairs += 1
+                features.append(
+                    _allpair_delta_feature(
+                        np.asarray(x_rows[base + a], dtype=np.float64),
+                        np.asarray(x_rows[base + b], dtype=np.float64),
+                        embedding_dim=int(embedding_dim),
+                        expert_feature_dim=int(expert_feature_dim),
+                        win_a=float(win[row_idx, a]),
+                        win_b=float(win[row_idx, b]),
+                        p_a_beats_b=float(prob_matrix[row_idx, a, b]),
+                        p_b_beats_a=float(prob_matrix[row_idx, b, a]),
+                        pairprob_margin=float(win[row_idx, a] - win[row_idx, b]),
+                        rank_a=int(ranks[row_idx, a]),
+                        rank_b=int(ranks[row_idx, b]),
+                    )
+                )
+                raw_targets.append(float(raw_delta))
+                clipped_targets.append(float(np.clip(raw_delta, low_clip, high_clip)))
+                weights.append(1.0)
+                domains.append(domain)
+                kept_by_domain[domain] = int(kept_by_domain.get(domain, 0)) + 1
+
+    return Top2DeltaGateTrainingData(
+        x=np.vstack(features).astype(np.float64, copy=False) if features else np.zeros((0, 0), dtype=np.float64),
+        y_raw=np.asarray(raw_targets, dtype=np.float64),
+        y_clipped=np.asarray(clipped_targets, dtype=np.float64),
+        weight=np.asarray(weights, dtype=np.float64),
+        query_domains=np.asarray(domains, dtype=np.int64),
+        total_active_rows=int(total_active),
+        dropped_near_tie=int(dropped),
+        switch_rows=int(switch_rows),
+        keep_rows=int(keep_rows),
+        helpful_switch_rows=int(helpful_top2),
+        harmful_switch_rows=int(harmful_top2),
+        kept_by_domain=kept_by_domain,
+        unique_queries=int(len(query_keys)),
+        unique_query_domains=int(len(set(int(v) for v in query_domains.tolist()))),
+        unique_base_top2_events=int(len(top2_events)),
+        helpful_pair_rows=int(helpful_pairs),
+        harmful_pair_rows=int(harmful_pairs),
     )
 
 
@@ -1719,6 +1971,177 @@ def build_group_oof_top2_delta_gate_training_data(
         helpful_switch_rows=merged.helpful_switch_rows,
         harmful_switch_rows=merged.harmful_switch_rows,
         kept_by_domain=merged.kept_by_domain,
+        group_oof_grouping_level="sample",
+        group_oof_unique_groups=len(unique_samples),
+        group_oof_min_groups_per_fold=int(min_groups_per_fold or 0),
+        group_oof_folds_used=int(folds_used),
+        group_oof_train_domains_per_fold_min=int(min_train_domains or 0),
+        group_oof_candidate_experts_per_fold_min=int(min_candidate_experts or 0),
+        group_oof_same_group_leakage_rate=0.0,
+        diagnostic_reason=str(final_reason or merged.diagnostic_reason),
+    )
+
+
+def build_group_oof_allpair_delta_gate_training_data(
+    *,
+    x_rows: np.ndarray,
+    q_rows: np.ndarray,
+    e_rows: np.ndarray,
+    s_rows: np.ndarray,
+    y_rows: np.ndarray,
+    feature_set: str,
+    ridge_l2: float,
+    pairprob_cfg: PairprobTournamentConfig,
+    delta_cfg: AllPairDeltaGateConfig,
+    embedding_dim: int,
+    expert_feature_dim: int,
+    margin_threshold: float,
+    device: str,
+) -> Top2DeltaGateTrainingData:
+    s_arr = np.asarray(s_rows, dtype=np.int64)
+    q_arr = np.asarray(q_rows, dtype=np.int64)
+    e_arr = np.asarray(e_rows, dtype=np.int64)
+    y_arr = np.asarray(y_rows, dtype=np.float64)
+    unique_samples = sorted(set(int(v) for v in s_arr.tolist()))
+    empty = Top2DeltaGateTrainingData(
+        x=np.zeros((0, 0), dtype=np.float64),
+        y_raw=np.zeros((0,), dtype=np.float64),
+        y_clipped=np.zeros((0,), dtype=np.float64),
+        weight=np.zeros((0,), dtype=np.float64),
+        query_domains=np.zeros((0,), dtype=np.int64),
+        total_active_rows=0,
+        dropped_near_tie=0,
+        switch_rows=0,
+        keep_rows=0,
+        helpful_switch_rows=0,
+        harmful_switch_rows=0,
+        kept_by_domain={},
+        group_oof_grouping_level="sample",
+        group_oof_unique_groups=len(unique_samples),
+    )
+    if len(unique_samples) < int(delta_cfg.group_oof_folds):
+        return replace(empty, diagnostic_reason="insufficient_group_oof_groups")
+    if _candidate_experts_per_sample_min(s_arr, e_arr) < int(delta_cfg.min_group_oof_candidate_experts_per_fold):
+        return replace(empty, diagnostic_reason="insufficient_group_oof_candidate_experts")
+
+    fold_by_sample = _group_oof_fold_ids(unique_samples, int(delta_cfg.group_oof_folds))
+    parts: List[Top2DeltaGateTrainingData] = []
+    folds_used = 0
+    min_groups_per_fold: int | None = None
+    min_train_domains: int | None = None
+    min_candidate_experts: int | None = None
+    reason = ""
+    for fold_id in range(int(delta_cfg.group_oof_folds)):
+        heldout_samples = {sample for sample, fid in fold_by_sample.items() if int(fid) == int(fold_id)}
+        if not heldout_samples:
+            continue
+        heldout_mask = np.asarray([int(v) in heldout_samples for v in s_arr.tolist()], dtype=bool)
+        train_mask = ~heldout_mask
+        train_domains = sorted(set(int(v) for v in q_arr[train_mask].tolist()))
+        train_candidate_min = _candidate_experts_per_sample_min(s_arr[train_mask], e_arr[train_mask])
+        min_groups_per_fold = (
+            len(heldout_samples)
+            if min_groups_per_fold is None
+            else min(min_groups_per_fold, len(heldout_samples))
+        )
+        min_train_domains = len(train_domains) if min_train_domains is None else min(min_train_domains, len(train_domains))
+        min_candidate_experts = (
+            train_candidate_min if min_candidate_experts is None else min(min_candidate_experts, train_candidate_min)
+        )
+        if len(train_domains) < int(delta_cfg.min_group_oof_train_domains_per_fold):
+            reason = reason or "insufficient_group_oof_train_domains"
+            continue
+        if train_candidate_min < int(delta_cfg.min_group_oof_candidate_experts_per_fold):
+            reason = reason or "insufficient_group_oof_candidate_experts"
+            continue
+        train_data = build_pairprob_training_data(
+            x_rows=x_rows[train_mask],
+            q_rows=q_arr[train_mask],
+            e_rows=e_arr[train_mask],
+            s_rows=s_arr[train_mask],
+            y_rows=y_arr[train_mask],
+            embedding_dim=int(embedding_dim),
+            expert_feature_dim=int(expert_feature_dim),
+            feature_set=str(feature_set),
+            near_tie_delta_pct=float(pairprob_cfg.near_tie_delta_pct),
+            margin_weight_scale_pct=float(pairprob_cfg.margin_weight_scale_pct),
+            margin_weight_clip=pairprob_cfg.margin_weight_clip,
+        )
+        if train_data.x.shape[0] <= 0:
+            reason = reason or "insufficient_group_oof_pairprob_geometry"
+            continue
+        try:
+            bundle = fit_pairprob_model(
+                train_data=train_data,
+                feature_set=str(feature_set),
+                ridge_l2=float(ridge_l2),
+                device=str(device),
+            )
+        except (ProtocolError, ValueError):
+            reason = reason or "insufficient_group_oof_pairprob_geometry"
+            continue
+        folds_used += 1
+        for query_domain in sorted(set(int(v) for v in q_arr[heldout_mask].tolist())):
+            heldout_q_mask = heldout_mask & (q_arr == int(query_domain))
+            candidate_domains = tuple(sorted(set(int(v) for v in e_arr[heldout_q_mask].tolist())))
+            k = len(candidate_domains)
+            if k < int(delta_cfg.min_group_oof_candidate_experts_per_fold) or int(np.sum(heldout_q_mask)) % k != 0:
+                reason = reason or "insufficient_group_oof_candidate_experts"
+                continue
+            try:
+                prob = pairprob_probability_matrix(
+                    bundle=bundle,
+                    x_rows=x_rows[heldout_q_mask],
+                    expert_domains=candidate_domains,
+                    embedding_dim=int(embedding_dim),
+                    expert_feature_dim=int(expert_feature_dim),
+                )
+            except (ProtocolError, ValueError):
+                reason = reason or "insufficient_group_oof_pairprob_geometry"
+                continue
+            y_matrix = y_arr[heldout_q_mask].reshape(-1, k)
+            s_matrix = s_arr[heldout_q_mask].reshape(-1, k)
+            part = build_allpair_delta_gate_training_data_from_predictions(
+                x_rows=x_rows[heldout_q_mask],
+                query_domains=np.full((y_matrix.shape[0],), int(query_domain), dtype=np.int64),
+                expert_domains=candidate_domains,
+                prob_matrix=prob,
+                true_nelbo_matrix=y_matrix,
+                embedding_dim=int(embedding_dim),
+                expert_feature_dim=int(expert_feature_dim),
+                margin_threshold=float(margin_threshold),
+                near_tie_delta_pct=float(delta_cfg.near_tie_delta_pct),
+                target_clip_delta_pct=delta_cfg.target_clip_delta_pct,
+                sample_ids=s_matrix[:, 0],
+            )
+            parts.append(part)
+
+    merged = _concat_top2_delta_gate_training_data(parts)
+    final_reason = reason
+    if folds_used < int(delta_cfg.group_oof_folds):
+        final_reason = final_reason or "insufficient_group_oof_groups"
+    if (min_train_domains or 0) < int(delta_cfg.min_group_oof_train_domains_per_fold):
+        final_reason = final_reason or "insufficient_group_oof_train_domains"
+    if (min_candidate_experts or 0) < int(delta_cfg.min_group_oof_candidate_experts_per_fold):
+        final_reason = final_reason or "insufficient_group_oof_candidate_experts"
+    return Top2DeltaGateTrainingData(
+        x=merged.x,
+        y_raw=merged.y_raw,
+        y_clipped=merged.y_clipped,
+        weight=merged.weight,
+        query_domains=merged.query_domains,
+        total_active_rows=merged.total_active_rows,
+        dropped_near_tie=merged.dropped_near_tie,
+        switch_rows=merged.switch_rows,
+        keep_rows=merged.keep_rows,
+        helpful_switch_rows=merged.helpful_switch_rows,
+        harmful_switch_rows=merged.harmful_switch_rows,
+        kept_by_domain=merged.kept_by_domain,
+        unique_queries=merged.unique_queries,
+        unique_query_domains=merged.unique_query_domains,
+        unique_base_top2_events=merged.unique_base_top2_events,
+        helpful_pair_rows=merged.helpful_pair_rows,
+        harmful_pair_rows=merged.harmful_pair_rows,
         group_oof_grouping_level="sample",
         group_oof_unique_groups=len(unique_samples),
         group_oof_min_groups_per_fold=int(min_groups_per_fold or 0),
@@ -3911,6 +4334,8 @@ def top2_delta_gate_route_rows(
         oracle_domain = int(expert_domains[int(oracle_idx[i])])
         top1_domain = int(expert_domains[int(top1_idx[i])])
         top2_domain = int(expert_domains[int(top2_idx[i])])
+        direct_top1_hit = int(top1_domain == oracle_domain)
+        selected_top1_hit = int(int(expert_domains[int(selected_idx[i])]) == oracle_domain)
         pair_diag = _pair_diagnostics_for_row(prob_matrix[i, :, :], true_nelbo_matrix[i, :])
         row.update(
             {
@@ -3994,6 +4419,246 @@ def top2_delta_gate_route_rows(
                 ),
                 "paired_gap_delta_vs_pairprob_hard": float(paired_delta),
                 "paired_gap_delta_vs_metadata": float(paired_delta_metadata),
+                "pairprob_hard_oracle_gap_pct": float(direct_gap[i]),
+                "metadata_oracle_gap_pct": float(metadata_gap[i]),
+                "absolute_high_regret_gap_gt_5": int(float(row["oracle_gap_pct"]) > float(cfg.absolute_high_regret_gap_pct)),
+                "relative_catastrophic_regression_vs_pairprob_hard_gt_5": int(
+                    float(paired_delta) > float(cfg.catastrophic_regression_vs_direct_gap_pct)
+                ),
+                "diagnostic_only_reason": str(reason),
+                **pair_diag,
+            }
+        )
+        if reason:
+            row.update({"method_role": "diagnostic", "adoption_eligible": 0, "diagnostic_only": 1})
+    return rows
+
+
+def _allpair_delta_features_for_top2_rows(
+    *,
+    x_rows: np.ndarray,
+    expert_domains: Sequence[int],
+    prob_matrix: np.ndarray,
+    embedding_dim: int,
+    expert_feature_dim: int,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    win, orders, margins = pairprob_order_and_margin(prob_matrix, expert_domains=expert_domains)
+    k = int(win.shape[1])
+    if x_rows.shape[0] % k != 0:
+        raise ProtocolError("All-pair delta gate feature rows are not divisible by candidate expert count")
+    ranks = _rank_positions_from_orders(orders)
+    features: List[np.ndarray] = []
+    top1 = orders[:, 0].astype(np.int64, copy=False)
+    top2 = orders[:, 1].astype(np.int64, copy=False) if k > 1 else orders[:, 0].astype(np.int64, copy=False)
+    for row_idx in range(win.shape[0]):
+        a = int(top1[row_idx])
+        b = int(top2[row_idx])
+        base = int(row_idx * k)
+        features.append(
+            _allpair_delta_feature(
+                np.asarray(x_rows[base + a], dtype=np.float64),
+                np.asarray(x_rows[base + b], dtype=np.float64),
+                embedding_dim=int(embedding_dim),
+                expert_feature_dim=int(expert_feature_dim),
+                win_a=float(win[row_idx, a]),
+                win_b=float(win[row_idx, b]),
+                p_a_beats_b=float(prob_matrix[row_idx, a, b]) if k > 1 else 0.5,
+                p_b_beats_a=float(prob_matrix[row_idx, b, a]) if k > 1 else 0.5,
+                pairprob_margin=float(win[row_idx, a] - win[row_idx, b]),
+                rank_a=int(ranks[row_idx, a]),
+                rank_b=int(ranks[row_idx, b]),
+            )
+        )
+    return (
+        np.vstack(features).astype(np.float64, copy=False) if features else np.zeros((0, 0), dtype=np.float64),
+        win,
+        orders,
+        margins,
+        top1,
+        top2,
+    )
+
+
+def allpair_delta_gate_route_rows(
+    *,
+    method: str,
+    fold: FoldCandidateSet,
+    query_domains: np.ndarray,
+    expert_domains: Sequence[int],
+    x_rows: np.ndarray,
+    prob_matrix: np.ndarray,
+    true_nelbo_matrix: np.ndarray,
+    global_true_nelbo_matrix: np.ndarray,
+    global_expert_domains: Sequence[int],
+    policy_name: str,
+    selection: Top2DeltaGateSelection,
+    delta_bundle: Top2DeltaGateModelBundle | None,
+    pairprob_direct_gap_pct: np.ndarray,
+    metadata_oracle_gap_pct: np.ndarray | None,
+    embedding_dim: int,
+    expert_feature_dim: int,
+    cfg: AllPairDeltaGateConfig,
+    oracle_diagnostic: bool = False,
+) -> List[Dict[str, Any]]:
+    features, win, _orders, margins, top1_idx, top2_idx = _allpair_delta_features_for_top2_rows(
+        x_rows=x_rows,
+        expert_domains=expert_domains,
+        prob_matrix=prob_matrix,
+        embedding_dim=int(embedding_dim),
+        expert_feature_dim=int(expert_feature_dim),
+    )
+    n = int(win.shape[0])
+    direct_gap = np.asarray(pairprob_direct_gap_pct, dtype=np.float64)
+    if direct_gap.shape[0] != n:
+        direct_gap = _gap_pct_for_selected(true_nelbo_matrix, top1_idx)
+    metadata_gap = (
+        np.asarray(metadata_oracle_gap_pct, dtype=np.float64)
+        if metadata_oracle_gap_pct is not None
+        else np.full((n,), float("nan"), dtype=np.float64)
+    )
+    if metadata_gap.shape[0] != n:
+        metadata_gap = np.full((n,), float("nan"), dtype=np.float64)
+    gap_matrix = _oracle_gap_pct_matrix(true_nelbo_matrix)
+    top2_delta = gap_matrix[np.arange(n), top2_idx] - gap_matrix[np.arange(n), top1_idx]
+    active = margins <= (float(selection.margin_threshold) + 1e-12)
+    if bool(selection.noop) and not bool(oracle_diagnostic):
+        active = np.zeros_like(active, dtype=bool)
+    if delta_bundle is not None and not bool(selection.noop):
+        pred_delta = _apply_top2_delta_gate_model(delta_bundle, features)
+    else:
+        pred_delta = np.full((n,), float("inf"), dtype=np.float64)
+    if pred_delta.shape[0] != n:
+        pred_delta = np.full((n,), float("inf"), dtype=np.float64)
+    switched = active & (top2_delta < 0.0) if bool(oracle_diagnostic) else active & (pred_delta <= float(selection.predicted_delta_threshold))
+    selected_idx = np.where(switched, top2_idx, top1_idx).astype(np.int64, copy=False)
+    ranking_score = -win
+    _metrics, rows = _selection_metrics(
+        method=method,
+        query_domains=query_domains,
+        expert_domains=expert_domains,
+        score_matrix=ranking_score,
+        true_nelbo_matrix=true_nelbo_matrix,
+        fold=fold,
+        global_true_nelbo_matrix=global_true_nelbo_matrix,
+        global_expert_domains=global_expert_domains,
+        selected_idx_override=selected_idx,
+        ranking_score_matrix=ranking_score,
+    )
+    reason = str(selection.diagnostic_only_reason)
+    if bool(oracle_diagnostic):
+        reason = str(selection.oracle_method)
+    oracle_idx = _stable_true_oracle_indices(true_nelbo_matrix)
+    for i, row in enumerate(rows):
+        paired_delta = float(row["oracle_gap_pct"]) - float(direct_gap[i])
+        paired_delta_metadata = (
+            float(row["oracle_gap_pct"]) - float(metadata_gap[i])
+            if np.isfinite(float(metadata_gap[i]))
+            else float("nan")
+        )
+        oracle_domain = int(expert_domains[int(oracle_idx[i])])
+        top1_domain = int(expert_domains[int(top1_idx[i])])
+        top2_domain = int(expert_domains[int(top2_idx[i])])
+        direct_top1_hit = int(top1_domain == oracle_domain)
+        selected_top1_hit = int(int(expert_domains[int(selected_idx[i])]) == oracle_domain)
+        pair_diag = _pair_diagnostics_for_row(prob_matrix[i, :, :], true_nelbo_matrix[i, :])
+        row.update(
+            {
+                "policy_name": str(policy_name),
+                "base_method": str(selection.base_method),
+                "feature_set": str(selection.feature_set),
+                "selected_tau": float(selection.base_ridge_l2),
+                "selected_by_inner_validation": int(bool(selection.selected_by_inner_validation)),
+                "threshold_selection_policy": str(cfg.calibration_policy),
+                "route_experts": str(int(expert_domains[int(selected_idx[i])])),
+                "route_weights": "1",
+                "route_size": 1,
+                "route_mode": "oracle_allpair_top2_delta_gate_diagnostic" if oracle_diagnostic else "allpair_delta_gate",
+                "pairprob_predictor": "logistic_ridge_pairprob",
+                "pairprob_probability_calibration": "none_v1",
+                "pairprob_ridge_l2": float(selection.base_ridge_l2),
+                "pairprob_feature_set": str(selection.base_feature_set),
+                "pairprob_selection_policy": str(cfg.calibration_policy),
+                "adoption_feature_family": DIRECT_PAIRPROB_ADOPTION_FEATURE_FAMILY if not oracle_diagnostic else "",
+                "base_direct_selected_expert": int(top1_domain),
+                "base_direct_top2_expert": int(top2_domain),
+                "base_direct_top1_win": float(win[i, int(top1_idx[i])]),
+                "base_direct_top2_win": float(win[i, int(top2_idx[i])]),
+                "base_direct_top2_margin": float(margins[i]),
+                "allpair_delta_gate_active": int(bool(active[i])),
+                "allpair_delta_gate_switched": int(bool(switched[i])),
+                "allpair_delta_gate_predicted_delta_gap_pct": float(pred_delta[i]),
+                "allpair_delta_gate_true_delta_gap_pct_top2_vs_top1": float(top2_delta[i]),
+                "allpair_delta_gate_margin_threshold": float(selection.margin_threshold),
+                "allpair_delta_gate_predicted_delta_threshold": float(selection.predicted_delta_threshold),
+                "allpair_delta_gate_l2": float(selection.ridge_l2),
+                "allpair_delta_gate_delta_gap_pct_vs_direct": float(paired_delta),
+                "allpair_delta_gate_help": int(bool(switched[i]) and paired_delta < 0.0),
+                "allpair_delta_gate_harm": int(bool(switched[i]) and paired_delta > 0.0),
+                "allpair_delta_gate_oracle_is_top2": int(oracle_domain == top2_domain),
+                "allpair_delta_gate_oracle_in_top2": int(oracle_domain in {top1_domain, top2_domain}),
+                "allpair_delta_gate_guard_status": str(selection.guard_status),
+                "allpair_delta_gate_diagnostic_only_reason": str(reason),
+                "selected_margin_threshold": float(selection.margin_threshold),
+                "selected_predicted_delta_threshold": float(selection.predicted_delta_threshold),
+                "selected_l2": float(selection.ridge_l2),
+                "selected_guard_status": str(selection.guard_status),
+                "selected_reason": str(selection.selected_reason or reason),
+                "source_inner_selected_config_mean_gap": float(selection.source_inner_mean_oracle_gap_pct),
+                "source_inner_selected_config_high_regret_rate": float(selection.source_inner_high_regret_rate),
+                "source_inner_selected_config_top1_delta_vs_direct": float(
+                    selection.source_inner_top1_delta_vs_direct
+                ),
+                "source_inner_selected_config_spearman_delta_vs_direct": float(
+                    selection.source_inner_spearman_delta_vs_direct
+                ),
+                "source_inner_top2_candidate_rows": int(selection.source_inner_top2_candidate_rows),
+                "source_inner_top2_switch_rows": int(selection.source_inner_switch_rows),
+                "source_inner_top2_help_rate_changed_only": float(selection.source_inner_help_rate_changed_only),
+                "source_inner_top2_harm_rate_changed_only": float(selection.source_inner_harm_rate_changed_only),
+                "source_inner_top2_mean_delta_vs_direct": float(selection.source_inner_gap_reduction_abs_pct_points),
+                "source_inner_top2_high_regret_delta_vs_direct": float(selection.source_inner_high_regret_reduction),
+                "source_inner_top2_top1_delta_vs_direct": float(selection.source_inner_top1_delta_vs_direct),
+                "source_inner_top2_spearman_delta_vs_direct": float(
+                    selection.source_inner_spearman_delta_vs_direct
+                ),
+                "source_inner_allpair_delta_rows": int(selection.source_inner_delta_rows),
+                "source_inner_allpair_unique_queries": int(selection.source_inner_unique_queries),
+                "source_inner_allpair_unique_query_domains": int(selection.source_inner_unique_query_domains),
+                "source_inner_allpair_unique_base_top2_events": int(selection.source_inner_unique_base_top2_events),
+                "source_inner_allpair_helpful_pair_rows": int(selection.source_inner_helpful_pair_rows),
+                "source_inner_allpair_harmful_pair_rows": int(selection.source_inner_harmful_pair_rows),
+                "allpair_delta_spearman_pred_vs_true_source_inner": float(
+                    selection.delta_gate_spearman_pred_vs_true_source_inner
+                ),
+                "allpair_delta_auc_switch_help_source_inner": float(
+                    selection.delta_gate_auc_switch_help_source_inner
+                ),
+                "allpair_delta_mae_source_inner": float(selection.delta_gate_mae_source_inner),
+                "low_margin_high_regret_enrichment": float(selection.low_margin_high_regret_enrichment),
+                "group_oof_grouping_level": str(selection.group_oof_grouping_level),
+                "group_oof_unique_groups": int(selection.group_oof_unique_groups),
+                "group_oof_min_groups_per_fold": int(selection.group_oof_min_groups_per_fold),
+                "group_oof_same_group_leakage_rate": float(selection.group_oof_same_group_leakage_rate),
+                "active_low_margin_oracle_is_top2_rate": float(selection.active_low_margin_oracle_is_top2_rate),
+                "active_low_margin_oracle_in_top2_rate": float(selection.active_low_margin_oracle_in_top2_rate),
+                "active_low_margin_high_regret_oracle_is_top2_rate": float(
+                    selection.active_low_margin_high_regret_oracle_is_top2_rate
+                ),
+                "oracle_top2_recoverable_error_rate": float(selection.oracle_top2_recoverable_error_rate),
+                "oracle_top2_recoverable_gap_mass_pct_points": float(
+                    selection.oracle_top2_recoverable_gap_mass_pct_points
+                ),
+                "paired_gap_delta_vs_pairprob_hard": float(paired_delta),
+                "paired_gap_delta_vs_metadata": float(paired_delta_metadata),
+                "heldout_mean_gap_delta_vs_direct": float(paired_delta),
+                "heldout_high_regret_delta_vs_direct": float(
+                    int(float(row["oracle_gap_pct"]) > float(cfg.absolute_high_regret_gap_pct))
+                    - int(float(direct_gap[i]) > float(cfg.absolute_high_regret_gap_pct))
+                ),
+                "heldout_top1_delta_vs_direct": float(selected_top1_hit - direct_top1_hit),
+                "heldout_spearman_delta_vs_direct": 0.0,
+                "heldout_mean_gap_delta_vs_metadata": float(paired_delta_metadata),
+                "heldout_high_regret_delta_vs_metadata": float("nan"),
                 "pairprob_hard_oracle_gap_pct": float(direct_gap[i]),
                 "metadata_oracle_gap_pct": float(metadata_gap[i]),
                 "absolute_high_regret_gap_gt_5": int(float(row["oracle_gap_pct"]) > float(cfg.absolute_high_regret_gap_pct)),
@@ -4117,6 +4782,123 @@ def summarize_top2_delta_gate_rows(rows: Sequence[Mapping[str, Any]]) -> Dict[st
         "low_margin_active_high_regret_rate": float(active_high),
         "direct_mean_oracle_gap_pct": float(np.mean(direct_gaps)) if direct_gaps else float("nan"),
         "direct_high_regret_rate": float(overall_high),
+    }
+
+
+def summarize_allpair_delta_gate_rows(rows: Sequence[Mapping[str, Any]]) -> Dict[str, float]:
+    if not rows:
+        return {
+            "n_rows": 0.0,
+            "validation_domains": 0.0,
+            "mean_oracle_gap_pct": float("nan"),
+            "high_regret_rate": float("nan"),
+            "top1_oracle_hit": float("nan"),
+            "spearman": float("nan"),
+            "allpair_delta_gate_activation_rate": float("nan"),
+            "allpair_delta_gate_switch_rate": float("nan"),
+            "allpair_delta_gate_help_rate_changed_only": float("nan"),
+            "allpair_delta_gate_harm_rate_changed_only": float("nan"),
+            "mean_allpair_delta_gate_delta_gap_pct_vs_direct": float("nan"),
+            "low_margin_high_regret_enrichment": float("nan"),
+            "active_low_margin_oracle_is_top2_rate": float("nan"),
+            "active_low_margin_oracle_in_top2_rate": float("nan"),
+            "active_low_margin_high_regret_oracle_is_top2_rate": float("nan"),
+            "oracle_top2_recoverable_error_rate": float("nan"),
+            "oracle_top2_recoverable_gap_mass_pct_points": float("nan"),
+            "direct_mean_oracle_gap_pct": float("nan"),
+            "direct_high_regret_rate": float("nan"),
+            "direct_top1_oracle_hit": float("nan"),
+            "direct_spearman": float("nan"),
+        }
+    by_domain: Dict[int, List[Mapping[str, Any]]] = {}
+    for row in rows:
+        by_domain.setdefault(int(row["query_domain"]), []).append(row)
+    active_rows = [r for r in rows if int(float(r.get("allpair_delta_gate_active", 0) or 0)) == 1]
+    switched_rows = [r for r in rows if int(float(r.get("allpair_delta_gate_switched", 0) or 0)) == 1]
+    deltas = [float(r.get("allpair_delta_gate_delta_gap_pct_vs_direct", float("nan"))) for r in rows]
+    switched_deltas = [
+        float(r.get("allpair_delta_gate_delta_gap_pct_vs_direct", float("nan"))) for r in switched_rows
+    ]
+    pred = [float(r.get("allpair_delta_gate_predicted_delta_gap_pct", float("nan"))) for r in active_rows]
+    true_delta = [
+        float(r.get("allpair_delta_gate_true_delta_gap_pct_top2_vs_top1", float("nan"))) for r in active_rows
+    ]
+    help_labels = [1 if float(v) < 0.0 else 0 for v in true_delta]
+    direct_gaps = [float(r.get("pairprob_hard_oracle_gap_pct", float("nan"))) for r in rows]
+    direct_high = [
+        1.0 if float(r.get("pairprob_hard_oracle_gap_pct", 0.0) or 0.0) > 5.0 else 0.0
+        for r in rows
+    ]
+    high_regret_rate = float(np.mean([float(r.get("absolute_high_regret_gap_gt_5", 0.0)) for r in rows]))
+    overall_high = float(np.mean(direct_high)) if direct_high else float("nan")
+    active_high = float(
+        np.mean(
+            [
+                1.0 if float(r.get("pairprob_hard_oracle_gap_pct", 0.0) or 0.0) > 5.0 else 0.0
+                for r in active_rows
+            ]
+        )
+    ) if active_rows else float("nan")
+    low_high_rows = [
+        r for r in active_rows if float(r.get("pairprob_hard_oracle_gap_pct", 0.0) or 0.0) > 5.0
+    ]
+    spearman_vals = [float(r["spearman"]) for r in rows if np.isfinite(float(r["spearman"]))]
+    direct_top1 = [
+        1.0 if int(r.get("base_direct_selected_expert", -1)) == int(r.get("oracle_expert", -2)) else 0.0
+        for r in rows
+    ]
+    return {
+        "n_rows": float(len(rows)),
+        "validation_domains": float(len(by_domain)),
+        "mean_oracle_gap_pct": float(np.mean([float(r["oracle_gap_pct"]) for r in rows])),
+        "high_regret_rate": float(high_regret_rate),
+        "top1_oracle_hit": float(np.mean([float(r["top1_oracle_hit"]) for r in rows])),
+        "spearman": float(np.mean(spearman_vals)) if spearman_vals else float("nan"),
+        "allpair_delta_gate_activation_rate": float(
+            np.mean([float(r.get("allpair_delta_gate_active", 0.0)) for r in rows])
+        ),
+        "allpair_delta_gate_switch_rate": float(
+            np.mean([float(r.get("allpair_delta_gate_switched", 0.0)) for r in rows])
+        ),
+        "allpair_delta_gate_help_rate_changed_only": float(
+            np.mean([float(r.get("allpair_delta_gate_help", 0.0)) for r in switched_rows])
+        ) if switched_rows else float("nan"),
+        "allpair_delta_gate_harm_rate_changed_only": float(
+            np.mean([float(r.get("allpair_delta_gate_harm", 0.0)) for r in switched_rows])
+        ) if switched_rows else float("nan"),
+        "mean_allpair_delta_gate_delta_gap_pct_vs_direct": float(np.mean(deltas)) if deltas else float("nan"),
+        "median_allpair_delta_gate_delta_gap_pct_vs_direct": float(np.median(deltas)) if deltas else float("nan"),
+        "paired_improvement_rate_vs_direct_pairprob": float(
+            np.mean([1.0 if float(v) < 0.0 else 0.0 for v in deltas])
+        ) if deltas else float("nan"),
+        "mean_switch_delta_gap_pct_vs_direct": float(np.mean(switched_deltas)) if switched_deltas else float("nan"),
+        "low_margin_high_regret_enrichment": (
+            float(active_high / overall_high) if np.isfinite(active_high) and overall_high > 0.0 else float("nan")
+        ),
+        "allpair_delta_spearman_pred_vs_true_source_inner": _finite_spearman(pred, true_delta),
+        "allpair_delta_auc_switch_help_source_inner": _binary_auc([-float(v) for v in pred], help_labels),
+        "allpair_delta_mae_source_inner": float(
+            np.mean([abs(float(p) - float(t)) for p, t in zip(pred, true_delta) if np.isfinite(float(p)) and np.isfinite(float(t))])
+        ) if pred else float("nan"),
+        "active_low_margin_oracle_is_top2_rate": float(
+            np.mean([float(r.get("allpair_delta_gate_oracle_is_top2", 0.0)) for r in active_rows])
+        ) if active_rows else float("nan"),
+        "active_low_margin_oracle_in_top2_rate": float(
+            np.mean([float(r.get("allpair_delta_gate_oracle_in_top2", 0.0)) for r in active_rows])
+        ) if active_rows else float("nan"),
+        "active_low_margin_high_regret_oracle_is_top2_rate": float(
+            np.mean([float(r.get("allpair_delta_gate_oracle_is_top2", 0.0)) for r in low_high_rows])
+        ) if low_high_rows else float("nan"),
+        "oracle_top2_recoverable_error_rate": float(
+            np.mean([1.0 if float(r.get("allpair_delta_gate_true_delta_gap_pct_top2_vs_top1", 0.0)) < 0.0 else 0.0 for r in active_rows])
+        ) if active_rows else float("nan"),
+        "oracle_top2_recoverable_gap_mass_pct_points": float(
+            np.mean([max(0.0, -float(r.get("allpair_delta_gate_true_delta_gap_pct_top2_vs_top1", 0.0))) for r in active_rows])
+        ) if active_rows else float("nan"),
+        "direct_mean_oracle_gap_pct": float(np.mean(direct_gaps)) if direct_gaps else float("nan"),
+        "direct_high_regret_rate": float(overall_high),
+        "direct_top1_oracle_hit": float(np.mean(direct_top1)) if direct_top1 else float("nan"),
+        "direct_spearman": float(np.mean(spearman_vals)) if spearman_vals else float("nan"),
     }
 
 
@@ -4311,6 +5093,80 @@ def _top2_delta_reason_from_summary(
     if str(stability_status) == "unstable":
         return "unstable_source_inner_selection"
     if float(summary.get("mean_top2_delta_gate_delta_gap_pct_vs_direct", 0.0)) > 0.0:
+        return "worsens_direct_pairprob"
+    return ""
+
+
+def allpair_delta_gate_evidence_reason(
+    *,
+    train_data: Top2DeltaGateTrainingData,
+    validation_domains: int,
+    cfg: AllPairDeltaGateConfig,
+) -> str:
+    if str(train_data.diagnostic_reason):
+        return str(train_data.diagnostic_reason)
+    if int(train_data.x.shape[0]) < int(cfg.min_source_inner_delta_rows):
+        return "insufficient_source_inner_delta_rows"
+    if int(train_data.unique_queries) < int(cfg.min_source_inner_unique_queries):
+        return "insufficient_source_inner_unique_queries"
+    if int(train_data.unique_query_domains or validation_domains) < int(cfg.min_source_inner_unique_query_domains):
+        return "insufficient_source_inner_unique_query_domains"
+    if int(train_data.unique_base_top2_events) < int(cfg.min_source_inner_unique_base_top2_events):
+        return "insufficient_source_inner_unique_base_top2_events"
+    if int(train_data.helpful_pair_rows) < int(cfg.min_source_inner_helpful_pair_rows):
+        return "insufficient_source_inner_helpful_pair_rows"
+    if int(train_data.harmful_pair_rows) < int(cfg.min_source_inner_harmful_pair_rows):
+        return "insufficient_source_inner_harmful_pair_rows"
+    return ""
+
+
+def _allpair_delta_reason_from_summary(
+    *,
+    summary: Mapping[str, float],
+    train_data: Top2DeltaGateTrainingData,
+    cfg: AllPairDeltaGateConfig,
+    stability_status: str,
+) -> str:
+    evidence = allpair_delta_gate_evidence_reason(
+        train_data=train_data,
+        validation_domains=len(train_data.kept_by_domain),
+        cfg=cfg,
+    )
+    if evidence:
+        return evidence
+    top2_candidates = int(
+        round(float(summary.get("allpair_delta_gate_activation_rate", 0.0)) * float(summary.get("n_rows", 0.0)))
+    )
+    if top2_candidates < int(cfg.min_source_inner_top2_candidate_rows):
+        return "insufficient_source_inner_top2_candidate_rows"
+    if int(summary.get("source_inner_top2_switch_rows", 0.0)) < int(
+        cfg.min_source_inner_top2_switch_rows_for_diagnostic
+    ):
+        return "insufficient_source_inner_top2_switch_rows"
+    enrichment = float(summary.get("low_margin_high_regret_enrichment", float("nan")))
+    if not np.isfinite(enrichment) or enrichment < float(cfg.min_low_margin_high_regret_enrichment):
+        return "low_margin_not_high_regret_enriched"
+    if float(summary.get("allpair_delta_gate_activation_rate", 0.0)) > float(cfg.max_activation_rate):
+        return "activation_rate_too_high"
+    if float(summary.get("allpair_delta_gate_switch_rate", 0.0)) > float(cfg.max_switch_rate):
+        return "switch_rate_too_high"
+    harm_rate = float(summary.get("allpair_delta_gate_harm_rate_changed_only", float("nan")))
+    if np.isfinite(harm_rate) and harm_rate > float(cfg.max_source_inner_top2_harm_rate_changed_only):
+        return "harm_rate_too_high"
+    help_rate = float(summary.get("allpair_delta_gate_help_rate_changed_only", float("nan")))
+    if not np.isfinite(help_rate) or help_rate < float(cfg.min_source_inner_top2_help_rate_changed_only):
+        return "insufficient_switch_precision"
+    if float(summary.get("source_inner_top1_delta_vs_direct", 0.0)) < -float(cfg.metric_epsilon):
+        return "top1_drop"
+    if float(summary.get("source_inner_spearman_delta_vs_direct", 0.0)) < -float(cfg.metric_epsilon):
+        return "spearman_drop"
+    if float(summary.get("source_inner_gap_reduction_abs_pct_points", 0.0)) < float(
+        cfg.min_source_inner_gap_reduction_abs_pct_points_for_diagnostic
+    ):
+        return "insufficient_source_inner_gap_reduction"
+    if str(stability_status) == "unstable":
+        return "unstable_source_inner_selection"
+    if float(summary.get("mean_allpair_delta_gate_delta_gap_pct_vs_direct", 0.0)) > 0.0:
         return "worsens_direct_pairprob"
     return ""
 
@@ -5299,4 +6155,300 @@ def select_group_oof_hardpair_boost_policy(
         boosted_help_rate_changed_only=float(summary["boosted_help_rate_changed_only"]),
         boosted_harm_rate_changed_only=float(summary["boosted_harm_rate_changed_only"]),
         mean_paired_gap_delta_vs_direct_pairprob=float(summary["mean_paired_gap_delta_vs_direct_pairprob"]),
+    )
+
+
+def select_allpair_delta_gate_policy(
+    *,
+    blocks: Sequence[Top2DeltaGateCalibrationBlock],
+    base_selection: PairprobPolicySelection | None,
+    global_expert_domains: Sequence[int],
+    pairprob_cfg: PairprobTournamentConfig,
+    cfg: AllPairDeltaGateConfig,
+    embedding_dim: int,
+    expert_feature_dim: int,
+    device: str,
+) -> Top2DeltaGateSelection | None:
+    if not bool(cfg.enabled):
+        return None
+    if base_selection is None or not blocks:
+        return Top2DeltaGateSelection(
+            method=cfg.method_name,
+            oracle_method=cfg.oracle_diagnostic_method_name,
+            base_method=cfg.base_method,
+            feature_set=cfg.feature_set,
+            base_feature_set=cfg.base_feature_set,
+            base_ridge_l2=float("nan"),
+            ridge_l2=float(cfg.ridge_l2_values[0]),
+            margin_threshold=float(cfg.margin_thresholds[0]),
+            predicted_delta_threshold=float(cfg.predicted_delta_thresholds[0]),
+            selected_by_inner_validation=False,
+            diagnostic_only_reason="insufficient_source_inner_delta_rows",
+            noop=True,
+            guard_status="failed_guards_noop",
+            selection_stability_status="forced_direct_pairprob",
+            selected_reason="insufficient_source_inner_delta_rows",
+        )
+
+    source_domains = sorted({int(block.validation_domain) for block in blocks})
+    candidates: List[
+        Tuple[Tuple[float, ...], float, float, float, Dict[str, float], Top2DeltaGateTrainingData, str]
+    ] = []
+    invalid: List[
+        Tuple[Tuple[float, ...], float, float, float, Dict[str, float], Top2DeltaGateTrainingData, str]
+    ] = []
+    training_cache: Dict[Tuple[int, float, float], Top2DeltaGateTrainingData] = {}
+    for l2 in cfg.ridge_l2_values:
+        for threshold in cfg.margin_thresholds:
+            train_parts_all: List[Top2DeltaGateTrainingData] = []
+            for block_idx, block in enumerate(blocks):
+                train_data = build_group_oof_allpair_delta_gate_training_data(
+                    x_rows=block.train_x_rows,
+                    q_rows=block.train_q_rows,
+                    e_rows=block.train_e_rows,
+                    s_rows=block.train_s_rows,
+                    y_rows=block.train_y_rows,
+                    feature_set=str(cfg.base_feature_set),
+                    ridge_l2=float(base_selection.ridge_l2),
+                    pairprob_cfg=pairprob_cfg,
+                    delta_cfg=cfg,
+                    embedding_dim=int(embedding_dim),
+                    expert_feature_dim=int(expert_feature_dim),
+                    margin_threshold=float(threshold),
+                    device=str(device),
+                )
+                training_cache[(block_idx, float(l2), float(threshold))] = train_data
+                train_parts_all.append(train_data)
+            full_train_data = _concat_top2_delta_gate_training_data(train_parts_all)
+            for pred_threshold in cfg.predicted_delta_thresholds:
+                rows: List[Dict[str, Any]] = []
+                pred_all: List[float] = []
+                true_all: List[float] = []
+                for block_idx, block in enumerate(blocks):
+                    train_data = training_cache[(block_idx, float(l2), float(threshold))]
+                    reason = allpair_delta_gate_evidence_reason(
+                        train_data=train_data,
+                        validation_domains=int(len(train_data.kept_by_domain)),
+                        cfg=cfg,
+                    )
+                    bundle: Top2DeltaGateModelBundle | None = None
+                    if not reason:
+                        bundle = fit_allpair_delta_gate_model(train_data=train_data, ridge_l2=float(l2))
+                    validation_rows = allpair_delta_gate_route_rows(
+                        method=cfg.method_name,
+                        fold=block.fold,
+                        query_domains=block.query_domains,
+                        expert_domains=block.expert_domains,
+                        x_rows=block.x_rows,
+                        prob_matrix=block.direct_prob_matrix,
+                        true_nelbo_matrix=block.true_nelbo_matrix,
+                        global_true_nelbo_matrix=block.global_true_nelbo_matrix,
+                        global_expert_domains=global_expert_domains,
+                        policy_name=cfg.method_name,
+                        selection=Top2DeltaGateSelection(
+                            method=cfg.method_name,
+                            oracle_method=cfg.oracle_diagnostic_method_name,
+                            base_method=cfg.base_method,
+                            feature_set=cfg.feature_set,
+                            base_feature_set=cfg.base_feature_set,
+                            base_ridge_l2=base_selection.ridge_l2,
+                            ridge_l2=float(l2),
+                            margin_threshold=float(threshold),
+                            predicted_delta_threshold=float(pred_threshold),
+                            selected_by_inner_validation=True,
+                            diagnostic_only_reason=str(reason),
+                            noop=bool(reason),
+                            selected_reason=str(reason),
+                        ),
+                        delta_bundle=bundle,
+                        pairprob_direct_gap_pct=block.pairprob_direct_gap_pct,
+                        metadata_oracle_gap_pct=block.metadata_oracle_gap_pct,
+                        embedding_dim=int(embedding_dim),
+                        expert_feature_dim=int(expert_feature_dim),
+                        cfg=cfg,
+                    )
+                    rows.extend(validation_rows)
+                    for row in validation_rows:
+                        if int(float(row.get("allpair_delta_gate_active", 0) or 0)) == 1:
+                            pred_all.append(float(row.get("allpair_delta_gate_predicted_delta_gap_pct", float("nan"))))
+                            true_all.append(float(row.get("allpair_delta_gate_true_delta_gap_pct_top2_vs_top1", float("nan"))))
+
+                summary = summarize_allpair_delta_gate_rows(rows)
+                direct_mean_gap = float(summary.get("direct_mean_oracle_gap_pct", float("nan")))
+                direct_high = float(summary.get("direct_high_regret_rate", float("nan")))
+                direct_top1 = float(summary.get("direct_top1_oracle_hit", float("nan")))
+                direct_spearman = float(summary.get("direct_spearman", float("nan")))
+                summary["source_inner_gap_reduction_abs_pct_points"] = float(
+                    direct_mean_gap - float(summary["mean_oracle_gap_pct"])
+                )
+                summary["source_inner_high_regret_reduction"] = float(direct_high - float(summary["high_regret_rate"]))
+                summary["source_inner_top1_delta_vs_direct"] = float(
+                    float(summary["top1_oracle_hit"]) - direct_top1
+                )
+                summary["source_inner_spearman_delta_vs_direct"] = float(float(summary["spearman"]) - direct_spearman)
+                summary["source_inner_top2_switch_rows"] = float(
+                    sum(1 for row in rows if int(float(row.get("allpair_delta_gate_switched", 0) or 0)) == 1)
+                )
+                if pred_all:
+                    summary["allpair_delta_spearman_pred_vs_true_source_inner"] = _finite_spearman(pred_all, true_all)
+                    summary["allpair_delta_auc_switch_help_source_inner"] = _binary_auc(
+                        [-float(v) for v in pred_all],
+                        [1 if float(v) < 0.0 else 0 for v in true_all],
+                    )
+                    summary["allpair_delta_mae_source_inner"] = float(
+                        np.mean(
+                            [
+                                abs(float(p) - float(t))
+                                for p, t in zip(pred_all, true_all)
+                                if np.isfinite(float(p)) and np.isfinite(float(t))
+                            ]
+                        )
+                    )
+                domain_harm = False
+                for domain in sorted({int(row["query_domain"]) for row in rows}):
+                    selected_vals = [float(r["oracle_gap_pct"]) for r in rows if int(r["query_domain"]) == domain]
+                    direct_vals = [
+                        float(r.get("pairprob_hard_oracle_gap_pct", float("nan")))
+                        for r in rows
+                        if int(r["query_domain"]) == domain
+                    ]
+                    if (
+                        selected_vals
+                        and direct_vals
+                        and float(np.mean(selected_vals)) - float(np.mean(direct_vals))
+                        > float(cfg.catastrophic_regression_vs_direct_gap_pct)
+                    ):
+                        domain_harm = True
+                        break
+                stability = "unstable" if domain_harm else "stable"
+                reason = _allpair_delta_reason_from_summary(
+                    summary=summary,
+                    train_data=full_train_data,
+                    cfg=cfg,
+                    stability_status=stability,
+                )
+                no_top1_drop = 1.0 if float(summary.get("source_inner_top1_delta_vs_direct", 0.0)) >= -float(cfg.metric_epsilon) else 0.0
+                no_spearman_drop = 1.0 if float(summary.get("source_inner_spearman_delta_vs_direct", 0.0)) >= -float(cfg.metric_epsilon) else 0.0
+                score = (
+                    no_top1_drop,
+                    no_spearman_drop,
+                    -float(summary["mean_oracle_gap_pct"]),
+                    -float(summary["high_regret_rate"]),
+                    float(summary["allpair_delta_gate_help_rate_changed_only"])
+                    if np.isfinite(float(summary["allpair_delta_gate_help_rate_changed_only"]))
+                    else -1e9,
+                    -float(summary["allpair_delta_gate_harm_rate_changed_only"])
+                    if np.isfinite(float(summary["allpair_delta_gate_harm_rate_changed_only"]))
+                    else -1e9,
+                    -1.0 if stability == "unstable" else 0.0,
+                    -float(summary["allpair_delta_gate_switch_rate"]),
+                    -float(pred_threshold),
+                    -float(threshold),
+                    float(l2),
+                )
+                item = (score, float(threshold), float(l2), float(pred_threshold), summary, full_train_data, stability)
+                (invalid if reason else candidates).append(item)
+
+    pool = candidates if candidates else invalid
+    if not pool:
+        return Top2DeltaGateSelection(
+            method=cfg.method_name,
+            oracle_method=cfg.oracle_diagnostic_method_name,
+            base_method=cfg.base_method,
+            feature_set=cfg.feature_set,
+            base_feature_set=cfg.base_feature_set,
+            base_ridge_l2=base_selection.ridge_l2,
+            ridge_l2=float(cfg.ridge_l2_values[0]),
+            margin_threshold=float(cfg.margin_thresholds[0]),
+            predicted_delta_threshold=float(cfg.predicted_delta_thresholds[0]),
+            selected_by_inner_validation=False,
+            diagnostic_only_reason="insufficient_source_inner_delta_rows",
+            noop=True,
+            guard_status="failed_guards_noop",
+            selection_stability_status="forced_direct_pairprob",
+            selected_reason="insufficient_source_inner_delta_rows",
+        )
+    _score, threshold, l2, pred_threshold, summary, train_data, stability = sorted(
+        pool,
+        key=lambda item: item[0],
+        reverse=True,
+    )[0]
+    reason = _allpair_delta_reason_from_summary(
+        summary=summary,
+        train_data=train_data,
+        cfg=cfg,
+        stability_status=stability,
+    )
+    if str(base_selection.diagnostic_only_reason):
+        reason = "|".join(
+            part for part in dict.fromkeys([str(base_selection.diagnostic_only_reason), str(reason)]) if part
+        )
+    model: Top2DeltaGateModelBundle | None = None
+    if not reason:
+        model = fit_allpair_delta_gate_model(train_data=train_data, ridge_l2=float(l2))
+    guard_status = "selected" if not reason else "failed_guards_noop"
+    return Top2DeltaGateSelection(
+        method=cfg.method_name,
+        oracle_method=cfg.oracle_diagnostic_method_name,
+        base_method=cfg.base_method,
+        feature_set=cfg.feature_set,
+        base_feature_set=cfg.base_feature_set,
+        base_ridge_l2=base_selection.ridge_l2,
+        ridge_l2=float(l2),
+        margin_threshold=float(threshold),
+        predicted_delta_threshold=float(pred_threshold),
+        selected_by_inner_validation=True,
+        diagnostic_only_reason=str(reason),
+        noop=bool(reason),
+        guard_status=str(guard_status),
+        selection_stability_status=str(stability if not reason else "forced_direct_pairprob"),
+        source_inner_validation_domains=len(source_domains),
+        source_inner_delta_rows=int(train_data.x.shape[0]),
+        source_inner_switch_rows=int(summary.get("source_inner_top2_switch_rows", 0.0)),
+        source_inner_keep_rows=int(train_data.keep_rows),
+        source_inner_helpful_switch_rows=int(train_data.helpful_switch_rows),
+        source_inner_harmful_switch_rows=int(train_data.harmful_switch_rows),
+        source_inner_active_domains=int(len(train_data.kept_by_domain)),
+        source_inner_unique_queries=int(train_data.unique_queries),
+        source_inner_unique_query_domains=int(train_data.unique_query_domains),
+        source_inner_unique_base_top2_events=int(train_data.unique_base_top2_events),
+        source_inner_helpful_pair_rows=int(train_data.helpful_pair_rows),
+        source_inner_harmful_pair_rows=int(train_data.harmful_pair_rows),
+        source_inner_top2_candidate_rows=int(
+            round(float(summary["allpair_delta_gate_activation_rate"]) * float(summary["n_rows"]))
+        ),
+        source_inner_gap_reduction_abs_pct_points=float(summary["source_inner_gap_reduction_abs_pct_points"]),
+        source_inner_high_regret_reduction=float(summary["source_inner_high_regret_reduction"]),
+        source_inner_activation_rate=float(summary["allpair_delta_gate_activation_rate"]),
+        source_inner_switch_rate=float(summary["allpair_delta_gate_switch_rate"]),
+        source_inner_help_rate_changed_only=float(summary["allpair_delta_gate_help_rate_changed_only"]),
+        source_inner_harm_rate_changed_only=float(summary["allpair_delta_gate_harm_rate_changed_only"]),
+        source_inner_mean_oracle_gap_pct=float(summary["mean_oracle_gap_pct"]),
+        source_inner_high_regret_rate=float(summary["high_regret_rate"]),
+        source_inner_top1=float(summary["top1_oracle_hit"]),
+        source_inner_spearman=float(summary["spearman"]),
+        source_inner_top1_delta_vs_direct=float(summary["source_inner_top1_delta_vs_direct"]),
+        source_inner_spearman_delta_vs_direct=float(summary["source_inner_spearman_delta_vs_direct"]),
+        low_margin_high_regret_enrichment=float(summary["low_margin_high_regret_enrichment"]),
+        delta_gate_spearman_pred_vs_true_source_inner=float(
+            summary["allpair_delta_spearman_pred_vs_true_source_inner"]
+        ),
+        delta_gate_auc_switch_help_source_inner=float(summary["allpair_delta_auc_switch_help_source_inner"]),
+        delta_gate_mae_source_inner=float(summary["allpair_delta_mae_source_inner"]),
+        group_oof_grouping_level=str(train_data.group_oof_grouping_level),
+        group_oof_unique_groups=int(train_data.group_oof_unique_groups),
+        group_oof_min_groups_per_fold=int(train_data.group_oof_min_groups_per_fold),
+        group_oof_folds_used=int(train_data.group_oof_folds_used),
+        group_oof_train_domains_per_fold_min=int(train_data.group_oof_train_domains_per_fold_min),
+        group_oof_candidate_experts_per_fold_min=int(train_data.group_oof_candidate_experts_per_fold_min),
+        group_oof_same_group_leakage_rate=float(train_data.group_oof_same_group_leakage_rate),
+        active_low_margin_oracle_is_top2_rate=float(summary["active_low_margin_oracle_is_top2_rate"]),
+        active_low_margin_oracle_in_top2_rate=float(summary["active_low_margin_oracle_in_top2_rate"]),
+        active_low_margin_high_regret_oracle_is_top2_rate=float(
+            summary["active_low_margin_high_regret_oracle_is_top2_rate"]
+        ),
+        oracle_top2_recoverable_error_rate=float(summary["oracle_top2_recoverable_error_rate"]),
+        oracle_top2_recoverable_gap_mass_pct_points=float(summary["oracle_top2_recoverable_gap_mass_pct_points"]),
+        selected_reason=str(reason or "selected"),
+        model=model,
     )

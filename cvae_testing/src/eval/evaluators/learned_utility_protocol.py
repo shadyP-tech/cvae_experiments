@@ -268,6 +268,13 @@ def _method_protocol(method: str) -> MethodProtocol:
             diagnostic_only=0,
             routing_uses_query_features=1,
         )
+    if name == "pairwise_direct_allpair_utility_delta_gate_v1":
+        return MethodProtocol(
+            method_role="learned",
+            adoption_eligible=1,
+            diagnostic_only=0,
+            routing_uses_query_features=1,
+        )
     if name == "pairwise_direct_group_oof_hardpair_boosted_pairprob_v1":
         return MethodProtocol(
             method_role="learned",
@@ -294,6 +301,14 @@ def _method_protocol(method: str) -> MethodProtocol:
             routing_uses_eval_nelbo=1,
         )
     if name == "oracle_top2_delta_gate_diagnostic_v1":
+        return MethodProtocol(
+            method_role="diagnostic",
+            adoption_eligible=0,
+            diagnostic_only=1,
+            routing_uses_query_features=1,
+            routing_uses_eval_nelbo=1,
+        )
+    if name == "oracle_allpair_top2_delta_gate_diagnostic_v1":
         return MethodProtocol(
             method_role="diagnostic",
             adoption_eligible=0,
@@ -612,6 +627,29 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
             "top2_rerank_candidate_delta_gap_pct_vs_direct"
         ),
         "top2_rerank_top2_better_than_base": "top2_rerank_top2_better_than_base",
+        "top2_delta_gate_active": "top2_delta_gate_active",
+        "top2_delta_gate_switched": "top2_delta_gate_switched",
+        "top2_delta_gate_delta_gap_pct_vs_direct": "top2_delta_gate_delta_gap_pct_vs_direct",
+        "top2_delta_gate_help": "top2_delta_gate_help",
+        "top2_delta_gate_harm": "top2_delta_gate_harm",
+        "top2_delta_gate_predicted_delta_gap_pct": "top2_delta_gate_predicted_delta_gap_pct",
+        "top2_delta_gate_true_delta_gap_pct_top2_vs_top1": (
+            "top2_delta_gate_true_delta_gap_pct_top2_vs_top1"
+        ),
+        "allpair_delta_gate_active": "allpair_delta_gate_active",
+        "allpair_delta_gate_switched": "allpair_delta_gate_switched",
+        "allpair_delta_gate_delta_gap_pct_vs_direct": "allpair_delta_gate_delta_gap_pct_vs_direct",
+        "allpair_delta_gate_help": "allpair_delta_gate_help",
+        "allpair_delta_gate_harm": "allpair_delta_gate_harm",
+        "allpair_delta_gate_predicted_delta_gap_pct": "allpair_delta_gate_predicted_delta_gap_pct",
+        "allpair_delta_gate_true_delta_gap_pct_top2_vs_top1": (
+            "allpair_delta_gate_true_delta_gap_pct_top2_vs_top1"
+        ),
+        "heldout_mean_gap_delta_vs_direct": "heldout_mean_gap_delta_vs_direct",
+        "heldout_high_regret_delta_vs_direct": "heldout_high_regret_delta_vs_direct",
+        "heldout_top1_delta_vs_direct": "heldout_top1_delta_vs_direct",
+        "heldout_spearman_delta_vs_direct": "heldout_spearman_delta_vs_direct",
+        "heldout_mean_gap_delta_vs_metadata": "heldout_mean_gap_delta_vs_metadata",
         "boosted_selection_changed": "boosted_selection_changed",
         "boosted_to_base_top2": "boosted_to_base_top2",
         "boosted_delta_gap_pct_vs_direct_pairprob": "boosted_delta_gap_pct_vs_direct_pairprob",
@@ -802,6 +840,47 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
                 ]
             )
         ) if any("top2_rerank_delta_gap_pct_vs_direct" in r for r in vals) else float("nan")
+        metrics["top2_delta_gate_activation_rate"] = metrics["micro_top2_delta_gate_active"]
+        metrics["top2_delta_gate_switch_rate"] = metrics["micro_top2_delta_gate_switched"]
+        top2_delta_switched = [
+            r for r in vals
+            if int(float(r.get("top2_delta_gate_switched", 0) or 0)) == 1
+        ]
+        metrics["top2_delta_gate_help_rate_changed_only"] = _finite_mean(
+            [float(r.get("top2_delta_gate_help", float("nan"))) for r in top2_delta_switched]
+        )
+        metrics["top2_delta_gate_harm_rate_changed_only"] = _finite_mean(
+            [float(r.get("top2_delta_gate_harm", float("nan"))) for r in top2_delta_switched]
+        )
+        metrics["mean_top2_delta_gate_delta_gap_pct_vs_direct"] = metrics[
+            "micro_top2_delta_gate_delta_gap_pct_vs_direct"
+        ]
+        metrics["median_top2_delta_gate_delta_gap_pct_vs_direct"] = _finite_median(
+            [float(r.get("top2_delta_gate_delta_gap_pct_vs_direct", float("nan"))) for r in vals]
+        )
+        metrics["allpair_delta_gate_activation_rate"] = metrics["micro_allpair_delta_gate_active"]
+        metrics["allpair_delta_gate_switch_rate"] = metrics["micro_allpair_delta_gate_switched"]
+        allpair_delta_switched = [
+            r for r in vals
+            if int(float(r.get("allpair_delta_gate_switched", 0) or 0)) == 1
+        ]
+        metrics["allpair_delta_gate_help_rate_changed_only"] = _finite_mean(
+            [float(r.get("allpair_delta_gate_help", float("nan"))) for r in allpair_delta_switched]
+        )
+        metrics["allpair_delta_gate_harm_rate_changed_only"] = _finite_mean(
+            [float(r.get("allpair_delta_gate_harm", float("nan"))) for r in allpair_delta_switched]
+        )
+        metrics["mean_allpair_delta_gate_delta_gap_pct_vs_direct"] = metrics[
+            "micro_allpair_delta_gate_delta_gap_pct_vs_direct"
+        ]
+        metrics["median_allpair_delta_gate_delta_gap_pct_vs_direct"] = _finite_median(
+            [float(r.get("allpair_delta_gate_delta_gap_pct_vs_direct", float("nan"))) for r in vals]
+        )
+        metrics["heldout_mean_gap_delta_vs_direct"] = metrics["micro_heldout_mean_gap_delta_vs_direct"]
+        metrics["heldout_high_regret_delta_vs_direct"] = metrics["micro_heldout_high_regret_delta_vs_direct"]
+        metrics["heldout_top1_delta_vs_direct"] = metrics["micro_heldout_top1_delta_vs_direct"]
+        metrics["heldout_spearman_delta_vs_direct"] = metrics["micro_heldout_spearman_delta_vs_direct"]
+        metrics["heldout_mean_gap_delta_vs_metadata"] = metrics["micro_heldout_mean_gap_delta_vs_metadata"]
         metrics["boosted_selection_change_rate"] = metrics["micro_boosted_selection_changed"]
         metrics["boosted_to_base_top2_rate"] = metrics["micro_boosted_to_base_top2"]
         boosted_changed_rows = [
@@ -1030,6 +1109,54 @@ def _aggregate_metrics_from_sample_rows(rows: Sequence[Dict[str, Any]]) -> Dict[
             "oracle_top2_active_high_regret_reduction",
             "oracle_top2_recoverable_error_rate",
             "oracle_top2_recoverable_gap_mass_pct_points",
+            "top2_delta_gate_threshold",
+            "top2_delta_gate_predicted_delta_threshold",
+            "top2_delta_gate_l2",
+            "top2_delta_gate_guard_status",
+            "top2_delta_gate_diagnostic_only_reason",
+            "top2_delta_gate_selection_stability_status",
+            "source_inner_top2_delta_gate_gap_reduction_abs_pct_points",
+            "source_inner_top2_delta_gate_high_regret_reduction",
+            "source_inner_top2_delta_gate_rows",
+            "source_inner_top2_delta_gate_switch_rows",
+            "source_inner_top2_delta_gate_keep_rows",
+            "source_inner_top2_delta_gate_helpful_switch_rows",
+            "source_inner_top2_delta_gate_harmful_switch_rows",
+            "source_inner_top2_delta_gate_active_domains",
+            "delta_gate_spearman_pred_vs_true_source_inner",
+            "delta_gate_auc_switch_help_source_inner",
+            "delta_gate_mae_source_inner",
+            "active_low_margin_oracle_is_top2_rate",
+            "active_low_margin_oracle_in_top2_rate",
+            "active_low_margin_high_regret_oracle_is_top2_rate",
+            "selected_margin_threshold",
+            "selected_predicted_delta_threshold",
+            "selected_l2",
+            "selected_guard_status",
+            "selected_reason",
+            "source_inner_selected_config_mean_gap",
+            "source_inner_selected_config_high_regret_rate",
+            "source_inner_selected_config_top1_delta_vs_direct",
+            "source_inner_selected_config_spearman_delta_vs_direct",
+            "source_inner_top2_candidate_rows",
+            "source_inner_top2_switch_rows",
+            "source_inner_top2_help_rate_changed_only",
+            "source_inner_top2_harm_rate_changed_only",
+            "source_inner_top2_mean_delta_vs_direct",
+            "source_inner_top2_high_regret_delta_vs_direct",
+            "source_inner_top2_top1_delta_vs_direct",
+            "source_inner_top2_spearman_delta_vs_direct",
+            "source_inner_allpair_delta_rows",
+            "source_inner_allpair_unique_queries",
+            "source_inner_allpair_unique_query_domains",
+            "source_inner_allpair_unique_base_top2_events",
+            "source_inner_allpair_helpful_pair_rows",
+            "source_inner_allpair_harmful_pair_rows",
+            "allpair_delta_spearman_pred_vs_true_source_inner",
+            "allpair_delta_auc_switch_help_source_inner",
+            "allpair_delta_mae_source_inner",
+            "allpair_delta_gate_guard_status",
+            "allpair_delta_gate_diagnostic_only_reason",
             "hardpair_boost_margin_threshold",
             "hardpair_miss_boost_weight",
             "hardpair_confirm_boost_weight",

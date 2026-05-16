@@ -11,6 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.eval.evaluators.learned_utility_config import (
+    AllPairDeltaGateConfig,
     ConformalRegretSetConfig,
     FallbackBenefitGateConfig,
     GroupOOFHardpairBoostConfig,
@@ -31,7 +32,9 @@ from src.eval.evaluators.learned_utility_pairprob import (
     Top2DeltaGateSelection,
     Top2RerankSelection,
     build_pairprob_training_data,
+    build_allpair_delta_gate_training_data_from_predictions,
     build_group_oof_hardpair_observations,
+    build_group_oof_allpair_delta_gate_training_data,
     build_group_oof_top2_delta_gate_training_data,
     build_top2_delta_gate_training_data_from_predictions,
     build_top2_rerank_training_data,
@@ -47,6 +50,7 @@ from src.eval.evaluators.learned_utility_pairprob import (
     hardpair_boost_route_rows,
     select_jackknife_lcb_policy,
     select_pairprob_policy,
+    allpair_delta_gate_route_rows,
     top2_delta_gate_route_rows,
     top2_rerank_feature_names,
     top2_rerank_route_rows,
@@ -252,6 +256,56 @@ def _top2_delta_cfg(**overrides: object) -> Top2DeltaGateConfig:
     }
     values.update(overrides)
     return Top2DeltaGateConfig(**values)
+
+
+def _allpair_delta_cfg(**overrides: object) -> AllPairDeltaGateConfig:
+    values = {
+        "enabled": True,
+        "method_name": "pairwise_direct_allpair_utility_delta_gate_v1",
+        "base_method": "pairwise_direct_pairprob_adoption_v1",
+        "oracle_diagnostic_method_name": "oracle_allpair_top2_delta_gate_diagnostic_v1",
+        "feature_set": "allpair_delta_latent_context_v1",
+        "base_feature_set": "pairprob_latent_only_v1",
+        "predictor": "ridge_delta_pct",
+        "calibration_policy": "source_inner_group_oof_allpair_delta_gate_v1",
+        "training_pair_scope": "all_base_preferred_candidate_pairs",
+        "inference_pair_scope": "direct_top1_top2_only",
+        "margin_thresholds": (0.10,),
+        "ridge_l2_values": (1.0e-1,),
+        "predicted_delta_thresholds": (-0.5, 0.0),
+        "target_clip_delta_pct": (-20.0, 20.0),
+        "near_tie_delta_pct": 0.5,
+        "metric_epsilon": 1.0e-9,
+        "group_oof_folds": 3,
+        "min_group_oof_train_domains_per_fold": 2,
+        "min_group_oof_candidate_experts_per_fold": 2,
+        "require_group_id_for_adoption": True,
+        "max_group_oof_same_group_leakage_rate": 0.0,
+        "max_activation_rate": 1.0,
+        "max_switch_rate": 1.0,
+        "min_source_inner_delta_rows": 1,
+        "min_source_inner_unique_queries": 1,
+        "min_source_inner_unique_query_domains": 1,
+        "min_source_inner_unique_base_top2_events": 1,
+        "min_source_inner_helpful_pair_rows": 0,
+        "min_source_inner_harmful_pair_rows": 0,
+        "min_source_inner_top2_candidate_rows": 1,
+        "min_source_inner_top2_switch_rows_for_diagnostic": 0,
+        "min_source_inner_top2_switch_rows_for_adoption": 0,
+        "min_source_inner_top2_help_rate_changed_only": 0.0,
+        "max_source_inner_top2_harm_rate_changed_only": 1.0,
+        "min_low_margin_high_regret_enrichment": 0.0,
+        "min_source_inner_gap_reduction_abs_pct_points_for_diagnostic": 0.0,
+        "min_source_inner_gap_reduction_abs_pct_points_for_adoption": 0.0,
+        "max_top1_drop_for_pass": 0.0,
+        "max_spearman_drop_for_pass": 0.0,
+        "max_top1_drop_for_weak_pass": 0.02,
+        "max_spearman_drop_for_weak_pass": 0.02,
+        "absolute_high_regret_gap_pct": 5.0,
+        "catastrophic_regression_vs_direct_gap_pct": 5.0,
+    }
+    values.update(overrides)
+    return AllPairDeltaGateConfig(**values)
 
 
 def _group_oof_cfg(**overrides: object) -> GroupOOFHardpairBoostConfig:
@@ -883,6 +937,93 @@ def test_top2_delta_gate_target_sign_and_near_tie_definitions() -> None:
     assert data.dropped_near_tie == 1
     assert data.y_raw[0] < 0.0
     assert data.y_raw[1] > 0.0
+
+
+def test_allpair_delta_gate_uses_all_pairs_but_routes_top1_top2_only() -> None:
+    x_rows = np.asarray(
+        [
+            [1.0, 0.0, 1.0, 0.0],
+            [1.0, 0.0, 0.0, 1.0],
+            [1.0, 0.0, 0.5, 0.5],
+        ],
+        dtype=np.float64,
+    )
+    prob = np.asarray(
+        [
+            [
+                [0.5, 0.51, 0.80],
+                [0.49, 0.5, 0.70],
+                [0.20, 0.30, 0.5],
+            ]
+        ],
+        dtype=np.float64,
+    )
+    true = np.asarray([[20.0, 10.0, 30.0]], dtype=np.float64)
+
+    data = build_allpair_delta_gate_training_data_from_predictions(
+        x_rows=x_rows,
+        query_domains=np.asarray([0], dtype=np.int64),
+        expert_domains=[1, 2, 3],
+        prob_matrix=prob,
+        true_nelbo_matrix=true,
+        embedding_dim=2,
+        expert_feature_dim=2,
+        margin_threshold=1.0,
+        near_tie_delta_pct=0.5,
+        target_clip_delta_pct=(-20.0, 20.0),
+        sample_ids=np.asarray([7], dtype=np.int64),
+    )
+
+    assert data.x.shape[0] == 3
+    assert data.unique_queries == 1
+    assert data.unique_base_top2_events == 1
+    assert data.helpful_pair_rows >= 1
+
+    fold = FoldCandidateSet(
+        heldout_domain=0,
+        candidate_col_indices=(1, 2, 3),
+        candidate_expert_domains=(1, 2, 3),
+        excluded_expert_domain=0,
+        target_expert_excluded=True,
+    )
+    selection = Top2DeltaGateSelection(
+        method="pairwise_direct_allpair_utility_delta_gate_v1",
+        oracle_method="oracle_allpair_top2_delta_gate_diagnostic_v1",
+        base_method="pairwise_direct_pairprob_adoption_v1",
+        feature_set="allpair_delta_latent_context_v1",
+        base_feature_set="pairprob_latent_only_v1",
+        base_ridge_l2=1.0e-3,
+        ridge_l2=1.0e-1,
+        margin_threshold=1.0,
+        predicted_delta_threshold=0.0,
+        selected_by_inner_validation=True,
+    )
+    rows = allpair_delta_gate_route_rows(
+        method="oracle_allpair_top2_delta_gate_diagnostic_v1",
+        fold=fold,
+        query_domains=np.asarray([0], dtype=np.int64),
+        expert_domains=fold.candidate_expert_domains,
+        x_rows=x_rows,
+        prob_matrix=prob,
+        true_nelbo_matrix=true,
+        global_true_nelbo_matrix=np.asarray([[5.0, 20.0, 10.0, 30.0]], dtype=np.float64),
+        global_expert_domains=[0, 1, 2, 3],
+        policy_name="pairwise_direct_allpair_utility_delta_gate_v1",
+        selection=selection,
+        delta_bundle=None,
+        pairprob_direct_gap_pct=np.asarray([100.0], dtype=np.float64),
+        metadata_oracle_gap_pct=None,
+        embedding_dim=2,
+        expert_feature_dim=2,
+        cfg=_allpair_delta_cfg(),
+        oracle_diagnostic=True,
+    )
+
+    assert rows[0]["base_direct_selected_expert"] == 1
+    assert rows[0]["base_direct_top2_expert"] == 2
+    assert rows[0]["selected_expert"] == 2
+    assert rows[0]["routing_uses_eval_nelbo"] == 1
+    assert _method_protocol("oracle_allpair_top2_delta_gate_diagnostic_v1").adoption_eligible == 0
 
 
 def test_group_oof_top2_delta_gate_preserves_candidate_geometry() -> None:

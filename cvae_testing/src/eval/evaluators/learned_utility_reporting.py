@@ -886,6 +886,104 @@ def _build_method_summary_rows(method_metrics: Dict[str, Dict[str, Any]]) -> Lis
                 "active_low_margin_high_regret_oracle_is_top2_rate": str(
                     metrics.get("active_low_margin_high_regret_oracle_is_top2_rate", "")
                 ),
+                "selected_margin_threshold": str(metrics.get("selected_margin_threshold", "")),
+                "selected_predicted_delta_threshold": str(
+                    metrics.get("selected_predicted_delta_threshold", "")
+                ),
+                "selected_l2": str(metrics.get("selected_l2", "")),
+                "selected_guard_status": str(metrics.get("selected_guard_status", "")),
+                "selected_reason": str(metrics.get("selected_reason", "")),
+                "source_inner_selected_config_mean_gap": str(
+                    metrics.get("source_inner_selected_config_mean_gap", "")
+                ),
+                "source_inner_selected_config_high_regret_rate": str(
+                    metrics.get("source_inner_selected_config_high_regret_rate", "")
+                ),
+                "source_inner_selected_config_top1_delta_vs_direct": str(
+                    metrics.get("source_inner_selected_config_top1_delta_vs_direct", "")
+                ),
+                "source_inner_selected_config_spearman_delta_vs_direct": str(
+                    metrics.get("source_inner_selected_config_spearman_delta_vs_direct", "")
+                ),
+                "heldout_mean_gap_delta_vs_direct": float(
+                    metrics.get("heldout_mean_gap_delta_vs_direct", float("nan"))
+                ),
+                "heldout_high_regret_delta_vs_direct": float(
+                    metrics.get("heldout_high_regret_delta_vs_direct", float("nan"))
+                ),
+                "heldout_top1_delta_vs_direct": str(metrics.get("heldout_top1_delta_vs_direct", "")),
+                "heldout_spearman_delta_vs_direct": str(metrics.get("heldout_spearman_delta_vs_direct", "")),
+                "heldout_mean_gap_delta_vs_metadata": float(
+                    metrics.get("heldout_mean_gap_delta_vs_metadata", float("nan"))
+                ),
+                "heldout_high_regret_delta_vs_metadata": str(
+                    metrics.get("heldout_high_regret_delta_vs_metadata", "")
+                ),
+                "source_inner_top2_candidate_rows": str(metrics.get("source_inner_top2_candidate_rows", "")),
+                "source_inner_top2_switch_rows": str(metrics.get("source_inner_top2_switch_rows", "")),
+                "source_inner_top2_help_rate_changed_only": str(
+                    metrics.get("source_inner_top2_help_rate_changed_only", "")
+                ),
+                "source_inner_top2_harm_rate_changed_only": str(
+                    metrics.get("source_inner_top2_harm_rate_changed_only", "")
+                ),
+                "source_inner_top2_mean_delta_vs_direct": str(
+                    metrics.get("source_inner_top2_mean_delta_vs_direct", "")
+                ),
+                "source_inner_top2_high_regret_delta_vs_direct": str(
+                    metrics.get("source_inner_top2_high_regret_delta_vs_direct", "")
+                ),
+                "source_inner_top2_top1_delta_vs_direct": str(
+                    metrics.get("source_inner_top2_top1_delta_vs_direct", "")
+                ),
+                "source_inner_top2_spearman_delta_vs_direct": str(
+                    metrics.get("source_inner_top2_spearman_delta_vs_direct", "")
+                ),
+                "source_inner_allpair_delta_rows": str(metrics.get("source_inner_allpair_delta_rows", "")),
+                "source_inner_allpair_unique_queries": str(
+                    metrics.get("source_inner_allpair_unique_queries", "")
+                ),
+                "source_inner_allpair_unique_query_domains": str(
+                    metrics.get("source_inner_allpair_unique_query_domains", "")
+                ),
+                "source_inner_allpair_unique_base_top2_events": str(
+                    metrics.get("source_inner_allpair_unique_base_top2_events", "")
+                ),
+                "source_inner_allpair_helpful_pair_rows": str(
+                    metrics.get("source_inner_allpair_helpful_pair_rows", "")
+                ),
+                "source_inner_allpair_harmful_pair_rows": str(
+                    metrics.get("source_inner_allpair_harmful_pair_rows", "")
+                ),
+                "allpair_delta_spearman_pred_vs_true_source_inner": str(
+                    metrics.get("allpair_delta_spearman_pred_vs_true_source_inner", "")
+                ),
+                "allpair_delta_auc_switch_help_source_inner": str(
+                    metrics.get("allpair_delta_auc_switch_help_source_inner", "")
+                ),
+                "allpair_delta_mae_source_inner": str(metrics.get("allpair_delta_mae_source_inner", "")),
+                "allpair_delta_gate_activation_rate": float(
+                    metrics.get("allpair_delta_gate_activation_rate", float("nan"))
+                ),
+                "allpair_delta_gate_switch_rate": float(
+                    metrics.get("allpair_delta_gate_switch_rate", float("nan"))
+                ),
+                "allpair_delta_gate_help_rate_changed_only": float(
+                    metrics.get("allpair_delta_gate_help_rate_changed_only", float("nan"))
+                ),
+                "allpair_delta_gate_harm_rate_changed_only": float(
+                    metrics.get("allpair_delta_gate_harm_rate_changed_only", float("nan"))
+                ),
+                "mean_allpair_delta_gate_delta_gap_pct_vs_direct": float(
+                    metrics.get("mean_allpair_delta_gate_delta_gap_pct_vs_direct", float("nan"))
+                ),
+                "median_allpair_delta_gate_delta_gap_pct_vs_direct": float(
+                    metrics.get("median_allpair_delta_gate_delta_gap_pct_vs_direct", float("nan"))
+                ),
+                "allpair_delta_gate_guard_status": str(metrics.get("allpair_delta_gate_guard_status", "")),
+                "allpair_delta_gate_diagnostic_only_reason": str(
+                    metrics.get("allpair_delta_gate_diagnostic_only_reason", "")
+                ),
                 "hardpair_boost_margin_threshold": str(metrics.get("hardpair_boost_margin_threshold", "")),
                 "hardpair_miss_boost_weight": str(metrics.get("hardpair_miss_boost_weight", "")),
                 "hardpair_confirm_boost_weight": str(metrics.get("hardpair_confirm_boost_weight", "")),

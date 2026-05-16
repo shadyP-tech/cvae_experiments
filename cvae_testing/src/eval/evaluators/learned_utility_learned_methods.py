@@ -34,12 +34,15 @@ from src.eval.evaluators.learned_utility_pairprob import (
     Top2RerankModelBundle,
     Top2RerankSelection,
     _gap_pct_for_selected,
+    allpair_delta_gate_route_rows,
+    build_group_oof_allpair_delta_gate_training_data,
     build_group_oof_top2_delta_gate_training_data,
     build_pairprob_training_data,
     build_group_oof_hardpair_observations,
     clone_direct_pairprob_adoption_rows,
     conformal_pairprob_route_rows,
     fit_pairprob_model,
+    fit_allpair_delta_gate_model,
     fit_top2_delta_gate_model,
     hardpair_boost_route_rows,
     hardpair_weight_multipliers_from_observations,
@@ -53,6 +56,7 @@ from src.eval.evaluators.learned_utility_pairprob import (
     select_conformal_regret_set_policy,
     select_group_oof_hardpair_boost_policy,
     select_jackknife_lcb_policy,
+    select_allpair_delta_gate_policy,
     select_top2_delta_gate_policy,
     select_top2_margin_reranker_policy,
     top2_delta_gate_route_rows,
@@ -460,12 +464,13 @@ def _calibrate_pairprob_tournament(
     JackknifeLCBSelection | None,
     Top2RerankSelection | None,
     Top2DeltaGateSelection | None,
+    Top2DeltaGateSelection | None,
     GroupOOFHardpairBoostSelection | None,
 ]:
     cfg = tournament_cfg.pairprob_tournament
     source_domains = sorted(set(int(sample_domains[int(i)]) for i in np.asarray(train_idx, dtype=np.int64).tolist()))
     if len(source_domains) < int(cfg.min_source_inner_validation_domains):
-        return None, None, None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None, None, None, None
 
     rows_by_key: Dict[Tuple[str, str, float], List[Dict[str, Any]]] = {}
     evidence_by_key: Dict[Tuple[str, str, float], Dict[str, float]] = {}
@@ -474,6 +479,7 @@ def _calibrate_pairprob_tournament(
     jackknife_blocks_by_key: Dict[Tuple[str, float], List[JackknifeCalibrationBlock]] = {}
     top2_blocks_by_key: Dict[Tuple[str, float], List[Top2RerankCalibrationBlock]] = {}
     top2_delta_blocks_by_key: Dict[Tuple[str, float], List[Top2DeltaGateCalibrationBlock]] = {}
+    allpair_delta_blocks_by_key: Dict[Tuple[str, float], List[Top2DeltaGateCalibrationBlock]] = {}
     hardpair_boost_blocks_by_key: Dict[Tuple[str, float], List[GroupOOFHardpairBoostCalibrationBlock]] = {}
     feature_sets = [str(cfg.adoption_feature_set), *[str(v) for v in cfg.diagnostic_feature_sets]]
     device = str(pairwise_cfg.get("device", "auto"))
@@ -622,6 +628,31 @@ def _calibrate_pairprob_tournament(
                     and str(feature_set) == str(cfg.top2_delta_gate.base_feature_set)
                 ):
                     top2_delta_blocks_by_key.setdefault((str(feature_set), float(l2)), []).append(
+                        Top2DeltaGateCalibrationBlock(
+                            validation_domain=int(validation_domain),
+                            train_x_rows=x_inner,
+                            train_q_rows=q_inner,
+                            train_e_rows=e_inner,
+                            train_s_rows=s_inner,
+                            train_y_rows=y_inner,
+                            query_domains=np.asarray(sample_domains[validation_idx], dtype=np.int64),
+                            expert_domains=tuple(int(v) for v in validation_fold.candidate_expert_domains),
+                            x_rows=x_val,
+                            direct_prob_matrix=prob,
+                            true_nelbo_matrix=true_matrix,
+                            global_true_nelbo_matrix=global_eval,
+                            fold=validation_fold,
+                            pairprob_direct_gap_pct=_gap_pct_for_selected(
+                                true_matrix,
+                                pairprob_selected_indices(prob, validation_fold.candidate_expert_domains),
+                            ),
+                        )
+                    )
+                if (
+                    bool(cfg.allpair_delta_gate.enabled)
+                    and str(feature_set) == str(cfg.allpair_delta_gate.base_feature_set)
+                ):
+                    allpair_delta_blocks_by_key.setdefault((str(feature_set), float(l2)), []).append(
                         Top2DeltaGateCalibrationBlock(
                             validation_domain=int(validation_domain),
                             train_x_rows=x_inner,
@@ -898,6 +929,22 @@ def _calibrate_pairprob_tournament(
             expert_feature_dim=int(expert_feature_dim),
             device=device,
         )
+    allpair_delta_selection = None
+    if bool(cfg.allpair_delta_gate.enabled):
+        allpair_delta_key = (
+            str(cfg.allpair_delta_gate.base_feature_set),
+            float(direct.ridge_l2) if direct is not None else float("nan"),
+        )
+        allpair_delta_selection = select_allpair_delta_gate_policy(
+            blocks=allpair_delta_blocks_by_key.get(allpair_delta_key, []),
+            base_selection=direct,
+            global_expert_domains=global_expert_domains,
+            pairprob_cfg=cfg,
+            cfg=cfg.allpair_delta_gate,
+            embedding_dim=int(embedding_feature_dim),
+            expert_feature_dim=int(expert_feature_dim),
+            device=device,
+        )
     hardpair_boost_selection = None
     if bool(cfg.group_oof_hardpair_boost.enabled):
         hardpair_key = (
@@ -923,6 +970,7 @@ def _calibrate_pairprob_tournament(
         jackknife_selection,
         top2_selection,
         top2_delta_selection,
+        allpair_delta_selection,
         hardpair_boost_selection,
     )
 
@@ -1335,6 +1383,7 @@ def _run_pairprob_tournament_for_fold(
     jackknife_selection: JackknifeLCBSelection | None,
     top2_selection: Top2RerankSelection | None,
     top2_delta_selection: Top2DeltaGateSelection | None,
+    allpair_delta_selection: Top2DeltaGateSelection | None,
     hardpair_boost_selection: GroupOOFHardpairBoostSelection | None,
     tournament_cfg: PairwiseTournamentConfig,
     pairwise_cfg: Dict[str, Any],
@@ -1763,6 +1812,105 @@ def _run_pairprob_tournament_for_fold(
                 embedding_dim=int(embedding_feature_dim),
                 expert_feature_dim=int(expert_feature_dim),
                 cfg=delta_cfg,
+                oracle_diagnostic=True,
+            )
+        )
+    if (
+        allpair_delta_selection is not None
+        and bool(cfg.allpair_delta_gate.enabled)
+        and direct_prob is not None
+        and direct_selection_for_eval is not None
+    ):
+        allpair_cfg = cfg.allpair_delta_gate
+        pairprob_gap = np.asarray([float(r["oracle_gap_pct"]) for r in direct_diagnostic_rows], dtype=np.float64)
+        final_train = build_group_oof_allpair_delta_gate_training_data(
+            x_rows=x_train,
+            q_rows=q_train,
+            e_rows=e_train,
+            s_rows=s_train,
+            y_rows=y_train,
+            feature_set=str(allpair_cfg.base_feature_set),
+            ridge_l2=float(direct_selection_for_eval.ridge_l2),
+            pairprob_cfg=cfg,
+            delta_cfg=allpair_cfg,
+            embedding_dim=int(embedding_feature_dim),
+            expert_feature_dim=int(expert_feature_dim),
+            margin_threshold=float(allpair_delta_selection.margin_threshold),
+            device=device,
+        )
+        allpair_reason_parts = [
+            str(allpair_delta_selection.diagnostic_only_reason),
+            str(final_train.diagnostic_reason),
+        ]
+        allpair_bundle: Top2DeltaGateModelBundle | None = None
+        if not any(str(part) for part in allpair_reason_parts) and not bool(allpair_delta_selection.noop):
+            try:
+                allpair_bundle = fit_allpair_delta_gate_model(
+                    train_data=final_train,
+                    ridge_l2=float(allpair_delta_selection.ridge_l2),
+                )
+            except (ProtocolError, ValueError):
+                allpair_reason_parts.append("insufficient_source_inner_delta_rows")
+        allpair_reason = "|".join(part for part in dict.fromkeys(allpair_reason_parts) if part)
+        allpair_selection_for_eval = replace(
+            allpair_delta_selection,
+            diagnostic_only_reason=str(allpair_reason),
+            noop=bool(allpair_reason),
+            guard_status="selected" if not allpair_reason else "failed_guards_noop",
+            selection_stability_status=(
+                allpair_delta_selection.selection_stability_status
+                if not allpair_reason or allpair_delta_selection.selection_stability_status == "unstable"
+                else "forced_direct_pairprob"
+            ),
+            group_oof_grouping_level=str(final_train.group_oof_grouping_level),
+            group_oof_unique_groups=int(final_train.group_oof_unique_groups),
+            group_oof_min_groups_per_fold=int(final_train.group_oof_min_groups_per_fold),
+            group_oof_folds_used=int(final_train.group_oof_folds_used),
+            group_oof_train_domains_per_fold_min=int(final_train.group_oof_train_domains_per_fold_min),
+            group_oof_candidate_experts_per_fold_min=int(final_train.group_oof_candidate_experts_per_fold_min),
+            group_oof_same_group_leakage_rate=float(final_train.group_oof_same_group_leakage_rate),
+            selected_reason=str(allpair_reason or allpair_delta_selection.selected_reason),
+        )
+        rows.extend(
+            allpair_delta_gate_route_rows(
+                method=str(allpair_cfg.method_name),
+                fold=fold,
+                query_domains=query_domains,
+                expert_domains=fold.candidate_expert_domains,
+                x_rows=x_test,
+                prob_matrix=direct_prob,
+                true_nelbo_matrix=true_matrix,
+                global_true_nelbo_matrix=global_eval,
+                global_expert_domains=global_expert_domains,
+                policy_name=allpair_cfg.method_name,
+                selection=allpair_selection_for_eval,
+                delta_bundle=allpair_bundle,
+                pairprob_direct_gap_pct=pairprob_gap,
+                metadata_oracle_gap_pct=metadata_oracle_gap_pct,
+                embedding_dim=int(embedding_feature_dim),
+                expert_feature_dim=int(expert_feature_dim),
+                cfg=allpair_cfg,
+            )
+        )
+        rows.extend(
+            allpair_delta_gate_route_rows(
+                method=str(allpair_cfg.oracle_diagnostic_method_name),
+                fold=fold,
+                query_domains=query_domains,
+                expert_domains=fold.candidate_expert_domains,
+                x_rows=x_test,
+                prob_matrix=direct_prob,
+                true_nelbo_matrix=true_matrix,
+                global_true_nelbo_matrix=global_eval,
+                global_expert_domains=global_expert_domains,
+                policy_name=allpair_cfg.method_name,
+                selection=allpair_selection_for_eval,
+                delta_bundle=None,
+                pairprob_direct_gap_pct=pairprob_gap,
+                metadata_oracle_gap_pct=metadata_oracle_gap_pct,
+                embedding_dim=int(embedding_feature_dim),
+                expert_feature_dim=int(expert_feature_dim),
+                cfg=allpair_cfg,
                 oracle_diagnostic=True,
             )
         )
@@ -2419,6 +2567,7 @@ def _run_learned_methods_for_fold(
                 jackknife_selection,
                 top2_selection,
                 top2_delta_selection,
+                allpair_delta_selection,
                 hardpair_boost_selection,
             ) = _calibrate_pairprob_tournament(
                 embeddings=embeddings,
@@ -2460,6 +2609,7 @@ def _run_learned_methods_for_fold(
                     jackknife_selection=jackknife_selection,
                     top2_selection=top2_selection,
                     top2_delta_selection=top2_delta_selection,
+                    allpair_delta_selection=allpair_delta_selection,
                     hardpair_boost_selection=hardpair_boost_selection,
                     tournament_cfg=tournament_cfg,
                     pairwise_cfg=pairwise_cfg,
