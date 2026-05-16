@@ -1,0 +1,4 @@
+scanner_domain,scanner_model,tumor_type,lab_or_origin,species,resolution,n_cases,n_groups,n_images
+0,Aperio CS2,human breast cancer,UMC Utrecht,Human,unknown,13,13,13
+1,Hamamatsu S360,human breast cancer,UMC Utrecht,Human,unknown,50,50,50
+2,Hamammatsu XR,human breast cancer,UMC Utrecht,Human,unknown,50,50,50

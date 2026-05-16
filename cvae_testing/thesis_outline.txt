@@ -1,0 +1,113 @@
+Project vision:
+The project aims to enable privacy-preserving multi-institutional medical imaging by exchanging lightweight generative experts instead of raw data. Institutions contribute independently trained models, and composition is performed post hoc at inference time.
+
+Thesis positioning (updated):
+This thesis is now centered on decision-grade evaluation of metadata-driven composition under controlled protocols, followed by a utility-aligned compatibility learning direction.
+
+Current evidence baseline (already achieved):
+1. Cross-dataset replication completed on BreakHis and Camelyon17.
+2. Locked protocol applied consistently (E1 utility, E2 ranking, E3 system gap).
+3. Naive domain-ID conditioning fails all gates on both datasets.
+4. Directional pattern is negative (utility and system tendency worsens).
+5. Oracle-gap-aware interpretation included to avoid overclaiming.
+
+Core thesis claim:
+Naive metadata conditioning (domain-ID concatenation in legacy routed CVAE experts) does not improve compatibility-aligned utility under a locked protocol, even across distinct domain-shift regimes.
+
+What this thesis does and does not claim:
+1. Claims supported:
+ - This specific conditioning mechanism fails to improve expert utility and routed system performance.
+ - Proxy ranking movement does not reliably translate into utility gains.
+ - The bottleneck is compatibility estimation aligned to utility, not metadata exposure alone.
+2. Claims not supported:
+ - Metadata is useless in general.
+ - Conditioning can never help.
+ - Routing/model composition is fundamentally wrong.
+
+Research questions (finalized):
+RQ1. Under a locked protocol, does naive metadata conditioning improve best-expert utility (E1)?
+RQ2. Does ranking improvement (E2) translate into system-level gap reduction (E3)?
+RQ3. Are failures dataset-specific or consistent across domain-shift regimes?
+RQ4. If naive conditioning fails, does a utility-aligned compatibility estimator become the right next modeling direction?
+
+Methodological contract (locked):
+1. Seeds: 11, 42, 73.
+2. Gates:
+ - E1: median relative utility delta <= -0.03 and at least 2 passing seeds.
+ - E2: median top1 uplift >= 0.05, median Spearman uplift >= 0.05, at least 2 positive seeds.
+ - E3: median relative gap reduction >= 0.30 or median normalized abs gap <= 0.05.
+3. Diagnostics (non-decision):
+ - Scale context (absolute and normalized gap statistics).
+ - Oracle gap context (>0.05 and >0.10 sensitivity).
+ - Seed sign consistency and variance.
+
+Chapter-level outline (restructured):
+Chapter 1. Introduction and problem framing
+ - Privacy-preserving decentralized composition in medical imaging.
+ - Gap between metadata similarity proxies and generative utility.
+ - Thesis claim and contributions.
+
+Chapter 2. Background and related work
+ - MoErging/model merging/MoE foundations [1-4].
+ - Conditional generative experts and privacy-preserving generation [5].
+ - Utility vs similarity mismatch in expert selection.
+
+Chapter 3. Experimental framework and protocol
+ - Datasets and domain definitions (BreakHis, Camelyon17).
+ - Model family, routing setup, evaluation metrics.
+ - Locked E1-E3 decision protocol and diagnostics.
+
+Chapter 4. Core negative result: naive conditioning fails
+ - BreakHis locked-protocol results.
+ - Camelyon17 locked-protocol replication.
+ - Cross-dataset synthesis: formal label vs empirical directional pattern.
+ - Non-actionable ranking-only behavior (E2 without E1/E3).
+
+Chapter 5. Tier 1 follow-up (must do): per-domain failure decomposition
+ - Domain-level heterogeneity analysis (which domains are harmed most).
+ - Link to domain shift characteristics and subgroup effects.
+ - Clarify whether failures are uniformly global or domain-concentrated.
+
+Chapter 6. Tier 2 strategic direction: utility-aligned compatibility learning
+ - Reformulate routing objective: predict utility, not similarity.
+ - Prototype learned compatibility estimation (e.g., NELBO predictor/ranker).
+ - Evaluation against locked protocol and existing baselines.
+
+Chapter 7. Tier 3 optional analyses (explanatory, not core)
+ - Encoder-only vs decoder-only conditioning (mechanistic localization).
+ - Richer metadata tests only as a new hypothesis, not continuation of the same claim.
+
+Chapter 8. Conclusions and implications
+ - Consolidated evidence and claim boundaries.
+ - Implications for privacy-preserving model composition.
+ - Future work centered on utility-aligned compatibility.
+
+Execution priority (strict):
+Tier 1 (must do now):
+1. Integrate current cross-dataset negative result into thesis narrative.
+2. Run per-domain decomposition and report heterogeneity.
+
+Tier 2 (next core experiment):
+1. Build and evaluate utility-aligned compatibility estimator.
+
+Tier 3 (optional):
+1. Encoder/decoder conditioning split.
+2. Richer metadata conditioning.
+
+Milestone plan:
+1. Milestone A: finalize Chapters 1-4 text around locked-protocol evidence.
+2. Milestone B: complete per-domain decomposition and Chapter 5.
+3. Milestone C: run first compatibility-learning prototype and draft Chapter 6.
+4. Milestone D: optional Tier 3 experiments only if time allows.
+
+References
+
+[1] Yadav, P., Raffel, C., Muqeeth, M., Caccia, L., Liu, H., Chen, T., ... & Sordoni, A. (2024). A survey on model moerging: Recycling and routing among specialized experts for collaborative learning. arXiv preprint arXiv:2408.07057.
+
+[2] Xu, Z., Yuan, K., Wang, H., Wang, Y., Song, M., & Song, J. (2024). Training-free pretrained model merging. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (pp. 5915-5925).
+
+[3] Jacobs, R. A., Jordan, M. I., Nowlan, S. J., & Hinton, G. E. (1991). Adaptive mixtures of local experts. Neural Computation.
+
+[4] Jiang, A. Q., Sablayrolles, A., Roux, A., Mensch, A., Savary, B., Bamford, C., ... & Sayed, W. E. (2024). Mixtral of experts. arXiv preprint arXiv:2401.04088.
+
+[5] Di Salvo, F., Tafler, D., Doerrich, S., & Ledig, C. (2024). Privacy-preserving datasets by capturing feature distributions with Conditional VAEs. The 35th British Machine Vision Conference (BMVC).

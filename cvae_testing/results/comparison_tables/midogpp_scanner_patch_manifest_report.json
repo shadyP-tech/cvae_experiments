@@ -1,0 +1,24 @@
+{
+  "annotations_path": "data/MIDOGpp/databases/MIDOG++.json",
+  "group_counts_by_scanner": {
+    "3D Histech": 199,
+    "Aperio CS2": 99,
+    "Hamamatsu S360": 50,
+    "Hamamatsu XR": 154
+  },
+  "metadata_path": "data/MIDOGpp/midogpp_scanner_metadata_full_resplit.csv",
+  "n_patch_rows": 1994,
+  "n_skipped_slides": 1,
+  "n_source_rows": 503,
+  "output_metadata": "data/MIDOGpp/midogpp_scanner_patch_metadata.csv",
+  "patch_counts_by_scanner": {
+    "3D Histech": 795,
+    "Aperio CS2": 393,
+    "Hamamatsu S360": 200,
+    "Hamamatsu XR": 606
+  },
+  "patch_dir": "data/MIDOGpp/patches_224",
+  "patch_size": 224,
+  "patches_per_slide": 4,
+  "skipped_csv": "results/comparison_tables/midogpp_scanner_patch_manifest_report_skipped.csv"
+}
