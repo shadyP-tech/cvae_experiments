@@ -199,6 +199,25 @@ def test_ae_utility_calibrator_harm_veto_v13_config_is_protocol_locked() -> None
     assert harm_veto["veto_thresholds"][-1] == "__inf__"
 
 
+def test_ae_utility_calibrator_recall_budget_v15_config_is_protocol_locked() -> None:
+    path = PROJECT_ROOT / "configs" / "experiments" / "camelyon17" / "learned_utility_ae_utility_calibrator_recall_budget_v15.yaml"
+    cfg = load_config(path)
+    validate_config(cfg)
+    utility = cfg["learned_utility"]["autoencoder_proxy"]["utility_calibrator"]
+    recall = utility["recall_expansion"]
+    assert cfg["experiment"]["name"] == "learned_utility_ae_utility_calibrator_recall_budget_v15"
+    assert utility["primary_method"] == "ae_utility_calibrated_v1_recall_budget_safe_override_v15"
+    assert utility["selection_mode"] == "v1_recall_budget_v15"
+    assert utility["model_types"] == ["ridge_delta"]
+    assert utility["primary_model_type"] == "ridge_delta"
+    assert utility["fallback_policy"] == "ae_argmin_zscore"
+    assert utility["feature_sets_primary"] == ["ae_core", "ae_quality"]
+    assert utility["feature_sets_diagnostic"] == []
+    assert recall["scoring_policy"] == "ridge_delta_best_non_anchor"
+    assert recall["budget_scope"] == "v1_abstentions_per_fold"
+    assert recall["max_active_override_rate_ratio_vs_v1"] == 1.20
+
+
 def test_quarantined_entrypoints_fail_fast() -> None:
     checks = [
         ([sys.executable, "scripts/run_learned_compatibility_loqdo.py"], "target expert"),

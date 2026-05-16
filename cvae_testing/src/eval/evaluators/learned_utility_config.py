@@ -155,6 +155,21 @@ class AEUtilityCalibratorConfig:
     harm_veto_min_retained_v1_override_gain_rate: float
     harm_veto_min_active_override_rate_ratio_vs_v1: float
     harm_veto_min_gap_delta_vs_v1_lcb_pp: float
+    recall_scoring_policy: str
+    recall_budget_rates: Tuple[float, ...]
+    recall_budget_scope: str
+    recall_min_v1_abstention_count_source_inner: int
+    recall_min_recall_override_count_source_inner: int
+    recall_min_recall_override_count_source_inner_for_pass: int
+    recall_min_strict_recall_precision: float
+    recall_min_strict_recall_precision_lcb: float
+    recall_max_harmful_recall_rate_ucb: float
+    recall_min_net_gain_vs_v1_source_inner: float
+    recall_min_gap_delta_vs_v1_lcb_pp: float
+    recall_min_gap_delta_vs_v1_lcb_pp_for_pass: float
+    recall_max_active_override_rate_ratio_vs_v1: float
+    recall_diagnostic_active_override_rate_ratio_upper_bound: float
+    recall_max_worst_pseudo_domain_gap_degradation_vs_v1_pp: float
 
 
 @dataclass(frozen=True)
@@ -364,6 +379,7 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
     precision_selection_cfg = _as_dict((utility_calibrator_cfg or {}).get("precision_selection", {}))
     v1_guard_cfg = _as_dict((precision_selection_cfg or {}).get("v1_guard", {}))
     harm_veto_cfg = _as_dict((utility_calibrator_cfg or {}).get("harm_veto", {}))
+    recall_expansion_cfg = _as_dict((utility_calibrator_cfg or {}).get("recall_expansion", {}))
     utility_calibrator = AEUtilityCalibratorConfig(
         enabled=bool((utility_calibrator_cfg or {}).get("enabled", False)),
         primary_method=str(
@@ -465,17 +481,26 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         neutral_override_gap_pct_band=float(
             (precision_selection_cfg or {}).get(
                 "neutral_override_gap_pct_band",
-                (harm_veto_cfg or {}).get("neutral_override_gap_pct_band", 0.25),
+                (harm_veto_cfg or {}).get(
+                    "neutral_override_gap_pct_band",
+                    (recall_expansion_cfg or {}).get("neutral_override_gap_pct_band", 0.25),
+                ),
             )
         ),
         max_worst_pseudo_domain_gap_degradation_pp=float(
             (precision_selection_cfg or {}).get("max_worst_pseudo_domain_gap_degradation_pp", 1.0)
         ),
         precision_bootstrap_reps=int(
-            (precision_selection_cfg or {}).get("bootstrap_reps", (harm_veto_cfg or {}).get("bootstrap_reps", 2000))
+            (precision_selection_cfg or {}).get(
+                "bootstrap_reps",
+                (harm_veto_cfg or {}).get("bootstrap_reps", (recall_expansion_cfg or {}).get("bootstrap_reps", 2000)),
+            )
         ),
         precision_bootstrap_seed=int(
-            (precision_selection_cfg or {}).get("bootstrap_seed", (harm_veto_cfg or {}).get("bootstrap_seed", 1337))
+            (precision_selection_cfg or {}).get(
+                "bootstrap_seed",
+                (harm_veto_cfg or {}).get("bootstrap_seed", (recall_expansion_cfg or {}).get("bootstrap_seed", 1337)),
+            )
         ),
         diagnostic_precision_thresholds=tuple(
             float(v)
@@ -517,6 +542,55 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
             (harm_veto_cfg or {}).get("min_active_override_rate_ratio_vs_v1", 0.80)
         ),
         harm_veto_min_gap_delta_vs_v1_lcb_pp=float((harm_veto_cfg or {}).get("min_gap_delta_vs_v1_lcb_pp", -0.10)),
+        recall_scoring_policy=str(
+            (recall_expansion_cfg or {}).get("scoring_policy", "ridge_delta_best_non_anchor")
+        ).strip().lower(),
+        recall_budget_rates=tuple(
+            float(v)
+            for v in (recall_expansion_cfg or {}).get(
+                "recall_budget_rates",
+                [0.0, 0.005, 0.01, 0.02, 0.05, 0.10],
+            )
+        ),
+        recall_budget_scope=str(
+            (recall_expansion_cfg or {}).get("budget_scope", "v1_abstentions_per_fold")
+        ).strip().lower(),
+        recall_min_v1_abstention_count_source_inner=int(
+            (recall_expansion_cfg or {}).get("min_v1_abstention_count_source_inner", 50)
+        ),
+        recall_min_recall_override_count_source_inner=int(
+            (recall_expansion_cfg or {}).get("min_recall_override_count_source_inner", 10)
+        ),
+        recall_min_recall_override_count_source_inner_for_pass=int(
+            (recall_expansion_cfg or {}).get("min_recall_override_count_source_inner_for_pass", 20)
+        ),
+        recall_min_strict_recall_precision=float(
+            (recall_expansion_cfg or {}).get("min_strict_recall_precision", 0.70)
+        ),
+        recall_min_strict_recall_precision_lcb=float(
+            (recall_expansion_cfg or {}).get("min_strict_recall_precision_lcb", 0.50)
+        ),
+        recall_max_harmful_recall_rate_ucb=float(
+            (recall_expansion_cfg or {}).get("max_harmful_recall_rate_ucb", 0.35)
+        ),
+        recall_min_net_gain_vs_v1_source_inner=float(
+            (recall_expansion_cfg or {}).get("min_net_gain_vs_v1_source_inner", 0.0)
+        ),
+        recall_min_gap_delta_vs_v1_lcb_pp=float(
+            (recall_expansion_cfg or {}).get("min_gap_delta_vs_v1_lcb_pp", -0.05)
+        ),
+        recall_min_gap_delta_vs_v1_lcb_pp_for_pass=float(
+            (recall_expansion_cfg or {}).get("min_gap_delta_vs_v1_lcb_pp_for_pass", 0.0)
+        ),
+        recall_max_active_override_rate_ratio_vs_v1=float(
+            (recall_expansion_cfg or {}).get("max_active_override_rate_ratio_vs_v1", 1.20)
+        ),
+        recall_diagnostic_active_override_rate_ratio_upper_bound=float(
+            (recall_expansion_cfg or {}).get("diagnostic_active_override_rate_ratio_upper_bound", 1.35)
+        ),
+        recall_max_worst_pseudo_domain_gap_degradation_vs_v1_pp=float(
+            (recall_expansion_cfg or {}).get("max_worst_pseudo_domain_gap_degradation_vs_v1_pp", 1.0)
+        ),
     )
     autoencoder = AutoencoderProxyConfig(
         enabled=bool((autoencoder_cfg or {}).get("enabled", False)),

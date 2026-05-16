@@ -31,6 +31,7 @@ PRIMARY_METHOD = "ae_utility_calibrated_safe_override_v1"
 PRIMARY_METHOD_V11 = "ae_utility_calibrated_precision_lcb_safe_override_v11"
 PRIMARY_METHOD_V12 = "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12"
 PRIMARY_METHOD_V13 = "ae_utility_calibrated_v1_harm_veto_safe_override_v13"
+PRIMARY_METHOD_V15 = "ae_utility_calibrated_v1_recall_budget_safe_override_v15"
 PRIMARY_METHOD_V2 = "ae_utility_calibrated_consensus_safe_override_v2"
 HYBRID_METADATA_METHOD = "ae_metadata_utility_calibrated_safe_override_v1"
 HYBRID_COMBINED_METHOD = "ae_combined_utility_calibrated_safe_override_v1"
@@ -41,7 +42,8 @@ ORACLE_HEADROOM_METHOD = "oracle_safe_override_over_ae_argmin"
 V2_METHODS = {PRIMARY_METHOD_V2, HYBRID_METADATA_METHOD_V2, HYBRID_COMBINED_METHOD_V2}
 PRECISION_LCB_METHODS = {PRIMARY_METHOD_V11, PRIMARY_METHOD_V12}
 HARM_VETO_METHODS = {PRIMARY_METHOD_V13}
-REPORT_ONLY_HARDENING_METHODS = PRECISION_LCB_METHODS | HARM_VETO_METHODS
+RECALL_BUDGET_METHODS = {PRIMARY_METHOD_V15}
+REPORT_ONLY_HARDENING_METHODS = PRECISION_LCB_METHODS | HARM_VETO_METHODS | RECALL_BUDGET_METHODS
 V2_PRIMARY_FEATURE_SETS = {"ae_consensus_core", "ae_consensus_quality"}
 V2_DIAGNOSTIC_FEATURE_SETS = {"ae_metadata_consensus", "ae_combined_consensus"}
 
@@ -89,6 +91,7 @@ class _SelectedConfig:
     selection_status: str = "source_inner_selected"
     fallback_reason: str = ""
     veto_threshold: float = float("inf")
+    recall_budget_rate: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -696,6 +699,182 @@ def _apply_safe_override_policy(
             selected[i] = best
             accepted[i] = True
     return selected, best_override, best_delta, margins
+
+
+def _ae_rank_matrix_from_zscores(ae_zscore_eval: np.ndarray) -> np.ndarray:
+    ranks = np.zeros_like(np.asarray(ae_zscore_eval, dtype=np.float64), dtype=np.int64)
+    for i in range(ranks.shape[0]):
+        ranks[i, :] = _rank_order(np.asarray(ae_zscore_eval[i, :], dtype=np.float64), lower_is_better=True)
+    return ranks
+
+
+def _best_recall_candidates(
+    *,
+    pred_delta_matrix: np.ndarray,
+    anchor_idx: np.ndarray,
+    ae_zscore_eval: np.ndarray,
+    delta_threshold: float,
+    margin_threshold: float,
+) -> Dict[str, Any]:
+    n_rows, n_cols = pred_delta_matrix.shape
+    best_idx = np.full((n_rows,), -1, dtype=np.int64)
+    best_delta = np.full((n_rows,), float("-inf"), dtype=np.float64)
+    best_margin = np.full((n_rows,), float("-inf"), dtype=np.float64)
+    best_ae_rank = np.full((n_rows,), -1, dtype=np.int64)
+    reasons = np.full((n_rows,), "v1_active_override", dtype=object)
+    ae_ranks = _ae_rank_matrix_from_zscores(ae_zscore_eval)
+    for i in range(n_rows):
+        raw_candidates = [j for j in range(n_cols) if int(j) != int(anchor_idx[i])]
+        if not raw_candidates:
+            reasons[i] = "no_non_anchor_candidate"
+            continue
+        finite_candidates = [j for j in raw_candidates if np.isfinite(float(pred_delta_matrix[i, j]))]
+        if not finite_candidates:
+            reasons[i] = "no_positive_candidate"
+            continue
+        ordered = sorted(finite_candidates, key=lambda j: (-float(pred_delta_matrix[i, j]), int(j)))
+        best = int(ordered[0])
+        second_delta = float(pred_delta_matrix[i, int(ordered[1])]) if len(ordered) > 1 else float("-inf")
+        best_idx[i] = best
+        best_delta[i] = float(pred_delta_matrix[i, best])
+        best_margin[i] = float(best_delta[i] - second_delta) if np.isfinite(second_delta) else float("inf")
+        best_ae_rank[i] = int(ae_ranks[i, best])
+        if float(best_delta[i]) <= 0.0:
+            reasons[i] = "no_positive_candidate"
+            continue
+        delta_fail = float(best_delta[i]) < float(delta_threshold)
+        margin_fail = float(best_margin[i]) < float(margin_threshold)
+        if delta_fail and margin_fail:
+            reasons[i] = "below_delta_and_margin_threshold"
+        elif delta_fail:
+            reasons[i] = "below_delta_threshold"
+        elif margin_fail:
+            reasons[i] = "below_margin_threshold"
+        else:
+            reasons[i] = "below_delta_and_margin_threshold"
+    return {
+        "best_idx": best_idx,
+        "best_delta": best_delta,
+        "best_margin": best_margin,
+        "best_ae_rank": best_ae_rank,
+        "abstention_reason": reasons,
+    }
+
+
+def _apply_recall_budget_policy(
+    *,
+    v1_selected_idx: np.ndarray,
+    anchor_idx: np.ndarray,
+    pred_delta_matrix: np.ndarray,
+    ae_zscore_eval: np.ndarray,
+    candidate_expert_domains: Sequence[int],
+    sample_indices: Sequence[int],
+    delta_threshold: float,
+    margin_threshold: float,
+    recall_budget_rate: float,
+) -> Tuple[np.ndarray, Dict[str, Any]]:
+    selected = np.asarray(v1_selected_idx, dtype=np.int64).copy()
+    n_rows = int(selected.shape[0])
+    candidates = _best_recall_candidates(
+        pred_delta_matrix=pred_delta_matrix,
+        anchor_idx=anchor_idx,
+        ae_zscore_eval=ae_zscore_eval,
+        delta_threshold=float(delta_threshold),
+        margin_threshold=float(margin_threshold),
+    )
+    v1_active = np.asarray(v1_selected_idx, dtype=np.int64) != np.asarray(anchor_idx, dtype=np.int64)
+    candidates["abstention_reason"] = np.asarray(candidates["abstention_reason"], dtype=object)
+    candidates["abstention_reason"][v1_active] = "v1_active_override"
+    eligible = (
+        ~v1_active
+        & (np.asarray(candidates["best_idx"], dtype=np.int64) >= 0)
+        & np.isfinite(np.asarray(candidates["best_delta"], dtype=np.float64))
+        & (np.asarray(candidates["best_delta"], dtype=np.float64) > 0.0)
+    )
+    eligible_positions = [int(i) for i in np.where(eligible)[0].tolist()]
+    expert_domains = list(candidate_expert_domains)
+    sample_ids = list(sample_indices)
+    ordered_positions = sorted(
+        eligible_positions,
+        key=lambda i: (
+            -float(candidates["best_delta"][i]),
+            -float(candidates["best_margin"][i]) if np.isfinite(float(candidates["best_margin"][i])) else float("-inf"),
+            int(candidates["best_ae_rank"][i]) if int(candidates["best_ae_rank"][i]) >= 0 else 10**9,
+            int(expert_domains[int(candidates["best_idx"][i])]),
+            int(sample_ids[i]),
+        ),
+    )
+    budget_count = 0 if float(recall_budget_rate) <= 0.0 else int(math.ceil(float(recall_budget_rate) * len(ordered_positions)))
+    budget_count = max(0, min(int(budget_count), len(ordered_positions)))
+    recall_applied = np.zeros((n_rows,), dtype=bool)
+    recall_rank = np.full((n_rows,), -1, dtype=np.int64)
+    for rank, pos in enumerate(ordered_positions, start=1):
+        recall_rank[int(pos)] = int(rank)
+        if rank <= budget_count:
+            selected[int(pos)] = int(candidates["best_idx"][int(pos)])
+            recall_applied[int(pos)] = True
+    info = {
+        **candidates,
+        "eligible_recall_count": int(len(ordered_positions)),
+        "recall_budget_count": int(budget_count),
+        "recall_applied": recall_applied,
+        "recall_rank": recall_rank,
+    }
+    return selected, info
+
+
+def _recall_budget_metrics(
+    *,
+    v1_selected_idx: np.ndarray,
+    v15_selected_idx: np.ndarray,
+    anchor_idx: np.ndarray,
+    recall_applied: np.ndarray,
+    true_eval: np.ndarray,
+    neutral_gap_pct_band: float,
+) -> Dict[str, float]:
+    rows = np.arange(true_eval.shape[0])
+    oracle_idx = _stable_argmin_indices(true_eval)
+    v1_nelbo = true_eval[rows, np.asarray(v1_selected_idx, dtype=np.int64)]
+    v15_nelbo = true_eval[rows, np.asarray(v15_selected_idx, dtype=np.int64)]
+    anchor_nelbo = true_eval[rows, np.asarray(anchor_idx, dtype=np.int64)]
+    oracle_nelbo = true_eval[rows, oracle_idx]
+    v1_gap_pct = ((v1_nelbo - oracle_nelbo) / np.maximum(np.abs(oracle_nelbo), 1e-12)) * 100.0
+    v15_gap_pct = ((v15_nelbo - oracle_nelbo) / np.maximum(np.abs(oracle_nelbo), 1e-12)) * 100.0
+    anchor_gap_pct = ((anchor_nelbo - oracle_nelbo) / np.maximum(np.abs(oracle_nelbo), 1e-12)) * 100.0
+    delta_vs_anchor = v15_gap_pct - anchor_gap_pct
+    recall = np.asarray(recall_applied, dtype=bool)
+    band = float(neutral_gap_pct_band)
+    improving = recall & (delta_vs_anchor <= -band)
+    harmful = recall & (delta_vs_anchor >= band)
+    neutral = recall & ~(improving | harmful)
+    recall_count = int(np.sum(recall))
+    improving_count = int(np.sum(improving))
+    harmful_count = int(np.sum(harmful))
+    neutral_count = int(np.sum(neutral))
+    strict_lcb, _strict_ucb = _wilson_bounds(improving_count, recall_count)
+    _harm_lcb, harmful_ucb = _wilson_bounds(harmful_count, recall_count)
+    v1_active = np.asarray(v1_selected_idx, dtype=np.int64) != np.asarray(anchor_idx, dtype=np.int64)
+    v15_active = np.asarray(v15_selected_idx, dtype=np.int64) != np.asarray(anchor_idx, dtype=np.int64)
+    v1_active_count = int(np.sum(v1_active))
+    v15_active_count = int(np.sum(v15_active))
+    return {
+        "recall_override_count": recall_count,
+        "recall_improving_count": improving_count,
+        "recall_harmful_count": harmful_count,
+        "recall_neutral_count": neutral_count,
+        "strict_recall_precision": float(improving_count / recall_count) if recall_count > 0 else float("nan"),
+        "strict_recall_precision_lcb": strict_lcb,
+        "harmful_recall_rate": float(harmful_count / recall_count) if recall_count > 0 else float("nan"),
+        "harmful_recall_rate_ucb": harmful_ucb,
+        "source_inner_gap_delta_vs_v1": float(np.mean(v1_gap_pct - v15_gap_pct)) if v1_gap_pct.size else float("nan"),
+        "gap_delta_vs_v1": float(np.mean(v1_gap_pct - v15_gap_pct)) if v1_gap_pct.size else float("nan"),
+        "net_gain_vs_v1": float(np.mean(v1_nelbo - v15_nelbo)) if v1_nelbo.size else float("nan"),
+        "top1_delta_vs_v1": float(np.mean(np.asarray(v15_selected_idx) == oracle_idx) - np.mean(np.asarray(v1_selected_idx) == oracle_idx)) if oracle_idx.size else float("nan"),
+        "v1_active_override_count": v1_active_count,
+        "v15_active_override_count": v15_active_count,
+        "active_override_rate_ratio_vs_v1": float(v15_active_count / max(v1_active_count, 1)),
+        "v1_abstention_count": int(np.sum(~v1_active)),
+    }
 
 
 def _true_delta_matrix(true_eval: np.ndarray, anchor_idx: np.ndarray) -> np.ndarray:
@@ -1340,6 +1519,81 @@ def _aggregate_harm_veto_metrics(
         "spearman_delta_vs_v1_source_inner": (
             float(cand_spearman - v1_spearman) if np.isfinite(cand_spearman) and np.isfinite(v1_spearman) else float("nan")
         ),
+    }
+
+
+def _aggregate_recall_budget_metrics(
+    *,
+    summaries: Sequence[Mapping[str, float]],
+    v1_summaries: Sequence[Mapping[str, float]],
+    cfg: AEUtilityCalibratorConfig,
+) -> Dict[str, float]:
+    recall_improving = int(sum(int(float(row.get("recall_improving_count", 0.0))) for row in summaries))
+    recall_harmful = int(sum(int(float(row.get("recall_harmful_count", 0.0))) for row in summaries))
+    recall_neutral = int(sum(int(float(row.get("recall_neutral_count", 0.0))) for row in summaries))
+    recall_count = int(recall_improving + recall_harmful + recall_neutral)
+    strict_lcb, _strict_ucb = _wilson_bounds(recall_improving, recall_count)
+    _harm_lcb, harmful_ucb = _wilson_bounds(recall_harmful, recall_count)
+    gap_deltas = [float(row.get("gap_delta_vs_v1", float("nan"))) for row in summaries]
+    gap_delta_lcb = _bootstrap_lcb(
+        gap_deltas,
+        reps=int(cfg.precision_bootstrap_reps),
+        seed=int(cfg.precision_bootstrap_seed),
+    )
+    gap_degradations = [-float(v) for v in gap_deltas if np.isfinite(float(v))]
+    v1_active = int(sum(int(float(row.get("v1_active_override_count", 0.0))) for row in summaries))
+    v15_active = int(sum(int(float(row.get("v15_active_override_count", 0.0))) for row in summaries))
+    v1_abstentions = int(sum(int(float(row.get("v1_abstention_count", 0.0))) for row in summaries))
+    active_ratio = float(v15_active / max(v1_active, 1))
+    net_gain = _finite_mean([float(row.get("net_gain_vs_v1", float("nan"))) for row in summaries], default=float("nan"))
+    v1_top1 = _finite_mean([float(row.get("top1_oracle_hit", float("nan"))) for row in v1_summaries], default=float("nan"))
+    cand_top1 = _finite_mean([float(row.get("top1_oracle_hit", float("nan"))) for row in summaries], default=float("nan"))
+    v1_spearman = _finite_mean([float(row.get("raw_predicted_delta_spearman_non_anchor", float("nan"))) for row in v1_summaries], default=float("nan"))
+    cand_spearman = _finite_mean([float(row.get("raw_predicted_delta_spearman_non_anchor", float("nan"))) for row in summaries], default=float("nan"))
+    worst_degradation = float(max(gap_degradations)) if gap_degradations else float("inf")
+    strict_precision = float(recall_improving / recall_count) if recall_count > 0 else float("nan")
+    harmful_rate = float(recall_harmful / recall_count) if recall_count > 0 else float("nan")
+    passes = bool(
+        v1_abstentions >= int(cfg.recall_min_v1_abstention_count_source_inner)
+        and recall_count >= int(cfg.recall_min_recall_override_count_source_inner)
+        and np.isfinite(strict_precision)
+        and strict_precision >= float(cfg.recall_min_strict_recall_precision)
+        and np.isfinite(strict_lcb)
+        and strict_lcb >= float(cfg.recall_min_strict_recall_precision_lcb)
+        and np.isfinite(harmful_ucb)
+        and harmful_ucb <= float(cfg.recall_max_harmful_recall_rate_ucb)
+        and np.isfinite(net_gain)
+        and net_gain >= float(cfg.recall_min_net_gain_vs_v1_source_inner)
+        and np.isfinite(gap_delta_lcb)
+        and gap_delta_lcb >= float(cfg.recall_min_gap_delta_vs_v1_lcb_pp)
+        and active_ratio <= float(cfg.recall_max_active_override_rate_ratio_vs_v1)
+        and worst_degradation <= float(cfg.recall_max_worst_pseudo_domain_gap_degradation_vs_v1_pp)
+    )
+    return {
+        "passes_recall_budget_gates": int(passes),
+        "recall_override_count_source_inner": recall_count,
+        "recall_improving_count": recall_improving,
+        "recall_harmful_count": recall_harmful,
+        "recall_neutral_count": recall_neutral,
+        "strict_recall_precision": strict_precision,
+        "strict_recall_precision_lcb": strict_lcb,
+        "harmful_recall_rate": harmful_rate,
+        "harmful_recall_rate_ucb": harmful_ucb,
+        "source_inner_gap_delta_vs_v1": _finite_mean(gap_deltas, default=float("nan")),
+        "source_inner_gap_delta_vs_v1_lcb": gap_delta_lcb,
+        "net_gain_vs_v1_source_inner": net_gain,
+        "worst_pseudo_domain_gap_degradation_vs_v1_pp": worst_degradation,
+        "v1_active_override_count_source_inner": v1_active,
+        "v15_active_override_count_source_inner": v15_active,
+        "active_override_count_source_inner": v15_active,
+        "v1_abstention_count_source_inner": v1_abstentions,
+        "active_override_rate_ratio_vs_v1": active_ratio,
+        "top1_delta_vs_v1_source_inner": float(cand_top1 - v1_top1) if np.isfinite(cand_top1) and np.isfinite(v1_top1) else float("nan"),
+        "spearman_delta_vs_v1_source_inner": (
+            float(cand_spearman - v1_spearman) if np.isfinite(cand_spearman) and np.isfinite(v1_spearman) else float("nan")
+        ),
+        "recall_override_count_source_inner_for_pass": int(cfg.recall_min_recall_override_count_source_inner_for_pass),
+        "min_gap_delta_vs_v1_lcb_pp_for_pass": float(cfg.recall_min_gap_delta_vs_v1_lcb_pp_for_pass),
     }
 
 
@@ -2268,6 +2522,285 @@ def _select_harm_veto_config_for_method(
     return selected, validation_rows
 
 
+def _select_recall_budget_config_for_method(
+    *,
+    method: str,
+    feature_sets: Sequence[str],
+    embeddings: np.ndarray,
+    sample_domains: np.ndarray,
+    true_nelbo: np.ndarray,
+    expert_domains: Sequence[int],
+    train_idx: np.ndarray,
+    outer_fold: FoldCandidateSet,
+    metadata_similarity: np.ndarray,
+    ae_scores: AutoencoderScoreMatrices,
+    cfg: AEUtilityCalibratorConfig,
+) -> Tuple[_SelectedConfig, List[Dict[str, Any]]]:
+    v1_selected, _v1_rows = _select_config_for_method(
+        method=PRIMARY_METHOD,
+        feature_sets=feature_sets,
+        embeddings=embeddings,
+        sample_domains=sample_domains,
+        true_nelbo=true_nelbo,
+        expert_domains=expert_domains,
+        train_idx=train_idx,
+        outer_fold=outer_fold,
+        metadata_similarity=metadata_similarity,
+        ae_scores=ae_scores,
+        cfg=cfg,
+    )
+    source_domains = sorted(set(int(sample_domains[int(i)]) for i in np.asarray(train_idx, dtype=np.int64)))
+    budgets = tuple(dict.fromkeys(float(v) for v in cfg.recall_budget_rates))
+    if 0.0 not in budgets:
+        budgets = tuple([0.0] + list(budgets))
+    validation_rows: List[Dict[str, Any]] = []
+    budget_domain_summaries: Dict[float, List[Dict[str, float]]] = {}
+    budget_domain_v1_summaries: Dict[float, List[Dict[str, float]]] = {}
+    budget_reason_summaries: Dict[Tuple[float, str], List[Dict[str, float]]] = {}
+
+    for pseudo_domain in source_domains:
+        val_idx = np.asarray(
+            [i for i in train_idx.tolist() if int(sample_domains[int(i)]) == int(pseudo_domain)],
+            dtype=np.int64,
+        )
+        inner_train_idx = np.asarray(
+            [i for i in train_idx.tolist() if int(sample_domains[int(i)]) != int(pseudo_domain)],
+            dtype=np.int64,
+        )
+        if val_idx.size == 0 or inner_train_idx.size == 0:
+            continue
+        inner_fold = FoldCandidateSet.for_heldout_domain(
+            heldout_domain=int(outer_fold.heldout_domain),
+            expert_domains=expert_domains,
+            excluded_domains=[int(pseudo_domain)],
+        )
+        if len(inner_fold.candidate_expert_domains) < 2:
+            continue
+        eval_fold, eval_rows, pred_matrix, anchor_idx, v1_selected_idx, override_margin = _fit_eval_v1_policy_for_fold(
+            embeddings=embeddings,
+            sample_domains=sample_domains,
+            true_nelbo=true_nelbo,
+            expert_domains=expert_domains,
+            train_idx=inner_train_idx,
+            eval_idx=val_idx,
+            outer_heldout_domain=int(outer_fold.heldout_domain),
+            eval_excluded_domains=[int(pseudo_domain)],
+            metadata_similarity=metadata_similarity,
+            ae_scores=ae_scores,
+            feature_set=str(v1_selected.feature_set),
+            delta_threshold=float(v1_selected.delta_threshold),
+            margin_threshold=float(v1_selected.margin_threshold),
+            ridge_l2=float(cfg.ridge_l2),
+        )
+        if eval_rows.x.size == 0:
+            continue
+        true_val = eval_fold.slice_nelbo(true_nelbo, val_idx)
+        metadata_val = metadata_similarity[val_idx][:, list(eval_fold.candidate_col_indices)]
+        metadata_idx = _metadata_selected_local_indices(metadata_val)
+        ae_val = ae_scores.zscore_matrix[val_idx][:, list(eval_fold.candidate_col_indices)]
+        v1_summary = _policy_summary(
+            selected_idx=v1_selected_idx,
+            anchor_idx=anchor_idx,
+            pred_delta_matrix=pred_matrix,
+            true_eval=true_val,
+            metadata_idx=metadata_idx,
+            ae_zscore_eval=ae_val,
+            neutral_gap_pct_band=float(cfg.neutral_override_gap_pct_band),
+        )
+        for budget_rate in budgets:
+            v15_selected_idx, recall_info = _apply_recall_budget_policy(
+                v1_selected_idx=v1_selected_idx,
+                anchor_idx=anchor_idx,
+                pred_delta_matrix=pred_matrix,
+                ae_zscore_eval=ae_val,
+                candidate_expert_domains=eval_fold.candidate_expert_domains,
+                sample_indices=val_idx.tolist(),
+                delta_threshold=float(v1_selected.delta_threshold),
+                margin_threshold=float(v1_selected.margin_threshold),
+                recall_budget_rate=float(budget_rate),
+            )
+            summary = _policy_summary(
+                selected_idx=v15_selected_idx,
+                anchor_idx=anchor_idx,
+                pred_delta_matrix=pred_matrix,
+                true_eval=true_val,
+                metadata_idx=metadata_idx,
+                ae_zscore_eval=ae_val,
+                neutral_gap_pct_band=float(cfg.neutral_override_gap_pct_band),
+            )
+            recall_metrics = _recall_budget_metrics(
+                v1_selected_idx=v1_selected_idx,
+                v15_selected_idx=v15_selected_idx,
+                anchor_idx=anchor_idx,
+                recall_applied=np.asarray(recall_info["recall_applied"], dtype=bool),
+                true_eval=true_val,
+                neutral_gap_pct_band=float(cfg.neutral_override_gap_pct_band),
+            )
+            row_summary = {
+                **dict(summary),
+                **recall_metrics,
+                "source_inner_pseudo_query_domain": int(pseudo_domain),
+                "recall_budget_rate": float(budget_rate),
+                "recall_budget_count": int(recall_info["recall_budget_count"]),
+                "eligible_recall_count": int(recall_info["eligible_recall_count"]),
+            }
+            budget_domain_summaries.setdefault(float(budget_rate), []).append(row_summary)
+            budget_domain_v1_summaries.setdefault(float(budget_rate), []).append(dict(v1_summary))
+            applied = np.asarray(recall_info["recall_applied"], dtype=bool)
+            reasons = np.asarray(recall_info["abstention_reason"], dtype=object)
+            for reason in sorted(set(str(v) for v in reasons.tolist() if str(v) != "v1_active_override")):
+                mask = reasons == reason
+                reason_recall_count = int(np.sum(applied & mask))
+                if reason_recall_count <= 0:
+                    continue
+                budget_reason_summaries.setdefault((float(budget_rate), str(reason)), []).append(
+                    {
+                        "recall_override_count": reason_recall_count,
+                        "recall_budget_rate": float(budget_rate),
+                        "v1_abstention_reason": str(reason),
+                    }
+                )
+            validation_rows.append(
+                {
+                    "method": str(method),
+                    "feature_set": str(v1_selected.feature_set),
+                    "model_type": "ridge_delta",
+                    "fold_query_domain": int(outer_fold.heldout_domain),
+                    "source_inner_pseudo_query_domain": int(pseudo_domain),
+                    "delta_threshold": _threshold_label(float(v1_selected.delta_threshold)),
+                    "margin_threshold": _threshold_label(float(v1_selected.margin_threshold)),
+                    "recall_budget_rate": float(budget_rate),
+                    "threshold_selection_policy": "source_inner_v1_recall_budget",
+                    "selection_mode": str(cfg.selection_mode),
+                    "n_validation_samples": int(val_idx.shape[0]),
+                    "candidate_experts": inner_fold.label(),
+                    "excluded_target_ae": 1,
+                    "excluded_target_cvae": 1,
+                    "excluded_pseudo_query_ae": 1,
+                    "excluded_pseudo_query_cvae": 1,
+                    "heldout_target_nelbo_used_for_selection": 0,
+                    **{f"macro_{k}": float(v) for k, v in row_summary.items() if isinstance(v, (int, float, np.integer, np.floating))},
+                }
+            )
+
+    config_summaries: List[Dict[str, Any]] = []
+    for budget_rate, summaries in budget_domain_summaries.items():
+        v1_summaries = budget_domain_v1_summaries.get(budget_rate, [])
+        if not summaries:
+            continue
+        keys = set().union(*(row.keys() for row in summaries))
+        macro = {
+            k: _finite_mean([float(row.get(k, float("nan"))) for row in summaries], default=float("nan"))
+            for k in keys
+            if all(isinstance(row.get(k, 0.0), (int, float, np.integer, np.floating)) for row in summaries)
+        }
+        aggregate = _aggregate_recall_budget_metrics(summaries=summaries, v1_summaries=v1_summaries, cfg=cfg)
+        config_row = {
+            "method": str(method),
+            "feature_set": str(v1_selected.feature_set),
+            "delta_threshold": float(v1_selected.delta_threshold),
+            "margin_threshold": float(v1_selected.margin_threshold),
+            "recall_budget_rate": float(budget_rate),
+            **macro,
+            **aggregate,
+        }
+        config_summaries.append(config_row)
+        validation_rows.append(
+            {
+                "method": str(method),
+                "feature_set": str(v1_selected.feature_set),
+                "model_type": "ridge_delta",
+                "fold_query_domain": int(outer_fold.heldout_domain),
+                "source_inner_pseudo_query_domain": "source_inner_macro",
+                "delta_threshold": _threshold_label(float(v1_selected.delta_threshold)),
+                "margin_threshold": _threshold_label(float(v1_selected.margin_threshold)),
+                "recall_budget_rate": float(budget_rate),
+                "threshold_selection_policy": "source_inner_v1_recall_budget",
+                "selection_mode": str(cfg.selection_mode),
+                "n_validation_samples": int(aggregate["v1_abstention_count_source_inner"]),
+                "candidate_experts": "source_inner_macro",
+                "excluded_target_ae": 1,
+                "excluded_target_cvae": 1,
+                "excluded_pseudo_query_ae": 1,
+                "excluded_pseudo_query_cvae": 1,
+                "heldout_target_nelbo_used_for_selection": 0,
+                **aggregate,
+                **{f"macro_{k}": float(v) for k, v in macro.items()},
+            }
+        )
+    for (budget_rate, reason), summaries in budget_reason_summaries.items():
+        validation_rows.append(
+            {
+                "method": str(method),
+                "feature_set": str(v1_selected.feature_set),
+                "model_type": "ridge_delta",
+                "fold_query_domain": int(outer_fold.heldout_domain),
+                "source_inner_pseudo_query_domain": f"abstention_reason:{reason}",
+                "delta_threshold": _threshold_label(float(v1_selected.delta_threshold)),
+                "margin_threshold": _threshold_label(float(v1_selected.margin_threshold)),
+                "recall_budget_rate": float(budget_rate),
+                "v1_abstention_reason": str(reason),
+                "threshold_selection_policy": "source_inner_v1_recall_budget_by_abstention_reason",
+                "selection_mode": str(cfg.selection_mode),
+                "recall_override_count_source_inner": int(sum(int(row.get("recall_override_count", 0)) for row in summaries)),
+                "heldout_target_nelbo_used_for_selection": 0,
+            }
+        )
+
+    passing = [
+        row
+        for row in config_summaries
+        if float(row.get("recall_budget_rate", 0.0)) > 0.0
+        and int(row.get("passes_recall_budget_gates", 0)) == 1
+    ]
+    if passing:
+        selected_row = sorted(
+            passing,
+            key=lambda row: (
+                -float(row.get("source_inner_gap_delta_vs_v1_lcb", float("-inf"))),
+                -float(row.get("strict_recall_precision_lcb", float("-inf"))),
+                float(row.get("harmful_recall_rate_ucb", float("inf"))),
+                float(row.get("active_override_rate_ratio_vs_v1", float("inf"))),
+                float(row.get("recall_budget_rate", float("inf"))),
+            ),
+        )[0]
+        selected = _SelectedConfig(
+            str(method),
+            str(selected_row["feature_set"]),
+            float(selected_row["delta_threshold"]),
+            float(selected_row["margin_threshold"]),
+            1,
+            selection_status="recall_budget_v15_selected",
+            recall_budget_rate=float(selected_row["recall_budget_rate"]),
+        )
+    else:
+        selected = _SelectedConfig(
+            str(method),
+            str(v1_selected.feature_set),
+            float(v1_selected.delta_threshold),
+            float(v1_selected.margin_threshold),
+            0,
+            selection_status="fallback_to_v1_no_recall_safe_budget",
+            fallback_reason="no_recall_safe_budget",
+            recall_budget_rate=0.0,
+        )
+    for row in validation_rows:
+        row["selected_feature_set"] = selected.feature_set
+        row["selected_delta_threshold"] = _threshold_label(selected.delta_threshold)
+        row["selected_margin_threshold"] = _threshold_label(selected.margin_threshold)
+        row["selected_recall_budget_rate"] = float(selected.recall_budget_rate)
+        row["selection_status"] = selected.selection_status
+        row["fallback_reason"] = selected.fallback_reason
+        row["selected_by_source_inner_validation"] = int(
+            selected.selected_by_source_inner
+            and row.get("feature_set") == selected.feature_set
+            and row.get("delta_threshold") == _threshold_label(selected.delta_threshold)
+            and row.get("margin_threshold") == _threshold_label(selected.margin_threshold)
+            and float(row.get("recall_budget_rate", -1.0)) == float(selected.recall_budget_rate)
+        )
+    return selected, validation_rows
+
+
 def _select_consensus_config_for_method(
     *,
     method: str,
@@ -2483,6 +3016,11 @@ def _method_feature_sets(cfg: AEUtilityCalibratorConfig) -> List[Tuple[str, Tupl
             (PRIMARY_METHOD_V12, tuple(cfg.feature_sets_primary), "v1_2_v1_guarded_precision_baseline"),
             (PRIMARY_METHOD_V13, tuple(cfg.feature_sets_primary), "primary_metadata_free_v1_harm_veto"),
         ]
+    if str(cfg.primary_method) == PRIMARY_METHOD_V15:
+        return [
+            (PRIMARY_METHOD, tuple(cfg.feature_sets_primary), "v1_baseline"),
+            (PRIMARY_METHOD_V15, tuple(cfg.feature_sets_primary), "primary_metadata_free_v1_recall_budget"),
+        ]
     methods = [(PRIMARY_METHOD, tuple(cfg.feature_sets_primary), "primary_metadata_free")]
     if "ae_metadata" in set(cfg.feature_sets_diagnostic):
         methods.append((HYBRID_METADATA_METHOD, ("ae_metadata",), "hybrid_metadata"))
@@ -2664,10 +3202,10 @@ def run_ae_utility_calibrator_methods_for_fold(
     if not bool(cfg.enabled):
         return AEUtilityCalibratorFoldOutputs([], [], [], [], [], [], [], [], [])
     is_v2 = str(cfg.primary_method) == PRIMARY_METHOD_V2
-    if str(cfg.primary_method) not in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V13, PRIMARY_METHOD_V2}:
+    if str(cfg.primary_method) not in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V13, PRIMARY_METHOD_V15, PRIMARY_METHOD_V2}:
         raise ProtocolError(
             "AE utility calibrator primary_method must be "
-            f"{PRIMARY_METHOD}, {PRIMARY_METHOD_V11}, {PRIMARY_METHOD_V12}, {PRIMARY_METHOD_V13}, or {PRIMARY_METHOD_V2}"
+            f"{PRIMARY_METHOD}, {PRIMARY_METHOD_V11}, {PRIMARY_METHOD_V12}, {PRIMARY_METHOD_V13}, {PRIMARY_METHOD_V15}, or {PRIMARY_METHOD_V2}"
         )
     if is_v2:
         if str(cfg.primary_model_type) != "ridge_delta_consensus" or set(cfg.model_types) != {"ridge_delta_consensus"}:
@@ -2729,6 +3267,20 @@ def run_ae_utility_calibrator_methods_for_fold(
                 ae_scores=ae_scores,
                 cfg=cfg,
             )
+        elif method == PRIMARY_METHOD_V15:
+            selected_cfg, rows = _select_recall_budget_config_for_method(
+                method=method,
+                feature_sets=feature_sets,
+                embeddings=embeddings,
+                sample_domains=sample_domains,
+                true_nelbo=true_nelbo,
+                expert_domains=expert_domains,
+                train_idx=train_idx,
+                outer_fold=fold,
+                metadata_similarity=metadata_similarity,
+                ae_scores=ae_scores,
+                cfg=cfg,
+            )
         else:
             selected_cfg, rows = _select_config_for_method(
                 method=method,
@@ -2755,6 +3307,10 @@ def run_ae_utility_calibrator_methods_for_fold(
                 and (
                     method != PRIMARY_METHOD_V13
                     or str(row.get("veto_threshold")) == _threshold_label(float(selected_cfg.veto_threshold))
+                )
+                and (
+                    method != PRIMARY_METHOD_V15
+                    or float(row.get("recall_budget_rate", -1.0)) == float(selected_cfg.recall_budget_rate)
                 )
             ),
             {},
@@ -2823,6 +3379,18 @@ def run_ae_utility_calibrator_methods_for_fold(
         harm_score_by_sample = np.full((int(test_idx.shape[0]),), float("nan"), dtype=np.float64)
         vetoed_by_sample = np.zeros((int(test_idx.shape[0]),), dtype=bool)
         v1_selected_for_harm_veto = np.asarray(selected_idx, dtype=np.int64).copy()
+        v1_selected_for_recall = np.asarray(selected_idx, dtype=np.int64).copy()
+        recall_info: Dict[str, Any] = {
+            "best_idx": np.full((int(test_idx.shape[0]),), -1, dtype=np.int64),
+            "best_delta": np.full((int(test_idx.shape[0]),), float("-inf"), dtype=np.float64),
+            "best_margin": np.full((int(test_idx.shape[0]),), float("-inf"), dtype=np.float64),
+            "best_ae_rank": np.full((int(test_idx.shape[0]),), -1, dtype=np.int64),
+            "abstention_reason": np.full((int(test_idx.shape[0]),), "", dtype=object),
+            "recall_applied": np.zeros((int(test_idx.shape[0]),), dtype=bool),
+            "recall_rank": np.full((int(test_idx.shape[0]),), -1, dtype=np.int64),
+            "eligible_recall_count": 0,
+            "recall_budget_count": 0,
+        }
         if method == PRIMARY_METHOD_V13:
             harm_train = _collect_source_inner_harm_examples(
                 embeddings=embeddings,
@@ -2872,6 +3440,18 @@ def run_ae_utility_calibrator_methods_for_fold(
                     harm_scores=active_scores,
                     veto_threshold=float(selected_cfg.veto_threshold),
                 )
+        if method == PRIMARY_METHOD_V15:
+            selected_idx, recall_info = _apply_recall_budget_policy(
+                v1_selected_idx=v1_selected_for_recall,
+                anchor_idx=anchor_idx,
+                pred_delta_matrix=pred_matrix,
+                ae_zscore_eval=ae_zscore_eval,
+                candidate_expert_domains=fold.candidate_expert_domains,
+                sample_indices=test_idx.tolist(),
+                delta_threshold=float(selected_cfg.delta_threshold),
+                margin_threshold=float(selected_cfg.margin_threshold),
+                recall_budget_rate=float(selected_cfg.recall_budget_rate),
+            )
         summary = _policy_summary(
             selected_idx=selected_idx,
             anchor_idx=anchor_idx,
@@ -2891,6 +3471,18 @@ def run_ae_utility_calibrator_methods_for_fold(
                 neutral_gap_pct_band=float(cfg.neutral_override_gap_pct_band),
             )
             if method == PRIMARY_METHOD_V13
+            else {}
+        )
+        heldout_recall_metrics = (
+            _recall_budget_metrics(
+                v1_selected_idx=v1_selected_for_recall,
+                v15_selected_idx=selected_idx,
+                anchor_idx=anchor_idx,
+                recall_applied=np.asarray(recall_info["recall_applied"], dtype=bool),
+                true_eval=true_eval,
+                neutral_gap_pct_band=float(cfg.neutral_override_gap_pct_band),
+            )
+            if method == PRIMARY_METHOD_V15
             else {}
         )
         score_matrix = -pred_matrix
@@ -3006,7 +3598,7 @@ def run_ae_utility_calibrator_methods_for_fold(
                     "source_inner_self_expert_excluded": 1,
                     "metadata_role": (
                         "not_used"
-                        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V13, PRIMARY_METHOD_V2}
+                        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V13, PRIMARY_METHOD_V15, PRIMARY_METHOD_V2}
                         else "hybrid_auxiliary_feature"
                     ),
                     "proxy_claim_boundary": "AE reconstruction fit is a proxy for CVAE utility, not compatibility.",
@@ -3016,6 +3608,31 @@ def run_ae_utility_calibrator_methods_for_fold(
                     "harm_score": float(harm_score_by_sample[local]) if method == PRIMARY_METHOD_V13 else "",
                     "veto_applied": int(vetoed_by_sample[local]) if method == PRIMARY_METHOD_V13 else "",
                     "veto_threshold": _threshold_label(float(selected_cfg.veto_threshold)) if method == PRIMARY_METHOD_V13 else "",
+                    "v1_selected_expert": (
+                        int(fold.candidate_expert_domains[int(v1_selected_for_recall[local])])
+                        if method == PRIMARY_METHOD_V15
+                        else ""
+                    ),
+                    "recall_budget_rate": float(selected_cfg.recall_budget_rate) if method == PRIMARY_METHOD_V15 else "",
+                    "recall_budget_count": int(recall_info["recall_budget_count"]) if method == PRIMARY_METHOD_V15 else "",
+                    "recall_applied": int(np.asarray(recall_info["recall_applied"], dtype=bool)[local]) if method == PRIMARY_METHOD_V15 else "",
+                    "recall_candidate_expert": (
+                        int(fold.candidate_expert_domains[int(recall_info["best_idx"][local])])
+                        if method == PRIMARY_METHOD_V15 and int(recall_info["best_idx"][local]) >= 0
+                        else ""
+                    ),
+                    "recall_score": float(recall_info["best_delta"][local]) if method == PRIMARY_METHOD_V15 else "",
+                    "recall_margin": float(recall_info["best_margin"][local]) if method == PRIMARY_METHOD_V15 else "",
+                    "recall_candidate_ae_rank": int(recall_info["best_ae_rank"][local]) if method == PRIMARY_METHOD_V15 else "",
+                    "recall_rank_within_abstentions": int(recall_info["recall_rank"][local]) if method == PRIMARY_METHOD_V15 else "",
+                    "v1_abstention_reason": str(recall_info["abstention_reason"][local]) if method == PRIMARY_METHOD_V15 else "",
+                    "v1_original_predicted_delta": float(best_delta[local]) if method == PRIMARY_METHOD_V15 else "",
+                    "v1_original_margin": float(override_margin[local]) if method == PRIMARY_METHOD_V15 else "",
+                    "recall_candidate_predicted_delta": float(recall_info["best_delta"][local]) if method == PRIMARY_METHOD_V15 else "",
+                    "recall_candidate_margin": float(recall_info["best_margin"][local]) if method == PRIMARY_METHOD_V15 else "",
+                    "delta_vs_anchor_nelbo_report_only": (
+                        float(anchor_nelbo[local] - selected_nelbo[local]) if method == PRIMARY_METHOD_V15 else ""
+                    ),
                     "net_gain_vs_ae_argmin": float(anchor_nelbo[local] - selected_nelbo[local]),
                     "net_gain_vs_metadata": float(row_metadata_nelbo - selected_nelbo[local]),
                     "active_override": row_active,
@@ -3093,6 +3710,9 @@ def run_ae_utility_calibrator_methods_for_fold(
                     "harm_score": float(harm_score_by_sample[local]) if method == PRIMARY_METHOD_V13 else "",
                     "veto_applied": int(vetoed_by_sample[local]) if method == PRIMARY_METHOD_V13 else "",
                     "veto_threshold": _threshold_label(float(selected_cfg.veto_threshold)) if method == PRIMARY_METHOD_V13 else "",
+                    "recall_budget_rate": float(selected_cfg.recall_budget_rate) if method == PRIMARY_METHOD_V15 else "",
+                    "recall_applied": int(np.asarray(recall_info["recall_applied"], dtype=bool)[local]) if method == PRIMARY_METHOD_V15 else "",
+                    "v1_abstention_reason": str(recall_info["abstention_reason"][local]) if method == PRIMARY_METHOD_V15 else "",
                     "selected_consensus_threshold": (
                         float(selected_cfg.consensus_threshold)
                         if method in V2_METHODS
@@ -3119,6 +3739,7 @@ def run_ae_utility_calibrator_methods_for_fold(
             "fallback_reason": selected_cfg.fallback_reason,
             "selection_mode": str(cfg.selection_mode) if method in REPORT_ONLY_HARDENING_METHODS else "",
             "selected_veto_threshold": _threshold_label(float(selected_cfg.veto_threshold)) if method == PRIMARY_METHOD_V13 else "",
+            "selected_recall_budget_rate": float(selected_cfg.recall_budget_rate) if method == PRIMARY_METHOD_V15 else "",
             "selected_consensus_threshold": (
                 float(selected_cfg.consensus_threshold)
                 if method in V2_METHODS
@@ -3199,6 +3820,42 @@ def run_ae_utility_calibrator_methods_for_fold(
                 "candidate_active_override_rate_source_inner", ""
             ),
             "veto_threshold": _threshold_label(float(selected_cfg.veto_threshold)) if method == PRIMARY_METHOD_V13 else "",
+            "recall_budget_rate": float(selected_cfg.recall_budget_rate) if method == PRIMARY_METHOD_V15 else "",
+            "recall_budget_count": int(recall_info["recall_budget_count"]) if method == PRIMARY_METHOD_V15 else "",
+            "recall_override_count_heldout": (
+                int(heldout_recall_metrics.get("recall_override_count", 0))
+                if method == PRIMARY_METHOD_V15 else ""
+            ),
+            "recall_override_count_source_inner": selected_source_inner_row.get(
+                "recall_override_count_source_inner", ""
+            ),
+            "recall_improving_count": (
+                int(heldout_recall_metrics.get("recall_improving_count", 0))
+                if method == PRIMARY_METHOD_V15 else selected_source_inner_row.get("recall_improving_count", "")
+            ),
+            "recall_harmful_count": (
+                int(heldout_recall_metrics.get("recall_harmful_count", 0))
+                if method == PRIMARY_METHOD_V15 else selected_source_inner_row.get("recall_harmful_count", "")
+            ),
+            "recall_neutral_count": (
+                int(heldout_recall_metrics.get("recall_neutral_count", 0))
+                if method == PRIMARY_METHOD_V15 else selected_source_inner_row.get("recall_neutral_count", "")
+            ),
+            "strict_recall_precision": (
+                float(heldout_recall_metrics.get("strict_recall_precision", float("nan")))
+                if method == PRIMARY_METHOD_V15 else selected_source_inner_row.get("strict_recall_precision", "")
+            ),
+            "strict_recall_precision_lcb": selected_source_inner_row.get("strict_recall_precision_lcb", ""),
+            "harmful_recall_rate": (
+                float(heldout_recall_metrics.get("harmful_recall_rate", float("nan")))
+                if method == PRIMARY_METHOD_V15 else selected_source_inner_row.get("harmful_recall_rate", "")
+            ),
+            "harmful_recall_rate_ucb": selected_source_inner_row.get("harmful_recall_rate_ucb", ""),
+            "v15_active_override_count_source_inner": selected_source_inner_row.get("v15_active_override_count_source_inner", ""),
+            "v15_active_override_count_heldout": (
+                int(heldout_recall_metrics.get("v15_active_override_count", 0))
+                if method == PRIMARY_METHOD_V15 else ""
+            ),
             "vetoed_harmful_count": selected_source_inner_row.get("vetoed_harmful_count", ""),
             "vetoed_improving_count": selected_source_inner_row.get("vetoed_improving_count", ""),
             "vetoed_neutral_count": selected_source_inner_row.get("vetoed_neutral_count", ""),
@@ -3297,6 +3954,28 @@ def run_ae_utility_calibrator_methods_for_fold(
                     int(heldout_harm_veto_metrics.get("v13_active_override_count", 0))
                     if method == PRIMARY_METHOD_V13 else ""
                 ),
+                "recall_budget_rate": float(selected_cfg.recall_budget_rate) if method == PRIMARY_METHOD_V15 else "",
+                "recall_override_count_source_inner": selected_source_inner_row.get(
+                    "recall_override_count_source_inner", ""
+                ),
+                "recall_override_count_heldout": (
+                    int(heldout_recall_metrics.get("recall_override_count", 0))
+                    if method == PRIMARY_METHOD_V15 else ""
+                ),
+                "strict_recall_precision": (
+                    float(heldout_recall_metrics.get("strict_recall_precision", float("nan")))
+                    if method == PRIMARY_METHOD_V15 else ""
+                ),
+                "strict_recall_precision_lcb": selected_source_inner_row.get(
+                    "strict_recall_precision_lcb", ""
+                ),
+                "harmful_recall_rate": (
+                    float(heldout_recall_metrics.get("harmful_recall_rate", float("nan")))
+                    if method == PRIMARY_METHOD_V15 else ""
+                ),
+                "harmful_recall_rate_ucb": selected_source_inner_row.get(
+                    "harmful_recall_rate_ucb", ""
+                ),
             }
         )
         override_diag_rows.append(
@@ -3336,6 +4015,22 @@ def run_ae_utility_calibrator_methods_for_fold(
                     float(heldout_harm_veto_metrics.get("retained_v1_override_gain_rate", float("nan")))
                     if method == PRIMARY_METHOD_V13 else ""
                 ),
+                "recall_override_count_heldout": (
+                    int(heldout_recall_metrics.get("recall_override_count", 0))
+                    if method == PRIMARY_METHOD_V15 else ""
+                ),
+                "strict_recall_precision": (
+                    float(heldout_recall_metrics.get("strict_recall_precision", float("nan")))
+                    if method == PRIMARY_METHOD_V15 else ""
+                ),
+                "harmful_recall_rate": (
+                    float(heldout_recall_metrics.get("harmful_recall_rate", float("nan")))
+                    if method == PRIMARY_METHOD_V15 else ""
+                ),
+                "active_override_rate_ratio_vs_v1": (
+                    float(heldout_recall_metrics.get("active_override_rate_ratio_vs_v1", float("nan")))
+                    if method == PRIMARY_METHOD_V15 else ""
+                ),
             }
         )
         selected_feature_rows.append(
@@ -3353,6 +4048,11 @@ def run_ae_utility_calibrator_methods_for_fold(
                 "selected_veto_threshold": (
                     _threshold_label(float(selected_cfg.veto_threshold))
                     if method == PRIMARY_METHOD_V13
+                    else ""
+                ),
+                "selected_recall_budget_rate": (
+                    float(selected_cfg.recall_budget_rate)
+                    if method == PRIMARY_METHOD_V15
                     else ""
                 ),
                 "selected_by_source_inner_validation": int(selected_cfg.selected_by_source_inner),
@@ -3392,9 +4092,19 @@ def run_ae_utility_calibrator_methods_for_fold(
                 "retained_v1_override_gain_rate": selected_source_inner_row.get(
                     "retained_v1_override_gain_rate", ""
                 ),
+                "recall_override_count_source_inner": selected_source_inner_row.get(
+                    "recall_override_count_source_inner", ""
+                ),
+                "strict_recall_precision_lcb": selected_source_inner_row.get(
+                    "strict_recall_precision_lcb", ""
+                ),
+                "harmful_recall_rate_ucb": selected_source_inner_row.get(
+                    "harmful_recall_rate_ucb", ""
+                ),
+                "recall_budget_rate": selected_source_inner_row.get("recall_budget_rate", ""),
             }
         )
-        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V13, PRIMARY_METHOD_V2}:
+        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V13, PRIMARY_METHOD_V15, PRIMARY_METHOD_V2}:
             primary_anchor_idx = anchor_idx
             primary_selected_idx = selected_idx
 
@@ -3631,6 +4341,57 @@ def write_ae_utility_calibrator_artifacts(
                 ),
                 "ae_utility_calibrator_harm_veto_v13_selection_status": (
                     "ae_utility_calibrator_harm_veto_v13_selection_status.csv"
+                ),
+            }
+        )
+    v15_validation_rows = [row for row in source_inner_validation_rows if str(row.get("method")) == PRIMARY_METHOD_V15]
+    v15_policy_rows = [row for row in policy_audit_rows if str(row.get("method")) == PRIMARY_METHOD_V15]
+    v15_override_rows = [row for row in override_diagnostic_rows if str(row.get("method")) == PRIMARY_METHOD_V15]
+    v15_precision_rows = [row for row in override_precision_rows if str(row.get("method")) == PRIMARY_METHOD_V15]
+    v15_selected_rows = [row for row in selected_feature_rows if str(row.get("method")) == PRIMARY_METHOD_V15]
+    v15_tradeoff_rows = [
+        row
+        for row in v15_validation_rows
+        if str(row.get("source_inner_pseudo_query_domain")) == "source_inner_macro"
+        or str(row.get("source_inner_pseudo_query_domain", "")).startswith("abstention_reason:")
+    ]
+    if v15_validation_rows or v15_policy_rows:
+        _write_csv(
+            reports_dir / "ae_utility_calibrator_recall_budget_v15_source_inner_validation.csv",
+            v15_validation_rows,
+        )
+        _write_csv(
+            reports_dir / "ae_utility_calibrator_recall_budget_v15_policy_audit.csv",
+            v15_policy_rows,
+        )
+        _write_csv(
+            reports_dir / "ae_utility_calibrator_recall_budget_v15_override_diagnostics.csv",
+            v15_override_rows,
+        )
+        _write_csv(
+            reports_dir / "ae_utility_calibrator_recall_budget_v15_recall_tradeoff.csv",
+            v15_tradeoff_rows or v15_precision_rows,
+        )
+        _write_csv(
+            reports_dir / "ae_utility_calibrator_recall_budget_v15_selection_status.csv",
+            v15_selected_rows,
+        )
+        artifacts.update(
+            {
+                "ae_utility_calibrator_recall_budget_v15_source_inner_validation": (
+                    "ae_utility_calibrator_recall_budget_v15_source_inner_validation.csv"
+                ),
+                "ae_utility_calibrator_recall_budget_v15_policy_audit": (
+                    "ae_utility_calibrator_recall_budget_v15_policy_audit.csv"
+                ),
+                "ae_utility_calibrator_recall_budget_v15_override_diagnostics": (
+                    "ae_utility_calibrator_recall_budget_v15_override_diagnostics.csv"
+                ),
+                "ae_utility_calibrator_recall_budget_v15_recall_tradeoff": (
+                    "ae_utility_calibrator_recall_budget_v15_recall_tradeoff.csv"
+                ),
+                "ae_utility_calibrator_recall_budget_v15_selection_status": (
+                    "ae_utility_calibrator_recall_budget_v15_selection_status.csv"
                 ),
             }
         )

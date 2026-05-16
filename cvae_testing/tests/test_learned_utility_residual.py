@@ -453,6 +453,61 @@ def _ae_utility_harm_veto_v13_cfg(
     return lu._parse_learned_utility_config(cfg).autoencoder.utility_calibrator
 
 
+def _ae_utility_recall_v15_cfg(
+    *,
+    budget_rates=None,
+    min_recall_count=10,
+    max_active_ratio=1.20,
+    min_strict_precision=0.0,
+    min_strict_lcb=0.0,
+    max_harm_ucb=1.0,
+):
+    cfg = _support_free_ae_cfg()
+    cfg["autoencoder_proxy"]["utility_calibrator"] = {
+        "enabled": True,
+        "primary_method": "ae_utility_calibrated_v1_recall_budget_safe_override_v15",
+        "model_types": ["ridge_delta"],
+        "primary_model_type": "ridge_delta",
+        "diagnostic_model_types": ["pairwise_ranker"],
+        "fallback_policy": "ae_argmin_zscore",
+        "feature_sets_primary": ["ae_core", "ae_quality"],
+        "feature_sets_diagnostic": [],
+        "delta_thresholds": [0.0, "__inf__"],
+        "margin_thresholds": [0.0, 0.05],
+        "selection_mode": "v1_recall_budget_v15",
+        "ridge_l2": 1.0e-4,
+        "recall_expansion": {
+            "scoring_policy": "ridge_delta_best_non_anchor",
+            "recall_budget_rates": list(budget_rates if budget_rates is not None else [0.0, 0.50]),
+            "budget_scope": "v1_abstentions_per_fold",
+            "min_v1_abstention_count_source_inner": 1,
+            "min_recall_override_count_source_inner": int(min_recall_count),
+            "min_recall_override_count_source_inner_for_pass": 2,
+            "min_strict_recall_precision": float(min_strict_precision),
+            "min_strict_recall_precision_lcb": float(min_strict_lcb),
+            "max_harmful_recall_rate_ucb": float(max_harm_ucb),
+            "min_net_gain_vs_v1_source_inner": -999.0,
+            "min_gap_delta_vs_v1_lcb_pp": -999.0,
+            "min_gap_delta_vs_v1_lcb_pp_for_pass": 0.0,
+            "max_active_override_rate_ratio_vs_v1": float(max_active_ratio),
+            "diagnostic_active_override_rate_ratio_upper_bound": 1.35,
+            "max_worst_pseudo_domain_gap_degradation_vs_v1_pp": 999.0,
+            "neutral_override_gap_pct_band": 0.25,
+            "bootstrap_reps": 100,
+            "bootstrap_seed": 1337,
+        },
+        "risk_gates": {
+            "max_top1_drop_vs_ae_argmin_abs": 0.02,
+            "max_spearman_drop_vs_ae_argmin_abs": 0.03,
+            "max_gap_pct_degradation_vs_ae_argmin": 1.0,
+            "max_top1_drop_vs_metadata_abs": 0.02,
+            "max_spearman_drop_vs_metadata_abs": 0.03,
+            "max_gap_pct_degradation_vs_metadata": 1.0,
+        },
+    }
+    return lu._parse_learned_utility_config(cfg).autoencoder.utility_calibrator
+
+
 def _ae_utility_consensus_v2_cfg(*, delta_thresholds=None, consensus_thresholds=None):
     cfg = _support_free_ae_cfg()
     cfg["autoencoder_proxy"]["utility_calibrator"] = {
@@ -2666,3 +2721,264 @@ def test_tau_inf_outputs_identical_to_metadata_routing(tmp_path, monkeypatch) ->
         assert row["selected_expert"] == base["selected_expert"]
         assert row["selected_nelbo"] == base["selected_nelbo"]
         assert row["oracle_gap"] == base["oracle_gap"]
+
+
+def test_ae_utility_recall_v15_config_parses() -> None:
+    cfg = _ae_utility_recall_v15_cfg()
+    assert cfg.primary_method == "ae_utility_calibrated_v1_recall_budget_safe_override_v15"
+    assert cfg.selection_mode == "v1_recall_budget_v15"
+    assert cfg.recall_budget_rates == (0.0, 0.50)
+    assert cfg.recall_scoring_policy == "ridge_delta_best_non_anchor"
+
+
+def test_ae_utility_recall_v15_primary_is_metadata_free() -> None:
+    cfg = _ae_utility_recall_v15_cfg()
+    assert cfg.feature_sets_primary == ("ae_core", "ae_quality")
+    assert cfg.feature_sets_diagnostic == ()
+
+
+def test_ae_utility_recall_v15_keeps_v1_active_overrides_unchanged() -> None:
+    pred = np.asarray([[0.0, 0.6, 0.3], [0.0, 0.2, 0.4], [0.0, 0.8, 0.7]], dtype=np.float64)
+    anchor = np.asarray([0, 0, 0], dtype=np.int64)
+    v1_selected = np.asarray([2, 0, 0], dtype=np.int64)
+    selected, info = auc._apply_recall_budget_policy(
+        v1_selected_idx=v1_selected,
+        anchor_idx=anchor,
+        pred_delta_matrix=pred,
+        ae_zscore_eval=np.asarray([[0.0, 1.0, 2.0], [0.0, 2.0, 1.0], [0.0, 1.0, 2.0]], dtype=np.float64),
+        candidate_expert_domains=[0, 1, 2],
+        sample_indices=[10, 11, 12],
+        delta_threshold=0.5,
+        margin_threshold=0.0,
+        recall_budget_rate=1.0,
+    )
+    assert int(selected[0]) == int(v1_selected[0])
+    assert not bool(info["recall_applied"][0])
+
+
+def test_ae_utility_recall_v15_budget_zero_matches_v1() -> None:
+    pred = np.asarray([[0.0, 0.9, 0.1], [0.0, 0.8, 0.2]], dtype=np.float64)
+    anchor = np.asarray([0, 0], dtype=np.int64)
+    v1_selected = np.asarray([0, 0], dtype=np.int64)
+    selected, info = auc._apply_recall_budget_policy(
+        v1_selected_idx=v1_selected,
+        anchor_idx=anchor,
+        pred_delta_matrix=pred,
+        ae_zscore_eval=np.asarray([[0.0, 1.0, 2.0], [0.0, 1.0, 2.0]], dtype=np.float64),
+        candidate_expert_domains=[0, 1, 2],
+        sample_indices=[1, 2],
+        delta_threshold=1.0,
+        margin_threshold=0.0,
+        recall_budget_rate=0.0,
+    )
+    assert selected.tolist() == v1_selected.tolist()
+    assert int(info["recall_budget_count"]) == 0
+
+
+def test_ae_utility_recall_v15_only_scores_v1_abstentions() -> None:
+    pred = np.asarray([[0.0, 0.9], [0.0, 0.8]], dtype=np.float64)
+    anchor = np.asarray([0, 0], dtype=np.int64)
+    v1_selected = np.asarray([1, 0], dtype=np.int64)
+    selected, info = auc._apply_recall_budget_policy(
+        v1_selected_idx=v1_selected,
+        anchor_idx=anchor,
+        pred_delta_matrix=pred,
+        ae_zscore_eval=np.asarray([[0.0, 1.0], [0.0, 1.0]], dtype=np.float64),
+        candidate_expert_domains=[0, 1],
+        sample_indices=[1, 2],
+        delta_threshold=1.0,
+        margin_threshold=0.0,
+        recall_budget_rate=1.0,
+    )
+    assert selected.tolist() == [1, 1]
+    assert info["abstention_reason"][0] == "v1_active_override"
+    assert bool(info["recall_applied"][1])
+
+
+def test_ae_utility_recall_v15_excludes_anchor_from_recall_candidates() -> None:
+    pred = np.asarray([[99.0, 0.2, 0.1]], dtype=np.float64)
+    selected, info = auc._apply_recall_budget_policy(
+        v1_selected_idx=np.asarray([0], dtype=np.int64),
+        anchor_idx=np.asarray([0], dtype=np.int64),
+        pred_delta_matrix=pred,
+        ae_zscore_eval=np.asarray([[0.0, 1.0, 2.0]], dtype=np.float64),
+        candidate_expert_domains=[0, 1, 2],
+        sample_indices=[1],
+        delta_threshold=1.0,
+        margin_threshold=0.0,
+        recall_budget_rate=1.0,
+    )
+    assert int(selected[0]) == 1
+    assert int(info["best_idx"][0]) == 1
+
+
+def test_ae_utility_recall_v15_excludes_nonfinite_candidate_scores() -> None:
+    selected, info = auc._apply_recall_budget_policy(
+        v1_selected_idx=np.asarray([0], dtype=np.int64),
+        anchor_idx=np.asarray([0], dtype=np.int64),
+        pred_delta_matrix=np.asarray([[0.0, float("nan"), float("-inf")]], dtype=np.float64),
+        ae_zscore_eval=np.asarray([[0.0, 1.0, 2.0]], dtype=np.float64),
+        candidate_expert_domains=[0, 1, 2],
+        sample_indices=[1],
+        delta_threshold=0.0,
+        margin_threshold=0.0,
+        recall_budget_rate=1.0,
+    )
+    assert int(selected[0]) == 0
+    assert info["abstention_reason"][0] == "no_positive_candidate"
+
+
+def test_ae_utility_recall_v15_requires_positive_predicted_delta() -> None:
+    selected, info = auc._apply_recall_budget_policy(
+        v1_selected_idx=np.asarray([0], dtype=np.int64),
+        anchor_idx=np.asarray([0], dtype=np.int64),
+        pred_delta_matrix=np.asarray([[0.0, -0.1, -0.2]], dtype=np.float64),
+        ae_zscore_eval=np.asarray([[0.0, 1.0, 2.0]], dtype=np.float64),
+        candidate_expert_domains=[0, 1, 2],
+        sample_indices=[1],
+        delta_threshold=0.0,
+        margin_threshold=0.0,
+        recall_budget_rate=1.0,
+    )
+    assert int(selected[0]) == 0
+    assert int(info["eligible_recall_count"]) == 0
+
+
+def test_ae_utility_recall_v15_reports_abstention_reason() -> None:
+    selected, info = auc._apply_recall_budget_policy(
+        v1_selected_idx=np.asarray([0, 0, 0, 1], dtype=np.int64),
+        anchor_idx=np.asarray([0, 0, 0, 0], dtype=np.int64),
+        pred_delta_matrix=np.asarray(
+            [
+                [0.0, 0.40, 0.30],
+                [0.0, 0.60, 0.59],
+                [0.0, -0.10, -0.20],
+                [0.0, 0.90, 0.10],
+            ],
+            dtype=np.float64,
+        ),
+        ae_zscore_eval=np.asarray(
+            [[0.0, 1.0, 2.0], [0.0, 1.0, 2.0], [0.0, 1.0, 2.0], [0.0, 1.0, 2.0]],
+            dtype=np.float64,
+        ),
+        candidate_expert_domains=[0, 1, 2],
+        sample_indices=[1, 2, 3, 4],
+        delta_threshold=0.50,
+        margin_threshold=0.05,
+        recall_budget_rate=1.0,
+    )
+    assert selected.tolist()[:3] == [1, 1, 0]
+    assert info["abstention_reason"][0] == "below_delta_threshold"
+    assert info["abstention_reason"][1] == "below_margin_threshold"
+    assert info["abstention_reason"][2] == "no_positive_candidate"
+    assert info["abstention_reason"][3] == "v1_active_override"
+
+
+def test_ae_utility_recall_v15_budget_count_ceil_semantics() -> None:
+    pred = np.asarray([[0.0, 0.9], [0.0, 0.8], [0.0, 0.7]], dtype=np.float64)
+    selected, info = auc._apply_recall_budget_policy(
+        v1_selected_idx=np.asarray([0, 0, 0], dtype=np.int64),
+        anchor_idx=np.asarray([0, 0, 0], dtype=np.int64),
+        pred_delta_matrix=pred,
+        ae_zscore_eval=np.asarray([[0.0, 1.0], [0.0, 1.0], [0.0, 1.0]], dtype=np.float64),
+        candidate_expert_domains=[0, 1],
+        sample_indices=[1, 2, 3],
+        delta_threshold=1.0,
+        margin_threshold=0.0,
+        recall_budget_rate=0.34,
+    )
+    assert int(info["recall_budget_count"]) == 2
+    assert int(np.sum(selected != 0)) == 2
+
+
+def test_ae_utility_recall_v15_rank_tiebreak_is_stable() -> None:
+    pred = np.asarray([[0.0, 0.5], [0.0, 0.5]], dtype=np.float64)
+    selected, info = auc._apply_recall_budget_policy(
+        v1_selected_idx=np.asarray([0, 0], dtype=np.int64),
+        anchor_idx=np.asarray([0, 0], dtype=np.int64),
+        pred_delta_matrix=pred,
+        ae_zscore_eval=np.asarray([[0.0, 1.0], [0.0, 1.0]], dtype=np.float64),
+        candidate_expert_domains=[0, 1],
+        sample_indices=[20, 10],
+        delta_threshold=1.0,
+        margin_threshold=0.0,
+        recall_budget_rate=0.5,
+    )
+    assert int(info["recall_budget_count"]) == 1
+    assert selected.tolist() == [0, 1]
+
+
+def test_ae_utility_recall_v15_recall_classes_are_anchor_relative() -> None:
+    metrics = auc._recall_budget_metrics(
+        v1_selected_idx=np.asarray([0, 0, 0], dtype=np.int64),
+        v15_selected_idx=np.asarray([1, 1, 1], dtype=np.int64),
+        anchor_idx=np.asarray([0, 0, 0], dtype=np.int64),
+        recall_applied=np.asarray([True, True, True]),
+        true_eval=np.asarray([[10.0, 8.0], [10.0, 12.0], [10.0, 10.01]], dtype=np.float64),
+        neutral_gap_pct_band=0.25,
+    )
+    assert int(metrics["recall_improving_count"]) == 1
+    assert int(metrics["recall_harmful_count"]) == 1
+    assert int(metrics["recall_neutral_count"]) == 1
+
+
+def test_ae_utility_recall_v15_rejects_excess_active_rate_ratio() -> None:
+    cfg = _ae_utility_recall_v15_cfg(max_active_ratio=1.1)
+    summaries = [
+        {
+            "recall_improving_count": 10,
+            "recall_harmful_count": 0,
+            "recall_neutral_count": 0,
+            "gap_delta_vs_v1": 0.1,
+            "net_gain_vs_v1": 1.0,
+            "v1_active_override_count": 10,
+            "v15_active_override_count": 20,
+            "v1_abstention_count": 100,
+            "top1_oracle_hit": 1.0,
+            "raw_predicted_delta_spearman_non_anchor": 1.0,
+        }
+    ]
+    metrics = auc._aggregate_recall_budget_metrics(summaries=summaries, v1_summaries=summaries, cfg=cfg)
+    assert int(metrics["passes_recall_budget_gates"]) == 0
+
+
+def test_ae_utility_recall_v15_rejects_low_precision_budget() -> None:
+    cfg = _ae_utility_recall_v15_cfg(min_strict_precision=0.70)
+    summaries = [
+        {
+            "recall_improving_count": 6,
+            "recall_harmful_count": 4,
+            "recall_neutral_count": 0,
+            "gap_delta_vs_v1": 0.20,
+            "net_gain_vs_v1": 1.0,
+            "v1_active_override_count": 100,
+            "v15_active_override_count": 110,
+            "v1_abstention_count": 100,
+            "top1_oracle_hit": 1.0,
+            "raw_predicted_delta_spearman_non_anchor": 1.0,
+        }
+    ]
+    metrics = auc._aggregate_recall_budget_metrics(summaries=summaries, v1_summaries=summaries, cfg=cfg)
+    assert float(metrics["strict_recall_precision"]) < 0.70
+    assert int(metrics["passes_recall_budget_gates"]) == 0
+
+
+def test_ae_utility_recall_v15_rejects_high_harm_budget() -> None:
+    cfg = _ae_utility_recall_v15_cfg(max_harm_ucb=0.35)
+    summaries = [
+        {
+            "recall_improving_count": 10,
+            "recall_harmful_count": 4,
+            "recall_neutral_count": 0,
+            "gap_delta_vs_v1": 0.20,
+            "net_gain_vs_v1": 1.0,
+            "v1_active_override_count": 100,
+            "v15_active_override_count": 110,
+            "v1_abstention_count": 100,
+            "top1_oracle_hit": 1.0,
+            "raw_predicted_delta_spearman_non_anchor": 1.0,
+        }
+    ]
+    metrics = auc._aggregate_recall_budget_metrics(summaries=summaries, v1_summaries=summaries, cfg=cfg)
+    assert float(metrics["harmful_recall_rate_ucb"]) > 0.35
+    assert int(metrics["passes_recall_budget_gates"]) == 0
