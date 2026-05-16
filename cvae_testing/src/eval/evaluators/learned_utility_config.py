@@ -145,6 +145,16 @@ class AEUtilityCalibratorConfig:
     v1_guard_max_spearman_drop_vs_v1_abs: float
     v1_guard_max_worst_pseudo_domain_gap_degradation_vs_v1_pp: float
     v1_guard_max_harmful_override_rate_ucb: float
+    harm_veto_score_model: str
+    harm_veto_thresholds: Tuple[float, ...]
+    harm_veto_min_active_v1_override_count_source_inner: int
+    harm_veto_min_veto_count_source_inner: int
+    harm_veto_min_harmful_v1_override_count_source_inner: int
+    harm_veto_min_strict_harm_prevention_precision_lcb: float
+    harm_veto_max_false_veto_rate_ucb: float
+    harm_veto_min_retained_v1_override_gain_rate: float
+    harm_veto_min_active_override_rate_ratio_vs_v1: float
+    harm_veto_min_gap_delta_vs_v1_lcb_pp: float
 
 
 @dataclass(frozen=True)
@@ -353,6 +363,7 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
     utility_calibrator_risk = _as_dict((utility_calibrator_cfg or {}).get("risk_gates", {}))
     precision_selection_cfg = _as_dict((utility_calibrator_cfg or {}).get("precision_selection", {}))
     v1_guard_cfg = _as_dict((precision_selection_cfg or {}).get("v1_guard", {}))
+    harm_veto_cfg = _as_dict((utility_calibrator_cfg or {}).get("harm_veto", {}))
     utility_calibrator = AEUtilityCalibratorConfig(
         enabled=bool((utility_calibrator_cfg or {}).get("enabled", False)),
         primary_method=str(
@@ -452,13 +463,20 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
         min_active_override_rate=float((precision_selection_cfg or {}).get("min_active_override_rate", 0.10)),
         min_net_gain_vs_ae_argmin=float((precision_selection_cfg or {}).get("min_net_gain_vs_ae_argmin", 0.0)),
         neutral_override_gap_pct_band=float(
-            (precision_selection_cfg or {}).get("neutral_override_gap_pct_band", 0.25)
+            (precision_selection_cfg or {}).get(
+                "neutral_override_gap_pct_band",
+                (harm_veto_cfg or {}).get("neutral_override_gap_pct_band", 0.25),
+            )
         ),
         max_worst_pseudo_domain_gap_degradation_pp=float(
             (precision_selection_cfg or {}).get("max_worst_pseudo_domain_gap_degradation_pp", 1.0)
         ),
-        precision_bootstrap_reps=int((precision_selection_cfg or {}).get("bootstrap_reps", 2000)),
-        precision_bootstrap_seed=int((precision_selection_cfg or {}).get("bootstrap_seed", 1337)),
+        precision_bootstrap_reps=int(
+            (precision_selection_cfg or {}).get("bootstrap_reps", (harm_veto_cfg or {}).get("bootstrap_reps", 2000))
+        ),
+        precision_bootstrap_seed=int(
+            (precision_selection_cfg or {}).get("bootstrap_seed", (harm_veto_cfg or {}).get("bootstrap_seed", 1337))
+        ),
         diagnostic_precision_thresholds=tuple(
             float(v)
             for v in (precision_selection_cfg or {}).get(
@@ -473,6 +491,32 @@ def _parse_learned_utility_config(learned_cfg: Dict[str, Any]) -> LearnedUtility
             (v1_guard_cfg or {}).get("max_worst_pseudo_domain_gap_degradation_vs_v1_pp", 1.0)
         ),
         v1_guard_max_harmful_override_rate_ucb=float((v1_guard_cfg or {}).get("max_harmful_override_rate_ucb", 0.30)),
+        harm_veto_score_model=str((harm_veto_cfg or {}).get("veto_score_model", "logistic_harm_score")).strip().lower(),
+        harm_veto_thresholds=tuple(
+            _parse_threshold(v)
+            for v in (harm_veto_cfg or {}).get(
+                "veto_thresholds",
+                [0.50, 0.60, 0.70, 0.80, 0.90, "__inf__"],
+            )
+        ),
+        harm_veto_min_active_v1_override_count_source_inner=int(
+            (harm_veto_cfg or {}).get("min_active_v1_override_count_source_inner", 12)
+        ),
+        harm_veto_min_veto_count_source_inner=int((harm_veto_cfg or {}).get("min_veto_count_source_inner", 6)),
+        harm_veto_min_harmful_v1_override_count_source_inner=int(
+            (harm_veto_cfg or {}).get("min_harmful_v1_override_count_source_inner", 3)
+        ),
+        harm_veto_min_strict_harm_prevention_precision_lcb=float(
+            (harm_veto_cfg or {}).get("min_strict_harm_prevention_precision_lcb", 0.50)
+        ),
+        harm_veto_max_false_veto_rate_ucb=float((harm_veto_cfg or {}).get("max_false_veto_rate_ucb", 0.40)),
+        harm_veto_min_retained_v1_override_gain_rate=float(
+            (harm_veto_cfg or {}).get("min_retained_v1_override_gain_rate", 0.85)
+        ),
+        harm_veto_min_active_override_rate_ratio_vs_v1=float(
+            (harm_veto_cfg or {}).get("min_active_override_rate_ratio_vs_v1", 0.80)
+        ),
+        harm_veto_min_gap_delta_vs_v1_lcb_pp=float((harm_veto_cfg or {}).get("min_gap_delta_vs_v1_lcb_pp", -0.10)),
     )
     autoencoder = AutoencoderProxyConfig(
         enabled=bool((autoencoder_cfg or {}).get("enabled", False)),

@@ -181,6 +181,24 @@ def test_ae_utility_calibrator_v2_configs_are_protocol_locked() -> None:
         assert utility["ensemble_strategy"] == "source_domain_leave_one_plus_full"
 
 
+def test_ae_utility_calibrator_harm_veto_v13_config_is_protocol_locked() -> None:
+    path = PROJECT_ROOT / "configs" / "experiments" / "camelyon17" / "learned_utility_ae_utility_calibrator_harm_veto_v13.yaml"
+    cfg = load_config(path)
+    validate_config(cfg)
+    utility = cfg["learned_utility"]["autoencoder_proxy"]["utility_calibrator"]
+    harm_veto = utility["harm_veto"]
+    assert cfg["experiment"]["name"] == "learned_utility_ae_utility_calibrator_harm_veto_v13"
+    assert utility["primary_method"] == "ae_utility_calibrated_v1_harm_veto_safe_override_v13"
+    assert utility["selection_mode"] == "v1_harm_veto_v13"
+    assert utility["model_types"] == ["ridge_delta"]
+    assert utility["primary_model_type"] == "ridge_delta"
+    assert utility["fallback_policy"] == "ae_argmin_zscore"
+    assert utility["feature_sets_primary"] == ["ae_core", "ae_quality"]
+    assert utility["feature_sets_diagnostic"] == []
+    assert harm_veto["veto_score_model"] == "logistic_harm_score"
+    assert harm_veto["veto_thresholds"][-1] == "__inf__"
+
+
 def test_quarantined_entrypoints_fail_fast() -> None:
     checks = [
         ([sys.executable, "scripts/run_learned_compatibility_loqdo.py"], "target expert"),

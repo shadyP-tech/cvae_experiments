@@ -30,6 +30,7 @@ from src.eval.metrics import spearman_corr
 PRIMARY_METHOD = "ae_utility_calibrated_safe_override_v1"
 PRIMARY_METHOD_V11 = "ae_utility_calibrated_precision_lcb_safe_override_v11"
 PRIMARY_METHOD_V12 = "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12"
+PRIMARY_METHOD_V13 = "ae_utility_calibrated_v1_harm_veto_safe_override_v13"
 PRIMARY_METHOD_V2 = "ae_utility_calibrated_consensus_safe_override_v2"
 HYBRID_METADATA_METHOD = "ae_metadata_utility_calibrated_safe_override_v1"
 HYBRID_COMBINED_METHOD = "ae_combined_utility_calibrated_safe_override_v1"
@@ -39,6 +40,8 @@ PAIRWISE_DIAG_METHOD = "ae_utility_pairwise_ranker_diagnostic_v1"
 ORACLE_HEADROOM_METHOD = "oracle_safe_override_over_ae_argmin"
 V2_METHODS = {PRIMARY_METHOD_V2, HYBRID_METADATA_METHOD_V2, HYBRID_COMBINED_METHOD_V2}
 PRECISION_LCB_METHODS = {PRIMARY_METHOD_V11, PRIMARY_METHOD_V12}
+HARM_VETO_METHODS = {PRIMARY_METHOD_V13}
+REPORT_ONLY_HARDENING_METHODS = PRECISION_LCB_METHODS | HARM_VETO_METHODS
 V2_PRIMARY_FEATURE_SETS = {"ae_consensus_core", "ae_consensus_quality"}
 V2_DIAGNOSTIC_FEATURE_SETS = {"ae_metadata_consensus", "ae_combined_consensus"}
 
@@ -85,6 +88,7 @@ class _SelectedConfig:
     consensus_threshold: float = 0.0
     selection_status: str = "source_inner_selected"
     fallback_reason: str = ""
+    veto_threshold: float = float("inf")
 
 
 @dataclass(frozen=True)
@@ -405,6 +409,217 @@ def _fit_predict_delta(
     model = _LinearRegressor(l2=float(ridge_l2))
     model.fit(x_train_z, train_rows.y_delta)
     return model.predict(x_eval_z).astype(np.float64, copy=False)
+
+
+def _sigmoid(values: np.ndarray) -> np.ndarray:
+    clipped = np.clip(np.asarray(values, dtype=np.float64), -40.0, 40.0)
+    return 1.0 / (1.0 + np.exp(-clipped))
+
+
+def _fit_predict_logistic_harm_score(
+    *,
+    train_x: np.ndarray,
+    train_y: np.ndarray,
+    eval_x: np.ndarray,
+    l2: float,
+    max_iter: int = 400,
+) -> np.ndarray:
+    if train_x.size == 0 or eval_x.size == 0:
+        return np.asarray([], dtype=np.float64)
+    labels = np.asarray(train_y, dtype=np.float64)
+    if len(set(int(v) for v in labels.tolist())) < 2:
+        return np.full((int(eval_x.shape[0]),), float("nan"), dtype=np.float64)
+    x_train_z, x_eval_z = _zscore_features(np.asarray(train_x, dtype=np.float64), np.asarray(eval_x, dtype=np.float64))
+    x_aug = np.concatenate([x_train_z, np.ones((x_train_z.shape[0], 1), dtype=np.float64)], axis=1)
+    x_eval_aug = np.concatenate([x_eval_z, np.ones((x_eval_z.shape[0], 1), dtype=np.float64)], axis=1)
+    w = np.zeros((x_aug.shape[1],), dtype=np.float64)
+    lipschitz = 0.25 * float(np.linalg.norm(x_aug, ord=2) ** 2) / max(float(x_aug.shape[0]), 1.0) + float(l2)
+    lr = 1.0 / max(lipschitz, 1e-6)
+    reg_mask = np.ones_like(w)
+    reg_mask[-1] = 0.0
+    for _ in range(int(max_iter)):
+        pred = _sigmoid(x_aug @ w)
+        grad = (x_aug.T @ (pred - labels)) / max(float(x_aug.shape[0]), 1.0)
+        grad += float(l2) * reg_mask * w
+        w -= lr * grad
+    return _sigmoid(x_eval_aug @ w).astype(np.float64, copy=False)
+
+
+def _active_v1_override_examples(
+    *,
+    eval_rows: _FeatureRows,
+    pred_delta_matrix: np.ndarray,
+    selected_idx: np.ndarray,
+    anchor_idx: np.ndarray,
+    override_margin: np.ndarray,
+    true_eval: np.ndarray | None,
+    delta_threshold: float,
+    margin_threshold: float,
+    neutral_gap_pct_band: float,
+) -> Dict[str, Any]:
+    row_by_sample_candidate = {
+        (int(eval_rows.sample_positions[k]), int(eval_rows.candidate_local_indices[k])): int(k)
+        for k in range(int(eval_rows.sample_positions.shape[0]))
+    }
+    if true_eval is not None:
+        rows = np.arange(true_eval.shape[0])
+        oracle_idx = _stable_argmin_indices(true_eval)
+        selected_nelbo = true_eval[rows, np.asarray(selected_idx, dtype=np.int64)]
+        anchor_nelbo = true_eval[rows, np.asarray(anchor_idx, dtype=np.int64)]
+        oracle_nelbo = true_eval[rows, oracle_idx]
+        selected_gap_pct = ((selected_nelbo - oracle_nelbo) / np.maximum(np.abs(oracle_nelbo), 1e-12)) * 100.0
+        anchor_gap_pct = ((anchor_nelbo - oracle_nelbo) / np.maximum(np.abs(oracle_nelbo), 1e-12)) * 100.0
+        delta_gap_pct = selected_gap_pct - anchor_gap_pct
+    else:
+        selected_nelbo = None
+        anchor_nelbo = None
+        delta_gap_pct = None
+    active = np.asarray(selected_idx, dtype=np.int64) != np.asarray(anchor_idx, dtype=np.int64)
+    band = float(neutral_gap_pct_band)
+    x_rows: List[List[float]] = []
+    y_rows: List[int] = []
+    sample_positions: List[int] = []
+    selected_locals: List[int] = []
+    classes: List[str] = []
+    gains: List[float] = []
+    n_samples = int(pred_delta_matrix.shape[0])
+    for local in range(n_samples):
+        if not bool(active[local]):
+            continue
+        selected_local = int(selected_idx[local])
+        row_index = row_by_sample_candidate.get((int(local), selected_local))
+        if row_index is None:
+            continue
+        if delta_gap_pct is not None:
+            delta_gap = float(delta_gap_pct[local])
+            if delta_gap >= band:
+                cls = "harmful"
+                label = 1
+            elif delta_gap <= -band:
+                cls = "improving"
+                label = 0
+            else:
+                cls = "neutral"
+                label = 0
+        else:
+            cls = "unlabeled"
+            label = 0
+        base_features = [float(v) for v in eval_rows.x[int(row_index)].tolist()]
+        x_rows.append(
+            base_features
+            + [
+                float(pred_delta_matrix[local, selected_local]),
+                float(override_margin[local]),
+                float(delta_threshold) if np.isfinite(float(delta_threshold)) else 1e6,
+                float(margin_threshold) if np.isfinite(float(margin_threshold)) else 1e6,
+            ]
+        )
+        y_rows.append(int(label))
+        sample_positions.append(int(local))
+        selected_locals.append(selected_local)
+        classes.append(cls)
+        gains.append(
+            float(anchor_nelbo[local] - selected_nelbo[local])
+            if anchor_nelbo is not None and selected_nelbo is not None
+            else float("nan")
+        )
+    x = np.asarray(x_rows, dtype=np.float64) if x_rows else np.zeros((0, 0), dtype=np.float64)
+    return {
+        "x": x,
+        "y": np.asarray(y_rows, dtype=np.int64),
+        "sample_positions": np.asarray(sample_positions, dtype=np.int64),
+        "selected_local_indices": np.asarray(selected_locals, dtype=np.int64),
+        "override_classes": tuple(classes),
+        "override_gains": np.asarray(gains, dtype=np.float64),
+    }
+
+
+def _apply_harm_veto_policy(
+    *,
+    v1_selected_idx: np.ndarray,
+    anchor_idx: np.ndarray,
+    active_sample_positions: np.ndarray,
+    harm_scores: np.ndarray,
+    veto_threshold: float,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    selected = np.asarray(v1_selected_idx, dtype=np.int64).copy()
+    scores = np.full((int(selected.shape[0]),), float("nan"), dtype=np.float64)
+    vetoed = np.zeros((int(selected.shape[0]),), dtype=bool)
+    if not np.isfinite(float(veto_threshold)):
+        return selected, scores, vetoed
+    for pos, score in zip(np.asarray(active_sample_positions, dtype=np.int64).tolist(), np.asarray(harm_scores, dtype=np.float64).tolist()):
+        scores[int(pos)] = float(score)
+        if np.isfinite(float(score)) and float(score) >= float(veto_threshold):
+            selected[int(pos)] = int(anchor_idx[int(pos)])
+            vetoed[int(pos)] = True
+    return selected, scores, vetoed
+
+
+def _harm_veto_metrics(
+    *,
+    v1_selected_idx: np.ndarray,
+    v13_selected_idx: np.ndarray,
+    anchor_idx: np.ndarray,
+    true_eval: np.ndarray,
+    neutral_gap_pct_band: float,
+) -> Dict[str, float]:
+    rows = np.arange(true_eval.shape[0])
+    oracle_idx = _stable_argmin_indices(true_eval)
+    v1_nelbo = true_eval[rows, np.asarray(v1_selected_idx, dtype=np.int64)]
+    v13_nelbo = true_eval[rows, np.asarray(v13_selected_idx, dtype=np.int64)]
+    anchor_nelbo = true_eval[rows, np.asarray(anchor_idx, dtype=np.int64)]
+    oracle_nelbo = true_eval[rows, oracle_idx]
+    v1_gap_pct = ((v1_nelbo - oracle_nelbo) / np.maximum(np.abs(oracle_nelbo), 1e-12)) * 100.0
+    v13_gap_pct = ((v13_nelbo - oracle_nelbo) / np.maximum(np.abs(oracle_nelbo), 1e-12)) * 100.0
+    anchor_gap_pct = ((anchor_nelbo - oracle_nelbo) / np.maximum(np.abs(oracle_nelbo), 1e-12)) * 100.0
+    v1_delta_gap_pct = v1_gap_pct - anchor_gap_pct
+    v1_active = np.asarray(v1_selected_idx, dtype=np.int64) != np.asarray(anchor_idx, dtype=np.int64)
+    v13_active = np.asarray(v13_selected_idx, dtype=np.int64) != np.asarray(anchor_idx, dtype=np.int64)
+    vetoed = v1_active & ~v13_active
+    band = float(neutral_gap_pct_band)
+    v1_improving = v1_active & (v1_delta_gap_pct <= -band)
+    v1_harmful = v1_active & (v1_delta_gap_pct >= band)
+    v1_neutral = v1_active & ~(v1_improving | v1_harmful)
+    vetoed_harmful = int(np.sum(vetoed & v1_harmful))
+    vetoed_improving = int(np.sum(vetoed & v1_improving))
+    vetoed_neutral = int(np.sum(vetoed & v1_neutral))
+    vetoed_count = int(np.sum(vetoed))
+    strict_lcb, _strict_ucb = _wilson_bounds(vetoed_harmful, vetoed_count)
+    _false_lcb, false_ucb = _wilson_bounds(vetoed_improving, vetoed_count)
+    v1_improving_gain = np.maximum(anchor_nelbo - v1_nelbo, 0.0)[v1_improving]
+    retained_improving_gain = np.maximum(anchor_nelbo - v1_nelbo, 0.0)[v1_improving & ~vetoed]
+    total_gain = float(np.sum(v1_improving_gain))
+    retained_gain = float(np.sum(retained_improving_gain))
+    missed_gain = float(np.sum(np.maximum(anchor_nelbo - v1_nelbo, 0.0)[v1_improving & vetoed]))
+    v1_active_count = int(np.sum(v1_active))
+    v13_active_count = int(np.sum(v13_active))
+    return {
+        "vetoed_harmful_count": vetoed_harmful,
+        "vetoed_improving_count": vetoed_improving,
+        "vetoed_neutral_count": vetoed_neutral,
+        "veto_count": vetoed_count,
+        "veto_rate": float(vetoed_count / max(v1_active_count, 1)),
+        "strict_harm_prevention_precision": float(vetoed_harmful / vetoed_count) if vetoed_count > 0 else float("nan"),
+        "safe_harm_prevention_precision": (
+            float((vetoed_harmful + vetoed_neutral) / vetoed_count) if vetoed_count > 0 else float("nan")
+        ),
+        "strict_harm_prevention_precision_lcb": strict_lcb,
+        "false_veto_rate": float(vetoed_improving / vetoed_count) if vetoed_count > 0 else float("nan"),
+        "false_veto_rate_ucb": false_ucb,
+        "retained_v1_override_gain_rate": float(retained_gain / total_gain) if total_gain > 0.0 else float("nan"),
+        "retained_v1_improving_gain": retained_gain,
+        "total_v1_improving_gain": total_gain,
+        "missed_gain_from_false_vetoes": missed_gain,
+        "v1_active_override_count": v1_active_count,
+        "v13_active_override_count": v13_active_count,
+        "active_override_rate_ratio_vs_v1": float(v13_active_count / max(v1_active_count, 1)),
+        "source_inner_gap_delta_vs_v1": float(np.mean(v1_gap_pct - v13_gap_pct)) if v1_gap_pct.size else float("nan"),
+        "gap_delta_vs_v1": float(np.mean(v1_gap_pct - v13_gap_pct)) if v1_gap_pct.size else float("nan"),
+        "top1_delta_vs_v1": float(np.mean(np.asarray(v13_selected_idx) == oracle_idx) - np.mean(np.asarray(v1_selected_idx) == oracle_idx)) if oracle_idx.size else float("nan"),
+        "harmful_v1_override_count": int(np.sum(v1_harmful)),
+        "nonharmful_v1_override_count": int(np.sum(v1_improving | v1_neutral)),
+        "harm_label_positive_rate": float(np.mean(v1_harmful[v1_active])) if v1_active_count > 0 else float("nan"),
+    }
 
 
 def _prediction_matrix_from_rows(
@@ -858,6 +1073,251 @@ def _v1_guard_metrics(
         "v1_active_override_rate_source_inner": v1_active_rate,
         "candidate_active_override_rate_source_inner": candidate_active_rate,
         "paired_source_inner_unit_count_vs_v1": int(len(common_units)),
+    }
+
+
+def _fit_eval_v1_policy_for_fold(
+    *,
+    embeddings: np.ndarray,
+    sample_domains: np.ndarray,
+    true_nelbo: np.ndarray,
+    expert_domains: Sequence[int],
+    train_idx: np.ndarray,
+    eval_idx: np.ndarray,
+    outer_heldout_domain: int,
+    eval_excluded_domains: Sequence[int],
+    metadata_similarity: np.ndarray,
+    ae_scores: AutoencoderScoreMatrices,
+    feature_set: str,
+    delta_threshold: float,
+    margin_threshold: float,
+    ridge_l2: float,
+) -> Tuple[FoldCandidateSet, _FeatureRows, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    eval_fold = FoldCandidateSet.for_heldout_domain(
+        heldout_domain=int(outer_heldout_domain),
+        expert_domains=expert_domains,
+        excluded_domains=[int(v) for v in eval_excluded_domains],
+    )
+    train_excluded_extra = [int(v) for v in eval_excluded_domains]
+    train_fold_for_sample = (
+        lambda sample_index, h=int(outer_heldout_domain), extra=tuple(train_excluded_extra): FoldCandidateSet.for_heldout_domain(
+            heldout_domain=h,
+            expert_domains=expert_domains,
+            excluded_domains=sorted(set([int(sample_domains[int(sample_index)]), *[int(v) for v in extra]])),
+        )
+    )
+    eval_fold_for_sample = lambda _sample_index, f=eval_fold: f
+    eval_rows, _pred_flat, pred_matrix, anchor_idx = _train_predict_for_fold(
+        embeddings=embeddings,
+        sample_domains=sample_domains,
+        true_nelbo=true_nelbo,
+        expert_domains=expert_domains,
+        train_idx=train_idx,
+        eval_idx=eval_idx,
+        train_fold_for_sample=train_fold_for_sample,
+        eval_fold_for_sample=eval_fold_for_sample,
+        metadata_similarity=metadata_similarity,
+        ae_scores=ae_scores,
+        feature_set=str(feature_set),
+        ridge_l2=float(ridge_l2),
+        n_eval_candidates=len(eval_fold.candidate_expert_domains),
+    )
+    selected_idx, _best_override, _best_delta, override_margin = _apply_safe_override_policy(
+        pred_delta_matrix=pred_matrix,
+        anchor_idx=anchor_idx,
+        delta_threshold=float(delta_threshold),
+        margin_threshold=float(margin_threshold),
+    )
+    return eval_fold, eval_rows, pred_matrix, anchor_idx, selected_idx, override_margin
+
+
+def _collect_source_inner_harm_examples(
+    *,
+    embeddings: np.ndarray,
+    sample_domains: np.ndarray,
+    true_nelbo: np.ndarray,
+    expert_domains: Sequence[int],
+    train_idx: np.ndarray,
+    outer_heldout_domain: int,
+    excluded_validation_domain: int | None,
+    metadata_similarity: np.ndarray,
+    ae_scores: AutoencoderScoreMatrices,
+    feature_set: str,
+    delta_threshold: float,
+    margin_threshold: float,
+    ridge_l2: float,
+    neutral_gap_pct_band: float,
+) -> Dict[str, Any]:
+    source_domains = sorted(set(int(sample_domains[int(i)]) for i in np.asarray(train_idx, dtype=np.int64).tolist()))
+    if excluded_validation_domain is not None:
+        source_domains = [d for d in source_domains if int(d) != int(excluded_validation_domain)]
+    x_parts: List[np.ndarray] = []
+    y_parts: List[np.ndarray] = []
+    classes: List[str] = []
+    for pseudo_domain in source_domains:
+        val_idx = np.asarray(
+            [i for i in np.asarray(train_idx, dtype=np.int64).tolist() if int(sample_domains[int(i)]) == int(pseudo_domain)],
+            dtype=np.int64,
+        )
+        inner_train_idx = np.asarray(
+            [
+                i
+                for i in np.asarray(train_idx, dtype=np.int64).tolist()
+                if int(sample_domains[int(i)]) != int(pseudo_domain)
+                and (excluded_validation_domain is None or int(sample_domains[int(i)]) != int(excluded_validation_domain))
+            ],
+            dtype=np.int64,
+        )
+        if val_idx.size == 0 or inner_train_idx.size == 0:
+            continue
+        eval_excluded = [int(pseudo_domain)]
+        if excluded_validation_domain is not None:
+            eval_excluded.append(int(excluded_validation_domain))
+        eval_fold = FoldCandidateSet.for_heldout_domain(
+            heldout_domain=int(outer_heldout_domain),
+            expert_domains=expert_domains,
+            excluded_domains=eval_excluded,
+        )
+        if len(eval_fold.candidate_expert_domains) < 2:
+            continue
+        try:
+            eval_fold, eval_rows, pred_matrix, anchor_idx, selected_idx, override_margin = _fit_eval_v1_policy_for_fold(
+                embeddings=embeddings,
+                sample_domains=sample_domains,
+                true_nelbo=true_nelbo,
+                expert_domains=expert_domains,
+                train_idx=inner_train_idx,
+                eval_idx=val_idx,
+                outer_heldout_domain=int(outer_heldout_domain),
+                eval_excluded_domains=eval_excluded,
+                metadata_similarity=metadata_similarity,
+                ae_scores=ae_scores,
+                feature_set=str(feature_set),
+                delta_threshold=float(delta_threshold),
+                margin_threshold=float(margin_threshold),
+                ridge_l2=float(ridge_l2),
+            )
+        except Exception:
+            continue
+        if eval_rows.x.size == 0:
+            continue
+        examples = _active_v1_override_examples(
+            eval_rows=eval_rows,
+            pred_delta_matrix=pred_matrix,
+            selected_idx=selected_idx,
+            anchor_idx=anchor_idx,
+            override_margin=override_margin,
+            true_eval=eval_fold.slice_nelbo(true_nelbo, val_idx),
+            delta_threshold=float(delta_threshold),
+            margin_threshold=float(margin_threshold),
+            neutral_gap_pct_band=float(neutral_gap_pct_band),
+        )
+        if examples["x"].size == 0:
+            continue
+        x_parts.append(examples["x"])
+        y_parts.append(examples["y"])
+        classes.extend(str(v) for v in examples["override_classes"])
+    x = np.concatenate(x_parts, axis=0) if x_parts else np.zeros((0, 0), dtype=np.float64)
+    y = np.concatenate(y_parts, axis=0) if y_parts else np.asarray([], dtype=np.int64)
+    harmful = int(np.sum(y == 1))
+    return {
+        "x": x,
+        "y": y,
+        "harmful_count": harmful,
+        "nonharmful_count": int(y.shape[0] - harmful),
+        "classes": tuple(classes),
+    }
+
+
+def _aggregate_harm_veto_metrics(
+    *,
+    summaries: Sequence[Mapping[str, float]],
+    v1_summaries: Sequence[Mapping[str, float]],
+    cfg: AEUtilityCalibratorConfig,
+) -> Dict[str, float]:
+    vetoed_harmful = int(sum(int(float(row.get("vetoed_harmful_count", 0.0))) for row in summaries))
+    vetoed_improving = int(sum(int(float(row.get("vetoed_improving_count", 0.0))) for row in summaries))
+    vetoed_neutral = int(sum(int(float(row.get("vetoed_neutral_count", 0.0))) for row in summaries))
+    veto_count = int(vetoed_harmful + vetoed_improving + vetoed_neutral)
+    strict_lcb, _strict_ucb = _wilson_bounds(vetoed_harmful, veto_count)
+    _false_lcb, false_ucb = _wilson_bounds(vetoed_improving, veto_count)
+    total_gain = float(sum(float(row.get("total_v1_improving_gain", 0.0)) for row in summaries))
+    retained_gain = float(sum(float(row.get("retained_v1_improving_gain", 0.0)) for row in summaries))
+    gap_deltas = [float(row.get("gap_delta_vs_v1", float("nan"))) for row in summaries]
+    gap_delta_lcb = _bootstrap_lcb(
+        gap_deltas,
+        reps=int(cfg.precision_bootstrap_reps),
+        seed=int(cfg.precision_bootstrap_seed),
+    )
+    gap_degradations = [-float(v) for v in gap_deltas if np.isfinite(float(v))]
+    active_v1 = int(sum(int(float(row.get("v1_active_override_count", 0.0))) for row in summaries))
+    active_v13 = int(sum(int(float(row.get("v13_active_override_count", 0.0))) for row in summaries))
+    harmful_v13 = 0
+    for row in summaries:
+        row_active = int(float(row.get("active_override_count", 0.0)))
+        row_harm_rate = float(row.get("harmful_override_rate", 0.0))
+        if row_active > 0 and np.isfinite(row_harm_rate):
+            harmful_v13 += int(round(row_harm_rate * row_active))
+    _harm_lcb, harmful_v13_ucb = _wilson_bounds(harmful_v13, active_v13)
+    harmful_source = int(sum(int(float(row.get("harmful_v1_override_count", 0.0))) for row in summaries))
+    nonharmful_source = int(sum(int(float(row.get("nonharmful_v1_override_count", 0.0))) for row in summaries))
+    v1_top1 = _finite_mean([float(row.get("top1_oracle_hit", float("nan"))) for row in v1_summaries], default=float("nan"))
+    cand_top1 = _finite_mean([float(row.get("top1_oracle_hit", float("nan"))) for row in summaries], default=float("nan"))
+    v1_spearman = _finite_mean([float(row.get("raw_predicted_delta_spearman_non_anchor", float("nan"))) for row in v1_summaries], default=float("nan"))
+    cand_spearman = _finite_mean([float(row.get("raw_predicted_delta_spearman_non_anchor", float("nan"))) for row in summaries], default=float("nan"))
+    retained_rate = float(retained_gain / total_gain) if total_gain > 0.0 else float("nan")
+    active_ratio = float(active_v13 / max(active_v1, 1))
+    worst_degradation = float(max(gap_degradations)) if gap_degradations else float("inf")
+    passes = bool(
+        active_v1 >= int(cfg.harm_veto_min_active_v1_override_count_source_inner)
+        and veto_count >= int(cfg.harm_veto_min_veto_count_source_inner)
+        and harmful_source >= int(cfg.harm_veto_min_harmful_v1_override_count_source_inner)
+        and np.isfinite(strict_lcb)
+        and strict_lcb >= float(cfg.harm_veto_min_strict_harm_prevention_precision_lcb)
+        and np.isfinite(false_ucb)
+        and false_ucb <= float(cfg.harm_veto_max_false_veto_rate_ucb)
+        and np.isfinite(retained_rate)
+        and retained_rate >= float(cfg.harm_veto_min_retained_v1_override_gain_rate)
+        and active_ratio >= float(cfg.harm_veto_min_active_override_rate_ratio_vs_v1)
+        and np.isfinite(gap_delta_lcb)
+        and gap_delta_lcb >= float(cfg.harm_veto_min_gap_delta_vs_v1_lcb_pp)
+        and (not np.isfinite(v1_top1) or not np.isfinite(cand_top1) or v1_top1 - cand_top1 <= float(cfg.max_top1_drop_vs_ae_argmin_abs))
+        and (
+            not np.isfinite(v1_spearman)
+            or not np.isfinite(cand_spearman)
+            or v1_spearman - cand_spearman <= float(cfg.max_spearman_drop_vs_ae_argmin_abs)
+        )
+        and worst_degradation <= float(cfg.max_worst_pseudo_domain_gap_degradation_pp)
+    )
+    return {
+        "passes_harm_veto_gates": int(passes),
+        "vetoed_harmful_count": vetoed_harmful,
+        "vetoed_improving_count": vetoed_improving,
+        "vetoed_neutral_count": vetoed_neutral,
+        "veto_count_source_inner": veto_count,
+        "strict_harm_prevention_precision": float(vetoed_harmful / veto_count) if veto_count > 0 else float("nan"),
+        "safe_harm_prevention_precision": (
+            float((vetoed_harmful + vetoed_neutral) / veto_count) if veto_count > 0 else float("nan")
+        ),
+        "strict_harm_prevention_precision_lcb": strict_lcb,
+        "harmful_override_rate_ucb": harmful_v13_ucb,
+        "false_veto_rate": float(vetoed_improving / veto_count) if veto_count > 0 else float("nan"),
+        "false_veto_rate_ucb": false_ucb,
+        "retained_v1_override_gain_rate": retained_rate,
+        "missed_gain_from_false_vetoes": float(sum(float(row.get("missed_gain_from_false_vetoes", 0.0)) for row in summaries)),
+        "v1_active_override_count_source_inner": active_v1,
+        "v13_active_override_count_source_inner": active_v13,
+        "active_override_rate_ratio_vs_v1": active_ratio,
+        "harmful_v1_override_count_source_inner": harmful_source,
+        "nonharmful_v1_override_count_source_inner": nonharmful_source,
+        "harm_label_positive_rate_source_inner": float(harmful_source / max(harmful_source + nonharmful_source, 1)),
+        "source_inner_gap_delta_vs_v1": _finite_mean(gap_deltas, default=float("nan")),
+        "source_inner_gap_delta_vs_v1_lcb": gap_delta_lcb,
+        "worst_pseudo_domain_gap_degradation_vs_v1_pp": worst_degradation,
+        "top1_delta_vs_v1_source_inner": float(cand_top1 - v1_top1) if np.isfinite(cand_top1) and np.isfinite(v1_top1) else float("nan"),
+        "spearman_delta_vs_v1_source_inner": (
+            float(cand_spearman - v1_spearman) if np.isfinite(cand_spearman) and np.isfinite(v1_spearman) else float("nan")
+        ),
     }
 
 
@@ -1495,6 +1955,297 @@ def _select_config_for_method(
     return selected, validation_rows
 
 
+def _select_harm_veto_config_for_method(
+    *,
+    method: str,
+    feature_sets: Sequence[str],
+    embeddings: np.ndarray,
+    sample_domains: np.ndarray,
+    true_nelbo: np.ndarray,
+    expert_domains: Sequence[int],
+    train_idx: np.ndarray,
+    outer_fold: FoldCandidateSet,
+    metadata_similarity: np.ndarray,
+    ae_scores: AutoencoderScoreMatrices,
+    cfg: AEUtilityCalibratorConfig,
+) -> Tuple[_SelectedConfig, List[Dict[str, Any]]]:
+    v1_selected, _v1_rows = _select_config_for_method(
+        method=PRIMARY_METHOD,
+        feature_sets=feature_sets,
+        embeddings=embeddings,
+        sample_domains=sample_domains,
+        true_nelbo=true_nelbo,
+        expert_domains=expert_domains,
+        train_idx=train_idx,
+        outer_fold=outer_fold,
+        metadata_similarity=metadata_similarity,
+        ae_scores=ae_scores,
+        cfg=cfg,
+    )
+    source_domains = sorted(set(int(sample_domains[int(i)]) for i in np.asarray(train_idx, dtype=np.int64)))
+    thresholds = tuple(dict.fromkeys(float(v) for v in cfg.harm_veto_thresholds))
+    if not any(not np.isfinite(v) for v in thresholds):
+        thresholds = tuple(list(thresholds) + [float("inf")])
+    validation_rows: List[Dict[str, Any]] = []
+    threshold_domain_summaries: Dict[float, List[Dict[str, float]]] = {}
+    threshold_domain_v1_summaries: Dict[float, List[Dict[str, float]]] = {}
+
+    for pseudo_domain in source_domains:
+        val_idx = np.asarray(
+            [i for i in train_idx.tolist() if int(sample_domains[int(i)]) == int(pseudo_domain)],
+            dtype=np.int64,
+        )
+        inner_train_idx = np.asarray(
+            [i for i in train_idx.tolist() if int(sample_domains[int(i)]) != int(pseudo_domain)],
+            dtype=np.int64,
+        )
+        if val_idx.size == 0 or inner_train_idx.size == 0:
+            continue
+        inner_fold = FoldCandidateSet.for_heldout_domain(
+            heldout_domain=int(outer_fold.heldout_domain),
+            expert_domains=expert_domains,
+            excluded_domains=[int(pseudo_domain)],
+        )
+        if len(inner_fold.candidate_expert_domains) < 2:
+            continue
+        harm_train = _collect_source_inner_harm_examples(
+            embeddings=embeddings,
+            sample_domains=sample_domains,
+            true_nelbo=true_nelbo,
+            expert_domains=expert_domains,
+            train_idx=train_idx,
+            outer_heldout_domain=int(outer_fold.heldout_domain),
+            excluded_validation_domain=int(pseudo_domain),
+            metadata_similarity=metadata_similarity,
+            ae_scores=ae_scores,
+            feature_set=str(v1_selected.feature_set),
+            delta_threshold=float(v1_selected.delta_threshold),
+            margin_threshold=float(v1_selected.margin_threshold),
+            ridge_l2=float(cfg.ridge_l2),
+            neutral_gap_pct_band=float(cfg.neutral_override_gap_pct_band),
+        )
+        label_classes = set(int(v) for v in np.asarray(harm_train["y"], dtype=np.int64).tolist())
+        has_train_signal = (
+            harm_train["x"].size > 0
+            and len(label_classes) >= 2
+            and int(harm_train["harmful_count"]) >= int(cfg.harm_veto_min_harmful_v1_override_count_source_inner)
+        )
+        eval_fold, eval_rows, pred_matrix, anchor_idx, v1_selected_idx, override_margin = _fit_eval_v1_policy_for_fold(
+            embeddings=embeddings,
+            sample_domains=sample_domains,
+            true_nelbo=true_nelbo,
+            expert_domains=expert_domains,
+            train_idx=inner_train_idx,
+            eval_idx=val_idx,
+            outer_heldout_domain=int(outer_fold.heldout_domain),
+            eval_excluded_domains=[int(pseudo_domain)],
+            metadata_similarity=metadata_similarity,
+            ae_scores=ae_scores,
+            feature_set=str(v1_selected.feature_set),
+            delta_threshold=float(v1_selected.delta_threshold),
+            margin_threshold=float(v1_selected.margin_threshold),
+            ridge_l2=float(cfg.ridge_l2),
+        )
+        if eval_rows.x.size == 0:
+            continue
+        true_val = eval_fold.slice_nelbo(true_nelbo, val_idx)
+        metadata_val = metadata_similarity[val_idx][:, list(eval_fold.candidate_col_indices)]
+        metadata_idx = _metadata_selected_local_indices(metadata_val)
+        ae_val = ae_scores.zscore_matrix[val_idx][:, list(eval_fold.candidate_col_indices)]
+        v1_summary = _policy_summary(
+            selected_idx=v1_selected_idx,
+            anchor_idx=anchor_idx,
+            pred_delta_matrix=pred_matrix,
+            true_eval=true_val,
+            metadata_idx=metadata_idx,
+            ae_zscore_eval=ae_val,
+            neutral_gap_pct_band=float(cfg.neutral_override_gap_pct_band),
+        )
+        eval_examples = _active_v1_override_examples(
+            eval_rows=eval_rows,
+            pred_delta_matrix=pred_matrix,
+            selected_idx=v1_selected_idx,
+            anchor_idx=anchor_idx,
+            override_margin=override_margin,
+            true_eval=None,
+            delta_threshold=float(v1_selected.delta_threshold),
+            margin_threshold=float(v1_selected.margin_threshold),
+            neutral_gap_pct_band=float(cfg.neutral_override_gap_pct_band),
+        )
+        harm_scores = (
+            _fit_predict_logistic_harm_score(
+                train_x=np.asarray(harm_train["x"], dtype=np.float64),
+                train_y=np.asarray(harm_train["y"], dtype=np.int64),
+                eval_x=np.asarray(eval_examples["x"], dtype=np.float64),
+                l2=float(cfg.ridge_l2),
+            )
+            if has_train_signal and eval_examples["x"].size > 0
+            else np.full((int(eval_examples["x"].shape[0]) if eval_examples["x"].ndim == 2 else 0,), float("nan"))
+        )
+        for veto_threshold in thresholds:
+            v13_selected_idx, _score_by_sample, _vetoed = _apply_harm_veto_policy(
+                v1_selected_idx=v1_selected_idx,
+                anchor_idx=anchor_idx,
+                active_sample_positions=np.asarray(eval_examples["sample_positions"], dtype=np.int64),
+                harm_scores=harm_scores,
+                veto_threshold=float(veto_threshold),
+            )
+            summary = _policy_summary(
+                selected_idx=v13_selected_idx,
+                anchor_idx=anchor_idx,
+                pred_delta_matrix=pred_matrix,
+                true_eval=true_val,
+                metadata_idx=metadata_idx,
+                ae_zscore_eval=ae_val,
+                neutral_gap_pct_band=float(cfg.neutral_override_gap_pct_band),
+            )
+            harm_metrics = _harm_veto_metrics(
+                v1_selected_idx=v1_selected_idx,
+                v13_selected_idx=v13_selected_idx,
+                anchor_idx=anchor_idx,
+                true_eval=true_val,
+                neutral_gap_pct_band=float(cfg.neutral_override_gap_pct_band),
+            )
+            row_summary = {
+                **dict(summary),
+                **harm_metrics,
+                "source_inner_pseudo_query_domain": int(pseudo_domain),
+                "harmful_v1_override_count_source_inner": int(harm_train["harmful_count"]),
+                "nonharmful_v1_override_count_source_inner": int(harm_train["nonharmful_count"]),
+                "harm_label_positive_rate_source_inner": (
+                    float(int(harm_train["harmful_count"]) / max(int(harm_train["harmful_count"]) + int(harm_train["nonharmful_count"]), 1))
+                ),
+                "harm_train_single_class": int(len(label_classes) < 2),
+                "harm_train_insufficient_harmful_count": int(
+                    int(harm_train["harmful_count"]) < int(cfg.harm_veto_min_harmful_v1_override_count_source_inner)
+                ),
+            }
+            threshold_domain_summaries.setdefault(float(veto_threshold), []).append(row_summary)
+            threshold_domain_v1_summaries.setdefault(float(veto_threshold), []).append(dict(v1_summary))
+            validation_rows.append(
+                {
+                    "method": str(method),
+                    "feature_set": str(v1_selected.feature_set),
+                    "model_type": "logistic_harm_score",
+                    "fold_query_domain": int(outer_fold.heldout_domain),
+                    "source_inner_pseudo_query_domain": int(pseudo_domain),
+                    "delta_threshold": _threshold_label(float(v1_selected.delta_threshold)),
+                    "margin_threshold": _threshold_label(float(v1_selected.margin_threshold)),
+                    "veto_threshold": _threshold_label(float(veto_threshold)),
+                    "threshold_selection_policy": "source_inner_v1_harm_veto",
+                    "selection_mode": str(cfg.selection_mode),
+                    "n_validation_samples": int(val_idx.shape[0]),
+                    "candidate_experts": inner_fold.label(),
+                    "excluded_target_ae": 1,
+                    "excluded_target_cvae": 1,
+                    "excluded_pseudo_query_ae": 1,
+                    "excluded_pseudo_query_cvae": 1,
+                    "heldout_target_nelbo_used_for_selection": 0,
+                    **{f"macro_{k}": float(v) for k, v in row_summary.items() if isinstance(v, (int, float, np.integer, np.floating))},
+                }
+            )
+
+    config_summaries: List[Dict[str, Any]] = []
+    for veto_threshold, summaries in threshold_domain_summaries.items():
+        v1_summaries = threshold_domain_v1_summaries.get(veto_threshold, [])
+        if not summaries:
+            continue
+        keys = set().union(*(row.keys() for row in summaries))
+        macro = {
+            k: _finite_mean([float(row.get(k, float("nan"))) for row in summaries], default=float("nan"))
+            for k in keys
+            if all(isinstance(row.get(k, 0.0), (int, float, np.integer, np.floating)) for row in summaries)
+        }
+        aggregate = _aggregate_harm_veto_metrics(summaries=summaries, v1_summaries=v1_summaries, cfg=cfg)
+        config_row = {
+            "method": str(method),
+            "feature_set": str(v1_selected.feature_set),
+            "delta_threshold": float(v1_selected.delta_threshold),
+            "margin_threshold": float(v1_selected.margin_threshold),
+            "veto_threshold": float(veto_threshold),
+            **macro,
+            **aggregate,
+        }
+        config_summaries.append(config_row)
+        validation_rows.append(
+            {
+                "method": str(method),
+                "feature_set": str(v1_selected.feature_set),
+                "model_type": "logistic_harm_score",
+                "fold_query_domain": int(outer_fold.heldout_domain),
+                "source_inner_pseudo_query_domain": "source_inner_macro",
+                "delta_threshold": _threshold_label(float(v1_selected.delta_threshold)),
+                "margin_threshold": _threshold_label(float(v1_selected.margin_threshold)),
+                "veto_threshold": _threshold_label(float(veto_threshold)),
+                "threshold_selection_policy": "source_inner_v1_harm_veto",
+                "selection_mode": str(cfg.selection_mode),
+                "n_validation_samples": int(aggregate["v1_active_override_count_source_inner"]),
+                "candidate_experts": "source_inner_macro",
+                "excluded_target_ae": 1,
+                "excluded_target_cvae": 1,
+                "excluded_pseudo_query_ae": 1,
+                "excluded_pseudo_query_cvae": 1,
+                "heldout_target_nelbo_used_for_selection": 0,
+                **aggregate,
+                **{f"macro_{k}": float(v) for k, v in macro.items()},
+            }
+        )
+
+    passing = [
+        row
+        for row in config_summaries
+        if np.isfinite(float(row.get("veto_threshold", float("inf"))))
+        and int(row.get("passes_harm_veto_gates", 0)) == 1
+    ]
+    if passing:
+        selected_row = sorted(
+            passing,
+            key=lambda row: (
+                float(row.get("harmful_override_rate_ucb", row.get("harmful_override_rate", float("inf")))),
+                -float(row.get("strict_harm_prevention_precision_lcb", float("-inf"))),
+                -float(row.get("source_inner_gap_delta_vs_v1_lcb", float("-inf"))),
+                -float(row.get("retained_v1_override_gain_rate", float("-inf"))),
+                float(row.get("veto_rate", float("inf"))),
+                -float(row.get("veto_threshold", float("-inf"))),
+            ),
+        )[0]
+        selected = _SelectedConfig(
+            str(method),
+            str(selected_row["feature_set"]),
+            float(selected_row["delta_threshold"]),
+            float(selected_row["margin_threshold"]),
+            1,
+            selection_status="harm_veto_v13_selected",
+            veto_threshold=float(selected_row["veto_threshold"]),
+        )
+    else:
+        selected = _SelectedConfig(
+            str(method),
+            str(v1_selected.feature_set),
+            float(v1_selected.delta_threshold),
+            float(v1_selected.margin_threshold),
+            0,
+            selection_status="fallback_to_v1_no_harm_veto_safe_config",
+            fallback_reason="no_harm_veto_safe_config",
+            veto_threshold=float("inf"),
+        )
+    for row in validation_rows:
+        row["selected_feature_set"] = selected.feature_set
+        row["selected_delta_threshold"] = _threshold_label(selected.delta_threshold)
+        row["selected_margin_threshold"] = _threshold_label(selected.margin_threshold)
+        row["selected_veto_threshold"] = _threshold_label(selected.veto_threshold)
+        row["selection_status"] = selected.selection_status
+        row["fallback_reason"] = selected.fallback_reason
+        row["selected_by_source_inner_validation"] = int(
+            selected.selected_by_source_inner
+            and row["feature_set"] == selected.feature_set
+            and row["delta_threshold"] == _threshold_label(selected.delta_threshold)
+            and row["margin_threshold"] == _threshold_label(selected.margin_threshold)
+            and row.get("veto_threshold") == _threshold_label(selected.veto_threshold)
+        )
+    return selected, validation_rows
+
+
 def _select_consensus_config_for_method(
     *,
     method: str,
@@ -1703,6 +2454,13 @@ def _method_feature_sets(cfg: AEUtilityCalibratorConfig) -> List[Tuple[str, Tupl
             (PRIMARY_METHOD_V11, tuple(cfg.feature_sets_primary), "v1_1_precision_lcb_baseline"),
             (PRIMARY_METHOD_V12, tuple(cfg.feature_sets_primary), "primary_metadata_free_precision_lcb_v1_guarded"),
         ]
+    if str(cfg.primary_method) == PRIMARY_METHOD_V13:
+        return [
+            (PRIMARY_METHOD, tuple(cfg.feature_sets_primary), "v1_baseline"),
+            (PRIMARY_METHOD_V11, tuple(cfg.feature_sets_primary), "v1_1_precision_lcb_baseline"),
+            (PRIMARY_METHOD_V12, tuple(cfg.feature_sets_primary), "v1_2_v1_guarded_precision_baseline"),
+            (PRIMARY_METHOD_V13, tuple(cfg.feature_sets_primary), "primary_metadata_free_v1_harm_veto"),
+        ]
     methods = [(PRIMARY_METHOD, tuple(cfg.feature_sets_primary), "primary_metadata_free")]
     if "ae_metadata" in set(cfg.feature_sets_diagnostic):
         methods.append((HYBRID_METADATA_METHOD, ("ae_metadata",), "hybrid_metadata"))
@@ -1884,10 +2642,10 @@ def run_ae_utility_calibrator_methods_for_fold(
     if not bool(cfg.enabled):
         return AEUtilityCalibratorFoldOutputs([], [], [], [], [], [], [], [], [])
     is_v2 = str(cfg.primary_method) == PRIMARY_METHOD_V2
-    if str(cfg.primary_method) not in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V2}:
+    if str(cfg.primary_method) not in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V13, PRIMARY_METHOD_V2}:
         raise ProtocolError(
             "AE utility calibrator primary_method must be "
-            f"{PRIMARY_METHOD}, {PRIMARY_METHOD_V11}, {PRIMARY_METHOD_V12}, or {PRIMARY_METHOD_V2}"
+            f"{PRIMARY_METHOD}, {PRIMARY_METHOD_V11}, {PRIMARY_METHOD_V12}, {PRIMARY_METHOD_V13}, or {PRIMARY_METHOD_V2}"
         )
     if is_v2:
         if str(cfg.primary_model_type) != "ridge_delta_consensus" or set(cfg.model_types) != {"ridge_delta_consensus"}:
@@ -1935,6 +2693,20 @@ def run_ae_utility_calibrator_methods_for_fold(
                 ae_scores=ae_scores,
                 cfg=cfg,
             )
+        elif method == PRIMARY_METHOD_V13:
+            selected_cfg, rows = _select_harm_veto_config_for_method(
+                method=method,
+                feature_sets=feature_sets,
+                embeddings=embeddings,
+                sample_domains=sample_domains,
+                true_nelbo=true_nelbo,
+                expert_domains=expert_domains,
+                train_idx=train_idx,
+                outer_fold=fold,
+                metadata_similarity=metadata_similarity,
+                ae_scores=ae_scores,
+                cfg=cfg,
+            )
         else:
             selected_cfg, rows = _select_config_for_method(
                 method=method,
@@ -1958,6 +2730,10 @@ def run_ae_utility_calibrator_methods_for_fold(
                 and str(row.get("feature_set")) == str(selected_cfg.feature_set)
                 and str(row.get("delta_threshold")) == _threshold_label(float(selected_cfg.delta_threshold))
                 and str(row.get("margin_threshold")) == _threshold_label(float(selected_cfg.margin_threshold))
+                and (
+                    method != PRIMARY_METHOD_V13
+                    or str(row.get("veto_threshold")) == _threshold_label(float(selected_cfg.veto_threshold))
+                )
             ),
             {},
         )
@@ -2022,6 +2798,58 @@ def run_ae_utility_calibrator_methods_for_fold(
             second_override = np.full(best_override.shape, -1, dtype=np.int64)
             second_delta = np.full(best_delta.shape, float("-inf"), dtype=np.float64)
             positive_rate_best = np.ones(best_delta.shape, dtype=np.float64)
+        harm_score_by_sample = np.full((int(test_idx.shape[0]),), float("nan"), dtype=np.float64)
+        vetoed_by_sample = np.zeros((int(test_idx.shape[0]),), dtype=bool)
+        v1_selected_for_harm_veto = np.asarray(selected_idx, dtype=np.int64).copy()
+        if method == PRIMARY_METHOD_V13:
+            harm_train = _collect_source_inner_harm_examples(
+                embeddings=embeddings,
+                sample_domains=sample_domains,
+                true_nelbo=true_nelbo,
+                expert_domains=expert_domains,
+                train_idx=train_idx,
+                outer_heldout_domain=int(fold.heldout_domain),
+                excluded_validation_domain=None,
+                metadata_similarity=metadata_similarity,
+                ae_scores=ae_scores,
+                feature_set=str(selected_cfg.feature_set),
+                delta_threshold=float(selected_cfg.delta_threshold),
+                margin_threshold=float(selected_cfg.margin_threshold),
+                ridge_l2=float(cfg.ridge_l2),
+                neutral_gap_pct_band=float(cfg.neutral_override_gap_pct_band),
+            )
+            eval_examples = _active_v1_override_examples(
+                eval_rows=eval_rows,
+                pred_delta_matrix=pred_matrix,
+                selected_idx=v1_selected_for_harm_veto,
+                anchor_idx=anchor_idx,
+                override_margin=override_margin,
+                true_eval=None,
+                delta_threshold=float(selected_cfg.delta_threshold),
+                margin_threshold=float(selected_cfg.margin_threshold),
+                neutral_gap_pct_band=float(cfg.neutral_override_gap_pct_band),
+            )
+            label_classes = set(int(v) for v in np.asarray(harm_train["y"], dtype=np.int64).tolist())
+            if (
+                np.isfinite(float(selected_cfg.veto_threshold))
+                and eval_examples["x"].size > 0
+                and harm_train["x"].size > 0
+                and len(label_classes) >= 2
+                and int(harm_train["harmful_count"]) >= int(cfg.harm_veto_min_harmful_v1_override_count_source_inner)
+            ):
+                active_scores = _fit_predict_logistic_harm_score(
+                    train_x=np.asarray(harm_train["x"], dtype=np.float64),
+                    train_y=np.asarray(harm_train["y"], dtype=np.int64),
+                    eval_x=np.asarray(eval_examples["x"], dtype=np.float64),
+                    l2=float(cfg.ridge_l2),
+                )
+                selected_idx, harm_score_by_sample, vetoed_by_sample = _apply_harm_veto_policy(
+                    v1_selected_idx=v1_selected_for_harm_veto,
+                    anchor_idx=anchor_idx,
+                    active_sample_positions=np.asarray(eval_examples["sample_positions"], dtype=np.int64),
+                    harm_scores=active_scores,
+                    veto_threshold=float(selected_cfg.veto_threshold),
+                )
         summary = _policy_summary(
             selected_idx=selected_idx,
             anchor_idx=anchor_idx,
@@ -2031,6 +2859,17 @@ def run_ae_utility_calibrator_methods_for_fold(
             ae_zscore_eval=ae_zscore_eval,
             abstention_correct_gap_pct_epsilon=float(cfg.abstention_correct_gap_pct_epsilon),
             neutral_gap_pct_band=float(cfg.neutral_override_gap_pct_band),
+        )
+        heldout_harm_veto_metrics = (
+            _harm_veto_metrics(
+                v1_selected_idx=v1_selected_for_harm_veto,
+                v13_selected_idx=selected_idx,
+                anchor_idx=anchor_idx,
+                true_eval=true_eval,
+                neutral_gap_pct_band=float(cfg.neutral_override_gap_pct_band),
+            )
+            if method == PRIMARY_METHOD_V13
+            else {}
         )
         score_matrix = -pred_matrix
         _metrics_unused, rows_for_method = _selection_metrics(
@@ -2070,7 +2909,7 @@ def run_ae_utility_calibrator_methods_for_fold(
             row["sample_index"] = int(test_idx[local])
             row.update(
                 {
-                    "model_type": "ridge_delta_consensus" if method in V2_METHODS else "ridge_delta",
+                    "model_type": "ridge_delta_consensus" if method in V2_METHODS else "logistic_harm_score" if method == PRIMARY_METHOD_V13 else "ridge_delta",
                     "ensemble_strategy": str(cfg.ensemble_strategy) if method in V2_METHODS else "",
                     "feature_set": selected_cfg.feature_set,
                     "method_kind": method_kind,
@@ -2145,13 +2984,16 @@ def run_ae_utility_calibrator_methods_for_fold(
                     "source_inner_self_expert_excluded": 1,
                     "metadata_role": (
                         "not_used"
-                        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V2}
+                        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V13, PRIMARY_METHOD_V2}
                         else "hybrid_auxiliary_feature"
                     ),
                     "proxy_claim_boundary": "AE reconstruction fit is a proxy for CVAE utility, not compatibility.",
                     "selection_status": selected_cfg.selection_status,
                     "fallback_reason": selected_cfg.fallback_reason,
-                    "heldout_precision_report_only": 1 if method in PRECISION_LCB_METHODS else "",
+                    "heldout_precision_report_only": 1 if method in REPORT_ONLY_HARDENING_METHODS else "",
+                    "harm_score": float(harm_score_by_sample[local]) if method == PRIMARY_METHOD_V13 else "",
+                    "veto_applied": int(vetoed_by_sample[local]) if method == PRIMARY_METHOD_V13 else "",
+                    "veto_threshold": _threshold_label(float(selected_cfg.veto_threshold)) if method == PRIMARY_METHOD_V13 else "",
                     "net_gain_vs_ae_argmin": float(anchor_nelbo[local] - selected_nelbo[local]),
                     "net_gain_vs_metadata": float(row_metadata_nelbo - selected_nelbo[local]),
                     "active_override": row_active,
@@ -2225,7 +3067,10 @@ def run_ae_utility_calibrator_methods_for_fold(
                     "predicted_override_margin": float(override_margin[local]),
                     "selection_status": selected_cfg.selection_status,
                     "fallback_reason": selected_cfg.fallback_reason,
-                    "heldout_precision_report_only": 1 if method in PRECISION_LCB_METHODS else "",
+                    "heldout_precision_report_only": 1 if method in REPORT_ONLY_HARDENING_METHODS else "",
+                    "harm_score": float(harm_score_by_sample[local]) if method == PRIMARY_METHOD_V13 else "",
+                    "veto_applied": int(vetoed_by_sample[local]) if method == PRIMARY_METHOD_V13 else "",
+                    "veto_threshold": _threshold_label(float(selected_cfg.veto_threshold)) if method == PRIMARY_METHOD_V13 else "",
                     "selected_consensus_threshold": (
                         float(selected_cfg.consensus_threshold)
                         if method in V2_METHODS
@@ -2242,7 +3087,7 @@ def run_ae_utility_calibrator_methods_for_fold(
             "query_domain": int(fold.heldout_domain),
             "aggregation_unit": "seed_x_heldout_domain_x_query_domain",
             "primary_aggregation": "macro_by_domain",
-            "model_type": "ridge_delta_consensus" if method in V2_METHODS else "ridge_delta",
+            "model_type": "ridge_delta_consensus" if method in V2_METHODS else "logistic_harm_score" if method == PRIMARY_METHOD_V13 else "ridge_delta",
             "feature_set": selected_cfg.feature_set,
             "method_kind": method_kind,
             "selected_delta_threshold": _threshold_label(float(selected_cfg.delta_threshold)),
@@ -2250,7 +3095,8 @@ def run_ae_utility_calibrator_methods_for_fold(
             "selected_by_source_inner_validation": int(selected_cfg.selected_by_source_inner),
             "selection_status": selected_cfg.selection_status,
             "fallback_reason": selected_cfg.fallback_reason,
-            "selection_mode": str(cfg.selection_mode) if method in PRECISION_LCB_METHODS else "",
+            "selection_mode": str(cfg.selection_mode) if method in REPORT_ONLY_HARDENING_METHODS else "",
+            "selected_veto_threshold": _threshold_label(float(selected_cfg.veto_threshold)) if method == PRIMARY_METHOD_V13 else "",
             "selected_consensus_threshold": (
                 float(selected_cfg.consensus_threshold)
                 if method in V2_METHODS
@@ -2274,7 +3120,7 @@ def run_ae_utility_calibrator_methods_for_fold(
             "target_cvae_excluded": 1,
             "source_inner_self_ae_excluded": 1,
             "source_inner_self_expert_excluded": 1,
-            "heldout_precision_report_only": 1 if method in PRECISION_LCB_METHODS else "",
+            "heldout_precision_report_only": 1 if method in REPORT_ONLY_HARDENING_METHODS else "",
             "active_override_count_heldout": int(summary["active_override_count"]),
             "active_override_rate_heldout": float(summary["active_override_rate"]),
             "active_override_count_source_inner": selected_source_inner_row.get(
@@ -2330,6 +3176,43 @@ def run_ae_utility_calibrator_methods_for_fold(
             "candidate_active_override_rate_source_inner": selected_source_inner_row.get(
                 "candidate_active_override_rate_source_inner", ""
             ),
+            "veto_threshold": _threshold_label(float(selected_cfg.veto_threshold)) if method == PRIMARY_METHOD_V13 else "",
+            "vetoed_harmful_count": selected_source_inner_row.get("vetoed_harmful_count", ""),
+            "vetoed_improving_count": selected_source_inner_row.get("vetoed_improving_count", ""),
+            "vetoed_neutral_count": selected_source_inner_row.get("vetoed_neutral_count", ""),
+            "strict_harm_prevention_precision": (
+                float(heldout_harm_veto_metrics.get("strict_harm_prevention_precision", float("nan")))
+                if method == PRIMARY_METHOD_V13 else ""
+            ),
+            "safe_harm_prevention_precision": (
+                float(heldout_harm_veto_metrics.get("safe_harm_prevention_precision", float("nan")))
+                if method == PRIMARY_METHOD_V13 else ""
+            ),
+            "strict_harm_prevention_precision_lcb": selected_source_inner_row.get("strict_harm_prevention_precision_lcb", ""),
+            "false_veto_rate": (
+                float(heldout_harm_veto_metrics.get("false_veto_rate", float("nan")))
+                if method == PRIMARY_METHOD_V13 else ""
+            ),
+            "false_veto_rate_ucb": selected_source_inner_row.get("false_veto_rate_ucb", ""),
+            "retained_v1_override_gain_rate": selected_source_inner_row.get("retained_v1_override_gain_rate", ""),
+            "missed_gain_from_false_vetoes": (
+                float(heldout_harm_veto_metrics.get("missed_gain_from_false_vetoes", float("nan")))
+                if method == PRIMARY_METHOD_V13 else ""
+            ),
+            "harmful_v1_override_count_source_inner": selected_source_inner_row.get("harmful_v1_override_count_source_inner", ""),
+            "nonharmful_v1_override_count_source_inner": selected_source_inner_row.get("nonharmful_v1_override_count_source_inner", ""),
+            "harm_label_positive_rate_source_inner": selected_source_inner_row.get("harm_label_positive_rate_source_inner", ""),
+            "v1_active_override_count_source_inner": selected_source_inner_row.get("v1_active_override_count_source_inner", ""),
+            "v13_active_override_count_source_inner": selected_source_inner_row.get("v13_active_override_count_source_inner", ""),
+            "v1_active_override_count_heldout": (
+                int(heldout_harm_veto_metrics.get("v1_active_override_count", 0))
+                if method == PRIMARY_METHOD_V13 else ""
+            ),
+            "v13_active_override_count_heldout": (
+                int(heldout_harm_veto_metrics.get("v13_active_override_count", 0))
+                if method == PRIMARY_METHOD_V13 else ""
+            ),
+            "active_override_rate_ratio_vs_v1": selected_source_inner_row.get("active_override_rate_ratio_vs_v1", ""),
             **summary,
         }
         policy_rows.append(policy)
@@ -2376,7 +3259,22 @@ def run_ae_utility_calibrator_methods_for_fold(
                 "active_override_rate": float(summary["active_override_rate"]),
                 "override_capture_rate": float(summary["override_capture_rate"]),
                 "captured_oracle_headroom_rate": float(summary["captured_oracle_headroom_rate"]),
-                "heldout_precision_report_only": 1 if method in PRECISION_LCB_METHODS else "",
+                "heldout_precision_report_only": 1 if method in REPORT_ONLY_HARDENING_METHODS else "",
+                "strict_harm_prevention_precision_lcb": selected_source_inner_row.get(
+                    "strict_harm_prevention_precision_lcb", ""
+                ),
+                "false_veto_rate_ucb": selected_source_inner_row.get("false_veto_rate_ucb", ""),
+                "retained_v1_override_gain_rate": selected_source_inner_row.get(
+                    "retained_v1_override_gain_rate", ""
+                ),
+                "v1_active_override_count_heldout": (
+                    int(heldout_harm_veto_metrics.get("v1_active_override_count", 0))
+                    if method == PRIMARY_METHOD_V13 else ""
+                ),
+                "v13_active_override_count_heldout": (
+                    int(heldout_harm_veto_metrics.get("v13_active_override_count", 0))
+                    if method == PRIMARY_METHOD_V13 else ""
+                ),
             }
         )
         override_diag_rows.append(
@@ -2400,6 +3298,22 @@ def run_ae_utility_calibrator_methods_for_fold(
                 "abstention_rate": float(summary["abstention_rate"]),
                 "abstention_correct_rate": float(summary["abstention_correct_rate"]),
                 "abstention_missed_gain": float(summary["abstention_missed_gain"]),
+                "veto_count_heldout": (
+                    int(heldout_harm_veto_metrics.get("veto_count", 0))
+                    if method == PRIMARY_METHOD_V13 else ""
+                ),
+                "strict_harm_prevention_precision": (
+                    float(heldout_harm_veto_metrics.get("strict_harm_prevention_precision", float("nan")))
+                    if method == PRIMARY_METHOD_V13 else ""
+                ),
+                "false_veto_rate": (
+                    float(heldout_harm_veto_metrics.get("false_veto_rate", float("nan")))
+                    if method == PRIMARY_METHOD_V13 else ""
+                ),
+                "retained_v1_override_gain_rate_heldout": (
+                    float(heldout_harm_veto_metrics.get("retained_v1_override_gain_rate", float("nan")))
+                    if method == PRIMARY_METHOD_V13 else ""
+                ),
             }
         )
         selected_feature_rows.append(
@@ -2412,6 +3326,11 @@ def run_ae_utility_calibrator_methods_for_fold(
                 "selected_consensus_threshold": (
                     float(selected_cfg.consensus_threshold)
                     if method in V2_METHODS
+                    else ""
+                ),
+                "selected_veto_threshold": (
+                    _threshold_label(float(selected_cfg.veto_threshold))
+                    if method == PRIMARY_METHOD_V13
                     else ""
                 ),
                 "selected_by_source_inner_validation": int(selected_cfg.selected_by_source_inner),
@@ -2444,9 +3363,16 @@ def run_ae_utility_calibrator_methods_for_fold(
                 "harmful_override_rate_ucb_source_inner": selected_source_inner_row.get(
                     "harmful_override_rate_ucb_source_inner", ""
                 ),
+                "strict_harm_prevention_precision_lcb": selected_source_inner_row.get(
+                    "strict_harm_prevention_precision_lcb", ""
+                ),
+                "false_veto_rate_ucb": selected_source_inner_row.get("false_veto_rate_ucb", ""),
+                "retained_v1_override_gain_rate": selected_source_inner_row.get(
+                    "retained_v1_override_gain_rate", ""
+                ),
             }
         )
-        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V2}:
+        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V13, PRIMARY_METHOD_V2}:
             primary_anchor_idx = anchor_idx
             primary_selected_idx = selected_idx
 
@@ -2633,6 +3559,56 @@ def write_ae_utility_calibrator_artifacts(
                 ),
                 "ae_utility_calibrator_precision_v12_selection_status": (
                     "ae_utility_calibrator_precision_v12_selection_status.csv"
+                ),
+            }
+        )
+    v13_validation_rows = [row for row in source_inner_validation_rows if str(row.get("method")) == PRIMARY_METHOD_V13]
+    v13_policy_rows = [row for row in policy_audit_rows if str(row.get("method")) == PRIMARY_METHOD_V13]
+    v13_override_rows = [row for row in override_diagnostic_rows if str(row.get("method")) == PRIMARY_METHOD_V13]
+    v13_precision_rows = [row for row in override_precision_rows if str(row.get("method")) == PRIMARY_METHOD_V13]
+    v13_selected_rows = [row for row in selected_feature_rows if str(row.get("method")) == PRIMARY_METHOD_V13]
+    v13_tradeoff_rows = [
+        row
+        for row in v13_validation_rows
+        if str(row.get("source_inner_pseudo_query_domain")) == "source_inner_macro"
+    ]
+    if v13_validation_rows or v13_policy_rows:
+        _write_csv(
+            reports_dir / "ae_utility_calibrator_harm_veto_v13_source_inner_validation.csv",
+            v13_validation_rows,
+        )
+        _write_csv(
+            reports_dir / "ae_utility_calibrator_harm_veto_v13_policy_audit.csv",
+            v13_policy_rows,
+        )
+        _write_csv(
+            reports_dir / "ae_utility_calibrator_harm_veto_v13_override_diagnostics.csv",
+            v13_override_rows,
+        )
+        _write_csv(
+            reports_dir / "ae_utility_calibrator_harm_veto_v13_veto_tradeoff.csv",
+            v13_tradeoff_rows or v13_precision_rows,
+        )
+        _write_csv(
+            reports_dir / "ae_utility_calibrator_harm_veto_v13_selection_status.csv",
+            v13_selected_rows,
+        )
+        artifacts.update(
+            {
+                "ae_utility_calibrator_harm_veto_v13_source_inner_validation": (
+                    "ae_utility_calibrator_harm_veto_v13_source_inner_validation.csv"
+                ),
+                "ae_utility_calibrator_harm_veto_v13_policy_audit": (
+                    "ae_utility_calibrator_harm_veto_v13_policy_audit.csv"
+                ),
+                "ae_utility_calibrator_harm_veto_v13_override_diagnostics": (
+                    "ae_utility_calibrator_harm_veto_v13_override_diagnostics.csv"
+                ),
+                "ae_utility_calibrator_harm_veto_v13_veto_tradeoff": (
+                    "ae_utility_calibrator_harm_veto_v13_veto_tradeoff.csv"
+                ),
+                "ae_utility_calibrator_harm_veto_v13_selection_status": (
+                    "ae_utility_calibrator_harm_veto_v13_selection_status.csv"
                 ),
             }
         )

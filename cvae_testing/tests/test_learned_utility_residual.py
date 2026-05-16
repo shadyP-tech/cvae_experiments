@@ -403,6 +403,56 @@ def _ae_utility_precision_v12_cfg(
     return lu._parse_learned_utility_config(cfg).autoencoder.utility_calibrator
 
 
+def _ae_utility_harm_veto_v13_cfg(
+    *,
+    delta_thresholds=None,
+    min_active_v1_override_count=12,
+    min_veto_count=6,
+    min_harmful_count=3,
+    min_harm_precision_lcb=0.50,
+    max_false_veto_ucb=0.40,
+):
+    cfg = _support_free_ae_cfg()
+    cfg["autoencoder_proxy"]["utility_calibrator"] = {
+        "enabled": True,
+        "primary_method": "ae_utility_calibrated_v1_harm_veto_safe_override_v13",
+        "model_types": ["ridge_delta"],
+        "primary_model_type": "ridge_delta",
+        "diagnostic_model_types": ["pairwise_ranker"],
+        "fallback_policy": "ae_argmin_zscore",
+        "feature_sets_primary": ["ae_core", "ae_quality"],
+        "feature_sets_diagnostic": [],
+        "delta_thresholds": list(delta_thresholds if delta_thresholds is not None else [0.0, "__inf__"]),
+        "margin_thresholds": [0.0, 0.05],
+        "selection_mode": "v1_harm_veto_v13",
+        "ridge_l2": 1.0e-4,
+        "harm_veto": {
+            "veto_score_model": "logistic_harm_score",
+            "veto_thresholds": [0.50, 0.60, "__inf__"],
+            "min_active_v1_override_count_source_inner": int(min_active_v1_override_count),
+            "min_veto_count_source_inner": int(min_veto_count),
+            "min_harmful_v1_override_count_source_inner": int(min_harmful_count),
+            "min_strict_harm_prevention_precision_lcb": float(min_harm_precision_lcb),
+            "max_false_veto_rate_ucb": float(max_false_veto_ucb),
+            "min_retained_v1_override_gain_rate": 0.0,
+            "min_active_override_rate_ratio_vs_v1": 0.0,
+            "min_gap_delta_vs_v1_lcb_pp": -999.0,
+            "neutral_override_gap_pct_band": 0.25,
+            "bootstrap_reps": 200,
+            "bootstrap_seed": 1337,
+        },
+        "risk_gates": {
+            "max_top1_drop_vs_ae_argmin_abs": 0.02,
+            "max_spearman_drop_vs_ae_argmin_abs": 0.03,
+            "max_gap_pct_degradation_vs_ae_argmin": 1.0,
+            "max_top1_drop_vs_metadata_abs": 0.02,
+            "max_spearman_drop_vs_metadata_abs": 0.03,
+            "max_gap_pct_degradation_vs_metadata": 1.0,
+        },
+    }
+    return lu._parse_learned_utility_config(cfg).autoencoder.utility_calibrator
+
+
 def _ae_utility_consensus_v2_cfg(*, delta_thresholds=None, consensus_thresholds=None):
     cfg = _support_free_ae_cfg()
     cfg["autoencoder_proxy"]["utility_calibrator"] = {
@@ -557,6 +607,46 @@ def _run_ae_utility_precision_v12_direct(
             max_worst_gap=max_worst_gap,
             min_gap_delta_vs_v1_lcb=min_gap_delta_vs_v1_lcb,
             max_harm_ucb=max_harm_ucb,
+        ),
+        seed=7,
+        tie_policy="stable_expert_index",
+    )
+
+
+def _run_ae_utility_harm_veto_v13_direct(
+    *,
+    delta_thresholds=None,
+    min_active_v1_override_count=12,
+    min_veto_count=6,
+    min_harmful_count=3,
+    min_harm_precision_lcb=0.50,
+    max_false_veto_ucb=0.40,
+):
+    sample_domains, expert_domains, true_nelbo, meta, ae_scores = _fake_payload_ae_first()
+    embeddings = np.stack([np.asarray([float(i), 0.0]) for i in range(len(sample_domains))])
+    fold = FoldCandidateSet.for_heldout_domain(heldout_domain=10, expert_domains=expert_domains)
+    test_idx = np.where(sample_domains == 10)[0]
+    train_idx = np.where(sample_domains != 10)[0]
+    return auc.run_ae_utility_calibrator_methods_for_fold(
+        embeddings=embeddings,
+        sample_domains=sample_domains,
+        expert_domains=expert_domains,
+        train_idx=train_idx,
+        test_idx=test_idx,
+        fold=fold,
+        true_nelbo=true_nelbo,
+        true_eval=fold.slice_nelbo(true_nelbo, test_idx),
+        global_eval=true_nelbo[test_idx],
+        metadata_similarity=meta,
+        metadata_similarity_eval=meta[test_idx][:, list(fold.candidate_col_indices)],
+        ae_scores=ae_scores,
+        cfg=_ae_utility_harm_veto_v13_cfg(
+            delta_thresholds=delta_thresholds,
+            min_active_v1_override_count=min_active_v1_override_count,
+            min_veto_count=min_veto_count,
+            min_harmful_count=min_harmful_count,
+            min_harm_precision_lcb=min_harm_precision_lcb,
+            max_false_veto_ucb=max_false_veto_ucb,
         ),
         seed=7,
         tie_policy="stable_expert_index",
@@ -1852,6 +1942,204 @@ def test_ae_utility_precision_v12_decision_builder_requires_both_datasets_for_cr
     ]
     _out, summary = module._aggregate(rows, [])
     assert summary["verdicts"]["cross_dataset_local_ae_calibration_verdict"] == "NEEDS EVIDENCE"
+
+
+def test_ae_utility_harm_veto_v13_config_parses() -> None:
+    cfg = _ae_utility_harm_veto_v13_cfg()
+    assert cfg.primary_method == "ae_utility_calibrated_v1_harm_veto_safe_override_v13"
+    assert cfg.selection_mode == "v1_harm_veto_v13"
+    assert cfg.harm_veto_score_model == "logistic_harm_score"
+    assert cfg.harm_veto_min_veto_count_source_inner == 6
+
+
+def test_ae_utility_harm_veto_v13_primary_is_metadata_free() -> None:
+    outputs = _run_ae_utility_harm_veto_v13_direct(delta_thresholds=["__inf__"])
+    rows = [
+        row for row in outputs.sample_rows
+        if row["method"] == "ae_utility_calibrated_v1_harm_veto_safe_override_v13"
+    ]
+    assert rows
+    assert all(row["metadata_role"] == "not_used" for row in rows)
+
+
+def test_ae_utility_harm_veto_v13_keeps_v1_behavior_unchanged() -> None:
+    outputs = _run_ae_utility_harm_veto_v13_direct(delta_thresholds=["__inf__"])
+    v1 = [row for row in outputs.sample_rows if row["method"] == "ae_utility_calibrated_safe_override_v1"]
+    assert v1
+    assert all(int(row["selected_expert"]) == int(row["ae_anchor_expert"]) for row in v1)
+
+
+def test_ae_utility_harm_veto_v13_exact_fallback_matches_v1() -> None:
+    outputs = _run_ae_utility_harm_veto_v13_direct(
+        delta_thresholds=[0.0, "__inf__"],
+        min_active_v1_override_count=999,
+    )
+    v1 = [row for row in outputs.sample_rows if row["method"] == "ae_utility_calibrated_safe_override_v1"]
+    v13 = [
+        row for row in outputs.sample_rows
+        if row["method"] == "ae_utility_calibrated_v1_harm_veto_safe_override_v13"
+    ]
+    assert v1 and v13
+    assert all(int(a["selected_expert"]) == int(b["selected_expert"]) for a, b in zip(v1, v13))
+    assert any(str(row["selection_status"]) == "fallback_to_v1_no_harm_veto_safe_config" for row in v13)
+
+
+def test_ae_utility_harm_veto_v13_trains_only_on_active_v1_overrides() -> None:
+    sample_domains, expert_domains, true_nelbo, meta, ae_scores = _fake_payload_ae_first()
+    train_idx = np.where(sample_domains != 10)[0]
+    examples = auc._collect_source_inner_harm_examples(
+        embeddings=np.stack([np.asarray([float(i), 0.0]) for i in range(len(sample_domains))]),
+        sample_domains=sample_domains,
+        true_nelbo=true_nelbo,
+        expert_domains=expert_domains,
+        train_idx=train_idx,
+        outer_heldout_domain=10,
+        excluded_validation_domain=None,
+        metadata_similarity=meta,
+        ae_scores=ae_scores,
+        feature_set="ae_core",
+        delta_threshold=0.0,
+        margin_threshold=0.0,
+        ridge_l2=1.0e-4,
+        neutral_gap_pct_band=0.25,
+    )
+    assert examples["y"].shape[0] <= train_idx.shape[0]
+
+
+def test_ae_utility_harm_veto_v13_only_scores_active_v1_overrides() -> None:
+    outputs = _run_ae_utility_harm_veto_v13_direct(delta_thresholds=[0.0, "__inf__"])
+    rows = [
+        row for row in outputs.sample_rows
+        if row["method"] == "ae_utility_calibrated_v1_harm_veto_safe_override_v13"
+    ]
+    assert rows
+    for row in rows:
+        if int(row["active_override"]) == 0:
+            assert str(row["harm_score"]) == "nan" or row["harm_score"] == ""
+
+
+def test_ae_utility_harm_veto_v13_logistic_score_is_bounded() -> None:
+    scores = auc._fit_predict_logistic_harm_score(
+        train_x=np.asarray([[0.0], [1.0], [2.0], [3.0]], dtype=np.float64),
+        train_y=np.asarray([0, 0, 1, 1], dtype=np.int64),
+        eval_x=np.asarray([[-10.0], [10.0]], dtype=np.float64),
+        l2=1.0e-4,
+    )
+    assert np.all(scores >= 0.0)
+    assert np.all(scores <= 1.0)
+
+
+def test_ae_utility_harm_veto_v13_fallback_when_harm_labels_single_class() -> None:
+    scores = auc._fit_predict_logistic_harm_score(
+        train_x=np.asarray([[0.0], [1.0]], dtype=np.float64),
+        train_y=np.asarray([0, 0], dtype=np.int64),
+        eval_x=np.asarray([[0.5]], dtype=np.float64),
+        l2=1.0e-4,
+    )
+    assert np.isnan(scores[0])
+
+
+def test_ae_utility_harm_veto_v13_fallback_when_too_few_harmful_examples() -> None:
+    outputs = _run_ae_utility_harm_veto_v13_direct(
+        delta_thresholds=[0.0, "__inf__"],
+        min_harmful_count=999,
+    )
+    policy = [
+        row for row in outputs.policy_audit_rows
+        if row["method"] == "ae_utility_calibrated_v1_harm_veto_safe_override_v13"
+    ][0]
+    assert policy["selection_status"] == "fallback_to_v1_no_harm_veto_safe_config"
+
+
+def test_ae_utility_harm_veto_v13_false_veto_ucb_gate_feasible_at_min_count() -> None:
+    _lcb, ucb = auc._wilson_bounds(0, 6)
+    assert ucb <= 0.40
+
+
+def test_ae_utility_harm_veto_v13_reports_harm_label_counts() -> None:
+    outputs = _run_ae_utility_harm_veto_v13_direct(delta_thresholds=[0.0, "__inf__"])
+    rows = [
+        row for row in outputs.source_inner_validation_rows
+        if row["method"] == "ae_utility_calibrated_v1_harm_veto_safe_override_v13"
+        and row["source_inner_pseudo_query_domain"] == "source_inner_macro"
+    ]
+    assert rows
+    assert "harmful_v1_override_count_source_inner" in rows[0]
+    assert "nonharmful_v1_override_count_source_inner" in rows[0]
+
+
+def test_ae_utility_harm_veto_v13_reports_raw_active_override_counts() -> None:
+    outputs = _run_ae_utility_harm_veto_v13_direct(delta_thresholds=[0.0, "__inf__"])
+    policy = [
+        row for row in outputs.policy_audit_rows
+        if row["method"] == "ae_utility_calibrated_v1_harm_veto_safe_override_v13"
+    ][0]
+    assert "v1_active_override_count_source_inner" in policy
+    assert "v13_active_override_count_heldout" in policy
+
+
+def test_ae_utility_harm_veto_v13_veto_returns_to_ae_argmin() -> None:
+    selected, scores, vetoed = auc._apply_harm_veto_policy(
+        v1_selected_idx=np.asarray([1, 2]),
+        anchor_idx=np.asarray([0, 0]),
+        active_sample_positions=np.asarray([0, 1]),
+        harm_scores=np.asarray([0.9, 0.1]),
+        veto_threshold=0.5,
+    )
+    assert selected.tolist() == [0, 2]
+    assert vetoed.tolist() == [True, False]
+    assert scores[0] == 0.9
+
+
+def test_ae_utility_harm_veto_v13_neutral_veto_not_counted_as_false_veto() -> None:
+    true_eval = np.asarray([[1.0, 1.0], [1.0, 0.0]], dtype=np.float64)
+    metrics = auc._harm_veto_metrics(
+        v1_selected_idx=np.asarray([1, 1]),
+        v13_selected_idx=np.asarray([0, 0]),
+        anchor_idx=np.asarray([0, 0]),
+        true_eval=true_eval,
+        neutral_gap_pct_band=0.25,
+    )
+    assert metrics["vetoed_neutral_count"] == 1
+    assert metrics["vetoed_improving_count"] == 1
+    assert metrics["false_veto_rate"] == 0.5
+
+
+def test_ae_utility_harm_veto_v13_retained_gain_is_utility_weighted() -> None:
+    true_eval = np.asarray([[2.0, 1.0], [11.0, 1.0]], dtype=np.float64)
+    metrics = auc._harm_veto_metrics(
+        v1_selected_idx=np.asarray([1, 1]),
+        v13_selected_idx=np.asarray([1, 0]),
+        anchor_idx=np.asarray([0, 0]),
+        true_eval=true_eval,
+        neutral_gap_pct_band=0.25,
+    )
+    assert 0.0 < metrics["retained_v1_override_gain_rate"] < 0.2
+
+
+def test_ae_utility_harm_veto_v13_selection_uses_no_target_nelbo() -> None:
+    outputs = _run_ae_utility_harm_veto_v13_direct(delta_thresholds=["__inf__"])
+    rows = [
+        row for row in outputs.source_inner_validation_rows
+        if row["method"] == "ae_utility_calibrated_v1_harm_veto_safe_override_v13"
+    ]
+    assert rows
+    assert all(int(row["heldout_target_nelbo_used_for_selection"]) == 0 for row in rows)
+
+
+def test_ae_utility_harm_veto_v13_heldout_precision_is_report_only() -> None:
+    outputs = _run_ae_utility_harm_veto_v13_direct(delta_thresholds=["__inf__"])
+    policy = [
+        row for row in outputs.policy_audit_rows
+        if row["method"] == "ae_utility_calibrated_v1_harm_veto_safe_override_v13"
+    ][0]
+    assert int(policy["heldout_precision_report_only"]) == 1
+
+
+def test_ae_utility_harm_veto_v13_tiny_capped_smoke_run() -> None:
+    outputs = _run_ae_utility_harm_veto_v13_direct(delta_thresholds=[0.0, "__inf__"])
+    methods = {row["method"] for row in outputs.policy_audit_rows}
+    assert "ae_utility_calibrated_v1_harm_veto_safe_override_v13" in methods
 
 
 def test_ae_utility_consensus_v2_primary_is_metadata_free() -> None:

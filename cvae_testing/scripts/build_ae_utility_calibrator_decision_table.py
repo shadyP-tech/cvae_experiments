@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Sequence
 PRIMARY_METHOD = "ae_utility_calibrated_safe_override_v1"
 PRIMARY_METHOD_V11 = "ae_utility_calibrated_precision_lcb_safe_override_v11"
 PRIMARY_METHOD_V12 = "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12"
+PRIMARY_METHOD_V13 = "ae_utility_calibrated_v1_harm_veto_safe_override_v13"
 PRIMARY_METHOD_V2 = "ae_utility_calibrated_consensus_safe_override_v2"
 AE_ARGMIN_METHOD = "ae_argmin_zscore"
 METADATA_METHOD = "metadata_routing"
@@ -26,6 +27,7 @@ REQUIRED_METHODS = set(GLOBAL_BASELINES) | {
     PRIMARY_METHOD,
     PRIMARY_METHOD_V11,
     PRIMARY_METHOD_V12,
+    PRIMARY_METHOD_V13,
     PRIMARY_METHOD_V2,
     AE_ARGMIN_METHOD,
     "ae_metadata_utility_calibrated_safe_override_v1",
@@ -122,7 +124,7 @@ def _load_run_rows(path: Path) -> List[Dict[str, Any]]:
             "diagnostic_only": int(_float(metrics.get("diagnostic_only"))),
             "adoption_eligible": int(_float(metrics.get("adoption_eligible"))),
         }
-        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V2}:
+        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V13, PRIMARY_METHOD_V2}:
             matching = [r for (m, _q), r in by_policy.items() if m == method]
             if matching:
                 row["raw_predicted_delta_spearman_non_anchor"] = _mean(
@@ -151,6 +153,15 @@ def _load_run_rows(path: Path) -> List[Dict[str, Any]]:
                 )
                 row["source_inner_gap_delta_vs_v1_lcb"] = _mean(
                     matching, "source_inner_gap_delta_vs_v1_lcb", default=float("nan")
+                )
+                row["harm_veto_used"] = int(
+                    any(str(r.get("selection_status")) == "harm_veto_v13_selected" for r in matching)
+                )
+                row["retained_v1_override_gain_rate"] = _mean(
+                    matching, "retained_v1_override_gain_rate", default=float("nan")
+                )
+                row["strict_harm_prevention_precision_lcb"] = _mean(
+                    matching, "strict_harm_prevention_precision_lcb", default=float("nan")
                 )
         rows.append(row)
     return rows
@@ -184,7 +195,9 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
     for dataset in sorted(set(str(r["dataset"]) for r in rows)):
         dataset_rows = [r for r in rows if str(r["dataset"]) == dataset]
         by_method = {method: [r for r in dataset_rows if r["method"] == method] for method in REQUIRED_METHODS}
-        if by_method.get(PRIMARY_METHOD_V12, []):
+        if by_method.get(PRIMARY_METHOD_V13, []):
+            primary_method = PRIMARY_METHOD_V13
+        elif by_method.get(PRIMARY_METHOD_V12, []):
             primary_method = PRIMARY_METHOD_V12
         elif by_method.get(PRIMARY_METHOD_V11, []):
             primary_method = PRIMARY_METHOD_V11
@@ -225,7 +238,7 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
             and p_gap - m_gap <= THRESHOLDS["gap_pct_degradation_pp_max"]
         )
         domain_ok = _domain_non_degradation_ok(paths, dataset=dataset, method=primary_method, baseline=AE_ARGMIN_METHOD)
-        if primary_method in {PRIMARY_METHOD_V11, PRIMARY_METHOD_V12}:
+        if primary_method in {PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V13}:
             v1_rows = by_method.get(PRIMARY_METHOD, [])
             if not v1_rows:
                 local_pass = False
@@ -240,6 +253,7 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
                 p_harmful = _mean(primary, "harmful_override_rate", default=float("nan"))
                 precision_used = any(int(_float(row.get("precision_lcb_selected_config_used"))) == 1 for row in primary)
                 v1_guarded_used = any(int(_float(row.get("v1_guarded_config_used"))) == 1 for row in primary)
+                harm_veto_used = any(int(_float(row.get("harm_veto_used"))) == 1 for row in primary)
                 no_v1_degrade = (
                     v1_top1 - p_top1 <= THRESHOLDS["top1_drop_abs_max"]
                     and v1_spearman - p_spearman <= THRESHOLDS["spearman_drop_abs_max"]
@@ -262,7 +276,33 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
                 )
                 utility_ok = (p_gap < v1_gap) or ((p_gap - v1_gap) < 0.25 and harm_reduced)
                 seed_non_degrade_count = sum(1 for row in primary if _float(row.get("mean_oracle_gap_pct")) <= v1_gap + 1.0)
-                if primary_method == PRIMARY_METHOD_V12:
+                if primary_method == PRIMARY_METHOD_V13:
+                    active_ratio = _mean(primary, "active_override_rate") / max(_mean(v1_rows, "active_override_rate"), 1e-12)
+                    retained_gain = _mean(primary, "retained_v1_override_gain_rate", default=float("nan"))
+                    utility_ok_v13 = (p_gap < v1_gap) or ((p_gap - v1_gap) < 0.10)
+                    harm_drop_25 = (
+                        math.isfinite(p_harmful)
+                        and math.isfinite(v1_harmful)
+                        and p_harmful <= 0.75 * v1_harmful
+                    )
+                    local_pass = (
+                        utility_ok_v13
+                        and no_v1_degrade
+                        and (not math.isfinite(v1_strict_precision) or p_strict_precision >= v1_strict_precision)
+                        and harm_drop_25
+                        and active_ratio >= 0.80
+                        and no_domain_degrade_vs_v1
+                        and seed_non_degrade_count >= 2
+                        and harm_veto_used
+                    )
+                    local_weak = (
+                        no_v1_degrade
+                        and (not math.isfinite(v1_strict_precision) or p_strict_precision >= v1_strict_precision)
+                        and harm_reduced
+                        and (not math.isfinite(retained_gain) or retained_gain >= 0.80)
+                        and harm_veto_used
+                    )
+                elif primary_method == PRIMARY_METHOD_V12:
                     local_pass = (
                         utility_ok
                         and no_v1_degrade
@@ -375,6 +415,9 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
                     "harmful_override_rate": _mean(method_rows, "harmful_override_rate", default=float("nan")),
                     "v1_guarded_config_used": max(
                         int(_float(row.get("v1_guarded_config_used"))) for row in method_rows
+                    ),
+                    "harm_veto_used": max(
+                        int(_float(row.get("harm_veto_used"))) for row in method_rows
                     ),
                     "source_inner_gap_delta_vs_v1_lcb": _mean(
                         method_rows, "source_inner_gap_delta_vs_v1_lcb", default=float("nan")

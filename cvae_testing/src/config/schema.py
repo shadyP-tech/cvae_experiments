@@ -57,6 +57,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_ae_utility_calibrator_v2",
         "learned_utility_ae_utility_calibrator_precision_v11",
         "learned_utility_ae_utility_calibrator_precision_v12",
+        "learned_utility_ae_utility_calibrator_harm_veto_v13",
         "learned_utility_source_reliability_v1",
         "learned_utility_pairwise_ae_combined_v2",
         "learned_utility_pairwise_ae_combined_v2_strict",
@@ -74,6 +75,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_ae_utility_calibrator_v2",
         "learned_utility_ae_utility_calibrator_precision_v11",
         "learned_utility_ae_utility_calibrator_precision_v12",
+        "learned_utility_ae_utility_calibrator_harm_veto_v13",
         "learned_utility_source_reliability_v1",
         "learned_utility_pairwise_ae_combined_v2",
         "learned_utility_pairwise_ae_combined_v2_strict",
@@ -1087,6 +1089,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                     "ae_utility_calibrated_safe_override_v1",
                     "ae_utility_calibrated_precision_lcb_safe_override_v11",
                     "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12",
+                    "ae_utility_calibrated_v1_harm_veto_safe_override_v13",
                     "ae_utility_calibrated_consensus_safe_override_v2",
                 }
                 if primary_method not in allowed_primary_methods:
@@ -1097,6 +1100,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                 is_consensus_v2 = primary_method == "ae_utility_calibrated_consensus_safe_override_v2"
                 is_precision_v11 = primary_method == "ae_utility_calibrated_precision_lcb_safe_override_v11"
                 is_precision_v12 = primary_method == "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12"
+                is_harm_veto_v13 = primary_method == "ae_utility_calibrated_v1_harm_veto_safe_override_v13"
                 model_types = utility_calibrator_cfg.get("model_types", ["ridge_delta"])
                 if not isinstance(model_types, list) or not model_types:
                     raise ValueError(
@@ -1234,6 +1238,77 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                                 "learned_utility.autoencoder_proxy.utility_calibrator."
                                 f"precision_selection.{key} must be in [0,1]"
                             )
+                if is_harm_veto_v13:
+                    if str(
+                        utility_calibrator_cfg.get("selection_mode", "v1_harm_veto_v13")
+                    ).strip().lower() != "v1_harm_veto_v13":
+                        raise ValueError(
+                            "learned_utility.autoencoder_proxy.utility_calibrator.selection_mode "
+                            "must be 'v1_harm_veto_v13' for v1.3"
+                        )
+                    harm_veto = utility_calibrator_cfg.get("harm_veto", {})
+                    if harm_veto is None or not isinstance(harm_veto, dict):
+                        raise ValueError(
+                            "learned_utility.autoencoder_proxy.utility_calibrator.harm_veto "
+                            "must be a dictionary for v1.3"
+                        )
+                    if str(harm_veto.get("veto_score_model", "logistic_harm_score")).strip().lower() != "logistic_harm_score":
+                        raise ValueError(
+                            "learned_utility.autoencoder_proxy.utility_calibrator.harm_veto."
+                            "veto_score_model must be 'logistic_harm_score'"
+                        )
+                    veto_thresholds = harm_veto.get("veto_thresholds", [0.50, 0.60, 0.70, 0.80, 0.90, "__inf__"])
+                    if not isinstance(veto_thresholds, list) or not veto_thresholds:
+                        raise ValueError(
+                            "learned_utility.autoencoder_proxy.utility_calibrator.harm_veto."
+                            "veto_thresholds must be a non-empty list"
+                        )
+                    has_inf_token = False
+                    for threshold in veto_thresholds:
+                        if isinstance(threshold, str) and threshold.strip().lower() == "__inf__":
+                            has_inf_token = True
+                            continue
+                        value = float(threshold)
+                        if value < 0.0 or value > 1.0:
+                            raise ValueError(
+                                "learned_utility.autoencoder_proxy.utility_calibrator.harm_veto."
+                                "veto_thresholds must be in [0,1] or '__inf__'"
+                            )
+                    if not has_inf_token:
+                        raise ValueError(
+                            "learned_utility.autoencoder_proxy.utility_calibrator.harm_veto."
+                            "veto_thresholds must include '__inf__'"
+                        )
+                    for key in [
+                        "min_active_v1_override_count_source_inner",
+                        "min_veto_count_source_inner",
+                        "min_harmful_v1_override_count_source_inner",
+                        "bootstrap_reps",
+                        "bootstrap_seed",
+                    ]:
+                        if int(harm_veto.get(key, 1)) < 0:
+                            raise ValueError(
+                                "learned_utility.autoencoder_proxy.utility_calibrator.harm_veto."
+                                f"{key} must be >= 0"
+                            )
+                    for key in [
+                        "min_strict_harm_prevention_precision_lcb",
+                        "max_false_veto_rate_ucb",
+                        "min_retained_v1_override_gain_rate",
+                        "min_active_override_rate_ratio_vs_v1",
+                    ]:
+                        value = float(harm_veto.get(key, 0.0))
+                        if value < 0.0 or value > 1.0:
+                            raise ValueError(
+                                "learned_utility.autoencoder_proxy.utility_calibrator.harm_veto."
+                                f"{key} must be in [0,1]"
+                            )
+                    float(harm_veto.get("min_gap_delta_vs_v1_lcb_pp", -0.10))
+                    if float(harm_veto.get("neutral_override_gap_pct_band", 0.25)) < 0.0:
+                        raise ValueError(
+                            "learned_utility.autoencoder_proxy.utility_calibrator.harm_veto."
+                            "neutral_override_gap_pct_band must be >= 0"
+                        )
                     for key in [
                         "min_active_override_count",
                         "bootstrap_reps",
