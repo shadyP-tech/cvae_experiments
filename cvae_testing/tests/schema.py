@@ -1090,7 +1090,6 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                     "ae_utility_calibrated_precision_lcb_safe_override_v11",
                     "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12",
                     "ae_utility_calibrated_v1_harm_veto_safe_override_v13",
-                    "ae_utility_calibrated_v1_recall_budget_safe_override_v15",
                     "ae_utility_calibrated_consensus_safe_override_v2",
                 }
                 if primary_method not in allowed_primary_methods:
@@ -1102,7 +1101,6 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                 is_precision_v11 = primary_method == "ae_utility_calibrated_precision_lcb_safe_override_v11"
                 is_precision_v12 = primary_method == "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12"
                 is_harm_veto_v13 = primary_method == "ae_utility_calibrated_v1_harm_veto_safe_override_v13"
-                is_recall_v15 = primary_method == "ae_utility_calibrated_v1_recall_budget_safe_override_v15"
                 model_types = utility_calibrator_cfg.get("model_types", ["ridge_delta"])
                 if not isinstance(model_types, list) or not model_types:
                     raise ValueError(
@@ -1355,83 +1353,6 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                             "learned_utility.autoencoder_proxy.utility_calibrator.harm_veto."
                             "neutral_override_gap_pct_band must be >= 0"
                         )
-                if is_recall_v15:
-                    if str(
-                        utility_calibrator_cfg.get("selection_mode", "v1_recall_budget_v15")
-                    ).strip().lower() != "v1_recall_budget_v15":
-                        raise ValueError(
-                            "learned_utility.autoencoder_proxy.utility_calibrator.selection_mode "
-                            "must be 'v1_recall_budget_v15' for v1.5"
-                        )
-                    recall_expansion = utility_calibrator_cfg.get("recall_expansion", {})
-                    if recall_expansion is None or not isinstance(recall_expansion, dict):
-                        raise ValueError(
-                            "learned_utility.autoencoder_proxy.utility_calibrator.recall_expansion "
-                            "must be a dictionary for v1.5"
-                        )
-                    if str(recall_expansion.get("scoring_policy", "ridge_delta_best_non_anchor")).strip().lower() != "ridge_delta_best_non_anchor":
-                        raise ValueError(
-                            "learned_utility.autoencoder_proxy.utility_calibrator.recall_expansion."
-                            "scoring_policy must be 'ridge_delta_best_non_anchor'"
-                        )
-                    if str(recall_expansion.get("budget_scope", "v1_abstentions_per_fold")).strip().lower() != "v1_abstentions_per_fold":
-                        raise ValueError(
-                            "learned_utility.autoencoder_proxy.utility_calibrator.recall_expansion."
-                            "budget_scope must be 'v1_abstentions_per_fold'"
-                        )
-                    rates = recall_expansion.get("recall_budget_rates", [0.0, 0.005, 0.01, 0.02, 0.05, 0.10])
-                    if not isinstance(rates, list) or not rates:
-                        raise ValueError(
-                            "learned_utility.autoencoder_proxy.utility_calibrator.recall_expansion."
-                            "recall_budget_rates must be a non-empty list"
-                        )
-                    for rate in rates:
-                        value = float(rate)
-                        if value < 0.0 or value > 1.0:
-                            raise ValueError(
-                                "learned_utility.autoencoder_proxy.utility_calibrator.recall_expansion."
-                                "recall_budget_rates must be in [0,1]"
-                            )
-                    for key in [
-                        "min_v1_abstention_count_source_inner",
-                        "min_recall_override_count_source_inner",
-                        "min_recall_override_count_source_inner_for_pass",
-                        "bootstrap_reps",
-                        "bootstrap_seed",
-                    ]:
-                        if int(recall_expansion.get(key, 1)) < 0:
-                            raise ValueError(
-                                "learned_utility.autoencoder_proxy.utility_calibrator.recall_expansion."
-                                f"{key} must be >= 0"
-                            )
-                    for key in [
-                        "min_strict_recall_precision",
-                        "min_strict_recall_precision_lcb",
-                        "max_harmful_recall_rate_ucb",
-                        "max_active_override_rate_ratio_vs_v1",
-                        "diagnostic_active_override_rate_ratio_upper_bound",
-                    ]:
-                        value = float(recall_expansion.get(key, 0.0))
-                        if value < 0.0 or value > 1.5:
-                            raise ValueError(
-                                "learned_utility.autoencoder_proxy.utility_calibrator.recall_expansion."
-                                f"{key} must be in [0,1.5]"
-                            )
-                    for key in [
-                        "min_net_gain_vs_v1_source_inner",
-                        "min_gap_delta_vs_v1_lcb_pp",
-                        "min_gap_delta_vs_v1_lcb_pp_for_pass",
-                    ]:
-                        float(recall_expansion.get(key, 0.0))
-                    for key in [
-                        "max_worst_pseudo_domain_gap_degradation_vs_v1_pp",
-                        "neutral_override_gap_pct_band",
-                    ]:
-                        if float(recall_expansion.get(key, 0.0)) < 0.0:
-                            raise ValueError(
-                                "learned_utility.autoencoder_proxy.utility_calibrator.recall_expansion."
-                                f"{key} must be >= 0"
-                            )
                 if is_consensus_v2:
                     if float(utility_calibrator_cfg.get("uncertainty_multiplier", 1.0)) < 0.0:
                         raise ValueError(

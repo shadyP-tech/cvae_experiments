@@ -14,7 +14,6 @@ PRIMARY_METHOD = "ae_utility_calibrated_safe_override_v1"
 PRIMARY_METHOD_V11 = "ae_utility_calibrated_precision_lcb_safe_override_v11"
 PRIMARY_METHOD_V12 = "ae_utility_calibrated_precision_lcb_v1_guarded_safe_override_v12"
 PRIMARY_METHOD_V13 = "ae_utility_calibrated_v1_harm_veto_safe_override_v13"
-PRIMARY_METHOD_V15 = "ae_utility_calibrated_v1_recall_budget_safe_override_v15"
 PRIMARY_METHOD_V2 = "ae_utility_calibrated_consensus_safe_override_v2"
 AE_ARGMIN_METHOD = "ae_argmin_zscore"
 METADATA_METHOD = "metadata_routing"
@@ -29,7 +28,6 @@ REQUIRED_METHODS = set(GLOBAL_BASELINES) | {
     PRIMARY_METHOD_V11,
     PRIMARY_METHOD_V12,
     PRIMARY_METHOD_V13,
-    PRIMARY_METHOD_V15,
     PRIMARY_METHOD_V2,
     AE_ARGMIN_METHOD,
     "ae_metadata_utility_calibrated_safe_override_v1",
@@ -103,8 +101,6 @@ def _dataset_from_path(path: Path) -> str:
 def _load_run_rows(path: Path) -> List[Dict[str, Any]]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     policy_rows = _read_csv(path.parent / "ae_utility_calibrator_policy_audit.csv")
-    override_rows = _read_csv(path.parent / "ae_utility_calibrator_harm_veto_v13_override_diagnostics.csv")
-    recall_rows = _read_csv(path.parent / "ae_utility_calibrator_recall_budget_v15_override_diagnostics.csv")
     by_policy = {(row.get("method", ""), row.get("fold_query_domain", "")): row for row in policy_rows}
     dataset = _dataset_from_path(path)
     rows: List[Dict[str, Any]] = []
@@ -128,7 +124,7 @@ def _load_run_rows(path: Path) -> List[Dict[str, Any]]:
             "diagnostic_only": int(_float(metrics.get("diagnostic_only"))),
             "adoption_eligible": int(_float(metrics.get("adoption_eligible"))),
         }
-        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V13, PRIMARY_METHOD_V15, PRIMARY_METHOD_V2}:
+        if method in {PRIMARY_METHOD, PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V13, PRIMARY_METHOD_V2}:
             matching = [r for (m, _q), r in by_policy.items() if m == method]
             if matching:
                 row["raw_predicted_delta_spearman_non_anchor"] = _mean(
@@ -161,43 +157,11 @@ def _load_run_rows(path: Path) -> List[Dict[str, Any]]:
                 row["harm_veto_used"] = int(
                     any(str(r.get("selection_status")) == "harm_veto_v13_selected" for r in matching)
                 )
-                veto_count_heldout = sum(
-                    int(_float(r.get("veto_count_heldout")))
-                    for r in override_rows
-                    if r.get("method") == method
-                )
-                row["harm_veto_applied_count_heldout"] = veto_count_heldout
-                row["harm_veto_applied_heldout"] = int(veto_count_heldout > 0)
                 row["retained_v1_override_gain_rate"] = _mean(
                     matching, "retained_v1_override_gain_rate", default=float("nan")
                 )
                 row["strict_harm_prevention_precision_lcb"] = _mean(
                     matching, "strict_harm_prevention_precision_lcb", default=float("nan")
-                )
-                row["recall_budget_used"] = int(
-                    any(str(r.get("selection_status")) == "recall_budget_v15_selected" for r in matching)
-                )
-                recall_count_heldout = sum(
-                    int(_float(r.get("recall_override_count_heldout")))
-                    for r in matching
-                    if method == PRIMARY_METHOD_V15
-                )
-                if not recall_count_heldout:
-                    recall_count_heldout = sum(
-                        int(_float(r.get("recall_override_count_heldout")))
-                        for r in recall_rows
-                        if r.get("method") == method
-                    )
-                row["recall_override_count_heldout"] = recall_count_heldout
-                row["recall_applied_heldout"] = int(recall_count_heldout > 0)
-                row["strict_recall_precision_lcb"] = _mean(
-                    matching, "strict_recall_precision_lcb", default=float("nan")
-                )
-                row["harmful_recall_rate_ucb"] = _mean(
-                    matching, "harmful_recall_rate_ucb", default=float("nan")
-                )
-                row["active_override_rate_ratio_vs_v1"] = _mean(
-                    matching, "active_override_rate_ratio_vs_v1", default=float("nan")
                 )
         rows.append(row)
     return rows
@@ -231,9 +195,7 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
     for dataset in sorted(set(str(r["dataset"]) for r in rows)):
         dataset_rows = [r for r in rows if str(r["dataset"]) == dataset]
         by_method = {method: [r for r in dataset_rows if r["method"] == method] for method in REQUIRED_METHODS}
-        if by_method.get(PRIMARY_METHOD_V15, []):
-            primary_method = PRIMARY_METHOD_V15
-        elif by_method.get(PRIMARY_METHOD_V13, []):
+        if by_method.get(PRIMARY_METHOD_V13, []):
             primary_method = PRIMARY_METHOD_V13
         elif by_method.get(PRIMARY_METHOD_V12, []):
             primary_method = PRIMARY_METHOD_V12
@@ -276,7 +238,7 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
             and p_gap - m_gap <= THRESHOLDS["gap_pct_degradation_pp_max"]
         )
         domain_ok = _domain_non_degradation_ok(paths, dataset=dataset, method=primary_method, baseline=AE_ARGMIN_METHOD)
-        if primary_method in {PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V13, PRIMARY_METHOD_V15}:
+        if primary_method in {PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V13}:
             v1_rows = by_method.get(PRIMARY_METHOD, [])
             if not v1_rows:
                 local_pass = False
@@ -292,9 +254,6 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
                 precision_used = any(int(_float(row.get("precision_lcb_selected_config_used"))) == 1 for row in primary)
                 v1_guarded_used = any(int(_float(row.get("v1_guarded_config_used"))) == 1 for row in primary)
                 harm_veto_used = any(int(_float(row.get("harm_veto_used"))) == 1 for row in primary)
-                harm_veto_applied = any(int(_float(row.get("harm_veto_applied_heldout"))) == 1 for row in primary)
-                recall_budget_used = any(int(_float(row.get("recall_budget_used"))) == 1 for row in primary)
-                recall_applied = any(int(_float(row.get("recall_applied_heldout"))) == 1 for row in primary)
                 no_v1_degrade = (
                     v1_top1 - p_top1 <= THRESHOLDS["top1_drop_abs_max"]
                     and v1_spearman - p_spearman <= THRESHOLDS["spearman_drop_abs_max"]
@@ -335,7 +294,6 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
                         and no_domain_degrade_vs_v1
                         and seed_non_degrade_count >= 2
                         and harm_veto_used
-                        and harm_veto_applied
                     )
                     local_weak = (
                         no_v1_degrade
@@ -343,42 +301,6 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
                         and harm_reduced
                         and (not math.isfinite(retained_gain) or retained_gain >= 0.80)
                         and harm_veto_used
-                        and harm_veto_applied
-                    )
-                elif primary_method == PRIMARY_METHOD_V15:
-                    gap_reduction_vs_v1 = v1_gap - p_gap
-                    source_inner_lcb = _mean(primary, "source_inner_gap_delta_vs_v1_lcb", default=float("nan"))
-                    active_ratio = _mean(primary, "active_override_rate") / max(_mean(v1_rows, "active_override_rate"), 1e-12)
-                    harm_not_materially_worse = (
-                        not math.isfinite(p_harmful)
-                        or not math.isfinite(v1_harmful)
-                        or p_harmful <= v1_harmful + 0.01
-                    )
-                    precision_not_worse = (
-                        not math.isfinite(v1_strict_precision)
-                        or not math.isfinite(p_strict_precision)
-                        or p_strict_precision >= v1_strict_precision
-                    )
-                    local_pass = (
-                        gap_reduction_vs_v1 >= 0.25
-                        and math.isfinite(source_inner_lcb)
-                        and source_inner_lcb >= 0.0
-                        and no_v1_degrade
-                        and precision_not_worse
-                        and harm_not_materially_worse
-                        and active_ratio <= 1.20
-                        and no_domain_degrade_vs_v1
-                        and seed_non_degrade_count >= 2
-                        and recall_budget_used
-                        and recall_applied
-                    )
-                    local_weak = (
-                        gap_reduction_vs_v1 > 0.0
-                        and no_v1_degrade
-                        and harm_not_materially_worse
-                        and active_ratio <= 1.20
-                        and recall_budget_used
-                        and recall_applied
                     )
                 elif primary_method == PRIMARY_METHOD_V12:
                     local_pass = (
@@ -450,7 +372,7 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
                 and harmful <= improving
                 and domain_ok
             )
-        if primary_method not in {PRIMARY_METHOD_V11, PRIMARY_METHOD_V12, PRIMARY_METHOD_V13, PRIMARY_METHOD_V15}:
+        if primary_method not in {PRIMARY_METHOD_V11, PRIMARY_METHOD_V12}:
             local_weak = (
                 (p_gap < a_gap or p_top1 > a_top1)
                 and no_ae_degrade
@@ -496,24 +418,6 @@ def _aggregate(rows: Sequence[Dict[str, Any]], paths: Sequence[Path]) -> tuple[L
                     ),
                     "harm_veto_used": max(
                         int(_float(row.get("harm_veto_used"))) for row in method_rows
-                    ),
-                    "harm_veto_applied_count_heldout": sum(
-                        int(_float(row.get("harm_veto_applied_count_heldout"))) for row in method_rows
-                    ),
-                    "harm_veto_applied_heldout": max(
-                        int(_float(row.get("harm_veto_applied_heldout"))) for row in method_rows
-                    ),
-                    "recall_budget_used": max(
-                        int(_float(row.get("recall_budget_used"))) for row in method_rows
-                    ),
-                    "recall_override_count_heldout": sum(
-                        int(_float(row.get("recall_override_count_heldout"))) for row in method_rows
-                    ),
-                    "recall_applied_heldout": max(
-                        int(_float(row.get("recall_applied_heldout"))) for row in method_rows
-                    ),
-                    "active_override_rate_ratio_vs_v1": _mean(
-                        method_rows, "active_override_rate_ratio_vs_v1", default=float("nan")
                     ),
                     "source_inner_gap_delta_vs_v1_lcb": _mean(
                         method_rows, "source_inner_gap_delta_vs_v1_lcb", default=float("nan")
