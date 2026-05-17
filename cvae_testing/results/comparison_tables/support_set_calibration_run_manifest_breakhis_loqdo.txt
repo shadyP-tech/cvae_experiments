@@ -1,2 +1,0 @@
-/home/stud/spark/cvae_metadata_routing/cvae_testing/results/comparison_tables/support_set_calibration_loqdo_breakhis_summary.json
-/home/stud/spark/cvae_metadata_routing/cvae_testing/results/comparison_tables/support_set_calibration_loqdo_breakhis_decision_summary.json

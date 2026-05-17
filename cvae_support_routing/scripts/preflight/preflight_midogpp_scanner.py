@@ -9,7 +9,9 @@ import sys
 from typing import Any, Dict, Iterable, List, Mapping, Sequence
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SUPPORT_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = SUPPORT_ROOT.parent
+PROJECT_ROOT = REPO_ROOT / "cvae_testing"
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -160,9 +162,13 @@ def main() -> int:
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path("configs/experiments/midogpp/midogpp_scanner_support_estimated_utility_routing_v1.yaml"),
+        default=SUPPORT_ROOT
+        / "configs"
+        / "experiments"
+        / "midogpp"
+        / "midogpp_scanner_support_estimated_utility_routing_v1.yaml",
     )
-    parser.add_argument("--output-dir", type=Path, default=Path("results/comparison_tables"))
+    parser.add_argument("--output-dir", type=Path, default=SUPPORT_ROOT / "artifacts" / "comparison_tables")
     parser.add_argument("--output-prefix", default="midogpp_scanner_support_estimated_utility_routing_v1")
     parser.add_argument("--require-full-feasible", action="store_true")
     args = parser.parse_args()

@@ -16,7 +16,9 @@ from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
 import numpy as np
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SUPPORT_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = SUPPORT_ROOT.parent
+PROJECT_ROOT = REPO_ROOT / "cvae_testing"
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -29,7 +31,7 @@ EXPERIMENT_ROOT = (
     / "camelyon17"
     / "camelyon17_support_estimated_utility_routing_v2"
 )
-OUTPUT_DIR = PROJECT_ROOT / "results" / "comparison_tables"
+OUTPUT_DIR = SUPPORT_ROOT / "artifacts" / "comparison_tables"
 PROTOCOL_AUDIT = OUTPUT_DIR / "support_nelbo_protocol_audit.csv"
 
 DIRECT_METHOD = "support_set_nelbo_top1"

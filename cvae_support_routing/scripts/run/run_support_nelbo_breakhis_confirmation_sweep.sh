@@ -3,8 +3,10 @@ set -euo pipefail
 
 # Run the BreakHis magnification-domain stress test for direct support-NELBO.
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT_DIR"
+SUPPORT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "${SUPPORT_ROOT}/.." && pwd)"
+CVAE_TESTING_ROOT="${REPO_ROOT}/cvae_testing"
+cd "$CVAE_TESTING_ROOT"
 
 VENV_PYTHON="/home/stud/spark/.venvs/cvae-breakhis/bin/python"
 if [[ ! -x "$VENV_PYTHON" ]]; then
@@ -18,9 +20,9 @@ export HF_HUB_CACHE="$HOME/.cache/huggingface/hub"
 export TRANSFORMERS_CACHE="$HOME/.cache/huggingface/hub"
 export TORCH_HOME="$HOME/.cache/torch"
 
-CONFIG="configs/experiments/breakhis/breakhis_support_estimated_utility_routing_v1.yaml"
+CONFIG="${SUPPORT_ROOT}/configs/experiments/breakhis/breakhis_support_estimated_utility_routing_v1.yaml"
 EXPERIMENT_ROOT="outputs/breakhis/breakhis_support_estimated_utility_routing_v1"
-RESULTS_DIR="results/comparison_tables"
+RESULTS_DIR="${SUPPORT_ROOT}/artifacts/comparison_tables"
 PREFIX="breakhis_support_estimated_utility_routing_v1"
 MANIFEST="${RESULTS_DIR}/${PREFIX}_run_manifest.txt"
 PREFLIGHT_OUT="${RESULTS_DIR}/${PREFIX}_preflight.json"
@@ -134,11 +136,11 @@ for seed in "${SEEDS[@]}"; do
   run_id="support_utility_v1_seed${seed}"
   echo "[run] seed=${seed} run_id=${run_id}"
   "$VENV_PYTHON" -m src.run_experiment --config "$CONFIG" --seed "$seed" --run-id "$run_id"
-  echo "${ROOT_DIR}/${EXPERIMENT_ROOT}/${run_id}/reports/learned_utility_results.json" >> "$MANIFEST"
+  echo "${CVAE_TESTING_ROOT}/${EXPERIMENT_ROOT}/${run_id}/reports/learned_utility_results.json" >> "$MANIFEST"
 done
 
 echo "[report] consolidating BreakHis support-NELBO artifacts"
-"$VENV_PYTHON" scripts/build_support_nelbo_consolidation_report.py \
+"$VENV_PYTHON" "${SUPPORT_ROOT}/scripts/reports/build_support_nelbo_consolidation_report.py" \
   --experiment-root "$EXPERIMENT_ROOT" \
   --output-dir "$RESULTS_DIR" \
   --decision-table "${RESULTS_DIR}/${PREFIX}_decision_table.csv" \

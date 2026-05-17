@@ -5,11 +5,14 @@ from pathlib import Path
 import sys
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+SUPPORT_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = SUPPORT_ROOT.parent
+CVAE_TESTING_ROOT = REPO_ROOT / "cvae_testing"
+for path in (REPO_ROOT, CVAE_TESTING_ROOT):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
 
-from scripts.build_support_nelbo_verification_package import (
+from cvae_support_routing.scripts.reports.build_support_nelbo_verification_package import (
     CONSERVATIVE_METHOD,
     DIRECT_METHOD,
     METHOD_LABELS,

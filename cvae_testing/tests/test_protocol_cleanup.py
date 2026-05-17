@@ -9,6 +9,8 @@ import yaml
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = PROJECT_ROOT.parent
+SUPPORT_ROOT = REPO_ROOT / "cvae_support_routing"
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -37,7 +39,13 @@ def test_cli_default_points_to_protocol_safe_config() -> None:
 
 def test_active_experiment_configs_have_supported_modes() -> None:
     supported = {"hybrid_ablation", "learned_utility_routing"}
-    for path in (PROJECT_ROOT / "configs" / "experiments").rglob("*.yaml"):
+    config_roots = [
+        PROJECT_ROOT / "configs" / "experiments",
+        SUPPORT_ROOT / "configs" / "experiments",
+    ]
+    for root in config_roots:
+        assert root.exists(), f"Missing config root: {root}"
+    for path in [path for root in config_roots for path in root.rglob("*.yaml")]:
         cfg = yaml.safe_load(path.read_text(encoding="utf-8"))
         mode = str((cfg.get("experiment") or {}).get("mode", "")).strip()
         assert mode, f"{path} must declare experiment.mode"
@@ -45,7 +53,13 @@ def test_active_experiment_configs_have_supported_modes() -> None:
 
 
 def test_support_estimated_utility_v2_config_is_unlabeled_and_grid_locked() -> None:
-    path = PROJECT_ROOT / "configs" / "experiments" / "camelyon17" / "camelyon17_support_estimated_utility_routing_v2.yaml"
+    path = (
+        SUPPORT_ROOT
+        / "configs"
+        / "experiments"
+        / "camelyon17"
+        / "camelyon17_support_estimated_utility_routing_v2.yaml"
+    )
     cfg = load_config(path)
     support_cfg = cfg["learned_utility"]["support_response_routing"]
     utility_cfg = support_cfg["support_utility"]
@@ -65,7 +79,7 @@ def test_support_estimated_utility_v2_config_is_unlabeled_and_grid_locked() -> N
 
 def test_breakhis_support_estimated_utility_config_is_protocol_locked() -> None:
     path = (
-        PROJECT_ROOT
+        SUPPORT_ROOT
         / "configs"
         / "experiments"
         / "breakhis"
@@ -96,7 +110,7 @@ def test_breakhis_support_estimated_utility_config_is_protocol_locked() -> None:
 
 def test_breakhis_support_estimated_utility_config_rejects_protocol_drift() -> None:
     path = (
-        PROJECT_ROOT
+        SUPPORT_ROOT
         / "configs"
         / "experiments"
         / "breakhis"
@@ -165,6 +179,7 @@ def test_thesis_facing_manifests_do_not_reference_quarantined_artifacts() -> Non
         "legacy_std_v1",
     ]
     manifest_paths = sorted((PROJECT_ROOT / "results" / "comparison_tables").glob("*manifest*.txt"))
+    manifest_paths.extend(sorted((SUPPORT_ROOT / "artifacts" / "comparison_tables").glob("*manifest*.txt")))
     assert manifest_paths
     for path in manifest_paths:
         text = path.read_text(encoding="utf-8")

@@ -9,10 +9,16 @@ import pytest
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+REPO_ROOT = PROJECT_ROOT.parent
+SUPPORT_ROOT = REPO_ROOT / "cvae_support_routing"
+for path in (PROJECT_ROOT, REPO_ROOT):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
 
-from scripts.preflight_midogpp_scanner import build_confounding_rows, build_fold_rows
+from cvae_support_routing.scripts.preflight.preflight_midogpp_scanner import (
+    build_confounding_rows,
+    build_fold_rows,
+)
 from src.config.load_config import load_config
 from src.config.schema import validate_config
 from src.data.datasets.midogpp import MidogPPRecord, prepare_midogpp_records
@@ -191,7 +197,13 @@ def test_midogpp_preflight_classifies_confounding_and_group_feasibility() -> Non
 
 
 def test_midogpp_support_config_is_protocol_locked() -> None:
-    path = PROJECT_ROOT / "configs" / "experiments" / "midogpp" / "midogpp_scanner_support_estimated_utility_routing_v1.yaml"
+    path = (
+        SUPPORT_ROOT
+        / "configs"
+        / "experiments"
+        / "midogpp"
+        / "midogpp_scanner_support_estimated_utility_routing_v1.yaml"
+    )
     cfg = load_config(path)
     validate_config(cfg)
     assert cfg["data"]["dataset_type"] == "midogpp"

@@ -10,7 +10,7 @@
   "artifact_lineage": "This report supersedes earlier selection summaries for thesis interpretation. It does not invalidate their protocol checks; it revises the claim level based on per-k support-seed stability and alpha-selection diagnostics.",
   "cross_check_against_earlier_decision_table": {
     "interpretation": "Changed conclusion is a claim-level revision based on per-k support-seed stability and alpha diagnostics, not a protocol invalidation.",
-    "path": "/home/stud/spark/cvae_metadata_routing/cvae_testing/results/comparison_tables/camelyon17_support_estimated_utility_routing_v2_decision_table.csv",
+    "path": "/home/stud/spark/cvae_metadata_routing/cvae_support_routing/artifacts/comparison_tables/camelyon17_support_estimated_utility_routing_v2_decision_table.csv",
     "rows": [
       {
         "method": "direct_support_nelbo",

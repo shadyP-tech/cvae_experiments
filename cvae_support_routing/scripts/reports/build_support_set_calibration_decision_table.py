@@ -11,7 +11,9 @@ from statistics import mean
 from typing import Dict, List, Mapping, Sequence, Tuple
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SUPPORT_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = SUPPORT_ROOT.parent
+PROJECT_ROOT = REPO_ROOT / "cvae_testing"
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -259,17 +261,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--out",
         type=Path,
-        default=Path("results/comparison_tables/support_set_calibration_loqdo_breakhis_decision.csv"),
+        default=SUPPORT_ROOT
+        / "artifacts"
+        / "comparison_tables"
+        / "support_set_calibration_loqdo_breakhis_decision.csv",
     )
     parser.add_argument(
         "--paired-out",
         type=Path,
-        default=Path("results/comparison_tables/support_set_calibration_loqdo_breakhis_paired_deltas.csv"),
+        default=SUPPORT_ROOT
+        / "artifacts"
+        / "comparison_tables"
+        / "support_set_calibration_loqdo_breakhis_paired_deltas.csv",
     )
     parser.add_argument(
         "--summary-json-out",
         type=Path,
-        default=Path("results/comparison_tables/support_set_calibration_loqdo_breakhis_decision_summary.json"),
+        default=SUPPORT_ROOT
+        / "artifacts"
+        / "comparison_tables"
+        / "support_set_calibration_loqdo_breakhis_decision_summary.json",
     )
     parser.add_argument("--min-gap-reduction", type=float, default=0.0)
     parser.add_argument("--max-top1-regression", type=float, default=0.0)
@@ -281,7 +292,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def _resolve(path: Path) -> Path:
-    return path if path.is_absolute() else PROJECT_ROOT / path
+    return path if path.is_absolute() else SUPPORT_ROOT / path
 
 
 def main() -> None:
