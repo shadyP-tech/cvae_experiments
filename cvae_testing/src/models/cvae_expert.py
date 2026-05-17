@@ -15,6 +15,7 @@ class CVAEExpert(nn.Module):
         metadata_constraint_cfg: dict[str, object] | None = None,
         aux_metadata_dim: int | None = None,
         class_condition_dim: int = 0,
+        label_utility_cfg: dict[str, object] | None = None,
     ) -> None:
         super().__init__()
         self.input_dim = int(input_dim)
@@ -42,6 +43,40 @@ class CVAEExpert(nn.Module):
         self.fc_logvar = nn.Linear(hidden_dim, latent_dim)
         self.dec1 = nn.Linear(dec_input_dim, self.hidden_dim)
         self.dec2 = nn.Linear(self.hidden_dim, self.input_dim)
+
+        utility_cfg = label_utility_cfg or {}
+        self.label_utility_enabled = bool(utility_cfg.get("enabled", False))
+        self.label_utility_use_mu = bool(utility_cfg.get("use_mu", True))
+        self.label_utility_num_classes = int(utility_cfg.get("num_classes", self.class_condition_dim))
+        if self.label_utility_enabled:
+            if self.class_condition_dim <= 0:
+                raise ValueError("Family D label-utility heads require class_condition_dim > 0")
+            if self.label_utility_num_classes != self.class_condition_dim:
+                raise ValueError(
+                    "label_utility.num_classes must match class_condition_dim for Family D "
+                    f"(got {self.label_utility_num_classes} vs {self.class_condition_dim})"
+                )
+
+        self.latent_label_head: nn.Module | None = None
+        self.decoded_label_head: nn.Module | None = None
+        if self.label_utility_enabled:
+            head_hidden_dim = int(utility_cfg.get("head_hidden_dim", 0))
+            if head_hidden_dim < 0:
+                raise ValueError("label_utility.head_hidden_dim must be >= 0")
+            if head_hidden_dim > 0:
+                self.latent_label_head = nn.Sequential(
+                    nn.Linear(self.latent_dim, head_hidden_dim),
+                    nn.ReLU(),
+                    nn.Linear(head_hidden_dim, self.label_utility_num_classes),
+                )
+                self.decoded_label_head = nn.Sequential(
+                    nn.Linear(self.input_dim, head_hidden_dim),
+                    nn.ReLU(),
+                    nn.Linear(head_hidden_dim, self.label_utility_num_classes),
+                )
+            else:
+                self.latent_label_head = nn.Linear(self.latent_dim, self.label_utility_num_classes)
+                self.decoded_label_head = nn.Linear(self.input_dim, self.label_utility_num_classes)
 
         constraint_cfg = metadata_constraint_cfg or {}
         self.metadata_constraint_enabled = bool(constraint_cfg.get("enabled", False))
@@ -258,6 +293,58 @@ class CVAEExpert(nn.Module):
             )
 
         return F.cross_entropy(aux_logits, targets)
+
+    def _class_targets_to_indices(self, class_targets: torch.Tensor | None) -> torch.Tensor:
+        if class_targets is None:
+            raise ValueError("class targets are required for Family D label-utility computations")
+
+        if class_targets.ndim == 2:
+            if class_targets.shape[1] != self.class_condition_dim:
+                raise ValueError(
+                    "Class target width mismatch for label-utility computations: "
+                    f"expected {self.class_condition_dim}, got {class_targets.shape[1]}."
+                )
+            targets = class_targets.argmax(dim=1)
+        elif class_targets.ndim == 1:
+            targets = class_targets.long()
+        else:
+            raise ValueError("class targets must be a 1D index tensor or 2D one-hot tensor")
+
+        max_target = int(targets.max().item()) if targets.numel() > 0 else -1
+        min_target = int(targets.min().item()) if targets.numel() > 0 else 0
+        if min_target < 0 or max_target >= self.label_utility_num_classes:
+            raise ValueError(
+                "class target indices are out of range for label utility: "
+                f"min={min_target}, max={max_target}, num_classes={self.label_utility_num_classes}"
+            )
+        return targets.long()
+
+    def label_utility_latent_logits(self, mu: torch.Tensor, z: torch.Tensor | None = None) -> torch.Tensor:
+        if not self.label_utility_enabled or self.latent_label_head is None:
+            raise ValueError("label_utility_latent_logits called while Family D label utility is disabled")
+        latent = mu if self.label_utility_use_mu or z is None else z
+        return self.latent_label_head(latent)
+
+    def label_utility_decoded_logits(self, decoded: torch.Tensor) -> torch.Tensor:
+        if not self.label_utility_enabled or self.decoded_label_head is None:
+            raise ValueError("label_utility_decoded_logits called while Family D label utility is disabled")
+        return self.decoded_label_head(decoded)
+
+    def label_utility_loss(self, logits: torch.Tensor, class_targets: torch.Tensor | None) -> torch.Tensor:
+        if not self.label_utility_enabled:
+            raise ValueError("label_utility_loss called while Family D label utility is disabled")
+        targets = self._class_targets_to_indices(class_targets)
+        if targets.shape[0] != logits.shape[0]:
+            raise ValueError(
+                "Batch-size mismatch for label-utility loss: "
+                f"targets={targets.shape[0]}, logits={logits.shape[0]}"
+            )
+        return F.cross_entropy(logits, targets)
+
+    def label_utility_accuracy(self, logits: torch.Tensor, class_targets: torch.Tensor | None) -> torch.Tensor:
+        targets = self._class_targets_to_indices(class_targets)
+        pred = logits.argmax(dim=1)
+        return (pred == targets).to(dtype=torch.float32).mean()
 
     def forward(
         self,

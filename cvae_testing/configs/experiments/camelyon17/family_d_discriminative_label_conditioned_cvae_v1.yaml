@@ -1,0 +1,82 @@
+seed: 42
+
+experiment:
+  name: family_d_discriminative_label_conditioned_cvae_v1
+  dataset: camelyon17
+  stage: discriminative_label_conditioned_expert_training
+  status: ready
+  primary_question: >
+    Was the downstream ceiling caused by the CVAE training objective rather
+    than the latent sampler?
+
+protocol:
+  expert_training_split: source_train
+  expert_validation_split: source_val
+  target_labels_used_for_training: 0
+  target_eval_labels_used_for_training: 0
+  target_oracle_used_for_selection: 0
+  loss_weights_fixed_before_run: true
+  early_stopping_metric: source_val_total_loss
+
+inputs:
+  train_cache: cvae_testing/outputs/camelyon17/camelyon17_label_marginal_support_nelbo_v1/family_c_cam17_label_marginal_s42/embeddings/train.pt
+  val_cache: cvae_testing/outputs/camelyon17/camelyon17_label_marginal_support_nelbo_v1/family_c_cam17_label_marginal_s42/embeddings/val.pt
+
+outputs:
+  run_root: cvae_testing/outputs/camelyon17/family_d_discriminative_label_conditioned_cvae_v1/family_d_cam17_discriminative_s42
+
+data:
+  centers: [0, 1, 2, 3, 4]
+  domain_field: center
+  legacy_domain_field_alias: magnification
+  dataset_domain_semantics: camelyon17_center
+
+model:
+  hidden_dim: 256
+  latent_dim: 16
+  conditioning:
+    enabled: false
+  metadata_constraint:
+    enabled: false
+  label_conditioning:
+    enabled: true
+    label_field: label
+    label_values: [0, 1]
+  label_utility:
+    enabled: true
+    expert_family: family_d_discriminative_label_conditioned_v1
+    condition_type: class_label_one_hot
+    discriminative_training_enabled: true
+    lambda_latent_cls: 0.25
+    lambda_recon_cls: 0.25
+    lambda_prior_cls: 0.50
+    prior_samples_per_batch: same_batch_size
+    beta_kl_weight: 1.0
+    early_stopping_metric: source_val_total_loss
+    head_hidden_dim: 0
+    d_lite_supported:
+      expert_family: family_d_prior_cls_only_v1
+      lambda_latent_cls: 0.0
+      lambda_recon_cls: 0.0
+      lambda_prior_cls: 0.50
+
+training:
+  batch_size: 128
+  learning_rate: 0.001
+  epochs: 25
+  patience: 5
+
+artifacts:
+  required_outputs:
+    - reports/family_d_checkpoint_provenance.csv
+    - reports/family_d_training_history.csv
+    - reports/family_d_training_protocol_audit.csv
+    - reports/family_d_source_val_diagnostics.csv
+
+claim_boundary:
+  allowed: >
+    Discriminative label-conditioned CVAE training can improve synthetic
+    embedding utility for independently trained source experts.
+  forbidden: >
+    Do not claim Family D improves support-NELBO routing, proves full medical
+    image realism, or uses target labels for training or selection.

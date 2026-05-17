@@ -453,6 +453,7 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
             configured_domains=cfg.get("data", {}).get("magnifications", []),
             metadata_constraint_cfg=cfg.get("model", {}).get("metadata_constraint", {}),
             label_conditioning_cfg=cfg.get("model", {}).get("label_conditioning", {}),
+            label_utility_cfg=cfg.get("model", {}).get("label_utility", {}),
         )
         progress.advance("domain experts trained for utility scoring")
 
