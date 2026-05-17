@@ -1,0 +1,273 @@
+from pathlib import Path
+import math
+import sys
+
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from cvae_downstream_evaluation.downstream import (  # noqa: E402
+    CandidateDownstreamRow,
+    assert_matrix_schema,
+    compute_single_expert_oracles,
+    validate_candidate_downstream_matrix,
+    write_candidate_downstream_matrix,
+)
+from cvae_downstream_evaluation.generation import (  # noqa: E402
+    allocate_equal_total_ensemble_budget,
+)
+from cvae_downstream_evaluation.protocol import (  # noqa: E402
+    ProtocolError,
+    assert_locked_v1_config_text,
+    load_locked_v1_config,
+)
+from cvae_downstream_evaluation.reporting import build_routing_alignment_rows  # noqa: E402
+from cvae_downstream_evaluation.matrix import (  # noqa: E402
+    build_target_eval_pool,
+    hash_candidate_experts,
+)
+from cvae_downstream_evaluation.routing import (  # noqa: E402
+    SupportSelectionUnit,
+    add_deterministic_random_units,
+)
+from cvae_downstream_evaluation.schemas import (  # noqa: E402
+    ENSEMBLE_METHOD,
+    METADATA_METHOD,
+    PRIMARY_GENERATION_MODE,
+    RANDOM_METHOD,
+    SOURCE_GLOBAL_METHOD,
+    SUPPORT_NELBO_METHOD,
+    NEGATIVE_CONTROL_GENERATION_MODE,
+)
+
+
+def test_expected_skeleton_files_exist() -> None:
+    expected = [
+        ROOT / "README.md",
+        ROOT / "docs" / "protocol.md",
+        ROOT / "docs" / "thesis_alignment.md",
+        ROOT / "docs" / "implementation_order.md",
+        ROOT / "configs" / "experiments" / "direct_support_nelbo_selected_synthetic_downstream_v1.yaml",
+        ROOT / "src" / "cvae_downstream_evaluation" / "protocol.py",
+        ROOT / "src" / "cvae_downstream_evaluation" / "routing.py",
+        ROOT / "src" / "cvae_downstream_evaluation" / "generation.py",
+        ROOT / "src" / "cvae_downstream_evaluation" / "downstream.py",
+        ROOT / "src" / "cvae_downstream_evaluation" / "matrix.py",
+        ROOT / "src" / "cvae_downstream_evaluation" / "fidelity.py",
+        ROOT / "src" / "cvae_downstream_evaluation" / "reporting.py",
+    ]
+    missing = [str(path.relative_to(ROOT)) for path in expected if not path.exists()]
+    assert not missing
+
+
+def test_protocol_docs_preserve_claim_boundary() -> None:
+    protocol = (ROOT / "docs" / "protocol.md").read_text(encoding="utf-8")
+    assert "Lower support NELBO proves better generative quality" in protocol
+    assert "Forbidden" in protocol
+    assert "target evaluation labels" in protocol
+
+
+def test_config_declares_second_stage_outputs() -> None:
+    config = (
+        ROOT
+        / "configs"
+        / "experiments"
+        / "direct_support_nelbo_selected_synthetic_downstream_v1.yaml"
+    ).read_text(encoding="utf-8")
+    assert "all_expert_downstream_matrix.csv" in config
+    assert "single_expert_downstream_oracle_diagnostic_only" in config
+    assert "support_eval_separation: required" in config
+    assert "support_size_stratified_downstream_summary.csv" in config
+
+
+def test_locked_config_rejects_stale_template_fields() -> None:
+    config = (
+        ROOT
+        / "configs"
+        / "experiments"
+        / "direct_support_nelbo_selected_synthetic_downstream_v1.yaml"
+    ).read_text(encoding="utf-8")
+    assert_locked_v1_config_text(config)
+    try:
+        assert_locked_v1_config_text(config + "\ngeneration:\n  decoder_sampling: conditional_cvae_decoder\n")
+    except ProtocolError:
+        pass
+    else:
+        raise AssertionError("stale conditional-generation wording was not rejected")
+
+
+def test_locked_config_loads_without_yaml_dependency() -> None:
+    config = load_locked_v1_config(
+        ROOT
+        / "configs"
+        / "experiments"
+        / "direct_support_nelbo_selected_synthetic_downstream_v1.yaml"
+    )
+    assert config.dataset_name == "camelyon17"
+    assert config.support_seeds == (17, 23, 31)
+    assert config.generation_seeds == (17, 23, 31)
+
+
+def test_deterministic_random_units_are_support_unit_aligned() -> None:
+    unit = _unit(SUPPORT_NELBO_METHOD, "2")
+    generated = add_deterministic_random_units([unit])
+    random_units = [row for row in generated if row.method == RANDOM_METHOD]
+    assert len(random_units) == 1
+    assert random_units[0].heldout_center == unit.heldout_center
+    assert random_units[0].support_eval_split_id == unit.support_eval_split_id
+    assert random_units[0].selected_expert in unit.candidate_experts
+
+
+def test_single_expert_oracle_excludes_method_baselines() -> None:
+    rows = [
+        _downstream("1", 0.70, "single_expert"),
+        _downstream("2", 0.80, "single_expert"),
+        _downstream("__ensemble__", 0.95, "method_baseline"),
+    ]
+    oracle = compute_single_expert_oracles(rows)
+    winner = next(iter(oracle.values()))
+    assert winner.expert == "2"
+
+
+def test_single_expert_oracle_excludes_failed_and_negative_control_rows() -> None:
+    rows = [
+        _downstream("1", 0.70, "single_expert"),
+        _downstream("2", 0.95, "single_expert", status="failed_empty_reference_pool"),
+        _downstream(
+            "3",
+            0.99,
+            "single_expert",
+            generation_mode=NEGATIVE_CONTROL_GENERATION_MODE,
+        ),
+    ]
+    oracle = compute_single_expert_oracles(rows)
+    winner = next(iter(oracle.values()))
+    assert winner.expert == "1"
+
+
+def test_candidate_matrix_rejects_duplicate_rows() -> None:
+    row = _downstream("1", 0.70, "single_expert")
+    try:
+        validate_candidate_downstream_matrix([row, row])
+    except ProtocolError:
+        pass
+    else:
+        raise AssertionError("duplicate downstream rows were not rejected")
+
+
+def test_candidate_matrix_key_includes_experiment_seed_and_candidate_hash() -> None:
+    row_seed42 = _downstream("1", 0.70, "single_expert", experiment_seed=42)
+    row_seed43 = _downstream("1", 0.70, "single_expert", experiment_seed=43)
+    row_hash_a = _downstream("__ensemble__", 0.80, "method_baseline", candidate_hash="abc")
+    row_hash_b = _downstream("__ensemble__", 0.80, "method_baseline", candidate_hash="def")
+    validate_candidate_downstream_matrix([row_seed42, row_seed43, row_hash_a, row_hash_b])
+
+
+def test_matrix_schema_sidecar_is_required_and_validated(tmp_path: Path) -> None:
+    path = tmp_path / "all_expert_downstream_matrix.csv"
+    write_candidate_downstream_matrix(path, [_downstream("1", 0.70, "single_expert")])
+    assert_matrix_schema(path)
+    (tmp_path / "all_expert_downstream_matrix.schema.json").write_text(
+        '{"schema_version":"stale"}\n',
+        encoding="utf-8",
+    )
+    try:
+        assert_matrix_schema(path)
+    except ProtocolError:
+        pass
+    else:
+        raise AssertionError("stale downstream matrix schema was not rejected")
+
+
+def test_late_ensemble_budget_is_equal_total() -> None:
+    assert allocate_equal_total_ensemble_budget(total_per_class=128, candidate_experts=["3", "1", "2"]) == {
+        "1": 43,
+        "2": 43,
+        "3": 42,
+    }
+
+
+def test_candidate_expert_hash_is_order_stable() -> None:
+    assert hash_candidate_experts(["3", "1", "2"]) == hash_candidate_experts(["2", "3", "1"])
+
+
+def test_target_eval_pool_excludes_support_by_sample_id() -> None:
+    records = [
+        {"sample_id": f"c0_{idx}", "magnification": "0", "label": str(idx % 2)}
+        for idx in range(12)
+    ]
+    records += [
+        {"sample_id": f"c1_{idx}", "magnification": "1", "label": str(idx % 2)}
+        for idx in range(12)
+    ]
+    pool = build_target_eval_pool(
+        test_metadata=records,
+        heldout_center="0",
+        support_sizes=(4, 8),
+        support_seeds=(17, 23),
+    )
+    eval_ids = {records[idx]["sample_id"] for idx in pool.eval_indices}
+    assert set(pool.excluded_support_sample_ids).isdisjoint(eval_ids)
+    assert all(str(records[idx]["magnification"]) == "0" for idx in pool.eval_indices)
+
+
+def test_alignment_uses_spearman_only_for_ranked_methods() -> None:
+    selections = [
+        _unit(SUPPORT_NELBO_METHOD, "2"),
+        _unit(METADATA_METHOD, "1"),
+        _unit(SOURCE_GLOBAL_METHOD, "1"),
+    ]
+    downstream = [
+        _downstream("1", 0.70, "single_expert"),
+        _downstream("2", 0.80, "single_expert"),
+    ]
+    rows = build_routing_alignment_rows(selections=selections, downstream_rows=downstream)
+    by_method = {str(row["method"]): row for row in rows}
+    assert by_method[SUPPORT_NELBO_METHOD]["downstream_oracle_gap_bacc"] == 0.0
+    assert by_method[SUPPORT_NELBO_METHOD]["spearman_neg_nelbo_vs_bacc"] > 0
+    assert math.isnan(float(by_method[METADATA_METHOD]["spearman_neg_nelbo_vs_bacc"]))
+    assert by_method[SUPPORT_NELBO_METHOD]["delta_vs_metadata"] > 0
+
+
+def _unit(method: str, selected: str) -> SupportSelectionUnit:
+    return SupportSelectionUnit(
+        heldout_center="0",
+        experiment_seed=42,
+        support_size=16,
+        support_seed=17,
+        method=method,
+        selected_expert=selected,
+        candidate_experts=("1", "2"),
+        support_nelbo_by_expert={"1": 10.0, "2": 5.0},
+        target_expert_excluded=True,
+        support_eval_split_id="target0_seed17_random_k16",
+    )
+
+
+def _downstream(
+    expert: str,
+    bacc: float,
+    row_type: str,
+    *,
+    experiment_seed: int = 42,
+    status: str = "ok",
+    generation_mode: str = PRIMARY_GENERATION_MODE,
+    candidate_hash: str = "__single_expert__",
+) -> CandidateDownstreamRow:
+    return CandidateDownstreamRow(
+        experiment_seed=experiment_seed,
+        heldout_center="0",
+        candidate_expert=expert,
+        generation_mode=generation_mode,
+        budget_per_class=128,
+        generation_seed=17,
+        classifier_seed=17,
+        bacc=bacc,
+        macro_f1=bacc - 0.05,
+        row_type=row_type,
+        n_synthetic_train=256,
+        n_target_eval=100,
+        target_eval_pool_id="target0_exclude_configured_support_union_test",
+        candidate_experts_hash=candidate_hash,
+        status=status,
+    )
