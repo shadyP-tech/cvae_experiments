@@ -1,0 +1,164 @@
+experiment:
+  name: direct_support_nelbo_selected_synthetic_downstream_v1
+  stage: second_stage_downstream_evaluation
+  status: locked_v1_ready_for_synced_artifacts
+  thesis_chapter: 6
+  primary_question: >
+    Does direct support-NELBO select source experts whose class-stratified
+    reference-posterior-resampled synthetic embeddings train useful held-out
+    Camelyon17 target classifiers?
+
+protocol:
+  split_regime: LOQDO
+  support_eval_separation: required
+  target_expert_exclusion: required
+  source_experts_frozen: required
+  support_labels_for_primary_routing: forbidden
+  target_eval_labels_for_selection_generation_or_training: forbidden
+  downstream_oracle_role: diagnostic_only
+  router_allowed_inputs:
+    - source_expert_checkpoints
+    - source_expert_provenance
+    - source_domain_metadata
+    - unlabeled_target_support_embeddings
+    - target_support_metadata_available_at_query_time
+  router_forbidden_inputs:
+    - target_evaluation_labels
+    - target_evaluation_nelbo
+    - downstream_oracle_expert
+    - target_test_metrics
+    - generation_hyperparameters_tuned_on_target_eval
+    - classifier_hyperparameters_tuned_on_target_eval
+
+datasets:
+  camelyon17:
+    enabled: true
+    domain_key: center
+    candidate_domains: [0, 1, 2, 3, 4]
+    experiment_seeds: [42, 43, 44]
+    support_sizes: [4, 8, 16, 32]
+    support_seeds: [17, 23, 31]
+    generation_seeds: [17, 23, 31]
+    classifier_seeds: [17, 23, 31]
+
+support_inputs:
+  selection_glob: cvae_testing/outputs/camelyon17/camelyon17_support_estimated_utility_routing_v2/support_utility_v2_seed*/reports/support_response_sample_selections.csv
+  authoritative_methods:
+    - support_set_nelbo_top1
+    - support_metadata_routing
+    - source_global_prior_routing
+  random_candidate_expert_policy: deterministic_downstream_baseline
+
+routing:
+  primary_method: support_set_nelbo_top1
+  score_direction: lower_is_better
+  decision_rule: argmin_mean_support_nelbo
+  tie_breaker: stable_expert_domain_order
+  full_ranking_methods:
+    - support_set_nelbo_top1
+  spearman_policy:
+    support_set_nelbo_top1: spearman_neg_support_nelbo_vs_bacc
+    methods_without_full_expert_ranking: nan
+
+generation:
+  object: expert_projected_cvae_embedding
+  primary_mode: class_stratified_reference_posterior_resampling
+  negative_control_mode: unconditional_prior_sampling_assigned_label_negative_control
+  reference_pool: expert_source_train
+  class_prior:
+    primary: class_balanced
+  primary_budget_per_class: 128
+  diagnostic_budgets_per_class: [64, 128, 256, 512]
+  ensemble_budget_policy: equal_total_per_class_split_across_experts
+  projection_frame_policy: target_eval_projected_through_matching_expert_head
+
+downstream:
+  primary_track: synthetic_only
+  classifier:
+    family: sklearn_logistic_regression
+    scaler_fit: synthetic_train_only
+    solver: lbfgs
+    C: 1.0
+    max_iter: 2000
+    class_weight: null
+    hyperparameter_tuning: forbidden
+  primary_metrics:
+    - bacc
+    - macro_f1
+  secondary_metrics:
+    - auroc
+    - auprc
+  utility_definition: U_downstream(q,e)=held_out_target_bacc_after_training_on_synthetic_from_e
+
+fidelity:
+  role: secondary_diagnostic
+  metrics:
+    - rbf_mmd
+    - energy_distance
+    - frechet_embedding_distance
+    - mean_distance
+    - covariance_distance
+    - knn_precision
+    - knn_recall
+    - density
+    - coverage
+
+baselines:
+  essential:
+    - support_metadata_routing
+    - support_set_nelbo_top1
+    - random_candidate_expert
+    - source_global_prior_routing
+    - naive_all_expert_ensemble
+    - single_expert_downstream_oracle_diagnostic_only
+  ensemble_policy:
+    row_type: method_baseline
+    oracle_membership: excluded_from_single_expert_oracle
+    prediction_rule: late_probability_average
+
+artifacts:
+  root: cvae_downstream_evaluation/artifacts
+  required_external:
+    - cvae_downstream_evaluation/artifacts/manifests/expert_checkpoints.csv
+    - cvae_downstream_evaluation/artifacts/manifests/embedding_cache_manifest.csv
+    - cvae_downstream_evaluation/artifacts/manifests/expert_provenance.csv
+  required_outputs:
+    - manifests/protocol_manifest.json
+    - manifests/split_manifest.csv
+    - manifests/expert_provenance.csv
+    - tables/support_selection_units.csv
+    - tables/all_expert_downstream_matrix.csv
+    - tables/routing_to_downstream_alignment.csv
+    - tables/baseline_comparison.csv
+    - tables/support_size_stratified_downstream_summary.csv
+    - tables/fidelity_diagnostics.csv
+    - tables/selection_stability.csv
+    - tables/generation_classifier_stability.csv
+    - reports/leakage_report.json
+    - reports/decision_summary.md
+    - run_config_resolved.yaml
+
+decision_rule:
+  primary_generation_mode: class_stratified_reference_posterior_resampling
+  primary_budget_per_class: 128
+  aggregation: equal_center_paired_deltas_after_equal_support_size_averaging
+  pass_gates:
+    - mean_delta_bacc_vs_metadata_gt_0
+    - mean_support_nelbo_oracle_gap_bacc_lt_metadata
+    - mean_spearman_neg_nelbo_vs_bacc_gt_0
+    - center_pass_count_gte_4_of_5
+    - protocol_checks_pass
+  center_pass_definition: >
+    center_pass = mean delta_bacc_vs_metadata >= 0 and mean
+    support_nelbo_downstream_oracle_gap_bacc <= mean
+    metadata_downstream_oracle_gap_bacc.
+  support_size_stratification: descriptive_only
+
+claim_boundary:
+  allowed: >
+    Direct support-NELBO is evaluated as a target-local compatibility estimator
+    for selecting source experts whose class-stratified posterior-resampled
+    synthetic embeddings support held-out Camelyon17 target classification.
+  forbidden: >
+    Do not claim true class-conditional CVAE generation, general target-domain
+    generative quality, or downstream utility from lower support NELBO alone.

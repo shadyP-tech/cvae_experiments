@@ -1,0 +1,9 @@
+*
+!.gitignore
+!README.md
+!manifests/
+!reports/
+!tables/
+!plots/
+!*/.gitkeep
+
