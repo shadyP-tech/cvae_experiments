@@ -1,0 +1,151 @@
+experiment:
+  name: family_c_label_conditioned_downstream_v1
+  stage: second_stage_downstream_evaluation
+  status: ready_for_family_c_synced_artifacts
+  dataset: camelyon17
+  smoke: false
+  primary_question: >
+    Does unlabeled Family C label-marginal support routing select
+    label-conditioned CVAE experts whose class-conditional prior samples
+    support held-out Camelyon17 target classification?
+
+protocol:
+  split_regime: LOQDO
+  support_eval_separation: required
+  target_expert_exclusion: required
+  source_experts_frozen: required
+  support_labels_for_routing: forbidden
+  target_eval_labels_for_training: forbidden
+  target_eval_labels_for_final_metric_only: required
+  downstream_oracle_role: diagnostic_only
+  routing_artifact_source: family_c_label_marginal_support_nelbo_v1
+
+inputs:
+  family_c_run_root: cvae_testing/outputs/camelyon17/camelyon17_label_marginal_support_nelbo_v1/family_c_cam17_label_marginal_s42
+  family_c_reports_dir: cvae_testing/outputs/camelyon17/camelyon17_label_marginal_support_nelbo_v1/family_c_cam17_label_marginal_s42/reports
+  checkpoints_dir: cvae_testing/outputs/camelyon17/camelyon17_label_marginal_support_nelbo_v1/family_c_cam17_label_marginal_s42/checkpoints
+  train_cache: cvae_testing/outputs/camelyon17/camelyon17_label_marginal_support_nelbo_v1/family_c_cam17_label_marginal_s42/embeddings/train.pt
+  val_cache: cvae_testing/outputs/camelyon17/camelyon17_label_marginal_support_nelbo_v1/family_c_cam17_label_marginal_s42/embeddings/val.pt
+  test_cache: cvae_testing/outputs/camelyon17/camelyon17_label_marginal_support_nelbo_v1/family_c_cam17_label_marginal_s42/embeddings/test.pt
+  required_family_c_reports:
+    - label_marginal_decision_table.csv
+    - label_marginal_support_nelbo_rows.csv
+    - label_conditioned_checkpoint_provenance.csv
+    - label_marginal_protocol_audit.csv
+
+routing:
+  primary_method: family_c_label_marginal
+  sensitivity_method: family_c_label_marginal_source_global_laplace
+  score_name: label_marginal_nelbo_proxy
+  score_direction: lower_is_better
+  support_sizes: [4, 8, 16, 32]
+  support_seeds: [17, 23, 31]
+  candidate_level_spearman: spearman_negative_support_score_vs_downstream_bacc
+  selected_methods:
+    - family_c_label_marginal
+    - family_c_label_marginal_source_global_laplace
+    - metadata_routing
+    - random_expert_floor
+    - source_global_static_expert
+    - static_embedding_mean_distance
+    - family_a_direct_support_nelbo_selection
+
+generation:
+  primary_mode: label_conditioned_prior_sampling
+  wrong_label_control: wrong_label_condition_control
+  class_prior:
+    primary: balanced
+  label_field: label
+  label_values: [0, 1]
+  label_semantics:
+    0: normal_non_tumor
+    1: tumor
+  input_dim: 768
+  hidden_dim: 256
+  latent_dim: 16
+  class_condition_dim: 2
+  budget_per_class: 128
+  generation_seeds: [17, 23, 31]
+  ensemble_baseline: all_expert_balanced_budget_ensemble
+  ensemble_budget_policy: same_total_per_class_split_across_candidate_experts
+  ensemble_remainder_policy: ascending_expert_id
+
+downstream:
+  primary_track: synthetic_only
+  classifier:
+    family: sklearn_logistic_regression
+    scaler_fit: synthetic_train_only
+    solver: lbfgs
+    C: 1.0
+    max_iter: 2000
+    class_weight: null
+    hyperparameter_tuning: forbidden
+  classifier_seeds: [17, 23, 31]
+  primary_metrics:
+    - bacc
+    - macro_f1
+  secondary_metrics:
+    - auroc
+    - auprc
+  metric_validity:
+    require_both_target_eval_classes: true
+
+preflight:
+  require:
+    expert_family: family_c_label_conditioned_v1
+    condition_type: class_label_one_hot
+    class_condition_dim: 2
+    label_values: [0, 1]
+    input_dim: 768
+    latent_dim: 16
+    feature_extractor_name: dinov2_vitb14
+    feature_extractor_checkpoint: facebook/dinov2-base
+    beta_kl_weight: 1.0
+    reconstruction_loss: mse_sum
+    target_expert_excluded: true
+    support_eval_disjoint: true
+    support_labels_used_for_routing: 0
+
+baselines:
+  primary:
+    - metadata_routing
+    - random_expert_floor
+    - source_global_static_expert
+    - static_embedding_mean_distance
+    - all_expert_balanced_budget_ensemble
+  diagnostic_only:
+    - wrong_label_condition_control
+    - single_expert_downstream_oracle_diagnostic_only
+
+artifacts:
+  root: cvae_downstream_evaluation/artifacts/family_c_label_conditioned_downstream_v1
+  required_outputs:
+    - manifests/family_c_downstream_generation_manifest.csv
+    - manifests/family_c_trained_classifier_manifest.csv
+    - tables/family_c_all_expert_downstream_matrix.csv
+    - tables/family_c_downstream_selection_alignment.csv
+    - tables/family_c_downstream_baseline_comparison.csv
+    - tables/family_c_downstream_fidelity_diagnostics.csv
+    - tables/family_c_label_controllability_diagnostics.csv
+    - reports/family_c_downstream_protocol_audit.csv
+    - reports/family_c_downstream_decision_summary.json
+
+decision_rule:
+  min_mean_bacc_delta: 0.005
+  min_oracle_gap_delta: 0.005
+  spearman_min: 0.0
+  required_centers_improved: 4
+  pass_requires_improvement_over:
+    - metadata_routing
+    - random_expert_floor
+    - source_global_static_expert
+    - static_embedding_mean_distance
+    - all_expert_balanced_budget_ensemble
+
+claim_boundary:
+  allowed: >
+    Family C label-marginal support routing is evaluated for selecting
+    label-conditioned synthetic embedding experts with held-out target utility.
+  forbidden: >
+    Do not claim full medical image realism or general class-conditional image
+    generation quality; this evaluates synthetic embedding utility only.
