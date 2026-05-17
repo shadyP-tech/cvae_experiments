@@ -22,6 +22,12 @@ from cvae_downstream_evaluation.protocol import (  # noqa: E402
     load_locked_v1_config,
 )
 from cvae_downstream_evaluation.reporting import build_routing_alignment_rows  # noqa: E402
+from cvae_downstream_evaluation.source_global_gated import (  # noqa: E402
+    build_source_global_gated_alignment_rows,
+    derive_source_global_gated_units,
+    gated_method_name,
+    source_global_gated_comparison_rows,
+)
 from cvae_downstream_evaluation.matrix import (  # noqa: E402
     build_target_eval_pool,
     hash_candidate_experts,
@@ -55,6 +61,8 @@ def test_expected_skeleton_files_exist() -> None:
         ROOT / "src" / "cvae_downstream_evaluation" / "matrix.py",
         ROOT / "src" / "cvae_downstream_evaluation" / "fidelity.py",
         ROOT / "src" / "cvae_downstream_evaluation" / "reporting.py",
+        ROOT / "src" / "cvae_downstream_evaluation" / "source_global_gated.py",
+        ROOT / "scripts" / "build_source_global_gated_router_report.py",
     ]
     missing = [str(path.relative_to(ROOT)) for path in expected if not path.exists()]
     assert not missing
@@ -229,6 +237,107 @@ def test_alignment_uses_spearman_only_for_ranked_methods() -> None:
     assert by_method[SUPPORT_NELBO_METHOD]["delta_vs_metadata"] > 0
 
 
+def test_source_global_gate_switches_on_sufficient_gain() -> None:
+    units = [
+        _unit(SUPPORT_NELBO_METHOD, "2"),
+        _unit(SOURCE_GLOBAL_METHOD, "1"),
+    ]
+    gated = derive_source_global_gated_units(units, taus=(0.10,))
+    assert len(gated) == 1
+    assert gated[0].method == gated_method_name(0.10)
+    assert gated[0].selected_expert == "2"
+    assert gated[0].eligible_switch
+    assert gated[0].switched_from_global
+    assert not gated[0].same_as_global
+
+
+def test_source_global_gate_falls_back_below_threshold_and_zero_range() -> None:
+    weak_support = _custom_unit(
+        SUPPORT_NELBO_METHOD,
+        "2",
+        candidates=("1", "2", "3"),
+        scores={"1": 10.0, "2": 9.95, "3": 20.0},
+    )
+    weak_global = _custom_unit(
+        SOURCE_GLOBAL_METHOD,
+        "1",
+        candidates=("1", "2", "3"),
+        scores={"1": 10.0, "2": 9.95, "3": 20.0},
+    )
+    weak_gated = derive_source_global_gated_units([weak_support, weak_global], taus=(0.10,))
+    assert weak_gated[0].selected_expert == "1"
+    assert weak_gated[0].eligible_switch
+    assert not weak_gated[0].switched_from_global
+
+    flat_support = _custom_unit(
+        SUPPORT_NELBO_METHOD,
+        "2",
+        scores={"1": 10.0, "2": 10.0},
+    )
+    flat_global = _custom_unit(
+        SOURCE_GLOBAL_METHOD,
+        "1",
+        scores={"1": 10.0, "2": 10.0},
+    )
+    flat_gated = derive_source_global_gated_units([flat_support, flat_global], taus=(0.0,))
+    assert flat_gated[0].score_range == 0.0
+    assert flat_gated[0].normalized_gain_vs_global == 0.0
+    assert flat_gated[0].selected_expert == "1"
+
+
+def test_source_global_gate_requires_global_expert_in_support_scores() -> None:
+    support = _custom_unit(
+        SUPPORT_NELBO_METHOD,
+        "2",
+        candidates=("1", "2", "3"),
+        scores={"1": 10.0, "2": 5.0},
+    )
+    source_global = _custom_unit(
+        SOURCE_GLOBAL_METHOD,
+        "3",
+        candidates=("1", "2", "3"),
+        scores={"1": 10.0, "2": 5.0},
+    )
+    try:
+        derive_source_global_gated_units([support, source_global], taus=(0.10,))
+    except ProtocolError:
+        pass
+    else:
+        raise AssertionError("missing source-global support score was not rejected")
+
+
+def test_source_global_gated_alignment_and_oracle_gap_deltas_are_paired() -> None:
+    selections = [
+        _unit(SUPPORT_NELBO_METHOD, "2"),
+        _unit(METADATA_METHOD, "1"),
+        _unit(SOURCE_GLOBAL_METHOD, "1"),
+    ]
+    downstream = [
+        _downstream("1", 0.70, "single_expert"),
+        _downstream("2", 0.80, "single_expert"),
+    ]
+    gated_units = derive_source_global_gated_units(selections, taus=(0.10,))
+    gated_rows = build_source_global_gated_alignment_rows(
+        gated_units=gated_units,
+        downstream_rows=downstream,
+    )
+    assert len(gated_rows) == 1
+    assert gated_rows[0]["selected_expert"] == "2"
+    assert gated_rows[0]["selected_bacc"] == 0.80
+
+    baseline_rows = build_routing_alignment_rows(selections=selections, downstream_rows=downstream)
+    comparison = source_global_gated_comparison_rows(
+        gated_alignment_rows=gated_rows,
+        baseline_alignment_rows=baseline_rows,
+    )
+    assert len(comparison) == 1
+    row = comparison[0]
+    assert row["method"] == gated_method_name(0.10)
+    assert row["mean_delta_bacc_vs_source_global"] > 0
+    assert row["mean_delta_oracle_gap_vs_source_global"] > 0
+    assert row["mean_delta_bacc_vs_support_nelbo"] == 0.0
+
+
 def _unit(method: str, selected: str) -> SupportSelectionUnit:
     return SupportSelectionUnit(
         heldout_center="0",
@@ -239,6 +348,27 @@ def _unit(method: str, selected: str) -> SupportSelectionUnit:
         selected_expert=selected,
         candidate_experts=("1", "2"),
         support_nelbo_by_expert={"1": 10.0, "2": 5.0},
+        target_expert_excluded=True,
+        support_eval_split_id="target0_seed17_random_k16",
+    )
+
+
+def _custom_unit(
+    method: str,
+    selected: str,
+    *,
+    candidates: tuple[str, ...] = ("1", "2"),
+    scores: dict[str, float] | None = None,
+) -> SupportSelectionUnit:
+    return SupportSelectionUnit(
+        heldout_center="0",
+        experiment_seed=42,
+        support_size=16,
+        support_seed=17,
+        method=method,
+        selected_expert=selected,
+        candidate_experts=candidates,
+        support_nelbo_by_expert=scores or {"1": 10.0, "2": 5.0},
         target_expert_excluded=True,
         support_eval_split_id="target0_seed17_random_k16",
     )

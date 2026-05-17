@@ -34,6 +34,7 @@ SOURCE_GLOBAL_METHOD = "source_global_prior_routing"
 RANDOM_METHOD = "random_candidate_expert"
 ENSEMBLE_METHOD = "naive_all_expert_ensemble"
 DOWNSTREAM_ORACLE_METHOD = "single_expert_downstream_oracle_diagnostic_only"
+SOURCE_GLOBAL_GATED_METHOD_PREFIX = "source_global_gated_support_nelbo"
 
 SINGLE_EXPERT_METHODS = (
     SUPPORT_NELBO_METHOD,
