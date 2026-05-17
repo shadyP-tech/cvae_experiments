@@ -15,6 +15,7 @@ from cvae_downstream_evaluation.family_c import (  # noqa: E402
     load_family_c_downstream_config,
     preflight_family_c_downstream_inputs,
     run_family_c_downstream,
+    run_family_c_source_transfer_report_only,
 )
 from cvae_downstream_evaluation.protocol import ArtifactSyncError, ProtocolError  # noqa: E402
 
@@ -42,6 +43,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="During --dry-run, also require checkpoint and embedding cache files.",
     )
+    parser.add_argument(
+        "--source-transfer-report-only",
+        action="store_true",
+        help=(
+            "Reuse the existing downstream matrix and only rebuild source-transfer "
+            "selector audit, alignment, baseline comparison, and decision summary."
+        ),
+    )
     return parser
 
 
@@ -59,6 +68,10 @@ def main() -> None:
             require_heavy_artifacts=bool(args.require_heavy_artifacts),
         )
         print(json.dumps({"status": "dry_run_passed", **result}, indent=2, sort_keys=True))
+        return
+    if args.source_transfer_report_only:
+        result = run_family_c_source_transfer_report_only(config, repo_root=repo_root)
+        print(json.dumps(result, indent=2, sort_keys=True))
         return
     result = run_family_c_downstream(config, repo_root=repo_root, dry_run=False)
     print(json.dumps(result, indent=2, sort_keys=True))

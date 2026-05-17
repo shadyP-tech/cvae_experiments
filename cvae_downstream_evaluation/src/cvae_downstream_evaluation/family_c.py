@@ -42,10 +42,14 @@ FAMILY_C_WRONG_LABEL_CONTROL_MODE = "wrong_label_condition_control"
 FAMILY_C_ENSEMBLE_METHOD = "all_expert_balanced_budget_ensemble"
 FAMILY_C_ENSEMBLE_EXPERT_ID = "__ensemble__"
 FAMILY_C_NEGATIVE_CONTROL_ROW_TYPE = "negative_control"
+FAMILY_C_SOURCE_TRANSFER_METHOD = "family_c_source_transfer_downstream_prior"
+FAMILY_C_SOURCE_TRANSFER_SELECTION_SOURCE = "source_transfer_downstream_prior_loto"
+FAMILY_C_MIN_SOURCE_TRANSFER_CENTERS = 3
 
 FAMILY_C_SELECTION_METHODS = (
     FAMILY_C_PRIMARY_METHOD,
     FAMILY_C_SENSITIVITY_METHOD,
+    FAMILY_C_SOURCE_TRANSFER_METHOD,
     "metadata_routing",
     "random_expert_floor",
     "source_global_static_expert",
@@ -74,6 +78,7 @@ FAMILY_C_REQUIRED_OUTPUTS = (
     "family_c_all_expert_downstream_matrix.csv",
     "family_c_downstream_selection_alignment.csv",
     "family_c_downstream_baseline_comparison.csv",
+    "family_c_source_transfer_prior_audit.csv",
     "family_c_downstream_fidelity_diagnostics.csv",
     "family_c_label_controllability_diagnostics.csv",
     "family_c_downstream_protocol_audit.csv",
@@ -159,8 +164,39 @@ FAMILY_C_BASELINE_COLUMNS = (
     "mean_bacc",
     "mean_macro_f1",
     "mean_downstream_oracle_gap_bacc",
+    "row_level_mean_bacc",
+    "row_level_mean_macro_f1",
+    "row_level_mean_downstream_oracle_gap_bacc",
+    "center_level_mean_bacc",
+    "center_level_mean_macro_f1",
+    "center_level_mean_downstream_oracle_gap_bacc",
     "top1_downstream_oracle_hit_rate",
+    "center_level_top1_downstream_oracle_hit_rate",
     "delta_bacc_vs_family_c",
+)
+
+FAMILY_C_SOURCE_TRANSFER_AUDIT_COLUMNS = (
+    "heldout_center",
+    "candidate_expert",
+    "prior_score",
+    "prior_score_std_across_source_centers",
+    "prior_score_min_across_source_centers",
+    "prior_score_max_across_source_centers",
+    "selected_expert",
+    "n_source_centers_used",
+    "source_centers_used",
+    "n_rows_used",
+    "min_required_source_centers",
+    "coverage_ok",
+    "self_expert_excluded_from_source_prior",
+    "target_heldout_rows_used",
+    "target_eval_labels_used",
+    "uses_target_support_embeddings",
+    "uses_target_support_labels",
+    "uses_target_eval_labels_for_selection",
+    "uses_target_eval_downstream_scores_for_selection",
+    "selection_source",
+    "available",
 )
 
 FAMILY_C_PROTOCOL_AUDIT_COLUMNS = (
@@ -342,6 +378,8 @@ def assert_family_c_config_text(text: str) -> None:
         "label_conditioned_prior_sampling",
         "wrong_label_condition_control",
         "all_expert_balanced_budget_ensemble",
+        "family_c_source_transfer_downstream_prior",
+        "family_c_source_transfer_prior_audit.csv",
         "family_c_downstream_decision_summary.json",
         "support_labels_for_routing: forbidden",
         "target_eval_labels_for_training: forbidden",
@@ -768,6 +806,183 @@ def build_family_c_selection_alignment_rows(
     return out
 
 
+def build_family_c_source_transfer_prior_audit_rows(
+    *,
+    downstream_rows: Sequence[FamilyCDownstreamRow],
+    min_required_source_centers: int = FAMILY_C_MIN_SOURCE_TRANSFER_CENTERS,
+) -> list[dict[str, object]]:
+    """Estimate downstream-transfer priors without using target-heldout rows.
+
+    The prior is intentionally source-center aggregated before averaging so
+    repeated support and seed rows do not become independent evidence.
+    """
+
+    validate_family_c_downstream_matrix(downstream_rows)
+    valid_rows = [
+        row
+        for row in downstream_rows
+        if row.row_type == SINGLE_EXPERT_ROW_TYPE
+        and row.generation_mode == FAMILY_C_PRIMARY_GENERATION_MODE
+        and int(row.metric_valid_bacc) == 1
+        and str(row.candidate_expert).isdigit()
+        and not math.isnan(float(row.bacc))
+    ]
+    heldout_centers = sorted({str(row.heldout_center) for row in valid_rows}, key=lambda value: int(value))
+    candidate_experts = sorted({str(row.candidate_expert) for row in valid_rows}, key=lambda value: int(value))
+
+    raw_rows: list[dict[str, object]] = []
+    selected_by_heldout: dict[str, str] = {}
+    for heldout in heldout_centers:
+        candidate_rows: list[dict[str, object]] = []
+        for candidate in candidate_experts:
+            if candidate == heldout:
+                continue
+            by_source_center: dict[str, list[float]] = {}
+            n_rows_used = 0
+            for row in valid_rows:
+                if str(row.candidate_expert) != candidate:
+                    continue
+                if str(row.heldout_center) == heldout:
+                    continue
+                if str(row.heldout_center) == candidate:
+                    continue
+                by_source_center.setdefault(str(row.heldout_center), []).append(float(row.bacc))
+                n_rows_used += 1
+
+            source_scores = {
+                source: _nanmean(scores)
+                for source, scores in sorted(by_source_center.items(), key=lambda item: int(item[0]))
+            }
+            source_values = [value for value in source_scores.values() if not math.isnan(value)]
+            prior_score = _nanmean(source_values)
+            coverage_ok = int(len(source_values) >= int(min_required_source_centers))
+            row = {
+                "heldout_center": heldout,
+                "candidate_expert": candidate,
+                "prior_score": prior_score,
+                "prior_score_std_across_source_centers": _std(source_values),
+                "prior_score_min_across_source_centers": min(source_values) if source_values else math.nan,
+                "prior_score_max_across_source_centers": max(source_values) if source_values else math.nan,
+                "selected_expert": "",
+                "n_source_centers_used": len(source_values),
+                "source_centers_used": "|".join(sorted(source_scores, key=lambda value: int(value))),
+                "n_rows_used": int(n_rows_used),
+                "min_required_source_centers": int(min_required_source_centers),
+                "coverage_ok": coverage_ok,
+                "self_expert_excluded_from_source_prior": 1,
+                "target_heldout_rows_used": 0,
+                "target_eval_labels_used": 0,
+                "uses_target_support_embeddings": 0,
+                "uses_target_support_labels": 0,
+                "uses_target_eval_labels_for_selection": 0,
+                "uses_target_eval_downstream_scores_for_selection": 0,
+                "selection_source": FAMILY_C_SOURCE_TRANSFER_SELECTION_SOURCE,
+                "available": coverage_ok,
+            }
+            candidate_rows.append(row)
+
+        available_rows = [
+            row
+            for row in candidate_rows
+            if int(row["available"]) == 1 and not math.isnan(float(row["prior_score"]))
+        ]
+        if available_rows:
+            selected = max(
+                available_rows,
+                key=lambda row: (float(row["prior_score"]), -int(str(row["candidate_expert"]))),
+            )
+            selected_by_heldout[heldout] = str(selected["candidate_expert"])
+        else:
+            selected_by_heldout[heldout] = ""
+
+        for row in candidate_rows:
+            row["selected_expert"] = selected_by_heldout[heldout]
+            raw_rows.append(row)
+    return raw_rows
+
+
+def build_family_c_source_transfer_selection_alignment_rows(
+    *,
+    source_transfer_audit_rows: Sequence[Mapping[str, object]],
+    downstream_rows: Sequence[FamilyCDownstreamRow],
+) -> list[dict[str, object]]:
+    validate_family_c_downstream_matrix(downstream_rows)
+    oracles = compute_family_c_oracles(downstream_rows)
+    single_index = {
+        (
+            row.heldout_center,
+            row.candidate_expert,
+            row.generation_seed,
+            row.classifier_seed,
+            row.budget_per_class,
+            row.generation_mode,
+            row.support_size,
+            row.support_seed,
+            row.support_eval_split_id,
+        ): row
+        for row in downstream_rows
+        if row.row_type == SINGLE_EXPERT_ROW_TYPE
+    }
+    selected_by_heldout: dict[str, str] = {}
+    for row in source_transfer_audit_rows:
+        if int(float(row.get("available", 0) or 0)) != 1:
+            continue
+        heldout = str(row.get("heldout_center", ""))
+        selected = str(row.get("selected_expert", ""))
+        if not selected:
+            continue
+        if str(row.get("candidate_expert", "")) == selected:
+            selected_by_heldout[heldout] = selected
+
+    out: list[dict[str, object]] = []
+    for context in sorted(oracles):
+        heldout, generation_seed, classifier_seed, budget, generation_mode, support_size, support_seed, split_id = context
+        selected = selected_by_heldout.get(heldout)
+        if not selected:
+            continue
+        selected_key = (
+            heldout,
+            selected,
+            generation_seed,
+            classifier_seed,
+            budget,
+            generation_mode,
+            support_size,
+            support_seed,
+            split_id,
+        )
+        selected_row = single_index.get(selected_key)
+        if selected_row is None:
+            raise ProtocolError(f"Missing downstream row for source-transfer selected key: {selected_key}")
+        oracle = oracles[context]
+        out.append(
+            {
+                "heldout_center": heldout,
+                "method": FAMILY_C_SOURCE_TRANSFER_METHOD,
+                "selected_expert": selected,
+                "generation_seed": generation_seed,
+                "classifier_seed": classifier_seed,
+                "budget_per_class": budget,
+                "generation_mode": generation_mode,
+                "support_size": support_size,
+                "support_seed": support_seed,
+                "support_eval_split_id": split_id,
+                "selected_bacc": float(selected_row.bacc),
+                "selected_macro_f1": float(selected_row.macro_f1),
+                "downstream_oracle_expert": oracle.expert,
+                "oracle_bacc": oracle.bacc,
+                "oracle_macro_f1": oracle.macro_f1,
+                "downstream_oracle_gap_bacc": oracle.bacc - float(selected_row.bacc),
+                "downstream_oracle_gap_macro_f1": oracle.macro_f1 - float(selected_row.macro_f1),
+                "top1_downstream_oracle_hit": int(selected == oracle.expert),
+                "spearman_neg_support_score_vs_bacc": math.nan,
+                "available": 1,
+                "selection_source": FAMILY_C_SOURCE_TRANSFER_SELECTION_SOURCE,
+            }
+        )
+    return out
+
+
 def build_family_c_baseline_comparison_rows(
     *,
     alignment_rows: Sequence[Mapping[str, object]],
@@ -781,21 +996,7 @@ def build_family_c_baseline_comparison_rows(
     )
     for method in sorted({str(row.get("method", "")) for row in alignment_rows}):
         subset = [row for row in alignment_rows if str(row.get("method", "")) == method]
-        rows.append(
-            {
-                "method": method,
-                "row_type": "selection_method",
-                "mean_bacc": _nanmean(float(row["selected_bacc"]) for row in subset),
-                "mean_macro_f1": _nanmean(float(row["selected_macro_f1"]) for row in subset),
-                "mean_downstream_oracle_gap_bacc": _nanmean(
-                    float(row["downstream_oracle_gap_bacc"]) for row in subset
-                ),
-                "top1_downstream_oracle_hit_rate": _nanmean(
-                    float(row["top1_downstream_oracle_hit"]) for row in subset
-                ),
-                "delta_bacc_vs_family_c": _nanmean(float(row["selected_bacc"]) for row in subset) - primary_bacc,
-            }
-        )
+        rows.append(_selection_summary_row(method, "selection_method", subset, primary_bacc=primary_bacc))
 
     ensemble_rows = [
         row
@@ -806,21 +1007,26 @@ def build_family_c_baseline_comparison_rows(
     ]
     if ensemble_rows:
         oracles = compute_family_c_oracles(downstream_rows)
-        gaps: list[float] = []
+        ensemble_alignment_like: list[dict[str, object]] = []
         for row in ensemble_rows:
             oracle = oracles.get(row.oracle_key())
             if oracle is not None and not math.isnan(float(row.bacc)):
-                gaps.append(float(oracle.bacc) - float(row.bacc))
+                ensemble_alignment_like.append(
+                    {
+                        "heldout_center": row.heldout_center,
+                        "selected_bacc": float(row.bacc),
+                        "selected_macro_f1": float(row.macro_f1),
+                        "downstream_oracle_gap_bacc": float(oracle.bacc) - float(row.bacc),
+                        "top1_downstream_oracle_hit": math.nan,
+                    }
+                )
         rows.append(
-            {
-                "method": FAMILY_C_ENSEMBLE_METHOD,
-                "row_type": METHOD_BASELINE_ROW_TYPE,
-                "mean_bacc": _nanmean(float(row.bacc) for row in ensemble_rows),
-                "mean_macro_f1": _nanmean(float(row.macro_f1) for row in ensemble_rows),
-                "mean_downstream_oracle_gap_bacc": _nanmean(gaps),
-                "top1_downstream_oracle_hit_rate": math.nan,
-                "delta_bacc_vs_family_c": _nanmean(float(row.bacc) for row in ensemble_rows) - primary_bacc,
-            }
+            _selection_summary_row(
+                FAMILY_C_ENSEMBLE_METHOD,
+                METHOD_BASELINE_ROW_TYPE,
+                ensemble_alignment_like,
+                primary_bacc=primary_bacc,
+            )
         )
     return rows
 
@@ -897,9 +1103,246 @@ def classify_family_c_decision(
     }
 
 
+def classify_source_transfer_downstream_prior(
+    baseline_rows: Sequence[Mapping[str, object]],
+    *,
+    alignment_rows: Sequence[Mapping[str, object]],
+    source_transfer_audit_rows: Sequence[Mapping[str, object]],
+    min_mean_bacc_delta: float = 0.005,
+    min_oracle_gap_delta: float = 0.005,
+    required_centers_improved: int = 4,
+    min_center_level_mean_bacc: float = 0.70,
+) -> dict[str, object]:
+    by_method = {str(row["method"]): row for row in baseline_rows}
+    selector = by_method.get(FAMILY_C_SOURCE_TRANSFER_METHOD)
+    family_c = by_method.get(FAMILY_C_PRIMARY_METHOD)
+    source_global = by_method.get("source_global_static_expert")
+    diversity = source_transfer_diversity_diagnostics(source_transfer_audit_rows)
+    protocol_pass = _source_transfer_protocol_audit_pass(source_transfer_audit_rows)
+    if selector is None:
+        return {
+            "classification": "DIAGNOSTIC_ONLY",
+            "method": FAMILY_C_SOURCE_TRANSFER_METHOD,
+            "reason": "missing_source_transfer_selector",
+            "selector_diversity": diversity,
+        }
+    if family_c is None or source_global is None:
+        return {
+            "classification": "DIAGNOSTIC_ONLY",
+            "method": FAMILY_C_SOURCE_TRANSFER_METHOD,
+            "reason": "missing_required_comparison_methods",
+            "missing_methods": [
+                method
+                for method, row in (
+                    (FAMILY_C_PRIMARY_METHOD, family_c),
+                    ("source_global_static_expert", source_global),
+                )
+                if row is None
+            ],
+            "selector_diversity": diversity,
+        }
+
+    selector_bacc = float(selector.get("center_level_mean_bacc", math.nan))
+    selector_gap = float(selector.get("center_level_mean_downstream_oracle_gap_bacc", math.nan))
+    family_c_bacc = float(family_c.get("center_level_mean_bacc", math.nan))
+    family_c_gap = float(family_c.get("center_level_mean_downstream_oracle_gap_bacc", math.nan))
+    source_global_bacc = float(source_global.get("center_level_mean_bacc", math.nan))
+    source_global_gap = float(source_global.get("center_level_mean_downstream_oracle_gap_bacc", math.nan))
+    bacc_delta_vs_family_c = selector_bacc - family_c_bacc
+    bacc_delta_vs_source_global = selector_bacc - source_global_bacc
+    oracle_gap_improvement_vs_family_c = family_c_gap - selector_gap
+    oracle_gap_improvement_vs_source_global = source_global_gap - selector_gap
+    center_pass_count = _source_transfer_center_pass_count(
+        alignment_rows,
+        min_mean_bacc_delta=float(min_mean_bacc_delta),
+        min_oracle_gap_delta=float(min_oracle_gap_delta),
+    )
+
+    pass_thresholds = {
+        "center_level_mean_bacc_min": float(min_center_level_mean_bacc),
+        "min_mean_bacc_delta": float(min_mean_bacc_delta),
+        "min_oracle_gap_delta": float(min_oracle_gap_delta),
+        "required_centers_improved": int(required_centers_improved),
+    }
+    improves_over_family_c = (
+        bacc_delta_vs_family_c >= float(min_mean_bacc_delta)
+        and oracle_gap_improvement_vs_family_c >= float(min_oracle_gap_delta)
+    )
+    improves_over_source_global = (
+        bacc_delta_vs_source_global >= float(min_mean_bacc_delta)
+        and oracle_gap_improvement_vs_source_global >= float(min_oracle_gap_delta)
+    )
+    if (
+        protocol_pass
+        and selector_bacc >= float(min_center_level_mean_bacc)
+        and improves_over_family_c
+        and improves_over_source_global
+        and center_pass_count >= int(required_centers_improved)
+    ):
+        classification = "PASS"
+    elif protocol_pass and improves_over_family_c:
+        classification = "PROMISING_DIAGNOSTIC"
+    elif math.isnan(selector_bacc) or math.isnan(selector_gap):
+        classification = "DIAGNOSTIC_ONLY"
+    else:
+        classification = "FAIL"
+    return {
+        "classification": classification,
+        "method": FAMILY_C_SOURCE_TRANSFER_METHOD,
+        "selection_source": FAMILY_C_SOURCE_TRANSFER_SELECTION_SOURCE,
+        "role": "historical_downstream_utility_prior_not_target_adaptive_router",
+        "metrics": {
+            "center_level_mean_bacc": selector_bacc,
+            "center_level_mean_downstream_oracle_gap_bacc": selector_gap,
+            "bacc_delta_vs_family_c_label_marginal": bacc_delta_vs_family_c,
+            "bacc_delta_vs_source_global_static_expert": bacc_delta_vs_source_global,
+            "oracle_gap_improvement_vs_family_c_label_marginal": oracle_gap_improvement_vs_family_c,
+            "oracle_gap_improvement_vs_source_global_static_expert": oracle_gap_improvement_vs_source_global,
+            "center_pass_count": center_pass_count,
+            "protocol_audit_pass": int(protocol_pass),
+            **diversity,
+        },
+        "thresholds": pass_thresholds,
+        "center_pass_count_definition": (
+            "Number of held-out centers where source_transfer_downstream_prior beats both "
+            "source_global_static_expert and family_c_label_marginal on BACC and oracle gap."
+        ),
+        "claim_boundary": {
+            "allowed": (
+                "Source-transfer downstream priors can be compared against target-adaptive "
+                "label-marginal support-NELBO for selecting label-conditioned synthetic experts."
+            ),
+            "forbidden": (
+                "This selector does not prove target-specific compatibility estimation is unnecessary."
+            ),
+        },
+    }
+
+
+def source_transfer_diversity_diagnostics(
+    source_transfer_audit_rows: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    selected_by_heldout: dict[str, str] = {}
+    for row in source_transfer_audit_rows:
+        if int(float(row.get("available", 0) or 0)) != 1:
+            continue
+        heldout = str(row.get("heldout_center", ""))
+        selected = str(row.get("selected_expert", ""))
+        if selected and str(row.get("candidate_expert", "")) == selected:
+            selected_by_heldout[heldout] = selected
+    counts: dict[str, int] = {}
+    for selected in selected_by_heldout.values():
+        counts[selected] = counts.get(selected, 0) + 1
+    total = sum(counts.values())
+    entropy = -sum((count / total) * math.log(count / total) for count in counts.values()) if total else math.nan
+    most_frequent = ""
+    if counts:
+        most_frequent = sorted(counts, key=lambda key: (-counts[key], int(key)))[0]
+    return {
+        "selected_expert_entropy": entropy,
+        "num_unique_selected_experts": len(counts),
+        "most_frequent_selected_expert": most_frequent,
+    }
+
+
 def write_family_c_downstream_matrix(path: Path, rows: Sequence[FamilyCDownstreamRow]) -> None:
     validate_family_c_downstream_matrix(rows)
     _write_csv(path, FAMILY_C_DOWNSTREAM_MATRIX_COLUMNS, [row.to_csv_row() for row in rows])
+
+
+def read_family_c_downstream_matrix(path: Path) -> list[FamilyCDownstreamRow]:
+    rows: list[FamilyCDownstreamRow] = []
+    for row in _read_csv(path):
+        rows.append(
+            FamilyCDownstreamRow(
+                heldout_center=str(row["heldout_center"]),
+                candidate_expert=str(row["candidate_expert"]),
+                generation_seed=int(float(row["generation_seed"])),
+                classifier_seed=int(float(row["classifier_seed"])),
+                budget_per_class=int(float(row["budget_per_class"])),
+                generation_mode=str(row["generation_mode"]),
+                support_size=int(float(row["support_size"])),
+                support_seed=int(float(row["support_seed"])),
+                support_eval_split_id=str(row["support_eval_split_id"]),
+                eval_n=int(float(row["eval_n"])),
+                eval_class_counts=str(row["eval_class_counts"]),
+                target_eval_n_class0=int(float(row["target_eval_n_class0"])),
+                target_eval_n_class1=int(float(row["target_eval_n_class1"])),
+                target_eval_min_class_count=int(float(row["target_eval_min_class_count"])),
+                metric_valid_bacc=int(float(row["metric_valid_bacc"])),
+                metric_valid_macro_f1=int(float(row["metric_valid_macro_f1"])),
+                bacc=float(row["bacc"]),
+                macro_f1=float(row["macro_f1"]),
+                auroc=float(row.get("auroc", "nan") or "nan"),
+                auprc=float(row.get("auprc", "nan") or "nan"),
+                row_type=str(row["row_type"]),
+            )
+        )
+    validate_family_c_downstream_matrix(rows)
+    return rows
+
+
+def run_family_c_source_transfer_report_only(
+    config: FamilyCDownstreamConfig,
+    *,
+    repo_root: Path,
+) -> dict[str, object]:
+    preflight = preflight_family_c_downstream_inputs(
+        config,
+        repo_root=repo_root,
+        require_heavy_artifacts=False,
+    )
+    reports_dir = _resolve(repo_root, config.family_c_reports_dir)
+    artifacts_root = _resolve(repo_root, config.artifacts_root)
+    tables_dir = artifacts_root / "tables"
+    reports_out_dir = artifacts_root / "reports"
+    matrix_path = tables_dir / "family_c_all_expert_downstream_matrix.csv"
+    if not matrix_path.exists():
+        raise ArtifactSyncError(f"Missing existing Family C downstream matrix: {matrix_path}")
+
+    decision_rows = _read_csv(reports_dir / "label_marginal_decision_table.csv")
+    downstream_rows = read_family_c_downstream_matrix(matrix_path)
+    source_transfer_audit_rows = build_family_c_source_transfer_prior_audit_rows(
+        downstream_rows=downstream_rows,
+    )
+    alignment_rows = build_family_c_selection_alignment_rows(
+        decision_rows=decision_rows,
+        downstream_rows=downstream_rows,
+    )
+    alignment_rows.extend(
+        build_family_c_source_transfer_selection_alignment_rows(
+            source_transfer_audit_rows=source_transfer_audit_rows,
+            downstream_rows=downstream_rows,
+        )
+    )
+    baseline_rows = build_family_c_baseline_comparison_rows(
+        alignment_rows=alignment_rows,
+        downstream_rows=downstream_rows,
+    )
+    decision_summary = classify_family_c_decision(
+        baseline_rows,
+        alignment_rows=alignment_rows,
+    )
+    decision_summary["source_transfer_downstream_prior_assessment"] = classify_source_transfer_downstream_prior(
+        baseline_rows,
+        alignment_rows=alignment_rows,
+        source_transfer_audit_rows=source_transfer_audit_rows,
+    )
+
+    _write_csv(tables_dir / "family_c_source_transfer_prior_audit.csv", FAMILY_C_SOURCE_TRANSFER_AUDIT_COLUMNS, source_transfer_audit_rows)
+    _write_csv(tables_dir / "family_c_downstream_selection_alignment.csv", FAMILY_C_ALIGNMENT_COLUMNS, alignment_rows)
+    _write_csv(tables_dir / "family_c_downstream_baseline_comparison.csv", FAMILY_C_BASELINE_COLUMNS, baseline_rows)
+    _write_json(reports_out_dir / "family_c_downstream_decision_summary.json", decision_summary)
+    return {
+        "status": "source_transfer_report_complete",
+        "artifacts_root": str(artifacts_root),
+        "n_downstream_rows": len(downstream_rows),
+        "n_alignment_rows": len(alignment_rows),
+        "n_source_transfer_audit_rows": len(source_transfer_audit_rows),
+        "decision": decision_summary.get("classification"),
+        "source_transfer_decision": decision_summary["source_transfer_downstream_prior_assessment"].get("classification"),
+        **preflight,
+    }
 
 
 def run_family_c_downstream(
@@ -1141,9 +1584,18 @@ def run_family_c_downstream(
                         )
                     )
 
+    source_transfer_audit_rows = build_family_c_source_transfer_prior_audit_rows(
+        downstream_rows=downstream_rows,
+    )
     alignment_rows = build_family_c_selection_alignment_rows(
         decision_rows=decision_rows,
         downstream_rows=downstream_rows,
+    )
+    alignment_rows.extend(
+        build_family_c_source_transfer_selection_alignment_rows(
+            source_transfer_audit_rows=source_transfer_audit_rows,
+            downstream_rows=downstream_rows,
+        )
     )
     baseline_rows = build_family_c_baseline_comparison_rows(
         alignment_rows=alignment_rows,
@@ -1153,6 +1605,11 @@ def run_family_c_downstream(
         baseline_rows,
         alignment_rows=alignment_rows,
     )
+    decision_summary["source_transfer_downstream_prior_assessment"] = classify_source_transfer_downstream_prior(
+        baseline_rows,
+        alignment_rows=alignment_rows,
+        source_transfer_audit_rows=source_transfer_audit_rows,
+    )
     audit_rows = _protocol_audit_rows(protocol_rows, downstream_rows)
 
     _write_csv(manifests_dir / "family_c_downstream_generation_manifest.csv", FAMILY_C_GENERATION_MANIFEST_COLUMNS, generation_manifest)
@@ -1160,6 +1617,7 @@ def run_family_c_downstream(
     write_family_c_downstream_matrix(tables_dir / "family_c_all_expert_downstream_matrix.csv", downstream_rows)
     _write_csv(tables_dir / "family_c_downstream_selection_alignment.csv", FAMILY_C_ALIGNMENT_COLUMNS, alignment_rows)
     _write_csv(tables_dir / "family_c_downstream_baseline_comparison.csv", FAMILY_C_BASELINE_COLUMNS, baseline_rows)
+    _write_csv(tables_dir / "family_c_source_transfer_prior_audit.csv", FAMILY_C_SOURCE_TRANSFER_AUDIT_COLUMNS, source_transfer_audit_rows)
     _write_csv(tables_dir / "family_c_downstream_fidelity_diagnostics.csv", tuple(_ordered_keys(fidelity_rows)), fidelity_rows)
     _write_csv(tables_dir / "family_c_label_controllability_diagnostics.csv", tuple(_ordered_keys(controllability_rows)), controllability_rows)
     _write_csv(reports_out_dir / "family_c_downstream_protocol_audit.csv", FAMILY_C_PROTOCOL_AUDIT_COLUMNS, audit_rows)
@@ -1170,7 +1628,9 @@ def run_family_c_downstream(
         "artifacts_root": str(artifacts_root),
         "n_downstream_rows": len(downstream_rows),
         "n_alignment_rows": len(alignment_rows),
+        "n_source_transfer_audit_rows": len(source_transfer_audit_rows),
         "decision": decision_summary.get("classification"),
+        "source_transfer_decision": decision_summary["source_transfer_downstream_prior_assessment"].get("classification"),
     }
 
 
@@ -1712,6 +2172,134 @@ def _linear_mmd(a: object, b: object) -> float:
     return float(np.dot(diff, diff))
 
 
+def _selection_summary_row(
+    method: str,
+    row_type: str,
+    rows: Sequence[Mapping[str, object]],
+    *,
+    primary_bacc: float,
+) -> dict[str, object]:
+    row_level_bacc = _nanmean(float(row.get("selected_bacc", math.nan)) for row in rows)
+    row_level_macro_f1 = _nanmean(float(row.get("selected_macro_f1", math.nan)) for row in rows)
+    row_level_gap = _nanmean(float(row.get("downstream_oracle_gap_bacc", math.nan)) for row in rows)
+    row_level_hit = _nanmean(float(row.get("top1_downstream_oracle_hit", math.nan)) for row in rows)
+    center_level_bacc = _center_level_mean(rows, "selected_bacc")
+    center_level_macro_f1 = _center_level_mean(rows, "selected_macro_f1")
+    center_level_gap = _center_level_mean(rows, "downstream_oracle_gap_bacc")
+    center_level_hit = _center_level_mean(rows, "top1_downstream_oracle_hit")
+    return {
+        "method": method,
+        "row_type": row_type,
+        "mean_bacc": row_level_bacc,
+        "mean_macro_f1": row_level_macro_f1,
+        "mean_downstream_oracle_gap_bacc": row_level_gap,
+        "row_level_mean_bacc": row_level_bacc,
+        "row_level_mean_macro_f1": row_level_macro_f1,
+        "row_level_mean_downstream_oracle_gap_bacc": row_level_gap,
+        "center_level_mean_bacc": center_level_bacc,
+        "center_level_mean_macro_f1": center_level_macro_f1,
+        "center_level_mean_downstream_oracle_gap_bacc": center_level_gap,
+        "top1_downstream_oracle_hit_rate": row_level_hit,
+        "center_level_top1_downstream_oracle_hit_rate": center_level_hit,
+        "delta_bacc_vs_family_c": row_level_bacc - primary_bacc,
+    }
+
+
+def _center_level_mean(rows: Sequence[Mapping[str, object]], field: str) -> float:
+    centers = sorted({str(row.get("heldout_center", "")) for row in rows})
+    return _nanmean(
+        _nanmean(float(row.get(field, math.nan)) for row in rows if str(row.get("heldout_center", "")) == center)
+        for center in centers
+    )
+
+
+def _method_center_metrics(
+    alignment_rows: Sequence[Mapping[str, object]],
+    method: str,
+) -> dict[str, dict[str, float]]:
+    centers = sorted(
+        {
+            str(row.get("heldout_center", ""))
+            for row in alignment_rows
+            if str(row.get("method", "")) == method
+        }
+    )
+    out: dict[str, dict[str, float]] = {}
+    for center in centers:
+        subset = [
+            row
+            for row in alignment_rows
+            if str(row.get("method", "")) == method and str(row.get("heldout_center", "")) == center
+        ]
+        out[center] = {
+            "bacc": _nanmean(float(row.get("selected_bacc", math.nan)) for row in subset),
+            "gap": _nanmean(float(row.get("downstream_oracle_gap_bacc", math.nan)) for row in subset),
+        }
+    return out
+
+
+def _source_transfer_center_pass_count(
+    alignment_rows: Sequence[Mapping[str, object]],
+    *,
+    min_mean_bacc_delta: float,
+    min_oracle_gap_delta: float,
+) -> int:
+    selector = _method_center_metrics(alignment_rows, FAMILY_C_SOURCE_TRANSFER_METHOD)
+    family_c = _method_center_metrics(alignment_rows, FAMILY_C_PRIMARY_METHOD)
+    source_global = _method_center_metrics(alignment_rows, "source_global_static_expert")
+    count = 0
+    for center, selector_metrics in selector.items():
+        required = [family_c.get(center), source_global.get(center)]
+        if any(metrics is None for metrics in required):
+            continue
+        if math.isnan(selector_metrics["bacc"]) or math.isnan(selector_metrics["gap"]):
+            continue
+        passed = True
+        for baseline in required:
+            assert baseline is not None
+            if selector_metrics["bacc"] < baseline["bacc"] + float(min_mean_bacc_delta):
+                passed = False
+            if selector_metrics["gap"] > baseline["gap"] - float(min_oracle_gap_delta):
+                passed = False
+        if passed:
+            count += 1
+    return count
+
+
+def _source_transfer_protocol_audit_pass(rows: Sequence[Mapping[str, object]]) -> bool:
+    if not rows:
+        return False
+    def as_int(row: Mapping[str, object], key: str, default: int) -> int:
+        value = row.get(key, default)
+        if value in ("", None):
+            value = default
+        return int(float(value))
+
+    required_ones = ("self_expert_excluded_from_source_prior",)
+    required_zeros = (
+        "target_heldout_rows_used",
+        "target_eval_labels_used",
+        "uses_target_support_embeddings",
+        "uses_target_support_labels",
+        "uses_target_eval_labels_for_selection",
+        "uses_target_eval_downstream_scores_for_selection",
+    )
+    selected_rows: dict[str, Mapping[str, object]] = {}
+    for row in rows:
+        for key in required_ones:
+            if as_int(row, key, 0) != 1:
+                return False
+        for key in required_zeros:
+            if as_int(row, key, 1) != 0:
+                return False
+        if str(row.get("selection_source", "")) != FAMILY_C_SOURCE_TRANSFER_SELECTION_SOURCE:
+            return False
+        selected = str(row.get("selected_expert", ""))
+        if selected and str(row.get("candidate_expert", "")) == selected:
+            selected_rows[str(row.get("heldout_center", ""))] = row
+    return bool(selected_rows) and all(as_int(row, "coverage_ok", 0) == 1 for row in selected_rows.values())
+
+
 def _center_pass_count(
     alignment_rows: Sequence[Mapping[str, object]],
     *,
@@ -1809,6 +2397,14 @@ def _parse_json_list(raw: str) -> list[int]:
 def _nanmean(values: Iterable[float]) -> float:
     arr = [float(value) for value in values if not math.isnan(float(value))]
     return sum(arr) / float(len(arr)) if arr else math.nan
+
+
+def _std(values: Sequence[float]) -> float:
+    arr = [float(value) for value in values if not math.isnan(float(value))]
+    if not arr:
+        return math.nan
+    mean = sum(arr) / float(len(arr))
+    return math.sqrt(sum((value - mean) ** 2 for value in arr) / float(len(arr)))
 
 
 def _ordered_keys(rows: Sequence[Mapping[str, object]]) -> list[str]:

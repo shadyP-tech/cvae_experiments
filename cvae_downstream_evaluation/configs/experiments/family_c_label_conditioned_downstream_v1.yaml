@@ -44,11 +44,24 @@ routing:
   selected_methods:
     - family_c_label_marginal
     - family_c_label_marginal_source_global_laplace
+    - family_c_source_transfer_downstream_prior
     - metadata_routing
     - random_expert_floor
     - source_global_static_expert
     - static_embedding_mean_distance
     - family_a_direct_support_nelbo_selection
+  source_transfer_downstream_prior:
+    enabled: true
+    role: historical_downstream_utility_prior_not_target_adaptive_router
+    selection_source: source_transfer_downstream_prior_loto
+    min_required_source_centers: 3
+    aggregation: source_center_then_mean
+    exclude_target_heldout_center: true
+    exclude_self_expert_source_center: true
+    uses_target_support_embeddings: false
+    uses_target_support_labels: false
+    uses_target_eval_labels_for_selection: false
+    uses_target_eval_downstream_scores_for_selection: false
 
 generation:
   primary_mode: label_conditioned_prior_sampling
@@ -116,6 +129,7 @@ baselines:
   diagnostic_only:
     - wrong_label_condition_control
     - single_expert_downstream_oracle_diagnostic_only
+    - family_c_source_transfer_downstream_prior
 
 artifacts:
   root: cvae_downstream_evaluation/artifacts/family_c_label_conditioned_downstream_v1
@@ -125,6 +139,7 @@ artifacts:
     - tables/family_c_all_expert_downstream_matrix.csv
     - tables/family_c_downstream_selection_alignment.csv
     - tables/family_c_downstream_baseline_comparison.csv
+    - tables/family_c_source_transfer_prior_audit.csv
     - tables/family_c_downstream_fidelity_diagnostics.csv
     - tables/family_c_label_controllability_diagnostics.csv
     - reports/family_c_downstream_protocol_audit.csv
@@ -141,6 +156,18 @@ decision_rule:
     - source_global_static_expert
     - static_embedding_mean_distance
     - all_expert_balanced_budget_ensemble
+  source_transfer_downstream_prior:
+    min_center_level_mean_bacc: 0.70
+    min_mean_bacc_delta: 0.005
+    min_oracle_gap_delta: 0.005
+    required_centers_improved: 4
+    compare_against:
+      - source_global_static_expert
+      - family_c_label_marginal
+    center_pass_count_definition: >
+      Number of held-out centers where source_transfer_downstream_prior beats
+      both source_global_static_expert and family_c_label_marginal on BACC and
+      oracle gap.
 
 claim_boundary:
   allowed: >
