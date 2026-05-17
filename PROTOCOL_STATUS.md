@@ -11,6 +11,9 @@ but only protocol-safe paths are thesis-facing.
   - Required invariant: held-out target/query expert is excluded from every LOQDO candidate pool.
 - `cvae_testing/src/eval/evaluators/support_set_calibration.py`
   - Protocol: target-local support NELBO estimates use support/evaluation splits that are disjoint.
+- `cvae_support_routing/`
+  - Owns direct support-NELBO experiment configs, run scripts, report builders, tests, and tracked comparison artifacts.
+  - Protocol: moved assets preserve target-local support/evaluation separation and keep held-out NELBO utility as evaluation-only.
 - `cvae_testing/src/eval/evaluators/domain_query_oracle_gap.py`
   - Diagnostic protocol: target expert is excluded from candidate baselines; oracle values are reporting-only.
 

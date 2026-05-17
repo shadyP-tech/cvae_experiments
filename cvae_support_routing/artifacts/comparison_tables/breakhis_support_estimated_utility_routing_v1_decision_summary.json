@@ -9,7 +9,7 @@
   },
   "artifact_lineage": "This report supersedes earlier selection summaries for thesis interpretation. It does not invalidate their protocol checks; it revises the claim level based on per-k support-seed stability and alpha-selection diagnostics.",
   "cross_check_against_earlier_decision_table": {
-    "path": "results/comparison_tables/breakhis_support_estimated_utility_routing_v1_decision_table.csv",
+    "path": "artifacts/comparison_tables/breakhis_support_estimated_utility_routing_v1_decision_table.csv",
     "rows": [],
     "status": "missing"
   },

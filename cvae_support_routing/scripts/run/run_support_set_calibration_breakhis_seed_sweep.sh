@@ -3,8 +3,10 @@ set -euo pipefail
 
 # Run BreakHis LOQDO support-set utility calibration over the locked seed/backbone matrix.
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT_DIR"
+SUPPORT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "${SUPPORT_ROOT}/.." && pwd)"
+CVAE_TESTING_ROOT="${REPO_ROOT}/cvae_testing"
+cd "$CVAE_TESTING_ROOT"
 
 VENV_PYTHON="/home/stud/spark/.venvs/cvae-breakhis/bin/python"
 if [[ ! -x "$VENV_PYTHON" ]]; then
@@ -17,13 +19,13 @@ BACKBONES=(resnet18 resnet50 dinov2_vitb14)
 VARIANT="B"
 DATASET="breakhis"
 
-RAW_OUT="results/comparison_tables/support_set_calibration_loqdo_${DATASET}_raw.csv"
-STATS_OUT="results/comparison_tables/support_set_calibration_loqdo_${DATASET}_stats.csv"
-SUMMARY_OUT="results/comparison_tables/support_set_calibration_loqdo_${DATASET}_summary.json"
-DECISION_OUT="results/comparison_tables/support_set_calibration_loqdo_${DATASET}_decision.csv"
-PAIRED_OUT="results/comparison_tables/support_set_calibration_loqdo_${DATASET}_paired_deltas.csv"
-DECISION_SUMMARY_OUT="results/comparison_tables/support_set_calibration_loqdo_${DATASET}_decision_summary.json"
-MANIFEST="results/comparison_tables/support_set_calibration_run_manifest_${DATASET}_loqdo.txt"
+RAW_OUT="${SUPPORT_ROOT}/artifacts/comparison_tables/support_set_calibration_loqdo_${DATASET}_raw.csv"
+STATS_OUT="${SUPPORT_ROOT}/artifacts/comparison_tables/support_set_calibration_loqdo_${DATASET}_stats.csv"
+SUMMARY_OUT="${SUPPORT_ROOT}/artifacts/comparison_tables/support_set_calibration_loqdo_${DATASET}_summary.json"
+DECISION_OUT="${SUPPORT_ROOT}/artifacts/comparison_tables/support_set_calibration_loqdo_${DATASET}_decision.csv"
+PAIRED_OUT="${SUPPORT_ROOT}/artifacts/comparison_tables/support_set_calibration_loqdo_${DATASET}_paired_deltas.csv"
+DECISION_SUMMARY_OUT="${SUPPORT_ROOT}/artifacts/comparison_tables/support_set_calibration_loqdo_${DATASET}_decision_summary.json"
+MANIFEST="${SUPPORT_ROOT}/artifacts/comparison_tables/support_set_calibration_run_manifest_${DATASET}_loqdo.txt"
 
 RUN_DIRS=()
 shopt -s nullglob
@@ -51,22 +53,22 @@ mkdir -p "$(dirname "$MANIFEST")"
 : > "$MANIFEST"
 
 echo "[run] dataset=${DATASET} runs=${#RUN_DIRS[@]}"
-"$VENV_PYTHON" scripts/run_support_set_calibration_loqdo.py \
+"$VENV_PYTHON" "${SUPPORT_ROOT}/scripts/run/run_support_set_calibration_loqdo.py" \
   --experiment-dirs "${RUN_DIRS[@]}" \
   --variant "$VARIANT" \
   --raw-out "$RAW_OUT" \
   --stats-out "$STATS_OUT" \
   --summary-json-out "$SUMMARY_OUT"
 
-"$VENV_PYTHON" scripts/build_support_set_calibration_decision_table.py \
+"$VENV_PYTHON" "${SUPPORT_ROOT}/scripts/reports/build_support_set_calibration_decision_table.py" \
   --raw "$RAW_OUT" \
   --out "$DECISION_OUT" \
   --paired-out "$PAIRED_OUT" \
   --summary-json-out "$DECISION_SUMMARY_OUT"
 
 {
-  echo "$ROOT_DIR/$SUMMARY_OUT"
-  echo "$ROOT_DIR/$DECISION_SUMMARY_OUT"
+  echo "$SUMMARY_OUT"
+  echo "$DECISION_SUMMARY_OUT"
 } >> "$MANIFEST"
 
 echo "Completed BreakHis support-set calibration sweep."

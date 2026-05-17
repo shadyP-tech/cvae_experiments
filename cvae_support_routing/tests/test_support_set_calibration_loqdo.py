@@ -7,9 +7,11 @@ import sys
 import numpy as np
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+SUPPORT_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = SUPPORT_ROOT.parent
+CVAE_TESTING_ROOT = REPO_ROOT / "cvae_testing"
+if str(CVAE_TESTING_ROOT) not in sys.path:
+    sys.path.insert(0, str(CVAE_TESTING_ROOT))
 
 from src.eval.evaluators.support_set_calibration import (
     SupportSetRunMeta,

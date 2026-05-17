@@ -259,8 +259,8 @@
       "response_proxy_rows_available": 0
     }
   ],
-  "raw_csv": "/home/stud/spark/cvae_metadata_routing/cvae_testing/results/comparison_tables/support_set_calibration_loqdo_breakhis_raw.csv",
-  "stats_csv": "/home/stud/spark/cvae_metadata_routing/cvae_testing/results/comparison_tables/support_set_calibration_loqdo_breakhis_stats.csv",
+  "raw_csv": "/home/stud/spark/cvae_metadata_routing/cvae_support_routing/artifacts/comparison_tables/support_set_calibration_loqdo_breakhis_raw.csv",
+  "stats_csv": "/home/stud/spark/cvae_metadata_routing/cvae_support_routing/artifacts/comparison_tables/support_set_calibration_loqdo_breakhis_stats.csv",
   "n_raw_rows": 5400,
   "n_stats_rows": 15
 }

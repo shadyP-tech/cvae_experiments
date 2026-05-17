@@ -11,7 +11,9 @@ from typing import Dict, Iterable, List, Mapping, Sequence, Tuple
 import yaml
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SUPPORT_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = SUPPORT_ROOT.parent
+PROJECT_ROOT = REPO_ROOT / "cvae_testing"
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -149,9 +151,14 @@ def _load_response_proxy_lookup(path: Path | None) -> Dict[Tuple[str, int, str, 
     return out
 
 
-def _as_abs(path: str) -> Path:
+def _cvae_abs(path: str) -> Path:
     p = Path(path)
     return p if p.is_absolute() else PROJECT_ROOT / p
+
+
+def _support_abs(path: str) -> Path:
+    p = Path(path)
+    return p if p.is_absolute() else SUPPORT_ROOT / p
 
 
 def parse_args() -> argparse.Namespace:
@@ -169,15 +176,30 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pair-table-dirname", default="support_set_calibration_loqdo")
     parser.add_argument(
         "--raw-out",
-        default="results/comparison_tables/support_set_calibration_loqdo_breakhis_raw.csv",
+        default=str(
+            SUPPORT_ROOT
+            / "artifacts"
+            / "comparison_tables"
+            / "support_set_calibration_loqdo_breakhis_raw.csv"
+        ),
     )
     parser.add_argument(
         "--stats-out",
-        default="results/comparison_tables/support_set_calibration_loqdo_breakhis_stats.csv",
+        default=str(
+            SUPPORT_ROOT
+            / "artifacts"
+            / "comparison_tables"
+            / "support_set_calibration_loqdo_breakhis_stats.csv"
+        ),
     )
     parser.add_argument(
         "--summary-json-out",
-        default="results/comparison_tables/support_set_calibration_loqdo_breakhis_summary.json",
+        default=str(
+            SUPPORT_ROOT
+            / "artifacts"
+            / "comparison_tables"
+            / "support_set_calibration_loqdo_breakhis_summary.json"
+        ),
     )
     return parser.parse_args()
 
@@ -186,7 +208,7 @@ def main() -> None:
     args = parse_args()
     experiment_dirs = [Path(p) for p in args.experiment_dirs] if args.experiment_dirs else _default_experiment_dirs(PROJECT_ROOT)
     resolved_runs = [_resolve_run_dir(p if p.is_absolute() else PROJECT_ROOT / p) for p in experiment_dirs]
-    response_lookup = _load_response_proxy_lookup(_as_abs(args.response_proxy_raw) if args.response_proxy_raw else None)
+    response_lookup = _load_response_proxy_lookup(_cvae_abs(args.response_proxy_raw) if args.response_proxy_raw else None)
 
     all_rows: List[Mapping[str, object]] = []
     run_summaries: List[Dict[str, object]] = []
@@ -251,9 +273,9 @@ def main() -> None:
     )
     stats_rows = aggregate_support_set_rows(raw_rows)
 
-    raw_out = _as_abs(str(args.raw_out))
-    stats_out = _as_abs(str(args.stats_out))
-    summary_out = _as_abs(str(args.summary_json_out))
+    raw_out = _support_abs(str(args.raw_out))
+    stats_out = _support_abs(str(args.stats_out))
+    summary_out = _support_abs(str(args.summary_json_out))
     write_csv(raw_out, raw_rows)
     write_csv(stats_out, stats_rows)
     summary_out.parent.mkdir(parents=True, exist_ok=True)
