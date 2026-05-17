@@ -1,0 +1,5 @@
+heldout_scanner,heldout_scanner_model,source_scanners,candidate_expert_count,target_group_count,support_feasible_sizes,eval_group_count_after_support,dominant_tumor_fraction,dominant_lab_fraction,dominant_species_fraction,tumor_effective_count,lab_effective_count,species_effective_count,resolution_effective_count,group_feasibility,fold_classification
+0,3D Histech,1|2|3,3,199,4|8|16|32,167,0.5025125628140703,0.5728643216080402,1.0,2.646948733373438,1.958409574205034,1.0,1.0,preferred,mixed scanner/tumor/lab fold
+1,Aperio CS2,0|2|3,3,100,4|8|16|32,68,0.5,0.5,0.5,2.0,2.0,2.0,1.0,preferred,clean-ish scanner fold
+2,Hamamatsu S360,0|1|3,3,50,4|8|16|32,18,1.0,1.0,1.0,1.0,1.0,1.0,1.0,feasible_high_variance,mixed scanner/tumor/lab fold
+3,Hamamatsu XR,0|1|2,3,154,4|8|16|32,122,0.35714285714285715,1.0,1.0,2.992177643199596,1.0,1.0,1.0,preferred,mixed scanner/tumor/lab fold

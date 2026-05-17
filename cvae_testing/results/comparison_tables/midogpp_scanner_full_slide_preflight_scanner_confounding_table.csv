@@ -1,0 +1,11 @@
+scanner_domain,scanner_model,tumor_type,lab_or_origin,species,resolution,n_cases,n_groups,n_images
+0,3D Histech,canine lung cancer,VMU Vienna,Canine,unknown,44,44,44
+0,3D Histech,canine lymphoma,VMU Vienna,Canine,unknown,55,55,55
+0,3D Histech,canine soft tissue sarcoma,AMC New York,Canine,unknown,85,85,85
+0,3D Histech,canine soft tissue sarcoma,VMU Vienna,Canine,unknown,15,15,15
+1,Aperio CS2,canine cutaneous mast cell tumor,FU Berlin,Canine,unknown,50,50,50
+1,Aperio CS2,human breast cancer,UMC Utrecht,Human,unknown,50,50,50
+2,Hamamatsu S360,human breast cancer,UMC Utrecht,Human,unknown,50,50,50
+3,Hamamatsu XR,human breast cancer,UMC Utrecht,Human,unknown,50,50,50
+3,Hamamatsu XR,human melanoma,UMC Utrecht,Human,unknown,49,49,49
+3,Hamamatsu XR,human neuroendocrine tumor,UMC Utrecht,Human,unknown,55,55,55

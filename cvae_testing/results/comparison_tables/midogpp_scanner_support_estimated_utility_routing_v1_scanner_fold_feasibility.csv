@@ -1,0 +1,4 @@
+heldout_scanner,heldout_scanner_model,source_scanners,candidate_expert_count,target_group_count,support_feasible_sizes,eval_group_count_after_support,dominant_tumor_fraction,dominant_lab_fraction,dominant_species_fraction,tumor_effective_count,lab_effective_count,species_effective_count,resolution_effective_count,group_feasibility,fold_classification
+0,Aperio CS2,1|2,2,13,,0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,smoke_only,invalid for scanner-specific claim
+1,Hamamatsu S360,0|2,2,50,4|8|16|32,18,1.0,1.0,1.0,1.0,1.0,1.0,1.0,feasible_high_variance,mixed scanner/tumor/lab fold
+2,Hamammatsu XR,0|1,2,50,4|8|16|32,18,1.0,1.0,1.0,1.0,1.0,1.0,1.0,feasible_high_variance,mixed scanner/tumor/lab fold

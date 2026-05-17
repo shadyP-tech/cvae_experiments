@@ -1,0 +1,153 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="480" viewBox="0 0 1600 480" role="img" aria-labelledby="title desc">
+  <title id="title">Pairwise direct pair-prob adoption method model</title>
+  <desc id="desc">Compact slide insert for pairwise_direct_pairprob_adoption_v1: train a source-only logistic pair-probability model from source-inner NELBO preferences, select the adoption policy by source-inner validation, route held-out target queries by pairwise tournament over candidate experts, then evaluate the fixed route with held-out NELBO.</desc>
+  <defs>
+    <marker id="arrow-dark" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#111827"/>
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#e15759"/>
+    </marker>
+    <style>
+      .bg { fill: #ffffff; }
+      .label { font: 700 20px Arial, Helvetica, sans-serif; fill: #111827; }
+      .body { font: 400 16px Arial, Helvetica, sans-serif; fill: #374151; }
+      .small { font: 400 13px Arial, Helvetica, sans-serif; fill: #6b7280; }
+      .tiny { font: 400 12px Arial, Helvetica, sans-serif; fill: #6b7280; }
+      .formula { font: 700 15px Arial, Helvetica, sans-serif; fill: #111827; }
+      .panel { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.7; rx: 14; }
+      .source { fill: #eff6ff; stroke: #4e79a7; stroke-width: 2; rx: 12; }
+      .pair { fill: #eef8ed; stroke: #54a24b; stroke-width: 2; rx: 12; }
+      .model { fill: #fff4e6; stroke: #f28e2b; stroke-width: 2; rx: 12; }
+      .decision { fill: #f9fafb; stroke: #111827; stroke-width: 2; rx: 12; }
+      .eval { fill: #fdecec; stroke: #e15759; stroke-width: 2; rx: 12; }
+      .guard { fill: #f9fafb; stroke: #d1d5db; stroke-width: 1.5; rx: 12; }
+      .arrow { stroke: #111827; stroke-width: 3; fill: none; marker-end: url(#arrow-dark); }
+      .soft-arrow { stroke: #6b7280; stroke-width: 2.5; fill: none; marker-end: url(#arrow-dark); }
+      .eval-arrow { stroke: #e15759; stroke-width: 2.2; fill: none; marker-end: url(#arrow-red); }
+      .blocked { stroke: #e15759; stroke-width: 2.2; stroke-dasharray: 8 6; fill: none; }
+      .divider { stroke: #e5e7eb; stroke-width: 1.5; }
+      .chip { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.3; rx: 9; }
+      .win { fill: #54a24b; }
+      .loss { fill: #9ca3af; }
+      .prob-bg { fill: #e5e7eb; rx: 6; }
+      .prob { fill: #54a24b; rx: 6; }
+      .selected-ring { fill: none; stroke: #54a24b; stroke-width: 3; rx: 10; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1600" height="480"/>
+
+  <rect x="42" y="24" width="270" height="320" class="panel"/>
+  <text x="64" y="60" class="label">Source-inner training</text>
+  <text x="64" y="85" class="small">Outer target domain excluded</text>
+
+  <rect x="66" y="112" width="222" height="78" class="source"/>
+  <text x="88" y="144" class="label">Source query folds</text>
+  <text x="88" y="169" class="body">candidate experts only</text>
+  <text x="88" y="187" class="small">source NELBO allowed here</text>
+
+  <line x1="66" y1="214" x2="288" y2="214" class="divider"/>
+
+  <rect x="66" y="238" width="222" height="84" class="pair"/>
+  <text x="88" y="270" class="label">Pair labels</text>
+  <text x="88" y="295" class="formula">e_i beats e_j if</text>
+  <text x="88" y="315" class="formula">NELBO_i &lt; NELBO_j</text>
+
+  <rect x="362" y="24" width="270" height="320" class="model"/>
+  <text x="384" y="60" class="label">Pair-prob model</text>
+  <text x="384" y="85" class="small">logistic ridge, latent-only feature set</text>
+
+  <rect x="394" y="122" width="206" height="52" class="chip"/>
+  <text x="416" y="154" class="body">features: q, e_i, e_j</text>
+
+  <rect x="394" y="194" width="206" height="52" class="chip"/>
+  <text x="416" y="226" class="body">target: P(e_i beats e_j)</text>
+
+  <line x1="394" y1="270" x2="600" y2="270" class="divider"/>
+  <text x="394" y="301" class="small">No held-out target NELBO in fitting</text>
+  <text x="394" y="322" class="small">No eval-domain statistics in routing</text>
+
+  <rect x="682" y="24" width="270" height="320" class="pair"/>
+  <text x="704" y="60" class="label">Adoption policy</text>
+  <text x="704" y="85" class="small">source-inner validation selects policy</text>
+
+  <text x="704" y="127" class="body">Direct tournament route</text>
+  <text x="704" y="154" class="small">selected as adoption alias</text>
+
+  <rect x="704" y="172" width="220" height="78" class="selected-ring"/>
+  <text x="726" y="198" class="formula">tau = 0.001 | 0.01</text>
+  <text x="726" y="220" class="small">mean gap -> catastrophic</text>
+  <text x="726" y="239" class="small">then top-1</text>
+
+  <line x1="704" y1="266" x2="924" y2="266" class="divider"/>
+  <text x="704" y="299" class="small">sign-CI gate: strong pass</text>
+  <text x="704" y="320" class="small">selected over metadata baseline</text>
+
+  <rect x="1002" y="24" width="270" height="320" class="decision"/>
+  <text x="1024" y="60" class="label">Held-out target routing</text>
+  <text x="1024" y="85" class="small">candidate pool excludes target expert</text>
+
+  <text x="1024" y="124" class="small">pairwise tournament votes</text>
+  <line x1="1024" y1="137" x2="1248" y2="137" class="divider"/>
+
+  <text x="1030" y="170" class="body">e1 vs e2</text>
+  <rect x="1112" y="154" width="112" height="15" class="prob-bg"/>
+  <rect x="1112" y="154" width="74" height="15" class="prob"/>
+  <text x="1230" y="170" class="small">e2</text>
+
+  <text x="1030" y="210" class="body">e2 vs e3</text>
+  <rect x="1112" y="194" width="112" height="15" class="prob-bg"/>
+  <rect x="1112" y="194" width="88" height="15" class="prob"/>
+  <text x="1230" y="210" class="small">e2</text>
+
+  <text x="1030" y="250" class="body">e2 vs e4</text>
+  <rect x="1112" y="234" width="112" height="15" class="prob-bg"/>
+  <rect x="1112" y="234" width="68" height="15" class="prob"/>
+  <text x="1230" y="250" class="small">e2</text>
+
+  <line x1="1024" y1="274" x2="1248" y2="274" class="divider"/>
+  <text x="1024" y="306" class="body">Select e* by pair wins</text>
+  <text x="1024" y="327" class="small">Freeze before utility evaluation</text>
+
+  <rect x="1332" y="24" width="228" height="320" class="eval"/>
+  <text x="1354" y="60" class="label">Utility evaluation</text>
+  <text x="1354" y="92" class="body">Only after e* is fixed</text>
+  <line x1="1354" y1="118" x2="1538" y2="118" class="divider"/>
+  <text x="1354" y="152" class="body">Score true NELBO</text>
+  <text x="1354" y="177" class="body">on held-out target</text>
+  <text x="1354" y="224" class="small">Selected result:</text>
+  <text x="1372" y="250" class="small">top-1 = 0.718</text>
+  <text x="1372" y="271" class="small">Spearman = 0.766</text>
+  <text x="1372" y="292" class="small">oracle gap = 1.93%</text>
+
+  <path d="M288 280 C326 280 326 148 362 148" class="soft-arrow"/>
+  <path d="M632 184 C656 184 658 184 682 184" class="arrow"/>
+  <path d="M952 184 C980 184 982 184 1002 184" class="arrow"/>
+  <path d="M1272 184 C1304 184 1308 184 1332 184" class="arrow"/>
+
+  <path d="M1446 344 V360 H1137 V344" class="eval-arrow"/>
+  <text x="1165" y="374" class="tiny">held-out NELBO judges the fixed route only</text>
+
+  <path d="M1446 344 V362 H516 V344" class="blocked"/>
+  <circle cx="516" cy="344" r="11" fill="#ffffff" stroke="#e15759" stroke-width="2.4"/>
+  <line x1="510" y1="338" x2="522" y2="350" stroke="#e15759" stroke-width="2.4"/>
+  <line x1="522" y1="338" x2="510" y2="350" stroke="#e15759" stroke-width="2.4"/>
+  <text x="560" y="355" class="tiny">blocked: target eval NELBO cannot train, tune, or select policy</text>
+
+  <rect x="42" y="384" width="348" height="58" class="guard"/>
+  <text x="64" y="408" class="label">Source-only adoption</text>
+  <text x="64" y="430" class="small">Policy and tau selected by source-inner validation.</text>
+
+  <rect x="416" y="384" width="348" height="58" class="guard"/>
+  <text x="438" y="408" class="label">Target expert excluded</text>
+  <text x="438" y="430" class="small">Candidate pool omits the held-out target expert.</text>
+
+  <rect x="790" y="384" width="348" height="58" class="guard"/>
+  <text x="812" y="408" class="label">Routing avoids eval utility</text>
+  <text x="812" y="430" class="small">routing_uses_eval_nelbo = 0; eval stats = 0.</text>
+
+  <rect x="1164" y="384" width="396" height="58" class="guard"/>
+  <text x="1186" y="408" class="label">Claim boundary</text>
+  <text x="1186" y="430" class="small">Pair probability is proxy compatibility; final utility is held-out NELBO.</text>
+</svg>
