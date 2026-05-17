@@ -33,8 +33,14 @@ def _make_loader(
     batch_size: int,
     shuffle: bool,
     metadata_vectors: torch.Tensor | None = None,
+    class_condition_vectors: torch.Tensor | None = None,
 ) -> DataLoader:
-    dataset = TensorDataset(embeddings) if metadata_vectors is None else TensorDataset(embeddings, metadata_vectors)
+    tensors = [embeddings]
+    if metadata_vectors is not None:
+        tensors.append(metadata_vectors)
+    if class_condition_vectors is not None:
+        tensors.append(class_condition_vectors)
+    dataset = TensorDataset(*tensors)
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
 
@@ -53,7 +59,10 @@ def run_training(
     resume_from: Path | None = None,
     train_metadata_vectors: torch.Tensor | None = None,
     val_metadata_vectors: torch.Tensor | None = None,
+    train_class_condition_vectors: torch.Tensor | None = None,
+    val_class_condition_vectors: torch.Tensor | None = None,
     metadata_dim: int = 0,
+    class_condition_dim: int = 0,
     metadata_constraint_cfg: Dict[str, Any] | None = None,
     checkpoint_metadata: Dict[str, Any] | None = None,
 ) -> TrainResult:
@@ -68,6 +77,7 @@ def run_training(
         metadata_dim=int(metadata_dim),
         metadata_constraint_cfg=metadata_constraint_cfg,
         aux_metadata_dim=int(metadata_dim),
+        class_condition_dim=int(class_condition_dim),
     ).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     state_ckpt = training_state_path(ckpt)
@@ -77,18 +87,30 @@ def run_training(
         raise ValueError("train_metadata_vectors must have the same number of rows as train_embeddings")
     if val_metadata_vectors is not None and int(val_metadata_vectors.shape[0]) != int(val_embeddings.shape[0]):
         raise ValueError("val_metadata_vectors must have the same number of rows as val_embeddings")
+    if train_class_condition_vectors is not None and int(train_class_condition_vectors.shape[0]) != int(train_embeddings.shape[0]):
+        raise ValueError("train_class_condition_vectors must have the same number of rows as train_embeddings")
+    if val_class_condition_vectors is not None and int(val_class_condition_vectors.shape[0]) != int(val_embeddings.shape[0]):
+        raise ValueError("val_class_condition_vectors must have the same number of rows as val_embeddings")
+    if int(class_condition_dim) > 0 and (train_class_condition_vectors is None or val_class_condition_vectors is None):
+        raise ValueError("class_condition_vectors are required when class_condition_dim > 0")
+    if train_class_condition_vectors is not None and int(train_class_condition_vectors.shape[1]) != int(class_condition_dim):
+        raise ValueError("train_class_condition_vectors width must match class_condition_dim")
+    if val_class_condition_vectors is not None and int(val_class_condition_vectors.shape[1]) != int(class_condition_dim):
+        raise ValueError("val_class_condition_vectors width must match class_condition_dim")
 
     train_loader = _make_loader(
         train_embeddings,
         batch_size=batch_size,
         shuffle=True,
         metadata_vectors=train_metadata_vectors,
+        class_condition_vectors=train_class_condition_vectors,
     )
     val_loader = _make_loader(
         val_embeddings,
         batch_size=batch_size,
         shuffle=False,
         metadata_vectors=val_metadata_vectors,
+        class_condition_vectors=val_class_condition_vectors,
     )
 
     best_val = float("inf")
@@ -122,14 +144,14 @@ def run_training(
         train_loss = 0.0
         train_aux_loss = 0.0
         for batch in train_loader:
-            if len(batch) == 1:
-                (x,) = batch
-                m = None
-            else:
-                x, m = batch
-                m = m.to(device)
+            offset = 1
+            x = batch[0]
+            m = batch[offset].to(device) if train_metadata_vectors is not None else None
+            if train_metadata_vectors is not None:
+                offset += 1
+            y = batch[offset].to(device) if train_class_condition_vectors is not None else None
             x = x.to(device)
-            recon, mu, logvar, aux_logits = model(x, m=m, return_aux=True)
+            recon, mu, logvar, aux_logits = model(x, m=m, y=y, return_aux=True)
             prior_mu, prior_logvar, kl_weight = model.metadata_constraint_prior(metadata_targets=m)
             nelbo = negative_elbo(
                 recon,
@@ -155,14 +177,14 @@ def run_training(
         val_aux_loss = 0.0
         with torch.no_grad():
             for batch in val_loader:
-                if len(batch) == 1:
-                    (x,) = batch
-                    m = None
-                else:
-                    x, m = batch
-                    m = m.to(device)
+                offset = 1
+                x = batch[0]
+                m = batch[offset].to(device) if val_metadata_vectors is not None else None
+                if val_metadata_vectors is not None:
+                    offset += 1
+                y = batch[offset].to(device) if val_class_condition_vectors is not None else None
                 x = x.to(device)
-                recon, mu, logvar, aux_logits = model(x, m=m, return_aux=True)
+                recon, mu, logvar, aux_logits = model(x, m=m, y=y, return_aux=True)
                 prior_mu, prior_logvar, kl_weight = model.metadata_constraint_prior(metadata_targets=m)
                 nelbo = negative_elbo(
                     recon,

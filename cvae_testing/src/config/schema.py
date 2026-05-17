@@ -60,6 +60,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "learned_utility_routing_v2",
         "learned_utility_routing_safe_v2",
     }
+    is_family_c_label_marginal = experiment_name == "camelyon17_label_marginal_support_nelbo_v1"
 
     split = cfg.get("data", {}).get("split")
     if not isinstance(split, dict):
@@ -86,23 +87,23 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
     dataset_domain_semantics = data_cfg.get("dataset_domain_semantics")
     if dataset_domain_semantics is not None and not str(dataset_domain_semantics).strip():
         raise ValueError("data.dataset_domain_semantics must be non-empty when provided")
-    if is_camelyon17_support_response_protocol:
+    if is_camelyon17_support_response_protocol or is_family_c_label_marginal:
         if str(data_cfg.get("dataset_type", "")).strip().lower() != "camelyon17":
             raise ValueError(
-                "data.dataset_type must be 'camelyon17' for learned_utility_support_response_routing_v1"
+                "data.dataset_type must be 'camelyon17' for Camelyon17 support-routing protocols"
             )
         if str(data_cfg.get("domain_field", "")).strip().lower() != "center":
             raise ValueError(
-                "data.domain_field must be 'center' for learned_utility_support_response_routing_v1"
+                "data.domain_field must be 'center' for Camelyon17 support-routing protocols"
             )
         if str(data_cfg.get("legacy_domain_field_alias", "")).strip().lower() != "magnification":
             raise ValueError(
-                "data.legacy_domain_field_alias must be 'magnification' for learned_utility_support_response_routing_v1"
+                "data.legacy_domain_field_alias must be 'magnification' for Camelyon17 support-routing protocols"
             )
         if str(data_cfg.get("dataset_domain_semantics", "")).strip().lower() != "camelyon17_center":
             raise ValueError(
                 "data.dataset_domain_semantics must be 'camelyon17_center' "
-                "for learned_utility_support_response_routing_v1"
+                "for Camelyon17 support-routing protocols"
             )
     if is_breakhis_support_response_protocol:
         if str(data_cfg.get("dataset_type", "")).strip().lower() != "breakhis":
@@ -277,8 +278,46 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
     if prior_logvar_min > prior_logvar_max:
         raise ValueError("model.metadata_constraint.prior_logvar_min must be <= prior_logvar_max")
 
+    if is_family_c_label_marginal and metadata_constraint_enabled:
+        raise ValueError("Family C keeps label conditioning separate; model.metadata_constraint.enabled must be false")
     if metadata_constraint_enabled and not conditioning_enabled:
         raise ValueError("model.metadata_constraint.enabled requires model.conditioning.enabled=true in v1")
+
+    label_conditioning_cfg = model_cfg.get("label_conditioning", {})
+    if label_conditioning_cfg is not None and not isinstance(label_conditioning_cfg, dict):
+        raise ValueError("model.label_conditioning must be a dictionary when provided")
+    label_conditioning_cfg = label_conditioning_cfg or {}
+    _ensure_bool(
+        label_conditioning_cfg.get("enabled", False),
+        "model.label_conditioning.enabled",
+    )
+    label_conditioning_enabled = bool(label_conditioning_cfg.get("enabled", False))
+    label_field = str(label_conditioning_cfg.get("label_field", "label")).strip()
+    if not label_field:
+        raise ValueError("model.label_conditioning.label_field must be non-empty")
+    label_values = label_conditioning_cfg.get("label_values", [])
+    if label_values is not None:
+        if not isinstance(label_values, list):
+            raise ValueError("model.label_conditioning.label_values must be a list when provided")
+        try:
+            normalized_label_values = [int(v) for v in label_values]
+        except (TypeError, ValueError) as exc:
+            raise ValueError("model.label_conditioning.label_values must contain integer labels") from exc
+    else:
+        normalized_label_values = []
+    if label_conditioning_enabled and not normalized_label_values:
+        raise ValueError("model.label_conditioning.label_values must be non-empty when enabled")
+    if is_family_c_label_marginal:
+        if not label_conditioning_enabled:
+            raise ValueError("Family C requires model.label_conditioning.enabled=true")
+        if label_field != "label":
+            raise ValueError("Family C requires model.label_conditioning.label_field='label'")
+        if normalized_label_values != [0, 1]:
+            raise ValueError("Family C requires model.label_conditioning.label_values to be exactly [0, 1]")
+        if conditioning_enabled:
+            raise ValueError("Family C keeps label conditioning separate; model.conditioning.enabled must be false")
+        if metadata_constraint_enabled:
+            raise ValueError("Family C keeps label conditioning separate; model.metadata_constraint.enabled must be false")
 
     protocol_cfg = cfg.get("legacy_protocol")
     if protocol_cfg is not None:
@@ -960,6 +999,72 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                         "spearman_tolerance must be >= 0"
                     )
 
+        label_marginal_cfg = learned_cfg.get("label_marginal_support_nelbo", {})
+        if label_marginal_cfg is not None and not isinstance(label_marginal_cfg, dict):
+            raise ValueError("learned_utility.label_marginal_support_nelbo must be a dictionary when provided")
+        label_marginal_cfg = label_marginal_cfg or {}
+        _ensure_bool(
+            label_marginal_cfg.get("enabled", False),
+            "learned_utility.label_marginal_support_nelbo.enabled",
+        )
+        if bool(label_marginal_cfg.get("enabled", False)):
+            if not is_family_c_label_marginal:
+                raise ValueError(
+                    "learned_utility.label_marginal_support_nelbo.enabled is only supported for "
+                    "camelyon17_label_marginal_support_nelbo_v1"
+                )
+            if bool(support_response_cfg.get("enabled", False)):
+                raise ValueError(
+                    "Family C label-marginal scoring must keep support_response_routing.enabled=false"
+                )
+            support_sizes = label_marginal_cfg.get("support_sizes", [4, 8, 16, 32])
+            if not isinstance(support_sizes, list) or [int(v) for v in support_sizes] != [4, 8, 16, 32]:
+                raise ValueError(
+                    "learned_utility.label_marginal_support_nelbo.support_sizes must be exactly [4, 8, 16, 32]"
+                )
+            support_seeds = label_marginal_cfg.get("support_seeds", [17, 23, 31])
+            if not isinstance(support_seeds, list) or [int(v) for v in support_seeds] != [17, 23, 31]:
+                raise ValueError(
+                    "learned_utility.label_marginal_support_nelbo.support_seeds must be exactly [17, 23, 31]"
+                )
+            sampling_policies = label_marginal_cfg.get("sampling_policies", ["random"])
+            if not isinstance(sampling_policies, list) or [
+                str(v).strip().lower() for v in sampling_policies
+            ] != ["random"]:
+                raise ValueError(
+                    "learned_utility.label_marginal_support_nelbo.sampling_policies must be exactly ['random']; "
+                    "class-balanced support sampling is forbidden"
+                )
+
+            primary_prior = str(label_marginal_cfg.get("primary_prior", "balanced")).strip().lower()
+            sensitivity_priors = label_marginal_cfg.get("sensitivity_priors", ["source_global_laplace"])
+            if not isinstance(sensitivity_priors, list):
+                raise ValueError(
+                    "learned_utility.label_marginal_support_nelbo.sensitivity_priors must be a list"
+                )
+            normalized_priors = [primary_prior] + [str(v).strip().lower() for v in sensitivity_priors]
+            forbidden_priors = {
+                "target_support_empirical",
+                "target_eval_empirical",
+                "target_true_label_prior",
+            }
+            leaked_priors = sorted(set(normalized_priors).intersection(forbidden_priors))
+            if leaked_priors:
+                raise ValueError(
+                    "Family C forbids target empirical or true-label priors for routing: "
+                    f"{leaked_priors}"
+                )
+            if primary_prior != "balanced":
+                raise ValueError("learned_utility.label_marginal_support_nelbo.primary_prior must be 'balanced'")
+            unknown_priors = sorted(set(normalized_priors).difference({"balanced", "source_global_laplace"}))
+            if unknown_priors:
+                raise ValueError(
+                    "learned_utility.label_marginal_support_nelbo class priors must be subset of "
+                    "['balanced', 'source_global_laplace']"
+                )
+            if float(label_marginal_cfg.get("laplace_alpha", 1.0)) != 1.0:
+                raise ValueError("learned_utility.label_marginal_support_nelbo.laplace_alpha must be 1.0")
+
         scoring_cfg = learned_cfg.get("scoring", {})
         if scoring_cfg is not None and not isinstance(scoring_cfg, dict):
             raise ValueError("learned_utility.scoring must be a dictionary when provided")
@@ -1255,7 +1360,39 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             if near_tie_eps < 0:
                 raise ValueError("learned_utility.near_tie_epsilon_norm must be >= 0")
         else:
-            if is_learned_utility_v2:
+            if is_family_c_label_marginal:
+                if backbone != "dinov2_vitb14":
+                    raise ValueError(
+                        "features.backbone_type must be 'dinov2_vitb14' for Family C label-marginal routing"
+                    )
+                if int(features_cfg.get("embedding_dim", 0)) != 768:
+                    raise ValueError(
+                        "features.embedding_dim must be 768 for Family C label-marginal routing"
+                    )
+                locked_name = str(features_cfg.get("feature_extractor_name", "")).strip().lower()
+                if locked_name != "dinov2_vitb14":
+                    raise ValueError(
+                        "features.feature_extractor_name must be 'dinov2_vitb14' "
+                        "for Family C label-marginal routing"
+                    )
+                locked_checkpoint = str(features_cfg.get("feature_extractor_checkpoint", "")).strip().lower()
+                if locked_checkpoint != "facebook/dinov2-base":
+                    raise ValueError(
+                        "features.feature_extractor_checkpoint must be 'facebook/dinov2-base' "
+                        "for Family C label-marginal routing"
+                    )
+                locked_layer = str(features_cfg.get("feature_extractor_layer", "")).strip().lower()
+                if locked_layer != "final_norm_cls":
+                    raise ValueError(
+                        "features.feature_extractor_layer must be 'final_norm_cls' "
+                        "for Family C label-marginal routing"
+                    )
+                locked_pooling = str(features_cfg.get("embedding_pooling", "")).strip().lower()
+                if locked_pooling != "cls_token":
+                    raise ValueError(
+                        "features.embedding_pooling must be 'cls_token' for Family C label-marginal routing"
+                    )
+            elif is_learned_utility_v2:
                 if backbone != "dinov2_vitb14":
                     raise ValueError(
                         "features.backbone_type must be 'dinov2_vitb14' for learned_utility_routing_v2"

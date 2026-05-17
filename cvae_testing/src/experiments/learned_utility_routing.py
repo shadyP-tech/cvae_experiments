@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from src.engine.contracts import RunContext
+from src.eval.evaluators.label_marginal_support_nelbo import evaluate_label_marginal_support_nelbo
 from src.eval.evaluators.learned_utility import evaluate_learned_utility_loqdo
 from src.eval.reporting.run_summary import write_run_summary
 from src.experiments.base import BaseExperiment
@@ -54,6 +55,8 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
         )
         residual_routing_cfg = learned_cfg.get("residual_routing", {}) or {}
         support_response_cfg = learned_cfg.get("support_response_routing", {}) or {}
+        label_marginal_cfg = learned_cfg.get("label_marginal_support_nelbo", {}) or {}
+        family_c_enabled = bool(label_marginal_cfg.get("enabled", False))
         support_response_pool_scope = (
             "all_splits"
             if str(cfg.get("data", {}).get("dataset_domain_semantics", "")).strip().lower() == "midogpp_scanner"
@@ -235,6 +238,32 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
                     "experts remain excluded from routing and candidate scoring."
                     if support_response_pool_scope == "all_splits"
                     else "Support-response routing uses the test embedding split."
+                ),
+            },
+            "label_marginal_support_nelbo": {
+                "enabled": family_c_enabled,
+                "status": "DIAGNOSTIC_ONLY" if family_c_enabled else "disabled",
+                "score_name": "label_marginal_nelbo_proxy",
+                "score_direction": "lower_is_better",
+                "primary_prior": str(label_marginal_cfg.get("primary_prior", "balanced")),
+                "sensitivity_priors": _as_str_list(
+                    label_marginal_cfg.get("sensitivity_priors"),
+                    ["source_global_laplace"],
+                ),
+                "support_sizes": [
+                    int(v) for v in label_marginal_cfg.get("support_sizes", [4, 8, 16, 32])
+                ],
+                "support_seeds": [
+                    int(v) for v in label_marginal_cfg.get("support_seeds", [17, 23, 31])
+                ],
+                "sampling_policies": _as_str_list(
+                    label_marginal_cfg.get("sampling_policies"),
+                    ["random"],
+                ),
+                "support_labels_used_for_routing": 0,
+                "routing_uses_eval_score": 0,
+                "claim_boundary": (
+                    "diagnostic routing-stage compatibility only; not a downstream synthetic utility claim"
                 ),
             },
             "winner_rule": {
@@ -423,28 +452,53 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
             conditioning_cfg=cfg.get("model", {}).get("conditioning", {}),
             configured_domains=cfg.get("data", {}).get("magnifications", []),
             metadata_constraint_cfg=cfg.get("model", {}).get("metadata_constraint", {}),
+            label_conditioning_cfg=cfg.get("model", {}).get("label_conditioning", {}),
         )
         progress.advance("domain experts trained for utility scoring")
 
-        results = evaluate_learned_utility_loqdo(
-            test_cache=cache_paths["test"],
-            cache_paths=cache_paths,
-            expert_checkpoints=experts,
-            hidden_dim=int(cfg["model"]["hidden_dim"]),
-            latent_dim=int(cfg["model"]["latent_dim"]),
-            strategy=str(cfg["routing"]["strategy"]),
-            tau=float(cfg["routing"]["tau"]),
-            seed=int(cfg["seed"]),
-            learned_cfg=learned_cfg,
-            reports_dir=run_ctx.reports_dir,
-            conditioning_cfg=cfg.get("model", {}).get("conditioning", {}),
-            configured_domains=cfg.get("data", {}).get("magnifications", []),
-            metadata_constraint_cfg=cfg.get("model", {}).get("metadata_constraint", {}),
-            data_cfg=cfg.get("data", {}),
-        )
+        if family_c_enabled:
+            family_a_selection_path = label_marginal_cfg.get("family_a_selection_path")
+            results = evaluate_label_marginal_support_nelbo(
+                train_cache=cache_paths["train"],
+                test_cache=cache_paths["test"],
+                expert_checkpoints=experts,
+                hidden_dim=int(cfg["model"]["hidden_dim"]),
+                latent_dim=int(cfg["model"]["latent_dim"]),
+                strategy=str(cfg["routing"]["strategy"]),
+                tau=float(cfg["routing"]["tau"]),
+                seed=int(cfg["seed"]),
+                learned_cfg={
+                    **learned_cfg,
+                    "label_marginal_support_nelbo": {
+                        **label_marginal_cfg,
+                        "label_conditioning": cfg.get("model", {}).get("label_conditioning", {}),
+                    },
+                },
+                reports_dir=run_ctx.reports_dir,
+                batch_size=int(learned_cfg.get("scoring", {}).get("pair_batch_size", 4096)),
+                family_a_selection_path=Path(family_a_selection_path) if family_a_selection_path else None,
+            )
+            progress.advance("Family C label-marginal LOQDO evaluation complete")
+        else:
+            results = evaluate_learned_utility_loqdo(
+                test_cache=cache_paths["test"],
+                cache_paths=cache_paths,
+                expert_checkpoints=experts,
+                hidden_dim=int(cfg["model"]["hidden_dim"]),
+                latent_dim=int(cfg["model"]["latent_dim"]),
+                strategy=str(cfg["routing"]["strategy"]),
+                tau=float(cfg["routing"]["tau"]),
+                seed=int(cfg["seed"]),
+                learned_cfg=learned_cfg,
+                reports_dir=run_ctx.reports_dir,
+                conditioning_cfg=cfg.get("model", {}).get("conditioning", {}),
+                configured_domains=cfg.get("data", {}).get("magnifications", []),
+                metadata_constraint_cfg=cfg.get("model", {}).get("metadata_constraint", {}),
+                data_cfg=cfg.get("data", {}),
+            )
+            progress.advance("learned utility LOQDO evaluation complete")
         with (run_ctx.reports_dir / "learned_utility_results.json").open("w", encoding="utf-8") as f:
             json.dump(results, f, indent=2)
-        progress.advance("learned utility LOQDO evaluation complete")
 
         write_run_summary(
             reports_dir=run_ctx.reports_dir,
@@ -458,6 +512,7 @@ class LearnedUtilityRoutingExperiment(BaseExperiment):
                 "compatibility_protocol": results.get("compatibility_protocol", {}),
                 "hybrid_diagnostics": results.get("hybrid_diagnostics", {}),
                 "support_response_results": results.get("support_response_results", {}),
+                "label_marginal_support_nelbo": results if family_c_enabled else {},
             },
         )
         progress.advance("learned utility summary written")

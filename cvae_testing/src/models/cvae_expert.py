@@ -14,6 +14,7 @@ class CVAEExpert(nn.Module):
         metadata_dim: int = 0,
         metadata_constraint_cfg: dict[str, object] | None = None,
         aux_metadata_dim: int | None = None,
+        class_condition_dim: int = 0,
     ) -> None:
         super().__init__()
         self.input_dim = int(input_dim)
@@ -22,10 +23,19 @@ class CVAEExpert(nn.Module):
         self.metadata_dim = int(metadata_dim)
         if self.metadata_dim < 0:
             raise ValueError("metadata_dim must be >= 0")
+        self.class_condition_dim = int(class_condition_dim)
+        if self.class_condition_dim < 0:
+            raise ValueError("class_condition_dim must be >= 0")
 
         self.conditioning_enabled = self.metadata_dim > 0
-        enc_input_dim = self.input_dim + (self.metadata_dim if self.conditioning_enabled else 0)
-        dec_input_dim = self.latent_dim + (self.metadata_dim if self.conditioning_enabled else 0)
+        self.class_conditioning_enabled = self.class_condition_dim > 0
+        condition_dim = 0
+        if self.conditioning_enabled:
+            condition_dim += self.metadata_dim
+        if self.class_conditioning_enabled:
+            condition_dim += self.class_condition_dim
+        enc_input_dim = self.input_dim + condition_dim
+        dec_input_dim = self.latent_dim + condition_dim
 
         self.enc = nn.Linear(enc_input_dim, self.hidden_dim)
         self.fc_mu = nn.Linear(hidden_dim, latent_dim)
@@ -121,8 +131,40 @@ class CVAEExpert(nn.Module):
             )
         return torch.cat([x, m], dim=1)
 
-    def encode(self, x: torch.Tensor, m: torch.Tensor | None = None):
-        x_enc = self._concat_metadata(x, m, stage="encoder")
+    def _concat_class_condition(self, x: torch.Tensor, y: torch.Tensor | None, stage: str) -> torch.Tensor:
+        if not self.class_conditioning_enabled:
+            return x
+        if y is None:
+            raise ValueError(f"Class-condition tensor is required for conditioning at stage '{stage}'.")
+        if x.ndim != 2 or y.ndim != 2:
+            raise ValueError(
+                f"Expected 2D tensors for class conditioning at stage '{stage}', "
+                f"got x.ndim={x.ndim}, y.ndim={y.ndim}."
+            )
+        if x.shape[0] != y.shape[0]:
+            raise ValueError(
+                f"Batch-size mismatch at stage '{stage}': x has {x.shape[0]} rows, "
+                f"class condition has {y.shape[0]} rows."
+            )
+        if y.shape[1] != self.class_condition_dim:
+            raise ValueError(
+                f"Class-condition width mismatch at stage '{stage}': "
+                f"expected {self.class_condition_dim}, got {y.shape[1]}."
+            )
+        return torch.cat([x, y], dim=1)
+
+    def _concat_conditions(
+        self,
+        x: torch.Tensor,
+        m: torch.Tensor | None,
+        y: torch.Tensor | None,
+        stage: str,
+    ) -> torch.Tensor:
+        out = self._concat_metadata(x, m, stage=stage)
+        return self._concat_class_condition(out, y, stage=stage)
+
+    def encode(self, x: torch.Tensor, m: torch.Tensor | None = None, y: torch.Tensor | None = None):
+        x_enc = self._concat_conditions(x, m=m, y=y, stage="encoder")
         h = F.relu(self.enc(x_enc))
         return self.fc_mu(h), self.fc_logvar(h)
 
@@ -131,8 +173,8 @@ class CVAEExpert(nn.Module):
         eps = torch.randn_like(std)
         return mu + eps * std
 
-    def decode(self, z: torch.Tensor, m: torch.Tensor | None = None):
-        z_dec = self._concat_metadata(z, m, stage="decoder")
+    def decode(self, z: torch.Tensor, m: torch.Tensor | None = None, y: torch.Tensor | None = None):
+        z_dec = self._concat_conditions(z, m=m, y=y, stage="decoder")
         h = F.relu(self.dec1(z_dec))
         return self.dec2(h)
 
@@ -221,11 +263,12 @@ class CVAEExpert(nn.Module):
         self,
         x: torch.Tensor,
         m: torch.Tensor | None = None,
+        y: torch.Tensor | None = None,
         return_aux: bool = False,
     ):
-        mu, logvar = self.encode(x, m=m)
+        mu, logvar = self.encode(x, m=m, y=y)
         z = self.reparameterize(mu, logvar)
-        recon = self.decode(z, m=m)
+        recon = self.decode(z, m=m, y=y)
         aux_logits = self.metadata_constraint_logits(mu=mu, z=z)
         if return_aux:
             return recon, mu, logvar, aux_logits
