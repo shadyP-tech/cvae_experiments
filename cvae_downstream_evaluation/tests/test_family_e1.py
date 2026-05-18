@@ -26,13 +26,14 @@ from cvae_downstream_evaluation.family_e1 import (  # noqa: E402
     fit_family_e1_sampler_bank,
     fit_smote_interpolate_sampler,
     generate_class_balanced_batch,
+    score_family_e1_candidate,
     select_lowest_bic,
     select_source_transfer_candidate,
     source_only_kde_bandwidth,
     valid_gmm_k_candidates,
     validate_family_e1_protocol_audit,
 )
-from cvae_downstream_evaluation.matrix import EmbeddingCache  # noqa: E402
+from cvae_downstream_evaluation.matrix import EmbeddingCache, TargetEvalPool  # noqa: E402
 from cvae_downstream_evaluation.protocol import ProtocolError  # noqa: E402
 
 
@@ -239,6 +240,39 @@ def test_protocol_audit_rejects_generation_or_selection_leakage() -> None:
         raise AssertionError("Family E1 protocol audit accepted target eval labels in training")
 
 
+def test_single_class_target_eval_context_is_marked_unavailable() -> None:
+    import numpy as np
+
+    row, generated_rows, diag, clf_manifest, audit = score_family_e1_candidate(
+        sampler_bank={},
+        experiment_seed=43,
+        heldout_center="2",
+        support_unit=_support_unit("2"),
+        candidate_expert="1",
+        mode=E1_GMM_MODE,
+        budget_per_class=128,
+        generation_seed=17,
+        classifier_seed=17,
+        class_labels=(0, 1),
+        target_embeddings=np.zeros((196, 2), dtype=float),
+        target_labels=[0] * 196,
+        target_pool=TargetEvalPool(
+            eval_indices=tuple(range(196)),
+            excluded_support_sample_ids=("a", "b", "c", "d"),
+            target_eval_pool_id="target2_seed17_random_k4_test",
+        ),
+    )
+    assert row.status == "failed_single_class_target_eval"
+    assert row.available == 0
+    assert row.target_eval_label_counts_json == '{"0":196}'
+    assert row.target_eval_has_all_classes == 0
+    assert math.isnan(row.bacc)
+    assert generated_rows == ()
+    assert diag["target_eval_label_counts_json"] == '{"0":196}'
+    assert clf_manifest["target_eval_has_all_classes"] == 0
+    validate_family_e1_protocol_audit([audit])
+
+
 def _cache() -> EmbeddingCache:
     import numpy as np
 
@@ -288,6 +322,8 @@ def _row(
         n_train=256,
         n_target_eval=100,
         target_eval_pool_id="pool",
+        target_eval_label_counts_json='{"0":50,"1":50}',
+        target_eval_has_all_classes=1,
         sampler_release_level="aggregate_statistics",
         available=1,
         status="ok",
@@ -344,8 +380,27 @@ def _audit(heldout: str, expert: str, mode: str) -> dict[str, object]:
         "target_eval_embeddings_used_for_generation": 0,
         "target_eval_labels_used_for_training": 0,
         "target_eval_labels_used_for_final_metric_only": 1,
+        "target_eval_label_counts_json": '{"0":50,"1":50}',
+        "target_eval_has_all_classes": 1,
         "target_oracle_used_for_selection": 0,
         "target_heldout_rows_used_for_source_transfer_prior": 0,
         "sampler_release_level": "aggregate_statistics",
         "available": 1,
     }
+
+
+def _support_unit(heldout: str):
+    from cvae_downstream_evaluation.routing import SupportSelectionUnit
+
+    return SupportSelectionUnit(
+        heldout_center=heldout,
+        experiment_seed=43,
+        support_size=4,
+        support_seed=17,
+        method="support_set_nelbo_top1",
+        selected_expert="1",
+        candidate_experts=("0", "1", "3", "4"),
+        support_nelbo_by_expert={"0": 1.0, "1": 0.5, "3": 0.7, "4": 0.8},
+        target_expert_excluded=True,
+        support_eval_split_id=f"target{heldout}_seed17_random_k4",
+    )

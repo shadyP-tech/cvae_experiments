@@ -122,6 +122,8 @@ E1_MATRIX_COLUMNS = (
     "n_train",
     "n_target_eval",
     "target_eval_pool_id",
+    "target_eval_label_counts_json",
+    "target_eval_has_all_classes",
     "candidate_experts_hash",
     "sampler_release_level",
     "available",
@@ -198,6 +200,8 @@ E1_PROTOCOL_AUDIT_COLUMNS = (
     "target_eval_embeddings_used_for_generation",
     "target_eval_labels_used_for_training",
     "target_eval_labels_used_for_final_metric_only",
+    "target_eval_label_counts_json",
+    "target_eval_has_all_classes",
     "target_oracle_used_for_selection",
     "target_heldout_rows_used_for_source_transfer_prior",
     "sampler_release_level",
@@ -305,6 +309,8 @@ class FamilyE1MatrixRow:
     n_train: int = 0
     n_target_eval: int = 0
     target_eval_pool_id: str = ""
+    target_eval_label_counts_json: str = "{}"
+    target_eval_has_all_classes: int = 0
     candidate_experts_hash: str = "__single_expert__"
     sampler_release_level: str = ""
     available: int = 1
@@ -354,6 +360,8 @@ class FamilyE1MatrixRow:
             "n_train": self.n_train,
             "n_target_eval": self.n_target_eval,
             "target_eval_pool_id": self.target_eval_pool_id,
+            "target_eval_label_counts_json": self.target_eval_label_counts_json,
+            "target_eval_has_all_classes": self.target_eval_has_all_classes,
             "candidate_experts_hash": self.candidate_experts_hash,
             "sampler_release_level": self.sampler_release_level,
             "available": self.available,
@@ -1288,7 +1296,12 @@ def build_family_e1_all_expert_downstream_matrix(
                     support_eval_split_id=unit.support_eval_split_id,
                 )
                 target_labels = [_label(test_cache.metadata[idx]) for idx in target_pool.eval_indices]
-                if tuple(sorted(set(target_labels).union(set(config.class_labels)))) != tuple(config.class_labels):
+                if not target_labels:
+                    raise ProtocolError(
+                        f"Family E1 target eval pool is empty for seed={artifact.experiment_seed}, "
+                        f"heldout={heldout}, support_size={unit.support_size}, support_seed={unit.support_seed}"
+                    )
+                if not set(target_labels).issubset(set(config.class_labels)):
                     raise ProtocolError(
                         f"Family E1 expects target labels {config.class_labels}, got {sorted(set(target_labels))}"
                     )
@@ -1398,6 +1411,17 @@ def score_family_e1_candidate(
         candidate_hash="__single_expert__",
     )
     release_level = E1_RELEASE_LEVELS[mode]
+    target_status = validate_target_eval_class_coverage(
+        target_labels=target_labels,
+        required_class_labels=class_labels,
+    )
+    if not target_status["target_eval_has_all_classes"]:
+        return _unavailable_target_eval_result(
+            base=base,
+            release_level=release_level,
+            target_status=target_status,
+            train_source="invalid_target_eval_single_class",
+        )
     try:
         if mode == E1_REAL_SOURCE_MODE:
             batch = build_real_source_train_batch(
@@ -1428,6 +1452,8 @@ def score_family_e1_candidate(
             auroc=float(prediction.score.secondary_metrics.get("auroc", math.nan)),
             auprc=float(prediction.score.secondary_metrics.get("auprc", math.nan)),
             n_train=len(batch.labels),
+            target_eval_label_counts_json=str(target_status["target_eval_label_counts_json"]),
+            target_eval_has_all_classes=int(target_status["target_eval_has_all_classes"]),
             sampler_release_level=release_level,
         )
         diag = _context_diagnostic_row(
@@ -1438,7 +1464,12 @@ def score_family_e1_candidate(
             diagnostics=batch.diagnostics,
         )
         clf_manifest = _classifier_manifest_row(base=base, row=row, train_source="real_source_train" if mode == E1_REAL_SOURCE_MODE else "generated_embedding_sampler")
-        audit = _protocol_audit_row(base=base, release_level=release_level, available=1)
+        audit = _protocol_audit_row(
+            base=base,
+            release_level=release_level,
+            available=1,
+            target_status=target_status,
+        )
         return row, batch.generation_rows, diag, clf_manifest, audit
     except Exception as exc:
         row = FamilyE1MatrixRow(
@@ -1446,6 +1477,8 @@ def score_family_e1_candidate(
             bacc=math.nan,
             macro_f1=math.nan,
             n_train=0,
+            target_eval_label_counts_json=str(target_status["target_eval_label_counts_json"]),
+            target_eval_has_all_classes=int(target_status["target_eval_has_all_classes"]),
             sampler_release_level=release_level,
             available=0,
             status=_failure_status(exc),
@@ -1459,7 +1492,12 @@ def score_family_e1_candidate(
             diagnostics={},
         )
         clf_manifest = _classifier_manifest_row(base=base, row=row, train_source="unavailable")
-        audit = _protocol_audit_row(base=base, release_level=release_level, available=0)
+        audit = _protocol_audit_row(
+            base=base,
+            release_level=release_level,
+            available=0,
+            target_status=target_status,
+        )
         return row, tuple(), diag, clf_manifest, audit
 
 
@@ -1493,6 +1531,17 @@ def score_family_e1_gmm_same_budget_ensemble(
         row_type=E1_METHOD_BASELINE_ROW_TYPE,
         candidate_hash=candidate_hash,
     )
+    target_status = validate_target_eval_class_coverage(
+        target_labels=target_labels,
+        required_class_labels=class_labels,
+    )
+    if not target_status["target_eval_has_all_classes"]:
+        return _unavailable_target_eval_result(
+            base=base,
+            release_level=E1_RELEASE_LEVELS[E1_GMM_MODE],
+            target_status=target_status,
+            train_source="invalid_target_eval_single_class",
+        )
     try:
         allocation = allocate_family_e1_ensemble_budget(
             total_per_class=budget_per_class,
@@ -1530,6 +1579,8 @@ def score_family_e1_gmm_same_budget_ensemble(
             auroc=float(prediction.score.secondary_metrics.get("auroc", math.nan)),
             auprc=float(prediction.score.secondary_metrics.get("auprc", math.nan)),
             n_train=len(labels),
+            target_eval_label_counts_json=str(target_status["target_eval_label_counts_json"]),
+            target_eval_has_all_classes=int(target_status["target_eval_has_all_classes"]),
             sampler_release_level=E1_RELEASE_LEVELS[E1_GMM_MODE],
         )
         diag = _context_diagnostic_row(
@@ -1540,7 +1591,12 @@ def score_family_e1_gmm_same_budget_ensemble(
             diagnostics=_mean_diagnostics(diagnostics),
         )
         clf_manifest = _classifier_manifest_row(base=base, row=row, train_source="gmm_same_budget_pooled_ensemble")
-        audit = _protocol_audit_row(base=base, release_level=E1_RELEASE_LEVELS[E1_GMM_MODE], available=1)
+        audit = _protocol_audit_row(
+            base=base,
+            release_level=E1_RELEASE_LEVELS[E1_GMM_MODE],
+            available=1,
+            target_status=target_status,
+        )
         return row, tuple(generation_rows), diag, clf_manifest, audit
     except Exception as exc:
         row = FamilyE1MatrixRow(
@@ -1548,6 +1604,8 @@ def score_family_e1_gmm_same_budget_ensemble(
             bacc=math.nan,
             macro_f1=math.nan,
             n_train=0,
+            target_eval_label_counts_json=str(target_status["target_eval_label_counts_json"]),
+            target_eval_has_all_classes=int(target_status["target_eval_has_all_classes"]),
             sampler_release_level=E1_RELEASE_LEVELS[E1_GMM_MODE],
             available=0,
             status=_failure_status(exc),
@@ -1561,7 +1619,12 @@ def score_family_e1_gmm_same_budget_ensemble(
             diagnostics={},
         )
         clf_manifest = _classifier_manifest_row(base=base, row=row, train_source="unavailable")
-        audit = _protocol_audit_row(base=base, release_level=E1_RELEASE_LEVELS[E1_GMM_MODE], available=0)
+        audit = _protocol_audit_row(
+            base=base,
+            release_level=E1_RELEASE_LEVELS[E1_GMM_MODE],
+            available=0,
+            target_status=target_status,
+        )
         return row, tuple(), diag, clf_manifest, audit
 
 
@@ -1573,6 +1636,23 @@ def allocate_family_e1_ensemble_budget(*, total_per_class: int, candidate_expert
     if sum(int(v) for v in allocation.values()) > int(total_per_class):
         raise ProtocolError("Family E1 same-budget ensemble exceeds single-expert per-class budget.")
     return allocation
+
+
+def validate_target_eval_class_coverage(
+    *,
+    target_labels: Sequence[int],
+    required_class_labels: Sequence[int],
+) -> dict[str, object]:
+    counts: dict[str, int] = {}
+    for label in target_labels:
+        key = str(int(label))
+        counts[key] = counts.get(key, 0) + 1
+    required = tuple(str(int(label)) for label in sorted(int(v) for v in required_class_labels))
+    has_all = all(int(counts.get(label, 0)) > 0 for label in required)
+    return {
+        "target_eval_label_counts_json": json.dumps(counts, sort_keys=True, separators=(",", ":")),
+        "target_eval_has_all_classes": int(has_all),
+    }
 
 
 def build_family_e1_reports(
@@ -1958,6 +2038,8 @@ def validate_family_e1_matrix(rows: Sequence[FamilyE1MatrixRow]) -> None:
             raise ProtocolError(f"Unknown Family E1 row_type: {row.row_type}")
         if row.heldout_center == row.candidate_expert:
             raise ProtocolError(f"Target expert leakage in Family E1 matrix row: {key}")
+        if row.status == "ok" and int(row.available) == 1 and int(row.target_eval_has_all_classes) != 1:
+            raise ProtocolError(f"Family E1 ok matrix row lacks all target eval classes: {key}")
 
 
 def validate_family_e1_protocol_audit(rows: Sequence[Mapping[str, object]]) -> None:
@@ -1971,12 +2053,19 @@ def validate_family_e1_protocol_audit(rows: Sequence[Mapping[str, object]]) -> N
             "target_eval_embeddings_used_for_generation": int(row.get("target_eval_embeddings_used_for_generation", 1)) == 0,
             "target_eval_labels_used_for_training": int(row.get("target_eval_labels_used_for_training", 1)) == 0,
             "target_eval_labels_used_for_final_metric_only": int(row.get("target_eval_labels_used_for_final_metric_only", 0)) == 1,
+            "target_eval_has_all_classes": _audit_target_class_check(row),
             "target_oracle_used_for_selection": int(row.get("target_oracle_used_for_selection", 1)) == 0,
             "target_heldout_rows_used_for_source_transfer_prior": int(row.get("target_heldout_rows_used_for_source_transfer_prior", 1)) == 0,
         }
         failed = [key for key, ok in checks.items() if not ok]
         if failed:
             raise ProtocolError(f"Family E1 protocol audit failed fields {failed}: {row}")
+
+
+def _audit_target_class_check(row: Mapping[str, object]) -> bool:
+    if int(row.get("available", 0)) == 0:
+        return True
+    return int(row.get("target_eval_has_all_classes", 0)) == 1
 
 
 def protocol_audit_pass(rows: Sequence[Mapping[str, object]]) -> bool:
@@ -2116,12 +2205,59 @@ def _row_base(
     }
 
 
+def _unavailable_target_eval_result(
+    *,
+    base: Mapping[str, object],
+    release_level: str,
+    target_status: Mapping[str, object],
+    train_source: str,
+) -> tuple[FamilyE1MatrixRow, tuple[Mapping[str, object], ...], Mapping[str, object], Mapping[str, object], Mapping[str, object]]:
+    row = FamilyE1MatrixRow(
+        **base,
+        bacc=math.nan,
+        macro_f1=math.nan,
+        n_train=0,
+        target_eval_label_counts_json=str(target_status["target_eval_label_counts_json"]),
+        target_eval_has_all_classes=int(target_status["target_eval_has_all_classes"]),
+        sampler_release_level=release_level,
+        available=0,
+        status="failed_single_class_target_eval",
+        error_message=(
+            "Target eval pool must contain every required class before downstream "
+            f"utility scoring; observed {target_status['target_eval_label_counts_json']}."
+        ),
+    )
+    diag = _context_diagnostic_row(
+        base=base,
+        release_level=release_level,
+        available=0,
+        status=row.status,
+        diagnostics={
+            "target_eval_label_counts_json": str(target_status["target_eval_label_counts_json"]),
+            "target_eval_has_all_classes": int(target_status["target_eval_has_all_classes"]),
+        },
+    )
+    clf_manifest = _classifier_manifest_row(base=base, row=row, train_source=train_source)
+    audit = _protocol_audit_row(
+        base=base,
+        release_level=release_level,
+        available=0,
+        target_status=target_status,
+    )
+    return row, tuple(), diag, clf_manifest, audit
+
+
 def _protocol_audit_row(
     *,
     base: Mapping[str, object],
     release_level: str,
     available: int,
+    target_status: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
+    target_status = target_status or {
+        "target_eval_label_counts_json": "{}",
+        "target_eval_has_all_classes": 0,
+    }
     return {
         "experiment_seed": base["experiment_seed"],
         "heldout_center": base["heldout_center"],
@@ -2138,6 +2274,8 @@ def _protocol_audit_row(
         "target_eval_embeddings_used_for_generation": 0,
         "target_eval_labels_used_for_training": 0,
         "target_eval_labels_used_for_final_metric_only": 1,
+        "target_eval_label_counts_json": str(target_status["target_eval_label_counts_json"]),
+        "target_eval_has_all_classes": int(target_status["target_eval_has_all_classes"]),
         "target_oracle_used_for_selection": 0,
         "target_heldout_rows_used_for_source_transfer_prior": 0,
         "sampler_release_level": release_level,
@@ -2170,6 +2308,8 @@ def _classifier_manifest_row(
         "n_train": row.n_train,
         "n_target_eval": row.n_target_eval,
         "target_eval_pool_id": row.target_eval_pool_id,
+        "target_eval_label_counts_json": row.target_eval_label_counts_json,
+        "target_eval_has_all_classes": row.target_eval_has_all_classes,
         "status": row.status,
         "available": row.available,
     }
@@ -2391,6 +2531,8 @@ def _e1_row_from_csv(row: Mapping[str, str]) -> FamilyE1MatrixRow:
         n_train=int(row.get("n_train") or 0),
         n_target_eval=int(row.get("n_target_eval") or 0),
         target_eval_pool_id=str(row.get("target_eval_pool_id") or ""),
+        target_eval_label_counts_json=str(row.get("target_eval_label_counts_json") or "{}"),
+        target_eval_has_all_classes=int(row.get("target_eval_has_all_classes") or 0),
         candidate_experts_hash=str(row.get("candidate_experts_hash") or "__single_expert__"),
         sampler_release_level=str(row.get("sampler_release_level") or ""),
         available=int(row.get("available") or 0),
@@ -2502,6 +2644,8 @@ def _classifier_manifest_columns() -> tuple[str, ...]:
         "n_train",
         "n_target_eval",
         "target_eval_pool_id",
+        "target_eval_label_counts_json",
+        "target_eval_has_all_classes",
         "status",
         "available",
     )
@@ -2521,6 +2665,8 @@ def _diagnostic_columns() -> tuple[str, ...]:
         "sampler_release_level",
         "available",
         "status",
+        "target_eval_label_counts_json",
+        "target_eval_has_all_classes",
         "n_source_train",
         "embedding_dim",
         "gmm_selected_k",
@@ -2553,7 +2699,7 @@ def _diagnostic_columns() -> tuple[str, ...]:
 
 
 def _blank_diagnostics() -> dict[str, object]:
-    return {column: math.nan for column in _diagnostic_columns() if column not in {
+    blank = {column: math.nan for column in _diagnostic_columns() if column not in {
         "experiment_seed",
         "heldout_center",
         "support_size",
@@ -2567,7 +2713,10 @@ def _blank_diagnostics() -> dict[str, object]:
         "available",
         "status",
         "gmm_bic_by_k",
+        "target_eval_label_counts_json",
     }} | {"gmm_bic_by_k": "{}"}
+    blank["target_eval_label_counts_json"] = "{}"
+    return blank
 
 
 def _baseline_columns() -> tuple[str, ...]:
