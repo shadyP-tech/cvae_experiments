@@ -1,0 +1,177 @@
+experiment:
+  name: family_e1_direct_embedding_sampler_downstream_v1
+  stage: second_stage_downstream_diagnostic
+  status: locked_v1_ready_for_synced_artifacts
+  thesis_chapter: 6
+  primary_question: >
+    Is the downstream ceiling caused by the CVAE decoder, or by
+    source-target mismatch / synthetic-only classification limits?
+  diagnostic_family: non_cvae_direct_embedding_sampler
+
+protocol:
+  split_regime: LOQDO
+  family_c_support_eval_splits: reused
+  target_expert_exclusion: required
+  sampler_fit_split: source_train
+  target_labels_used_for_sampler_fit: forbidden
+  target_support_labels_used_for_generation: forbidden
+  target_eval_embeddings_used_for_generation: forbidden
+  target_eval_labels_used_for_training: forbidden
+  target_eval_labels_used_for_final_metric_only: required
+  target_oracle_used_for_selection: forbidden
+  downstream_oracle_role: diagnostic_only
+  claim_boundary: >
+    Family E1 is diagnostic and non-CVAE. It must not be presented as
+    replacing Family C/C2 support-NELBO routing or CVAE experts.
+
+datasets:
+  camelyon17:
+    enabled: true
+    domain_key: center
+    candidate_domains: [0, 1, 2, 3, 4]
+    experiment_seeds: [42, 43, 44]
+    support_sizes: [4, 8, 16, 32]
+    support_seeds: [17, 23, 31]
+    generation_seeds: [17, 23, 31]
+    classifier_seeds: [17, 23, 31]
+
+support_inputs:
+  selection_glob: cvae_testing/outputs/camelyon17/camelyon17_support_estimated_utility_routing_v2/support_utility_v2_seed*/reports/support_response_sample_selections.csv
+  family_c_split_source: support_response_sample_selections.csv
+
+samplers:
+  modes:
+    - family_e1_class_conditional_gmm_diag_bic
+    - family_e1_class_conditional_kde_gaussian
+    - family_e1_class_conditional_smote_interpolate
+    - family_e1_source_bootstrap_upper_bound
+    - real_source_train_classifier_baseline
+  release_levels:
+    gmm_diag_bic: aggregate_statistics
+    kde_gaussian: per_sample_source_bank
+    smote_interpolate: per_sample_source_bank
+    source_bootstrap_upper_bound: per_sample_source_bank
+    real_source_train_classifier_baseline: real_source_non_synthetic
+  pca_before_sampler:
+    enabled: false
+    n_components: 64
+  gmm_diag_bic:
+    covariance_type: diag
+    k_candidates: [1, 2, 4, 8]
+    valid_k_min_samples: 32
+    valid_k_samples_per_component: 8
+    selection_rule: lowest_bic_over_valid_k
+    reg_covar: 1e-4
+    fallback: unavailable
+  kde_gaussian:
+    bandwidth_source: source_train_only
+    min_bandwidth: 1e-6
+  smote_interpolate:
+    source: source_train_only
+    jitter_scale: 0.01
+
+generation:
+  object: direct_dino_embedding
+  labels: [0, 1]
+  class_prior: class_balanced
+  budget_per_class: 128
+  target_support_labels_used_for_generation: false
+  same_budget_ensemble:
+    primary: gmm_only_across_candidate_experts
+    total_per_class_budget: 128
+
+downstream:
+  primary_track: synthetic_only
+  classifier:
+    family: sklearn_logistic_regression
+    scaler_fit: synthetic_train_only
+    solver: lbfgs
+    C: 1.0
+    max_iter: 2000
+    class_weight: null
+    hyperparameter_tuning: forbidden
+  primary_metrics:
+    - bacc
+    - macro_f1
+  secondary_metrics:
+    - auroc
+    - auprc
+
+selection:
+  primary_selector: family_e1_gmm_source_transfer_expert_prior
+  sensitivity_selector: family_e1_source_transfer_sampler_expert_prior
+  primary_selector_modes:
+    - family_e1_class_conditional_gmm_diag_bic
+  sensitivity_selector_modes:
+    - family_e1_class_conditional_gmm_diag_bic
+    - family_e1_class_conditional_kde_gaussian
+    - family_e1_class_conditional_smote_interpolate
+  source_transfer_prior:
+    target_heldout_rows_used: false
+    aggregate_by_source_heldout_center_first: true
+    source_center_score: mean_bacc_for_mode_expert_on_source_center
+    prior_score: mean_over_source_centers_where_source_not_target_and_source_not_expert
+  tie_break:
+    score: descending_prior_score
+    mode_order:
+      - family_e1_class_conditional_gmm_diag_bic
+      - family_e1_class_conditional_kde_gaussian
+      - family_e1_class_conditional_smote_interpolate
+    expert_order: ascending_expert_id
+
+baselines:
+  required:
+    - C2 source-transfer selector
+    - C2 fixed-expert oracle
+    - C3 fixed mode+expert oracle
+    - Family D fixed-expert oracle
+    - Family C label-marginal selector
+    - metadata/static/random/source-global baselines
+    - GMM-only same-budget ensemble
+    - bootstrap upper bound
+    - real-source train upper bound
+
+external_comparisons:
+  c2_artifacts_root: cvae_downstream_evaluation/artifacts
+
+artifacts:
+  root: cvae_downstream_evaluation/artifacts/family_e1_direct_embedding_sampler_downstream_v1
+  required_outputs:
+    - family_e1_sampler_provenance.csv
+    - family_e1_sampler_diagnostics.csv
+    - family_e1_generation_manifest.csv
+    - family_e1_trained_classifier_manifest.csv
+    - family_e1_all_expert_downstream_matrix.csv
+    - family_e1_downstream_selection_alignment.csv
+    - family_e1_downstream_baseline_comparison.csv
+    - family_e1_source_transfer_sampler_prior_audit.csv
+    - family_e1_generation_mode_comparison_vs_c2.csv
+    - family_e1_downstream_protocol_audit.csv
+    - family_e1_downstream_decision_summary.json
+
+decision_rule:
+  aggregation: center_level_mean
+  downstream_strong:
+    gmm_selected_center_level_mean_bacc_gte: 0.80
+    gmm_selected_delta_vs_c2_gte: 0.02
+    oracle_gap_worsening_vs_c2_lte: 0.005
+    protocol_audit_pass: 1
+  generation_oracle_strong:
+    gmm_fixed_expert_oracle_center_level_mean_bacc_gte: 0.80
+  generation_improved:
+    gmm_oracle_delta_vs_c2_oracle_gte: 0.01
+    or_gmm_selected_delta_vs_c2_selected_gte: 0.005
+    protocol_audit_pass: 1
+    downstream_strong_not_met: true
+  sensitivity_strong:
+    kde_or_smote_mode_expert_selector_gte: 0.80
+    gmm_only_selector_lt: 0.80
+  bootstrap_only_upper_bound:
+    bootstrap_or_real_source_train_gte: 0.80
+    gmm_kde_smote_lt: 0.80
+  selector_bottleneck:
+    gmm_kde_smote_oracle_gte: 0.80
+    selected_e1_lt: 0.80
+  otherwise:
+    classification: DIAGNOSTIC_ONLY
+    pass_fail: FAIL

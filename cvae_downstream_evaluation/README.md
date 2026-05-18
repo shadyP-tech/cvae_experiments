@@ -69,6 +69,12 @@ Locked v1 scope:
 
 Defer source-only augmentation, few-shot target augmentation, and corruption robustness until the primary downstream transfer question has a stable answer.
 
+## Diagnostic Baseline: Family E1
+
+`family_e1_direct_embedding_sampler_downstream_v1` is a non-CVAE diagnostic family. It keeps independently fitted source-center experts, but replaces the CVAE decoder with direct class-conditional DINO embedding samplers fit on source-train rows only.
+
+GMM with diagonal covariance and BIC-selected component count is the primary thesis-facing E1 mode. KDE, SMOTE, source bootstrap, and real-source train rows are sensitivity or upper-bound diagnostics only.
+
 ## Non-Negotiable Protocol
 
 - Candidate expert pool excludes the held-out target/query expert under LOQDO/LODO.
