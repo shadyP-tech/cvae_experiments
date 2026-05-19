@@ -1,0 +1,148 @@
+experiment:
+  name: family_e1_1_pca64_gmm_direct_embedding_sampler_downstream_v1
+  stage: second_stage_downstream_diagnostic
+  status: locked_v1_ready_for_smoke
+  thesis_chapter: 6
+  primary_question: >
+    Did high-dimensional DINO geometry / low sample-to-dimension ratio make
+    aggregate diagonal GMM look weak in Family E1 v1?
+  diagnostic_family: non_cvae_pca64_direct_embedding_sampler
+
+protocol:
+  split_regime: LOQDO
+  family_c_support_eval_splits: reused
+  target_expert_exclusion: required
+  sampler_fit_split: source_train
+  pca_fit_split: source_train
+  pca_source_only: required
+  target_labels_used_for_sampler_fit: forbidden
+  target_support_labels_used_for_generation: forbidden
+  target_eval_embeddings_used_for_generation: forbidden
+  target_eval_labels_used_for_training: forbidden
+  target_eval_labels_used_for_final_metric_only: required
+  target_oracle_used_for_selection: forbidden
+  downstream_oracle_role: diagnostic_only
+  claim_boundary: >
+    Family E1.1 is diagnostic and non-CVAE. It must not be presented as
+    replacing Family C/C2 support-NELBO routing or CVAE experts.
+
+datasets:
+  camelyon17:
+    enabled: true
+    domain_key: center
+    candidate_domains: [0, 1, 2, 3, 4]
+    experiment_seeds: [42, 43, 44]
+    support_sizes: [4, 8, 16, 32]
+    support_seeds: [17, 23, 31]
+    generation_seeds: [17, 23, 31]
+    classifier_seeds: [17, 23, 31]
+
+support_inputs:
+  selection_glob: cvae_testing/outputs/camelyon17/camelyon17_support_estimated_utility_routing_v2/support_utility_v2_seed*/reports/support_response_sample_selections.csv
+  family_c_split_source: support_response_sample_selections.csv
+
+samplers:
+  modes:
+    - family_e1_1_pca64_class_conditional_gmm_diag_bic
+  release_levels:
+    pca64_gmm_diag_bic: aggregate_statistics
+  pca_before_sampler:
+    enabled: true
+    n_components: 64
+    whiten: false
+    svd_solver: randomized
+    availability_rule: n_source_train_matching_class >= 65 and embedding_dim >= 64
+  gmm_diag_bic:
+    covariance_type: diag
+    k_candidates: [1, 2, 4, 8]
+    valid_k_min_samples: 32
+    valid_k_samples_per_component: 8
+    selection_rule: lowest_bic_over_valid_k
+    reg_covar: 1e-4
+    n_init: 1
+    max_iter: 100
+    init_params: kmeans
+    fallback: unavailable
+
+generation:
+  object: pca64_inverse_transformed_dino_embedding
+  labels: [0, 1]
+  class_prior: class_balanced
+  budget_per_class: 128
+  target_support_labels_used_for_generation: false
+  same_budget_ensemble:
+    primary: pca64_gmm_only_across_candidate_experts
+    total_per_class_budget: 128
+
+downstream:
+  primary_track: synthetic_only
+  classifier:
+    family: sklearn_logistic_regression
+    scaler_fit: synthetic_train_only
+    solver: lbfgs
+    C: 1.0
+    max_iter: 2000
+    class_weight: null
+    hyperparameter_tuning: forbidden
+  primary_metrics:
+    - bacc
+    - macro_f1
+  secondary_metrics:
+    - auroc
+    - auprc
+
+selection:
+  primary_selector: family_e1_1_pca64_gmm_source_transfer_expert_prior
+  primary_selector_modes:
+    - family_e1_1_pca64_class_conditional_gmm_diag_bic
+  source_transfer_prior:
+    target_heldout_rows_used: false
+    aggregate_by_source_heldout_center_first: true
+    source_center_score: mean_bacc_for_pca64_gmm_expert_on_source_center
+    prior_score: mean_over_source_centers_where_source_not_target_and_source_not_expert
+  tie_break:
+    score: descending_prior_score
+    mode_order:
+      - family_e1_1_pca64_class_conditional_gmm_diag_bic
+    expert_order: ascending_expert_id
+
+baselines:
+  required:
+    - E1 v1 GMM source-transfer selector reference
+    - E1 v1 GMM fixed-expert oracle reference
+    - PCA-GMM same-budget ensemble
+
+external_comparisons:
+  c2_artifacts_root: cvae_downstream_evaluation/artifacts
+
+artifacts:
+  root: cvae_downstream_evaluation/artifacts/family_e1_1_pca64_gmm_direct_embedding_sampler_downstream_v1
+  required_outputs:
+    - family_e1_sampler_provenance.csv
+    - family_e1_sampler_diagnostics.csv
+    - family_e1_generation_manifest.csv
+    - family_e1_trained_classifier_manifest.csv
+    - family_e1_all_expert_downstream_matrix.csv
+    - family_e1_downstream_selection_alignment.csv
+    - family_e1_downstream_baseline_comparison.csv
+    - family_e1_source_transfer_sampler_prior_audit.csv
+    - family_e1_generation_mode_comparison_vs_c2.csv
+    - family_e1_downstream_protocol_audit.csv
+    - family_e1_downstream_decision_summary.json
+
+decision_rule:
+  aggregation: center_level_mean
+  pass:
+    protocol_audit_pass: 1
+    all_required_center_class_sampler_rows_available: true
+    pass_aggregation_full_expected_center_set: true
+    selected_center_level_mean_bacc_gte: 0.80
+    selected_delta_vs_e1_v1_gmm_selected_gte: 0.01
+  pca_gmm_oracle_strong:
+    oracle_center_level_mean_bacc_gte: 0.80
+    selected_center_level_mean_bacc_lt: 0.80
+  partial:
+    any_required_center_class_sampler_unavailable: DIAGNOSTIC_PARTIAL
+  otherwise:
+    classification: DIAGNOSTIC_NEGATIVE
+    pass_fail: FAIL

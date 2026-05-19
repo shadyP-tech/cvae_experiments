@@ -48,22 +48,29 @@ from .schemas import (
 
 
 FAMILY_E1_NAME = "family_e1_direct_embedding_sampler_downstream_v1"
+FAMILY_E1_1_NAME = "family_e1_1_pca64_gmm_direct_embedding_sampler_downstream_v1"
 
 E1_GMM_MODE = "family_e1_class_conditional_gmm_diag_bic"
 E1_KDE_MODE = "family_e1_class_conditional_kde_gaussian"
 E1_SMOTE_MODE = "family_e1_class_conditional_smote_interpolate"
 E1_BOOTSTRAP_MODE = "family_e1_source_bootstrap_upper_bound"
 E1_REAL_SOURCE_MODE = "real_source_train_classifier_baseline"
+E1_1_GMM_MODE = "family_e1_1_pca64_class_conditional_gmm_diag_bic"
 
 E1_SYNTHETIC_MODES = (E1_GMM_MODE, E1_KDE_MODE, E1_SMOTE_MODE)
 E1_ALL_MODES = E1_SYNTHETIC_MODES + (E1_BOOTSTRAP_MODE, E1_REAL_SOURCE_MODE)
 E1_PRIMARY_GMM_MODES = (E1_GMM_MODE,)
 E1_SENSITIVITY_MODES = (E1_GMM_MODE, E1_KDE_MODE, E1_SMOTE_MODE)
+E1_1_ALL_MODES = (E1_1_GMM_MODE,)
+E1_SELECTOR_ELIGIBLE_MODES = E1_SENSITIVITY_MODES + E1_1_ALL_MODES
 
 E1_GMM_SELECTOR = "family_e1_gmm_source_transfer_expert_prior"
 E1_SAMPLER_SELECTOR = "family_e1_source_transfer_sampler_expert_prior"
+E1_1_GMM_SELECTOR = "family_e1_1_pca64_gmm_source_transfer_expert_prior"
 E1_GMM_ENSEMBLE_METHOD = "family_e1_gmm_same_budget_ensemble"
+E1_1_GMM_ENSEMBLE_METHOD = "family_e1_1_pca64_gmm_same_budget_ensemble"
 E1_GMM_ORACLE_METHOD = "family_e1_gmm_fixed_expert_oracle"
+E1_1_GMM_ORACLE_METHOD = "family_e1_1_pca64_gmm_fixed_expert_oracle"
 E1_SAMPLER_ORACLE_METHOD = "family_e1_fixed_mode_expert_oracle"
 E1_BOOTSTRAP_ORACLE_METHOD = "family_e1_bootstrap_upper_bound_oracle"
 E1_REAL_SOURCE_ORACLE_METHOD = "family_e1_real_source_train_upper_bound_oracle"
@@ -73,15 +80,18 @@ E1_SINGLE_EXPERT_ROW_TYPE = "single_expert_sampler"
 E1_METHOD_BASELINE_ROW_TYPE = "method_baseline"
 E1_DIAGNOSTIC_UPPER_BOUND_ROW_TYPE = "diagnostic_upper_bound"
 E1_SCHEMA_VERSION = "family_e1_direct_embedding_sampler_downstream_v1"
+E1_1_SCHEMA_VERSION = "family_e1_1_pca64_gmm_direct_embedding_sampler_downstream_v1"
 
 E1_MODE_ORDER = {
     E1_GMM_MODE: 0,
     E1_KDE_MODE: 1,
     E1_SMOTE_MODE: 2,
+    E1_1_GMM_MODE: 0,
 }
 
 E1_RELEASE_LEVELS = {
     E1_GMM_MODE: "aggregate_statistics",
+    E1_1_GMM_MODE: "aggregate_statistics",
     E1_KDE_MODE: "per_sample_source_bank",
     E1_SMOTE_MODE: "per_sample_source_bank",
     E1_BOOTSTRAP_MODE: "per_sample_source_bank",
@@ -204,6 +214,12 @@ E1_PROTOCOL_AUDIT_COLUMNS = (
     "target_eval_has_all_classes",
     "target_oracle_used_for_selection",
     "target_heldout_rows_used_for_source_transfer_prior",
+    "pca_fit_split",
+    "pca_source_only",
+    "pca_inverse_transform_used",
+    "pca_gmm_lineage_key",
+    "generated_lineage_key",
+    "classifier_lineage_key",
     "sampler_release_level",
     "available",
 )
@@ -211,6 +227,8 @@ E1_PROTOCOL_AUDIT_COLUMNS = (
 
 @dataclass(frozen=True)
 class FamilyE1Config:
+    experiment_name: str
+    schema_version: str
     dataset_name: str
     domain_key: str
     candidate_domains: tuple[str, ...]
@@ -226,6 +244,7 @@ class FamilyE1Config:
     artifacts_root: str
     pca_enabled: bool
     pca_n_components: int
+    pca_whiten: bool
     gmm_k_candidates: tuple[int, ...]
     gmm_reg_covar: float
     gmm_valid_min_samples: int
@@ -334,7 +353,7 @@ class FamilyE1MatrixRow:
     def is_selector_eligible(self) -> bool:
         return (
             self.row_type == E1_SINGLE_EXPERT_ROW_TYPE
-            and self.generation_mode in E1_SENSITIVITY_MODES
+            and self.generation_mode in E1_SELECTOR_ELIGIBLE_MODES
             and self.status == "ok"
             and int(self.available) == 1
         )
@@ -389,6 +408,8 @@ class SourceTransferSelection:
 
 def default_family_e1_config() -> FamilyE1Config:
     return FamilyE1Config(
+        experiment_name=FAMILY_E1_NAME,
+        schema_version=E1_SCHEMA_VERSION,
         dataset_name="camelyon17",
         domain_key="center",
         candidate_domains=CAMELYON17_CENTERS,
@@ -411,6 +432,7 @@ def default_family_e1_config() -> FamilyE1Config:
         ),
         pca_enabled=False,
         pca_n_components=64,
+        pca_whiten=False,
         gmm_k_candidates=(1, 2, 4, 8),
         gmm_reg_covar=1e-4,
         gmm_valid_min_samples=32,
@@ -421,13 +443,47 @@ def default_family_e1_config() -> FamilyE1Config:
     )
 
 
+def default_family_e1_1_config() -> FamilyE1Config:
+    base = default_family_e1_config()
+    return FamilyE1Config(
+        experiment_name=FAMILY_E1_1_NAME,
+        schema_version=E1_1_SCHEMA_VERSION,
+        dataset_name=base.dataset_name,
+        domain_key=base.domain_key,
+        candidate_domains=base.candidate_domains,
+        experiment_seeds=base.experiment_seeds,
+        support_sizes=base.support_sizes,
+        support_seeds=base.support_seeds,
+        generation_seeds=base.generation_seeds,
+        classifier_seeds=base.classifier_seeds,
+        class_labels=base.class_labels,
+        budget_per_class=base.budget_per_class,
+        modes=E1_1_ALL_MODES,
+        support_selection_glob=base.support_selection_glob,
+        artifacts_root=(
+            "cvae_downstream_evaluation/artifacts/"
+            "family_e1_1_pca64_gmm_direct_embedding_sampler_downstream_v1"
+        ),
+        pca_enabled=True,
+        pca_n_components=64,
+        pca_whiten=False,
+        gmm_k_candidates=base.gmm_k_candidates,
+        gmm_reg_covar=base.gmm_reg_covar,
+        gmm_valid_min_samples=base.gmm_valid_min_samples,
+        gmm_valid_samples_per_component=base.gmm_valid_samples_per_component,
+        kde_min_bandwidth=base.kde_min_bandwidth,
+        smote_jitter_scale=base.smote_jitter_scale,
+        c2_artifacts_root=base.c2_artifacts_root,
+    )
+
+
 def load_family_e1_config(path: Path) -> FamilyE1Config:
     text = Path(path).read_text(encoding="utf-8")
     assert_family_e1_config_text(text)
     try:
         import yaml  # type: ignore
     except ModuleNotFoundError:
-        return default_family_e1_config()
+        return default_family_e1_1_config() if f"name: {FAMILY_E1_1_NAME}" in text else default_family_e1_config()
     loaded = yaml.safe_load(text) or {}
     if not isinstance(loaded, Mapping):
         raise ProtocolError("Family E1 config must decode to a mapping.")
@@ -435,6 +491,13 @@ def load_family_e1_config(path: Path) -> FamilyE1Config:
 
 
 def assert_family_e1_config_text(text: str) -> None:
+    if f"name: {FAMILY_E1_1_NAME}" in text:
+        _assert_family_e1_1_config_text(text)
+        return
+    _assert_family_e1_v1_config_text(text)
+
+
+def _assert_family_e1_v1_config_text(text: str) -> None:
     required = (
         f"name: {FAMILY_E1_NAME}",
         E1_GMM_MODE,
@@ -464,6 +527,40 @@ def assert_family_e1_config_text(text: str) -> None:
     present = [snippet for snippet in forbidden if snippet in text]
     if present:
         raise ProtocolError(f"Family E1 config contains forbidden fields: {', '.join(present)}")
+
+
+def _assert_family_e1_1_config_text(text: str) -> None:
+    required = (
+        f"name: {FAMILY_E1_1_NAME}",
+        E1_1_GMM_MODE,
+        "covariance_type: diag",
+        "k_candidates: [1, 2, 4, 8]",
+        "reg_covar: 1e-4",
+        "n_init: 1",
+        "max_iter: 100",
+        "init_params: kmeans",
+        "budget_per_class: 128",
+        "enabled: true",
+        "n_components: 64",
+        "whiten: false",
+        E1_1_GMM_SELECTOR,
+        "pca64_gmm_diag_bic: aggregate_statistics",
+    )
+    missing = [snippet for snippet in required if snippet not in text]
+    if missing:
+        raise ProtocolError(f"Family E1.1 config missing locked fields: {', '.join(missing)}")
+    forbidden = (
+        "conditional_cvae_decoder",
+        "support_labels_for_generation: required",
+        "target_eval_labels_for_selection",
+        E1_KDE_MODE,
+        E1_SMOTE_MODE,
+        E1_BOOTSTRAP_MODE,
+        E1_REAL_SOURCE_MODE,
+    )
+    present = [snippet for snippet in forbidden if snippet in text]
+    if present:
+        raise ProtocolError(f"Family E1.1 config contains forbidden fields: {', '.join(present)}")
 
 
 def valid_gmm_k_candidates(
@@ -503,6 +600,8 @@ def fit_family_e1_sampler_bank(
             for mode in config.modes:
                 if mode == E1_GMM_MODE:
                     result = fit_gmm_diag_bic_sampler(source, config=config, random_state=random_state)
+                elif mode == E1_1_GMM_MODE:
+                    result = fit_pca64_gmm_diag_bic_sampler(source, config=config, random_state=random_state)
                 elif mode == E1_KDE_MODE:
                     result = fit_kde_gaussian_sampler(source, config=config)
                 elif mode == E1_SMOTE_MODE:
@@ -576,8 +675,12 @@ def fit_gmm_diag_bic_sampler(
             source_sample_ids=source.sample_ids,
             diagnostics={
                 **base,
+                "gmm_k_candidates": json.dumps([int(k) for k in config.gmm_k_candidates]),
+                "gmm_valid_k": json.dumps([int(k) for k in valid]),
                 "gmm_selected_k": "",
                 "gmm_bic_by_k": "{}",
+                "gmm_converged_by_k": "{}",
+                "gmm_n_iter_by_k": "{}",
                 "gmm_converged": 0,
                 "gmm_n_iter": 0,
                 "gmm_min_component_weight": math.nan,
@@ -593,16 +696,23 @@ def fit_gmm_diag_bic_sampler(
 
     models: dict[int, Any] = {}
     bic_by_k: dict[int, float] = {}
+    converged_by_k: dict[int, bool] = {}
+    n_iter_by_k: dict[int, int] = {}
     for k in valid:
         model = GaussianMixture(
             n_components=int(k),
             covariance_type="diag",
             reg_covar=float(config.gmm_reg_covar),
             random_state=int(random_state),
+            n_init=1,
+            max_iter=100,
+            init_params="kmeans",
         )
         model.fit(x)
         models[int(k)] = model
         bic_by_k[int(k)] = float(model.bic(x))
+        converged_by_k[int(k)] = bool(getattr(model, "converged_", False))
+        n_iter_by_k[int(k)] = int(getattr(model, "n_iter_", 0))
     selected_k = select_lowest_bic(bic_by_k)
     selected = models[selected_k]
     covariances = _as_numpy_2d(selected.covariances_)
@@ -620,14 +730,228 @@ def fit_gmm_diag_bic_sampler(
         source_sample_ids=source.sample_ids,
         diagnostics={
             **base,
+            "gmm_k_candidates": json.dumps([int(k) for k in config.gmm_k_candidates]),
+            "gmm_valid_k": json.dumps([int(k) for k in valid]),
             "gmm_selected_k": int(selected_k),
             "gmm_bic_by_k": json.dumps({str(k): float(v) for k, v in sorted(bic_by_k.items())}, sort_keys=True),
+            "gmm_converged_by_k": json.dumps({str(k): bool(v) for k, v in sorted(converged_by_k.items())}, sort_keys=True),
+            "gmm_n_iter_by_k": json.dumps({str(k): int(v) for k, v in sorted(n_iter_by_k.items())}, sort_keys=True),
             "gmm_converged": int(bool(getattr(selected, "converged_", False))),
             "gmm_n_iter": int(getattr(selected, "n_iter_", 0)),
             "gmm_min_component_weight": float(weights.min()) if weights.size else math.nan,
             "gmm_cov_min": float(covariances.min()) if covariances.size else math.nan,
             "gmm_cov_max": float(covariances.max()) if covariances.size else math.nan,
         },
+    )
+
+
+def fit_pca64_gmm_diag_bic_sampler(
+    source: SourceClassData,
+    *,
+    config: FamilyE1Config,
+    random_state: int = 0,
+) -> SamplerFitResult:
+    x = _as_numpy_2d(source.embeddings)
+    n, dim = _shape2(x)
+    mode = E1_1_GMM_MODE
+    release_level = E1_RELEASE_LEVELS[mode]
+    pca_seed = stable_family_e1_seed("e1_1_pca64", random_state, source.source_center, source.class_label)
+    gmm_seed = stable_family_e1_seed("e1_1_gmm", random_state, source.source_center, source.class_label)
+    base = {
+        **_base_fit_diagnostics(source, mode=mode, embedding_dim=dim),
+        **_blank_pca_diagnostics(),
+        "pca_available": 0,
+        "pca_fit_n_samples": n,
+        "pca_fit_embedding_dim": dim,
+        "pca_rank_upper_bound": max(0, min(n - 1, dim)),
+        "pca_random_state": int(pca_seed),
+        "gmm_random_state": int(gmm_seed),
+        "gmm_k_candidates": json.dumps([int(k) for k in config.gmm_k_candidates]),
+        "pca_inverse_transform_used": 1,
+        "pca_inverse_transform_exact_inverse": 0,
+        "synthetic_space_for_gmm": "pca64",
+        "synthetic_space_for_classifier": "original_embedding_after_pca_inverse_transform",
+    }
+    if not bool(config.pca_enabled):
+        return _unavailable_pca64_gmm_fit(
+            source=source,
+            x=x,
+            release_level=release_level,
+            diagnostics=base,
+            reason="pca_disabled_for_e1_1",
+        )
+    if int(config.pca_n_components) != 64:
+        return _unavailable_pca64_gmm_fit(
+            source=source,
+            x=x,
+            release_level=release_level,
+            diagnostics=base,
+            reason="pca_n_components_not_64",
+        )
+    if n < 65:
+        return _unavailable_pca64_gmm_fit(
+            source=source,
+            x=x,
+            release_level=release_level,
+            diagnostics=base,
+            reason="too_few_source_train_samples_for_pca64",
+        )
+    if dim < 64:
+        return _unavailable_pca64_gmm_fit(
+            source=source,
+            x=x,
+            release_level=release_level,
+            diagnostics=base,
+            reason="embedding_dim_less_than_64",
+        )
+    try:
+        from sklearn.decomposition import PCA  # type: ignore
+        from sklearn.mixture import GaussianMixture  # type: ignore
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("Family E1.1 PCA-GMM sampler requires scikit-learn.") from exc
+
+    try:
+        pca = PCA(
+            n_components=64,
+            svd_solver="randomized",
+            whiten=False,
+            random_state=int(pca_seed),
+        )
+        x_pca = pca.fit_transform(x)
+        reconstructed = pca.inverse_transform(x_pca)
+        mse = float(_np().mean((x - reconstructed) ** 2))
+        centered_mse = float(_np().mean((x - _np().mean(x, axis=0, keepdims=True)) ** 2))
+        rel_mse = mse / centered_mse if centered_mse > 0.0 else math.nan
+    except Exception:
+        return _unavailable_pca64_gmm_fit(
+            source=source,
+            x=x,
+            release_level=release_level,
+            diagnostics=base,
+            reason="pca_fit_error",
+        )
+
+    singular = _as_numpy_1d(getattr(pca, "singular_values_", []))
+    rank_tol = float(max(x.shape) * _np().finfo(float).eps * float(singular.max())) if singular.size else 0.0
+    retained_rank = int(_np().sum(singular > rank_tol)) if singular.size else 0
+    valid = valid_gmm_k_candidates(
+        int(x_pca.shape[0]),
+        config.gmm_k_candidates,
+        min_samples=config.gmm_valid_min_samples,
+        samples_per_component=config.gmm_valid_samples_per_component,
+    )
+    pca_diag = {
+        **base,
+        "pca_available": 1,
+        "pca_unavailable_reason": "",
+        "pca_retained_rank_estimate": retained_rank,
+        "pca_explained_variance_ratio_sum": float(_np().sum(getattr(pca, "explained_variance_ratio_", []))),
+        "pca_reconstruction_mse_source_train": mse,
+        "pca_reconstruction_relative_mse_source_train": rel_mse,
+        "gmm_valid_k": json.dumps([int(k) for k in valid]),
+    }
+    if not valid:
+        return _unavailable_pca64_gmm_fit(
+            source=source,
+            x=x,
+            release_level=release_level,
+            diagnostics=pca_diag,
+            reason="gmm_fit_error_after_pca",
+        )
+
+    try:
+        models: dict[int, Any] = {}
+        bic_by_k: dict[int, float] = {}
+        converged_by_k: dict[int, bool] = {}
+        n_iter_by_k: dict[int, int] = {}
+        for k in valid:
+            model = GaussianMixture(
+                n_components=int(k),
+                covariance_type="diag",
+                reg_covar=float(config.gmm_reg_covar),
+                random_state=int(gmm_seed),
+                n_init=1,
+                max_iter=100,
+                init_params="kmeans",
+            )
+            model.fit(x_pca)
+            models[int(k)] = model
+            bic_by_k[int(k)] = float(model.bic(x_pca))
+            converged_by_k[int(k)] = bool(getattr(model, "converged_", False))
+            n_iter_by_k[int(k)] = int(getattr(model, "n_iter_", 0))
+        selected_k = select_lowest_bic(bic_by_k)
+        selected = models[selected_k]
+        covariances = _as_numpy_2d(selected.covariances_)
+        weights = _as_numpy_1d(selected.weights_)
+    except Exception:
+        return _unavailable_pca64_gmm_fit(
+            source=source,
+            x=x,
+            release_level=release_level,
+            diagnostics=pca_diag,
+            reason="gmm_fit_error_after_pca",
+        )
+
+    return SamplerFitResult(
+        mode=mode,
+        source_center=source.source_center,
+        class_label=source.class_label,
+        n_source_train=n,
+        embedding_dim=dim,
+        available=True,
+        release_level=release_level,
+        model={"pca": pca, "gmm": selected},
+        source_embeddings=x,
+        source_sample_ids=source.sample_ids,
+        diagnostics={
+            **pca_diag,
+            "gmm_selected_k": int(selected_k),
+            "gmm_bic_by_k": json.dumps({str(k): float(v) for k, v in sorted(bic_by_k.items())}, sort_keys=True),
+            "gmm_converged_by_k": json.dumps({str(k): bool(v) for k, v in sorted(converged_by_k.items())}, sort_keys=True),
+            "gmm_n_iter_by_k": json.dumps({str(k): int(v) for k, v in sorted(n_iter_by_k.items())}, sort_keys=True),
+            "gmm_converged": int(bool(getattr(selected, "converged_", False))),
+            "gmm_n_iter": int(getattr(selected, "n_iter_", 0)),
+            "gmm_min_component_weight": float(weights.min()) if weights.size else math.nan,
+            "gmm_cov_min": float(covariances.min()) if covariances.size else math.nan,
+            "gmm_cov_max": float(covariances.max()) if covariances.size else math.nan,
+        },
+    )
+
+
+def _unavailable_pca64_gmm_fit(
+    *,
+    source: SourceClassData,
+    x: Any,
+    release_level: str,
+    diagnostics: Mapping[str, object],
+    reason: str,
+) -> SamplerFitResult:
+    return SamplerFitResult(
+        mode=E1_1_GMM_MODE,
+        source_center=source.source_center,
+        class_label=source.class_label,
+        n_source_train=int(x.shape[0]),
+        embedding_dim=int(x.shape[1]) if x.ndim == 2 else 0,
+        available=False,
+        release_level=release_level,
+        model=None,
+        source_embeddings=x,
+        source_sample_ids=source.sample_ids,
+        diagnostics={
+            **diagnostics,
+            "pca_available": 0,
+            "pca_unavailable_reason": reason,
+            "gmm_selected_k": "",
+            "gmm_bic_by_k": "{}",
+            "gmm_converged_by_k": "{}",
+            "gmm_n_iter_by_k": "{}",
+            "gmm_converged": 0,
+            "gmm_n_iter": 0,
+            "gmm_min_component_weight": math.nan,
+            "gmm_cov_min": math.nan,
+            "gmm_cov_max": math.nan,
+        },
+        error_message=reason,
     )
 
 
@@ -770,6 +1094,22 @@ def generate_from_sampler(
     if fit.mode == E1_GMM_MODE:
         generated, _ = fit.model.sample(int(n_samples))
         return np.asarray(generated, dtype=float), {"smote_alpha_mean": math.nan}
+    if fit.mode == E1_1_GMM_MODE:
+        sample_seed = stable_family_e1_seed("e1_1_gmm_sample", fit.source_center, fit.class_label, seed)
+        pca = (fit.model or {}).get("pca")
+        gmm = (fit.model or {}).get("gmm")
+        if pca is None or gmm is None:
+            raise ProtocolError("E1.1 PCA-GMM sampler cannot fall back to original-space GMM.")
+        generated_pca = sample_diag_gmm_parameters(gmm, n_samples=int(n_samples), seed=int(sample_seed))
+        generated = pca.inverse_transform(generated_pca)
+        return np.asarray(generated, dtype=float), {
+            "smote_alpha_mean": math.nan,
+            "gmm_sample_random_state": int(sample_seed),
+            "pca_inverse_transform_used": 1,
+            "pca_inverse_transform_exact_inverse": 0,
+            "synthetic_space_for_gmm": "pca64",
+            "synthetic_space_for_classifier": "original_embedding_after_pca_inverse_transform",
+        }
     if fit.mode == E1_KDE_MODE:
         generated = fit.model.sample(int(n_samples), random_state=int(seed))
         return np.asarray(generated, dtype=float), {"smote_alpha_mean": math.nan}
@@ -801,6 +1141,9 @@ def generate_class_balanced_batch(
     class_labels: Sequence[int],
     budget_per_class: int,
     generation_seed: int,
+    experiment_seed: object = "",
+    support_size: object = "",
+    support_seed: object = "",
 ) -> GeneratedBatch:
     np = _np()
     chunks: list[Any] = []
@@ -819,7 +1162,7 @@ def generate_class_balanced_batch(
         labels.extend([int(class_label)] * int(budget_per_class))
         real_by_class[int(class_label)] = _as_numpy_2d(fit.source_embeddings)
         for key, value in diag.items():
-            if key not in extra_diag or math.isnan(float(extra_diag.get(key, math.nan))):
+            if key not in extra_diag or _is_nan_like(extra_diag.get(key)):
                 extra_diag[key] = value
         generation_rows.append(
             {
@@ -833,6 +1176,18 @@ def generate_class_balanced_batch(
                 "sampler_release_level": fit.release_level,
                 "available": int(fit.available),
                 "source_sample_ids_hash": _hash_values(fit.source_sample_ids),
+                "pca_inverse_transform_used": diag.get("pca_inverse_transform_used", ""),
+                "synthetic_space_for_gmm": diag.get("synthetic_space_for_gmm", ""),
+                "synthetic_space_for_classifier": diag.get("synthetic_space_for_classifier", ""),
+                "gmm_sample_random_state": diag.get("gmm_sample_random_state", ""),
+                "sampler_lineage_key": sampler_lineage_key(
+                    experiment_seed=experiment_seed,
+                    source_center=source_center,
+                    class_label=class_label,
+                    support_size=support_size,
+                    support_seed=support_seed,
+                    generation_seed=generation_seed,
+                ),
             }
         )
     embeddings = np.vstack(chunks) if chunks else np.empty((0, 0), dtype=float)
@@ -990,10 +1345,7 @@ def build_family_e1_alignment_rows(
     for context in contexts:
         _, heldout, _, _, _, _ = context
         candidates = candidate_experts_for_heldout(candidate_domains, heldout)
-        selector_specs = (
-            (E1_GMM_SELECTOR, E1_PRIMARY_GMM_MODES),
-            (E1_SAMPLER_SELECTOR, E1_SENSITIVITY_MODES),
-        )
+        selector_specs = _selector_specs_for_rows(rows)
         for selector, modes in selector_specs:
             prior = family_e1_source_transfer_prior(
                 rows,
@@ -1059,7 +1411,8 @@ def build_family_e1_baseline_comparison_rows(
 ) -> list[dict[str, object]]:
     c2 = dict(c2_comparison or {})
     output: list[dict[str, object]] = []
-    for selector in (E1_GMM_SELECTOR, E1_SAMPLER_SELECTOR):
+    e1_1 = _rows_are_e1_1(rows)
+    for selector, _ in _selector_specs_for_rows(rows):
         subset = [row for row in alignment_rows if row.get("selector") == selector]
         output.append(
             _comparison_row(
@@ -1071,12 +1424,15 @@ def build_family_e1_baseline_comparison_rows(
                 available=1 if subset else 0,
             )
         )
-    oracle_specs = (
-        (E1_GMM_ORACLE_METHOD, (E1_GMM_MODE,)),
-        (E1_SAMPLER_ORACLE_METHOD, E1_SENSITIVITY_MODES),
-        (E1_BOOTSTRAP_ORACLE_METHOD, (E1_BOOTSTRAP_MODE,)),
-        (E1_REAL_SOURCE_ORACLE_METHOD, (E1_REAL_SOURCE_MODE,)),
-    )
+    if e1_1:
+        oracle_specs = ((E1_1_GMM_ORACLE_METHOD, (E1_1_GMM_MODE,)),)
+    else:
+        oracle_specs = (
+            (E1_GMM_ORACLE_METHOD, (E1_GMM_MODE,)),
+            (E1_SAMPLER_ORACLE_METHOD, E1_SENSITIVITY_MODES),
+            (E1_BOOTSTRAP_ORACLE_METHOD, (E1_BOOTSTRAP_MODE,)),
+            (E1_REAL_SOURCE_ORACLE_METHOD, (E1_REAL_SOURCE_MODE,)),
+        )
     for method, modes in oracle_specs:
         oracle_rows = _oracle_rows_by_context(rows, modes=modes)
         output.append(
@@ -1094,7 +1450,7 @@ def build_family_e1_baseline_comparison_rows(
     ]
     output.append(
         _comparison_row(
-            method=E1_GMM_ENSEMBLE_METHOD,
+            method=E1_1_GMM_ENSEMBLE_METHOD if e1_1 else E1_GMM_ENSEMBLE_METHOD,
             row_type=E1_METHOD_BASELINE_ROW_TYPE,
             mean_bacc=center_level_mean(ensemble_rows, metric="bacc"),
             mean_macro_f1=center_level_mean(ensemble_rows, metric="macro_f1"),
@@ -1130,6 +1486,13 @@ def classify_family_e1_decision(
     protocol_audit_rows: Sequence[Mapping[str, object]],
     c2_metrics: Mapping[str, float] | None = None,
 ) -> dict[str, object]:
+    if _rows_are_e1_1(rows):
+        return classify_family_e1_1_decision(
+            rows=rows,
+            alignment_rows=alignment_rows,
+            protocol_audit_rows=protocol_audit_rows,
+            c2_metrics=c2_metrics,
+        )
     c2 = dict(c2_metrics or {})
     protocol_pass = int(protocol_audit_pass(protocol_audit_rows))
     gmm_selected = [row for row in alignment_rows if row.get("selector") == E1_GMM_SELECTOR]
@@ -1229,6 +1592,69 @@ def classify_family_e1_decision(
     }
 
 
+def classify_family_e1_1_decision(
+    *,
+    rows: Sequence[FamilyE1MatrixRow],
+    alignment_rows: Sequence[Mapping[str, object]],
+    protocol_audit_rows: Sequence[Mapping[str, object]],
+    c2_metrics: Mapping[str, float] | None = None,
+) -> dict[str, object]:
+    metrics = dict(c2_metrics or {})
+    protocol_pass = int(protocol_audit_pass(protocol_audit_rows))
+    selected = [row for row in alignment_rows if row.get("selector") == E1_1_GMM_SELECTOR]
+    selected_bacc = center_level_mean(selected, metric="selected_bacc")
+    selected_gap = center_level_mean(selected, metric="oracle_gap_bacc")
+    oracle_rows = _oracle_rows_by_context(rows, modes=(E1_1_GMM_MODE,))
+    oracle_bacc = center_level_mean(oracle_rows, metric="bacc")
+    e1_v1_selected = float(metrics.get("e1_v1_gmm_selected_center_level_mean_bacc", math.nan))
+    delta_vs_e1_v1 = selected_bacc - e1_v1_selected if not math.isnan(e1_v1_selected) else math.nan
+    full_centers = _selected_rows_cover_expected_centers(selected)
+    sampler_coverage = _pca_gmm_sampler_coverage_complete(rows)
+    partial = not full_centers or not sampler_coverage
+
+    classification = "DIAGNOSTIC_NEGATIVE"
+    pass_fail = "FAIL"
+    if partial:
+        classification = "DIAGNOSTIC_PARTIAL"
+    elif (
+        protocol_pass
+        and selected_bacc >= 0.80
+        and not math.isnan(delta_vs_e1_v1)
+        and delta_vs_e1_v1 >= 0.01
+    ):
+        classification = "PASS"
+        pass_fail = "PASS"
+    elif oracle_bacc >= 0.80 and selected_bacc < 0.80:
+        classification = "PCA_GMM_ORACLE_STRONG"
+
+    return {
+        "schema_version": E1_1_SCHEMA_VERSION,
+        "decision_classification": classification,
+        "pass_fail": pass_fail,
+        "protocol_audit_pass": protocol_pass,
+        "metrics": {
+            "e1_1_gmm_selected_center_level_mean_bacc": selected_bacc,
+            "e1_1_gmm_selected_delta_vs_e1_v1_gmm_selected": delta_vs_e1_v1,
+            "e1_1_gmm_selected_oracle_gap_bacc": selected_gap,
+            "e1_1_gmm_oracle_center_level_mean_bacc": oracle_bacc,
+            "e1_v1_gmm_selected_center_level_mean_bacc": e1_v1_selected,
+            "all_required_center_class_sampler_rows_available": int(sampler_coverage),
+            "pass_aggregation_full_expected_center_set": int(full_centers),
+        },
+        "claim_boundary": (
+            "Family E1.1 is a non-CVAE diagnostic follow-up. It changes only "
+            "the aggregate GMM sampler geometry by fitting source-train-only "
+            "PCA-64 before diag-GMM and inverse-transforming generated samples "
+            "back to original DINO embedding space."
+        ),
+        "recommendation": (
+            "Treat partial availability as descriptive only; do not use it as a PASS condition."
+            if partial
+            else ""
+        ),
+    }
+
+
 def build_family_e1_all_expert_downstream_matrix(
     *,
     config: FamilyE1Config,
@@ -1245,7 +1671,17 @@ def build_family_e1_all_expert_downstream_matrix(
     selected_classifier_seeds = limits.classifier_seeds or tuple(config.classifier_seeds)
     selected_heldouts = limits.heldout_centers or tuple(str(v) for v in config.candidate_domains)
     matrix_path = artifacts_root / "family_e1_all_expert_downstream_matrix.csv"
+    diagnostic_path = artifacts_root / "family_e1_sampler_diagnostics.csv"
+    generation_path = artifacts_root / "family_e1_generation_manifest.csv"
+    classifier_path = artifacts_root / "family_e1_trained_classifier_manifest.csv"
+    protocol_path = artifacts_root / "family_e1_downstream_protocol_audit.csv"
     completed = _read_completed_e1_keys(matrix_path) if resume else set()
+    completed_classifier = _read_completed_e1_classifier_keys(classifier_path) if resume else set()
+    existing_matrix_rows = read_family_e1_matrix(matrix_path) if resume and matrix_path.exists() else []
+    existing_diagnostic_rows = _read_dict_csv(diagnostic_path) if resume and diagnostic_path.exists() else []
+    existing_generation_rows = _read_dict_csv(generation_path) if resume and generation_path.exists() else []
+    existing_classifier_rows = _read_dict_csv(classifier_path) if resume and classifier_path.exists() else []
+    existing_protocol_rows = _read_dict_csv(protocol_path) if resume and protocol_path.exists() else []
 
     matrix_rows: list[FamilyE1MatrixRow] = []
     provenance_rows: list[dict[str, object]] = []
@@ -1267,6 +1703,7 @@ def build_family_e1_all_expert_downstream_matrix(
         sampler_bank = fit_family_e1_sampler_bank(train_cache=train_cache, config=config)
         provenance_rows.extend(_sampler_provenance_rows(sampler_bank, experiment_seed=artifact.experiment_seed))
         diagnostic_rows.extend(_sampler_fit_diagnostic_rows(sampler_bank, experiment_seed=artifact.experiment_seed))
+        gmm_mode = _gmm_mode_for_config(config)
 
         for heldout in selected_heldouts:
             heldout = str(heldout)
@@ -1310,6 +1747,36 @@ def build_family_e1_all_expert_downstream_matrix(
                     for mode in config.modes:
                         for generation_seed in selected_generation_seeds:
                             for classifier_seed in selected_classifier_seeds:
+                                row_type = (
+                                    E1_DIAGNOSTIC_UPPER_BOUND_ROW_TYPE
+                                    if mode in {E1_BOOTSTRAP_MODE, E1_REAL_SOURCE_MODE}
+                                    else E1_SINGLE_EXPERT_ROW_TYPE
+                                )
+                                primary_key = _e1_matrix_primary_key(
+                                    experiment_seed=artifact.experiment_seed,
+                                    heldout_center=heldout,
+                                    support_size=unit.support_size,
+                                    support_seed=unit.support_seed,
+                                    candidate_expert=candidate,
+                                    generation_mode=mode,
+                                    budget_per_class=config.budget_per_class,
+                                    generation_seed=generation_seed,
+                                    classifier_seed=classifier_seed,
+                                    row_type=row_type,
+                                    candidate_hash="__single_expert__",
+                                )
+                                classifier_key = _e1_classifier_sidecar_key(
+                                    experiment_seed=artifact.experiment_seed,
+                                    heldout_center=heldout,
+                                    support_size=unit.support_size,
+                                    support_seed=unit.support_seed,
+                                    candidate_expert=candidate,
+                                    generation_mode=mode,
+                                    generation_seed=generation_seed,
+                                    classifier_seed=classifier_seed,
+                                )
+                                if resume and primary_key in completed and classifier_key in completed_classifier:
+                                    continue
                                 row, generated_meta, diag, clf_manifest, audit = score_family_e1_candidate(
                                     sampler_bank=sampler_bank,
                                     experiment_seed=artifact.experiment_seed,
@@ -1325,22 +1792,48 @@ def build_family_e1_all_expert_downstream_matrix(
                                     target_labels=target_labels,
                                     target_pool=target_pool,
                                 )
-                                if resume and row.primary_key() in completed:
-                                    continue
                                 matrix_rows.append(row)
                                 completed.add(row.primary_key())
+                                completed_classifier.add(classifier_key)
                                 generation_rows.extend(generated_meta)
                                 diagnostic_rows.append(diag)
                                 classifier_rows.append(clf_manifest)
                                 protocol_rows.append(audit)
                 for generation_seed in selected_generation_seeds:
                     for classifier_seed in selected_classifier_seeds:
+                        candidate_hash = hash_candidate_experts(candidates)
+                        primary_key = _e1_matrix_primary_key(
+                            experiment_seed=artifact.experiment_seed,
+                            heldout_center=heldout,
+                            support_size=unit.support_size,
+                            support_seed=unit.support_seed,
+                            candidate_expert=E1_ENSEMBLE_EXPERT_ID,
+                            generation_mode=gmm_mode,
+                            budget_per_class=config.budget_per_class,
+                            generation_seed=generation_seed,
+                            classifier_seed=classifier_seed,
+                            row_type=E1_METHOD_BASELINE_ROW_TYPE,
+                            candidate_hash=candidate_hash,
+                        )
+                        classifier_key = _e1_classifier_sidecar_key(
+                            experiment_seed=artifact.experiment_seed,
+                            heldout_center=heldout,
+                            support_size=unit.support_size,
+                            support_seed=unit.support_seed,
+                            candidate_expert=E1_ENSEMBLE_EXPERT_ID,
+                            generation_mode=gmm_mode,
+                            generation_seed=generation_seed,
+                            classifier_seed=classifier_seed,
+                        )
+                        if resume and primary_key in completed and classifier_key in completed_classifier:
+                            continue
                         row, generated_meta, diag, clf_manifest, audit = score_family_e1_gmm_same_budget_ensemble(
                             sampler_bank=sampler_bank,
                             experiment_seed=artifact.experiment_seed,
                             heldout_center=heldout,
                             support_unit=unit,
                             candidate_experts=candidates,
+                            mode=gmm_mode,
                             budget_per_class=int(config.budget_per_class),
                             generation_seed=int(generation_seed),
                             classifier_seed=int(classifier_seed),
@@ -1349,28 +1842,34 @@ def build_family_e1_all_expert_downstream_matrix(
                             target_labels=target_labels,
                             target_pool=target_pool,
                         )
-                        if resume and row.primary_key() in completed:
-                            continue
                         matrix_rows.append(row)
                         completed.add(row.primary_key())
+                        completed_classifier.add(classifier_key)
                         generation_rows.extend(generated_meta)
                         diagnostic_rows.append(diag)
                         classifier_rows.append(clf_manifest)
                         protocol_rows.append(audit)
 
-    if resume and matrix_path.exists():
-        existing = read_family_e1_matrix(matrix_path)
-        matrix_rows = existing + matrix_rows
+    if resume:
+        matrix_rows = _dedupe_family_e1_matrix_rows(existing_matrix_rows + matrix_rows)
+        diagnostic_rows = _dedupe_dict_rows(existing_diagnostic_rows + diagnostic_rows)
+        generation_rows = existing_generation_rows + generation_rows
+        classifier_rows = _merge_dict_rows_by_key(
+            existing_classifier_rows,
+            classifier_rows,
+            key_func=_e1_classifier_sidecar_key_from_mapping,
+        )
+        protocol_rows = existing_protocol_rows + protocol_rows
 
     validate_family_e1_matrix(matrix_rows)
     validate_family_e1_protocol_audit(protocol_rows)
     artifacts_root.mkdir(parents=True, exist_ok=True)
     _write_csv(artifacts_root / "family_e1_sampler_provenance.csv", _provenance_columns(), provenance_rows)
-    _write_csv(artifacts_root / "family_e1_sampler_diagnostics.csv", _diagnostic_columns(), diagnostic_rows)
-    _write_csv(artifacts_root / "family_e1_generation_manifest.csv", _generation_manifest_columns(), generation_rows)
-    _write_csv(artifacts_root / "family_e1_trained_classifier_manifest.csv", _classifier_manifest_columns(), classifier_rows)
+    _write_csv(diagnostic_path, _diagnostic_columns(), diagnostic_rows)
+    _write_csv(generation_path, _generation_manifest_columns(), generation_rows)
+    _write_csv(classifier_path, _classifier_manifest_columns(), classifier_rows)
     write_family_e1_matrix(matrix_path, matrix_rows)
-    _write_csv(artifacts_root / "family_e1_downstream_protocol_audit.csv", E1_PROTOCOL_AUDIT_COLUMNS, protocol_rows)
+    _write_csv(protocol_path, E1_PROTOCOL_AUDIT_COLUMNS, protocol_rows)
     return {
         "sampler_provenance": artifacts_root / "family_e1_sampler_provenance.csv",
         "sampler_diagnostics": artifacts_root / "family_e1_sampler_diagnostics.csv",
@@ -1437,6 +1936,9 @@ def score_family_e1_candidate(
                 class_labels=class_labels,
                 budget_per_class=budget_per_class,
                 generation_seed=generation_seed,
+                experiment_seed=experiment_seed,
+                support_size=support_unit.support_size,
+                support_seed=support_unit.support_seed,
             )
         prediction = fit_locked_logistic_classifier(
             batch.embeddings,
@@ -1508,6 +2010,7 @@ def score_family_e1_gmm_same_budget_ensemble(
     heldout_center: str,
     support_unit: SupportSelectionUnit,
     candidate_experts: Sequence[str],
+    mode: str = E1_GMM_MODE,
     budget_per_class: int,
     generation_seed: int,
     classifier_seed: int,
@@ -1523,7 +2026,7 @@ def score_family_e1_gmm_same_budget_ensemble(
         heldout_center=heldout_center,
         support_unit=support_unit,
         candidate_expert=E1_ENSEMBLE_EXPERT_ID,
-        mode=E1_GMM_MODE,
+        mode=mode,
         budget_per_class=budget_per_class,
         generation_seed=generation_seed,
         classifier_seed=classifier_seed,
@@ -1538,7 +2041,7 @@ def score_family_e1_gmm_same_budget_ensemble(
     if not target_status["target_eval_has_all_classes"]:
         return _unavailable_target_eval_result(
             base=base,
-            release_level=E1_RELEASE_LEVELS[E1_GMM_MODE],
+            release_level=E1_RELEASE_LEVELS[mode],
             target_status=target_status,
             train_source="invalid_target_eval_single_class",
         )
@@ -1554,11 +2057,14 @@ def score_family_e1_gmm_same_budget_ensemble(
         for expert in sorted(str(v) for v in candidate_experts):
             batch = generate_class_balanced_batch(
                 sampler_bank=sampler_bank,
-                mode=E1_GMM_MODE,
+                mode=mode,
                 source_center=expert,
                 class_labels=class_labels,
                 budget_per_class=int(allocation[expert]),
                 generation_seed=int(generation_seed) + int(_expert_sort_value(expert)) * 7919,
+                experiment_seed=experiment_seed,
+                support_size=support_unit.support_size,
+                support_seed=support_unit.support_seed,
             )
             chunks.append(batch.embeddings)
             labels.extend(batch.labels)
@@ -1581,11 +2087,11 @@ def score_family_e1_gmm_same_budget_ensemble(
             n_train=len(labels),
             target_eval_label_counts_json=str(target_status["target_eval_label_counts_json"]),
             target_eval_has_all_classes=int(target_status["target_eval_has_all_classes"]),
-            sampler_release_level=E1_RELEASE_LEVELS[E1_GMM_MODE],
+            sampler_release_level=E1_RELEASE_LEVELS[mode],
         )
         diag = _context_diagnostic_row(
             base=base,
-            release_level=E1_RELEASE_LEVELS[E1_GMM_MODE],
+            release_level=E1_RELEASE_LEVELS[mode],
             available=1,
             status="ok",
             diagnostics=_mean_diagnostics(diagnostics),
@@ -1593,7 +2099,7 @@ def score_family_e1_gmm_same_budget_ensemble(
         clf_manifest = _classifier_manifest_row(base=base, row=row, train_source="gmm_same_budget_pooled_ensemble")
         audit = _protocol_audit_row(
             base=base,
-            release_level=E1_RELEASE_LEVELS[E1_GMM_MODE],
+            release_level=E1_RELEASE_LEVELS[mode],
             available=1,
             target_status=target_status,
         )
@@ -1606,14 +2112,14 @@ def score_family_e1_gmm_same_budget_ensemble(
             n_train=0,
             target_eval_label_counts_json=str(target_status["target_eval_label_counts_json"]),
             target_eval_has_all_classes=int(target_status["target_eval_has_all_classes"]),
-            sampler_release_level=E1_RELEASE_LEVELS[E1_GMM_MODE],
+            sampler_release_level=E1_RELEASE_LEVELS[mode],
             available=0,
             status=_failure_status(exc),
             error_message=str(exc),
         )
         diag = _context_diagnostic_row(
             base=base,
-            release_level=E1_RELEASE_LEVELS[E1_GMM_MODE],
+            release_level=E1_RELEASE_LEVELS[mode],
             available=0,
             status=row.status,
             diagnostics={},
@@ -1621,7 +2127,7 @@ def score_family_e1_gmm_same_budget_ensemble(
         clf_manifest = _classifier_manifest_row(base=base, row=row, train_source="unavailable")
         audit = _protocol_audit_row(
             base=base,
-            release_level=E1_RELEASE_LEVELS[E1_GMM_MODE],
+            release_level=E1_RELEASE_LEVELS[mode],
             available=0,
             target_status=target_status,
         )
@@ -1665,6 +2171,7 @@ def build_family_e1_reports(
     audit_path = artifacts_root / "family_e1_downstream_protocol_audit.csv"
     rows = read_family_e1_matrix(matrix_path)
     protocol_rows = _read_dict_csv(audit_path) if audit_path.exists() else []
+    merged_metrics = {**_load_e1_v1_reference_metrics(artifacts_root), **dict(c2_metrics or {})}
     alignment_rows, prior_rows = build_family_e1_alignment_rows(
         rows=rows,
         candidate_domains=candidate_domains,
@@ -1672,18 +2179,18 @@ def build_family_e1_reports(
     baseline_rows = build_family_e1_baseline_comparison_rows(
         rows=rows,
         alignment_rows=alignment_rows,
-        c2_comparison=c2_metrics,
+        c2_comparison=merged_metrics,
     )
     comparison_vs_c2 = build_family_e1_generation_mode_comparison_vs_c2(
         rows=rows,
         alignment_rows=alignment_rows,
-        c2_metrics=c2_metrics or {},
+        c2_metrics=merged_metrics,
     )
     summary = classify_family_e1_decision(
         rows=rows,
         alignment_rows=alignment_rows,
         protocol_audit_rows=protocol_rows,
-        c2_metrics=c2_metrics or {},
+        c2_metrics=merged_metrics,
     )
     _write_csv(artifacts_root / "family_e1_downstream_selection_alignment.csv", E1_ALIGNMENT_COLUMNS, alignment_rows)
     _write_csv(artifacts_root / "family_e1_source_transfer_sampler_prior_audit.csv", E1_PRIOR_AUDIT_COLUMNS, prior_rows)
@@ -1712,6 +2219,27 @@ def build_family_e1_generation_mode_comparison_vs_c2(
     alignment_rows: Sequence[Mapping[str, object]],
     c2_metrics: Mapping[str, float],
 ) -> list[dict[str, object]]:
+    if _rows_are_e1_1(rows):
+        selected = [row for row in alignment_rows if row.get("selector") == E1_1_GMM_SELECTOR]
+        oracle = _oracle_rows_by_context(rows, modes=(E1_1_GMM_MODE,))
+        e1_v1_selected = float(c2_metrics.get("e1_v1_gmm_selected_center_level_mean_bacc", math.nan))
+        e1_v1_oracle = float(c2_metrics.get("e1_v1_gmm_oracle_center_level_mean_bacc", math.nan))
+        return [
+            {
+                "comparison": "pca64_gmm_selected_vs_e1_v1_gmm_selected",
+                "family_e1_bacc": center_level_mean(selected, metric="selected_bacc"),
+                "c2_bacc": e1_v1_selected,
+                "delta_bacc": _delta_or_nan(center_level_mean(selected, metric="selected_bacc"), e1_v1_selected),
+                "available": int(not math.isnan(e1_v1_selected)),
+            },
+            {
+                "comparison": "pca64_gmm_oracle_vs_e1_v1_gmm_oracle",
+                "family_e1_bacc": center_level_mean(oracle, metric="bacc"),
+                "c2_bacc": e1_v1_oracle,
+                "delta_bacc": _delta_or_nan(center_level_mean(oracle, metric="bacc"), e1_v1_oracle),
+                "available": int(not math.isnan(e1_v1_oracle)),
+            },
+        ]
     gmm_selected = [row for row in alignment_rows if row.get("selector") == E1_GMM_SELECTOR]
     sampler_selected = [row for row in alignment_rows if row.get("selector") == E1_SAMPLER_SELECTOR]
     gmm_oracle = _oracle_rows_by_context(rows, modes=(E1_GMM_MODE,))
@@ -2028,7 +2556,7 @@ def read_family_e1_support_units(paths: Iterable[Path]) -> list[SupportSelection
 def validate_family_e1_matrix(rows: Sequence[FamilyE1MatrixRow]) -> None:
     seen: set[tuple[object, ...]] = set()
     for row in rows:
-        if row.schema_version != E1_SCHEMA_VERSION:
+        if row.schema_version not in {E1_SCHEMA_VERSION, E1_1_SCHEMA_VERSION}:
             raise ProtocolError(f"Unexpected Family E1 matrix schema: {row.schema_version}")
         key = row.primary_key()
         if key in seen:
@@ -2056,6 +2584,7 @@ def validate_family_e1_protocol_audit(rows: Sequence[Mapping[str, object]]) -> N
             "target_eval_has_all_classes": _audit_target_class_check(row),
             "target_oracle_used_for_selection": int(row.get("target_oracle_used_for_selection", 1)) == 0,
             "target_heldout_rows_used_for_source_transfer_prior": int(row.get("target_heldout_rows_used_for_source_transfer_prior", 1)) == 0,
+            "pca_lineage": _audit_pca_lineage_check(row),
         }
         failed = [key for key, ok in checks.items() if not ok]
         if failed:
@@ -2066,6 +2595,19 @@ def _audit_target_class_check(row: Mapping[str, object]) -> bool:
     if int(row.get("available", 0)) == 0:
         return True
     return int(row.get("target_eval_has_all_classes", 0)) == 1
+
+
+def _audit_pca_lineage_check(row: Mapping[str, object]) -> bool:
+    if str(row.get("generation_mode", "")) != E1_1_GMM_MODE:
+        return True
+    if str(row.get("pca_fit_split", "")) != "source_train":
+        return False
+    if int(row.get("pca_source_only", 0)) != 1:
+        return False
+    if int(row.get("pca_inverse_transform_used", 0)) != 1:
+        return False
+    lineage = str(row.get("pca_gmm_lineage_key", ""))
+    return bool(lineage) and lineage == str(row.get("generated_lineage_key", "")) == str(row.get("classifier_lineage_key", ""))
 
 
 def protocol_audit_pass(rows: Sequence[Mapping[str, object]]) -> bool:
@@ -2101,24 +2643,37 @@ def center_level_mean(rows: Sequence[Mapping[str, object] | FamilyE1MatrixRow], 
 
 
 def _family_e1_config_from_mapping(config: Mapping[str, Any]) -> FamilyE1Config:
-    base = default_family_e1_config()
     experiment = _mapping(config.get("experiment"), "experiment")
-    if experiment.get("name") != FAMILY_E1_NAME:
+    experiment_name = str(experiment.get("name") or "")
+    if experiment_name not in {FAMILY_E1_NAME, FAMILY_E1_1_NAME}:
         raise ProtocolError(f"Unexpected Family E1 experiment.name: {experiment.get('name')!r}")
+    base = default_family_e1_1_config() if experiment_name == FAMILY_E1_1_NAME else default_family_e1_config()
     datasets = _mapping(config.get("datasets"), "datasets")
     camelyon = _mapping(datasets.get("camelyon17"), "datasets.camelyon17")
     if not bool(camelyon.get("enabled")):
-        raise ProtocolError("Family E1 v1 must enable camelyon17.")
+        raise ProtocolError("Family E1 must enable camelyon17.")
     generation = _mapping(config.get("generation"), "generation")
     samplers = _mapping(config.get("samplers"), "samplers")
     pca = _mapping(samplers.get("pca_before_sampler"), "samplers.pca_before_sampler")
-    if bool(pca.get("enabled")):
+    pca_enabled = bool(pca.get("enabled", base.pca_enabled))
+    if experiment_name == FAMILY_E1_NAME and pca_enabled:
         raise ProtocolError("Family E1 v1 must keep pca_before_sampler.enabled=false.")
+    if experiment_name == FAMILY_E1_1_NAME and not pca_enabled:
+        raise ProtocolError("Family E1.1 must enable pca_before_sampler.")
+    if experiment_name == FAMILY_E1_1_NAME and int(pca.get("n_components", 0)) != 64:
+        raise ProtocolError("Family E1.1 must use pca_before_sampler.n_components=64.")
+    if experiment_name == FAMILY_E1_1_NAME and bool(pca.get("whiten", False)):
+        raise ProtocolError("Family E1.1 must use pca_before_sampler.whiten=false.")
     gmm = _mapping(samplers.get("gmm_diag_bic"), "samplers.gmm_diag_bic")
     if gmm.get("covariance_type") != "diag":
         raise ProtocolError("Family E1 GMM covariance_type must be diag.")
     release_levels = _mapping(samplers.get("release_levels"), "samplers.release_levels")
-    for mode, expected in E1_RELEASE_LEVELS.items():
+    modes = tuple(str(v) for v in samplers.get("modes", base.modes))
+    expected_modes = E1_1_ALL_MODES if experiment_name == FAMILY_E1_1_NAME else E1_ALL_MODES
+    if set(modes) != set(expected_modes):
+        raise ProtocolError(f"{experiment_name} modes must be exactly {expected_modes}.")
+    for mode in modes:
+        expected = E1_RELEASE_LEVELS[mode]
         key = _mode_short_name(mode)
         if release_levels.get(key) != expected:
             raise ProtocolError(f"Family E1 release level for {key} must be {expected!r}.")
@@ -2126,6 +2681,8 @@ def _family_e1_config_from_mapping(config: Mapping[str, Any]) -> FamilyE1Config:
     artifacts = _mapping(config.get("artifacts"), "artifacts")
     comparison = _mapping(config.get("external_comparisons"), "external_comparisons")
     return FamilyE1Config(
+        experiment_name=experiment_name,
+        schema_version=E1_1_SCHEMA_VERSION if experiment_name == FAMILY_E1_1_NAME else E1_SCHEMA_VERSION,
         dataset_name="camelyon17",
         domain_key=str(camelyon.get("domain_key", base.domain_key)),
         candidate_domains=tuple(str(v) for v in camelyon.get("candidate_domains", base.candidate_domains)),
@@ -2136,11 +2693,12 @@ def _family_e1_config_from_mapping(config: Mapping[str, Any]) -> FamilyE1Config:
         classifier_seeds=tuple(int(v) for v in camelyon.get("classifier_seeds", base.classifier_seeds)),
         class_labels=tuple(int(v) for v in generation.get("labels", base.class_labels)),
         budget_per_class=int(generation.get("budget_per_class", base.budget_per_class)),
-        modes=tuple(str(v) for v in samplers.get("modes", base.modes)),
+        modes=modes,
         support_selection_glob=str(support_inputs.get("selection_glob", base.support_selection_glob)),
         artifacts_root=str(artifacts.get("root", base.artifacts_root)),
-        pca_enabled=bool(pca.get("enabled", False)),
+        pca_enabled=pca_enabled,
         pca_n_components=int(pca.get("n_components", base.pca_n_components)),
+        pca_whiten=bool(pca.get("whiten", base.pca_whiten)),
         gmm_k_candidates=tuple(int(v) for v in gmm.get("k_candidates", base.gmm_k_candidates)),
         gmm_reg_covar=float(gmm.get("reg_covar", base.gmm_reg_covar)),
         gmm_valid_min_samples=int(gmm.get("valid_k_min_samples", base.gmm_valid_min_samples)),
@@ -2188,6 +2746,7 @@ def _row_base(
     candidate_hash: str,
 ) -> dict[str, object]:
     return {
+        "schema_version": _schema_version_for_mode(mode),
         "experiment_seed": int(experiment_seed),
         "heldout_center": str(heldout_center),
         "support_size": int(support_unit.support_size),
@@ -2258,6 +2817,16 @@ def _protocol_audit_row(
         "target_eval_label_counts_json": "{}",
         "target_eval_has_all_classes": 0,
     }
+    mode = str(base["generation_mode"])
+    is_pca = int(mode == E1_1_GMM_MODE)
+    lineage = sampler_lineage_key(
+        experiment_seed=base["experiment_seed"],
+        source_center=base["candidate_expert"],
+        class_label="",
+        support_size=base["support_size"],
+        support_seed=base["support_seed"],
+        generation_seed=base["generation_seed"],
+    )
     return {
         "experiment_seed": base["experiment_seed"],
         "heldout_center": base["heldout_center"],
@@ -2278,6 +2847,12 @@ def _protocol_audit_row(
         "target_eval_has_all_classes": int(target_status["target_eval_has_all_classes"]),
         "target_oracle_used_for_selection": 0,
         "target_heldout_rows_used_for_source_transfer_prior": 0,
+        "pca_fit_split": "source_train" if is_pca else "",
+        "pca_source_only": is_pca,
+        "pca_inverse_transform_used": is_pca,
+        "pca_gmm_lineage_key": lineage if is_pca else "",
+        "generated_lineage_key": lineage if is_pca else "",
+        "classifier_lineage_key": lineage if is_pca else "",
         "sampler_release_level": release_level,
         "available": int(available),
     }
@@ -2298,6 +2873,7 @@ def _classifier_manifest_row(
         "generation_mode": base["generation_mode"],
         "generation_seed": base["generation_seed"],
         "classifier_seed": base["classifier_seed"],
+        "classifier_random_state": base["classifier_seed"],
         "train_source": train_source,
         "scaler_fit": "synthetic_train_only" if train_source != "real_source_train" else "real_source_train_only",
         "classifier_family": "sklearn_logistic_regression",
@@ -2310,6 +2886,14 @@ def _classifier_manifest_row(
         "target_eval_pool_id": row.target_eval_pool_id,
         "target_eval_label_counts_json": row.target_eval_label_counts_json,
         "target_eval_has_all_classes": row.target_eval_has_all_classes,
+        "classifier_lineage_key": sampler_lineage_key(
+            experiment_seed=base["experiment_seed"],
+            source_center=base["candidate_expert"],
+            class_label="",
+            support_size=base["support_size"],
+            support_seed=base["support_seed"],
+            generation_seed=base["generation_seed"],
+        ) if row.generation_mode == E1_1_GMM_MODE else "",
         "status": row.status,
         "available": row.available,
     }
@@ -2362,8 +2946,19 @@ def _sampler_provenance_rows(
                 "available": int(fit.available),
                 "source_sample_ids_hash": _hash_values(fit.source_sample_ids),
                 "target_rows_used_for_fit": 0,
-                "pca_before_sampler_enabled": 0,
-                "pca_n_components": "",
+                "pca_before_sampler_enabled": int(fit.mode == E1_1_GMM_MODE),
+                "pca_n_components": 64 if fit.mode == E1_1_GMM_MODE else "",
+                "pca_available": fit.diagnostics.get("pca_available", ""),
+                "pca_unavailable_reason": fit.diagnostics.get("pca_unavailable_reason", ""),
+                "pca_fit_n_samples": fit.diagnostics.get("pca_fit_n_samples", ""),
+                "pca_fit_embedding_dim": fit.diagnostics.get("pca_fit_embedding_dim", ""),
+                "pca_rank_upper_bound": fit.diagnostics.get("pca_rank_upper_bound", ""),
+                "pca_retained_rank_estimate": fit.diagnostics.get("pca_retained_rank_estimate", ""),
+                "pca_explained_variance_ratio_sum": fit.diagnostics.get("pca_explained_variance_ratio_sum", ""),
+                "pca_reconstruction_mse_source_train": fit.diagnostics.get("pca_reconstruction_mse_source_train", ""),
+                "pca_reconstruction_relative_mse_source_train": fit.diagnostics.get("pca_reconstruction_relative_mse_source_train", ""),
+                "pca_random_state": fit.diagnostics.get("pca_random_state", ""),
+                "gmm_random_state": fit.diagnostics.get("gmm_random_state", ""),
                 "error_message": fit.error_message,
             }
         )
@@ -2405,8 +3000,12 @@ def _base_fit_diagnostics(source: SourceClassData, *, mode: str, embedding_dim: 
         "embedding_dim": int(embedding_dim),
         "effective_sample_to_dim_ratio": float(n) / float(max(1, int(embedding_dim))),
         "median_pairwise_distance": median_pairwise_distance(x),
+        "gmm_k_candidates": "[]",
+        "gmm_valid_k": "[]",
         "gmm_selected_k": "",
         "gmm_bic_by_k": "{}",
+        "gmm_converged_by_k": "{}",
+        "gmm_n_iter_by_k": "{}",
         "gmm_converged": "",
         "gmm_n_iter": "",
         "gmm_min_component_weight": math.nan,
@@ -2504,10 +3103,196 @@ def _low_effective_sample_ratio(rows: Sequence[FamilyE1MatrixRow]) -> bool:
     return False
 
 
+def _selector_specs_for_rows(rows: Sequence[FamilyE1MatrixRow]) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    if _rows_are_e1_1(rows):
+        return ((E1_1_GMM_SELECTOR, (E1_1_GMM_MODE,)),)
+    return (
+        (E1_GMM_SELECTOR, E1_PRIMARY_GMM_MODES),
+        (E1_SAMPLER_SELECTOR, E1_SENSITIVITY_MODES),
+    )
+
+
+def _rows_are_e1_1(rows: Sequence[FamilyE1MatrixRow]) -> bool:
+    return any(row.schema_version == E1_1_SCHEMA_VERSION or row.generation_mode == E1_1_GMM_MODE for row in rows)
+
+
+def _gmm_mode_for_config(config: FamilyE1Config) -> str:
+    if E1_1_GMM_MODE in set(config.modes):
+        return E1_1_GMM_MODE
+    return E1_GMM_MODE
+
+
+def _schema_version_for_mode(mode: str) -> str:
+    return E1_1_SCHEMA_VERSION if str(mode) == E1_1_GMM_MODE else E1_SCHEMA_VERSION
+
+
+def _pca_gmm_sampler_coverage_complete(rows: Sequence[FamilyE1MatrixRow]) -> bool:
+    pca_rows = [
+        row for row in rows
+        if row.generation_mode == E1_1_GMM_MODE
+        and row.row_type == E1_SINGLE_EXPERT_ROW_TYPE
+        and row.candidate_expert != E1_ENSEMBLE_EXPERT_ID
+    ]
+    if not pca_rows:
+        return False
+    for row in pca_rows:
+        if int(row.available) == 0 and row.status != "failed_single_class_target_eval":
+            return False
+    return True
+
+
+def _selected_rows_cover_expected_centers(rows: Sequence[Mapping[str, object]]) -> bool:
+    centers = {str(_row_get(row, "heldout_center")) for row in rows if not math.isnan(_to_float(_row_get(row, "selected_bacc")))}
+    return set(str(v) for v in CAMELYON17_CENTERS).issubset(centers)
+
+
+def _load_e1_v1_reference_metrics(artifacts_root: Path) -> dict[str, float]:
+    summary_path = artifacts_root.parent / FAMILY_E1_NAME / "family_e1_downstream_decision_summary.json"
+    if not summary_path.exists():
+        return {}
+    try:
+        payload = json.loads(summary_path.read_text(encoding="utf-8"))
+        metrics = payload.get("metrics", {})
+        if not isinstance(metrics, Mapping):
+            return {}
+        return {
+            "e1_v1_gmm_selected_center_level_mean_bacc": float(
+                metrics.get("gmm_selected_center_level_mean_bacc", math.nan)
+            ),
+            "e1_v1_gmm_oracle_center_level_mean_bacc": float(
+                metrics.get("gmm_oracle_center_level_mean_bacc", math.nan)
+            ),
+        }
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return {}
+
+
 def _read_completed_e1_keys(path: Path) -> set[tuple[object, ...]]:
     if not path.exists():
         return set()
     return {row.primary_key() for row in read_family_e1_matrix(path)}
+
+
+def _read_completed_e1_classifier_keys(path: Path) -> set[tuple[object, ...]]:
+    if not path.exists():
+        return set()
+    return {_e1_classifier_sidecar_key_from_mapping(row) for row in _read_dict_csv(path)}
+
+
+def _e1_matrix_primary_key(
+    *,
+    experiment_seed: object,
+    heldout_center: object,
+    support_size: object,
+    support_seed: object,
+    candidate_expert: object,
+    generation_mode: object,
+    budget_per_class: object,
+    generation_seed: object,
+    classifier_seed: object,
+    row_type: object,
+    candidate_hash: object,
+) -> tuple[object, ...]:
+    return (
+        int(experiment_seed),
+        str(heldout_center),
+        int(support_size),
+        int(support_seed),
+        str(candidate_expert),
+        str(generation_mode),
+        int(budget_per_class),
+        int(generation_seed),
+        int(classifier_seed),
+        str(row_type),
+        str(candidate_hash),
+    )
+
+
+def _e1_classifier_sidecar_key(
+    *,
+    experiment_seed: object,
+    heldout_center: object,
+    support_size: object,
+    support_seed: object,
+    candidate_expert: object,
+    generation_mode: object,
+    generation_seed: object,
+    classifier_seed: object,
+) -> tuple[object, ...]:
+    return (
+        int(experiment_seed),
+        str(heldout_center),
+        int(support_size),
+        int(support_seed),
+        str(candidate_expert),
+        str(generation_mode),
+        int(generation_seed),
+        int(classifier_seed),
+    )
+
+
+def _e1_classifier_sidecar_key_from_matrix_row(row: FamilyE1MatrixRow) -> tuple[object, ...]:
+    return _e1_classifier_sidecar_key(
+        experiment_seed=row.experiment_seed,
+        heldout_center=row.heldout_center,
+        support_size=row.support_size,
+        support_seed=row.support_seed,
+        candidate_expert=row.candidate_expert,
+        generation_mode=row.generation_mode,
+        generation_seed=row.generation_seed,
+        classifier_seed=row.classifier_seed,
+    )
+
+
+def _e1_classifier_sidecar_key_from_mapping(row: Mapping[str, object]) -> tuple[object, ...]:
+    return _e1_classifier_sidecar_key(
+        experiment_seed=row.get("experiment_seed") or 0,
+        heldout_center=row.get("heldout_center") or "",
+        support_size=row.get("support_size") or 0,
+        support_seed=row.get("support_seed") or 0,
+        candidate_expert=row.get("candidate_expert") or "",
+        generation_mode=row.get("generation_mode") or "",
+        generation_seed=row.get("generation_seed") or 0,
+        classifier_seed=row.get("classifier_seed") or 0,
+    )
+
+
+def _dedupe_family_e1_matrix_rows(rows: Sequence[FamilyE1MatrixRow]) -> list[FamilyE1MatrixRow]:
+    by_key: dict[tuple[object, ...], FamilyE1MatrixRow] = {}
+    order: list[tuple[object, ...]] = []
+    for row in rows:
+        key = row.primary_key()
+        if key not in by_key:
+            order.append(key)
+        by_key[key] = row
+    return [by_key[key] for key in order]
+
+
+def _dedupe_dict_rows(rows: Sequence[Mapping[str, object]]) -> list[dict[str, object]]:
+    by_key: dict[tuple[tuple[str, str], ...], dict[str, object]] = {}
+    order: list[tuple[tuple[str, str], ...]] = []
+    for row in rows:
+        key = tuple(sorted((str(k), str(v)) for k, v in row.items()))
+        if key not in by_key:
+            order.append(key)
+        by_key[key] = dict(row)
+    return [by_key[key] for key in order]
+
+
+def _merge_dict_rows_by_key(
+    existing: Sequence[Mapping[str, object]],
+    new_rows: Sequence[Mapping[str, object]],
+    *,
+    key_func: Any,
+) -> list[dict[str, object]]:
+    by_key: dict[tuple[object, ...], dict[str, object]] = {}
+    order: list[tuple[object, ...]] = []
+    for row in tuple(existing) + tuple(new_rows):
+        key = key_func(row)
+        if key not in by_key:
+            order.append(key)
+        by_key[key] = dict(row)
+    return [by_key[key] for key in order]
 
 
 def _e1_row_from_csv(row: Mapping[str, str]) -> FamilyE1MatrixRow:
@@ -2605,6 +3390,17 @@ def _provenance_columns() -> tuple[str, ...]:
         "target_rows_used_for_fit",
         "pca_before_sampler_enabled",
         "pca_n_components",
+        "pca_available",
+        "pca_unavailable_reason",
+        "pca_fit_n_samples",
+        "pca_fit_embedding_dim",
+        "pca_rank_upper_bound",
+        "pca_retained_rank_estimate",
+        "pca_explained_variance_ratio_sum",
+        "pca_reconstruction_mse_source_train",
+        "pca_reconstruction_relative_mse_source_train",
+        "pca_random_state",
+        "gmm_random_state",
         "error_message",
     )
 
@@ -2621,6 +3417,11 @@ def _generation_manifest_columns() -> tuple[str, ...]:
         "sampler_release_level",
         "available",
         "source_sample_ids_hash",
+        "pca_inverse_transform_used",
+        "synthetic_space_for_gmm",
+        "synthetic_space_for_classifier",
+        "gmm_sample_random_state",
+        "sampler_lineage_key",
     )
 
 
@@ -2634,6 +3435,7 @@ def _classifier_manifest_columns() -> tuple[str, ...]:
         "generation_mode",
         "generation_seed",
         "classifier_seed",
+        "classifier_random_state",
         "train_source",
         "scaler_fit",
         "classifier_family",
@@ -2646,6 +3448,7 @@ def _classifier_manifest_columns() -> tuple[str, ...]:
         "target_eval_pool_id",
         "target_eval_label_counts_json",
         "target_eval_has_all_classes",
+        "classifier_lineage_key",
         "status",
         "available",
     )
@@ -2669,8 +3472,28 @@ def _diagnostic_columns() -> tuple[str, ...]:
         "target_eval_has_all_classes",
         "n_source_train",
         "embedding_dim",
+        "pca_available",
+        "pca_unavailable_reason",
+        "pca_fit_n_samples",
+        "pca_fit_embedding_dim",
+        "pca_rank_upper_bound",
+        "pca_retained_rank_estimate",
+        "pca_explained_variance_ratio_sum",
+        "pca_reconstruction_mse_source_train",
+        "pca_reconstruction_relative_mse_source_train",
+        "pca_inverse_transform_used",
+        "pca_inverse_transform_exact_inverse",
+        "synthetic_space_for_gmm",
+        "synthetic_space_for_classifier",
+        "pca_random_state",
+        "gmm_random_state",
+        "gmm_sample_random_state",
+        "gmm_k_candidates",
+        "gmm_valid_k",
         "gmm_selected_k",
         "gmm_bic_by_k",
+        "gmm_converged_by_k",
+        "gmm_n_iter_by_k",
         "gmm_converged",
         "gmm_n_iter",
         "gmm_min_component_weight",
@@ -2712,10 +3535,26 @@ def _blank_diagnostics() -> dict[str, object]:
         "sampler_release_level",
         "available",
         "status",
+        "gmm_k_candidates",
+        "gmm_valid_k",
         "gmm_bic_by_k",
+        "gmm_converged_by_k",
+        "gmm_n_iter_by_k",
         "target_eval_label_counts_json",
-    }} | {"gmm_bic_by_k": "{}"}
+        "pca_unavailable_reason",
+        "synthetic_space_for_gmm",
+        "synthetic_space_for_classifier",
+    }} | {
+        "gmm_k_candidates": "[]",
+        "gmm_valid_k": "[]",
+        "gmm_bic_by_k": "{}",
+        "gmm_converged_by_k": "{}",
+        "gmm_n_iter_by_k": "{}",
+    }
     blank["target_eval_label_counts_json"] = "{}"
+    blank["pca_unavailable_reason"] = ""
+    blank["synthetic_space_for_gmm"] = ""
+    blank["synthetic_space_for_classifier"] = ""
     return blank
 
 
@@ -2743,12 +3582,72 @@ def _mapping(value: Any, name: str) -> Mapping[str, Any]:
 def _mode_short_name(mode: str) -> str:
     mapping = {
         E1_GMM_MODE: "gmm_diag_bic",
+        E1_1_GMM_MODE: "pca64_gmm_diag_bic",
         E1_KDE_MODE: "kde_gaussian",
         E1_SMOTE_MODE: "smote_interpolate",
         E1_BOOTSTRAP_MODE: "source_bootstrap_upper_bound",
         E1_REAL_SOURCE_MODE: "real_source_train_classifier_baseline",
     }
     return mapping[mode]
+
+
+def stable_family_e1_seed(*parts: object) -> int:
+    payload = "|".join(str(part) for part in parts).encode("utf-8")
+    return int(hashlib.sha256(payload).hexdigest()[:8], 16) % (2**31 - 1)
+
+
+def sample_diag_gmm_parameters(gmm: Any, *, n_samples: int, seed: int) -> Any:
+    np = _np()
+    rng = np.random.default_rng(int(seed))
+    weights = _as_numpy_1d(getattr(gmm, "weights_"))
+    means = _as_numpy_2d(getattr(gmm, "means_"))
+    covariances = _as_numpy_2d(getattr(gmm, "covariances_"))
+    components = rng.choice(len(weights), size=int(n_samples), p=weights / weights.sum())
+    noise = rng.normal(size=(int(n_samples), means.shape[1]))
+    return means[components] + noise * np.sqrt(covariances[components])
+
+
+def sampler_lineage_key(
+    *,
+    experiment_seed: object,
+    source_center: object,
+    class_label: object,
+    support_size: object,
+    support_seed: object,
+    generation_seed: object,
+) -> str:
+    return (
+        f"experiment_seed={experiment_seed}|source_center={source_center}|class_label={class_label}|"
+        f"support_size={support_size}|support_seed={support_seed}|generation_seed={generation_seed}"
+    )
+
+
+def _blank_pca_diagnostics() -> dict[str, object]:
+    return {
+        "pca_available": "",
+        "pca_unavailable_reason": "",
+        "pca_fit_n_samples": "",
+        "pca_fit_embedding_dim": "",
+        "pca_rank_upper_bound": "",
+        "pca_retained_rank_estimate": "",
+        "pca_explained_variance_ratio_sum": math.nan,
+        "pca_reconstruction_mse_source_train": math.nan,
+        "pca_reconstruction_relative_mse_source_train": math.nan,
+        "pca_inverse_transform_used": "",
+        "pca_inverse_transform_exact_inverse": "",
+        "synthetic_space_for_gmm": "",
+        "synthetic_space_for_classifier": "",
+        "pca_random_state": "",
+        "gmm_random_state": "",
+        "gmm_sample_random_state": "",
+    }
+
+
+def _is_nan_like(value: object) -> bool:
+    try:
+        return math.isnan(float(value))
+    except (TypeError, ValueError):
+        return False
 
 
 def _as_numpy_2d(value: Any) -> Any:

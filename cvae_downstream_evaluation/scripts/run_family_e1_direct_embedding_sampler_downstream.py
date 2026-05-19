@@ -71,7 +71,7 @@ def main() -> None:
     repo_root = Path.cwd()
     config = load_family_e1_config(Path(args.config))
     if args.validate_config_only:
-        print("Config validation passed for Family E1 direct embedding sampler downstream v1.")
+        print(f"Config validation passed for {config.experiment_name}.")
         return
 
     support_paths = [Path(path) for path in glob.glob(str(repo_root / config.support_selection_glob))]
