@@ -1,0 +1,154 @@
+experiment:
+  name: family_c_pca64_standardized_cvae_downstream_v1
+  stage: second_stage_downstream_diagnostic
+  status: locked_v1_ready_for_workstation_run
+  thesis_chapter: 6
+  primary_question: >
+    Is the current CVAE downstream ceiling caused by 768-D DINO geometry,
+    or by the CVAE generator itself?
+  diagnostic_family: pca64_standardized_cvae
+
+protocol:
+  split_regime: LOQDO
+  family_c_support_eval_splits: reused
+  target_expert_exclusion: required
+  source_experts_independent: required
+  pca_fit_split: source_train
+  scaler_fit_split: source_train_pca_coordinates
+  support_labels_for_primary_routing: forbidden
+  target_eval_labels_used_for_selection: forbidden
+  target_eval_labels_used_for_training: forbidden
+  target_eval_labels_used_for_final_metric_only: required
+  downstream_oracle_role: diagnostic_only
+  claim_boundary: >
+    Family C PCA64 standardized CVAE is diagnostic. It must not be
+    presented as replacing Family C/C2 routing or the locked CVAE protocol.
+
+datasets:
+  camelyon17:
+    enabled: true
+    domain_key: center
+    candidate_domains: [0, 1, 2, 3, 4]
+    experiment_seeds: [42, 43, 44]
+    support_sizes: [4, 8, 16, 32]
+    support_seeds: [17, 23, 31]
+    generation_seeds: [17, 23, 31]
+    classifier_seeds: [17, 23, 31]
+
+support_inputs:
+  selection_glob: cvae_testing/outputs/camelyon17/camelyon17_support_estimated_utility_routing_v2/support_utility_v2_seed*/reports/support_response_sample_selections.csv
+  family_c_split_source: support_response_sample_selections.csv
+
+preprocessing:
+  feature_space: standardized_pca64
+  pca_dim: 64
+  standardized: true
+  pca:
+    n_components: 64
+    whiten: false
+    svd_solver: randomized
+  scaler:
+    family: sklearn_standard_scaler
+    fit_after_pca: true
+  artifact_key_fields:
+    - experiment_seed
+    - source_center
+    - feature_extractor
+    - split_id
+    - pca_dim
+    - standardized
+
+training:
+  cvae_family: unconditioned_domain_cvae
+  input_dim: 64
+  hidden_dim: inherit_from_support_run
+  latent_dim: inherit_from_support_run
+  lr: 1e-3
+  epochs: 80
+  patience: 10
+  batch_size: 128
+  val_fraction: 0.2
+  kl_beta: 1.0
+  normalized_nelbo_eps: 1e-8
+  checkpoint_metadata_required:
+    input_dim: 64
+    feature_space: standardized_pca64
+    pca_artifact_id: required
+    scaler_artifact_id: required
+    source_center: required
+    experiment_seed: required
+
+scoring:
+  canonical_function: score_unlabeled_nelbo
+  class_prior: uniform_class_prior
+  support_nelbo_label_policy: label_marginal_unlabeled
+  target_eval_density_oracle_label_policy: label_marginal_unlabeled
+  primary_selector: family_c_pca64_raw_support_nelbo
+  diagnostic_selector: family_c_pca64_source_normalized_support_nelbo
+  nelbo_reduction: mean_over_samples
+  recon_reduction: mean_per_sample_per_dim
+  decoder_output_variance_assumption: unit_variance_mse_proxy
+
+generation:
+  mode: family_c_pca64_standardized_cvae_reference_posterior_resampling
+  object: original_dino_after_inverse_transform
+  labels: [0, 1]
+  class_prior: class_balanced
+  budget_per_class: 128
+  target_support_labels_used_for_generation: false
+  inverse_scaler_used: true
+  inverse_pca_used: true
+
+downstream:
+  primary_track: synthetic_only
+  classifier:
+    family: sklearn_logistic_regression
+    scaler_fit: synthetic_train_only
+    solver: lbfgs
+    C: 1.0
+    max_iter: 2000
+    class_weight: null
+    hyperparameter_tuning: forbidden
+  primary_metrics:
+    - bacc
+    - macro_f1
+
+diagnostics:
+  real_reconstruction_upper:
+    name: PCA64_real_reconstruction_upper
+    scope: single_source_expert_only
+    pooled_source_main_table: forbidden
+  oracles:
+    downstream_oracle: best_expert_by_target_eval_downstream_bacc
+    density_oracle: best_expert_by_target_eval_unlabeled_nelbo
+
+artifacts:
+  root: cvae_downstream_evaluation/artifacts/family_c_pca64_standardized_cvae_downstream_v1
+  required_outputs:
+    - family_c_pca64_preprocessing_manifest.csv
+    - family_c_pca64_expert_checkpoint_manifest.csv
+    - family_c_pca64_nelbo_diagnostics.csv
+    - family_c_pca64_generation_manifest.csv
+    - family_c_pca64_all_expert_downstream_matrix.csv
+    - family_c_pca64_routing_alignment.csv
+    - family_c_pca64_baseline_comparison.csv
+    - family_c_pca64_protocol_audit.csv
+    - family_c_pca64_decision_summary.json
+
+decision_rule:
+  aggregation: center_level_mean
+  current_cvae_oracle_bacc: 0.7547755213552805
+  smoke_oracle_drop_tolerance: 0.05
+  small_std_threshold: 1e-8
+  geometry_bottleneck_confirmed:
+    pca64_cvae_downstream_oracle_bacc_gte: 0.80
+  cvae_modeling_bottleneck:
+    pca64_cvae_downstream_oracle_bacc_lt: 0.80
+    pca64_real_reconstruction_upper_gte: 0.80
+  compression_or_subspace_limit:
+    pca64_cvae_downstream_oracle_bacc_lt: 0.80
+    pca64_real_reconstruction_upper_lt: 0.80
+  routing_bottleneck:
+    pca64_cvae_downstream_oracle_bacc_gte: 0.80
+    pca64_cvae_selected_bacc_lt: 0.80
+
