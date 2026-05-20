@@ -1,0 +1,200 @@
+experiment:
+  name: family_c_pca64_class_conditional_aux_head_cvae_downstream_v1
+  schema_version: family_c_pca64_class_conditional_aux_head_cvae_downstream_v1
+  stage: second_stage_downstream_generator_diagnostic
+  status: locked_v1_ready_for_workstation_run
+  thesis_chapter: 6
+  primary_question: >
+    Can source-only discriminative latent regularization help the PCA64
+    class-conditional CVAE preserve decoded class structure and move its oracle
+    BACC from 0.7687 toward the 0.84 PCA64 reconstruction / PCA-GMM upper range?
+  diagnostic_family: pca64_class_conditional_aux_head_cvae
+
+protocol:
+  split_regime: LOQDO
+  family_c_support_eval_splits: reused
+  target_expert_exclusion: required
+  source_experts_independent: required
+  pca_fit_split: source_train
+  scaler_fit_split: source_train_pca_coordinates
+  cvae_fit_split: source_train
+  aux_head_fit_split: source_train
+  support_labels_for_primary_routing: forbidden
+  target_eval_labels_used_for_selection: forbidden
+  target_eval_labels_used_for_training: forbidden
+  target_eval_labels_used_for_final_metric_only: required
+  downstream_oracle_role: diagnostic_only
+  claim_boundary: >
+    Family C PCA64 class-conditional aux-head CVAE is diagnostic. It tests
+    source-only generator regularization and must not be presented as replacing
+    Family C/C2 routing.
+
+datasets:
+  camelyon17:
+    enabled: true
+    domain_key: center
+    candidate_domains: [0, 1, 2, 3, 4]
+    experiment_seeds: [42, 43, 44]
+    support_sizes: [4, 8, 16, 32]
+    support_seeds: [17, 23, 31]
+    generation_seeds: [17, 23, 31]
+    classifier_seeds: [17, 23, 31]
+
+support_inputs:
+  selection_glob: cvae_testing/outputs/camelyon17/camelyon17_support_estimated_utility_routing_v2/support_utility_v2_seed*/reports/support_response_sample_selections.csv
+  family_c_split_source: support_response_sample_selections.csv
+
+preprocessing:
+  feature_space: standardized_pca64_class_conditional_aux_head
+  pca_dim: 64
+  standardized: true
+  pca:
+    n_components: 64
+    whiten: false
+    svd_solver: randomized
+  scaler:
+    family: sklearn_standard_scaler
+    fit_after_pca: true
+
+training:
+  cvae_family: class_conditional_domain_cvae_aux_head
+  input_dim: 64
+  conditioning: class_label_one_hot
+  metadata_dim: 2
+  hidden_dim: inherit_from_support_run
+  latent_dim: inherit_from_support_run
+  lr: 1e-3
+  epochs: 80
+  patience: 10
+  batch_size: 128
+  val_fraction: 0.2
+  kl_beta: 1.0
+  normalized_nelbo_eps: 1e-8
+  metadata_constraint:
+    enabled: true
+    variant: aux_head
+    use_mu: true
+    head_hidden_dim: 0
+    aux_weight: 1.0
+  checkpoint_metadata_required:
+    input_dim: 64
+    feature_space: standardized_pca64_class_conditional_aux_head
+    conditioning: class_label_one_hot
+    metadata_dim: 2
+    metadata_constraint_enabled: 1
+    metadata_constraint_variant: aux_head
+    metadata_constraint_use_mu: 1
+    metadata_constraint_aux_weight: 1.0
+    pca_artifact_id: required
+    scaler_artifact_id: required
+    source_center: required
+    experiment_seed: required
+
+scoring:
+  canonical_function: score_label_marginal_nelbo
+  class_prior: uniform_class_prior
+  source_prior_diagnostic: enabled
+  global_source_prior_diagnostic: enabled
+  support_nelbo_label_policy: label_marginal_unlabeled
+  target_eval_density_oracle_label_policy: label_marginal_unlabeled
+  primary_selector: family_c_pca64_aux_head_uniform_support_nelbo
+  diagnostic_selectors:
+    - family_c_pca64_aux_head_source_prior_support_nelbo
+    - family_c_pca64_aux_head_global_source_prior_support_nelbo
+  auxiliary_ce_in_support_nelbo: forbidden
+  nelbo_reduction: mean_over_samples
+  recon_reduction: mean_per_sample_per_dim
+  decoder_output_variance_assumption: unit_variance_mse_proxy
+
+generation:
+  mode: family_c_pca64_class_conditional_aux_head_cvae_reference_posterior_resampling
+  object: original_dino_after_inverse_transform
+  labels: [0, 1]
+  condition_policy: matched_label_posterior
+  class_prior: class_balanced
+  budget_per_class: 128
+  target_support_labels_used_for_generation: false
+  inverse_scaler_used: true
+  inverse_pca_used: true
+
+downstream:
+  primary_track: synthetic_only
+  classifier:
+    family: sklearn_logistic_regression
+    scaler_fit: synthetic_train_only
+    solver: lbfgs
+    C: 1.0
+    max_iter: 2000
+    class_weight: null
+    hyperparameter_tuning: forbidden
+  primary_metrics:
+    - bacc
+    - macro_f1
+
+diagnostics:
+  real_reconstruction_upper:
+    name: PCA64_real_reconstruction_upper
+    scope: single_source_expert_only
+    pooled_source_main_table: forbidden
+  objective_scale:
+    required:
+      - nelbo_mean
+      - recon_loss_mean
+      - kl_mean
+      - aux_ce_mean
+      - aux_loss_fraction
+      - total_loss_mean
+  decoded_space:
+    required:
+      - generated_class_linear_probe_bacc
+      - generated_class_centroid_distance
+      - source_class_centroid_distance
+      - centroid_distance_ratio
+      - generated_vs_source_probe_gap
+      - source_val_reconstruction_probe_bacc
+  headline_filter:
+    target_eval_has_all_classes_required: true
+
+baseline_references:
+  pca64_unconditioned_selected_bacc: 0.48615812746936227
+  pca64_unconditioned_oracle_bacc: 0.6159814144466809
+  pca64_class_conditional_selected_bacc: 0.7107152787204991
+  pca64_class_conditional_oracle_bacc: 0.7687184395194737
+  pca64_class_conditional_generated_class_linear_probe_bacc: 0.5
+  pca_gmm_oracle_bacc: 0.844213323150479
+
+artifacts:
+  root: cvae_downstream_evaluation/artifacts/family_c_pca64_class_conditional_aux_head_cvae_downstream_v1
+  required_outputs:
+    - family_c_pca64_cc_preprocessing_manifest.csv
+    - family_c_pca64_cc_expert_checkpoint_manifest.csv
+    - family_c_pca64_cc_nelbo_diagnostics.csv
+    - family_c_pca64_cc_generation_manifest.csv
+    - family_c_pca64_cc_all_expert_downstream_matrix.csv
+    - family_c_pca64_cc_routing_alignment.csv
+    - family_c_pca64_cc_baseline_comparison.csv
+    - family_c_pca64_cc_protocol_audit.csv
+    - family_c_pca64_cc_decision_summary.json
+
+decision_rule:
+  aggregation: center_level_mean
+  meaningful_oracle_gain: 0.02
+  high_disagreement_threshold: 0.60
+  material_oracle_gap: 0.02
+  small_std_threshold: 1e-8
+  collapse_ratio_threshold: 0.25
+  aux_head_generator_solved:
+    downstream_oracle_bacc_gte: 0.80
+    delta_vs_pca64_class_conditional_oracle_bacc_gte: 0.02
+    generated_class_linear_probe_bacc_improves: required
+    mean_and_median_stable: required
+  aux_head_routing_bottleneck:
+    downstream_oracle_bacc_gte: 0.80
+    selected_bacc_lt: 0.80
+    material_oracle_gap: required
+    high_oracle_selected_disagreement: required
+  aux_head_insufficient:
+    downstream_oracle_bacc_lt: 0.80
+    pca64_real_reconstruction_upper_gte: 0.80
+  no_meaningful_aux_gain:
+    delta_vs_pca64_class_conditional_oracle_bacc_lt: 0.02

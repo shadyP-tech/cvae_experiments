@@ -50,20 +50,30 @@ from .schemas import CLASSIFIER_SEEDS, EXPERIMENT_SEEDS, GENERATION_SEEDS, SUPPO
 
 FAMILY_C_PCA64_CC_NAME = "family_c_pca64_class_conditional_cvae_downstream_v1"
 FAMILY_C_PCA64_CC_SCHEMA_VERSION = "family_c_pca64_class_conditional_cvae_downstream_v1"
+FAMILY_C_PCA64_AUX_NAME = "family_c_pca64_class_conditional_aux_head_cvae_downstream_v1"
+FAMILY_C_PCA64_AUX_SCHEMA_VERSION = "family_c_pca64_class_conditional_aux_head_cvae_downstream_v1"
 PCA64_CC_CVAE_MODE = "family_c_pca64_class_conditional_cvae_reference_posterior_resampling"
+PCA64_AUX_CVAE_MODE = "family_c_pca64_class_conditional_aux_head_cvae_reference_posterior_resampling"
 PCA64_CC_REAL_RECONSTRUCTION_MODE = "pca64_real_reconstruction_upper"
 PCA64_CC_RAW_SELECTOR = "family_c_pca64_cc_uniform_support_nelbo"
 PCA64_CC_SOURCE_PRIOR_SELECTOR = "family_c_pca64_cc_source_prior_support_nelbo"
 PCA64_CC_GLOBAL_PRIOR_SELECTOR = "family_c_pca64_cc_global_source_prior_support_nelbo"
+PCA64_AUX_RAW_SELECTOR = "family_c_pca64_aux_head_uniform_support_nelbo"
+PCA64_AUX_SOURCE_PRIOR_SELECTOR = "family_c_pca64_aux_head_source_prior_support_nelbo"
+PCA64_AUX_GLOBAL_PRIOR_SELECTOR = "family_c_pca64_aux_head_global_source_prior_support_nelbo"
 PCA64_CC_SINGLE_EXPERT_ROW_TYPE = "single_expert_pca64_class_conditional_cvae"
+PCA64_AUX_SINGLE_EXPERT_ROW_TYPE = "single_expert_pca64_class_conditional_aux_head_cvae"
 PCA64_CC_REAL_UPPER_ROW_TYPE = "real_reconstruction_upper"
 PCA64_CC_FEATURE_SPACE = "standardized_pca64_class_conditional"
+PCA64_AUX_FEATURE_SPACE = "standardized_pca64_class_conditional_aux_head"
 PCA64_CC_PCA_DIM = 64
 PCA64_CC_BUDGET_PER_CLASS = 128
 PCA64_CC_CLASS_LABELS = (0, 1)
 PCA64_CC_CONDITION_DIM = 2
 PCA64_CC_NORMALIZED_EPS = 1e-8
 PCA64_CC_SMALL_STD_THRESHOLD = 1e-8
+PCA64_CC_BASELINE_SELECTED_BACC = 0.7107152787204991
+PCA64_CC_BASELINE_ORACLE_BACC = 0.7687184395194737
 
 
 PCA64_CC_MATRIX_COLUMNS = (
@@ -95,6 +105,10 @@ PCA64_CC_MATRIX_COLUMNS = (
     "target_eval_nelbo_unlabeled",
     "target_eval_nelbo_source_prior",
     "target_eval_nelbo_global_source_prior",
+    "generated_class_linear_probe_bacc",
+    "source_val_reconstruction_probe_bacc",
+    "generated_vs_source_probe_gap",
+    "centroid_distance_ratio",
     "available",
     "status",
     "error_message",
@@ -162,11 +176,30 @@ PCA64_CC_CHECKPOINT_COLUMNS = (
     "feature_space",
     "conditioning",
     "metadata_dim",
+    "metadata_constraint_enabled",
+    "metadata_constraint_variant",
+    "metadata_constraint_use_mu",
+    "metadata_constraint_aux_weight",
     "pca_artifact_id",
     "scaler_artifact_id",
     "source_class_prior_json",
     "source_train_nelbo_mean",
     "source_train_nelbo_std",
+    "nelbo_mean",
+    "recon_loss_mean",
+    "kl_mean",
+    "aux_ce_mean",
+    "aux_loss_fraction",
+    "total_loss_mean",
+    "train_aux_ce_mean",
+    "val_aux_ce_mean",
+    "train_aux_accuracy",
+    "val_aux_accuracy",
+    "source_train_aux_accuracy",
+    "source_val_aux_accuracy",
+    "source_val_majority_baseline",
+    "aux_weight",
+    "aux_head_input",
     "kl_beta",
     "decoder_output_variance_assumption",
     "available",
@@ -224,6 +257,10 @@ PCA64_CC_GENERATION_COLUMNS = (
     "generated_class_centroid_distance",
     "source_class_centroid_distance",
     "generated_class_centroid_ratio",
+    "centroid_distance_ratio",
+    "generated_class_linear_probe_bacc",
+    "source_val_reconstruction_probe_bacc",
+    "generated_vs_source_probe_gap",
     "generated_class_overlap_score",
     "missing_class_generation",
     "low_generated_dino_std_ratio",
@@ -287,6 +324,8 @@ PCA64_CC_BASELINE_COLUMNS = (
     "spearman_neg_nelbo_vs_bacc",
     "delta_vs_pca64_unconditioned_selected_bacc",
     "delta_vs_pca64_unconditioned_oracle_bacc",
+    "delta_vs_pca64_class_conditional_selected_bacc",
+    "delta_vs_pca64_class_conditional_oracle_bacc",
     "delta_vs_pca_gmm_oracle_bacc",
     "available",
 )
@@ -295,6 +334,13 @@ PCA64_CC_BASELINE_COLUMNS = (
 @dataclass(frozen=True)
 class FamilyCPca64ClassConditionalConfig:
     experiment_name: str = FAMILY_C_PCA64_CC_NAME
+    schema_version: str = FAMILY_C_PCA64_CC_SCHEMA_VERSION
+    feature_space: str = PCA64_CC_FEATURE_SPACE
+    cvae_mode: str = PCA64_CC_CVAE_MODE
+    raw_selector: str = PCA64_CC_RAW_SELECTOR
+    source_prior_selector: str = PCA64_CC_SOURCE_PRIOR_SELECTOR
+    global_prior_selector: str = PCA64_CC_GLOBAL_PRIOR_SELECTOR
+    single_expert_row_type: str = PCA64_CC_SINGLE_EXPERT_ROW_TYPE
     candidate_domains: tuple[str, ...] = ("0", "1", "2", "3", "4")
     experiment_seeds: tuple[int, ...] = EXPERIMENT_SEEDS
     support_sizes: tuple[int, ...] = SUPPORT_SIZES
@@ -317,6 +363,11 @@ class FamilyCPca64ClassConditionalConfig:
     batch_size: int = 128
     val_fraction: float = 0.2
     kl_beta: float = 1.0
+    metadata_constraint_enabled: bool = False
+    metadata_constraint_variant: str = "none"
+    metadata_constraint_use_mu: bool = True
+    metadata_constraint_aux_weight: float = 0.0
+    metadata_constraint_head_hidden_dim: int = 0
     normalized_nelbo_eps: float = PCA64_CC_NORMALIZED_EPS
     small_std_threshold: float = PCA64_CC_SMALL_STD_THRESHOLD
     collapse_ratio_threshold: float = 0.25
@@ -325,6 +376,9 @@ class FamilyCPca64ClassConditionalConfig:
     material_oracle_gap: float = 0.02
     pca64_unconditioned_selected_bacc: float = 0.48615812746936227
     pca64_unconditioned_oracle_bacc: float = 0.6159814144466809
+    pca64_class_conditional_selected_bacc: float = PCA64_CC_BASELINE_SELECTED_BACC
+    pca64_class_conditional_oracle_bacc: float = PCA64_CC_BASELINE_ORACLE_BACC
+    pca64_class_conditional_generated_class_linear_probe_bacc: float = 0.5
     pca_gmm_oracle_bacc: float = 0.844213323150479
 
 
@@ -350,10 +404,33 @@ class Pca64ClassConditionalExpert:
     hidden_dim: int
     latent_dim: int
     kl_beta: float
+    feature_space: str = PCA64_CC_FEATURE_SPACE
+    metadata_constraint_enabled: bool = False
+    metadata_constraint_aux_weight: float = 0.0
+    training_diagnostics: Mapping[str, float] | None = None
 
 
 def default_family_c_pca64_cc_config() -> FamilyCPca64ClassConditionalConfig:
     return FamilyCPca64ClassConditionalConfig()
+
+
+def default_family_c_pca64_aux_head_config() -> FamilyCPca64ClassConditionalConfig:
+    return FamilyCPca64ClassConditionalConfig(
+        experiment_name=FAMILY_C_PCA64_AUX_NAME,
+        schema_version=FAMILY_C_PCA64_AUX_SCHEMA_VERSION,
+        feature_space=PCA64_AUX_FEATURE_SPACE,
+        cvae_mode=PCA64_AUX_CVAE_MODE,
+        raw_selector=PCA64_AUX_RAW_SELECTOR,
+        source_prior_selector=PCA64_AUX_SOURCE_PRIOR_SELECTOR,
+        global_prior_selector=PCA64_AUX_GLOBAL_PRIOR_SELECTOR,
+        single_expert_row_type=PCA64_AUX_SINGLE_EXPERT_ROW_TYPE,
+        artifacts_root="cvae_downstream_evaluation/artifacts/family_c_pca64_class_conditional_aux_head_cvae_downstream_v1",
+        metadata_constraint_enabled=True,
+        metadata_constraint_variant="aux_head",
+        metadata_constraint_use_mu=True,
+        metadata_constraint_aux_weight=1.0,
+        metadata_constraint_head_hidden_dim=0,
+    )
 
 
 def load_family_c_pca64_cc_config(path: Path) -> FamilyCPca64ClassConditionalConfig:
@@ -362,6 +439,8 @@ def load_family_c_pca64_cc_config(path: Path) -> FamilyCPca64ClassConditionalCon
     try:
         import yaml  # type: ignore
     except ModuleNotFoundError:
+        if FAMILY_C_PCA64_AUX_NAME in text:
+            return default_family_c_pca64_aux_head_config()
         return default_family_c_pca64_cc_config()
     loaded = yaml.safe_load(text) or {}
     experiment = _mapping(loaded.get("experiment"), "experiment")
@@ -372,10 +451,27 @@ def load_family_c_pca64_cc_config(path: Path) -> FamilyCPca64ClassConditionalCon
     generation = _mapping(loaded.get("generation"), "generation")
     artifacts = _mapping(loaded.get("artifacts"), "artifacts")
     support_inputs = _mapping(loaded.get("support_inputs"), "support_inputs")
+    scoring = _mapping(loaded.get("scoring"), "scoring")
     decision = _mapping(loaded.get("decision_rule"), "decision_rule")
     baselines = _mapping(loaded.get("baseline_references"), "baseline_references")
+    experiment_name = str(experiment.get("name", FAMILY_C_PCA64_CC_NAME))
+    defaults = default_family_c_pca64_aux_head_config() if experiment_name == FAMILY_C_PCA64_AUX_NAME else default_family_c_pca64_cc_config()
+    metadata_constraint = _mapping(training.get("metadata_constraint", {}), "training.metadata_constraint")
+    constraint_enabled = bool(metadata_constraint.get("enabled", defaults.metadata_constraint_enabled))
+    constraint_variant = str(metadata_constraint.get("variant", defaults.metadata_constraint_variant))
+    constraint_use_mu = bool(metadata_constraint.get("use_mu", defaults.metadata_constraint_use_mu))
+    constraint_aux_weight = float(metadata_constraint.get("aux_weight", defaults.metadata_constraint_aux_weight))
+    constraint_head_hidden_dim = int(metadata_constraint.get("head_hidden_dim", defaults.metadata_constraint_head_hidden_dim))
+    feature_space = str(preprocessing.get("feature_space", defaults.feature_space))
     return FamilyCPca64ClassConditionalConfig(
-        experiment_name=str(experiment.get("name", FAMILY_C_PCA64_CC_NAME)),
+        experiment_name=experiment_name,
+        schema_version=str(experiment.get("schema_version", defaults.schema_version)),
+        feature_space=feature_space,
+        cvae_mode=str(generation.get("mode", defaults.cvae_mode)),
+        raw_selector=str(scoring.get("primary_selector", defaults.raw_selector)),
+        source_prior_selector=defaults.source_prior_selector,
+        global_prior_selector=defaults.global_prior_selector,
+        single_expert_row_type=defaults.single_expert_row_type,
         candidate_domains=tuple(str(v) for v in camelyon.get("candidate_domains", ("0", "1", "2", "3", "4"))),
         experiment_seeds=tuple(int(v) for v in camelyon.get("experiment_seeds", EXPERIMENT_SEEDS)),
         support_sizes=tuple(int(v) for v in camelyon.get("support_sizes", SUPPORT_SIZES)),
@@ -394,6 +490,11 @@ def load_family_c_pca64_cc_config(path: Path) -> FamilyCPca64ClassConditionalCon
         batch_size=int(training.get("batch_size", 128)),
         val_fraction=float(training.get("val_fraction", 0.2)),
         kl_beta=float(training.get("kl_beta", 1.0)),
+        metadata_constraint_enabled=constraint_enabled,
+        metadata_constraint_variant=constraint_variant,
+        metadata_constraint_use_mu=constraint_use_mu,
+        metadata_constraint_aux_weight=constraint_aux_weight,
+        metadata_constraint_head_hidden_dim=constraint_head_hidden_dim,
         normalized_nelbo_eps=float(training.get("normalized_nelbo_eps", PCA64_CC_NORMALIZED_EPS)),
         small_std_threshold=float(decision.get("small_std_threshold", PCA64_CC_SMALL_STD_THRESHOLD)),
         collapse_ratio_threshold=float(decision.get("collapse_ratio_threshold", 0.25)),
@@ -402,33 +503,66 @@ def load_family_c_pca64_cc_config(path: Path) -> FamilyCPca64ClassConditionalCon
         material_oracle_gap=float(decision.get("material_oracle_gap", 0.02)),
         pca64_unconditioned_selected_bacc=float(baselines.get("pca64_unconditioned_selected_bacc", 0.48615812746936227)),
         pca64_unconditioned_oracle_bacc=float(baselines.get("pca64_unconditioned_oracle_bacc", 0.6159814144466809)),
+        pca64_class_conditional_selected_bacc=float(baselines.get("pca64_class_conditional_selected_bacc", PCA64_CC_BASELINE_SELECTED_BACC)),
+        pca64_class_conditional_oracle_bacc=float(baselines.get("pca64_class_conditional_oracle_bacc", PCA64_CC_BASELINE_ORACLE_BACC)),
+        pca64_class_conditional_generated_class_linear_probe_bacc=float(
+            baselines.get("pca64_class_conditional_generated_class_linear_probe_bacc", 0.5)
+        ),
         pca_gmm_oracle_bacc=float(baselines.get("pca_gmm_oracle_bacc", 0.844213323150479)),
     )
 
 
+def load_family_c_pca64_aux_head_config(path: Path) -> FamilyCPca64ClassConditionalConfig:
+    config = load_family_c_pca64_cc_config(path)
+    if config.experiment_name != FAMILY_C_PCA64_AUX_NAME:
+        raise ProtocolError(f"Expected {FAMILY_C_PCA64_AUX_NAME}, got {config.experiment_name}")
+    return config
+
+
 def assert_family_c_pca64_cc_config_text(text: str) -> None:
-    required = (
-        f"name: {FAMILY_C_PCA64_CC_NAME}",
-        "feature_space: standardized_pca64_class_conditional",
-        "conditioning: class_label_one_hot",
-        "pca_dim: 64",
-        "uniform_class_prior",
-        "source_prior_diagnostic",
-        "support_labels_for_primary_routing: forbidden",
-        "target_eval_labels_used_for_selection: forbidden",
-        "budget_per_class: 128",
-        "meaningful_oracle_gain: 0.02",
-        "family_c_pca64_cc_all_expert_downstream_matrix.csv",
-    )
+    if FAMILY_C_PCA64_AUX_NAME in text:
+        required = (
+            f"name: {FAMILY_C_PCA64_AUX_NAME}",
+            "feature_space: standardized_pca64_class_conditional_aux_head",
+            "conditioning: class_label_one_hot",
+            "variant: aux_head",
+            "use_mu: true",
+            "aux_weight: 1.0",
+            "support_labels_for_primary_routing: forbidden",
+            "target_eval_labels_used_for_selection: forbidden",
+            "budget_per_class: 128",
+            "meaningful_oracle_gain: 0.02",
+            "family_c_pca64_cc_all_expert_downstream_matrix.csv",
+        )
+    else:
+        required = (
+            f"name: {FAMILY_C_PCA64_CC_NAME}",
+            "feature_space: standardized_pca64_class_conditional",
+            "conditioning: class_label_one_hot",
+            "pca_dim: 64",
+            "uniform_class_prior",
+            "source_prior_diagnostic",
+            "support_labels_for_primary_routing: forbidden",
+            "target_eval_labels_used_for_selection: forbidden",
+            "budget_per_class: 128",
+            "meaningful_oracle_gain: 0.02",
+            "family_c_pca64_cc_all_expert_downstream_matrix.csv",
+        )
     missing = [snippet for snippet in required if snippet not in text]
     if missing:
         raise ProtocolError(f"Family C PCA64 class-conditional config missing required fields: {missing}")
 
 
+def assert_family_c_pca64_aux_head_config_text(text: str) -> None:
+    if FAMILY_C_PCA64_AUX_NAME not in text:
+        raise ProtocolError(f"Family C PCA64 aux-head config must declare {FAMILY_C_PCA64_AUX_NAME}")
+    assert_family_c_pca64_cc_config_text(text)
+
+
 def assert_pca64_cc_checkpoint_metadata(metadata: Mapping[str, object], *, expected: Mapping[str, object]) -> None:
     required = {
         "input_dim": 64,
-        "feature_space": PCA64_CC_FEATURE_SPACE,
+        "feature_space": str(expected.get("feature_space", PCA64_CC_FEATURE_SPACE)),
         "conditioning": "class_label_one_hot",
         "metadata_dim": PCA64_CC_CONDITION_DIM,
         "pca_artifact_id": expected.get("pca_artifact_id"),
@@ -448,6 +582,29 @@ def assert_pca64_cc_checkpoint_metadata(metadata: Mapping[str, object], *, expec
                 f"Incompatible PCA64 class-conditional CVAE checkpoint metadata for {key}: "
                 f"got {actual!r}, expected {value!r}"
             )
+    if str(expected.get("feature_space", "")) == PCA64_AUX_FEATURE_SPACE or bool(expected.get("metadata_constraint_enabled", False)):
+        aux_required = {
+            "metadata_constraint_enabled": 1,
+            "metadata_constraint_variant": "aux_head",
+            "metadata_constraint_use_mu": 1,
+            "metadata_constraint_aux_weight": float(expected.get("metadata_constraint_aux_weight", 1.0)),
+        }
+        for key, value in aux_required.items():
+            actual = metadata.get(key)
+            if key in {"metadata_constraint_enabled", "metadata_constraint_use_mu"}:
+                actual = int(actual) if str(actual).strip() else actual
+                value = int(value)
+            elif key == "metadata_constraint_aux_weight":
+                actual = float(actual) if str(actual).strip() else actual
+                value = float(value)
+            else:
+                actual = str(actual)
+                value = str(value)
+            if actual != value:
+                raise ProtocolError(
+                    f"Incompatible PCA64 aux-head CVAE checkpoint metadata for {key}: "
+                    f"got {actual!r}, expected {value!r}"
+                )
 
 
 def class_one_hot(labels: Sequence[int], *, torch: Any | None = None, device: Any | None = None) -> Any:
@@ -701,16 +858,20 @@ def fit_or_load_pca64_cc_cvae_bank(
             artifacts_root
             / "checkpoints"
             / f"seed{int(artifact.experiment_seed)}"
-            / f"expert_{source_center}_standardized_pca64_class_conditional.pt"
+            / f"expert_{source_center}_{config.feature_space}.pt"
         )
         metadata = {
-            "schema_version": FAMILY_C_PCA64_CC_SCHEMA_VERSION,
+            "schema_version": config.schema_version,
             "input_dim": int(config.pca_dim),
             "hidden_dim": hidden_dim,
             "latent_dim": latent_dim,
-            "feature_space": PCA64_CC_FEATURE_SPACE,
+            "feature_space": config.feature_space,
             "conditioning": "class_label_one_hot",
             "metadata_dim": PCA64_CC_CONDITION_DIM,
+            "metadata_constraint_enabled": int(config.metadata_constraint_enabled),
+            "metadata_constraint_variant": str(config.metadata_constraint_variant),
+            "metadata_constraint_use_mu": int(config.metadata_constraint_use_mu),
+            "metadata_constraint_aux_weight": float(config.metadata_constraint_aux_weight),
             "pca_artifact_id": prep.pca_artifact_id,
             "scaler_artifact_id": prep.scaler_artifact_id,
             "source_center": str(source_center),
@@ -728,6 +889,7 @@ def fit_or_load_pca64_cc_cvae_bank(
                 hidden_dim,
                 latent_dim,
                 metadata_dim=PCA64_CC_CONDITION_DIM,
+                metadata_constraint_cfg=_metadata_constraint_cfg(config),
                 aux_metadata_dim=PCA64_CC_CONDITION_DIM,
             ).to(resolved_device)
             model.load_state_dict(loaded.model_state_dict)
@@ -738,6 +900,7 @@ def fit_or_load_pca64_cc_cvae_bank(
                 hidden_dim,
                 latent_dim,
                 metadata_dim=PCA64_CC_CONDITION_DIM,
+                metadata_constraint_cfg=_metadata_constraint_cfg(config),
                 aux_metadata_dim=PCA64_CC_CONDITION_DIM,
             ).to(resolved_device)
             _train_pca64_cc_cvae(
@@ -755,6 +918,15 @@ def fit_or_load_pca64_cc_cvae_bank(
         model.eval()
         model._pca64_torch = torch
         model._pca64_device = resolved_device
+        train_diag = _source_objective_diagnostics(
+            model=model,
+            x=source_x,
+            labels=source_labels,
+            config=config,
+            seed=_stable_seed(artifact.experiment_seed, source_center, "aux_objective_diag"),
+            torch=torch,
+            device=resolved_device,
+        )
         expert_shell = Pca64ClassConditionalExpert(
             experiment_seed=int(artifact.experiment_seed),
             source_center=str(source_center),
@@ -769,6 +941,10 @@ def fit_or_load_pca64_cc_cvae_bank(
             hidden_dim=hidden_dim,
             latent_dim=latent_dim,
             kl_beta=float(config.kl_beta),
+            feature_space=config.feature_space,
+            metadata_constraint_enabled=bool(config.metadata_constraint_enabled),
+            metadata_constraint_aux_weight=float(config.metadata_constraint_aux_weight),
+            training_diagnostics=train_diag,
         )
         source_score = score_label_marginal_nelbo(
             model,
@@ -799,14 +975,21 @@ def fit_or_load_pca64_cc_cvae_bank(
                 "input_dim": int(config.pca_dim),
                 "hidden_dim": hidden_dim,
                 "latent_dim": latent_dim,
-                "feature_space": PCA64_CC_FEATURE_SPACE,
+                "feature_space": config.feature_space,
                 "conditioning": "class_label_one_hot",
                 "metadata_dim": PCA64_CC_CONDITION_DIM,
+                "metadata_constraint_enabled": int(config.metadata_constraint_enabled),
+                "metadata_constraint_variant": str(config.metadata_constraint_variant),
+                "metadata_constraint_use_mu": int(config.metadata_constraint_use_mu),
+                "metadata_constraint_aux_weight": float(config.metadata_constraint_aux_weight),
                 "pca_artifact_id": prep.pca_artifact_id,
                 "scaler_artifact_id": prep.scaler_artifact_id,
                 "source_class_prior_json": _json_prior(source_prior),
                 "source_train_nelbo_mean": float(source_score.total),
                 "source_train_nelbo_std": source_std,
+                **train_diag,
+                "aux_weight": float(config.metadata_constraint_aux_weight),
+                "aux_head_input": "mu" if config.metadata_constraint_use_mu else "z",
                 "kl_beta": float(config.kl_beta),
                 "decoder_output_variance_assumption": "unit_variance_mse_proxy",
                 "available": 1,
@@ -835,16 +1018,16 @@ def score_pca64_cc_cvae_candidate(
     target_density_scores: ClassConditionalNelboScores,
 ) -> tuple[dict[str, object], list[dict[str, object]], dict[str, object]]:
     base = _row_base(
-        schema_version=FAMILY_C_PCA64_CC_SCHEMA_VERSION,
+        schema_version=config.schema_version,
         experiment_seed=experiment_seed,
         heldout_center=heldout_center,
         unit=unit,
         candidate_expert=candidate_expert,
-        generation_mode=PCA64_CC_CVAE_MODE,
+        generation_mode=config.cvae_mode,
         budget_per_class=config.budget_per_class,
         generation_seed=generation_seed,
         classifier_seed=classifier_seed,
-        row_type=PCA64_CC_SINGLE_EXPERT_ROW_TYPE,
+        row_type=config.single_expert_row_type,
         n_target_eval=len(target_split.eval_indices),
         target_eval_pool_id=target_split.target_eval_pool_id,
         target_status=target_status,
@@ -882,6 +1065,10 @@ def score_pca64_cc_cvae_candidate(
             "macro_f1": float(prediction.score.macro_f1),
             "auroc": float(prediction.score.secondary_metrics.get("auroc", math.nan)),
             "auprc": float(prediction.score.secondary_metrics.get("auprc", math.nan)),
+            "generated_class_linear_probe_bacc": _first_generation_metric(generation_rows, "generated_class_linear_probe_bacc"),
+            "source_val_reconstruction_probe_bacc": _first_generation_metric(generation_rows, "source_val_reconstruction_probe_bacc"),
+            "generated_vs_source_probe_gap": _first_generation_metric(generation_rows, "generated_vs_source_probe_gap"),
+            "centroid_distance_ratio": _first_generation_metric(generation_rows, "centroid_distance_ratio"),
             "n_train": len(labels),
             "available": 1,
             "status": "ok",
@@ -912,7 +1099,7 @@ def score_pca64_cc_real_reconstruction_candidate(
     target_density_scores: ClassConditionalNelboScores,
 ) -> tuple[dict[str, object], dict[str, object]]:
     base = _row_base(
-        schema_version=FAMILY_C_PCA64_CC_SCHEMA_VERSION,
+        schema_version=config.schema_version,
         experiment_seed=experiment_seed,
         heldout_center=heldout_center,
         unit=unit,
@@ -952,6 +1139,10 @@ def score_pca64_cc_real_reconstruction_candidate(
             "macro_f1": float(prediction.score.macro_f1),
             "auroc": float(prediction.score.secondary_metrics.get("auroc", math.nan)),
             "auprc": float(prediction.score.secondary_metrics.get("auprc", math.nan)),
+            "generated_class_linear_probe_bacc": math.nan,
+            "source_val_reconstruction_probe_bacc": math.nan,
+            "generated_vs_source_probe_gap": math.nan,
+            "centroid_distance_ratio": math.nan,
             "n_train": len(labels),
             "available": 1,
             "status": "ok",
@@ -1017,6 +1208,15 @@ def generate_pca64_cc_cvae_class_balanced(
         source=source,
         source_labels=source_labels,
         threshold=collapse_ratio_threshold,
+    )
+    global_diag.update(
+        _decoded_space_probe_diagnostics(
+            generated=generated,
+            generated_labels=gen_labels,
+            source=source,
+            source_labels=source_labels,
+            seed=int(generation_seed),
+        )
     )
     for class_label in tuple(int(v) for v in class_labels):
         generated_dino = chunks[class_label]
@@ -1091,7 +1291,7 @@ def build_family_c_pca64_cc_reports(
     cfg = config or default_family_c_pca64_cc_config()
     paths = _artifact_paths(artifacts_root)
     rows = _read_dict_rows(paths["matrix"])
-    align = build_family_c_pca64_cc_alignment_rows(rows=rows, candidate_domains=candidate_domains)
+    align = build_family_c_pca64_cc_alignment_rows(rows=rows, candidate_domains=candidate_domains, config=cfg)
     baseline = build_family_c_pca64_cc_baseline_rows(rows=rows, alignment_rows=align, config=cfg)
     summary = classify_family_c_pca64_cc_decision(rows=rows, alignment_rows=align, config=cfg)
     _write_dict_csv(paths["alignment"], PCA64_CC_ALIGNMENT_COLUMNS, align)
@@ -1104,12 +1304,14 @@ def build_family_c_pca64_cc_alignment_rows(
     *,
     rows: Sequence[Mapping[str, object]],
     candidate_domains: Sequence[str],
+    config: FamilyCPca64ClassConditionalConfig | None = None,
 ) -> list[dict[str, object]]:
+    cfg = config or default_family_c_pca64_cc_config()
     _ = tuple(candidate_domains)
     generated = [
         r
         for r in rows
-        if r.get("generation_mode") == PCA64_CC_CVAE_MODE
+        if r.get("generation_mode") == cfg.cvae_mode
         and str(r.get("status")) == "ok"
         and str(r.get("target_eval_has_all_classes")) == "1"
     ]
@@ -1121,9 +1323,9 @@ def build_family_c_pca64_cc_alignment_rows(
         downstream_oracle = max(group, key=lambda row: (_float(row.get("bacc")), _float(row.get("macro_f1")), _reverse_sort(str(row.get("candidate_expert")))))
         density_oracle = min(group, key=lambda row: (_float(row.get("target_eval_nelbo_unlabeled")), str(row.get("candidate_expert"))))
         for selector, score_column in (
-            (PCA64_CC_RAW_SELECTOR, "support_nelbo_raw"),
-            (PCA64_CC_SOURCE_PRIOR_SELECTOR, "support_nelbo_source_prior"),
-            (PCA64_CC_GLOBAL_PRIOR_SELECTOR, "support_nelbo_global_source_prior"),
+            (cfg.raw_selector, "support_nelbo_raw"),
+            (cfg.source_prior_selector, "support_nelbo_source_prior"),
+            (cfg.global_prior_selector, "support_nelbo_global_source_prior"),
         ):
             available_group = [row for row in group if not math.isnan(_float(row.get(score_column)))]
             if not available_group:
@@ -1174,7 +1376,7 @@ def build_family_c_pca64_cc_baseline_rows(
     config: FamilyCPca64ClassConditionalConfig,
 ) -> list[dict[str, object]]:
     out: list[dict[str, object]] = []
-    for selector in (PCA64_CC_RAW_SELECTOR, PCA64_CC_SOURCE_PRIOR_SELECTOR, PCA64_CC_GLOBAL_PRIOR_SELECTOR):
+    for selector in (config.raw_selector, config.source_prior_selector, config.global_prior_selector):
         subset = [row for row in alignment_rows if row.get("selector") == selector and int(row.get("available", 0)) == 1]
         selected_bacc = _center_level_mean(subset, "selected_bacc")
         out.append(
@@ -1190,6 +1392,8 @@ def build_family_c_pca64_cc_baseline_rows(
                 "spearman_neg_nelbo_vs_bacc": _mean(_float(row.get("spearman_neg_nelbo_vs_bacc")) for row in subset),
                 "delta_vs_pca64_unconditioned_selected_bacc": selected_bacc - float(config.pca64_unconditioned_selected_bacc),
                 "delta_vs_pca64_unconditioned_oracle_bacc": math.nan,
+                "delta_vs_pca64_class_conditional_selected_bacc": selected_bacc - float(config.pca64_class_conditional_selected_bacc),
+                "delta_vs_pca64_class_conditional_oracle_bacc": math.nan,
                 "delta_vs_pca_gmm_oracle_bacc": math.nan,
                 "available": int(bool(subset)),
             }
@@ -1197,8 +1401,8 @@ def build_family_c_pca64_cc_baseline_rows(
     generated = [
         row
         for row in rows
-        if row.get("generation_mode") == PCA64_CC_CVAE_MODE
-        and row.get("row_type") == PCA64_CC_SINGLE_EXPERT_ROW_TYPE
+        if row.get("generation_mode") == config.cvae_mode
+        and row.get("row_type") == config.single_expert_row_type
         and row.get("status") == "ok"
         and str(row.get("target_eval_has_all_classes")) == "1"
     ]
@@ -1211,7 +1415,7 @@ def build_family_c_pca64_cc_baseline_rows(
         and str(row.get("target_eval_has_all_classes")) == "1"
     ]
     oracle = _oracle_center_mean(generated)
-    out.append(_oracle_baseline_row(generated, method="family_c_pca64_cc_downstream_oracle", row_type="diagnostic_oracle", config=config, oracle_value=oracle))
+    out.append(_oracle_baseline_row(generated, method=f"{config.experiment_name}_downstream_oracle", row_type="diagnostic_oracle", config=config, oracle_value=oracle))
     out.append(_oracle_baseline_row(recon, method="PCA64_real_reconstruction_upper", row_type="diagnostic_upper_bound", config=config, oracle_value=_oracle_center_mean(recon)))
     return out
 
@@ -1222,7 +1426,7 @@ def classify_family_c_pca64_cc_decision(
     alignment_rows: Sequence[Mapping[str, object]],
     config: FamilyCPca64ClassConditionalConfig,
 ) -> dict[str, object]:
-    raw_rows = [row for row in alignment_rows if row.get("selector") == PCA64_CC_RAW_SELECTOR and int(row.get("available", 0)) == 1]
+    raw_rows = [row for row in alignment_rows if row.get("selector") == config.raw_selector and int(row.get("available", 0)) == 1]
     selected = _center_level_mean(raw_rows, "selected_bacc")
     oracle = _center_level_mean(raw_rows, "downstream_oracle_bacc")
     gap = _center_level_mean(raw_rows, "oracle_gap_bacc")
@@ -1241,28 +1445,59 @@ def classify_family_c_pca64_cc_decision(
     )
     delta_selected = selected - float(config.pca64_unconditioned_selected_bacc)
     delta_oracle = oracle - float(config.pca64_unconditioned_oracle_bacc)
+    delta_cc_selected = selected - float(config.pca64_class_conditional_selected_bacc)
+    delta_cc_oracle = oracle - float(config.pca64_class_conditional_oracle_bacc)
     delta_pca_gmm_oracle = oracle - float(config.pca_gmm_oracle_bacc)
-    stable_gain = delta_oracle >= float(config.meaningful_oracle_gain) and oracle_median >= float(config.pca64_unconditioned_oracle_bacc) + float(config.meaningful_oracle_gain)
+    primary_delta = delta_cc_oracle if config.metadata_constraint_enabled else delta_oracle
+    primary_baseline = float(config.pca64_class_conditional_oracle_bacc) if config.metadata_constraint_enabled else float(config.pca64_unconditioned_oracle_bacc)
+    stable_gain = primary_delta >= float(config.meaningful_oracle_gain) and oracle_median >= primary_baseline + float(config.meaningful_oracle_gain)
     high_disagreement = top1 <= float(config.high_disagreement_threshold) or agreement <= float(config.high_disagreement_threshold)
     material_gap = gap >= float(config.material_oracle_gap)
-    if delta_oracle < float(config.meaningful_oracle_gain) or not stable_gain:
-        classification = "NO_MEANINGFUL_GAIN"
-    elif oracle >= 0.80 and selected < 0.80 and material_gap and high_disagreement:
-        classification = "ROUTING_BOTTLENECK"
-    elif oracle >= 0.80 and stable_gain:
-        classification = "GENERATOR_SOLVED"
-    elif oracle < 0.80 and recon_oracle >= 0.80:
-        classification = "CLASS_CONDITIONING_INSUFFICIENT"
-    elif oracle < 0.80 and recon_oracle < 0.80:
-        classification = "PCA64_OR_SOURCE_LIMIT"
+    generated_rows = [
+        row
+        for row in rows
+        if row.get("generation_mode") == config.cvae_mode
+        and row.get("row_type") == config.single_expert_row_type
+        and row.get("status") == "ok"
+        and str(row.get("target_eval_has_all_classes")) == "1"
+    ]
+    generated_probe = _center_level_mean(generated_rows, "generated_class_linear_probe_bacc")
+    generated_probe_improves = (
+        math.isnan(float(config.pca64_class_conditional_generated_class_linear_probe_bacc))
+        or generated_probe >= float(config.pca64_class_conditional_generated_class_linear_probe_bacc)
+    )
+    if config.metadata_constraint_enabled:
+        if primary_delta < float(config.meaningful_oracle_gain) or not stable_gain:
+            classification = "NO_MEANINGFUL_AUX_GAIN"
+        elif oracle >= 0.80 and selected < 0.80 and material_gap and high_disagreement:
+            classification = "AUX_HEAD_ROUTING_BOTTLENECK"
+        elif oracle >= 0.80 and stable_gain and generated_probe_improves:
+            classification = "AUX_HEAD_GENERATOR_SOLVED"
+        elif oracle < 0.80 and recon_oracle >= 0.80:
+            classification = "AUX_HEAD_INSUFFICIENT"
+        elif oracle < 0.80 and recon_oracle < 0.80:
+            classification = "PCA64_OR_SOURCE_LIMIT"
+        else:
+            classification = "DIAGNOSTIC_ONLY"
     else:
-        classification = "DIAGNOSTIC_ONLY"
+        if delta_oracle < float(config.meaningful_oracle_gain) or not stable_gain:
+            classification = "NO_MEANINGFUL_GAIN"
+        elif oracle >= 0.80 and selected < 0.80 and material_gap and high_disagreement:
+            classification = "ROUTING_BOTTLENECK"
+        elif oracle >= 0.80 and stable_gain:
+            classification = "GENERATOR_SOLVED"
+        elif oracle < 0.80 and recon_oracle >= 0.80:
+            classification = "CLASS_CONDITIONING_INSUFFICIENT"
+        elif oracle < 0.80 and recon_oracle < 0.80:
+            classification = "PCA64_OR_SOURCE_LIMIT"
+        else:
+            classification = "DIAGNOSTIC_ONLY"
     all_rows = [row for row in rows if row.get("status") == "ok"]
     all_class_rows = [row for row in all_rows if str(row.get("target_eval_has_all_classes")) == "1"]
     return {
-        "schema_version": FAMILY_C_PCA64_CC_SCHEMA_VERSION,
+        "schema_version": config.schema_version,
         "decision_classification": classification,
-        "pass_fail": "PASS" if classification in {"GENERATOR_SOLVED", "ROUTING_BOTTLENECK"} else "FAIL",
+        "pass_fail": "PASS" if classification in {"GENERATOR_SOLVED", "ROUTING_BOTTLENECK", "AUX_HEAD_GENERATOR_SOLVED", "AUX_HEAD_ROUTING_BOTTLENECK"} else "FAIL",
         "metrics": {
             "pca64_cc_cvae_selected_center_level_mean_bacc": selected,
             "pca64_cc_cvae_selected_median_bacc": selected_median,
@@ -1272,7 +1507,11 @@ def classify_family_c_pca64_cc_decision(
             "pca64_real_reconstruction_upper_center_level_mean_bacc": recon_oracle,
             "delta_vs_pca64_unconditioned_selected_bacc": delta_selected,
             "delta_vs_pca64_unconditioned_oracle_bacc": delta_oracle,
+            "delta_vs_pca64_class_conditional_selected_bacc": delta_cc_selected,
+            "delta_vs_pca64_class_conditional_oracle_bacc": delta_cc_oracle,
             "delta_vs_pca_gmm_oracle_bacc": delta_pca_gmm_oracle,
+            "generated_class_linear_probe_center_level_mean_bacc": generated_probe,
+            "generated_class_linear_probe_improves_over_baseline": int(generated_probe_improves),
             "top1_oracle_hit_rate": top1,
             "oracle_agreement_rate": agreement,
             "stable_meaningful_oracle_gain": int(stable_gain),
@@ -1289,14 +1528,104 @@ def classify_family_c_pca64_cc_decision(
             "material_oracle_gap": float(config.material_oracle_gap),
         },
         "claim_boundary": (
-            "Family C PCA64 class-conditional CVAE is a generator diagnostic. It tests whether "
-            "source-label conditioning recovers downstream utility; it does not introduce a new router."
+            "Family C PCA64 class-conditional CVAE is a generator diagnostic. It tests source-only "
+            "generator regularization and does not introduce a new router."
         ),
     }
 
 
 def read_family_c_pca64_cc_support_units(paths: Sequence[Path]) -> list[SupportSelectionUnit]:
     return [unit for unit in read_support_selection_units(paths, methods=(SUPPORT_NELBO_METHOD,)) if unit.method == SUPPORT_NELBO_METHOD]
+
+
+def _metadata_constraint_cfg(config: FamilyCPca64ClassConditionalConfig) -> dict[str, object] | None:
+    if not config.metadata_constraint_enabled:
+        return None
+    return {
+        "enabled": True,
+        "variant": str(config.metadata_constraint_variant),
+        "use_mu": bool(config.metadata_constraint_use_mu),
+        "head_hidden_dim": int(config.metadata_constraint_head_hidden_dim),
+        "aux_weight": float(config.metadata_constraint_aux_weight),
+    }
+
+
+def _source_objective_diagnostics(
+    *,
+    model: Any,
+    x: Any,
+    labels: Sequence[int],
+    config: FamilyCPca64ClassConditionalConfig,
+    seed: int,
+    torch: Any,
+    device: Any,
+) -> dict[str, float]:
+    import numpy as np  # type: ignore
+
+    x_np = np.asarray(x, dtype=np.float32)
+    y_np = np.asarray([int(v) for v in labels], dtype=np.int64)
+    train_idx, val_idx = _stratified_train_val_indices(y_np, val_fraction=config.val_fraction, seed=seed)
+    train = _objective_split_diagnostics(
+        model=model,
+        x=torch.as_tensor(x_np[train_idx], dtype=torch.float32, device=device),
+        y=torch.as_tensor(y_np[train_idx], dtype=torch.long, device=device),
+        config=config,
+        torch=torch,
+    )
+    val = _objective_split_diagnostics(
+        model=model,
+        x=torch.as_tensor(x_np[val_idx], dtype=torch.float32, device=device),
+        y=torch.as_tensor(y_np[val_idx], dtype=torch.long, device=device),
+        config=config,
+        torch=torch,
+    )
+    val_labels = [int(y_np[idx]) for idx in val_idx]
+    majority = _majority_baseline(val_labels)
+    return {
+        "nelbo_mean": val["nelbo_mean"],
+        "recon_loss_mean": val["recon_loss_mean"],
+        "kl_mean": val["kl_mean"],
+        "aux_ce_mean": val["aux_ce_mean"],
+        "aux_loss_fraction": val["aux_loss_fraction"],
+        "total_loss_mean": val["total_loss_mean"],
+        "train_aux_ce_mean": train["aux_ce_mean"],
+        "val_aux_ce_mean": val["aux_ce_mean"],
+        "train_aux_accuracy": train["aux_accuracy"],
+        "val_aux_accuracy": val["aux_accuracy"],
+        "source_train_aux_accuracy": train["aux_accuracy"],
+        "source_train_aux_ce": train["aux_ce_mean"],
+        "source_val_aux_accuracy": val["aux_accuracy"],
+        "source_val_majority_baseline": majority,
+    }
+
+
+def _objective_split_diagnostics(
+    *,
+    model: Any,
+    x: Any,
+    y: Any,
+    config: FamilyCPca64ClassConditionalConfig,
+    torch: Any,
+) -> dict[str, float]:
+    model.eval()
+    with torch.no_grad():
+        comp = _pca64_cc_cvae_components(
+            model,
+            x,
+            y,
+            kl_beta=float(config.kl_beta),
+            aux_weight=float(config.metadata_constraint_aux_weight),
+            torch=torch,
+        )
+    return {
+        "total_loss_mean": _tensor_float(comp["total_loss"]),
+        "nelbo_mean": _tensor_float(comp["nelbo_mean"]),
+        "recon_loss_mean": _tensor_float(comp["recon_loss_mean"]),
+        "kl_mean": _tensor_float(comp["kl_mean"]),
+        "aux_ce_mean": _tensor_float(comp["aux_ce_mean"]),
+        "aux_accuracy": _tensor_float(comp["aux_accuracy"]),
+        "aux_loss_fraction": _tensor_float(comp["aux_loss_fraction"]),
+    }
 
 
 def _train_pca64_cc_cvae(
@@ -1338,12 +1667,31 @@ def _train_pca64_cc_cvae(
             seed=int(seed) + int(epoch),
         ):
             optimizer.zero_grad()
-            loss = _pca64_cc_cvae_loss(model, batch_x, batch_y, kl_beta=float(config.kl_beta), torch=torch)
+            loss = _pca64_cc_cvae_loss(
+                model,
+                batch_x,
+                batch_y,
+                kl_beta=float(config.kl_beta),
+                aux_weight=float(config.metadata_constraint_aux_weight),
+                torch=torch,
+            )
             loss.backward()
             optimizer.step()
         model.eval()
         with torch.no_grad():
-            val_loss = float(_pca64_cc_cvae_loss(model, val_x, val_y, kl_beta=float(config.kl_beta), torch=torch).detach().cpu().item())
+            val_loss = float(
+                _pca64_cc_cvae_loss(
+                    model,
+                    val_x,
+                    val_y,
+                    kl_beta=float(config.kl_beta),
+                    aux_weight=float(config.metadata_constraint_aux_weight),
+                    torch=torch,
+                )
+                .detach()
+                .cpu()
+                .item()
+            )
         if val_loss < best_val - 1e-8:
             best_val = val_loss
             best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
@@ -1355,12 +1703,34 @@ def _train_pca64_cc_cvae(
     model.load_state_dict(best_state)
 
 
-def _pca64_cc_cvae_loss(model: Any, x: Any, labels: Any, *, kl_beta: float, torch: Any) -> Any:
+def _pca64_cc_cvae_loss(model: Any, x: Any, labels: Any, *, kl_beta: float, aux_weight: float = 0.0, torch: Any) -> Any:
+    return _pca64_cc_cvae_components(model, x, labels, kl_beta=kl_beta, aux_weight=aux_weight, torch=torch)["total_loss"]
+
+
+def _pca64_cc_cvae_components(model: Any, x: Any, labels: Any, *, kl_beta: float, aux_weight: float, torch: Any) -> dict[str, Any]:
     m = class_one_hot([int(v) for v in labels.detach().cpu().tolist()], torch=torch, device=x.device)
-    recon, mu, logvar = model(x, m=m)
+    recon, mu, logvar, aux_logits = model(x, m=m, return_aux=True)
     recon_term = torch.mean((recon - x).pow(2), dim=1)
     kl = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp(), dim=1)
-    return torch.mean(recon_term + (float(kl_beta) * kl))
+    nelbo = torch.mean(recon_term + (float(kl_beta) * kl))
+    aux_ce = torch.zeros((), dtype=x.dtype, device=x.device)
+    aux_acc = torch.full((), float("nan"), dtype=x.dtype, device=x.device)
+    if bool(getattr(model, "metadata_constraint_enabled", False)) and getattr(model, "metadata_constraint_variant", "") == "aux_head":
+        aux_ce = model.metadata_constraint_loss(aux_logits=aux_logits, metadata_targets=m)
+        preds = torch.argmax(aux_logits, dim=1)
+        aux_acc = torch.mean((preds == labels.long()).to(dtype=x.dtype))
+    aux_term = float(aux_weight) * aux_ce
+    total = nelbo + aux_term
+    fraction = aux_term / torch.clamp(total.detach().abs(), min=1e-12)
+    return {
+        "total_loss": total,
+        "nelbo_mean": nelbo,
+        "recon_loss_mean": torch.mean(recon_term),
+        "kl_mean": torch.mean(kl),
+        "aux_ce_mean": aux_ce,
+        "aux_accuracy": aux_acc,
+        "aux_loss_fraction": fraction,
+    }
 
 
 def _iter_balanced_condition_batches(x: Any, y: Any, batch_size: int, *, torch: Any, seed: int) -> Any:
@@ -1547,6 +1917,10 @@ def _failed_row(base: Mapping[str, object], exc: Exception) -> dict[str, object]
         "macro_f1": math.nan,
         "auroc": math.nan,
         "auprc": math.nan,
+        "generated_class_linear_probe_bacc": math.nan,
+        "source_val_reconstruction_probe_bacc": math.nan,
+        "generated_vs_source_probe_gap": math.nan,
+        "centroid_distance_ratio": math.nan,
         "n_train": 0,
         "available": 0,
         "status": _failure_status(exc),
@@ -1587,7 +1961,7 @@ def _audit_row(*, row: Mapping[str, object], expert: Pca64ClassConditionalExpert
         "target_eval_labels_used_for_training": 0,
         "target_eval_labels_used_for_final_metric_only": 1,
         "classifier_scaler_fit": "synthetic_train_only" if row.get("generation_mode") != PCA64_CC_REAL_RECONSTRUCTION_MODE else "reconstructed_source_train_only",
-        "checkpoint_feature_space": PCA64_CC_FEATURE_SPACE,
+        "checkpoint_feature_space": expert.feature_space,
         "checkpoint_conditioning": "class_label_one_hot",
         "available": row.get("available", 0),
         "status": row.get("status", ""),
@@ -1789,6 +2163,8 @@ def _oracle_baseline_row(
         "spearman_neg_nelbo_vs_bacc": math.nan,
         "delta_vs_pca64_unconditioned_selected_bacc": math.nan,
         "delta_vs_pca64_unconditioned_oracle_bacc": oracle_value - float(config.pca64_unconditioned_oracle_bacc),
+        "delta_vs_pca64_class_conditional_selected_bacc": math.nan,
+        "delta_vs_pca64_class_conditional_oracle_bacc": oracle_value - float(config.pca64_class_conditional_oracle_bacc),
         "delta_vs_pca_gmm_oracle_bacc": oracle_value - float(config.pca_gmm_oracle_bacc),
         "available": int(bool(rows)),
     }
@@ -1825,10 +2201,51 @@ def _generation_global_diagnostics(*, generated: Any, generated_labels: Sequence
         "generated_class_centroid_distance": gen_centroid,
         "source_class_centroid_distance": source_centroid,
         "generated_class_centroid_ratio": ratio,
+        "centroid_distance_ratio": ratio,
         "generated_class_overlap_score": overlap,
         "low_generated_class_centroid_ratio": int(ratio < float(threshold)),
         "generated_class_overlap_too_high": int(overlap < float(threshold)),
     }
+
+
+def _decoded_space_probe_diagnostics(
+    *,
+    generated: Any,
+    generated_labels: Sequence[int],
+    source: Any,
+    source_labels: Sequence[int],
+    seed: int,
+) -> dict[str, object]:
+    generated_probe = _linear_probe_bacc(generated, generated_labels, seed=seed)
+    source_probe = _linear_probe_bacc(source, source_labels, seed=seed + 7919)
+    return {
+        "generated_class_linear_probe_bacc": generated_probe,
+        "source_val_reconstruction_probe_bacc": source_probe,
+        "generated_vs_source_probe_gap": source_probe - generated_probe if not math.isnan(source_probe) and not math.isnan(generated_probe) else math.nan,
+    }
+
+
+def _linear_probe_bacc(x: Any, labels: Sequence[int], *, seed: int) -> float:
+    import numpy as np  # type: ignore
+
+    arr = np.asarray(x, dtype=float)
+    y = np.asarray([int(v) for v in labels], dtype=int)
+    train_idx, val_idx = _stratified_train_val_indices(y, val_fraction=0.5, seed=seed)
+    if not train_idx or not val_idx:
+        return math.nan
+    if len(set(int(v) for v in y[train_idx])) < 2 or len(set(int(v) for v in y[val_idx])) < 2:
+        return math.nan
+    try:
+        prediction = fit_locked_logistic_classifier(
+            arr[train_idx],
+            [int(v) for v in y[train_idx].tolist()],
+            arr[val_idx],
+            [int(v) for v in y[val_idx].tolist()],
+            classifier_seed=int(seed),
+        )
+    except Exception:
+        return math.nan
+    return float(prediction.score.balanced_accuracy)
 
 
 def _class_centroid_distance(x: Any, labels: Sequence[int]) -> float:
@@ -1932,7 +2349,7 @@ def _lineage_key(*, row: Mapping[str, object], expert: Pca64ClassConditionalExpe
             "generation_mode": str(row.get("generation_mode", "")),
             "generation_seed": int(row.get("generation_seed", 0)),
             "classifier_seed": int(row.get("classifier_seed", 0)),
-            "feature_space": PCA64_CC_FEATURE_SPACE,
+            "feature_space": expert.feature_space,
             "conditioning": "class_label_one_hot",
             "pca_artifact_id": expert.preprocessor.pca_artifact_id,
             "scaler_artifact_id": expert.preprocessor.scaler_artifact_id,
@@ -1987,6 +2404,30 @@ def _float(value: object) -> float:
         return float(value)
     except Exception:
         return math.nan
+
+
+def _tensor_float(value: Any) -> float:
+    try:
+        if hasattr(value, "detach"):
+            return float(value.detach().cpu().item())
+        return float(value)
+    except Exception:
+        return math.nan
+
+
+def _majority_baseline(labels: Sequence[int]) -> float:
+    vals = [int(v) for v in labels]
+    if not vals:
+        return math.nan
+    return max(vals.count(label) for label in set(vals)) / len(vals)
+
+
+def _first_generation_metric(rows: Sequence[Mapping[str, object]], key: str) -> float:
+    for row in rows:
+        value = _float(row.get(key))
+        if not math.isnan(value):
+            return value
+    return math.nan
 
 
 def _int_value(value: object) -> int:
