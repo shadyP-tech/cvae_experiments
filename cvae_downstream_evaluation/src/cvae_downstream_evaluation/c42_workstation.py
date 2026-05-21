@@ -66,6 +66,7 @@ from .schemas import (
 C42_ARTIFACTS_ROOT = "cvae_downstream_evaluation/artifacts/c42_latent_gmm_prior_v1"
 C42_DEFAULT_C41_ROOT = "cvae_downstream_evaluation/artifacts/c41_heteroscedastic_decoder_full_v1"
 PLAIN_REPLAY_TOLERANCE = 1.0e-6
+ORACLE_TOP1_STABILITY_MIN = 2.0 / 3.0
 
 DECISION_PASS = "PASS_CANDIDATE"
 DECISION_CEILING_ONLY = "LATENT_GMM_IMPROVES_GENERATOR_CEILING_BUT_ROUTING_STILL_LIMITS_UTILITY"
@@ -583,7 +584,12 @@ def _decision_label(
         return DECISION_PROTOCOL_FAILURE
     if not replay_ok:
         return DECISION_REPLAY_MISMATCH
-    if float(oracle_delta) >= 0.02 and float(selected_delta) >= 0.0 and float(gap_delta) <= 0.0 and float(stability) >= 0.67:
+    if (
+        float(oracle_delta) >= 0.02
+        and float(selected_delta) >= 0.0
+        and float(gap_delta) <= 0.0
+        and float(stability) >= ORACLE_TOP1_STABILITY_MIN
+    ):
         return DECISION_PASS
     if float(oracle_delta) >= 0.02 and float(selected_delta) < 0.0:
         return DECISION_CEILING_ONLY
@@ -592,7 +598,7 @@ def _decision_label(
         return DECISION_UNDERDISPERSION
     if not math.isnan(cov_ratio) and cov_ratio > 1.5 and float(oracle_delta) < 0.02:
         return DECISION_OVERDISPERSION
-    if float(stability) < 0.67 and float(oracle_delta) < 0.02:
+    if float(stability) < ORACLE_TOP1_STABILITY_MIN and float(oracle_delta) < 0.02:
         return DECISION_RANK_INSTABILITY
     mismatch = float(diagnostics.get("decoder_output_norm_mean", 0.0)) > 10.0 * max(float(diagnostics.get("latent_mu_norm_mean", 1.0)), 1.0)
     if mismatch and float(oracle_delta) < 0.02:
