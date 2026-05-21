@@ -68,6 +68,7 @@ GATED_ROUTING_COLUMNS = (
 )
 
 GATED_ALIGNMENT_COLUMNS = GATED_ROUTING_COLUMNS + (
+    "generator_family",
     "generation_seed",
     "classifier_seed",
     "selected_bacc",
@@ -218,6 +219,7 @@ def build_source_global_gated_alignment_rows(
             int(row.experiment_seed),
             row.heldout_center,
             row.candidate_expert,
+            row.generator_family,
             row.generation_mode,
             int(row.budget_per_class),
             int(row.generation_seed),
@@ -243,13 +245,14 @@ def build_source_global_gated_alignment_rows(
     rows: list[dict[str, object]] = []
     for unit in gated_units:
         for context_key in contexts:
-            experiment_seed, heldout, generation_mode, budget, generation_seed, classifier_seed = context_key
+            experiment_seed, heldout, generator_family, generation_mode, budget, generation_seed, classifier_seed = context_key
             if int(experiment_seed) != int(unit.experiment_seed) or heldout != unit.heldout_center:
                 continue
             matrix_key = (
                 int(unit.experiment_seed),
                 unit.heldout_center,
                 unit.selected_expert,
+                generator_family,
                 generation_mode,
                 int(budget),
                 int(generation_seed),
@@ -269,6 +272,7 @@ def build_source_global_gated_alignment_rows(
             row = unit.to_csv_row()
             row.update(
                 {
+                    "generator_family": generator_family,
                     "generation_seed": generation_seed,
                     "classifier_seed": classifier_seed,
                     "selected_bacc": float(selected.bacc),
@@ -635,21 +639,22 @@ def _selection_sort_key(unit: SupportSelectionUnit) -> tuple[object, ...]:
     return _selection_key(unit)
 
 
-def _comparison_key(row: Mapping[str, object]) -> tuple[str, int, int, int, int, int]:
+def _comparison_key(row: Mapping[str, object]) -> tuple[str, int, int, int, str, int, int]:
     return (
         str(row["heldout_center"]),
         int(row["experiment_seed"]),
         int(row["support_size"]),
         int(row["support_seed"]),
+        str(row.get("generator_family", "")),
         int(row["generation_seed"]),
         int(row["classifier_seed"]),
     )
 
 
 def _require_baseline(
-    rows: Mapping[tuple[str, tuple[str, int, int, int, int, int]], Mapping[str, object]],
+    rows: Mapping[tuple[str, tuple[str, int, int, int, str, int, int]], Mapping[str, object]],
     method: str,
-    context_key: tuple[str, int, int, int, int, int],
+    context_key: tuple[str, int, int, int, str, int, int],
 ) -> Mapping[str, object]:
     row = rows.get((method, context_key))
     if row is None:

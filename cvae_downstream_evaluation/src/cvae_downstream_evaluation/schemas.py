@@ -23,10 +23,27 @@ DIAGNOSTIC_BUDGETS_PER_CLASS = (64, 128, 256, 512)
 
 PRIMARY_GENERATION_MODE = "class_stratified_reference_posterior_resampling"
 NEGATIVE_CONTROL_GENERATION_MODE = "unconditional_prior_sampling_assigned_label_negative_control"
+POSTERIOR_DECODER_MEAN_GENERATION_MODE = "posterior_sample_decoder_mean"
+POSTERIOR_DECODER_NOISE_GENERATION_MODE = "posterior_sample_decoder_noise"
 GENERATION_MODES = (
     PRIMARY_GENERATION_MODE,
     NEGATIVE_CONTROL_GENERATION_MODE,
+    POSTERIOR_DECODER_MEAN_GENERATION_MODE,
+    POSTERIOR_DECODER_NOISE_GENERATION_MODE,
 )
+
+LEGACY_GENERATOR_FAMILY = "legacy_locked_v1"
+PLAIN_CLASS_CONDITIONAL_GENERATOR_FAMILY = "family_c_pca64_class_conditional_cvae_downstream_v1"
+HETEROSCEDASTIC_GENERATOR_FAMILY = "family_c_pca64_class_conditional_heteroscedastic_cvae_downstream_v1"
+
+C41_ORACLE_ELIGIBLE_GENERATION_MODES = (
+    PRIMARY_GENERATION_MODE,
+    POSTERIOR_DECODER_MEAN_GENERATION_MODE,
+    POSTERIOR_DECODER_NOISE_GENERATION_MODE,
+)
+
+BASELINE_ROUTING_FAMILY_USED = "plain_pca64_class_conditional_cvae"
+BASELINE_SELECTED_EXPERT_IDS_SOURCE = "locked_plain_class_conditional_support_nelbo"
 
 SUPPORT_NELBO_METHOD = "support_set_nelbo_top1"
 METADATA_METHOD = "support_metadata_routing"
@@ -65,11 +82,14 @@ METHOD_BASELINE_ROW_TYPE = "method_baseline"
 ENSEMBLE_EXPERT_ID = "__ensemble__"
 SINGLE_EXPERT_HASH = "__single_expert__"
 
-MATRIX_SCHEMA_VERSION = "all_expert_downstream_matrix_v1"
+MATRIX_SCHEMA_VERSION = "all_expert_downstream_matrix_v3"
 ALL_EXPERT_DOWNSTREAM_PRIMARY_KEY = (
     "experiment_seed",
     "heldout_center",
+    "support_size",
+    "support_seed",
     "candidate_expert",
+    "generator_family",
     "generation_mode",
     "budget_per_class",
     "generation_seed",
@@ -130,7 +150,10 @@ ALL_EXPERT_DOWNSTREAM_COLUMNS = (
     "schema_version",
     "experiment_seed",
     "heldout_center",
+    "support_size",
+    "support_seed",
     "candidate_expert",
+    "generator_family",
     "generation_mode",
     "budget_per_class",
     "generation_seed",
@@ -144,6 +167,16 @@ ALL_EXPERT_DOWNSTREAM_COLUMNS = (
     "n_target_eval",
     "target_eval_pool_id",
     "candidate_experts_hash",
+    "utility_context_key",
+    "utility_depends_on_support",
+    "selection_depends_on_support",
+    "plain_baseline_source",
+    "plain_baseline_artifact_path",
+    "plain_baseline_training_profile",
+    "plain_baseline_matches_locked_hparams",
+    "routing_family_used",
+    "routing_scores_recomputed_for_heteroscedastic",
+    "selected_expert_ids_source",
     "status",
     "error_message",
 )
@@ -166,6 +199,8 @@ ROUTING_ALIGNMENT_COLUMNS = (
     "experiment_seed",
     "support_size",
     "support_seed",
+    "generator_family",
+    "generation_mode",
     "generation_seed",
     "classifier_seed",
     "method",
@@ -182,6 +217,26 @@ ROUTING_ALIGNMENT_COLUMNS = (
     "spearman_neg_nelbo_vs_bacc",
     "metadata_bacc",
     "delta_vs_metadata",
+    "selection_depends_on_support",
+)
+
+C41_DELTA_SUMMARY_COLUMNS = (
+    "heldout_center",
+    "support_size",
+    "generation_mode",
+    "oracle_bacc_plain",
+    "oracle_bacc_hetero_mean",
+    "oracle_bacc_hetero_noise",
+    "selected_bacc_plain_router_plain_generator",
+    "selected_bacc_plain_router_hetero_mean_generator",
+    "selected_bacc_plain_router_hetero_noise_generator",
+    "oracle_bacc_delta_vs_plain_retrained",
+    "selected_bacc_delta_vs_plain_retrained",
+    "oracle_gap_delta_vs_plain_retrained",
+    "generated_std_delta_vs_plain",
+    "selected_expert_changed_across_modes",
+    "oracle_expert_changed_vs_plain",
+    "decision_label",
 )
 
 SUPPORT_SIZE_SUMMARY_COLUMNS = (

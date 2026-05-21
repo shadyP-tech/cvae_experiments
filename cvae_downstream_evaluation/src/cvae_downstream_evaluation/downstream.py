@@ -8,6 +8,7 @@ packages.
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import math
 from dataclasses import dataclass
@@ -18,9 +19,12 @@ from .protocol import ProtocolError
 from .schemas import (
     ALL_EXPERT_DOWNSTREAM_COLUMNS,
     ALL_EXPERT_DOWNSTREAM_PRIMARY_KEY,
+    BASELINE_ROUTING_FAMILY_USED,
+    BASELINE_SELECTED_EXPERT_IDS_SOURCE,
+    C41_ORACLE_ELIGIBLE_GENERATION_MODES,
+    LEGACY_GENERATOR_FAMILY,
     MATRIX_SCHEMA_VERSION,
     METHOD_BASELINE_ROW_TYPE,
-    PRIMARY_GENERATION_MODE,
     SINGLE_EXPERT_HASH,
     SINGLE_EXPERT_ROW_TYPE,
 )
@@ -56,6 +60,9 @@ class CandidateDownstreamRow:
     classifier_seed: int
     bacc: float
     macro_f1: float
+    support_size: int = 0
+    support_seed: int = 0
+    generator_family: str = LEGACY_GENERATOR_FAMILY
     auroc: float = math.nan
     auprc: float = math.nan
     row_type: str = SINGLE_EXPERT_ROW_TYPE
@@ -63,14 +70,25 @@ class CandidateDownstreamRow:
     n_target_eval: int = 0
     target_eval_pool_id: str = ""
     candidate_experts_hash: str = SINGLE_EXPERT_HASH
+    utility_context_key: str = ""
+    utility_depends_on_support: int = 0
+    selection_depends_on_support: int = 0
+    plain_baseline_source: str = ""
+    plain_baseline_artifact_path: str = ""
+    plain_baseline_training_profile: str = ""
+    plain_baseline_matches_locked_hparams: int = 0
+    routing_family_used: str = BASELINE_ROUTING_FAMILY_USED
+    routing_scores_recomputed_for_heteroscedastic: int = 0
+    selected_expert_ids_source: str = BASELINE_SELECTED_EXPERT_IDS_SOURCE
     status: str = "ok"
     error_message: str = ""
     schema_version: str = MATRIX_SCHEMA_VERSION
 
-    def oracle_key(self) -> tuple[int, str, str, int, int, int]:
+    def oracle_key(self) -> tuple[int, str, str, str, int, int, int]:
         return (
             int(self.experiment_seed),
             self.heldout_center,
+            self.generator_family,
             self.generation_mode,
             int(self.budget_per_class),
             int(self.generation_seed),
@@ -80,10 +98,32 @@ class CandidateDownstreamRow:
     def primary_key(self) -> tuple[object, ...]:
         return tuple(getattr(self, field) for field in ALL_EXPERT_DOWNSTREAM_PRIMARY_KEY)
 
+    def utility_context_tuple(self) -> tuple[object, ...]:
+        """Candidate utility identity, intentionally excluding support size/seed."""
+
+        return (
+            int(self.experiment_seed),
+            self.heldout_center,
+            self.candidate_expert,
+            self.generator_family,
+            self.generation_mode,
+            int(self.budget_per_class),
+            int(self.generation_seed),
+            int(self.classifier_seed),
+            self.row_type,
+            self.candidate_experts_hash,
+        )
+
+    def resolved_utility_context_key(self) -> str:
+        if str(self.utility_context_key).strip():
+            return str(self.utility_context_key)
+        payload = json.dumps([str(v) for v in self.utility_context_tuple()], separators=(",", ":"))
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
     def is_oracle_eligible(self) -> bool:
         return (
             self.row_type == SINGLE_EXPERT_ROW_TYPE
-            and self.generation_mode == PRIMARY_GENERATION_MODE
+            and self.generation_mode in C41_ORACLE_ELIGIBLE_GENERATION_MODES
             and self.status == "ok"
         )
 
@@ -92,7 +132,10 @@ class CandidateDownstreamRow:
             "schema_version": self.schema_version,
             "experiment_seed": self.experiment_seed,
             "heldout_center": self.heldout_center,
+            "support_size": self.support_size,
+            "support_seed": self.support_seed,
             "candidate_expert": self.candidate_expert,
+            "generator_family": self.generator_family,
             "generation_mode": self.generation_mode,
             "budget_per_class": self.budget_per_class,
             "generation_seed": self.generation_seed,
@@ -106,6 +149,16 @@ class CandidateDownstreamRow:
             "n_target_eval": self.n_target_eval,
             "target_eval_pool_id": self.target_eval_pool_id,
             "candidate_experts_hash": self.candidate_experts_hash,
+            "utility_context_key": self.resolved_utility_context_key(),
+            "utility_depends_on_support": self.utility_depends_on_support,
+            "selection_depends_on_support": self.selection_depends_on_support,
+            "plain_baseline_source": self.plain_baseline_source,
+            "plain_baseline_artifact_path": self.plain_baseline_artifact_path,
+            "plain_baseline_training_profile": self.plain_baseline_training_profile,
+            "plain_baseline_matches_locked_hparams": self.plain_baseline_matches_locked_hparams,
+            "routing_family_used": self.routing_family_used,
+            "routing_scores_recomputed_for_heteroscedastic": self.routing_scores_recomputed_for_heteroscedastic,
+            "selected_expert_ids_source": self.selected_expert_ids_source,
             "status": self.status,
             "error_message": self.error_message,
         }
@@ -115,6 +168,7 @@ class CandidateDownstreamRow:
 class OracleScore:
     experiment_seed: int
     heldout_center: str
+    generator_family: str
     generation_mode: str
     budget_per_class: int
     generation_seed: int
@@ -244,10 +298,13 @@ def macro_f1(y_true: Sequence[int], y_pred: Sequence[int]) -> float:
     return sum(scores) / float(len(scores))
 
 
-def compute_single_expert_oracles(rows: Sequence[CandidateDownstreamRow]) -> dict[tuple[int, str, str, int, int, int], OracleScore]:
+def compute_single_expert_oracles(
+    rows: Sequence[CandidateDownstreamRow],
+) -> dict[tuple[int, str, str, str, int, int, int], OracleScore]:
     """Compute diagnostic downstream oracle over single-expert rows only."""
 
-    grouped: dict[tuple[int, str, str, int, int, int], list[CandidateDownstreamRow]] = {}
+    assert_duplicate_utility_contexts_consistent(rows)
+    grouped: dict[tuple[int, str, str, str, int, int, int], list[CandidateDownstreamRow]] = {}
     for row in rows:
         if not row.is_oracle_eligible():
             continue
@@ -258,6 +315,7 @@ def compute_single_expert_oracles(rows: Sequence[CandidateDownstreamRow]) -> dic
         oracles[key] = OracleScore(
             experiment_seed=winner.experiment_seed,
             heldout_center=winner.heldout_center,
+            generator_family=winner.generator_family,
             generation_mode=winner.generation_mode,
             budget_per_class=winner.budget_per_class,
             generation_seed=winner.generation_seed,
@@ -285,6 +343,37 @@ def validate_candidate_downstream_matrix(rows: Sequence[CandidateDownstreamRow])
                 f"Unexpected downstream matrix row schema_version={row.schema_version!r}; "
                 f"expected {MATRIX_SCHEMA_VERSION!r}."
             )
+    assert_duplicate_utility_contexts_consistent(rows)
+
+
+def assert_duplicate_utility_contexts_consistent(rows: Sequence[CandidateDownstreamRow]) -> None:
+    """Ensure support-replicated utility rows do not change candidate metrics."""
+
+    seen: dict[str, CandidateDownstreamRow] = {}
+    for row in rows:
+        if int(row.utility_depends_on_support):
+            continue
+        key = row.resolved_utility_context_key()
+        previous = seen.get(key)
+        if previous is None:
+            seen[key] = row
+            continue
+        comparable = (
+            _same_float(previous.bacc, row.bacc)
+            and _same_float(previous.macro_f1, row.macro_f1)
+            and _same_float(previous.auroc, row.auroc)
+            and _same_float(previous.auprc, row.auprc)
+            and previous.status == row.status
+            and previous.candidate_expert == row.candidate_expert
+            and previous.generator_family == row.generator_family
+            and previous.generation_mode == row.generation_mode
+        )
+        if not comparable:
+            raise ProtocolError(
+                "Support-replicated utility rows disagree for utility_context_key="
+                f"{key}: support ({previous.support_size}, {previous.support_seed}) vs "
+                f"({row.support_size}, {row.support_seed})."
+            )
 
 
 def read_candidate_downstream_matrix(path: Path) -> list[CandidateDownstreamRow]:
@@ -311,7 +400,7 @@ def matrix_schema_payload() -> dict[str, object]:
         "primary_key": list(ALL_EXPERT_DOWNSTREAM_PRIMARY_KEY),
         "oracle_eligible_filter": {
             "row_type": SINGLE_EXPERT_ROW_TYPE,
-            "generation_mode": PRIMARY_GENERATION_MODE,
+            "generation_modes": list(C41_ORACLE_ELIGIBLE_GENERATION_MODES),
             "status": "ok",
         },
     }
@@ -379,7 +468,10 @@ def _candidate_from_csv_row(row: Mapping[str, str]) -> CandidateDownstreamRow:
         schema_version=str(row.get("schema_version") or MATRIX_SCHEMA_VERSION),
         experiment_seed=int(row.get("experiment_seed") or 0),
         heldout_center=str(row["heldout_center"]),
+        support_size=int(row.get("support_size") or 0),
+        support_seed=int(row.get("support_seed") or 0),
         candidate_expert=str(row["candidate_expert"]),
+        generator_family=str(row.get("generator_family") or LEGACY_GENERATOR_FAMILY),
         generation_mode=str(row["generation_mode"]),
         budget_per_class=int(row["budget_per_class"]),
         generation_seed=int(row["generation_seed"]),
@@ -393,6 +485,16 @@ def _candidate_from_csv_row(row: Mapping[str, str]) -> CandidateDownstreamRow:
         n_target_eval=int(row.get("n_target_eval") or 0),
         target_eval_pool_id=str(row.get("target_eval_pool_id") or ""),
         candidate_experts_hash=str(row.get("candidate_experts_hash") or SINGLE_EXPERT_HASH),
+        utility_context_key=str(row.get("utility_context_key") or ""),
+        utility_depends_on_support=int(row.get("utility_depends_on_support") or 0),
+        selection_depends_on_support=int(row.get("selection_depends_on_support") or 0),
+        plain_baseline_source=str(row.get("plain_baseline_source") or ""),
+        plain_baseline_artifact_path=str(row.get("plain_baseline_artifact_path") or ""),
+        plain_baseline_training_profile=str(row.get("plain_baseline_training_profile") or ""),
+        plain_baseline_matches_locked_hparams=int(row.get("plain_baseline_matches_locked_hparams") or 0),
+        routing_family_used=str(row.get("routing_family_used") or BASELINE_ROUTING_FAMILY_USED),
+        routing_scores_recomputed_for_heteroscedastic=int(row.get("routing_scores_recomputed_for_heteroscedastic") or 0),
+        selected_expert_ids_source=str(row.get("selected_expert_ids_source") or BASELINE_SELECTED_EXPERT_IDS_SOURCE),
         status=str(row.get("status") or "ok"),
         error_message=str(row.get("error_message") or ""),
     )
@@ -403,6 +505,12 @@ def _float_or_nan(raw: object) -> float:
     if not text:
         return math.nan
     return float(text)
+
+
+def _same_float(left: float, right: float, *, tol: float = 1.0e-12) -> bool:
+    if math.isnan(float(left)) and math.isnan(float(right)):
+        return True
+    return abs(float(left) - float(right)) <= float(tol)
 
 
 def _reverse_lex(value: str) -> str:

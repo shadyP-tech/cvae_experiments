@@ -54,7 +54,10 @@ def build_routing_alignment_rows(
         (
             int(row.experiment_seed),
             row.heldout_center,
+            int(row.support_size),
+            int(row.support_seed),
             row.candidate_expert,
+            row.generator_family,
             row.generation_mode,
             int(row.budget_per_class),
             int(row.generation_seed),
@@ -83,19 +86,35 @@ def build_routing_alignment_rows(
             continue
         metadata_unit = metadata_by_support.get(_selection_key(unit))
         for context_key in contexts:
-            experiment_seed, heldout, generation_mode, budget, generation_seed, classifier_seed = context_key
+            experiment_seed, heldout, generator_family, generation_mode, budget, generation_seed, classifier_seed = context_key
             if int(experiment_seed) != int(unit.experiment_seed) or heldout != unit.heldout_center:
                 continue
             selected_key = (
                 int(unit.experiment_seed),
                 unit.heldout_center,
+                int(unit.support_size),
+                int(unit.support_seed),
                 unit.selected_expert,
+                generator_family,
                 generation_mode,
                 int(budget),
                 int(generation_seed),
                 int(classifier_seed),
             )
-            selected = single_rows.get(selected_key)
+            selected = single_rows.get(selected_key) or single_rows.get(
+                (
+                    int(unit.experiment_seed),
+                    unit.heldout_center,
+                    0,
+                    0,
+                    unit.selected_expert,
+                    generator_family,
+                    generation_mode,
+                    int(budget),
+                    int(generation_seed),
+                    int(classifier_seed),
+                )
+            )
             if selected is None:
                 raise ProtocolError(f"Missing downstream row for selected expert key {selected_key}")
             oracle = oracles.get(context_key)
@@ -106,13 +125,29 @@ def build_routing_alignment_rows(
                 metadata_key = (
                     int(metadata_unit.experiment_seed),
                     metadata_unit.heldout_center,
+                    int(metadata_unit.support_size),
+                    int(metadata_unit.support_seed),
                     metadata_unit.selected_expert,
+                    generator_family,
                     generation_mode,
                     int(budget),
                     int(generation_seed),
                     int(classifier_seed),
                 )
-                metadata_row = single_rows.get(metadata_key)
+                metadata_row = single_rows.get(metadata_key) or single_rows.get(
+                    (
+                        int(metadata_unit.experiment_seed),
+                        metadata_unit.heldout_center,
+                        0,
+                        0,
+                        metadata_unit.selected_expert,
+                        generator_family,
+                        generation_mode,
+                        int(budget),
+                        int(generation_seed),
+                        int(classifier_seed),
+                    )
+                )
                 if metadata_row is not None:
                     metadata_bacc = float(metadata_row.bacc)
             spearman_value = math.nan
@@ -124,6 +159,8 @@ def build_routing_alignment_rows(
                 "experiment_seed": unit.experiment_seed,
                 "support_size": unit.support_size,
                 "support_seed": unit.support_seed,
+                "generator_family": generator_family,
+                "generation_mode": generation_mode,
                 "generation_seed": generation_seed,
                 "classifier_seed": classifier_seed,
                 "method": unit.method,
@@ -140,6 +177,7 @@ def build_routing_alignment_rows(
                 "spearman_neg_nelbo_vs_bacc": spearman_value,
                 "metadata_bacc": metadata_bacc,
                 "delta_vs_metadata": float(selected.bacc) - metadata_bacc if not math.isnan(metadata_bacc) else math.nan,
+                "selection_depends_on_support": 1,
             }
             rows.append(row)
     return rows
@@ -359,7 +397,7 @@ def write_decision_summary(path: Path, summary: DecisionSummary) -> None:
 
 def _spearman_neg_nelbo_vs_bacc(
     unit: SupportSelectionUnit,
-    rows_by_key: Mapping[tuple[int, str, str, str, int, int, int], CandidateDownstreamRow],
+    rows_by_key: Mapping[tuple[int, str, int, int, str, str, str, int, int, int], CandidateDownstreamRow],
     downstream_context: CandidateDownstreamRow,
 ) -> float:
     neg_nelbo: list[float] = []
@@ -370,13 +408,29 @@ def _spearman_neg_nelbo_vs_bacc(
         key = (
             int(unit.experiment_seed),
             unit.heldout_center,
+            int(unit.support_size),
+            int(unit.support_seed),
             expert,
+            downstream_context.generator_family,
             downstream_context.generation_mode,
             int(downstream_context.budget_per_class),
             int(downstream_context.generation_seed),
             int(downstream_context.classifier_seed),
         )
-        row = rows_by_key.get(key)
+        row = rows_by_key.get(key) or rows_by_key.get(
+            (
+                int(unit.experiment_seed),
+                unit.heldout_center,
+                0,
+                0,
+                expert,
+                downstream_context.generator_family,
+                downstream_context.generation_mode,
+                int(downstream_context.budget_per_class),
+                int(downstream_context.generation_seed),
+                int(downstream_context.classifier_seed),
+            )
+        )
         if row is None:
             continue
         neg_nelbo.append(-float(unit.support_nelbo_by_expert[expert]))

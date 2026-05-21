@@ -34,6 +34,7 @@ from .schemas import (
     ALL_EXPERT_DOWNSTREAM_COLUMNS,
     ALL_EXPERT_DOWNSTREAM_PRIMARY_KEY,
     ENSEMBLE_EXPERT_ID,
+    LEGACY_GENERATOR_FAMILY,
     MATRIX_SCHEMA_VERSION,
     METHOD_BASELINE_ROW_TYPE,
     NEGATIVE_CONTROL_GENERATION_MODE,
@@ -707,7 +708,17 @@ def _read_completed_keys(path: Path) -> set[tuple[object, ...]]:
         return set()
     with path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
-        missing = [field for field in ALL_EXPERT_DOWNSTREAM_PRIMARY_KEY if field not in (reader.fieldnames or ())]
+        fieldnames = tuple(reader.fieldnames or ())
+        backward_compatible_missing = {
+            "generator_family",
+            "support_size",
+            "support_seed",
+        }
+        missing = [
+            field
+            for field in ALL_EXPERT_DOWNSTREAM_PRIMARY_KEY
+            if field not in fieldnames and field not in backward_compatible_missing
+        ]
         if missing:
             raise ProtocolError(f"Existing matrix is missing primary-key columns: {missing}")
         return {
@@ -717,8 +728,12 @@ def _read_completed_keys(path: Path) -> set[tuple[object, ...]]:
 
 
 def _primary_key_value(field: str, raw: object) -> object:
-    if field in {"experiment_seed", "budget_per_class", "generation_seed", "classifier_seed"}:
+    if field in {"experiment_seed", "support_size", "support_seed", "budget_per_class", "generation_seed", "classifier_seed"}:
+        if raw is None or not str(raw).strip():
+            return 0
         return int(raw)
+    if field == "generator_family" and not str(raw).strip():
+        return LEGACY_GENERATOR_FAMILY
     return str(raw)
 
 
