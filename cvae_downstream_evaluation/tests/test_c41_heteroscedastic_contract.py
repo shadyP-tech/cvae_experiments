@@ -19,6 +19,7 @@ from cvae_downstream_evaluation.c41_heteroscedastic import (  # noqa: E402
     fit_source_train_pca_projection,
     build_source_train_reference_pools,
     c41_routing_provenance_fields,
+    decoder_logvar_diagnostics_by_class,
     generate_posterior_sampled_embeddings,
 )
 from cvae_downstream_evaluation.c41_workstation import (  # noqa: E402
@@ -139,6 +140,25 @@ def test_c41_generation_modes_are_seeded_and_distinct() -> None:
     assert not torch.allclose(mean_a.embeddings, noise.embeddings)
     assert mean_a.diagnostics["decoder_noise_energy_ratio"] == 0.0
     assert noise.diagnostics["decoder_noise_energy_ratio"] > 0.0
+
+
+def test_decoder_logvar_diagnostics_accept_cpu_reference_pools() -> None:
+    model = CVAEExpert(
+        input_dim=4,
+        hidden_dim=8,
+        latent_dim=2,
+        class_condition_dim=2,
+        decoder_likelihood="gaussian_diag",
+    )
+    refs = {
+        0: torch.randn(3, 4),
+        1: torch.randn(2, 4),
+    }
+
+    diagnostics = decoder_logvar_diagnostics_by_class(model=model, reference_pools=refs)
+
+    assert "decoder_logvar_mean" in diagnostics
+    assert "decoder_sigma_class_ratio" in diagnostics
 
 
 def test_generator_family_prevents_downstream_matrix_key_collision() -> None:

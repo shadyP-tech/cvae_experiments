@@ -297,16 +297,21 @@ def decoder_logvar_diagnostics_by_class(
 ) -> dict[str, float]:
     class_sigma_means: list[float] = []
     logvars: list[torch.Tensor] = []
+    try:
+        model_device = next(model.parameters()).device  # type: ignore[attr-defined]
+    except (AttributeError, StopIteration):
+        model_device = torch.device("cpu")
     for class_label, refs in sorted(reference_pools.items()):
         if refs.ndim != 2 or refs.shape[0] <= 0:
             continue
-        y = torch.full((int(refs.shape[0]),), int(class_label), dtype=torch.long, device=refs.device)
+        refs_device = refs.to(model_device)
+        y = torch.full((int(refs_device.shape[0]),), int(class_label), dtype=torch.long, device=model_device)
         with torch.no_grad():
-            mu_z, _logvar_z = model.encode(refs, y=y)
+            mu_z, _logvar_z = model.encode(refs_device, y=y)
             _mu_x, logvar_x = model.decode(mu_z, y=y, return_distribution=True)
         if logvar_x is None:
             continue
-        logvars.append(logvar_x.detach())
+        logvars.append(logvar_x.detach().cpu())
         class_sigma_means.append(float(torch.exp(0.5 * logvar_x).mean().item()))
     if not logvars:
         return {
