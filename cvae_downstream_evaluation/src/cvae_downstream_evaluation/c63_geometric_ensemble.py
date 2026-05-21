@@ -60,6 +60,7 @@ from .c62_late_ensemble import (
     _generate_member,
     _hard_vote_predictions,
     _member_probability_diagnostics,
+    _np_array,
     _np_stack,
     _score_predictions_and_probabilities,
     _selector_visible_support_rows,

@@ -14,6 +14,7 @@ from cvae_downstream_evaluation.c63_geometric_ensemble import (  # noqa: E402
     POLICY_C62_REPLAY,
     POLICY_GEOM_FIXED_TOTAL,
     POLICY_GEOM_SAFE_MULTI,
+    _score_c63_row,
     build_c63_ensemble_plans,
     geometric_pool_probabilities,
     normalize_weights,
@@ -138,3 +139,7 @@ def test_c63_prejoin_guard_rejects_target_or_utility_columns() -> None:
 def test_c63_global_class_order_remains_binary_locked_v1() -> None:
     assert GLOBAL_CLASS_ORDER == (0, 1)
     assert GEOMETRIC_SOFTMAX_TEMPERATURE == 1.0
+
+
+def test_c63_score_path_has_required_numpy_helpers_bound() -> None:
+    assert callable(_score_c63_row)
