@@ -25,21 +25,37 @@ PRIMARY_GENERATION_MODE = "class_stratified_reference_posterior_resampling"
 NEGATIVE_CONTROL_GENERATION_MODE = "unconditional_prior_sampling_assigned_label_negative_control"
 POSTERIOR_DECODER_MEAN_GENERATION_MODE = "posterior_sample_decoder_mean"
 POSTERIOR_DECODER_NOISE_GENERATION_MODE = "posterior_sample_decoder_noise"
+C42_POSTERIOR_REPLAY_GENERATION_MODE = "posterior_sample_decoder_mean_replayed"
+C42_STANDARD_PRIOR_REPLAY_GENERATION_MODE = "standard_prior_decoder_mean_replayed"
+C42_LATENT_GMM_K1_GENERATION_MODE = "latent_gmm_k1_decoder_mean"
+C42_LATENT_GMM_K2_GENERATION_MODE = "latent_gmm_k2_decoder_mean"
+C42_LATENT_GMM_K4_GENERATION_MODE = "latent_gmm_k4_decoder_mean"
 GENERATION_MODES = (
     PRIMARY_GENERATION_MODE,
     NEGATIVE_CONTROL_GENERATION_MODE,
     POSTERIOR_DECODER_MEAN_GENERATION_MODE,
     POSTERIOR_DECODER_NOISE_GENERATION_MODE,
+    C42_POSTERIOR_REPLAY_GENERATION_MODE,
+    C42_STANDARD_PRIOR_REPLAY_GENERATION_MODE,
+    C42_LATENT_GMM_K1_GENERATION_MODE,
+    C42_LATENT_GMM_K2_GENERATION_MODE,
+    C42_LATENT_GMM_K4_GENERATION_MODE,
 )
 
 LEGACY_GENERATOR_FAMILY = "legacy_locked_v1"
 PLAIN_CLASS_CONDITIONAL_GENERATOR_FAMILY = "family_c_pca64_class_conditional_cvae_downstream_v1"
 HETEROSCEDASTIC_GENERATOR_FAMILY = "family_c_pca64_class_conditional_heteroscedastic_cvae_downstream_v1"
+LATENT_GMM_PRIOR_GENERATOR_FAMILY = "family_c_pca64_class_conditional_latent_gmm_prior_cvae_downstream_v1"
 
 C41_ORACLE_ELIGIBLE_GENERATION_MODES = (
     PRIMARY_GENERATION_MODE,
     POSTERIOR_DECODER_MEAN_GENERATION_MODE,
     POSTERIOR_DECODER_NOISE_GENERATION_MODE,
+    C42_POSTERIOR_REPLAY_GENERATION_MODE,
+    C42_STANDARD_PRIOR_REPLAY_GENERATION_MODE,
+    C42_LATENT_GMM_K1_GENERATION_MODE,
+    C42_LATENT_GMM_K2_GENERATION_MODE,
+    C42_LATENT_GMM_K4_GENERATION_MODE,
 )
 
 BASELINE_ROUTING_FAMILY_USED = "plain_pca64_class_conditional_cvae"
@@ -236,6 +252,31 @@ C41_DELTA_SUMMARY_COLUMNS = (
     "generated_std_delta_vs_plain",
     "selected_expert_changed_across_modes",
     "oracle_expert_changed_vs_plain",
+    "decision_label",
+)
+
+C42_DELTA_SUMMARY_COLUMNS = (
+    "heldout_center",
+    "support_size",
+    "generation_mode",
+    "latent_gmm_components_requested",
+    "latent_gmm_components_effective",
+    "oracle_bacc_plain",
+    "oracle_bacc_posterior_replay",
+    "oracle_bacc_standard_prior_replay",
+    "oracle_bacc_latent_gmm",
+    "selected_bacc_locked_c41_router_plain_generator",
+    "selected_bacc_locked_c41_router_posterior_replay_generator",
+    "selected_bacc_locked_c41_router_standard_prior_replay_generator",
+    "selected_bacc_locked_c41_router_latent_gmm_generator",
+    "oracle_bacc_delta_vs_plain_retrained",
+    "selected_bacc_delta_vs_plain_retrained",
+    "oracle_gap_delta_vs_plain_retrained",
+    "plain_replay_bacc_delta_vs_c41_stored",
+    "plain_replay_matches_c41_within_tolerance",
+    "oracle_expert_changed_vs_plain",
+    "oracle_top1_stability_across_generation_seeds",
+    "selected_expert_changed_across_modes",
     "decision_label",
 )
 
