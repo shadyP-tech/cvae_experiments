@@ -348,20 +348,78 @@ def resolve_device(raw: str) -> Any:
 
 def extract_image_features(model: Any, inputs: Mapping[str, Any]) -> Any:
     if hasattr(model, "get_image_features") and "pixel_values" in inputs:
-        return model.get_image_features(pixel_values=inputs["pixel_values"])
+        return resolve_feature_tensor(model.get_image_features(pixel_values=inputs["pixel_values"]))
     outputs = model(**inputs)
-    if hasattr(outputs, "image_embeds") and outputs.image_embeds is not None:
-        return outputs.image_embeds
-    if hasattr(outputs, "pooler_output") and outputs.pooler_output is not None:
-        return outputs.pooler_output
-    if hasattr(outputs, "last_hidden_state") and outputs.last_hidden_state is not None:
-        return outputs.last_hidden_state[:, 0]
-    if isinstance(outputs, (tuple, list)) and outputs:
-        first = outputs[0]
-        if getattr(first, "ndim", 0) == 3:
-            return first[:, 0]
-        return first
-    raise RuntimeError(f"Could not extract image features from model output type {type(outputs)}")
+    return resolve_feature_tensor(outputs)
+
+
+def resolve_feature_tensor(value: Any, *, depth: int = 0) -> Any:
+    """Resolve HF vision/model outputs to a 2D embedding tensor."""
+
+    if depth > 8:
+        raise RuntimeError(f"Could not resolve image features from deeply nested output type {type(value)}")
+    if value is None:
+        raise RuntimeError("Could not resolve image features from None")
+    if getattr(value, "ndim", None) is not None:
+        return to_2d_tensor(value)
+
+    preferred_fields = (
+        "image_embeds",
+        "image_features",
+        "pooler_output",
+        "last_hidden_state",
+        "vision_model_output",
+        "vision_outputs",
+    )
+    if isinstance(value, Mapping):
+        for key in preferred_fields:
+            if key in value and value[key] is not None:
+                try:
+                    return resolve_feature_tensor(value[key], depth=depth + 1)
+                except RuntimeError:
+                    continue
+        for candidate in value.values():
+            if candidate is None:
+                continue
+            try:
+                return resolve_feature_tensor(candidate, depth=depth + 1)
+            except RuntimeError:
+                continue
+
+    for field in preferred_fields:
+        if hasattr(value, field):
+            candidate = getattr(value, field)
+            if candidate is None:
+                continue
+            try:
+                return resolve_feature_tensor(candidate, depth=depth + 1)
+            except RuntimeError:
+                continue
+
+    if hasattr(value, "to_tuple"):
+        try:
+            tuple_value = value.to_tuple()
+        except TypeError:
+            tuple_value = ()
+        if tuple_value:
+            try:
+                return resolve_feature_tensor(tuple_value, depth=depth + 1)
+            except RuntimeError:
+                pass
+
+    if isinstance(value, (tuple, list)):
+        for candidate in value:
+            if candidate is None:
+                continue
+            try:
+                return resolve_feature_tensor(candidate, depth=depth + 1)
+            except RuntimeError:
+                continue
+
+    raise RuntimeError(
+        f"Could not extract image features from model output type {type(value)} "
+        f"with shape={getattr(value, 'shape', None)}"
+    )
 
 
 def to_2d_tensor(value: Any) -> Any:

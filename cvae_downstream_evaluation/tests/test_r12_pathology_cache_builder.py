@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -10,9 +11,12 @@ from cvae_downstream_evaluation.pathology_cache_builder import (  # noqa: E402
     assert_cache_payload,
     build_r12_pathology_embedding_cache,
     canonical_cache_metadata,
+    extract_image_features,
     parse_csv_list,
     read_manifest_rows_by_split,
+    resolve_feature_tensor,
     resolve_manifest_image_path,
+    to_2d_tensor,
 )
 from cvae_downstream_evaluation.protocol import ProtocolError  # noqa: E402
 
@@ -116,3 +120,44 @@ def test_relative_manifest_path_requires_repo_marker(tmp_path: Path) -> None:
     manifest.parent.mkdir(parents=True)
     resolved = resolve_manifest_image_path(manifest, "data/a.png")
     assert resolved == repo / "data" / "a.png"
+
+
+def test_feature_tensor_resolver_handles_hf_output_shapes() -> None:
+    torch = __import__("torch")
+    two_d = torch.arange(6, dtype=torch.float32).reshape(2, 3)
+    three_d = torch.arange(24, dtype=torch.float32).reshape(2, 4, 3)
+    four_d = torch.arange(48, dtype=torch.float32).reshape(2, 3, 2, 4)
+
+    assert torch.equal(to_2d_tensor(two_d), two_d)
+    assert torch.equal(to_2d_tensor(three_d), three_d[:, 0])
+    assert torch.equal(to_2d_tensor(four_d), four_d.mean(dim=(2, 3)))
+    assert torch.equal(resolve_feature_tensor(SimpleNamespace(image_embeds=two_d)), two_d)
+    assert torch.equal(resolve_feature_tensor(SimpleNamespace(pooler_output=two_d)), two_d)
+    assert torch.equal(resolve_feature_tensor(SimpleNamespace(last_hidden_state=three_d)), three_d[:, 0])
+
+
+def test_feature_tensor_resolver_handles_nested_vision_outputs_and_mappings() -> None:
+    torch = __import__("torch")
+    pooled = torch.ones((2, 5), dtype=torch.float32)
+    hidden = torch.arange(30, dtype=torch.float32).reshape(2, 3, 5)
+
+    nested_object = SimpleNamespace(vision_model_output=SimpleNamespace(pooler_output=pooled))
+    nested_mapping = {"vision_outputs": {"last_hidden_state": hidden}}
+    tuple_output = SimpleNamespace(to_tuple=lambda: (None, SimpleNamespace(pooler_output=pooled)))
+
+    assert torch.equal(resolve_feature_tensor(nested_object), pooled)
+    assert torch.equal(resolve_feature_tensor(nested_mapping), hidden[:, 0])
+    assert torch.equal(resolve_feature_tensor(tuple_output), pooled)
+
+
+def test_extract_image_features_accepts_get_image_features_model_output() -> None:
+    torch = __import__("torch")
+    pooled = torch.ones((2, 4), dtype=torch.float32)
+
+    class FakeModel:
+        def get_image_features(self, pixel_values):
+            assert pixel_values.shape == (2, 3)
+            return SimpleNamespace(pooler_output=pooled)
+
+    feats = extract_image_features(FakeModel(), {"pixel_values": torch.zeros((2, 3))})
+    assert torch.equal(feats, pooled)
