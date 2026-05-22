@@ -12,11 +12,13 @@ from cvae_downstream_evaluation.pathology_cache_builder import (  # noqa: E402
     build_r12_pathology_embedding_cache,
     canonical_cache_metadata,
     extract_image_features,
+    extract_timm_image_features,
     parse_csv_list,
     read_manifest_rows_by_split,
     resolve_feature_tensor,
     resolve_manifest_image_path,
     to_2d_tensor,
+    virchow2_embedding_from_tokens,
 )
 from cvae_downstream_evaluation.protocol import ProtocolError  # noqa: E402
 
@@ -161,3 +163,23 @@ def test_extract_image_features_accepts_get_image_features_model_output() -> Non
 
     feats = extract_image_features(FakeModel(), {"pixel_values": torch.zeros((2, 3))})
     assert torch.equal(feats, pooled)
+
+
+def test_virchow2_pooling_concatenates_cls_and_mean_patch_tokens() -> None:
+    torch = __import__("torch")
+    tokens = torch.arange(2 * 7 * 4, dtype=torch.float32).reshape(2, 7, 4)
+    pooled = virchow2_embedding_from_tokens(tokens)
+    expected = torch.cat([tokens[:, 0], tokens[:, 5:].mean(dim=1)], dim=-1)
+    assert torch.equal(pooled, expected)
+    assert pooled.shape == (2, 8)
+
+
+def test_timm_feature_extractor_uses_requested_pooling_policy() -> None:
+    torch = __import__("torch")
+    two_d = torch.ones((2, 3), dtype=torch.float32)
+    tokens = torch.ones((2, 7, 4), dtype=torch.float32)
+    assert torch.equal(extract_timm_image_features(two_d, pooling_policy="model_output_2d"), two_d)
+    assert extract_timm_image_features(
+        tokens,
+        pooling_policy="class_token_plus_mean_patch_tokens_skip_registers",
+    ).shape == (2, 8)

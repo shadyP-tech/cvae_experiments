@@ -18,11 +18,16 @@ from cvae_downstream_evaluation.pathology_embedding_screen import (  # noqa: E40
     LABEL_CACHE_INCOMPLETE,
     LABEL_CLASS_BALANCE,
     LABEL_REBUILD_ELIGIBLE,
+    LABEL_R12B_CVAE_REBUILD_ELIGIBLE,
+    LABEL_R12B_SELECTOR_GAP_REDUCED,
+    LABEL_R12B_SOURCE_090,
     R12RunLimits,
     ROW_POSTHOC_BEST,
+    ROW_SOURCE_INNER_CANDIDATE_TARGET_EVAL,
     ROW_SOURCE_INNER_SELECTED,
     ROW_TARGET_TRAIN,
     assert_r12_config_text,
+    build_selector_oracle_gap_rows,
     build_center_summary_rows,
     compute_r12_decision_labels,
     default_r12_config,
@@ -30,6 +35,7 @@ from cvae_downstream_evaluation.pathology_embedding_screen import (  # noqa: E40
     eval_class_warning,
     load_r12_config,
     run_r12_pathology_embedding_screen,
+    robust_selector_score,
     select_source_inner_lodo_candidate,
     validate_cache_manifest_alignment,
 )
@@ -40,6 +46,16 @@ def test_r12_config_loads_locked_template() -> None:
     assert config.backbones == ("uni", "virchow2", "conch", "ctranspath", "phikon", "plip")
     assert config.representations == ("raw", "PCA64", "PCA128", "PCA256")
     assert config.c_grid == (0.01, 0.1, 1.0, 10.0)
+
+
+def test_r12b_config_loads_selector_audit_template() -> None:
+    config = load_r12_config(ROOT / "configs" / "experiments" / "r12b_source_selector_pathology_screen.yaml")
+    assert config.artifact_prefix == "r12b"
+    assert config.backbones == ("phikon", "uni", "virchow2")
+    assert config.class_weight_grid == ("none", "balanced")
+    assert config.primary_robust_penalty_weight == 0.5
+    assert config.robust_penalty_weights == (0.0, 0.5, 1.0)
+    assert config.emit_candidate_target_eval_rows is True
 
 
 def test_r12_config_rejects_diagnostics_as_selector() -> None:
@@ -111,6 +127,15 @@ def test_source_inner_lodo_selector_uses_source_metric_not_target_fields() -> No
     assert selected["row_id"] == "pca64"
 
 
+def test_robust_selector_score_penalizes_source_inner_weak_center() -> None:
+    assert robust_selector_score(
+        0.90,
+        0.80,
+        penalty_weight=0.5,
+        weak_center_threshold=0.85,
+    ) == 0.875
+
+
 def test_center_summary_uses_source_selected_backbone_not_target_best() -> None:
     config = default_r12_config()
     selection_rows = [
@@ -130,6 +155,30 @@ def test_center_summary_uses_source_selected_backbone_not_target_best() -> None:
     center = next(row for row in rows if row["heldout_center"] == "0")
     assert center["best_source_selected_backbone"] == "a"
     assert center["best_source_selected_target_eval_bacc"] == 0.60
+
+
+def test_selector_oracle_gap_reports_rank_and_top3_match() -> None:
+    config = replace(
+        default_r12_config(),
+        artifact_prefix="r12b",
+        primary_robust_penalty_weight=0.5,
+        robust_penalty_weights=(0.5,),
+        weak_center_threshold=0.85,
+    )
+    selection_rows = [
+        _selection_candidate("a", representation="raw", c=1.0, source_mean=0.90, source_min=0.80),
+        _selection_candidate("b", representation="PCA64", c=0.1, source_mean=0.88, source_min=0.86),
+    ]
+    real_rows = [
+        _candidate_target_row("a", representation="raw", c=1.0, bacc=0.82),
+        _candidate_target_row("b", representation="PCA64", c=0.1, bacc=0.90),
+    ]
+    rows = build_selector_oracle_gap_rows(config=config, selection_rows=selection_rows, real_rows=real_rows)
+    assert len(rows) == 1
+    assert rows[0]["source_selected_config"].startswith("backbone=b")
+    assert rows[0]["posthoc_best_config"].startswith("backbone=b")
+    assert rows[0]["source_selected_rank_under_target"] == 1
+    assert rows[0]["top1_config_match"] == "true"
 
 
 def test_decision_labels_separate_posthoc_and_source_selected_090() -> None:
@@ -152,6 +201,42 @@ def test_decision_labels_separate_posthoc_and_source_selected_090() -> None:
     assert LABEL_090_AUDIT in labels
     assert LABEL_090_SOURCE_SELECTED in labels
     assert LABEL_REBUILD_ELIGIBLE in labels
+
+
+def test_r12b_decision_labels_require_source_selected_and_selector_gap() -> None:
+    config = replace(default_r12_config(), artifact_prefix="r12b", experiment_name="r12b_source_selector_pathology_screen")
+    center_rows = [
+        _center("0", posthoc=0.92, selected=0.91, z11=0.80),
+        _center("1", posthoc=0.91, selected=0.90, z11=0.80),
+        _center("2", posthoc=0.92, selected=0.90, z11=0.80),
+        _center("3", posthoc=0.90, selected=0.89, z11=0.80),
+        _center("4", posthoc=0.91, selected=0.90, z11=0.80),
+        _center("__mean__", posthoc=0.912, selected=0.90, z11=0.80, delta=0.10),
+    ]
+    selector_rows = [
+        {
+            "seed": seed,
+            "heldout_center": center,
+            "selector_scope": "global_source_inner_lodo",
+            "robust_penalty_role": "primary",
+            "source_selected_target_bacc": 0.90,
+            "source_selected_rank_under_target": 1,
+            "oracle_gap": 0.0,
+        }
+        for seed in (42, 43, 44)
+        for center in ("0", "1", "2", "3", "4")
+    ]
+    labels = compute_r12_decision_labels(
+        config=config,
+        fingerprint_rows=[{"cache_status": "ok"}],
+        real_rows=[],
+        center_rows=center_rows,
+        ranking_rows=[],
+        selector_gap_rows=selector_rows,
+    )
+    assert LABEL_R12B_SOURCE_090 in labels
+    assert LABEL_R12B_SELECTOR_GAP_REDUCED in labels
+    assert LABEL_R12B_CVAE_REBUILD_ELIGIBLE in labels
 
 
 def test_decision_labels_mark_not_supported_and_class_balance_caveat() -> None:
@@ -238,6 +323,53 @@ def _selection_row(backbone: str, *, source_bacc: float) -> dict[str, object]:
         "C": 1.0,
         "source_inner_lodo_mean_bacc": source_bacc,
         "selected_by_source_inner_lodo": "true",
+        "status": "ok",
+    }
+
+
+def _selection_candidate(
+    backbone: str,
+    *,
+    representation: str,
+    c: float,
+    source_mean: float,
+    source_min: float,
+) -> dict[str, object]:
+    return {
+        "row_id": f"sel_{backbone}_{representation}_{c}",
+        "experiment_seed": 42,
+        "backbone_name": backbone,
+        "heldout_center": "0",
+        "row_role": "source_inner_lodo_candidate",
+        "representation": representation,
+        "C": c,
+        "class_weight": "none",
+        "source_inner_lodo_mean_bacc": source_mean,
+        "source_inner_lodo_min_center_bacc": source_min,
+        "source_inner_lodo_center_baccs": '{"1": 0.8}',
+        "source_inner_lodo_center_bacc_vector": '{"1": 0.8}',
+        "source_inner_lodo_min_center_id": "1",
+        "status": "ok",
+    }
+
+
+def _candidate_target_row(
+    backbone: str,
+    *,
+    representation: str,
+    c: float,
+    bacc: float,
+) -> dict[str, object]:
+    return {
+        "row_id": f"target_{backbone}_{representation}_{c}",
+        "experiment_seed": 42,
+        "backbone_name": backbone,
+        "heldout_center": "0",
+        "row_role": ROW_SOURCE_INNER_CANDIDATE_TARGET_EVAL,
+        "representation": representation,
+        "C": c,
+        "class_weight": "none",
+        "bacc": bacc,
         "status": "ok",
     }
 

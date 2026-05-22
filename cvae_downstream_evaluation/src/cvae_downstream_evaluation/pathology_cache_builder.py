@@ -21,6 +21,19 @@ from .protocol import ProtocolError
 
 
 SUPPORTED_HF_AUTO_BACKBONES = {"phikon", "plip"}
+SUPPORTED_TIMM_HF_BACKBONES = {"uni", "virchow2"}
+TIMM_HF_MODEL_REFS = {
+    "uni": "hf-hub:MahmoodLab/UNI",
+    "virchow2": "hf-hub:paige-ai/Virchow2",
+}
+EXPECTED_TIMM_EMBEDDING_DIMS = {
+    "uni": 1024,
+    "virchow2": 2560,
+}
+TIMM_POOLING_POLICIES = {
+    "uni": "model_output_2d",
+    "virchow2": "class_token_plus_mean_patch_tokens_skip_registers",
+}
 DEFAULT_SPLITS = ("train", "val", "test")
 
 
@@ -56,7 +69,7 @@ def build_r12_pathology_embedding_cache(request: CacheBuildRequest) -> CacheBuil
     manifest_path = request.support_run_dir / "manifests" / "samples.csv"
     if not manifest_path.exists():
         raise ProtocolError(f"Missing support-run samples manifest: {manifest_path}")
-    if not request.model_dir.exists():
+    if str(request.loader).strip().lower() != "timm_hf" and not request.model_dir.exists():
         raise ProtocolError(f"Missing model directory: {request.model_dir}")
 
     rows_by_split = read_manifest_rows_by_split(
@@ -117,13 +130,21 @@ def build_r12_pathology_embedding_cache(request: CacheBuildRequest) -> CacheBuil
         output_path = output_paths[split]
         output_path.parent.mkdir(parents=True, exist_ok=True)
         embeddings = extractor.extract(rows, batch_size=int(request.batch_size))
+        observed_dim = int(embeddings.shape[1]) if int(embeddings.ndim) == 2 else 0
+        expected_dim = _optional_int(extractor.feature_metadata.get("expected_embedding_dim"))
+        if expected_dim is not None and observed_dim != int(expected_dim):
+            raise ProtocolError(
+                f"{request.backbone_name}: observed embedding dim {observed_dim} does not match "
+                f"expected embedding dim {expected_dim}"
+            )
+        extractor.feature_metadata["observed_embedding_dim"] = observed_dim
         payload = {
             "embeddings": embeddings,
             "metadata": [canonical_cache_metadata(row, split=split) for row in rows],
             "feature_extractor": {
                 **extractor.feature_metadata,
                 "backbone_type": request.backbone_name,
-                "embedding_dim": int(embeddings.shape[1]) if int(embeddings.ndim) == 2 else 0,
+                "embedding_dim": observed_dim,
                 "image_size": int(request.image_size) if request.image_size is not None else "",
                 "local_files_only": bool(request.local_files_only),
                 "cache_builder": "r12_pathology_cache_builder_v1",
@@ -276,10 +297,35 @@ class PathologyFeatureExtractor:
         return torch.cat(chunks, dim=0)
 
 
+class TimmPathologyFeatureExtractor(PathologyFeatureExtractor):
+    def extract(self, rows: Sequence[Mapping[str, object]], *, batch_size: int) -> Any:
+        import torch  # type: ignore
+        from PIL import Image  # type: ignore
+
+        pooling_policy = str(self.feature_metadata.get("pooling_policy", "model_output_2d"))
+        chunks = []
+        with torch.no_grad():
+            for start in range(0, len(rows), int(batch_size)):
+                batch = rows[start : start + int(batch_size)]
+                images = [Image.open(str(row["image_path"])).convert("RGB") for row in batch]
+                tensors = [self.processor(image) for image in images]
+                inputs = torch.stack(tensors, dim=0).to(self.device)
+                outputs = self.model(inputs)
+                feats = extract_timm_image_features(outputs, pooling_policy=pooling_policy)
+                chunks.append(to_2d_tensor(feats).detach().cpu().float())
+                for image in images:
+                    image.close()
+        if not chunks:
+            return torch.empty((0, 0), dtype=torch.float32)
+        return torch.cat(chunks, dim=0)
+
+
 def load_pathology_feature_extractor(request: CacheBuildRequest) -> PathologyFeatureExtractor:
     loader = str(request.loader).strip().lower()
+    if loader == "timm_hf":
+        return load_timm_hf_feature_extractor(request)
     if loader != "hf_auto":
-        raise ProtocolError(f"Unsupported R1.2 cache loader '{request.loader}'. Supported: hf_auto")
+        raise ProtocolError(f"Unsupported R1.2 cache loader '{request.loader}'. Supported: hf_auto, timm_hf")
     if str(request.backbone_name).strip().lower() not in SUPPORTED_HF_AUTO_BACKBONES:
         raise ProtocolError(
             f"Backbone '{request.backbone_name}' is not enabled for the HF auto cache builder yet. "
@@ -335,6 +381,62 @@ def load_pathology_feature_extractor(request: CacheBuildRequest) -> PathologyFea
     return PathologyFeatureExtractor(model=model, processor=processor, device=device, feature_metadata=metadata)
 
 
+def load_timm_hf_feature_extractor(request: CacheBuildRequest) -> PathologyFeatureExtractor:
+    backbone = str(request.backbone_name).strip().lower()
+    if backbone not in SUPPORTED_TIMM_HF_BACKBONES:
+        raise ProtocolError(
+            f"Backbone '{request.backbone_name}' is not enabled for the timm_hf cache builder yet. "
+            f"Supported timm_hf backbones: {sorted(SUPPORTED_TIMM_HF_BACKBONES)}"
+        )
+    try:
+        import torch  # type: ignore
+        import timm  # type: ignore
+        from timm.data import resolve_data_config  # type: ignore
+        from timm.data.transforms_factory import create_transform  # type: ignore
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("R1.2b timm_hf cache extraction requires torch and timm in the workstation venv.") from exc
+
+    device = resolve_device(request.device)
+    model_ref = _resolve_timm_model_ref(request)
+    kwargs: dict[str, Any] = {"pretrained": True}
+    if backbone == "uni":
+        kwargs.update({"init_values": 1e-5, "dynamic_img_size": True})
+    if backbone == "virchow2":
+        try:
+            from timm.layers import SwiGLUPacked  # type: ignore
+        except ModuleNotFoundError as exc:
+            raise RuntimeError("Virchow2 extraction requires timm.layers.SwiGLUPacked.") from exc
+        kwargs.update({"mlp_layer": SwiGLUPacked, "act_layer": torch.nn.SiLU})
+    model = timm.create_model(model_ref, **kwargs)
+    model.eval()
+    model.to(device)
+    transform = create_transform(**resolve_data_config(model.pretrained_cfg, model=model))
+    pooling_policy = TIMM_POOLING_POLICIES[backbone]
+    metadata = {
+        "backbone_type": backbone,
+        "feature_extractor_name": backbone,
+        "feature_extractor_checkpoint": str(request.model_dir),
+        "feature_extractor_layer": "timm_model_output",
+        "embedding_pooling": pooling_policy,
+        "pooling_policy": pooling_policy,
+        "loader": "timm_hf",
+        "model_repo": TIMM_HF_MODEL_REFS[backbone],
+        "model_ref": model_ref,
+        "model_revision_or_commit": _timm_revision(model),
+        "transform_class": type(transform).__name__,
+        "model_class": type(model).__name__,
+        "device": str(device),
+        "expected_embedding_dim": int(EXPECTED_TIMM_EMBEDDING_DIMS[backbone]),
+        "local_files_only": bool(request.local_files_only),
+    }
+    try:
+        first_param = next(model.parameters())
+        metadata["torch_dtype"] = str(first_param.dtype)
+    except StopIteration:
+        metadata["torch_dtype"] = ""
+    return TimmPathologyFeatureExtractor(model=model, processor=transform, device=device, feature_metadata=metadata)
+
+
 def resolve_device(raw: str) -> Any:
     import torch  # type: ignore
 
@@ -351,6 +453,50 @@ def extract_image_features(model: Any, inputs: Mapping[str, Any]) -> Any:
         return resolve_feature_tensor(model.get_image_features(pixel_values=inputs["pixel_values"]))
     outputs = model(**inputs)
     return resolve_feature_tensor(outputs)
+
+
+def extract_timm_image_features(outputs: Any, *, pooling_policy: str) -> Any:
+    if str(pooling_policy) == "class_token_plus_mean_patch_tokens_skip_registers":
+        return virchow2_embedding_from_tokens(outputs)
+    return resolve_feature_tensor(outputs)
+
+
+def virchow2_embedding_from_tokens(outputs: Any) -> Any:
+    tokens = resolve_raw_tensor(outputs)
+    if getattr(tokens, "ndim", 0) != 3:
+        raise RuntimeError(f"Virchow2 expected 3D token output, got shape={getattr(tokens, 'shape', None)}")
+    if int(tokens.shape[1]) <= 5:
+        raise RuntimeError(f"Virchow2 expected class/register/patch tokens, got shape={getattr(tokens, 'shape', None)}")
+    class_token = tokens[:, 0]
+    patch_tokens = tokens[:, 5:]
+    return _torch_cat((class_token, patch_tokens.mean(dim=1)), dim=-1)
+
+
+def resolve_raw_tensor(value: Any, *, depth: int = 0) -> Any:
+    if depth > 8:
+        raise RuntimeError(f"Could not resolve tensor from deeply nested output type {type(value)}")
+    if value is None:
+        raise RuntimeError("Could not resolve tensor from None")
+    if getattr(value, "ndim", None) is not None:
+        return value
+    if isinstance(value, Mapping):
+        for candidate in value.values():
+            try:
+                return resolve_raw_tensor(candidate, depth=depth + 1)
+            except RuntimeError:
+                continue
+    if hasattr(value, "to_tuple"):
+        try:
+            return resolve_raw_tensor(value.to_tuple(), depth=depth + 1)
+        except RuntimeError:
+            pass
+    if isinstance(value, (tuple, list)):
+        for candidate in value:
+            try:
+                return resolve_raw_tensor(candidate, depth=depth + 1)
+            except RuntimeError:
+                continue
+    raise RuntimeError(f"Could not resolve tensor from output type {type(value)}")
 
 
 def resolve_feature_tensor(value: Any, *, depth: int = 0) -> Any:
@@ -520,10 +666,47 @@ def _infer_repo_root_from_manifest(manifest_path: Path) -> Path:
     return manifest_path.resolve().parents[5]
 
 
+def _resolve_timm_model_ref(request: CacheBuildRequest) -> str:
+    raw = str(request.model_dir).strip()
+    backbone = str(request.backbone_name).strip().lower()
+    if raw in {"", "auto", "."}:
+        return TIMM_HF_MODEL_REFS[backbone]
+    if raw.startswith("hf-hub:") or raw.startswith("hf_hub:"):
+        return raw
+    if "/" in raw and not Path(raw).exists():
+        return f"hf-hub:{raw}"
+    return TIMM_HF_MODEL_REFS[backbone]
+
+
+def _timm_revision(model: Any) -> str:
+    cfg = getattr(model, "pretrained_cfg", {}) or {}
+    if isinstance(cfg, Mapping):
+        for key in ("hf_hub_revision", "revision", "commit_hash", "sha"):
+            value = str(cfg.get(key, "")).strip()
+            if value:
+                return value
+    return ""
+
+
+def _optional_int(value: object) -> int | None:
+    try:
+        if value in ("", None):
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _torch_is_bad(value: Any) -> bool:
     import torch  # type: ignore
 
     return bool(torch.isnan(value).any().item() or torch.isinf(value).any().item())
+
+
+def _torch_cat(values: Sequence[Any], *, dim: int) -> Any:
+    import torch  # type: ignore
+
+    return torch.cat(tuple(values), dim=int(dim))
 
 
 def _torch_save(payload: Mapping[str, Any], path: Path) -> None:

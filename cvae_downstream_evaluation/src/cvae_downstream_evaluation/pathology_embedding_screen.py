@@ -50,14 +50,19 @@ from .protocol import ProtocolError
 
 
 R12_EXPERIMENT_NAME = "r12_pathology_embedding_screen"
+R12B_EXPERIMENT_NAME = "r12b_source_selector_pathology_screen"
 R12_DATASET_NAME = "camelyon17"
 R12_BACKBONES = ("uni", "virchow2", "conch", "ctranspath", "phikon", "plip")
 R12_REPRESENTATIONS = ("raw", "PCA64", "PCA128", "PCA256")
 R12_C_GRID = (0.01, 0.1, 1.0, 10.0)
+R12_CLASS_WEIGHT_GRID = ("none",)
+R12B_CLASS_WEIGHT_GRID = ("none", "balanced")
+R12B_ROBUST_PENALTY_WEIGHTS = (0.0, 0.5, 1.0)
 
 ROW_PARITY_FIXED = "parity_fixed"
 ROW_SOURCE_INNER_CANDIDATE = "source_inner_lodo_candidate"
 ROW_SOURCE_INNER_SELECTED = "source_inner_lodo_selected"
+ROW_SOURCE_INNER_CANDIDATE_TARGET_EVAL = "source_inner_lodo_candidate_target_eval"
 ROW_POSTHOC_BEST = "posthoc_best"
 ROW_TARGET_TRAIN = "target_train_diagnostic"
 
@@ -75,6 +80,14 @@ LABEL_WEAK_REPAIRED = "R12_WEAK_CENTER_REPAIRED"
 LABEL_WEAK_PERSISTS = "R12_WEAK_CENTER_PERSISTS"
 LABEL_CLASS_BALANCE = "R12_EVAL_CLASS_BALANCE_CAVEAT"
 
+LABEL_R12B_SCREEN_COMPLETE = "R12B_SOURCE_SELECTOR_SCREEN_COMPLETE"
+LABEL_R12B_CACHE_INCOMPLETE = "R12B_BACKBONE_CACHE_INCOMPLETE"
+LABEL_R12B_SOURCE_090 = "R12B_SOURCE_SELECTED_090_SUPPORTED"
+LABEL_R12B_SELECTOR_GAP_REDUCED = "R12B_SELECTOR_GAP_REDUCED"
+LABEL_R12B_CVAE_REBUILD_ELIGIBLE = "R12B_CVAE_REBUILD_ELIGIBLE"
+LABEL_R12B_POSTHOC_ONLY = "R12B_POSTHOC_IMPROVES_SOURCE_SELECTION_FAILS"
+LABEL_R12B_NOT_CREDIBLE = "R12B_CAMELYON17_090_NOT_CREDIBLE_UNDER_SETUP"
+
 FINGERPRINT_COLUMNS = (
     "experiment_seed",
     "backbone_name",
@@ -87,6 +100,13 @@ FINGERPRINT_COLUMNS = (
     "cache_hash",
     "feature_cache_hash",
     "backbone_metadata",
+    "model_repo",
+    "model_revision_or_commit",
+    "loader",
+    "transform_class",
+    "observed_embedding_dim",
+    "expected_embedding_dim",
+    "pooling_policy",
     "sample_manifest_match",
     "row_order_match",
     "canonical_sort_key",
@@ -124,6 +144,14 @@ REAL_FEATURE_COLUMNS = (
     "classifier",
     "classifier_hparams",
     "C",
+    "class_weight",
+    "selector_scope",
+    "selection_metric",
+    "source_inner_lodo_robust_score",
+    "robust_penalty_weight",
+    "robust_penalty_role",
+    "source_inner_lodo_min_center_id",
+    "source_inner_lodo_center_bacc_vector",
     "bacc",
     "macro_f1",
     "auroc_if_valid",
@@ -154,10 +182,18 @@ SOURCE_SELECTION_COLUMNS = (
     "representation",
     "pca_dim",
     "C",
+    "class_weight",
     "selector_centers",
     "source_inner_lodo_mean_bacc",
     "source_inner_lodo_min_center_bacc",
     "source_inner_lodo_center_baccs",
+    "source_inner_lodo_robust_score",
+    "robust_penalty_weight",
+    "robust_penalty_role",
+    "source_inner_lodo_min_center_id",
+    "source_inner_lodo_center_bacc_vector",
+    "selection_metric",
+    "selector_scope",
     "selected_by_source_inner_lodo",
     "selection_used_target_labels",
     "eligibility",
@@ -210,6 +246,7 @@ CENTER_SUMMARY_COLUMNS = (
     "best_source_selected_backbone",
     "best_source_selected_representation",
     "best_source_selected_C",
+    "best_source_selected_class_weight",
     "best_source_selected_target_eval_bacc",
     "target_train_diagnostic_bacc",
     "z11_reference_bacc",
@@ -235,9 +272,40 @@ BACKBONE_RANKING_COLUMNS = (
     "downstream_claim_scope",
 )
 
+SELECTOR_ORACLE_GAP_COLUMNS = (
+    "seed",
+    "heldout_center",
+    "selector_scope",
+    "robust_penalty_weight",
+    "robust_penalty_role",
+    "backbone_name",
+    "source_selected_config",
+    "source_selected_target_bacc",
+    "posthoc_best_config",
+    "posthoc_best_target_bacc",
+    "oracle_gap",
+    "source_selected_rank_under_target",
+    "spearman_source_score_vs_target_bacc",
+    "top1_config_match",
+    "top3_contains_oracle",
+    "source_inner_lodo_min_center_id",
+    "source_inner_lodo_center_bacc_vector",
+)
+
+CLASS_WEIGHT_DIAGNOSTIC_COLUMNS = (
+    "heldout_center",
+    "selector_scope",
+    "selected_class_weight_frequency",
+    "balanced_win_rate_by_center",
+    "balanced_oracle_gap_delta",
+    "eligibility",
+)
+
 
 @dataclass(frozen=True)
 class R12Config:
+    experiment_name: str
+    artifact_prefix: str
     candidate_centers: tuple[str, ...]
     experiment_seeds: tuple[int, ...]
     support_sizes: tuple[int, ...]
@@ -245,6 +313,11 @@ class R12Config:
     backbones: tuple[str, ...]
     representations: tuple[str, ...]
     c_grid: tuple[float, ...]
+    class_weight_grid: tuple[str, ...]
+    primary_robust_penalty_weight: float
+    robust_penalty_weights: tuple[float, ...]
+    weak_center_threshold: float
+    emit_candidate_target_eval_rows: bool
     cache_root: str
     cache_path_template: str
     artifacts_root: str
@@ -259,6 +332,10 @@ class R12Config:
     mean_gain_threshold: float
     weak_center_gain_threshold: float
     no_mean_gain_threshold: float
+    selector_gap_improvement_threshold: float
+    selector_rank_threshold: int
+    seed_std_mean_bacc_max: float
+    seed_worst_center_min: float
     pca_low_sample_warning_multiplier: int
     mmd_max_samples_per_domain: int
     mmd_seed: int
@@ -293,6 +370,8 @@ class R12AuditResult:
 def default_r12_config() -> R12Config:
     z11 = default_z11_config()
     return R12Config(
+        experiment_name=R12_EXPERIMENT_NAME,
+        artifact_prefix="r12",
         candidate_centers=Z11_CENTERS,
         experiment_seeds=Z11_SEEDS,
         support_sizes=z11.support_sizes,
@@ -300,6 +379,11 @@ def default_r12_config() -> R12Config:
         backbones=R12_BACKBONES,
         representations=R12_REPRESENTATIONS,
         c_grid=R12_C_GRID,
+        class_weight_grid=R12_CLASS_WEIGHT_GRID,
+        primary_robust_penalty_weight=0.0,
+        robust_penalty_weights=(0.0,),
+        weak_center_threshold=0.85,
+        emit_candidate_target_eval_rows=False,
         cache_root="cvae_downstream_evaluation/artifacts/pathology_embeddings",
         cache_path_template="{cache_root}/{backbone}/seed{seed}/embeddings/{split}.pt",
         artifacts_root="cvae_downstream_evaluation/artifacts",
@@ -314,6 +398,10 @@ def default_r12_config() -> R12Config:
         mean_gain_threshold=0.03,
         weak_center_gain_threshold=0.05,
         no_mean_gain_threshold=0.03,
+        selector_gap_improvement_threshold=0.02,
+        selector_rank_threshold=3,
+        seed_std_mean_bacc_max=0.015,
+        seed_worst_center_min=0.82,
         pca_low_sample_warning_multiplier=3,
         mmd_max_samples_per_domain=2000,
         mmd_seed=12017,
@@ -335,7 +423,6 @@ def load_r12_config(path: Path) -> R12Config:
 
 def assert_r12_config_text(text: str) -> None:
     required = (
-        "name: r12_pathology_embedding_screen",
         "retrain_cvae_experts: forbidden",
         "embedding_extraction: external_frozen_cache",
         "target_eval_tuned_deployable_selection: forbidden",
@@ -344,6 +431,8 @@ def assert_r12_config_text(text: str) -> None:
         "diagnostics_used_for_decision_labels: false",
         "sklearn_logistic_regression",
     )
+    if f"name: {R12_EXPERIMENT_NAME}" not in text and f"name: {R12B_EXPERIMENT_NAME}" not in text:
+        raise ProtocolError(f"R1.2/R1.2b config has unexpected experiment name")
     missing = [snippet for snippet in required if snippet not in text]
     if missing:
         raise ProtocolError(f"R1.2 config is missing locked fields: {missing}")
@@ -359,7 +448,7 @@ def assert_r12_config_text(text: str) -> None:
 
 def assert_r12_config_mapping(config: Mapping[str, Any]) -> None:
     experiment = _mapping(config.get("experiment"), "experiment")
-    if experiment.get("name") != R12_EXPERIMENT_NAME:
+    if experiment.get("name") not in {R12_EXPERIMENT_NAME, R12B_EXPERIMENT_NAME}:
         raise ProtocolError(f"Unexpected experiment.name: {experiment.get('name')!r}")
     protocol = _mapping(config.get("protocol"), "protocol")
     if protocol.get("retrain_cvae_experts") != "forbidden":
@@ -475,26 +564,41 @@ def run_r12_pathology_embedding_screen(
         z11_reference=z11_reference,
     )
     ranking_rows = build_backbone_ranking_rows(config=config, real_rows=real_rows)
+    selector_gap_rows = build_selector_oracle_gap_rows(
+        config=config,
+        selection_rows=selection_rows,
+        real_rows=real_rows,
+    )
+    class_weight_rows = build_class_weight_diagnostic_rows(
+        config=config,
+        selector_gap_rows=selector_gap_rows,
+        real_rows=real_rows,
+    )
     labels = compute_r12_decision_labels(
         config=config,
         fingerprint_rows=fingerprint_rows,
         real_rows=real_rows,
         center_rows=center_rows,
         ranking_rows=ranking_rows,
+        selector_gap_rows=selector_gap_rows,
     )
 
+    prefix = config.artifact_prefix
     output_paths = {
-        "fingerprint": tables_dir / "r12_embedding_cache_fingerprint.csv",
-        "real_feature": tables_dir / "r12_real_feature_ceiling_matrix.csv",
-        "source_inner_lodo": tables_dir / "r12_source_inner_lodo_selection_matrix.csv",
-        "pca_capacity": tables_dir / "r12_pca_capacity_matrix.csv",
-        "diagnostics": tables_dir / "r12_representation_shift_diagnostics.csv",
-        "center_summary": tables_dir / "r12_center_summary.csv",
-        "backbone_ranking": tables_dir / "r12_backbone_ranking.csv",
-        "protocol_manifest": manifests_dir / "r12_protocol_manifest.json",
-        "leakage_report": reports_dir / "r12_leakage_report.json",
-        "decision_report": reports_dir / "r12_decision_report.md",
+        "fingerprint": tables_dir / f"{prefix}_embedding_cache_fingerprint.csv",
+        "real_feature": tables_dir / f"{prefix}_real_feature_ceiling_matrix.csv",
+        "source_inner_lodo": tables_dir / f"{prefix}_source_inner_lodo_selection_matrix.csv",
+        "pca_capacity": tables_dir / f"{prefix}_pca_capacity_matrix.csv",
+        "diagnostics": tables_dir / f"{prefix}_representation_shift_diagnostics.csv",
+        "center_summary": tables_dir / f"{prefix}_center_summary.csv",
+        "backbone_ranking": tables_dir / f"{prefix}_backbone_ranking.csv",
+        "protocol_manifest": manifests_dir / f"{prefix}_protocol_manifest.json",
+        "leakage_report": reports_dir / f"{prefix}_leakage_report.json",
+        "decision_report": reports_dir / f"{prefix}_decision_report.md",
     }
+    if prefix == "r12b":
+        output_paths["selector_oracle_gap"] = tables_dir / "r12b_selector_oracle_gap.csv"
+        output_paths["class_weight_diagnostics"] = tables_dir / "r12b_class_weight_diagnostics.csv"
     _write_csv(output_paths["fingerprint"], FINGERPRINT_COLUMNS, fingerprint_rows)
     _write_csv(output_paths["real_feature"], REAL_FEATURE_COLUMNS, real_rows)
     _write_csv(output_paths["source_inner_lodo"], SOURCE_SELECTION_COLUMNS, selection_rows)
@@ -502,6 +606,9 @@ def run_r12_pathology_embedding_screen(
     _write_csv(output_paths["diagnostics"], DIAGNOSTIC_COLUMNS, diagnostic_rows)
     _write_csv(output_paths["center_summary"], CENTER_SUMMARY_COLUMNS, center_rows)
     _write_csv(output_paths["backbone_ranking"], BACKBONE_RANKING_COLUMNS, ranking_rows)
+    if prefix == "r12b":
+        _write_csv(output_paths["selector_oracle_gap"], SELECTOR_ORACLE_GAP_COLUMNS, selector_gap_rows)
+        _write_csv(output_paths["class_weight_diagnostics"], CLASS_WEIGHT_DIAGNOSTIC_COLUMNS, class_weight_rows)
     write_protocol_manifest(output_paths["protocol_manifest"], config=config, artifacts=artifacts, limits=limits)
     write_leakage_report(
         output_paths["leakage_report"],
@@ -511,10 +618,12 @@ def run_r12_pathology_embedding_screen(
     )
     write_decision_report(
         output_paths["decision_report"],
+        config=config,
         labels=labels,
         center_rows=center_rows,
         ranking_rows=ranking_rows,
         real_rows=real_rows,
+        selector_gap_rows=selector_gap_rows,
     )
     return R12AuditResult(decision_labels=labels, output_paths=output_paths)
 
@@ -570,6 +679,13 @@ def fingerprint_pathology_cache(
         "cache_hash": "",
         "feature_cache_hash": "",
         "backbone_metadata": "",
+        "model_repo": "",
+        "model_revision_or_commit": "",
+        "loader": "",
+        "transform_class": "",
+        "observed_embedding_dim": "",
+        "expected_embedding_dim": "",
+        "pooling_policy": "",
         "sample_manifest_match": "missing_samples" if not path.exists() else "",
         "row_order_match": "false" if not path.exists() else "",
         "canonical_sort_key": "sample_id",
@@ -593,7 +709,15 @@ def fingerprint_pathology_cache(
         row["embedding_dim"] = shape[1] if len(shape) >= 2 else ""
         row["dtype"] = str(getattr(embeddings, "dtype", ""))
         row["feature_cache_hash"] = _feature_cache_hash(payload)
-        row["backbone_metadata"] = json.dumps(_feature_metadata(payload), sort_keys=True, default=str)
+        feature = _feature_metadata(payload)
+        row["backbone_metadata"] = json.dumps(feature, sort_keys=True, default=str)
+        row["model_repo"] = str(feature.get("model_repo", feature.get("feature_extractor_checkpoint", "")))
+        row["model_revision_or_commit"] = str(feature.get("model_revision_or_commit", ""))
+        row["loader"] = str(feature.get("loader", ""))
+        row["transform_class"] = str(feature.get("transform_class", feature.get("processor_class", "")))
+        row["observed_embedding_dim"] = feature.get("observed_embedding_dim", row["embedding_dim"])
+        row["expected_embedding_dim"] = feature.get("expected_embedding_dim", "")
+        row["pooling_policy"] = str(feature.get("pooling_policy", feature.get("embedding_pooling", "")))
         if expected_rows is not None and int(row["num_rows"]) != int(expected_rows):
             row["sample_manifest_match"] = "missing_samples"
         else:
@@ -663,17 +787,19 @@ def build_source_inner_lodo_selection_rows(
             center_rows: list[dict[str, object]] = []
             for representation in representations:
                 for c_value in config.c_grid:
-                    row = _source_inner_candidate_row(
-                        config=config,
-                        artifact=artifact,
-                        heldout_center=str(heldout),
-                        representation=representation,
-                        c_value=float(c_value),
-                        train_cache=train_cache,
-                        source_centers=source_centers,
-                    )
-                    center_rows.append(row)
-                    rows.append(row)
+                    for class_weight in config.class_weight_grid:
+                        row = _source_inner_candidate_row(
+                            config=config,
+                            artifact=artifact,
+                            heldout_center=str(heldout),
+                            representation=representation,
+                            c_value=float(c_value),
+                            class_weight=_class_weight_label(class_weight),
+                            train_cache=train_cache,
+                            source_centers=source_centers,
+                        )
+                        center_rows.append(row)
+                        rows.append(row)
             ok_rows = [row for row in center_rows if str(row.get("status")) == "ok"]
             if ok_rows:
                 selected = select_source_inner_lodo_candidate(ok_rows, config=config)
@@ -690,12 +816,16 @@ def select_source_inner_lodo_candidate(
 ) -> Mapping[str, object]:
     rep_order = {rep: idx for idx, rep in enumerate(config.representations)}
     c_order = {float(c): idx for idx, c in enumerate(config.c_grid)}
+    weight_order = {weight: idx for idx, weight in enumerate(config.class_weight_grid)}
     return max(
         rows,
         key=lambda row: (
+            _nan_to_low(_selector_score(row, weight=config.primary_robust_penalty_weight, threshold=config.weak_center_threshold)),
             _nan_to_low(_float(row.get("source_inner_lodo_mean_bacc"))),
+            _nan_to_low(_float(row.get("source_inner_lodo_min_center_bacc"))),
             -rep_order.get(str(row.get("representation")), 999),
             -c_order.get(_float(row.get("C")), 999),
+            -weight_order.get(_class_weight_label(row.get("class_weight")), 999),
         ),
     )
 
@@ -717,6 +847,13 @@ def build_real_feature_rows(
         for row in selection_rows
         if str(row.get("selected_by_source_inner_lodo")) == "true" and str(row.get("status")) == "ok"
     }
+    candidates_by_key: dict[tuple[int, str, str], list[Mapping[str, object]]] = {}
+    if config.emit_candidate_target_eval_rows:
+        for row in selection_rows:
+            if str(row.get("status")) != "ok":
+                continue
+            key = (int(row["experiment_seed"]), str(row["backbone_name"]), str(row["heldout_center"]))
+            candidates_by_key.setdefault(key, []).append(row)
     for artifact in artifacts:
         if not artifact.train_cache.exists() or not artifact.test_cache.exists():
             continue
@@ -739,6 +876,8 @@ def build_real_feature_rows(
                         row_role=ROW_PARITY_FIXED,
                         representation=representation,
                         c_value=1.0,
+                        class_weight="none",
+                        source_selection_row=None,
                         train_cache=train_cache,
                         test_cache=test_cache,
                         z11_reference=z11_reference,
@@ -756,6 +895,26 @@ def build_real_feature_rows(
                         row_role=ROW_SOURCE_INNER_SELECTED,
                         representation=str(selected["representation"]),
                         c_value=_float(selected["C"]),
+                        class_weight=_class_weight_label(selected.get("class_weight")),
+                        source_selection_row=selected,
+                        train_cache=train_cache,
+                        test_cache=test_cache,
+                        z11_reference=z11_reference,
+                        sample_manifest_match=sample_match,
+                        row_order_match=row_order_match,
+                    )
+                )
+            for candidate in candidates_by_key.get((int(artifact.experiment_seed), artifact.backbone_name, str(heldout)), ()):
+                rows.append(
+                    _real_feature_row(
+                        config=config,
+                        artifact=artifact,
+                        heldout_center=str(heldout),
+                        row_role=ROW_SOURCE_INNER_CANDIDATE_TARGET_EVAL,
+                        representation=str(candidate["representation"]),
+                        c_value=_float(candidate["C"]),
+                        class_weight=_class_weight_label(candidate.get("class_weight")),
+                        source_selection_row=candidate,
                         train_cache=train_cache,
                         test_cache=test_cache,
                         z11_reference=z11_reference,
@@ -771,6 +930,8 @@ def build_real_feature_rows(
                     row_role=ROW_TARGET_TRAIN,
                     representation="raw",
                     c_value=1.0,
+                    class_weight="none",
+                    source_selection_row=None,
                     train_cache=train_cache,
                     test_cache=test_cache,
                     z11_reference=z11_reference,
@@ -895,6 +1056,7 @@ def build_center_summary_rows(
                 "best_source_selected_backbone": _join_unique(row.get("backbone_name", "") for row in selected),
                 "best_source_selected_representation": _join_unique(row.get("representation", "") for row in selected),
                 "best_source_selected_C": _join_unique(row.get("C", "") for row in selected),
+                "best_source_selected_class_weight": _join_unique(row.get("class_weight", "") for row in selected),
                 "best_source_selected_target_eval_bacc": selected_bacc,
                 "target_train_diagnostic_bacc": target_bacc,
                 "z11_reference_bacc": z11,
@@ -919,6 +1081,7 @@ def build_center_summary_rows(
                 "best_source_selected_backbone": "source_selected_by_center",
                 "best_source_selected_representation": "source_selected_by_center",
                 "best_source_selected_C": "",
+                "best_source_selected_class_weight": "",
                 "best_source_selected_target_eval_bacc": _nanmean(
                     row["best_source_selected_target_eval_bacc"] for row in out
                 ),
@@ -945,7 +1108,7 @@ def build_backbone_ranking_rows(
 ) -> list[dict[str, object]]:
     rankings: list[dict[str, object]] = []
     for regime, allowed_roles in (
-        ("posthoc_target_eval", {ROW_PARITY_FIXED, ROW_SOURCE_INNER_SELECTED}),
+        ("posthoc_target_eval", {ROW_PARITY_FIXED, ROW_SOURCE_INNER_SELECTED, ROW_SOURCE_INNER_CANDIDATE_TARGET_EVAL}),
         ("source_inner_lodo_selected", {ROW_SOURCE_INNER_SELECTED}),
     ):
         candidates = [
@@ -1027,6 +1190,157 @@ def build_backbone_ranking_rows(
     return rankings
 
 
+def build_selector_oracle_gap_rows(
+    *,
+    config: R12Config,
+    selection_rows: Sequence[Mapping[str, object]],
+    real_rows: Sequence[Mapping[str, object]],
+) -> list[dict[str, object]]:
+    candidate_targets = {
+        _config_key_from_row(row): row
+        for row in real_rows
+        if str(row.get("row_role")) == ROW_SOURCE_INNER_CANDIDATE_TARGET_EVAL
+        and str(row.get("status")) == "ok"
+        and not math.isnan(_float(row.get("bacc")))
+    }
+    if not candidate_targets:
+        return []
+    ok_selection = [
+        row for row in selection_rows
+        if str(row.get("status")) == "ok" and _config_key_from_row(row) in candidate_targets
+    ]
+    out: list[dict[str, object]] = []
+    keys = sorted({(int(row["experiment_seed"]), str(row["heldout_center"])) for row in ok_selection})
+    for seed, center in keys:
+        cell_rows = [
+            row for row in ok_selection
+            if int(row["experiment_seed"]) == seed and str(row["heldout_center"]) == center
+        ]
+        if not cell_rows:
+            continue
+        for weight in config.robust_penalty_weights:
+            scored = []
+            for row in cell_rows:
+                target = candidate_targets[_config_key_from_row(row)]
+                score = _selector_score(row, weight=float(weight), threshold=config.weak_center_threshold)
+                target_bacc = _float(target.get("bacc"))
+                if math.isnan(score) or math.isnan(target_bacc):
+                    continue
+                scored.append((row, target, score, target_bacc))
+            if not scored:
+                continue
+            selected = max(
+                scored,
+                key=lambda item: (
+                    item[2],
+                    _float(item[0].get("source_inner_lodo_mean_bacc")),
+                    _float(item[0].get("source_inner_lodo_min_center_bacc")),
+                    str(item[0].get("backbone_name")),
+                    str(item[0].get("representation")),
+                ),
+            )
+            oracle = max(scored, key=lambda item: item[3])
+            ranked_by_target = sorted(scored, key=lambda item: item[3], reverse=True)
+            selected_key = _config_key_from_row(selected[0])
+            oracle_key = _config_key_from_row(oracle[0])
+            selected_rank = 1 + next(
+                idx for idx, item in enumerate(ranked_by_target) if _config_key_from_row(item[0]) == selected_key
+            )
+            top3_keys = {_config_key_from_row(item[0]) for item in ranked_by_target[:3]}
+            out.append(
+                {
+                    "seed": seed,
+                    "heldout_center": center,
+                    "selector_scope": "global_source_inner_lodo",
+                    "robust_penalty_weight": float(weight),
+                    "robust_penalty_role": "primary"
+                    if abs(float(weight) - config.primary_robust_penalty_weight) < 1e-12
+                    else "sensitivity_only",
+                    "backbone_name": selected[0].get("backbone_name", ""),
+                    "source_selected_config": _config_string(selected[0]),
+                    "source_selected_target_bacc": selected[3],
+                    "posthoc_best_config": _config_string(oracle[0]),
+                    "posthoc_best_target_bacc": oracle[3],
+                    "oracle_gap": oracle[3] - selected[3],
+                    "source_selected_rank_under_target": selected_rank,
+                    "spearman_source_score_vs_target_bacc": _spearman(
+                        [item[2] for item in scored],
+                        [item[3] for item in scored],
+                    ),
+                    "top1_config_match": str(selected_key == oracle_key).lower(),
+                    "top3_contains_oracle": str(oracle_key in top3_keys).lower(),
+                    "source_inner_lodo_min_center_id": selected[0].get("source_inner_lodo_min_center_id", ""),
+                    "source_inner_lodo_center_bacc_vector": selected[0].get(
+                        "source_inner_lodo_center_bacc_vector",
+                        selected[0].get("source_inner_lodo_center_baccs", "{}"),
+                    ),
+                }
+            )
+    return out
+
+
+def build_class_weight_diagnostic_rows(
+    *,
+    config: R12Config,
+    selector_gap_rows: Sequence[Mapping[str, object]],
+    real_rows: Sequence[Mapping[str, object]],
+) -> list[dict[str, object]]:
+    primary_rows = [
+        row for row in selector_gap_rows
+        if str(row.get("selector_scope")) == "global_source_inner_lodo"
+        and str(row.get("robust_penalty_role")) == "primary"
+    ]
+    target_rows = [
+        row for row in real_rows
+        if str(row.get("row_role")) == ROW_SOURCE_INNER_CANDIDATE_TARGET_EVAL
+        and str(row.get("status")) == "ok"
+        and not math.isnan(_float(row.get("bacc")))
+    ]
+    centers = sorted({str(row.get("heldout_center")) for row in primary_rows if str(row.get("heldout_center"))})
+    out: list[dict[str, object]] = []
+    for center in centers + (["__mean__"] if centers else []):
+        rows = primary_rows if center == "__mean__" else [row for row in primary_rows if str(row.get("heldout_center")) == center]
+        selected_weights = [_parse_config_string(row.get("source_selected_config", "")).get("class_weight", "") for row in rows]
+        freq = {
+            weight: selected_weights.count(weight)
+            for weight in sorted(set(selected_weights))
+            if weight
+        }
+        cell_targets = target_rows if center == "__mean__" else [
+            row for row in target_rows if str(row.get("heldout_center")) == center
+        ]
+        balanced_wins = 0
+        comparable_cells = 0
+        balanced_gaps = []
+        for seed in sorted({int(row["experiment_seed"]) for row in cell_targets}):
+            seed_rows = [row for row in cell_targets if int(row["experiment_seed"]) == seed]
+            if not seed_rows:
+                continue
+            best_balanced = _nanmax(
+                _float(row.get("bacc")) for row in seed_rows if _class_weight_label(row.get("class_weight")) == "balanced"
+            )
+            best_none = _nanmax(
+                _float(row.get("bacc")) for row in seed_rows if _class_weight_label(row.get("class_weight")) == "none"
+            )
+            if math.isnan(best_balanced) or math.isnan(best_none):
+                continue
+            comparable_cells += 1
+            if best_balanced > best_none:
+                balanced_wins += 1
+            balanced_gaps.append(best_balanced - best_none)
+        out.append(
+            {
+                "heldout_center": center,
+                "selector_scope": "global_source_inner_lodo",
+                "selected_class_weight_frequency": json.dumps(freq, sort_keys=True),
+                "balanced_win_rate_by_center": balanced_wins / comparable_cells if comparable_cells else math.nan,
+                "balanced_oracle_gap_delta": _nanmean(balanced_gaps),
+                "eligibility": ELIGIBILITY_AUDIT_ONLY,
+            }
+        )
+    return out
+
+
 def compute_r12_decision_labels(
     *,
     config: R12Config,
@@ -1034,7 +1348,16 @@ def compute_r12_decision_labels(
     real_rows: Sequence[Mapping[str, object]],
     center_rows: Sequence[Mapping[str, object]],
     ranking_rows: Sequence[Mapping[str, object]],
+    selector_gap_rows: Sequence[Mapping[str, object]] = (),
 ) -> list[str]:
+    if config.artifact_prefix == "r12b":
+        return compute_r12b_decision_labels(
+            config=config,
+            fingerprint_rows=fingerprint_rows,
+            real_rows=real_rows,
+            center_rows=center_rows,
+            selector_gap_rows=selector_gap_rows,
+        )
     labels: list[str] = []
     if fingerprint_rows and all(str(row.get("cache_status")) == "ok" for row in fingerprint_rows):
         labels.append(LABEL_SCREEN_COMPLETE)
@@ -1088,6 +1411,63 @@ def compute_r12_decision_labels(
     return _unique(labels)
 
 
+def compute_r12b_decision_labels(
+    *,
+    config: R12Config,
+    fingerprint_rows: Sequence[Mapping[str, object]],
+    real_rows: Sequence[Mapping[str, object]],
+    center_rows: Sequence[Mapping[str, object]],
+    selector_gap_rows: Sequence[Mapping[str, object]],
+) -> list[str]:
+    labels: list[str] = []
+    if fingerprint_rows and all(str(row.get("cache_status")) == "ok" for row in fingerprint_rows):
+        labels.append(LABEL_R12B_SCREEN_COMPLETE)
+    else:
+        labels.append(LABEL_R12B_CACHE_INCOMPLETE)
+
+    detail = [row for row in center_rows if str(row.get("heldout_center")) != "__mean__"]
+    mean_row = next((row for row in center_rows if str(row.get("heldout_center")) == "__mean__"), None)
+    if mean_row is not None:
+        posthoc_mean = _float(mean_row.get("best_posthoc_target_eval_bacc"))
+        selected_mean = _float(mean_row.get("best_source_selected_target_eval_bacc"))
+        selected_ge = sum(
+            1
+            for row in detail
+            if _float(row.get("best_source_selected_target_eval_bacc")) >= config.audit_centers_ge_threshold
+        )
+        selected_worst = _nanmin(_float(row.get("best_source_selected_target_eval_bacc")) for row in detail)
+        delta_mean = _float(mean_row.get("delta_vs_z11_pca64"))
+        weak_gain = any(
+            _float(row.get("delta_vs_z11_pca64")) >= config.weak_center_gain_threshold
+            for row in detail
+            if _float(row.get("z11_reference_bacc")) < config.rebuild_worst_center_bacc
+        )
+        if selected_mean >= config.audit_mean_bacc and selected_ge >= config.audit_min_centers_ge_threshold:
+            labels.append(LABEL_R12B_SOURCE_090)
+        if posthoc_mean >= config.audit_mean_bacc and selected_mean < config.audit_mean_bacc:
+            labels.append(LABEL_R12B_POSTHOC_ONLY)
+        if selected_mean < config.rebuild_mean_bacc and posthoc_mean < config.rebuild_mean_bacc:
+            labels.append(LABEL_R12B_NOT_CREDIBLE)
+        if _selector_gap_reduced(config, selector_gap_rows):
+            labels.append(LABEL_R12B_SELECTOR_GAP_REDUCED)
+        if (
+            selected_mean >= config.rebuild_mean_bacc
+            and selected_worst >= config.rebuild_worst_center_bacc
+            and (delta_mean >= config.mean_gain_threshold or weak_gain)
+            and _seed_stability_passes(config, selector_gap_rows)
+        ):
+            labels.append(LABEL_R12B_CVAE_REBUILD_ELIGIBLE)
+        if selected_mean >= config.rebuild_mean_bacc and selected_worst < config.rebuild_worst_center_bacc:
+            labels.append(LABEL_MEAN_IMPROVES_WEAK_FAILS)
+        if detail and all(str(row.get("weak_center_repaired")) == "true" for row in detail):
+            labels.append(LABEL_WEAK_REPAIRED)
+        if any(str(row.get("weak_center_persists")) == "true" for row in detail):
+            labels.append(LABEL_WEAK_PERSISTS)
+    if any(str(row.get("eval_class_warning")) for row in real_rows):
+        labels.append(LABEL_CLASS_BALANCE)
+    return _unique(labels)
+
+
 def write_protocol_manifest(
     path: Path,
     *,
@@ -1096,8 +1476,8 @@ def write_protocol_manifest(
     limits: R12RunLimits,
 ) -> None:
     payload = {
-        "schema_version": "r12_protocol_manifest_v1",
-        "experiment_name": R12_EXPERIMENT_NAME,
+        "schema_version": f"{config.artifact_prefix}_protocol_manifest_v1",
+        "experiment_name": config.experiment_name,
         "dataset_name": R12_DATASET_NAME,
         "audit_only": True,
         "cvae_retraining": "forbidden",
@@ -1109,6 +1489,15 @@ def write_protocol_manifest(
         "target_train_rows": ELIGIBILITY_NON_DEPLOYABLE,
         "classifier": _classifier_hparams(),
         "c_grid": config.c_grid,
+        "class_weight_grid": config.class_weight_grid,
+        "primary_robust_penalty_weight": config.primary_robust_penalty_weight,
+        "robust_penalty_weights": config.robust_penalty_weights,
+        "weak_center_threshold": config.weak_center_threshold,
+        "global_selection_used_target_eval_labels": False,
+        "posthoc_best_used_target_eval_labels": True,
+        "same_benchmark_deployable_claim_allowed": config.artifact_prefix == "r12b",
+        "same_benchmark_deployable_claim": False,
+        "exploratory_rebuild_allowed": True,
         "representations": limits.representations or config.representations,
         "backbones": limits.backbones or config.backbones,
         "candidate_centers": config.candidate_centers,
@@ -1192,10 +1581,12 @@ def write_leakage_report(
 def write_decision_report(
     path: Path,
     *,
+    config: R12Config,
     labels: Sequence[str],
     center_rows: Sequence[Mapping[str, object]],
     ranking_rows: Sequence[Mapping[str, object]],
     real_rows: Sequence[Mapping[str, object]],
+    selector_gap_rows: Sequence[Mapping[str, object]] = (),
 ) -> None:
     mean_row = next((row for row in center_rows if str(row["heldout_center"]) == "__mean__"), None)
     source_best = next(
@@ -1206,8 +1597,13 @@ def write_decision_report(
         (row for row in ranking_rows if str(row.get("selection_regime")) == "posthoc_target_eval" and int(row.get("rank", 0)) == 1),
         None,
     )
+    title = (
+        "R1.2b Source-Only Compatibility Selector Audit"
+        if config.artifact_prefix == "r12b"
+        else "R1.2 Pathology Foundation Embedding Screen"
+    )
     lines = [
-        "# R1.2 Pathology Foundation Embedding Screen",
+        f"# {title}",
         "",
         "## Decision Labels",
         "",
@@ -1238,6 +1634,17 @@ def write_decision_report(
             f"`{posthoc_best.get('backbone_name')}` "
             f"(mean BACC {_format_float(posthoc_best.get('mean_bacc'))})"
         )
+    primary_gap = [
+        row for row in selector_gap_rows
+        if str(row.get("robust_penalty_role")) == "primary"
+        and str(row.get("selector_scope")) == "global_source_inner_lodo"
+    ]
+    if primary_gap:
+        lines.append(f"- Mean selector oracle gap: {_format_float(_nanmean(row.get('oracle_gap') for row in primary_gap))}")
+        lines.append(
+            "- Median selected rank under target utility: "
+            f"{_format_float(_median(_float(row.get('source_selected_rank_under_target')) for row in primary_gap))}"
+        )
     lines.extend(
         [
             "",
@@ -1252,11 +1659,15 @@ def write_decision_report(
             "",
             "Representation shift diagnostics are explanation-only and are not selector inputs.",
             "",
+            "For R1.2b, `same_benchmark_deployable_claim` remains false unless the global "
+            "source-inner-LODO selected rule passes the predeclared source-selected threshold.",
+            "",
             "## Artifact Counts",
             "",
             f"- Real-feature rows: {len(real_rows)}",
             f"- Center-summary rows: {len(center_rows)}",
             f"- Backbone-ranking rows: {len(ranking_rows)}",
+            f"- Selector-oracle-gap rows: {len(selector_gap_rows)}",
             "",
         ]
     )
@@ -1313,7 +1724,12 @@ def eligibility_for_row_role(row_role: str) -> str:
         return ELIGIBILITY_DEPLOYABLE_DIAGNOSTIC
     if row_role == ROW_TARGET_TRAIN:
         return ELIGIBILITY_NON_DEPLOYABLE
-    if row_role in {ROW_PARITY_FIXED, ROW_POSTHOC_BEST, ROW_SOURCE_INNER_CANDIDATE}:
+    if row_role in {
+        ROW_PARITY_FIXED,
+        ROW_POSTHOC_BEST,
+        ROW_SOURCE_INNER_CANDIDATE,
+        ROW_SOURCE_INNER_CANDIDATE_TARGET_EVAL,
+    }:
         return ELIGIBILITY_AUDIT_ONLY
     raise ProtocolError(f"Unknown R1.2 row_role: {row_role}")
 
@@ -1333,6 +1749,7 @@ def _source_inner_candidate_row(
     heldout_center: str,
     representation: str,
     c_value: float,
+    class_weight: str,
     train_cache: Mapping[str, Any],
     source_centers: Sequence[str],
 ) -> dict[str, object]:
@@ -1347,6 +1764,7 @@ def _source_inner_candidate_row(
                 experiment_seed=int(artifact.experiment_seed),
                 representation=representation,
                 c_value=float(c_value),
+                class_weight=_class_weight_label(class_weight),
                 fit_centers=fit_centers,
                 eval_center=str(selector_center),
                 train_cache=train_cache,
@@ -1359,10 +1777,17 @@ def _source_inner_candidate_row(
             status = "failed"
             error = str(exc)
             center_scores[str(selector_center)] = math.nan
+    min_center_id, min_center_bacc = _min_center_score(center_scores)
+    robust_score = robust_selector_score(
+        _nanmean(center_scores.values()),
+        min_center_bacc,
+        penalty_weight=config.primary_robust_penalty_weight,
+        weak_center_threshold=config.weak_center_threshold,
+    )
     return {
         "row_id": (
             f"r12_seed{artifact.experiment_seed}_{artifact.backbone_name}_center{heldout_center}_"
-            f"{ROW_SOURCE_INNER_CANDIDATE}_{representation}_C{c_value:g}"
+            f"{ROW_SOURCE_INNER_CANDIDATE}_{representation}_C{c_value:g}_cw{_class_weight_label(class_weight)}"
         ),
         "experiment_seed": int(artifact.experiment_seed),
         "backbone_name": artifact.backbone_name,
@@ -1371,10 +1796,18 @@ def _source_inner_candidate_row(
         "representation": representation,
         "pca_dim": _representation_pca_dim(representation) or "",
         "C": float(c_value),
+        "class_weight": _class_weight_label(class_weight),
         "selector_centers": "|".join(str(center) for center in source_centers),
         "source_inner_lodo_mean_bacc": _nanmean(center_scores.values()),
-        "source_inner_lodo_min_center_bacc": _nanmin(center_scores.values()),
+        "source_inner_lodo_min_center_bacc": min_center_bacc,
         "source_inner_lodo_center_baccs": json.dumps(center_scores, sort_keys=True),
+        "source_inner_lodo_robust_score": robust_score,
+        "robust_penalty_weight": config.primary_robust_penalty_weight,
+        "robust_penalty_role": "primary",
+        "source_inner_lodo_min_center_id": min_center_id,
+        "source_inner_lodo_center_bacc_vector": json.dumps(center_scores, sort_keys=True),
+        "selection_metric": "source_inner_lodo_robust_score",
+        "selector_scope": "within_backbone_source_inner_lodo_candidate",
         "selected_by_source_inner_lodo": "false",
         "selection_used_target_labels": "false",
         "eligibility": ELIGIBILITY_AUDIT_ONLY,
@@ -1398,10 +1831,18 @@ def _selection_failure_row(
         "representation": "",
         "pca_dim": "",
         "C": "",
+        "class_weight": "",
         "selector_centers": "|".join(center for center in config.candidate_centers if center != heldout_center),
         "source_inner_lodo_mean_bacc": math.nan,
         "source_inner_lodo_min_center_bacc": math.nan,
         "source_inner_lodo_center_baccs": "{}",
+        "source_inner_lodo_robust_score": math.nan,
+        "robust_penalty_weight": config.primary_robust_penalty_weight,
+        "robust_penalty_role": "primary",
+        "source_inner_lodo_min_center_id": "",
+        "source_inner_lodo_center_bacc_vector": "{}",
+        "selection_metric": "source_inner_lodo_robust_score",
+        "selector_scope": "within_backbone_source_inner_lodo_candidate",
         "selected_by_source_inner_lodo": "false",
         "selection_used_target_labels": "false",
         "eligibility": ELIGIBILITY_AUDIT_ONLY,
@@ -1418,6 +1859,8 @@ def _real_feature_row(
     row_role: str,
     representation: str,
     c_value: float,
+    class_weight: str,
+    source_selection_row: Mapping[str, object] | None,
     train_cache: Mapping[str, Any],
     test_cache: Mapping[str, Any],
     z11_reference: Mapping[str, float],
@@ -1442,6 +1885,8 @@ def _real_feature_row(
         row_role=row_role,
         representation=representation,
         c_value=c_value,
+        class_weight=_class_weight_label(class_weight),
+        source_selection_row=source_selection_row,
         fit_centers=fit_centers,
         selector_centers=source_centers,
         z11_reference=z11_reference,
@@ -1454,6 +1899,7 @@ def _real_feature_row(
             experiment_seed=int(artifact.experiment_seed),
             representation=representation,
             c_value=float(c_value),
+            class_weight=_class_weight_label(class_weight),
             fit_centers=fit_centers,
             eval_center=str(heldout_center),
             train_cache=train_cache,
@@ -1477,6 +1923,7 @@ def _fit_eval_real_features(
     experiment_seed: int,
     representation: str,
     c_value: float,
+    class_weight: str,
     fit_centers: Sequence[str],
     eval_center: str,
     train_cache: Mapping[str, Any],
@@ -1529,7 +1976,7 @@ def _fit_eval_real_features(
         solver="lbfgs",
         C=float(c_value),
         max_iter=2000,
-        class_weight=None,
+        class_weight=_class_weight_value(class_weight),
         random_state=int(experiment_seed),
     )
     clf.fit(x_train_scaled, y_train)
@@ -1575,6 +2022,8 @@ def _base_real_row(
     row_role: str,
     representation: str,
     c_value: float,
+    class_weight: str,
+    source_selection_row: Mapping[str, object] | None,
     fit_centers: Sequence[str],
     selector_centers: Sequence[str],
     z11_reference: Mapping[str, float],
@@ -1582,11 +2031,14 @@ def _base_real_row(
     row_order_match: str,
 ) -> dict[str, object]:
     pca_dim = _representation_pca_dim(representation)
-    source_selected = row_role == ROW_SOURCE_INNER_SELECTED
     posthoc = row_role == ROW_POSTHOC_BEST
     target_train = row_role == ROW_TARGET_TRAIN
+    class_weight_label = _class_weight_label(class_weight)
     return {
-        "row_id": f"r12_seed{artifact.experiment_seed}_{artifact.backbone_name}_center{heldout_center}_{row_role}_{representation}_C{c_value:g}",
+        "row_id": (
+            f"r12_seed{artifact.experiment_seed}_{artifact.backbone_name}_center{heldout_center}_"
+            f"{row_role}_{representation}_C{c_value:g}_cw{class_weight_label}"
+        ),
         "experiment_seed": int(artifact.experiment_seed),
         "backbone_name": artifact.backbone_name,
         "checkpoint": "",
@@ -1612,8 +2064,21 @@ def _base_real_row(
         "scaler_fit_scope": "classifier_train_rows_only",
         "classifier_fit_scope": "classifier_train_rows_only",
         "classifier": "sklearn_logistic_regression",
-        "classifier_hparams": json.dumps(_classifier_hparams() | {"C": float(c_value)}, sort_keys=True),
+        "classifier_hparams": json.dumps(
+            _classifier_hparams() | {"C": float(c_value), "class_weight": _class_weight_value(class_weight_label)},
+            sort_keys=True,
+        ),
         "C": float(c_value),
+        "class_weight": class_weight_label,
+        "selector_scope": _selector_scope(row_role, source_selection_row),
+        "selection_metric": str((source_selection_row or {}).get("selection_metric", "")),
+        "source_inner_lodo_robust_score": (source_selection_row or {}).get("source_inner_lodo_robust_score", ""),
+        "robust_penalty_weight": (source_selection_row or {}).get("robust_penalty_weight", ""),
+        "robust_penalty_role": (source_selection_row or {}).get("robust_penalty_role", ""),
+        "source_inner_lodo_min_center_id": (source_selection_row or {}).get("source_inner_lodo_min_center_id", ""),
+        "source_inner_lodo_center_bacc_vector": (source_selection_row or {}).get(
+            "source_inner_lodo_center_bacc_vector", ""
+        ),
         "bacc": math.nan,
         "macro_f1": math.nan,
         "auroc_if_valid": math.nan,
@@ -1642,7 +2107,8 @@ def _posthoc_best_rows(rows: Sequence[Mapping[str, object]]) -> list[dict[str, o
         {
             (int(row["experiment_seed"]), str(row["heldout_center"]))
             for row in rows
-            if str(row.get("row_role")) in {ROW_PARITY_FIXED, ROW_SOURCE_INNER_SELECTED}
+            if str(row.get("row_role"))
+            in {ROW_PARITY_FIXED, ROW_SOURCE_INNER_SELECTED, ROW_SOURCE_INNER_CANDIDATE_TARGET_EVAL}
         }
     )
     for seed, center in keys:
@@ -1650,7 +2116,8 @@ def _posthoc_best_rows(rows: Sequence[Mapping[str, object]]) -> list[dict[str, o
             row for row in rows
             if int(row["experiment_seed"]) == seed
             and str(row["heldout_center"]) == center
-            and str(row.get("row_role")) in {ROW_PARITY_FIXED, ROW_SOURCE_INNER_SELECTED}
+            and str(row.get("row_role"))
+            in {ROW_PARITY_FIXED, ROW_SOURCE_INNER_SELECTED, ROW_SOURCE_INNER_CANDIDATE_TARGET_EVAL}
             and str(row.get("status")) == "ok"
         ]
         best = _best_bacc_row(candidates)
@@ -1672,7 +2139,7 @@ def _global_source_selected_keys(
     selection_rows: Sequence[Mapping[str, object]],
     *,
     config: R12Config,
-) -> dict[tuple[int, str], tuple[str, str, float]]:
+) -> dict[tuple[int, str], tuple[str, str, float, str]]:
     selected_by_backbone = [
         row for row in selection_rows
         if str(row.get("selected_by_source_inner_lodo")) == "true"
@@ -1693,13 +2160,14 @@ def _global_source_selected_keys(
             str(selected["backbone_name"]),
             str(selected["representation"]),
             _float(selected["C"]),
+            _class_weight_label(selected.get("class_weight")),
         )
     return out
 
 
 def _source_selected_real_rows_for_center(
     real_rows: Sequence[Mapping[str, object]],
-    source_selected_keys: Mapping[tuple[int, str], tuple[str, str, float]],
+    source_selected_keys: Mapping[tuple[int, str], tuple[str, str, float, str]],
     center: str,
 ) -> list[Mapping[str, object]]:
     out: list[Mapping[str, object]] = []
@@ -1713,11 +2181,12 @@ def _source_selected_real_rows_for_center(
         selected = source_selected_keys.get((int(row["experiment_seed"]), str(center)))
         if selected is None:
             continue
-        backbone, representation, c_value = selected
+        backbone, representation, c_value, class_weight = selected
         if (
             str(row.get("backbone_name")) == backbone
             and str(row.get("representation")) == representation
             and abs(_float(row.get("C")) - c_value) < 1e-12
+            and _class_weight_label(row.get("class_weight")) == class_weight
         ):
             out.append(row)
     return out
@@ -1827,6 +2296,9 @@ def _diagnostic_row(
 
 def _r12_config_from_mapping(config: Mapping[str, Any]) -> R12Config:
     defaults = default_r12_config()
+    experiment = _mapping(config.get("experiment"), "experiment")
+    experiment_name = str(experiment.get("name", defaults.experiment_name))
+    artifact_prefix = "r12b" if experiment_name == R12B_EXPERIMENT_NAME else "r12"
     dataset = _mapping(_mapping(config.get("datasets"), "datasets").get("camelyon17"), "datasets.camelyon17")
     backbones = _mapping(config.get("backbones"), "backbones")
     reps = _mapping(config.get("representations"), "representations")
@@ -1859,6 +2331,8 @@ def _r12_config_from_mapping(config: Mapping[str, Any]) -> R12Config:
         pca_low_sample_warning_multiplier=z11.pca_low_sample_warning_multiplier,
     )
     return R12Config(
+        experiment_name=experiment_name,
+        artifact_prefix=artifact_prefix,
         candidate_centers=z11.candidate_centers,
         experiment_seeds=z11.experiment_seeds,
         support_sizes=z11.support_sizes,
@@ -1866,6 +2340,20 @@ def _r12_config_from_mapping(config: Mapping[str, Any]) -> R12Config:
         backbones=tuple(str(v) for v in backbones.get("requested", defaults.backbones)),
         representations=tuple(str(v) for v in reps.get("requested", defaults.representations)),
         c_grid=tuple(float(v) for v in source_selection.get("C_grid", defaults.c_grid)),
+        class_weight_grid=tuple(
+            _class_weight_label(v)
+            for v in source_selection.get("class_weight_grid", defaults.class_weight_grid)
+        ),
+        primary_robust_penalty_weight=float(
+            source_selection.get("primary_robust_penalty_weight", defaults.primary_robust_penalty_weight)
+        ),
+        robust_penalty_weights=tuple(
+            float(v) for v in source_selection.get("robust_penalty_weights", defaults.robust_penalty_weights)
+        ),
+        weak_center_threshold=float(source_selection.get("weak_center_threshold", defaults.weak_center_threshold)),
+        emit_candidate_target_eval_rows=bool(
+            source_selection.get("emit_candidate_target_eval_rows", defaults.emit_candidate_target_eval_rows)
+        ),
         cache_root=str(inputs.get("cache_root", defaults.cache_root)),
         cache_path_template=str(inputs.get("cache_path_template", defaults.cache_path_template)),
         artifacts_root=str(artifacts.get("root", defaults.artifacts_root)),
@@ -1886,6 +2374,12 @@ def _r12_config_from_mapping(config: Mapping[str, Any]) -> R12Config:
         mean_gain_threshold=float(decision.get("mean_gain_threshold", defaults.mean_gain_threshold)),
         weak_center_gain_threshold=float(decision.get("weak_center_gain_threshold", defaults.weak_center_gain_threshold)),
         no_mean_gain_threshold=float(decision.get("no_mean_gain_threshold", defaults.no_mean_gain_threshold)),
+        selector_gap_improvement_threshold=float(
+            decision.get("selector_gap_improvement_threshold", defaults.selector_gap_improvement_threshold)
+        ),
+        selector_rank_threshold=int(decision.get("selector_rank_threshold", defaults.selector_rank_threshold)),
+        seed_std_mean_bacc_max=float(decision.get("seed_std_mean_bacc_max", defaults.seed_std_mean_bacc_max)),
+        seed_worst_center_min=float(decision.get("seed_worst_center_min", defaults.seed_worst_center_min)),
         pca_low_sample_warning_multiplier=int(
             reps.get("pca_low_sample_warning_multiplier", defaults.pca_low_sample_warning_multiplier)
         ),
@@ -1947,6 +2441,8 @@ def _min_class_count(values: Sequence[int]) -> int:
 def _selection_scope(row_role: str) -> str:
     if row_role == ROW_SOURCE_INNER_SELECTED:
         return "source_inner_lodo_only"
+    if row_role == ROW_SOURCE_INNER_CANDIDATE_TARGET_EVAL:
+        return "audit_only_candidate_target_eval"
     if row_role == ROW_POSTHOC_BEST:
         return "audit_only_target_label_informed"
     if row_role == ROW_TARGET_TRAIN:
@@ -1954,9 +2450,21 @@ def _selection_scope(row_role: str) -> str:
     return "fixed_predeclared_parity"
 
 
+def _selector_scope(row_role: str, source_selection_row: Mapping[str, object] | None) -> str:
+    if row_role == ROW_SOURCE_INNER_SELECTED:
+        return "within_backbone_source_inner_lodo"
+    if row_role == ROW_SOURCE_INNER_CANDIDATE_TARGET_EVAL:
+        return "candidate_target_eval_for_selector_oracle"
+    if source_selection_row:
+        return str(source_selection_row.get("selector_scope", ""))
+    return ""
+
+
 def _downstream_claim_scope(row_role: str) -> str:
     if row_role == ROW_SOURCE_INNER_SELECTED:
         return "protocol_clean_representation_selection_evidence"
+    if row_role == ROW_SOURCE_INNER_CANDIDATE_TARGET_EVAL:
+        return "selector_oracle_gap_diagnostic_only"
     if row_role == ROW_POSTHOC_BEST:
         return "exploratory_rebuild_only"
     if row_role == ROW_TARGET_TRAIN:
@@ -2105,6 +2613,179 @@ def _safe_silhouette(silhouette_score: Any, x: Any, labels: Any) -> float:
         return float(silhouette_score(x, labels))
     except Exception:
         return math.nan
+
+
+def robust_selector_score(
+    mean_bacc: float,
+    min_center_bacc: float,
+    *,
+    penalty_weight: float,
+    weak_center_threshold: float,
+) -> float:
+    if math.isnan(float(mean_bacc)) or math.isnan(float(min_center_bacc)):
+        return math.nan
+    penalty = float(penalty_weight) * max(0.0, float(weak_center_threshold) - float(min_center_bacc))
+    return float(mean_bacc) - penalty
+
+
+def _selector_score(row: Mapping[str, object], *, weight: float, threshold: float) -> float:
+    return robust_selector_score(
+        _float(row.get("source_inner_lodo_mean_bacc")),
+        _float(row.get("source_inner_lodo_min_center_bacc")),
+        penalty_weight=float(weight),
+        weak_center_threshold=float(threshold),
+    )
+
+
+def _min_center_score(center_scores: Mapping[str, float]) -> tuple[str, float]:
+    valid = [(str(center), float(score)) for center, score in center_scores.items() if not math.isnan(float(score))]
+    if not valid:
+        return "", math.nan
+    return min(valid, key=lambda item: (item[1], item[0]))
+
+
+def _class_weight_label(value: object) -> str:
+    text = str(value).strip().lower()
+    if value is None or text in {"", "none", "null"}:
+        return "none"
+    if text == "balanced":
+        return "balanced"
+    raise ProtocolError(f"Unsupported class_weight value for R1.2b: {value!r}")
+
+
+def _class_weight_value(value: object) -> str | None:
+    label = _class_weight_label(value)
+    return None if label == "none" else label
+
+
+def _config_key_from_row(row: Mapping[str, object]) -> tuple[int, str, str, str, str, float, str]:
+    return (
+        int(row["experiment_seed"]),
+        str(row["heldout_center"]),
+        str(row["backbone_name"]),
+        str(row["representation"]),
+        str(_representation_pca_dim(str(row["representation"])) or ""),
+        _float(row["C"]),
+        _class_weight_label(row.get("class_weight")),
+    )
+
+
+def _config_string(row: Mapping[str, object]) -> str:
+    return "|".join(
+        [
+            f"backbone={row.get('backbone_name', '')}",
+            f"representation={row.get('representation', '')}",
+            f"C={_float(row.get('C')):g}",
+            f"class_weight={_class_weight_label(row.get('class_weight'))}",
+        ]
+    )
+
+
+def _parse_config_string(raw: object) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for part in str(raw or "").split("|"):
+        if "=" not in part:
+            continue
+        key, value = part.split("=", 1)
+        out[key] = value
+    return out
+
+
+def _rank_average(values: Sequence[float]) -> list[float]:
+    indexed = sorted(enumerate(float(v) for v in values), key=lambda item: item[1])
+    ranks = [math.nan] * len(values)
+    idx = 0
+    while idx < len(indexed):
+        end = idx + 1
+        while end < len(indexed) and indexed[end][1] == indexed[idx][1]:
+            end += 1
+        avg_rank = (idx + 1 + end) / 2.0
+        for original_idx, _ in indexed[idx:end]:
+            ranks[original_idx] = avg_rank
+        idx = end
+    return ranks
+
+
+def _spearman(x: Sequence[float], y: Sequence[float]) -> float:
+    import numpy as np  # type: ignore
+
+    pairs = [(float(a), float(b)) for a, b in zip(x, y) if not math.isnan(float(a)) and not math.isnan(float(b))]
+    if len(pairs) < 2:
+        return math.nan
+    rx = np.asarray(_rank_average([a for a, _ in pairs]), dtype=float)
+    ry = np.asarray(_rank_average([b for _, b in pairs]), dtype=float)
+    if float(rx.std()) == 0.0 or float(ry.std()) == 0.0:
+        return math.nan
+    return float(np.corrcoef(rx, ry)[0, 1])
+
+
+def _median(values: Iterable[float]) -> float:
+    vals = sorted(float(value) for value in values if not math.isnan(float(value)))
+    if not vals:
+        return math.nan
+    mid = len(vals) // 2
+    if len(vals) % 2:
+        return vals[mid]
+    return (vals[mid - 1] + vals[mid]) / 2.0
+
+
+def _nanmax(values: Iterable[float]) -> float:
+    vals = [float(value) for value in values if not math.isnan(float(value))]
+    return max(vals) if vals else math.nan
+
+
+def _std(values: Iterable[float]) -> float:
+    vals = [float(value) for value in values if not math.isnan(float(value))]
+    if not vals:
+        return math.nan
+    mu = sum(vals) / len(vals)
+    return math.sqrt(sum((value - mu) ** 2 for value in vals) / len(vals))
+
+
+def _selector_gap_reduced(config: R12Config, selector_gap_rows: Sequence[Mapping[str, object]]) -> bool:
+    primary = [
+        row for row in selector_gap_rows
+        if str(row.get("robust_penalty_role")) == "primary"
+        and str(row.get("selector_scope")) == "global_source_inner_lodo"
+    ]
+    if not primary:
+        return False
+    median_rank = _median(_float(row.get("source_selected_rank_under_target")) for row in primary)
+    if not math.isnan(median_rank) and median_rank <= config.selector_rank_threshold:
+        return True
+    phikon = [
+        row for row in primary
+        if str(row.get("source_selected_config", "")).startswith("backbone=phikon|")
+    ]
+    if not phikon:
+        return False
+    return (
+        _nanmean(row.get("oracle_gap") for row in primary)
+        <= _nanmean(row.get("oracle_gap") for row in phikon) - config.selector_gap_improvement_threshold
+    )
+
+
+def _seed_stability_passes(config: R12Config, selector_gap_rows: Sequence[Mapping[str, object]]) -> bool:
+    primary = [
+        row for row in selector_gap_rows
+        if str(row.get("robust_penalty_role")) == "primary"
+        and str(row.get("selector_scope")) == "global_source_inner_lodo"
+    ]
+    if not primary:
+        return False
+    seeds = sorted({int(row["seed"]) for row in primary})
+    seed_means = []
+    seed_worsts = []
+    for seed in seeds:
+        values = [_float(row.get("source_selected_target_bacc")) for row in primary if int(row["seed"]) == seed]
+        seed_means.append(_nanmean(values))
+        seed_worsts.append(_nanmin(values))
+    std = _std(seed_means)
+    return (
+        not math.isnan(std)
+        and std <= config.seed_std_mean_bacc_max
+        and all(not math.isnan(value) and value >= config.seed_worst_center_min for value in seed_worsts)
+    )
 
 
 def _write_csv(path: Path, columns: Sequence[str], rows: Sequence[Mapping[str, object]]) -> None:
