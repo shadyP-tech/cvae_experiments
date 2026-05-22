@@ -1,0 +1,121 @@
+experiment:
+  name: r12_pathology_embedding_screen
+  stage: pathology_foundation_embedding_screen
+  status: audit_only
+  thesis_chapter: 6
+  primary_question: >
+    Do pathology-specific foundation embeddings make Camelyon17 source-only
+    cross-center transfer strong enough to justify rebuilding the CVAE/C6.3
+    stack?
+
+protocol:
+  split_regime: LOQDO
+  audit_only: true
+  retrain_cvae_experts: forbidden
+  routing_tweak: forbidden
+  embedding_extraction: external_frozen_cache
+  target_eval_tuned_deployable_selection: forbidden
+  posthoc_best_rows: audit_only
+  source_inner_lodo_selected_rows: deployable_diagnostic
+  target_train_rows: non_deployable
+  same_camelyon17_rebuild_after_target_eval_selection: exploratory_rebuild_only
+
+datasets:
+  camelyon17:
+    enabled: true
+    domain_key: center
+    candidate_centers: [0, 1, 2, 3, 4]
+    experiment_seeds: [42, 43, 44]
+    support_sizes: [4, 8, 16, 32]
+    support_seeds: [17, 23, 31]
+    eval_split: test
+
+backbones:
+  requested:
+    - uni
+    - virchow2
+    - conch
+    - ctranspath
+    - phikon
+    - plip
+
+representations:
+  requested:
+    - raw
+    - PCA64
+    - PCA128
+    - PCA256
+  pca_dims: [64, 128, 256]
+  pca_fit_scope: classifier_train_rows_only
+  pca_low_sample_warning_multiplier: 3
+
+classifier:
+  primary:
+    family: sklearn_logistic_regression
+    scaler: StandardScaler
+    solver: lbfgs
+    C: 1.0
+    max_iter: 2000
+    class_weight: null
+    random_state: experiment_seed
+    hyperparameter_tuning: forbidden
+
+source_inner_lodo:
+  row_role_candidate: source_inner_lodo_candidate
+  row_role_selected: source_inner_lodo_selected
+  selector_centers: source_centers_only
+  C_grid: [0.01, 0.1, 1.0, 10.0]
+  pca_grid: [raw, 64, 128, 256]
+  selection_metric: source_inner_lodo_mean_bacc
+  target_labels_used_for_selection: false
+
+diagnostics:
+  diagnostics_used_for_selection: false
+  diagnostics_used_for_decision_labels: false
+  mmd_space: source_fitted_standard_scaler_then_optional_pca
+  mmd_pca_dim_policy: min_64_n_source_minus_1_embedding_dim
+  mmd_bandwidth: median_pairwise_distance_on_source_subset
+  mmd_max_samples_per_domain: 2000
+  mmd_seed: 12017
+
+inputs:
+  support_selection_glob: cvae_testing/outputs/camelyon17/camelyon17_support_estimated_utility_routing_v2/support_utility_v2_seed*/reports/support_response_sample_selections.csv
+  expected_support_run_root: cvae_testing/outputs/camelyon17/camelyon17_support_estimated_utility_routing_v2
+  expected_support_run_dir_pattern: support_utility_v2_seed{seed}
+  cache_root: cvae_downstream_evaluation/artifacts/pathology_embeddings
+  cache_path_template: "{cache_root}/{backbone}/seed{seed}/embeddings/{split}.pt"
+  z11_reference_table: cvae_downstream_evaluation/artifacts/tables/z11_real_feature_ceiling_matrix.csv
+  z11_reference_representation: PCA64
+
+artifacts:
+  root: cvae_downstream_evaluation/artifacts
+  required_outputs:
+    - tables/r12_embedding_cache_fingerprint.csv
+    - tables/r12_real_feature_ceiling_matrix.csv
+    - tables/r12_source_inner_lodo_selection_matrix.csv
+    - tables/r12_pca_capacity_matrix.csv
+    - tables/r12_representation_shift_diagnostics.csv
+    - tables/r12_center_summary.csv
+    - tables/r12_backbone_ranking.csv
+    - manifests/r12_protocol_manifest.json
+    - reports/r12_leakage_report.json
+    - reports/r12_decision_report.md
+
+decision_rule:
+  chance_bacc: 0.50
+  audit_mean_bacc: 0.90
+  audit_centers_ge_threshold: 0.85
+  audit_min_centers_ge_threshold: 4
+  rebuild_mean_bacc: 0.88
+  rebuild_worst_center_bacc: 0.85
+  mean_gain_threshold: 0.03
+  weak_center_gain_threshold: 0.05
+  no_mean_gain_threshold: 0.03
+
+claim_boundary:
+  allowed: >
+    R1.2 can support or reject whether pathology embeddings make a Camelyon17
+    CVAE/C6.3 rebuild worth attempting.
+  forbidden: >
+    Do not claim a deployable same-Camelyon17 backbone-selection method from
+    target-eval-informed post-hoc backbone ranking.
