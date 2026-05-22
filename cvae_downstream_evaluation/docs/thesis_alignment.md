@@ -87,3 +87,13 @@ Supporting placement:
 
 Do not use this package to revise the existing negative result unless downstream evidence directly changes the thesis claim boundary.
 
+## Current Downstream Synthesis
+
+For the current CVAE downstream branch, use
+[`c63_conceptual_synthesis.md`](c63_conceptual_synthesis.md) as the working synthesis.
+
+Key takeaway:
+
+- C6.3 is the strongest current CVAE setup because it reframes the failure from sparse top-1 compatibility selection to dense post-hoc routing-risk reduction.
+- C6.3 should be described as dense late aggregation over frozen CVAE expert/mode classifiers, not as learned compatibility estimation.
+- C7.1a source-probe CE is negative diagnostic evidence: improving source-discriminative generated geometry did not improve held-out downstream utility.
