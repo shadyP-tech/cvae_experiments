@@ -1,0 +1,15 @@
+[project]
+name = "cvae-rebuild"
+version = "0.1.0"
+description = "Virchow2-CVAE rebuild with unlabeled target-support NELBO routing."
+requires-python = ">=3.10"
+dependencies = [
+  "numpy",
+  "PyYAML",
+  "scikit-learn",
+  "torch",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
