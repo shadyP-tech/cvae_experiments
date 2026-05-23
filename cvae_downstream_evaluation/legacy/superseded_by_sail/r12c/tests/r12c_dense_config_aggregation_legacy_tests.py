@@ -1,3 +1,9 @@
+"""Legacy R1.2c-V tests retained for SAIL extraction provenance only.
+
+These tests are intentionally outside the active pytest discovery path.
+Use ``sail/tests`` for the active SAIL implementation.
+"""
+
 from pathlib import Path
 import sys
 

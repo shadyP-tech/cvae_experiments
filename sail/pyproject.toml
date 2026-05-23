@@ -1,0 +1,21 @@
+[project]
+name = "sail-source-aggregation"
+version = "0.1.0"
+description = "SAIL: source-only aggregation via inner-domain leaveout."
+requires-python = ">=3.10"
+dependencies = [
+  "numpy",
+  "scikit-learn",
+  "PyYAML",
+]
+
+[project.optional-dependencies]
+cache = [
+  "torch",
+  "timm",
+  "Pillow",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

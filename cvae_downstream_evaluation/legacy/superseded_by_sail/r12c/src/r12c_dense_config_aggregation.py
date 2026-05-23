@@ -1,4 +1,8 @@
-"""R1.2c-V dense source-selected real-feature config aggregation.
+"""Legacy R1.2c-V dense source-selected real-feature config aggregation.
+
+Superseded by SAIL: Source-only Aggregation via Inner-domain Leaveout.
+This archived module is provenance only and should not be used as an active
+experiment entrypoint. Use ``sail/`` instead.
 
 This audit stays upstream of CVAE rebuilding. It consumes frozen R1.2b
 pathology embedding caches and source-inner-LODO candidate rows, then tests
