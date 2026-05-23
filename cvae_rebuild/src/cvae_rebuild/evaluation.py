@@ -13,7 +13,7 @@ from .downstream import (
 )
 from .experts import ExpertRuntime, source_refs_by_class, to_numpy
 from .generation import generate_reference_posterior, generation_budgets
-from .protocol import ORACLE_ROW
+from .protocol import METHOD_ROWS, ORACLE_ROW
 from .support_nelbo import SupportScore, selected_experts
 
 
@@ -62,10 +62,7 @@ def run_downstream_cell(
         )
 
     for method, expert_ids in selected_method_experts(ranked, candidates, experiment_seed, heldout_center, support_seed):
-        if method in {"support_nelbo_top1", "support_nelbo_top2_geom", "support_nelbo_top3_geom", "all4_geom"}:
-            selection_source = "calibrated_marginal_support_nelbo"
-        else:
-            selection_source = "deterministic_random_baseline"
+        selection_source = selection_source_for_method(method)
         budgets = generation_budgets(cfg.synthetic_per_class_total, expert_ids, len(expert_ids))
         bundles = [
             fit_expert_prediction(
@@ -151,6 +148,80 @@ def fit_expert_prediction(
     )
 
 
+def ineligible_downstream_rows(
+    *,
+    ranked: Sequence[SupportScore],
+    candidates: Sequence[str],
+    experiment_seed: int,
+    heldout_center: str,
+    support_seed: int,
+    generation_seed: int,
+    classifier_seed: int,
+    error_message: str,
+) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for expert_id in candidates:
+        rows.append(
+            _ineligible_row(
+                method="single_expert",
+                experiment_seed=experiment_seed,
+                heldout_center=heldout_center,
+                support_seed=support_seed,
+                generation_seed=generation_seed,
+                classifier_seed=classifier_seed,
+                expert_ids=(str(expert_id),),
+                selection_source="all_expert_matrix",
+                error_message=error_message,
+            )
+        )
+
+    method_experts = dict(selected_method_experts(ranked, candidates, experiment_seed, heldout_center, support_seed))
+    for method in METHOD_ROWS:
+        if method == ORACLE_ROW:
+            rows.append(
+                _ineligible_row(
+                    method=method,
+                    experiment_seed=experiment_seed,
+                    heldout_center=heldout_center,
+                    support_seed=support_seed,
+                    generation_seed=generation_seed,
+                    classifier_seed=classifier_seed,
+                    expert_ids=(),
+                    selection_source="diagnostic_only",
+                    error_message=error_message,
+                )
+            )
+        elif method in method_experts:
+            rows.append(
+                _ineligible_row(
+                    method=method,
+                    experiment_seed=experiment_seed,
+                    heldout_center=heldout_center,
+                    support_seed=support_seed,
+                    generation_seed=generation_seed,
+                    classifier_seed=classifier_seed,
+                    expert_ids=method_experts[method],
+                    selection_source=selection_source_for_method(method),
+                    error_message=error_message,
+                )
+            )
+        else:
+            rows.append(
+                _ineligible_row(
+                    method=method,
+                    experiment_seed=experiment_seed,
+                    heldout_center=heldout_center,
+                    support_seed=support_seed,
+                    generation_seed=generation_seed,
+                    classifier_seed=classifier_seed,
+                    expert_ids=(),
+                    selection_source="not_available",
+                    error_message=error_message,
+                )
+            )
+    return rows
+
+
 def selected_method_experts(
     ranked: Sequence[SupportScore],
     candidates: Sequence[str],
@@ -167,6 +238,12 @@ def selected_method_experts(
         ("random_top1", random_order[:1]),
         ("random_top2_geom", random_order[:2]),
     )
+
+
+def selection_source_for_method(method: str) -> str:
+    if method in {"support_nelbo_top1", "support_nelbo_top2_geom", "support_nelbo_top3_geom", "all4_geom"}:
+        return "calibrated_marginal_support_nelbo"
+    return "deterministic_random_baseline"
 
 
 def deterministic_random_order(
@@ -247,6 +324,36 @@ def not_available_rows(
             }
         )
     return rows
+
+
+def _ineligible_row(
+    *,
+    method: str,
+    experiment_seed: int,
+    heldout_center: str,
+    support_seed: int,
+    generation_seed: int,
+    classifier_seed: int,
+    expert_ids: Sequence[str],
+    selection_source: str,
+    error_message: str,
+) -> dict[str, object]:
+    return {
+        "method": method,
+        "experiment_seed": int(experiment_seed),
+        "heldout_center": str(heldout_center),
+        "support_seed": int(support_seed),
+        "generation_seed": int(generation_seed),
+        "classifier_seed": int(classifier_seed),
+        "expert_id": "|".join(str(value) for value in expert_ids),
+        "selected_expert_count": len(expert_ids) if expert_ids else "",
+        "selection_source": selection_source,
+        "bacc": "",
+        "macro_f1": "",
+        "n_target_eval": "",
+        "status": "ineligible",
+        "error_message": str(error_message),
+    }
 
 
 def _stable_int(*parts: str) -> int:

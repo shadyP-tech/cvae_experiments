@@ -44,6 +44,37 @@ def test_real_run_tiny_npz_cache_writes_protocol_artifacts(tmp_path: Path) -> No
     )
 
 
+def test_real_run_records_mono_class_target_eval_as_ineligible(tmp_path: Path) -> None:
+    cfg = _tiny_config(tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42, mono_test_centers={"2"})
+
+    root = run_real_cache_backed(cfg)
+
+    support_rows = list(csv.DictReader(open(root / "tables" / "support_nelbo_routing_scores.csv", newline="")))
+    downstream_rows = list(csv.DictReader(open(root / "tables" / "all_expert_downstream_matrix.csv", newline="")))
+    alignment_rows = list(csv.DictReader(open(root / "tables" / "routing_to_downstream_alignment.csv", newline="")))
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+
+    invalid_support = [row for row in support_rows if row["heldout_center"] == "2"]
+    invalid_downstream = [row for row in downstream_rows if row["heldout_center"] == "2"]
+    invalid_alignment = [row for row in alignment_rows if row["heldout_center"] == "2"]
+
+    assert leakage["status"] == "PASS"
+    assert invalid_support
+    assert invalid_downstream
+    assert invalid_alignment
+    assert {row["eval_status"] for row in invalid_support} == {"ineligible"}
+    assert {row["error_message"] for row in invalid_support} == {"mono_class_target_eval"}
+    assert any(
+        row["method"] == "support_nelbo_top2_geom"
+        and row["status"] == "ineligible"
+        and row["error_message"] == "mono_class_target_eval"
+        for row in invalid_downstream
+    )
+    assert {row["status"] for row in invalid_alignment} == {"ineligible"}
+    assert any(row["method"] == "support_nelbo_top2_geom" and row["status"] == "ok" for row in downstream_rows)
+
+
 def test_source_train_val_split_uses_only_requested_source_center() -> None:
     metadata = []
     for center in ("0", "1"):
@@ -135,8 +166,9 @@ def _tiny_config(tmp_path: Path):
     )
 
 
-def _write_tiny_cache(root: Path, *, seed: int) -> None:
+def _write_tiny_cache(root: Path, *, seed: int, mono_test_centers: set[str] | None = None) -> None:
     rng = np.random.default_rng(123)
+    mono_test_centers = set(mono_test_centers or set())
     for split, per_class in (("train", 12), ("test", 26)):
         embeddings = []
         metadata = []
@@ -145,11 +177,12 @@ def _write_tiny_cache(root: Path, *, seed: int) -> None:
                 mean = np.array([center_idx * 0.5, label * 1.2, center_idx * 0.1, label * 0.3])
                 for idx in range(per_class):
                     embeddings.append(mean + rng.normal(0.0, 0.05, size=4))
+                    observed_label = 0 if split == "test" and center in mono_test_centers else label
                     metadata.append(
                         {
-                            "sample_id": f"{split}_c{center}_y{label}_{idx}",
+                            "sample_id": f"{split}_c{center}_y{observed_label}_{label}_{idx}",
                             "center": center,
-                            "label": label,
+                            "label": observed_label,
                             "split": split,
                         }
                     )

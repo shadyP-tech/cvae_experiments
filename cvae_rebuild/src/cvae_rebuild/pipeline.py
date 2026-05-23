@@ -4,7 +4,7 @@ import math
 from pathlib import Path
 
 from .config import RebuildConfig
-from .evaluation import run_downstream_cell
+from .evaluation import ineligible_downstream_rows, run_downstream_cell
 from .experts import label, to_numpy, train_seed_experts
 from .features import default_cache_path, load_feature_cache, select_rows
 from .metrics import nanmean
@@ -108,11 +108,8 @@ def run_real_cache_backed(cfg: RebuildConfig, *, artifact_root: str | Path | Non
                 support_raw, _support_meta = select_rows(test_cache.embeddings, test_cache.metadata, split.support_indices)
                 eval_raw, eval_meta = select_rows(test_cache.embeddings, test_cache.metadata, split.eval_indices)
                 eval_labels = tuple(label(row) for row in eval_meta)
-                if len(set(eval_labels)) < 2:
-                    raise RuntimeError(
-                        f"Target eval split for seed={experiment_seed}, center={heldout_center}, "
-                        f"support_seed={support_seed} has fewer than two classes."
-                    )
+                target_eval_class_count = len(set(eval_labels))
+                eval_error = "mono_class_target_eval" if target_eval_class_count < 2 else ""
 
                 scores = []
                 for expert_id in candidates:
@@ -144,6 +141,55 @@ def run_real_cache_backed(cfg: RebuildConfig, *, artifact_root: str | Path | Non
                 )
                 for generation_seed in cfg.generation_seeds:
                     for classifier_seed in cfg.classifier_seeds:
+                        if eval_error:
+                            for row in ranked:
+                                support_score_rows.append(
+                                    {
+                                        **row.to_csv_row(),
+                                        "generation_seed": int(generation_seed),
+                                        "classifier_seed": int(classifier_seed),
+                                        "support_eval_split_id": split.support_eval_split_id,
+                                        "oracle_rank_diagnostic": "",
+                                        "downstream_bacc": "",
+                                        "eval_status": "ineligible",
+                                        "error_message": eval_error,
+                                        "n_target_eval": len(eval_labels),
+                                        "target_eval_class_count": target_eval_class_count,
+                                    }
+                                )
+                            downstream_rows.extend(
+                                ineligible_downstream_rows(
+                                    ranked=ranked,
+                                    candidates=candidates,
+                                    experiment_seed=int(experiment_seed),
+                                    heldout_center=str(heldout_center),
+                                    support_seed=int(support_seed),
+                                    generation_seed=int(generation_seed),
+                                    classifier_seed=int(classifier_seed),
+                                    error_message=eval_error,
+                                )
+                            )
+                            alignment_rows.append(
+                                _ineligible_alignment_row(
+                                    experiment_seed=int(experiment_seed),
+                                    heldout_center=str(heldout_center),
+                                    support_seed=int(support_seed),
+                                    generation_seed=int(generation_seed),
+                                    classifier_seed=int(classifier_seed),
+                                    error_message=eval_error,
+                                )
+                            )
+                            preservation_rows.append(
+                                _ineligible_preservation_row(
+                                    experiment_seed=int(experiment_seed),
+                                    heldout_center=str(heldout_center),
+                                    support_seed=int(support_seed),
+                                    generation_seed=int(generation_seed),
+                                    classifier_seed=int(classifier_seed),
+                                    error_message=eval_error,
+                                )
+                            )
+                            continue
                         cell_rows, single_bacc_by_expert, method_baccs = run_downstream_cell(
                             cfg=cfg,
                             experts=experts,
@@ -168,6 +214,10 @@ def run_real_cache_backed(cfg: RebuildConfig, *, artifact_root: str | Path | Non
                                     "support_eval_split_id": split.support_eval_split_id,
                                     "oracle_rank_diagnostic": oracle_order.index(row.expert_id) + 1,
                                     "downstream_bacc": single_bacc_by_expert[row.expert_id],
+                                    "eval_status": "ok",
+                                    "error_message": "",
+                                    "n_target_eval": len(eval_labels),
+                                    "target_eval_class_count": target_eval_class_count,
                                 }
                             )
                         alignment = ranking_alignment(
@@ -239,3 +289,59 @@ def _existing_cache_path(root: str | Path, *, seed: int, split: str) -> Path:
     if npz_path.exists():
         return npz_path
     return pt_path
+
+
+def _ineligible_alignment_row(
+    *,
+    experiment_seed: int,
+    heldout_center: str,
+    support_seed: int,
+    generation_seed: int,
+    classifier_seed: int,
+    error_message: str,
+) -> dict[str, object]:
+    return {
+        "experiment_seed": int(experiment_seed),
+        "heldout_center": str(heldout_center),
+        "support_seed": int(support_seed),
+        "generation_seed": int(generation_seed),
+        "classifier_seed": int(classifier_seed),
+        "top1_downstream_oracle_hit": math.nan,
+        "top2_oracle_containment": math.nan,
+        "top3_oracle_containment": math.nan,
+        "spearman_support_nelbo_vs_downstream_bacc": math.nan,
+        "mean_oracle_rank_of_selected_experts": math.nan,
+        "oracle_gap_top1": math.nan,
+        "oracle_gap_top2": math.nan,
+        "oracle_gap_top3": math.nan,
+        "oracle_gap_all4": math.nan,
+        "status": "ineligible",
+        "error_message": str(error_message),
+    }
+
+
+def _ineligible_preservation_row(
+    *,
+    experiment_seed: int,
+    heldout_center: str,
+    support_seed: int,
+    generation_seed: int,
+    classifier_seed: int,
+    error_message: str,
+) -> dict[str, object]:
+    return {
+        "experiment_seed": int(experiment_seed),
+        "heldout_center": str(heldout_center),
+        "support_seed": int(support_seed),
+        "generation_seed": int(generation_seed),
+        "classifier_seed": int(classifier_seed),
+        "real_feature_source_top1_bacc": "",
+        "cvae_source_top1_synthetic_bacc": "",
+        "cvae_support_nelbo_top1_synthetic_bacc": "",
+        "cvae_support_nelbo_top2_synthetic_bacc": "",
+        "cvae_support_nelbo_top3_synthetic_bacc": "",
+        "cvae_all4_synthetic_bacc": "",
+        "cvae_oracle_synthetic_bacc_diagnostic_only": "",
+        "status": "ineligible",
+        "error_message": str(error_message),
+    }
