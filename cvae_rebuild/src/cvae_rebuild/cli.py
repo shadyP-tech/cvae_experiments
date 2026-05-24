@@ -17,6 +17,7 @@ from .source_union_balanced_gmm_prior import (
     run_source_union_balanced_gmm_prior,
 )
 from .source_union_gmm_prior import load_source_union_gmm_prior_config, run_source_union_gmm_prior
+from .source_union_k24_gmm_prior import load_source_union_k24_gmm_prior_config, run_source_union_k24_gmm_prior
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -90,7 +91,22 @@ def main(argv: list[str] | None = None) -> int:
     source_union_balanced_gmm.add_argument("--config", required=True)
     source_union_balanced_gmm.add_argument("--artifact-root", default=None)
 
+    source_union_k24_gmm = sub.add_parser(
+        "diagnose-source-union-k24-gmm-prior",
+        help="Run the Virchow2-CVAE source-union K24 GMM prior locked follow-up.",
+    )
+    source_union_k24_gmm.add_argument("--config", required=True)
+    source_union_k24_gmm.add_argument("--artifact-root", default=None)
+
     args = parser.parse_args(argv)
+    if args.command == "diagnose-source-union-k24-gmm-prior":
+        cfg = load_source_union_k24_gmm_prior_config(args.config)
+        root = run_source_union_k24_gmm_prior(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
     if args.command == "diagnose-source-union-balanced-gmm-prior":
         cfg = load_source_union_balanced_gmm_prior_config(args.config)
         root = run_source_union_balanced_gmm_prior(
