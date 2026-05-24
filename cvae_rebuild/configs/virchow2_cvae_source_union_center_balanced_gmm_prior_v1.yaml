@@ -4,7 +4,7 @@ experiment:
   primary_variant: source_union_pca64_beta001_diagnostic
 
 inputs:
-  feature_cache_root: cvae_rebuild/artifacts/feature_cache/virchow2
+  feature_cache_root: sail/artifacts/pathology_embeddings/virchow2
   repair_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_preservation_repair_v1
   sampling_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_pca64_sampling_continuation_v1
   prior_calibration_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_latent_prior_calibration_v1
