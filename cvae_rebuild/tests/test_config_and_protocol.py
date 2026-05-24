@@ -4,6 +4,7 @@ import pytest
 
 from cvae_rebuild.config import load_config
 from cvae_rebuild.pipeline import run_artifact_contract_smoke, run_synthetic_smoke
+from cvae_rebuild.preservation import load_preservation_config
 from cvae_rebuild.protocol import (
     ProtocolError,
     assert_candidate_pool,
@@ -21,6 +22,15 @@ def test_locked_config_loads() -> None:
     assert cfg.experiment_seeds == (42, 43, 44)
     assert cfg.heldout_centers == ("0", "1", "2", "3", "4")
     assert cfg.artifact_root.as_posix().endswith("cvae_rebuild/artifacts/target_support32_virchow2_cvae_top2_v1")
+
+
+def test_locked_preservation_config_loads() -> None:
+    cfg = load_preservation_config("cvae_rebuild/configs/virchow2_cvae_preservation_diagnosis_v1.yaml")
+    assert cfg.name == "virchow2_cvae_preservation_diagnosis_v1"
+    assert cfg.replicate_seeds == (17, 23, 31)
+    assert cfg.classifier_class_weight == "balanced"
+    assert cfg.classifier_seed is None
+    assert cfg.artifact_root.as_posix().endswith("cvae_rebuild/artifacts/virchow2_cvae_preservation_diagnosis_v1")
 
 
 def test_budget_splits_are_rank_order_deterministic() -> None:

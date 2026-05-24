@@ -11,6 +11,7 @@ class ExpertFeatureFrame:
     pca: object
     requested_dim: int
     effective_dim: int
+    explained_variance_ratio_sum: float
     fit_scope: str = "per_expert_source_train"
 
     def transform(self, embeddings: Sequence[Sequence[float]]) -> object:
@@ -47,4 +48,5 @@ def fit_expert_frame(
         pca=pca,
         requested_dim=int(requested_dim),
         effective_dim=int(effective),
+        explained_variance_ratio_sum=float(pca.explained_variance_ratio_.sum()),
     )

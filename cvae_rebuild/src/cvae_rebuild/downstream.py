@@ -83,8 +83,9 @@ def fit_locked_logistic_classifier(
     synthetic_labels: Sequence[int],
     target_embeddings: Sequence[Sequence[float]],
     *,
-    classifier_seed: int,
+    classifier_seed: int | None,
     expert_id: str,
+    class_weight: str | None = None,
 ) -> PredictionBundle:
     try:
         import numpy as np  # type: ignore
@@ -109,8 +110,8 @@ def fit_locked_logistic_classifier(
         solver="lbfgs",
         C=1.0,
         max_iter=2000,
-        class_weight=None,
-        random_state=int(classifier_seed),
+        class_weight=class_weight,
+        random_state=None if classifier_seed is None else int(classifier_seed),
     )
     clf.fit(x_syn_scaled, y_syn)
     classes = tuple(int(v) for v in clf.classes_.tolist())

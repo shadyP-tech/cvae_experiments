@@ -14,6 +14,15 @@ from cvae_rebuild.config import parse_config
 from cvae_rebuild.generation import generate_reference_posterior
 from cvae_rebuild.models import ClassConditionedCVAE
 from cvae_rebuild.pipeline import run_real_cache_backed
+from cvae_rebuild.preservation import (
+    ROW_DECODE_MU,
+    ROW_POSTERIOR,
+    ROW_PRIOR,
+    ROW_REAL_BUDGET,
+    ROW_REAL_FULL,
+    parse_preservation_config,
+    run_preservation_diagnosis,
+)
 from cvae_rebuild.splits import stratified_source_train_val_split
 
 
@@ -117,6 +126,94 @@ def test_reference_posterior_generation_is_torch_seed_deterministic() -> None:
     assert np.allclose(first.embeddings, second.embeddings)
 
 
+def test_preservation_diagnosis_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    cfg = _tiny_preservation_config(tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_preservation_diagnosis(cfg)
+
+    downstream = list(csv.DictReader(open(root / "tables" / "preservation_downstream_matrix.csv", newline="")))
+    gaps = list(csv.DictReader(open(root / "tables" / "preservation_gap_summary.csv", newline="")))
+    sampling = list(csv.DictReader(open(root / "tables" / "reference_sampling_diagnostics.csv", newline="")))
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+
+    assert leakage["status"] == "PASS"
+    assert len(downstream) == 100
+    assert len([row for row in downstream if row["row_role"] == ROW_REAL_FULL]) == 20
+    assert all(row["replicate_seed"] == "NA" for row in downstream if row["row_role"] == ROW_REAL_FULL)
+    assert any(row["row_role"] == ROW_PRIOR and row["reference_sample_seed"] == "NA" for row in downstream)
+    assert all(row["classifier_class_weight"] == "balanced" for row in downstream)
+    assert gaps
+    assert sampling
+
+
+def test_preservation_diagnosis_marks_mono_class_target_eval_ineligible(tmp_path: Path) -> None:
+    cfg = _tiny_preservation_config(tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42, mono_test_centers={"2"})
+
+    root = run_preservation_diagnosis(cfg)
+    downstream = list(csv.DictReader(open(root / "tables" / "preservation_downstream_matrix.csv", newline="")))
+
+    invalid = [row for row in downstream if row["heldout_center"] == "2"]
+    valid = [row for row in downstream if row["heldout_center"] != "2"]
+    assert len(invalid) == 20
+    assert {row["status"] for row in invalid} == {"ineligible"}
+    assert {row["error_message"] for row in invalid} == {"mono_class_target_eval"}
+    assert any(row["status"] == "ok" for row in valid)
+
+
+def test_preservation_gaps_use_paired_replicate_key_and_reference_hash(tmp_path: Path) -> None:
+    cfg = _tiny_preservation_config(tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_preservation_diagnosis(cfg)
+    downstream = list(csv.DictReader(open(root / "tables" / "preservation_downstream_matrix.csv", newline="")))
+    gaps = list(csv.DictReader(open(root / "tables" / "preservation_gap_summary.csv", newline="")))
+
+    first_gap = gaps[0]
+    key = {
+        "experiment_seed": first_gap["experiment_seed"],
+        "heldout_center": first_gap["heldout_center"],
+        "expert_id": first_gap["expert_id"],
+        "replicate_seed": first_gap["replicate_seed"],
+    }
+    paired = [
+        row for row in downstream
+        if all(row[field] == value for field, value in key.items())
+    ]
+    by_role = {row["row_role"]: row for row in paired}
+    full = [
+        row for row in downstream
+        if row["experiment_seed"] == key["experiment_seed"]
+        and row["heldout_center"] == key["heldout_center"]
+        and row["expert_id"] == key["expert_id"]
+        and row["row_role"] == ROW_REAL_FULL
+    ]
+
+    assert len(full) == 1
+    assert {ROW_REAL_BUDGET, ROW_DECODE_MU, ROW_POSTERIOR, ROW_PRIOR}.issubset(by_role)
+    assert by_role[ROW_REAL_BUDGET]["reference_ids_hash"] == by_role[ROW_DECODE_MU]["reference_ids_hash"]
+    assert by_role[ROW_REAL_BUDGET]["reference_ids_hash"] == by_role[ROW_POSTERIOR]["reference_ids_hash"]
+    assert by_role[ROW_PRIOR]["reference_sample_seed"] == "NA"
+    expected_budget_gap = float(full[0]["bacc"]) - float(by_role[ROW_REAL_BUDGET]["bacc"])
+    assert float(first_gap["budget_gap"]) == pytest.approx(expected_budget_gap)
+
+
+def test_preservation_chance_adjusted_is_na_for_near_chance_real_budget(tmp_path: Path) -> None:
+    cfg = _tiny_preservation_config(tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_preservation_diagnosis(cfg)
+    gaps_path = root / "tables" / "preservation_gap_summary.csv"
+    rows = list(csv.DictReader(open(gaps_path, newline="")))
+
+    # Force a focused check of the schema-level behavior with the produced rows:
+    # rows at or below the guard must not carry a numeric preservation ratio.
+    for row in rows:
+        if float(row["real_source_budget_matched_bacc"]) <= 0.55:
+            assert row["chance_adjusted_preservation"] == ""
+
+
 def _tiny_config(tmp_path: Path):
     return parse_config(
         {
@@ -160,6 +257,50 @@ def _tiny_config(tmp_path: Path):
                 "classifier": "sklearn_logistic_regression",
                 "aggregation": "geometric_probability_pooling",
                 "eps": 1e-12,
+            },
+        },
+        base_dir=tmp_path,
+    )
+
+
+def _tiny_preservation_config(tmp_path: Path):
+    return parse_preservation_config(
+        {
+            "experiment": {
+                "name": "virchow2_cvae_preservation_diagnosis_v1",
+                "artifact_root": str(tmp_path / "preservation_artifacts"),
+            },
+            "inputs": {
+                "feature_cache_root": str(tmp_path / "preservation_cache" / "virchow2"),
+                "backbone": "virchow2",
+            },
+            "run_matrix": {
+                "experiment_seeds": [42],
+                "heldout_centers": ["0", "1", "2", "3", "4"],
+                "replicate_seeds": [17],
+                "candidate_count_per_cell": 4,
+            },
+            "feature_frame": {"pca_dim": 256, "fit_scope": "per_expert_source_train"},
+            "model": {
+                "hidden_dim": 512,
+                "latent_dim": 64,
+                "num_hidden_layers": 2,
+                "train_epochs": 1,
+                "batch_size": 16,
+                "learning_rate": 0.001,
+                "class_conditioning": "encoder_decoder_one_hot",
+            },
+            "generation": {
+                "synthetic_per_class_total": 128,
+                "class_prior_for_generation": "uniform",
+            },
+            "classifier": {
+                "type": "sklearn_logistic_regression",
+                "solver": "lbfgs",
+                "C": 1.0,
+                "max_iter": 2000,
+                "class_weight": "balanced",
+                "classifier_seed": None,
             },
         },
         base_dir=tmp_path,

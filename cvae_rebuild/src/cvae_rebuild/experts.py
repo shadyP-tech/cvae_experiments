@@ -18,6 +18,7 @@ class ExpertRuntime:
     calibration: object
     source_train_embeddings: object
     source_train_labels: tuple[int, ...]
+    source_train_sample_ids: tuple[str, ...]
     source_val_split: SourceTrainValSplit
     n_train: int
     n_val: int
@@ -70,6 +71,7 @@ def train_seed_experts(
             calibration=trained.calibration,
             source_train_embeddings=np.asarray(source_train_x, dtype=float),
             source_train_labels=source_train_labels,
+            source_train_sample_ids=tuple(sample_id(row, idx) for idx, row in enumerate(source_train_meta)),
             source_val_split=split,
             n_train=trained.n_train,
             n_val=trained.n_val,
@@ -96,3 +98,8 @@ def to_numpy(value: object) -> object:
 
 def label(row: Mapping[str, object]) -> int:
     return int(float(str(row.get("label", 0))))
+
+
+def sample_id(row: Mapping[str, object], fallback_idx: int) -> str:
+    value = row.get("sample_id", "")
+    return str(value) if str(value) else f"row_{int(fallback_idx)}"

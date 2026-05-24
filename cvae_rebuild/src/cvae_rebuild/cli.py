@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .config import load_config
 from .pipeline import run_artifact_contract_smoke, run_real_cache_backed, run_synthetic_smoke
+from .preservation import load_preservation_config, run_preservation_diagnosis
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -27,7 +28,19 @@ def main(argv: list[str] | None = None) -> int:
         help="Run a tiny end-to-end synthetic train/routing/downstream smoke.",
     )
 
+    diagnose = sub.add_parser("diagnose-preservation", help="Run the Virchow2-CVAE preservation diagnosis.")
+    diagnose.add_argument("--config", required=True)
+    diagnose.add_argument("--artifact-root", default=None)
+
     args = parser.parse_args(argv)
+    if args.command == "diagnose-preservation":
+        cfg = load_preservation_config(args.config)
+        root = run_preservation_diagnosis(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
     cfg = load_config(args.config)
     if args.command == "validate-config":
         print(f"OK: {cfg.name}")
