@@ -17,6 +17,11 @@ from cvae_rebuild.covariance_prior import (
     parse_covariance_prior_config,
     run_covariance_prior_confirmation,
 )
+from cvae_rebuild.covariance_shrinkage import (
+    PRIMARY_SHRINKAGE_METHOD,
+    parse_covariance_shrinkage_config,
+    run_covariance_shrinkage_stability,
+)
 from cvae_rebuild.covariance_viability import (
     parse_covariance_viability_config,
     run_covariance_prior_viability_audit,
@@ -676,6 +681,88 @@ def test_covariance_viability_missing_artifact_is_protocol_fail(tmp_path: Path) 
     assert any("Missing covariance confirmation artifact files" in violation for violation in leakage["violations"])
 
 
+def test_covariance_shrinkage_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    repair_cfg = _tiny_repair_config(tmp_path)
+    _write_tiny_cache(repair_cfg.feature_cache_root, seed=42)
+    repair_root = run_preservation_repair(repair_cfg)
+    sampling_cfg = _tiny_sampling_config(tmp_path, repair_root)
+    sampling_root = run_preservation_sampling(sampling_cfg)
+    prior_cfg = _tiny_prior_calibration_config(tmp_path, repair_root, sampling_root)
+    prior_root = run_prior_calibration(prior_cfg)
+    cov_cfg = _tiny_covariance_prior_config(tmp_path, repair_root, sampling_root, prior_root)
+    cov_root = run_covariance_prior_confirmation(cov_cfg)
+    viability_cfg = _tiny_covariance_viability_config(tmp_path, cov_root)
+    viability_root = run_covariance_prior_viability_audit(viability_cfg)
+    cfg = _tiny_covariance_shrinkage_config(tmp_path, repair_root, sampling_root, prior_root, cov_root, viability_root)
+
+    root = run_covariance_shrinkage_stability(cfg)
+
+    expected = [
+        "tables/shrinkage_prior_downstream_matrix.csv",
+        "tables/shrinkage_prior_gap_summary.csv",
+        "tables/shrinkage_alpha_comparison.csv",
+        "tables/high_real_viability_summary.csv",
+        "tables/original_9_stress_summary.csv",
+        "tables/variant_real_stratum_summary.csv",
+        "tables/covariance_health_by_alpha.csv",
+        "tables/fallback_stability_audit.csv",
+        "tables/source_pool_shrinkage_summary.csv",
+        "manifests/protocol_manifest.json",
+        "manifests/covariance_shrinkage_model_manifest.csv",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "shrinkage_prior_downstream_matrix.csv", newline="")))
+    health = list(csv.DictReader(open(root / "tables" / "covariance_health_by_alpha.csv", newline="")))
+    summary = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert any(row["prior_method"] == PRIMARY_SHRINKAGE_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == "cvae_cc_cov_diag_shrinkage050_prior_sample_diagnostic" for row in matrix)
+    assert any(row["prior_method"] == "cvae_cc_cov_diag_shrinkage090_prior_sample_diagnostic" for row in matrix)
+    assert all("offdiag_frobenius_ratio" in row for row in matrix)
+    assert all("trace_ratio_vs_diag" in row for row in matrix)
+    assert health
+    assert "does not evaluate routing" in summary
+
+
+def test_covariance_shrinkage_config_rejects_noncanonical_primary_alpha(tmp_path: Path) -> None:
+    payload = _tiny_covariance_shrinkage_payload(
+        tmp_path,
+        tmp_path / "repair",
+        tmp_path / "sampling",
+        tmp_path / "prior",
+        tmp_path / "virchow2_cvae_covariance_prior_confirmation_v1",
+        tmp_path / "virchow2_cvae_covariance_prior_viability_audit_v1",
+    )
+    payload["covariance_shrinkage"]["primary_covariance_shrinkage_alpha"] = 0.50
+
+    with pytest.raises(Exception, match="primary_covariance_shrinkage_alpha"):
+        parse_covariance_shrinkage_config(payload, base_dir=tmp_path)
+
+
+def test_covariance_shrinkage_missing_imports_is_protocol_fail(tmp_path: Path) -> None:
+    cfg = _tiny_covariance_shrinkage_config(
+        tmp_path,
+        tmp_path / "repair",
+        tmp_path / "sampling",
+        tmp_path / "prior",
+        tmp_path / "virchow2_cvae_covariance_prior_confirmation_v1",
+        tmp_path / "virchow2_cvae_covariance_prior_viability_audit_v1",
+    )
+
+    root = run_covariance_shrinkage_stability(cfg)
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+
+    assert leakage["status"] == "FAIL"
+    assert any("Missing imported shrinkage reference artifacts" in violation for violation in leakage["violations"])
+
+
 def _tiny_config(tmp_path: Path):
     return parse_config(
         {
@@ -1021,7 +1108,7 @@ def _tiny_covariance_viability_payload(tmp_path: Path, covariance_root: Path):
     return {
         "experiment": {
             "name": "virchow2_cvae_covariance_prior_viability_audit_v1",
-            "artifact_root": str(tmp_path / "covariance_viability_artifacts"),
+            "artifact_root": str(tmp_path / "virchow2_cvae_covariance_prior_viability_audit_v1"),
         },
         "inputs": {
             "covariance_confirmation_artifact_root": str(covariance_root),
@@ -1045,6 +1132,76 @@ def _tiny_covariance_viability_payload(tmp_path: Path, covariance_root: Path):
             "worst_delta_vs_diag_prior_min": -0.05,
             "min_cell_bacc_min": 0.60,
             "min_center_mean_bacc_min": 0.75,
+        },
+    }
+
+
+def _tiny_covariance_shrinkage_config(
+    tmp_path: Path,
+    repair_root: Path,
+    sampling_root: Path,
+    prior_root: Path,
+    covariance_root: Path,
+    viability_root: Path,
+):
+    return parse_covariance_shrinkage_config(
+        _tiny_covariance_shrinkage_payload(tmp_path, repair_root, sampling_root, prior_root, covariance_root, viability_root),
+        base_dir=tmp_path,
+    )
+
+
+def _tiny_covariance_shrinkage_payload(
+    tmp_path: Path,
+    repair_root: Path,
+    sampling_root: Path,
+    prior_root: Path,
+    covariance_root: Path,
+    viability_root: Path,
+):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_covariance_shrinkage_stability_v1",
+            "artifact_root": str(tmp_path / "virchow2_cvae_covariance_shrinkage_stability_v1"),
+            "primary_variant": "pca64_beta001",
+            "min_decision_cells": 9,
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(repair_root),
+            "sampling_artifact_root": str(sampling_root),
+            "prior_calibration_artifact_root": str(prior_root),
+            "covariance_confirmation_artifact_root": str(covariance_root),
+            "covariance_viability_artifact_root": str(viability_root),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2"],
+            "replicate_seeds": [17],
+        },
+        "generation": {
+            "synthetic_per_class_total": 128,
+        },
+        "covariance_shrinkage": {
+            "primary_method": "cvae_cc_cov_diag_shrinkage075_prior_sample",
+            "primary_covariance_shrinkage_alpha": 0.75,
+            "diagnostic_covariance_shrinkage_alphas": [0.50, 0.90],
+            "reference_covariance_shrinkage_alpha": 0.10,
+            "diagonal_reference_alpha": 1.00,
+            "covariance_eigenvalue_floor": 1.0e-4,
+            "full_cov_min_records_per_class": 32,
+            "fallback_if_under_ranked": "diag",
+            "standard_prior_repro_abs_tol_bacc": 1.0,
+            "diag_prior_repro_abs_tol_bacc": 1.0,
+            "alpha010_repro_abs_tol_bacc": 1.0,
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
         },
     }
 
