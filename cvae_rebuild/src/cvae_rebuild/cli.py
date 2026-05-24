@@ -6,6 +6,7 @@ from pathlib import Path
 from .config import load_config
 from .pipeline import run_artifact_contract_smoke, run_real_cache_backed, run_synthetic_smoke
 from .preservation import load_preservation_config, run_preservation_diagnosis
+from .preservation_repair import load_repair_config, run_preservation_repair
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -32,7 +33,19 @@ def main(argv: list[str] | None = None) -> int:
     diagnose.add_argument("--config", required=True)
     diagnose.add_argument("--artifact-root", default=None)
 
+    repair = sub.add_parser("diagnose-preservation-repair", help="Run the Virchow2-CVAE preservation repair diagnosis.")
+    repair.add_argument("--config", required=True)
+    repair.add_argument("--artifact-root", default=None)
+
     args = parser.parse_args(argv)
+    if args.command == "diagnose-preservation-repair":
+        cfg = load_repair_config(args.config)
+        root = run_preservation_repair(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
     if args.command == "diagnose-preservation":
         cfg = load_preservation_config(args.config)
         root = run_preservation_diagnosis(

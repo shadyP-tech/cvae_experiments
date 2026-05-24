@@ -5,6 +5,7 @@ import pytest
 from cvae_rebuild.config import load_config
 from cvae_rebuild.pipeline import run_artifact_contract_smoke, run_synthetic_smoke
 from cvae_rebuild.preservation import load_preservation_config
+from cvae_rebuild.preservation_repair import load_repair_config
 from cvae_rebuild.protocol import (
     ProtocolError,
     assert_candidate_pool,
@@ -31,6 +32,23 @@ def test_locked_preservation_config_loads() -> None:
     assert cfg.classifier_class_weight == "balanced"
     assert cfg.classifier_seed is None
     assert cfg.artifact_root.as_posix().endswith("cvae_rebuild/artifacts/virchow2_cvae_preservation_diagnosis_v1")
+
+
+def test_locked_preservation_repair_config_loads() -> None:
+    cfg = load_repair_config("cvae_rebuild/configs/virchow2_cvae_preservation_repair_v1.yaml")
+    assert cfg.name == "virchow2_cvae_preservation_repair_v1"
+    assert cfg.primary_variant == "pca64_beta001"
+    assert cfg.min_decision_rows == 10
+    assert {variant.variant_id for variant in cfg.variants} == {
+        "current_pca200_beta1_reference",
+        "pca64_beta001",
+        "pca128_beta001",
+        "pca64_beta001_probe025",
+        "pca128_beta001_probe025",
+        "source_union_pca64_beta001_diagnostic",
+        "source_union_pca64_beta001_probe025_diagnostic",
+    }
+    assert cfg.artifact_root.as_posix().endswith("cvae_rebuild/artifacts/virchow2_cvae_preservation_repair_v1")
 
 
 def test_budget_splits_are_rank_order_deterministic() -> None:
