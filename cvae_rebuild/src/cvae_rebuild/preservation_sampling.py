@@ -1014,6 +1014,8 @@ def _runtime_source(
         return RuntimeSource(runtime=runtime, checkpoint_path=path, checkpoint_sha256=_file_sha256(path), checkpoint_reused_from_repair=False)
     with path.open("rb") as f:
         runtime = pickle.load(f)
+    if len(tuple(getattr(runtime, "source_train_centers", ()))) != len(runtime.source_train_labels):
+        runtime.source_train_centers = tuple(str(v) for v in source_data.train_centers)
     _validate_runtime(runtime, variant)
     return RuntimeSource(runtime=runtime, checkpoint_path=path, checkpoint_sha256=_file_sha256(path), checkpoint_reused_from_repair=reused)
 
