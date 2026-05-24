@@ -7,6 +7,10 @@ from .config import load_config
 from .covariance_prior import load_covariance_prior_config, run_covariance_prior_confirmation
 from .covariance_shrinkage import load_covariance_shrinkage_config, run_covariance_shrinkage_stability
 from .covariance_viability import load_covariance_viability_config, run_covariance_prior_viability_audit
+from .decentralized_k16_gmm_prior import (
+    load_decentralized_k16_gmm_prior_config,
+    run_decentralized_k16_gmm_prior,
+)
 from .pipeline import run_artifact_contract_smoke, run_real_cache_backed, run_synthetic_smoke
 from .preservation import load_preservation_config, run_preservation_diagnosis
 from .preservation_repair import load_repair_config, run_preservation_repair
@@ -98,7 +102,22 @@ def main(argv: list[str] | None = None) -> int:
     source_union_k24_gmm.add_argument("--config", required=True)
     source_union_k24_gmm.add_argument("--artifact-root", default=None)
 
+    decentralized_k16_gmm = sub.add_parser(
+        "diagnose-decentralized-k16-gmm-prior",
+        help="Run the Virchow2-CVAE decentralized K16 summary-composition preservation test.",
+    )
+    decentralized_k16_gmm.add_argument("--config", required=True)
+    decentralized_k16_gmm.add_argument("--artifact-root", default=None)
+
     args = parser.parse_args(argv)
+    if args.command == "diagnose-decentralized-k16-gmm-prior":
+        cfg = load_decentralized_k16_gmm_prior_config(args.config)
+        root = run_decentralized_k16_gmm_prior(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
     if args.command == "diagnose-source-union-k24-gmm-prior":
         cfg = load_source_union_k24_gmm_prior_config(args.config)
         root = run_source_union_k24_gmm_prior(

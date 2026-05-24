@@ -26,6 +26,11 @@ from cvae_rebuild.covariance_viability import (
     parse_covariance_viability_config,
     run_covariance_prior_viability_audit,
 )
+from cvae_rebuild.decentralized_k16_gmm_prior import (
+    PRIMARY_DECENTRALIZED_METHOD,
+    parse_decentralized_k16_gmm_prior_config,
+    run_decentralized_k16_gmm_prior,
+)
 from cvae_rebuild.generation import generate_reference_posterior
 from cvae_rebuild.models import ClassConditionedCVAE
 from cvae_rebuild.pipeline import run_real_cache_backed
@@ -1030,6 +1035,77 @@ def test_source_union_balanced_gmm_prior_config_rejects_noncanonical_primary(tmp
         parse_source_union_balanced_gmm_prior_config(payload, base_dir=tmp_path)
 
 
+def test_decentralized_k16_gmm_prior_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_decentralized_k16_gmm_payload(tmp_path)
+    cfg = parse_decentralized_k16_gmm_prior_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_decentralized_k16_gmm_prior(cfg)
+
+    expected = [
+        "tables/decentralized_k16_downstream_matrix.csv",
+        "tables/decentralized_k16_gap_summary.csv",
+        "tables/decentralized_k16_summary.csv",
+        "tables/exported_source_summary_manifest.csv",
+        "tables/composed_prior_component_manifest.csv",
+        "tables/source_summary_diagnostics.csv",
+        "tables/late_aggregation_matrix.csv",
+        "tables/real_feature_reference_matrix.csv",
+        "tables/generated_component_coverage_audit.csv",
+        "tables/weak_source_audit.csv",
+        "tables/nearest_neighbor_memorization_audit.csv",
+        "tables/negative_control_summary.csv",
+        "manifests/protocol_manifest.json",
+        "manifests/decentralized_k16_prior_model_manifest.csv",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+        "summaries/source_0/class_0_k4_summary.npz",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "decentralized_k16_downstream_matrix.csv", newline="")))
+    summary_manifest_reader = csv.DictReader(open(root / "tables" / "exported_source_summary_manifest.csv", newline=""))
+    summary_manifest = list(summary_manifest_reader)
+    composition = list(csv.DictReader(open(root / "tables" / "composed_prior_component_manifest.csv", newline="")))
+    diagnostics = list(csv.DictReader(open(root / "tables" / "source_summary_diagnostics.csv", newline="")))
+    real_reference = list(csv.DictReader(open(root / "tables" / "real_feature_reference_matrix.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert "heldout_center" not in (summary_manifest_reader.fieldnames or [])
+    assert summary_manifest
+    assert diagnostics and all(row["heldout_center"] != row["source_center"] for row in composition)
+    assert any(row["prior_method"] == PRIMARY_DECENTRALIZED_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_exported_k4x4_cc_diag_gmm_k16_late_arith" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_k16_shuffled_summary_control" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_k16_shuffled_label_control" for row in matrix)
+    assert any(row["prior_method"] == "real_source_embedding_classifier_dense_reference" and row["status"] == "ok" for row in matrix)
+    assert any(row["prior_method"] == "source_union_cc_diag_gmm_k16_prior_sample_reference" and row["status"] == "missing_reference" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_exported_k4x4_cc_diag_gmm_k16_support_nelbo_weighted_geom_diagnostic" and row["status"] == "diagnostic_disabled" for row in matrix)
+    assert all(row["heldout_center"] != row["source_center"] for row in composition)
+    for key in {(row["experiment_seed"], row["heldout_center"], row["class_label"]) for row in composition}:
+        total = sum(
+            float(row["component_weight_after_equal_source_normalization"])
+            for row in composition
+            if (row["experiment_seed"], row["heldout_center"], row["class_label"]) == key
+        )
+        assert abs(total - 1.0) < 1.0e-6
+    assert real_reference
+    assert "not a target-specific compatibility-routing result" in report
+    assert "not a formal differential privacy claim" in report
+
+
+def test_decentralized_k16_gmm_prior_config_rejects_non_virchow2(tmp_path: Path) -> None:
+    payload = _tiny_decentralized_k16_gmm_payload(tmp_path)
+    payload["inputs"]["backbone"] = "dinov2"
+
+    with pytest.raises(Exception, match="backbone=virchow2"):
+        parse_decentralized_k16_gmm_prior_config(payload, base_dir=tmp_path)
+
+
 def test_source_union_k24_gmm_prior_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
     repair_cfg = _tiny_repair_config(tmp_path)
     _write_tiny_cache(repair_cfg.feature_cache_root, seed=42)
@@ -1750,6 +1826,56 @@ def _tiny_source_union_balanced_gmm_payload(
             "mean_center_class_replacement_rate": 1.0,
             "posterior_noise_scale": 0.0,
             "diagnostic_gmm_components": [8, 24],
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_decentralized_k16_gmm_payload(tmp_path: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_decentralized_k16_gmm_prior_v1",
+            "artifact_root": str(tmp_path / "virchow2_cvae_decentralized_k16_gmm_prior_v1"),
+            "primary_variant": "pca64_beta001",
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
+            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
+            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2", "3", "4"],
+            "replicate_seeds": [17],
+        },
+        "generation": {
+            "synthetic_per_class_total": 128,
+        },
+        "decentralized_k16_prior": {
+            "primary_method": "decentralized_exported_k4x4_cc_diag_gmm_k16_late_geom",
+            "local_gmm_components_per_source_class": 4,
+            "composed_components_per_class": 16,
+            "source_weighting": "equal_source_mass",
+            "gmm_covariance_type": "diag",
+            "gmm_reg_covar": 1.0e-4,
+            "gmm_n_init": 1,
+            "gmm_max_iter": 100,
+            "min_count_for_k4": 8,
+            "min_component_weight": 0.001,
+            "variance_floor": 1.0e-5,
+            "primary_pooling": "geometric",
+        },
+        "support_nelbo_diagnostic": {
+            "enabled": False,
         },
         "classifier": {
             "type": "sklearn_logistic_regression",

@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from cvae_rebuild.config import load_config
+from cvae_rebuild.decentralized_k16_gmm_prior import load_decentralized_k16_gmm_prior_config
 from cvae_rebuild.pipeline import run_artifact_contract_smoke, run_synthetic_smoke
 from cvae_rebuild.preservation import load_preservation_config
 from cvae_rebuild.preservation_repair import load_repair_config
@@ -49,6 +50,20 @@ def test_locked_preservation_repair_config_loads() -> None:
         "source_union_pca64_beta001_probe025_diagnostic",
     }
     assert cfg.artifact_root.as_posix().endswith("cvae_rebuild/artifacts/virchow2_cvae_preservation_repair_v1")
+
+
+def test_locked_decentralized_k16_gmm_prior_config_loads() -> None:
+    cfg = load_decentralized_k16_gmm_prior_config(
+        "cvae_rebuild/configs/virchow2_cvae_decentralized_k16_gmm_prior_v1.yaml"
+    )
+    assert cfg.name == "virchow2_cvae_decentralized_k16_gmm_prior_v1"
+    assert cfg.backbone == "virchow2"
+    assert cfg.primary_variant == "pca64_beta001"
+    assert cfg.primary_method == "decentralized_exported_k4x4_cc_diag_gmm_k16_late_geom"
+    assert cfg.local_gmm_components_per_source_class == 4
+    assert cfg.composed_components_per_class == 16
+    assert cfg.source_weighting == "equal_source_mass"
+    assert cfg.support_nelbo_enabled is False
 
 
 def test_budget_splits_are_rank_order_deterministic() -> None:
