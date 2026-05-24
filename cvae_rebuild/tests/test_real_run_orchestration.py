@@ -38,6 +38,11 @@ from cvae_rebuild.preservation_sampling import (
     parse_sampling_config,
     run_preservation_sampling,
 )
+from cvae_rebuild.prior_calibration import (
+    PRIMARY_PRIOR_METHOD,
+    parse_prior_calibration_config,
+    run_prior_calibration,
+)
 from cvae_rebuild.splits import stratified_source_train_val_split
 
 
@@ -438,6 +443,86 @@ def test_preservation_sampling_config_rejects_noncanonical_values(tmp_path: Path
         parse_sampling_config(payload, base_dir=tmp_path)
 
 
+def test_prior_calibration_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    repair_cfg = _tiny_repair_config(tmp_path)
+    _write_tiny_cache(repair_cfg.feature_cache_root, seed=42)
+    repair_root = run_preservation_repair(repair_cfg)
+    sampling_cfg = _tiny_sampling_config(tmp_path, repair_root)
+    sampling_root = run_preservation_sampling(sampling_cfg)
+    cfg = _tiny_prior_calibration_config(tmp_path, repair_root, sampling_root)
+
+    root = run_prior_calibration(cfg)
+
+    expected = [
+        "tables/calibrated_prior_downstream_matrix.csv",
+        "tables/calibrated_prior_gap_summary.csv",
+        "tables/latent_prior_parameter_manifest.csv",
+        "tables/latent_prior_diagnostics.csv",
+        "tables/source_pool_prior_calibration_summary.csv",
+        "manifests/protocol_manifest.json",
+        "manifests/prior_calibration_model_manifest.csv",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "calibrated_prior_downstream_matrix.csv", newline="")))
+    gaps = list(csv.DictReader(open(root / "tables" / "calibrated_prior_gap_summary.csv", newline="")))
+    manifest = list(csv.DictReader(open(root / "tables" / "latent_prior_parameter_manifest.csv", newline="")))
+
+    assert leakage["status"] == "PASS"
+    assert any(row["prior_method"] == PRIMARY_PRIOR_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == "cvae_cc_diag_shrinkage_gaussian_prior_sample_diagnostic" for row in matrix)
+    assert any(row["prior_method"] == "cvae_standard_prior_sample_reference" for row in matrix)
+    assert any(row["expert_pool_type"] == "source_union_excluding_target" for row in matrix)
+    assert all(row["generated_features_hash"] for row in matrix if row["status"] == "ok")
+    assert all(row["prediction_hash"] for row in matrix if row["status"] == "ok")
+    assert gaps
+    assert manifest
+
+
+def test_prior_calibration_requires_sampling_reference(tmp_path: Path) -> None:
+    repair_cfg = _tiny_repair_config(tmp_path)
+    _write_tiny_cache(repair_cfg.feature_cache_root, seed=42)
+    repair_root = run_preservation_repair(repair_cfg)
+    cfg = _tiny_prior_calibration_config(tmp_path, repair_root, tmp_path / "missing_sampling")
+
+    root = run_prior_calibration(cfg)
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+
+    assert leakage["status"] == "FAIL"
+    assert any("Missing sampling gap summary" in violation for violation in leakage["violations"])
+
+
+def test_prior_calibration_config_rejects_noncanonical_primary(tmp_path: Path) -> None:
+    payload = _tiny_prior_calibration_payload(tmp_path, tmp_path / "repair", tmp_path / "sampling")
+    payload["prior_calibration"]["primary_method"] = "cvae_empirical_mu_codebook_prior_sample_diagnostic"
+
+    with pytest.raises(Exception, match="primary_method"):
+        parse_prior_calibration_config(payload, base_dir=tmp_path)
+
+
+def test_prior_calibration_source_under_threshold_is_ineligible(tmp_path: Path) -> None:
+    repair_cfg = _tiny_repair_config(tmp_path)
+    _write_tiny_cache(repair_cfg.feature_cache_root, seed=42)
+    repair_root = run_preservation_repair(repair_cfg)
+    sampling_cfg = _tiny_sampling_config(tmp_path, repair_root)
+    sampling_root = run_preservation_sampling(sampling_cfg)
+    payload = _tiny_prior_calibration_payload(tmp_path, repair_root, sampling_root)
+    payload["prior_calibration"]["min_prior_fit_records_per_class"] = 100
+    payload["prior_calibration"]["full_cov_min_records_per_class"] = 100
+    cfg = parse_prior_calibration_config(payload, base_dir=tmp_path)
+
+    root = run_prior_calibration(cfg)
+    matrix = list(csv.DictReader(open(root / "tables" / "calibrated_prior_downstream_matrix.csv", newline="")))
+
+    assert matrix
+    assert any(row["status"] == "ineligible" and "insufficient_source_class_records" in row["error_message"] for row in matrix)
+
+
 def _tiny_config(tmp_path: Path):
     return parse_config(
         {
@@ -657,6 +742,58 @@ def _tiny_sampling_payload(tmp_path: Path, repair_root: Path):
             "prior_scales_primary": [1.0],
             "prior_scales_diagnostic": [0.25, 0.5],
             "empirical_posterior_temperature": 1.0,
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_prior_calibration_config(tmp_path: Path, repair_root: Path, sampling_root: Path):
+    return parse_prior_calibration_config(
+        _tiny_prior_calibration_payload(tmp_path, repair_root, sampling_root),
+        base_dir=tmp_path,
+    )
+
+
+def _tiny_prior_calibration_payload(tmp_path: Path, repair_root: Path, sampling_root: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_latent_prior_calibration_v1",
+            "artifact_root": str(tmp_path / "prior_calibration_artifacts"),
+            "primary_variant": "pca64_beta001",
+            "min_decision_cells": 9,
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(repair_root),
+            "sampling_artifact_root": str(sampling_root),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2"],
+            "replicate_seeds": [17],
+        },
+        "generation": {
+            "synthetic_per_class_total": 128,
+        },
+        "prior_calibration": {
+            "primary_method": "cvae_cc_diag_gaussian_prior_sample",
+            "min_prior_fit_records_per_class": 8,
+            "variance_floor": 1.0e-4,
+            "variance_ddof": 0,
+            "shrinkage_alphas": [0.25, 0.5],
+            "standard_prior_repro_abs_tol_bacc": 1.0,
+            "full_cov_min_records_per_class": 32,
+            "full_cov_shrinkage_alpha": 0.1,
+            "full_cov_eigenvalue_floor": 1.0e-4,
+            "full_cov_fallback_if_singular": "diag",
         },
         "classifier": {
             "type": "sklearn_logistic_regression",

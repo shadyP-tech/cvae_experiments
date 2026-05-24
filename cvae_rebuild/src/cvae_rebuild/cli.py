@@ -8,6 +8,7 @@ from .pipeline import run_artifact_contract_smoke, run_real_cache_backed, run_sy
 from .preservation import load_preservation_config, run_preservation_diagnosis
 from .preservation_repair import load_repair_config, run_preservation_repair
 from .preservation_sampling import load_sampling_config, run_preservation_sampling
+from .prior_calibration import load_prior_calibration_config, run_prior_calibration
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -42,7 +43,19 @@ def main(argv: list[str] | None = None) -> int:
     sampling.add_argument("--config", required=True)
     sampling.add_argument("--artifact-root", default=None)
 
+    prior = sub.add_parser("diagnose-latent-prior-calibration", help="Run the Virchow2-CVAE latent prior calibration diagnostic.")
+    prior.add_argument("--config", required=True)
+    prior.add_argument("--artifact-root", default=None)
+
     args = parser.parse_args(argv)
+    if args.command == "diagnose-latent-prior-calibration":
+        cfg = load_prior_calibration_config(args.config)
+        root = run_prior_calibration(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
     if args.command == "diagnose-preservation-sampling":
         cfg = load_sampling_config(args.config)
         root = run_preservation_sampling(
