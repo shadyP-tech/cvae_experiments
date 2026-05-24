@@ -31,6 +31,13 @@ from cvae_rebuild.preservation_repair import (
     parse_repair_config,
     run_preservation_repair,
 )
+from cvae_rebuild.preservation_sampling import (
+    ROW_DECODE_MU as SAMPLING_ROW_DECODE_MU,
+    ROW_POSTERIOR as SAMPLING_ROW_POSTERIOR,
+    ROW_PRIOR as SAMPLING_ROW_PRIOR,
+    parse_sampling_config,
+    run_preservation_sampling,
+)
 from cvae_rebuild.splits import stratified_source_train_val_split
 
 
@@ -324,6 +331,93 @@ def test_preservation_repair_kl_warmup_reaches_beta_final(tmp_path: Path) -> Non
     assert _beta_for_epoch(variant, variant.kl_warmup_epochs + 10) == pytest.approx(variant.beta_final)
 
 
+def test_preservation_sampling_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    repair_cfg = _tiny_repair_config(tmp_path)
+    _write_tiny_cache(repair_cfg.feature_cache_root, seed=42)
+    repair_root = run_preservation_repair(repair_cfg)
+    sampling_cfg = _tiny_sampling_config(tmp_path, repair_root)
+
+    root = run_preservation_sampling(sampling_cfg)
+
+    expected = [
+        "tables/sampling_downstream_matrix.csv",
+        "tables/sampling_gap_summary.csv",
+        "tables/latent_distribution_diagnostics.csv",
+        "tables/source_pool_sampling_summary.csv",
+        "manifests/protocol_manifest.json",
+        "manifests/sampling_model_manifest.csv",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "sampling_downstream_matrix.csv", newline="")))
+    gaps = list(csv.DictReader(open(root / "tables" / "sampling_gap_summary.csv", newline="")))
+    manifest = list(csv.DictReader(open(root / "manifests" / "sampling_model_manifest.csv", newline="")))
+
+    assert leakage["status"] == "PASS"
+    assert any(row["row_role"] == SAMPLING_ROW_POSTERIOR and row["posterior_temperature"] == "1.0" for row in matrix)
+    assert any(row["row_role"] == SAMPLING_ROW_PRIOR and row["prior_scale"] == "1.0" for row in matrix)
+    assert any(row["row_role"] == "cvae_empirical_mu_sample_diagnostic" for row in matrix)
+    assert any(row["expert_pool_type"] == "source_union_excluding_target" for row in matrix)
+    assert gaps
+    assert manifest
+    assert all(row["variant_id"] in {"pca64_beta001", "source_union_pca64_beta001_diagnostic"} for row in matrix)
+
+
+def test_preservation_sampling_requires_frozen_repair_reference(tmp_path: Path) -> None:
+    repair_cfg = _tiny_repair_config(tmp_path)
+    _write_tiny_cache(repair_cfg.feature_cache_root, seed=42)
+    sampling_cfg = _tiny_sampling_config(tmp_path, tmp_path / "missing_repair")
+
+    root = run_preservation_sampling(sampling_cfg)
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+
+    assert leakage["status"] == "FAIL"
+    assert any("Missing frozen repair gap summary" in violation for violation in leakage["violations"])
+
+
+def test_preservation_sampling_source_hashes_and_budget_types(tmp_path: Path) -> None:
+    repair_cfg = _tiny_repair_config(tmp_path)
+    _write_tiny_cache(repair_cfg.feature_cache_root, seed=42)
+    repair_root = run_preservation_repair(repair_cfg)
+    sampling_cfg = _tiny_sampling_config(tmp_path, repair_root)
+
+    root = run_preservation_sampling(sampling_cfg)
+    matrix = list(csv.DictReader(open(root / "tables" / "sampling_downstream_matrix.csv", newline="")))
+    ok_rows = [row for row in matrix if row["status"] == "ok" and row["expert_pool_type"] == "per_source"]
+    grouped = {}
+    for row in ok_rows:
+        key = (row["experiment_seed"], row["heldout_center"], row["expert_id"], row["replicate_seed"])
+        grouped.setdefault(key, []).append(row)
+    assert grouped
+    first = next(rows for rows in grouped.values() if any(row["row_role"] == SAMPLING_ROW_PRIOR for row in rows))
+    by_role = {}
+    for row in first:
+        if row["row_role"] in {ROW_REAL_BUDGET, SAMPLING_ROW_DECODE_MU, SAMPLING_ROW_POSTERIOR, SAMPLING_ROW_PRIOR}:
+            by_role.setdefault(row["row_role"], []).append(row)
+
+    real_hash = by_role[ROW_REAL_BUDGET][0]["source_budget_index_hash"]
+    assert by_role[SAMPLING_ROW_DECODE_MU][0]["source_budget_index_hash"] == real_hash
+    assert next(row for row in by_role[SAMPLING_ROW_POSTERIOR] if row["posterior_temperature"] == "1.0")["source_budget_index_hash"] == real_hash
+    prior = next(row for row in by_role[SAMPLING_ROW_PRIOR] if row["prior_scale"] == "1.0")
+    assert prior["source_budget_index_hash"] == "NA"
+    assert prior["budget_match_type"] == "class_count_matched"
+    assert by_role[ROW_REAL_BUDGET][0]["budget_match_type"] == "source_record_matched"
+
+
+def test_preservation_sampling_config_rejects_noncanonical_values(tmp_path: Path) -> None:
+    repair_root = tmp_path / "repair"
+    payload = _tiny_sampling_payload(tmp_path, repair_root)
+    payload["sampling"]["prior_scales_primary"] = [0.5]
+
+    with pytest.raises(Exception, match="Primary prior scale"):
+        parse_sampling_config(payload, base_dir=tmp_path)
+
+
 def _tiny_config(tmp_path: Path):
     return parse_config(
         {
@@ -510,6 +604,49 @@ def _tiny_repair_config(tmp_path: Path):
         },
         base_dir=tmp_path,
     )
+
+
+def _tiny_sampling_config(tmp_path: Path, repair_root: Path):
+    return parse_sampling_config(_tiny_sampling_payload(tmp_path, repair_root), base_dir=tmp_path)
+
+
+def _tiny_sampling_payload(tmp_path: Path, repair_root: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_pca64_sampling_continuation_v1",
+            "artifact_root": str(tmp_path / "sampling_artifacts"),
+            "primary_variant": "pca64_beta001",
+            "min_decision_cells": 1,
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(repair_root),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2"],
+            "replicate_seeds": [17],
+        },
+        "generation": {
+            "synthetic_per_class_total": 128,
+        },
+        "sampling": {
+            "posterior_temperatures_primary": [1.0],
+            "posterior_temperatures_diagnostic": [0.25, 0.5],
+            "prior_scales_primary": [1.0],
+            "prior_scales_diagnostic": [0.25, 0.5],
+            "empirical_posterior_temperature": 1.0,
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
 
 
 def _write_tiny_cache(root: Path, *, seed: int, mono_test_centers: set[str] | None = None) -> None:

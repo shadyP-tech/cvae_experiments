@@ -7,6 +7,7 @@ from .config import load_config
 from .pipeline import run_artifact_contract_smoke, run_real_cache_backed, run_synthetic_smoke
 from .preservation import load_preservation_config, run_preservation_diagnosis
 from .preservation_repair import load_repair_config, run_preservation_repair
+from .preservation_sampling import load_sampling_config, run_preservation_sampling
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -37,7 +38,19 @@ def main(argv: list[str] | None = None) -> int:
     repair.add_argument("--config", required=True)
     repair.add_argument("--artifact-root", default=None)
 
+    sampling = sub.add_parser("diagnose-preservation-sampling", help="Run the Virchow2-CVAE PCA64 sampling continuation.")
+    sampling.add_argument("--config", required=True)
+    sampling.add_argument("--artifact-root", default=None)
+
     args = parser.parse_args(argv)
+    if args.command == "diagnose-preservation-sampling":
+        cfg = load_sampling_config(args.config)
+        root = run_preservation_sampling(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
     if args.command == "diagnose-preservation-repair":
         cfg = load_repair_config(args.config)
         root = run_preservation_repair(
