@@ -17,6 +17,10 @@ from cvae_rebuild.covariance_prior import (
     parse_covariance_prior_config,
     run_covariance_prior_confirmation,
 )
+from cvae_rebuild.covariance_viability import (
+    parse_covariance_viability_config,
+    run_covariance_prior_viability_audit,
+)
 from cvae_rebuild.generation import generate_reference_posterior
 from cvae_rebuild.models import ClassConditionedCVAE
 from cvae_rebuild.pipeline import run_real_cache_backed
@@ -612,6 +616,66 @@ def test_covariance_prior_formula_uses_aggregate_diag_and_deterministic_psd() ->
     assert health1 == health2
 
 
+def test_covariance_viability_audit_tiny_artifact_writes_expected_outputs(tmp_path: Path) -> None:
+    repair_cfg = _tiny_repair_config(tmp_path)
+    _write_tiny_cache(repair_cfg.feature_cache_root, seed=42)
+    repair_root = run_preservation_repair(repair_cfg)
+    sampling_cfg = _tiny_sampling_config(tmp_path, repair_root)
+    sampling_root = run_preservation_sampling(sampling_cfg)
+    prior_cfg = _tiny_prior_calibration_config(tmp_path, repair_root, sampling_root)
+    prior_root = run_prior_calibration(prior_cfg)
+    cov_cfg = _tiny_covariance_prior_config(tmp_path, repair_root, sampling_root, prior_root)
+    cov_root = run_covariance_prior_confirmation(cov_cfg)
+    cfg = _tiny_covariance_viability_config(tmp_path, cov_root)
+
+    root = run_covariance_prior_viability_audit(cfg)
+
+    expected = [
+        "tables/conditional_viability_cells.csv",
+        "tables/variant_real_stratum_summary.csv",
+        "tables/original_9_cell_failure_audit.csv",
+        "tables/center_seed_stability_summary.csv",
+        "tables/fallback_viability_audit.csv",
+        "tables/source_pool_viability_summary.csv",
+        "manifests/protocol_manifest.json",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    conditional = list(csv.DictReader(open(root / "tables" / "conditional_viability_cells.csv", newline="")))
+    strata = list(csv.DictReader(open(root / "tables" / "variant_real_stratum_summary.csv", newline="")))
+    original = list(csv.DictReader(open(root / "tables" / "original_9_cell_failure_audit.csv", newline="")))
+    summary = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert all(float(row["variant_real_budget_bacc"]) >= 0.80 for row in conditional)
+    assert any(row["variant_real_stratum"] == "selection_denominator" for row in strata)
+    assert original
+    assert "This audit does not replace the original 9-cell covariance-prior verdict." in summary
+    assert "does not evaluate routing" in summary
+
+
+def test_covariance_viability_config_rejects_wrong_imported_artifact_name(tmp_path: Path) -> None:
+    payload = _tiny_covariance_viability_payload(tmp_path, tmp_path / "wrong_artifact")
+
+    with pytest.raises(Exception, match="covariance_confirmation_artifact_root"):
+        parse_covariance_viability_config(payload, base_dir=tmp_path)
+
+
+def test_covariance_viability_missing_artifact_is_protocol_fail(tmp_path: Path) -> None:
+    cfg = _tiny_covariance_viability_config(tmp_path, tmp_path / "virchow2_cvae_covariance_prior_confirmation_v1")
+
+    root = run_covariance_prior_viability_audit(cfg)
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+
+    assert leakage["status"] == "FAIL"
+    assert any("Missing covariance confirmation artifact files" in violation for violation in leakage["violations"])
+
+
 def _tiny_config(tmp_path: Path):
     return parse_config(
         {
@@ -906,7 +970,7 @@ def _tiny_covariance_prior_payload(tmp_path: Path, repair_root: Path, sampling_r
     return {
         "experiment": {
             "name": "virchow2_cvae_covariance_prior_confirmation_v1",
-            "artifact_root": str(tmp_path / "covariance_prior_artifacts"),
+            "artifact_root": str(tmp_path / "virchow2_cvae_covariance_prior_confirmation_v1"),
             "primary_variant": "pca64_beta001",
             "min_decision_cells": 9,
         },
@@ -942,6 +1006,45 @@ def _tiny_covariance_prior_payload(tmp_path: Path, repair_root: Path, sampling_r
             "max_iter": 2000,
             "class_weight": "balanced",
             "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_covariance_viability_config(tmp_path: Path, covariance_root: Path):
+    return parse_covariance_viability_config(
+        _tiny_covariance_viability_payload(tmp_path, covariance_root),
+        base_dir=tmp_path,
+    )
+
+
+def _tiny_covariance_viability_payload(tmp_path: Path, covariance_root: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_covariance_prior_viability_audit_v1",
+            "artifact_root": str(tmp_path / "covariance_viability_artifacts"),
+        },
+        "inputs": {
+            "covariance_confirmation_artifact_root": str(covariance_root),
+        },
+        "viability_audit": {
+            "heldout_centers": ["0", "1", "2", "3", "4"],
+            "min_viable_cells": 30,
+            "min_viable_cells_per_center": 3,
+            "min_viable_seeds_per_center": 2,
+            "high_real_threshold": 0.80,
+            "viable_real_threshold": 0.75,
+            "borderline_real_threshold": 0.65,
+            "global_center_equal_mean_bacc_min": 0.85,
+            "mean_clipped_preservation_gap_max": 0.08,
+            "mean_preservation_ratio_min": 0.92,
+            "seed_std_max": 0.07,
+            "delta_bacc_vs_standard_prior_min": 0.05,
+            "delta_bacc_vs_diag_prior_min": 0.03,
+            "covariance_beats_diag_cell_fraction_min": 0.70,
+            "covariance_beats_diag_center_fraction_min": 0.75,
+            "worst_delta_vs_diag_prior_min": -0.05,
+            "min_cell_bacc_min": 0.60,
+            "min_center_mean_bacc_min": 0.75,
         },
     }
 
