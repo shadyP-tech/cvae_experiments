@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from .config import load_config
+from .covariance_prior import load_covariance_prior_config, run_covariance_prior_confirmation
 from .pipeline import run_artifact_contract_smoke, run_real_cache_backed, run_synthetic_smoke
 from .preservation import load_preservation_config, run_preservation_diagnosis
 from .preservation_repair import load_repair_config, run_preservation_repair
@@ -47,7 +48,22 @@ def main(argv: list[str] | None = None) -> int:
     prior.add_argument("--config", required=True)
     prior.add_argument("--artifact-root", default=None)
 
+    cov_prior = sub.add_parser(
+        "diagnose-covariance-prior-confirmation",
+        help="Run the Virchow2-CVAE covariance prior confirmation diagnostic.",
+    )
+    cov_prior.add_argument("--config", required=True)
+    cov_prior.add_argument("--artifact-root", default=None)
+
     args = parser.parse_args(argv)
+    if args.command == "diagnose-covariance-prior-confirmation":
+        cfg = load_covariance_prior_config(args.config)
+        root = run_covariance_prior_confirmation(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
     if args.command == "diagnose-latent-prior-calibration":
         cfg = load_prior_calibration_config(args.config)
         root = run_prior_calibration(

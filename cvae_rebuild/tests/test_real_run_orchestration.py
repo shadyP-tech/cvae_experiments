@@ -11,6 +11,12 @@ pytest.importorskip("sklearn")
 import numpy as np
 
 from cvae_rebuild.config import parse_config
+from cvae_rebuild.covariance_prior import (
+    PRIMARY_COVARIANCE_METHOD,
+    _stabilized_covariance_psd,
+    parse_covariance_prior_config,
+    run_covariance_prior_confirmation,
+)
 from cvae_rebuild.generation import generate_reference_posterior
 from cvae_rebuild.models import ClassConditionedCVAE
 from cvae_rebuild.pipeline import run_real_cache_backed
@@ -523,6 +529,89 @@ def test_prior_calibration_source_under_threshold_is_ineligible(tmp_path: Path) 
     assert any(row["status"] == "ineligible" and "insufficient_source_class_records" in row["error_message"] for row in matrix)
 
 
+def test_covariance_prior_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    repair_cfg = _tiny_repair_config(tmp_path)
+    _write_tiny_cache(repair_cfg.feature_cache_root, seed=42)
+    repair_root = run_preservation_repair(repair_cfg)
+    sampling_cfg = _tiny_sampling_config(tmp_path, repair_root)
+    sampling_root = run_preservation_sampling(sampling_cfg)
+    prior_cfg = _tiny_prior_calibration_config(tmp_path, repair_root, sampling_root)
+    prior_root = run_prior_calibration(prior_cfg)
+    cfg = _tiny_covariance_prior_config(tmp_path, repair_root, sampling_root, prior_root)
+
+    root = run_covariance_prior_confirmation(cfg)
+
+    expected = [
+        "tables/covariance_prior_downstream_matrix.csv",
+        "tables/covariance_prior_gap_summary.csv",
+        "tables/covariance_prior_parameter_manifest.csv",
+        "tables/covariance_fallback_audit.csv",
+        "tables/covariance_prior_low_stratum_audit.csv",
+        "tables/source_pool_covariance_prior_summary.csv",
+        "manifests/protocol_manifest.json",
+        "manifests/covariance_prior_model_manifest.csv",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "covariance_prior_downstream_matrix.csv", newline="")))
+    params = list(csv.DictReader(open(root / "tables" / "covariance_prior_parameter_manifest.csv", newline="")))
+    fallback = list(csv.DictReader(open(root / "tables" / "covariance_fallback_audit.csv", newline="")))
+    summary = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert any(row["prior_method"] == PRIMARY_COVARIANCE_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == "cvae_cc_diag_aggregate_prior_reference" for row in matrix)
+    assert any(row["prior_method"] == "cvae_standard_prior_sample_reference" for row in matrix)
+    assert any(row["expert_pool_type"] == "source_union_excluding_target" for row in matrix)
+    assert all(row["generated_features_hash"] for row in matrix if row["status"] == "ok")
+    assert all(row["prediction_hash"] for row in matrix if row["status"] == "ok")
+    assert all("trace_before_shrinkage" in row for row in params)
+    assert any(row["covariance_fallback_used"] == "True" for row in fallback)
+    assert "PASS does not unlock routing directly." in summary
+
+
+def test_covariance_prior_config_rejects_noncanonical_alpha(tmp_path: Path) -> None:
+    payload = _tiny_covariance_prior_payload(tmp_path, tmp_path / "repair", tmp_path / "sampling", tmp_path / "prior")
+    payload["covariance_prior"]["covariance_shrinkage_alpha"] = 0.2
+
+    with pytest.raises(Exception, match="covariance_shrinkage_alpha"):
+        parse_covariance_prior_config(payload, base_dir=tmp_path)
+
+
+def test_covariance_prior_requires_imported_references(tmp_path: Path) -> None:
+    repair_cfg = _tiny_repair_config(tmp_path)
+    _write_tiny_cache(repair_cfg.feature_cache_root, seed=42)
+    repair_root = run_preservation_repair(repair_cfg)
+    cfg = _tiny_covariance_prior_config(tmp_path, repair_root, tmp_path / "missing_sampling", tmp_path / "missing_prior")
+
+    root = run_covariance_prior_confirmation(cfg)
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+
+    assert leakage["status"] == "FAIL"
+    assert any("Missing sampling gap summary" in violation for violation in leakage["violations"])
+
+
+def test_covariance_prior_formula_uses_aggregate_diag_and_deterministic_psd() -> None:
+    mu = np.asarray([[1.0, 0.0], [3.0, 2.0], [5.0, 4.0]], dtype=float)
+    post_var = np.asarray([[0.5, 0.2], [0.7, 0.3], [0.9, 0.4]], dtype=float)
+    sigma_emp = np.cov(mu, rowvar=False, ddof=1) + np.diag(post_var.mean(axis=0))
+    sigma_diag = np.diag(np.diag(sigma_emp))
+
+    psd1, factor1, health1 = _stabilized_covariance_psd(sigma_emp, alpha=0.10, eigenvalue_floor=1.0e-4)
+    psd2, factor2, health2 = _stabilized_covariance_psd(sigma_emp, alpha=0.10, eigenvalue_floor=1.0e-4)
+
+    assert np.allclose(sigma_diag, np.diag(np.diag(np.cov(mu, rowvar=False, ddof=1) + np.diag(post_var.mean(axis=0)))))
+    assert np.allclose(psd1, psd2)
+    assert np.allclose(factor1, factor2)
+    assert np.linalg.eigvalsh(psd1).min() >= 1.0e-4 - 1.0e-10
+    assert health1 == health2
+
+
 def _tiny_config(tmp_path: Path):
     return parse_config(
         {
@@ -794,6 +883,57 @@ def _tiny_prior_calibration_payload(tmp_path: Path, repair_root: Path, sampling_
             "full_cov_shrinkage_alpha": 0.1,
             "full_cov_eigenvalue_floor": 1.0e-4,
             "full_cov_fallback_if_singular": "diag",
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_covariance_prior_config(tmp_path: Path, repair_root: Path, sampling_root: Path, prior_root: Path):
+    return parse_covariance_prior_config(
+        _tiny_covariance_prior_payload(tmp_path, repair_root, sampling_root, prior_root),
+        base_dir=tmp_path,
+    )
+
+
+def _tiny_covariance_prior_payload(tmp_path: Path, repair_root: Path, sampling_root: Path, prior_root: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_covariance_prior_confirmation_v1",
+            "artifact_root": str(tmp_path / "covariance_prior_artifacts"),
+            "primary_variant": "pca64_beta001",
+            "min_decision_cells": 9,
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(repair_root),
+            "sampling_artifact_root": str(sampling_root),
+            "prior_calibration_artifact_root": str(prior_root),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2"],
+            "replicate_seeds": [17],
+        },
+        "generation": {
+            "synthetic_per_class_total": 128,
+        },
+        "covariance_prior": {
+            "primary_method": "cvae_cc_cov_shrinkage_prior_sample",
+            "covariance_shrinkage_alpha": 0.10,
+            "covariance_eigenvalue_floor": 1.0e-4,
+            "full_cov_min_records_per_class": 32,
+            "fallback_if_under_ranked": "diag",
+            "standard_prior_repro_abs_tol_bacc": 1.0,
+            "diag_prior_repro_abs_tol_bacc": 1.0,
+            "full_cov_diagnostic_repro_abs_tol_bacc": 1.0,
         },
         "classifier": {
             "type": "sklearn_logistic_regression",
