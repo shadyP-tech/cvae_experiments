@@ -380,6 +380,26 @@ def test_preservation_sampling_requires_frozen_repair_reference(tmp_path: Path) 
     assert any("Missing frozen repair gap summary" in violation for violation in leakage["violations"])
 
 
+def test_preservation_sampling_mono_class_target_eval_is_ineligible_not_protocol_fail(tmp_path: Path) -> None:
+    repair_cfg = _tiny_repair_config(tmp_path)
+    _write_tiny_cache(repair_cfg.feature_cache_root, seed=42, mono_test_centers={"2"})
+    repair_root = run_preservation_repair(repair_cfg)
+    sampling_cfg = _tiny_sampling_config(tmp_path, repair_root)
+
+    root = run_preservation_sampling(sampling_cfg)
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "sampling_downstream_matrix.csv", newline="")))
+
+    invalid = [row for row in matrix if row["heldout_center"] == "2"]
+    valid = [row for row in matrix if row["heldout_center"] != "2"]
+
+    assert leakage["status"] == "PASS"
+    assert invalid
+    assert {row["status"] for row in invalid} == {"ineligible"}
+    assert {row["error_message"] for row in invalid} == {"mono_class_target_eval"}
+    assert any(row["status"] == "ok" for row in valid)
+
+
 def test_preservation_sampling_source_hashes_and_budget_types(tmp_path: Path) -> None:
     repair_cfg = _tiny_repair_config(tmp_path)
     _write_tiny_cache(repair_cfg.feature_cache_root, seed=42)

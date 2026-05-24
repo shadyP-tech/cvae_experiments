@@ -338,10 +338,11 @@ def _evaluate_runtime(
     error = eval_error or source_error
     eval_x = None if error else runtime.frame.transform(_to_numpy(eval_raw))
     for seed in cfg.replicate_seeds:
-        ref = _frozen_for_runtime(frozen, runtime, experiment_seed, heldout_center, int(seed))
         if error:
+            ref = _empty_frozen_reference()
             rows.extend(_ineligible_rows(cfg, runtime, experiment_seed, heldout_center, int(seed), ref, error, len(eval_labels)))
             continue
+        ref = _frozen_for_runtime(frozen, runtime, experiment_seed, heldout_center, int(seed))
         sample = _sample_source_positions(runtime, cfg.synthetic_per_class_total, int(seed))
         if ref.source_budget_index_hash and sample.source_budget_index_hash != ref.source_budget_index_hash:
             raise ProtocolError(
@@ -948,6 +949,15 @@ def _frozen_for_runtime(
     if ref is None:
         raise ProtocolError(f"Missing frozen repair reference for {key}.")
     return ref
+
+
+def _empty_frozen_reference() -> FrozenReference:
+    return FrozenReference(
+        reference_real_budget_bacc=math.nan,
+        variant_real_budget_bacc=math.nan,
+        source_utility_stratum_reference="",
+        source_budget_index_hash=NA,
+    )
 
 
 def _frozen_key(
