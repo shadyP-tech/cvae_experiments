@@ -94,6 +94,8 @@ class SourceData:
     val_labels: tuple[int, ...]
     train_sample_ids: tuple[str, ...]
     val_sample_ids: tuple[str, ...]
+    train_centers: tuple[str, ...]
+    val_centers: tuple[str, ...]
     source_scope: str
 
 
@@ -120,6 +122,7 @@ class VariantRuntime:
     source_train_labels: tuple[int, ...]
     source_val_labels: tuple[int, ...]
     source_train_sample_ids: tuple[str, ...]
+    source_train_centers: tuple[str, ...]
     source_scope: str
     n_train: int
     n_val: int
@@ -643,6 +646,7 @@ def _train_variant_runtime(
         source_train_labels=train_y,
         source_val_labels=val_y,
         source_train_sample_ids=source_data.train_sample_ids,
+        source_train_centers=source_data.train_centers,
         source_scope=source_data.source_scope,
         n_train=int(train_x.shape[0]),
         n_val=int(val_x.shape[0]),
@@ -903,6 +907,8 @@ def _source_data_for_centers(
     val_labels: list[int] = []
     train_ids: list[str] = []
     val_ids: list[str] = []
+    train_centers: list[str] = []
+    val_centers: list[str] = []
     for center in centers:
         split = stratified_source_train_val_split(
             train_cache.metadata,
@@ -917,6 +923,8 @@ def _source_data_for_centers(
         val_labels.extend(_label(row) for row in source_val_meta)
         train_ids.extend(str(v) for v in split.train_sample_ids)
         val_ids.extend(str(v) for v in split.val_sample_ids)
+        train_centers.extend(str(row.get("center", center)) for row in source_train_meta)
+        val_centers.extend(str(row.get("center", center)) for row in source_val_meta)
     return SourceData(
         raw_train=np.vstack(raw_train),
         raw_val=np.vstack(raw_val),
@@ -924,6 +932,8 @@ def _source_data_for_centers(
         val_labels=tuple(val_labels),
         train_sample_ids=tuple(train_ids),
         val_sample_ids=tuple(val_ids),
+        train_centers=tuple(train_centers),
+        val_centers=tuple(val_centers),
         source_scope="|".join(str(v) for v in centers),
     )
 

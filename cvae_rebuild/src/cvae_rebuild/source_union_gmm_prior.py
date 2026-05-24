@@ -1367,7 +1367,11 @@ def _gmm_adequacy_failed(rows: Sequence[Mapping[str, object]]) -> bool:
         if row.get("prior_method") == PRIMARY_GMM_METHOD
         and row.get("expert_pool_type") == POOL_SOURCE_UNION
     ]
-    return bool(primary) and any(row.get("status") != "ok" for row in primary)
+    return bool(primary) and any(
+        row.get("status") != "ok"
+        and row.get("error_message") != "mono_class_target_eval"
+        for row in primary
+    )
 
 
 def _replicate_averaged_union(rows: Sequence[Mapping[str, object]]) -> list[dict[str, object]]:

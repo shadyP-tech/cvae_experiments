@@ -12,6 +12,10 @@ from .preservation import load_preservation_config, run_preservation_diagnosis
 from .preservation_repair import load_repair_config, run_preservation_repair
 from .preservation_sampling import load_sampling_config, run_preservation_sampling
 from .prior_calibration import load_prior_calibration_config, run_prior_calibration
+from .source_union_balanced_gmm_prior import (
+    load_source_union_balanced_gmm_prior_config,
+    run_source_union_balanced_gmm_prior,
+)
 from .source_union_gmm_prior import load_source_union_gmm_prior_config, run_source_union_gmm_prior
 
 
@@ -79,7 +83,22 @@ def main(argv: list[str] | None = None) -> int:
     source_union_gmm.add_argument("--config", required=True)
     source_union_gmm.add_argument("--artifact-root", default=None)
 
+    source_union_balanced_gmm = sub.add_parser(
+        "diagnose-source-union-balanced-gmm-prior",
+        help="Run the Virchow2-CVAE source-union center-balanced GMM prior diagnostic.",
+    )
+    source_union_balanced_gmm.add_argument("--config", required=True)
+    source_union_balanced_gmm.add_argument("--artifact-root", default=None)
+
     args = parser.parse_args(argv)
+    if args.command == "diagnose-source-union-balanced-gmm-prior":
+        cfg = load_source_union_balanced_gmm_prior_config(args.config)
+        root = run_source_union_balanced_gmm_prior(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
     if args.command == "diagnose-source-union-gmm-prior":
         cfg = load_source_union_gmm_prior_config(args.config)
         root = run_source_union_gmm_prior(

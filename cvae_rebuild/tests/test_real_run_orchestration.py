@@ -63,6 +63,11 @@ from cvae_rebuild.source_union_gmm_prior import (
     parse_source_union_gmm_prior_config,
     run_source_union_gmm_prior,
 )
+from cvae_rebuild.source_union_balanced_gmm_prior import (
+    PRIMARY_BALANCED_METHOD,
+    parse_source_union_balanced_gmm_prior_config,
+    run_source_union_balanced_gmm_prior,
+)
 from cvae_rebuild.splits import stratified_source_train_val_split
 
 
@@ -907,6 +912,119 @@ def test_source_union_gmm_prior_marks_collapsed_fit_ineligible(tmp_path: Path) -
     assert summary[0]["primary_verdict"] == "GMM_FIT_INELIGIBLE"
 
 
+def test_source_union_gmm_prior_mono_class_target_eval_is_not_fit_ineligible(tmp_path: Path) -> None:
+    repair_cfg = _tiny_repair_config(tmp_path)
+    _write_tiny_cache(repair_cfg.feature_cache_root, seed=42, mono_test_centers={"1"})
+    repair_root = run_preservation_repair(repair_cfg)
+    sampling_cfg = _tiny_sampling_config(tmp_path, repair_root)
+    sampling_root = run_preservation_sampling(sampling_cfg)
+    prior_cfg = _tiny_prior_calibration_config(tmp_path, repair_root, sampling_root)
+    prior_root = run_prior_calibration(prior_cfg)
+    cov_cfg = _tiny_covariance_prior_config(tmp_path, repair_root, sampling_root, prior_root)
+    cov_root = run_covariance_prior_confirmation(cov_cfg)
+    cfg = _tiny_source_union_gmm_config(tmp_path, repair_root, sampling_root, prior_root, cov_root)
+
+    root = run_source_union_gmm_prior(cfg)
+    summary = list(csv.DictReader(open(root / "tables" / "source_union_gmm_summary.csv", newline="")))
+    matrix = list(csv.DictReader(open(root / "tables" / "gmm_prior_downstream_matrix.csv", newline="")))
+
+    assert summary[0]["primary_verdict"] != "GMM_FIT_INELIGIBLE"
+    assert any(
+        row["prior_method"] == PRIMARY_GMM_METHOD
+        and row["heldout_center"] == "1"
+        and row["status"] == "ineligible"
+        and row["error_message"] == "mono_class_target_eval"
+        for row in matrix
+    )
+
+
+def test_source_union_balanced_gmm_prior_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    repair_cfg = _tiny_repair_config(tmp_path)
+    _write_tiny_cache(repair_cfg.feature_cache_root, seed=42)
+    repair_root = run_preservation_repair(repair_cfg)
+    sampling_cfg = _tiny_sampling_config(tmp_path, repair_root)
+    sampling_root = run_preservation_sampling(sampling_cfg)
+    prior_cfg = _tiny_prior_calibration_config(tmp_path, repair_root, sampling_root)
+    prior_root = run_prior_calibration(prior_cfg)
+    cov_cfg = _tiny_covariance_prior_config(tmp_path, repair_root, sampling_root, prior_root)
+    cov_root = run_covariance_prior_confirmation(cov_cfg)
+    source_union_gmm_cfg = _tiny_source_union_gmm_config(tmp_path, repair_root, sampling_root, prior_root, cov_root)
+    source_union_gmm_root = run_source_union_gmm_prior(source_union_gmm_cfg)
+    cfg = _tiny_source_union_balanced_gmm_config(
+        tmp_path,
+        repair_root,
+        sampling_root,
+        prior_root,
+        cov_root,
+        source_union_gmm_root,
+    )
+
+    root = run_source_union_balanced_gmm_prior(cfg)
+
+    expected = [
+        "tables/balanced_gmm_downstream_matrix.csv",
+        "tables/balanced_gmm_gap_summary.csv",
+        "tables/source_union_balanced_gmm_summary.csv",
+        "tables/source_center_balance_audit.csv",
+        "tables/gmm_component_diagnostics.csv",
+        "tables/generated_component_coverage_audit.csv",
+        "tables/weak_cell_audit.csv",
+        "tables/nearest_neighbor_memorization_audit.csv",
+        "tables/negative_control_summary.csv",
+        "tables/per_source_balanced_gmm_diagnostic_summary.csv",
+        "manifests/protocol_manifest.json",
+        "manifests/balanced_gmm_prior_model_manifest.csv",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "balanced_gmm_downstream_matrix.csv", newline="")))
+    balance = list(csv.DictReader(open(root / "tables" / "source_center_balance_audit.csv", newline="")))
+    coverage = list(csv.DictReader(open(root / "tables" / "generated_component_coverage_audit.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "source_union_balanced_gmm_summary.csv", newline="")))
+    nn = list(csv.DictReader(open(root / "tables" / "nearest_neighbor_memorization_audit.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert any(row["prior_method"] == PRIMARY_BALANCED_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == "source_union_center_balanced_cc_diag_gmm_k16_shuffled_label_control_diagnostic" for row in matrix)
+    assert any(row["prior_method"] == "per_source_center_balanced_cc_diag_gmm_k16_prior_sample_diagnostic" for row in matrix)
+    assert all(
+        row["heldout_center"] != row["source_center"]
+        for row in balance
+        if row["expert_pool_type"] == "source_union_excluding_target"
+    )
+    assert any(row["source_center_balance_strategy"] == "center_balanced" for row in matrix)
+    assert all(row["generated_features_hash"] for row in matrix if row["status"] == "ok" and row["prior_method"] != "source_union_cc_diag_gmm_k16_prior_sample_reference")
+    assert all(row["prediction_hash"] for row in matrix if row["status"] == "ok" and row["prior_method"] != "source_union_cc_diag_gmm_k16_prior_sample_reference")
+    assert coverage
+    assert "paired_delta_vs_vanilla_k16_ci95" in summary[0]
+    assert nn and {row["audit_interpretation"] for row in nn} == {"memorization_proximity_audit_only_not_formal_privacy"}
+    assert "It does not evaluate metadata routing." in report
+    assert "It does not evaluate support-NELBO routing." in report
+    assert "It does not evaluate decentralized per-source expert selection." in report
+    assert "It does not provide formal differential privacy." in report
+
+
+def test_source_union_balanced_gmm_prior_config_rejects_noncanonical_primary(tmp_path: Path) -> None:
+    payload = _tiny_source_union_balanced_gmm_payload(
+        tmp_path,
+        tmp_path / "repair",
+        tmp_path / "sampling",
+        tmp_path / "prior",
+        tmp_path / "virchow2_cvae_covariance_prior_confirmation_v1",
+        tmp_path / "virchow2_cvae_source_union_gmm_prior_v1",
+    )
+    payload["balanced_gmm_prior"]["primary_method"] = "source_union_center_balanced_cc_diag_gmm_k8_prior_sample_diagnostic"
+
+    with pytest.raises(Exception, match="primary_method"):
+        parse_source_union_balanced_gmm_prior_config(payload, base_dir=tmp_path)
+
+
 def _tiny_config(tmp_path: Path):
     return parse_config(
         {
@@ -1405,6 +1523,85 @@ def _tiny_source_union_gmm_payload(
             "posterior_noise_scale": 0.0,
             "diagnostic_gmm_components": [4, 16],
             "diagnostic_posterior_noise_scales": [0.25],
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_source_union_balanced_gmm_config(
+    tmp_path: Path,
+    repair_root: Path,
+    sampling_root: Path,
+    prior_root: Path,
+    covariance_root: Path,
+    source_union_gmm_root: Path,
+):
+    return parse_source_union_balanced_gmm_prior_config(
+        _tiny_source_union_balanced_gmm_payload(
+            tmp_path,
+            repair_root,
+            sampling_root,
+            prior_root,
+            covariance_root,
+            source_union_gmm_root,
+        ),
+        base_dir=tmp_path,
+    )
+
+
+def _tiny_source_union_balanced_gmm_payload(
+    tmp_path: Path,
+    repair_root: Path,
+    sampling_root: Path,
+    prior_root: Path,
+    covariance_root: Path,
+    source_union_gmm_root: Path,
+):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_source_union_center_balanced_gmm_prior_v1",
+            "artifact_root": str(tmp_path / "virchow2_cvae_source_union_center_balanced_gmm_prior_v1"),
+            "primary_variant": "source_union_pca64_beta001_diagnostic",
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(repair_root),
+            "sampling_artifact_root": str(sampling_root),
+            "prior_calibration_artifact_root": str(prior_root),
+            "covariance_confirmation_artifact_root": str(covariance_root),
+            "source_union_gmm_artifact_root": str(source_union_gmm_root),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2"],
+            "replicate_seeds": [17],
+        },
+        "generation": {
+            "synthetic_per_class_total": 128,
+        },
+        "balanced_gmm_prior": {
+            "primary_method": "source_union_center_balanced_cc_diag_gmm_k16_prior_sample",
+            "gmm_components": 16,
+            "gmm_covariance_type": "diag",
+            "gmm_reg_covar": 1.0e-4,
+            "gmm_n_init": 2,
+            "gmm_max_iter": 200,
+            "gmm_weight_floor": 0.005,
+            "min_source_center_class_count": 8,
+            "min_effective_gmm_components": 1,
+            "balanced_fit_samples_per_center_class": 8,
+            "max_center_class_replacement_rate": 1.0,
+            "mean_center_class_replacement_rate": 1.0,
+            "posterior_noise_scale": 0.0,
+            "diagnostic_gmm_components": [8, 24],
         },
         "classifier": {
             "type": "sklearn_logistic_regression",

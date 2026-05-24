@@ -1,0 +1,45 @@
+experiment:
+  name: virchow2_cvae_source_union_center_balanced_gmm_prior_v1
+  artifact_root: cvae_rebuild/artifacts/virchow2_cvae_source_union_center_balanced_gmm_prior_v1
+  primary_variant: source_union_pca64_beta001_diagnostic
+
+inputs:
+  feature_cache_root: cvae_rebuild/artifacts/feature_cache/virchow2
+  repair_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_preservation_repair_v1
+  sampling_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_pca64_sampling_continuation_v1
+  prior_calibration_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_latent_prior_calibration_v1
+  covariance_confirmation_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_covariance_prior_confirmation_v1
+  source_union_gmm_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_source_union_gmm_prior_v1
+  backbone: virchow2
+
+run_matrix:
+  experiment_seeds: [42, 43, 44]
+  heldout_centers: ["0", "1", "2", "3", "4"]
+  replicate_seeds: [17, 23, 31]
+
+generation:
+  synthetic_per_class_total: 128
+
+balanced_gmm_prior:
+  primary_method: source_union_center_balanced_cc_diag_gmm_k16_prior_sample
+  gmm_components: 16
+  gmm_covariance_type: diag
+  gmm_reg_covar: 1.0e-4
+  gmm_n_init: 5
+  gmm_max_iter: 500
+  gmm_weight_floor: 0.005
+  min_source_center_class_count: 32
+  min_effective_gmm_components: 8
+  balanced_fit_samples_per_center_class: 128
+  max_center_class_replacement_rate: 0.50
+  mean_center_class_replacement_rate: 0.25
+  posterior_noise_scale: 0.0
+  diagnostic_gmm_components: [8, 24]
+
+classifier:
+  type: sklearn_logistic_regression
+  solver: lbfgs
+  C: 1.0
+  max_iter: 2000
+  class_weight: balanced
+  classifier_seed: null
