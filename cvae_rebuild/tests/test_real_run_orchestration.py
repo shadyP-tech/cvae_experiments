@@ -731,6 +731,49 @@ def test_covariance_shrinkage_tiny_cache_writes_expected_artifacts(tmp_path: Pat
     assert "does not evaluate routing" in summary
 
 
+def test_covariance_shrinkage_alpha010_reference_uses_covariance_confirmation(tmp_path: Path) -> None:
+    repair_cfg = _tiny_repair_config(tmp_path)
+    _write_tiny_cache(repair_cfg.feature_cache_root, seed=42)
+    repair_root = run_preservation_repair(repair_cfg)
+    sampling_cfg = _tiny_sampling_config(tmp_path, repair_root)
+    sampling_root = run_preservation_sampling(sampling_cfg)
+    prior_cfg = _tiny_prior_calibration_config(tmp_path, repair_root, sampling_root)
+    prior_root = run_prior_calibration(prior_cfg)
+    cov_cfg = _tiny_covariance_prior_config(tmp_path, repair_root, sampling_root, prior_root)
+    cov_root = run_covariance_prior_confirmation(cov_cfg)
+    viability_cfg = _tiny_covariance_viability_config(tmp_path, cov_root)
+    viability_root = run_covariance_prior_viability_audit(viability_cfg)
+
+    prior_gap_path = prior_root / "tables" / "calibrated_prior_gap_summary.csv"
+    prior_rows = list(csv.DictReader(open(prior_gap_path, newline="")))
+    fieldnames = list(prior_rows[0])
+    for row in prior_rows:
+        if row["row_role"] == "cvae_cc_full_cov_gaussian_prior_sample_diagnostic":
+            row["calibrated_prior_bacc"] = "0.0"
+            row["total_calibrated_prior_cvae_gap"] = "999.0"
+    with prior_gap_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(prior_rows)
+
+    payload = _tiny_covariance_shrinkage_payload(tmp_path, repair_root, sampling_root, prior_root, cov_root, viability_root)
+    payload["covariance_shrinkage"]["alpha010_repro_abs_tol_bacc"] = 1.0e-6
+    cfg = parse_covariance_shrinkage_config(payload, base_dir=tmp_path)
+
+    root = run_covariance_shrinkage_stability(cfg)
+
+    matrix = list(csv.DictReader(open(root / "tables" / "shrinkage_prior_downstream_matrix.csv", newline="")))
+    alpha010_rows = [
+        row
+        for row in matrix
+        if row["row_role"] == "cvae_cc_cov_shrinkage010_prior_reference" and row["status"] == "ok"
+    ]
+
+    assert alpha010_rows
+    assert any(float(row["imported_full_cov_diagnostic_bacc"]) != 0.0 for row in alpha010_rows)
+    assert all(abs(float(row["bacc"]) - float(row["imported_full_cov_diagnostic_bacc"])) <= 1.0e-6 for row in alpha010_rows)
+
+
 def test_covariance_shrinkage_config_rejects_noncanonical_primary_alpha(tmp_path: Path) -> None:
     payload = _tiny_covariance_shrinkage_payload(
         tmp_path,

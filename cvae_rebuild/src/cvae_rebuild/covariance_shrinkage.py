@@ -63,6 +63,7 @@ ROW_SHRINKAGE075 = PRIMARY_SHRINKAGE_METHOD
 ROW_SHRINKAGE050 = "cvae_cc_cov_diag_shrinkage050_prior_sample_diagnostic"
 ROW_SHRINKAGE090 = "cvae_cc_cov_diag_shrinkage090_prior_sample_diagnostic"
 ROW_ALPHA010_REFERENCE = "cvae_cc_cov_shrinkage010_prior_reference"
+ROW_COVARIANCE_CONFIRMATION_PRIOR = "cvae_cc_cov_shrinkage_prior_sample"
 ROW_DIAG_REFERENCE = "cvae_cc_diag_aggregate_prior_reference"
 ROW_ROLES = (
     ROW_STANDARD_PRIOR,
@@ -915,28 +916,36 @@ def _covariance_health(
 def _load_imported_references(cfg: CovarianceShrinkageConfig) -> tuple[dict[tuple[object, ...], ImportedReference], str]:
     sampling = _load_sampling_baselines(cfg)
     prior_rows = _load_prior_calibration_baselines(cfg)
+    covariance_rows = _load_covariance_confirmation_baselines(cfg)
     decision_hashes = {ref["decision_cell_set_hash"] for ref in sampling.values()}
     prior_hashes = {row["decision_cell_set_hash"] for row in prior_rows.values()}
-    if len(decision_hashes) != 1 or len(prior_hashes) != 1 or decision_hashes != prior_hashes:
-        raise ProtocolError("Decision-cell hash mismatch between sampling and prior-calibration artifacts.")
+    covariance_hashes = {row["decision_cell_set_hash"] for row in covariance_rows.values()}
+    if (
+        len(decision_hashes) != 1
+        or len(prior_hashes) != 1
+        or len(covariance_hashes) != 1
+        or decision_hashes != prior_hashes
+        or decision_hashes != covariance_hashes
+    ):
+        raise ProtocolError("Decision-cell hash mismatch between sampling, prior-calibration, and covariance-confirmation artifacts.")
     decision_hash = next(iter(decision_hashes))
     out = {}
     for key, ref in sampling.items():
         diag_role = ROW_UNION_DIAG_PRIOR if key[3] == POOL_SOURCE_UNION else ROW_DIAG_PRIOR
         diag = prior_rows.get((key, diag_role))
-        full = prior_rows.get((key, ROW_FULL_COV_PRIOR))
+        full = covariance_rows.get(key)
         if diag is None or full is None:
-            raise ProtocolError(f"Missing imported diagonal/full-cov prior calibration reference for {key}.")
+            raise ProtocolError(f"Missing imported diagonal prior or alpha010 covariance-confirmation reference for {key}.")
         out[key] = ImportedReference(
             reference_real_budget_bacc=float(ref["reference_real_budget_bacc"]),
             variant_real_budget_bacc=float(ref["variant_real_budget_bacc"]),
             source_utility_stratum_reference=str(ref["source_utility_stratum_reference"]),
             imported_standard_prior_bacc=float(ref["imported_standard_prior_bacc"]),
             imported_diag_prior_bacc=float(diag["calibrated_prior_bacc"]),
-            imported_full_cov_diagnostic_bacc=float(full["calibrated_prior_bacc"]),
+            imported_full_cov_diagnostic_bacc=float(full["bacc"]),
             imported_total_prior_cvae_gap=float(ref["imported_total_prior_cvae_gap"]),
             imported_diag_prior_gap=float(diag["total_calibrated_prior_cvae_gap"]),
-            imported_full_cov_diagnostic_gap=float(full["total_calibrated_prior_cvae_gap"]),
+            imported_full_cov_diagnostic_gap=float(full["total_covariance_prior_gap"]),
             source_budget_index_hash=str(ref["source_budget_index_hash"]),
             decision_cell_id=str(ref["decision_cell_id"]),
             decision_cell_set_hash=decision_hash,
@@ -1078,6 +1087,50 @@ def _load_prior_calibration_baselines(cfg: CovarianceShrinkageConfig) -> dict[tu
                 row["replicate_seed"],
             )
             out[(key, str(row["row_role"]))] = dict(row)
+    return out
+
+
+def _load_covariance_confirmation_baselines(cfg: CovarianceShrinkageConfig) -> dict[tuple[object, ...], dict[str, object]]:
+    path = cfg.covariance_confirmation_artifact_root / "tables" / "covariance_prior_gap_summary.csv"
+    if not path.exists():
+        raise ProtocolError(f"Missing covariance prior gap summary: {path}")
+    required = {
+        "experiment_seed",
+        "heldout_center",
+        "expert_id",
+        "expert_pool_type",
+        "variant_id",
+        "replicate_seed",
+        "row_role",
+        "decision_cell_set_hash",
+        "bacc",
+        "total_covariance_prior_gap",
+        "status",
+    }
+    out: dict[tuple[object, ...], dict[str, object]] = {}
+    with path.open(newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        missing = required.difference(reader.fieldnames or ())
+        if missing:
+            raise ProtocolError(f"Covariance prior gap summary is missing fields: {sorted(missing)}")
+        for row in reader:
+            if row.get("status") != "ok":
+                continue
+            if row.get("variant_id") not in {PRIMARY_VARIANT, UNION_VARIANT}:
+                continue
+            if row.get("row_role") != ROW_COVARIANCE_CONFIRMATION_PRIOR:
+                continue
+            key = _reference_key(
+                row["experiment_seed"],
+                row["heldout_center"],
+                row["expert_id"],
+                row["expert_pool_type"],
+                row["variant_id"],
+                row["replicate_seed"],
+            )
+            out[key] = dict(row)
+    if not out:
+        raise ProtocolError("Covariance prior confirmation artifact did not contain alpha010 reference rows.")
     return out
 
 
