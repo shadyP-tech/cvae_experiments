@@ -31,7 +31,7 @@ k24_gmm_prior:
   gmm_weight_floor: 0.005
   min_class_train_count: 240
   min_effective_gmm_components: 12
-  min_train_count_per_effective_component: 20
+  min_train_count_per_effective_component: 12
   posterior_noise_scale: 0.0
   diagnostic_gmm_components: [20, 32]
   budget256_synthetic_per_class_total: 256
