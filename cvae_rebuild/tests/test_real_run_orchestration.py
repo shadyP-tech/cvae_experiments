@@ -46,6 +46,11 @@ from cvae_rebuild.decentralized_reliability_top3_gmm_prior import (
     parse_decentralized_reliability_top3_gmm_prior_config,
     run_decentralized_reliability_top3_gmm_prior,
 )
+from cvae_rebuild.decentralized_source_inner_transfer_top3_gmm_prior import (
+    PRIMARY_SOURCE_INNER_TRANSFER_METHOD,
+    parse_decentralized_source_inner_transfer_top3_gmm_prior_config,
+    run_decentralized_source_inner_transfer_top3_gmm_prior,
+)
 from cvae_rebuild.decentralized_support_nelbo_reliability_gmm_prior import (
     PRIMARY_SUPPORT_RELIABILITY_METHOD,
     parse_decentralized_support_nelbo_reliability_gmm_prior_config,
@@ -1400,6 +1405,85 @@ def test_decentralized_reliability_top3_gmm_prior_rejects_invalid_top_k(tmp_path
         parse_decentralized_reliability_top3_gmm_prior_config(payload, base_dir=tmp_path)
 
 
+def test_decentralized_source_inner_transfer_top3_gmm_prior_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_decentralized_source_inner_transfer_top3_gmm_payload(tmp_path)
+    cfg = parse_decentralized_source_inner_transfer_top3_gmm_prior_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_decentralized_source_inner_transfer_top3_gmm_prior(cfg)
+
+    expected = [
+        "tables/decentralized_source_inner_transfer_downstream_matrix.csv",
+        "tables/decentralized_source_inner_transfer_gap_summary.csv",
+        "tables/decentralized_source_inner_transfer_summary.csv",
+        "tables/source_inner_transfer_matrix.csv",
+        "tables/source_inner_subset_score_manifest.csv",
+        "tables/source_inner_top3_selection_manifest.csv",
+        "tables/source_drop_frequency_summary.csv",
+        "tables/drop_one_subset_target_utility_matrix.csv",
+        "tables/centerwise_delta_summary.csv",
+        "tables/late_aggregation_matrix.csv",
+        "tables/real_feature_reference_matrix.csv",
+        "tables/generated_component_coverage_audit.csv",
+        "tables/weak_source_audit.csv",
+        "tables/nearest_neighbor_memorization_audit.csv",
+        "tables/negative_control_summary.csv",
+        "manifests/protocol_manifest.json",
+        "manifests/decentralized_source_inner_transfer_prior_model_manifest.csv",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "decentralized_source_inner_transfer_downstream_matrix.csv", newline="")))
+    transfer = list(csv.DictReader(open(root / "tables" / "source_inner_transfer_matrix.csv", newline="")))
+    subsets = list(csv.DictReader(open(root / "tables" / "source_inner_subset_score_manifest.csv", newline="")))
+    selections = list(csv.DictReader(open(root / "tables" / "source_inner_top3_selection_manifest.csv", newline="")))
+    drops = list(csv.DictReader(open(root / "tables" / "source_drop_frequency_summary.csv", newline="")))
+    target_subsets = list(csv.DictReader(open(root / "tables" / "drop_one_subset_target_utility_matrix.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "decentralized_source_inner_transfer_summary.csv", newline="")))
+    negative = list(csv.DictReader(open(root / "tables" / "negative_control_summary.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert protocol["heldout_target_rows_used_for_source_inner_scoring"] is False
+    assert protocol["source_inner_uses_non_target_source_eval_rows"] is True
+    assert any(row["prior_method"] == PRIMARY_SOURCE_INNER_TRANSFER_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_equal_all4_geom_reference" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_reliability_top3_geom_reference" for row in matrix)
+    assert any(row["prior_method"] == "exhaustive_drop_one_top3_mean_reference" for row in matrix)
+    assert any(row["prior_method"] == "exhaustive_drop_one_top3_oracle_reference" for row in matrix)
+    assert transfer and all(row["source_expert"] != row["pseudo_target_source"] for row in transfer)
+    assert subsets and all(row["heldout_center"] not in row["selected_sources"].split("|") for row in subsets)
+    assert selections and all(row["heldout_center"] not in row["selected_sources"].split("|") for row in selections)
+    assert drops and {"dropped_source_target_utility_rank", "dropped_source_source_inner_score_rank"} <= set(drops[0])
+    assert target_subsets and len([row for row in target_subsets if row["heldout_center"] == "0"]) == 4
+    assert "seed_equal_mean_bacc" in summary[0]
+    assert "replicate_row_mean_bacc" in summary[0]
+    assert "shuffled_score_control_gap" in negative[0]
+    assert "Top-3 over four candidates is drop-one source selection" in report
+
+
+def test_decentralized_source_inner_transfer_top3_rejects_support_usage(tmp_path: Path) -> None:
+    payload = _tiny_decentralized_source_inner_transfer_top3_gmm_payload(tmp_path)
+    payload["run_matrix"]["support_size"] = 8
+
+    with pytest.raises(Exception, match="must not configure or consume target support"):
+        parse_decentralized_source_inner_transfer_top3_gmm_prior_config(payload, base_dir=tmp_path)
+
+
+def test_decentralized_source_inner_transfer_top3_rejects_invalid_top_k(tmp_path: Path) -> None:
+    payload = _tiny_decentralized_source_inner_transfer_top3_gmm_payload(tmp_path)
+    payload["generation"]["top_k_sources"] = 2
+
+    with pytest.raises(Exception, match="top_k_sources must be locked to 3"):
+        parse_decentralized_source_inner_transfer_top3_gmm_prior_config(payload, base_dir=tmp_path)
+
+
 def test_decentralized_support_nelbo_reliability_gmm_prior_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
     payload = _tiny_decentralized_support_nelbo_reliability_gmm_payload(tmp_path)
     cfg = parse_decentralized_support_nelbo_reliability_gmm_prior_config(payload, base_dir=tmp_path)
@@ -2475,6 +2559,53 @@ def _tiny_decentralized_reliability_top3_gmm_payload(tmp_path: Path):
             "candidate_components_per_source_class": [4, 3, 2, 1],
             "min_samples_per_component": 12,
             "source_weighting": "source_local_reliability_top3",
+            "gmm_covariance_type": "diag",
+            "gmm_reg_covar": 1.0e-4,
+            "gmm_n_init": 1,
+            "gmm_max_iter": 100,
+            "min_component_weight": 0.001,
+            "variance_floor": 1.0e-5,
+            "primary_pooling": "geometric",
+            "reliability_floor_score": 0.05,
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_decentralized_source_inner_transfer_top3_gmm_payload(tmp_path: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_decentralized_source_inner_transfer_top3_gmm_prior_v1",
+            "artifact_root": str(tmp_path / "virchow2_cvae_decentralized_source_inner_transfer_top3_gmm_prior_v1"),
+            "primary_variant": "pca64_beta001",
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2", "3", "4"],
+            "replicate_seeds": [17],
+        },
+        "generation": {
+            "synthetic_per_class_total": 128,
+            "min_per_source_per_class": 8,
+            "top_k_sources": 3,
+        },
+        "source_inner_transfer_top3_gmm_prior": {
+            "primary_method": "decentralized_source_inner_transfer_top3_geom_confirmation",
+            "candidate_components_per_source_class": [4, 3, 2, 1],
+            "min_samples_per_component": 12,
+            "source_weighting": "source_inner_transfer_top3",
             "gmm_covariance_type": "diag",
             "gmm_reg_covar": 1.0e-4,
             "gmm_n_init": 1,

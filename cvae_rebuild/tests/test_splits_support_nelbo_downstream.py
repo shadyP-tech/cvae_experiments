@@ -11,6 +11,11 @@ from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import SourceReli
 from cvae_rebuild.decentralized_support_nelbo_reliability_gmm_prior import _combined_weight_plan, _strongest_control
 from cvae_rebuild.decentralized_support8_top3_tau05_gmm_prior import _topk_existing_plan
 from cvae_rebuild.decentralized_reliability_top3_gmm_prior import _select_topk_reliable
+from cvae_rebuild.decentralized_source_inner_transfer_top3_gmm_prior import (
+    SubsetScore,
+    _best_subset,
+    _method_stats,
+)
 from cvae_rebuild.protocol import ProtocolError
 from cvae_rebuild.splits import candidate_experts, random_unlabeled_support_eval_split
 from cvae_rebuild.support_nelbo import (
@@ -182,3 +187,30 @@ def test_reliability_top3_selection_uses_raw_bacc_and_source_tie_breaks() -> Non
         "4": SourceReliability(42, 17, "4", 0.75, 0.75, 0.6, "ok", "", 20, "", ""),
     }
     assert _select_topk_reliable(("1", "2", "3", "4"), rels, k=3) == ("2", "1", "4")
+
+
+def test_source_inner_subset_selection_uses_lexicographic_tie_breaks() -> None:
+    rows = [
+        SubsetScore(42, "0", 17, ("1", "2", "3"), "4", 3, 0.80, 0.90, 0.70, 4),
+        SubsetScore(42, "0", 17, ("1", "2", "4"), "3", 3, 0.80, 0.91, 0.60, 4),
+        SubsetScore(42, "0", 17, ("1", "3", "4"), "2", 3, 0.79, 0.99, 0.99, 4),
+    ]
+    assert _best_subset(rows).subset_sources == ("1", "2", "4")
+    tied = [
+        SubsetScore(42, "0", 17, ("1", "2", "3"), "4", 3, 0.80, 0.90, 0.70, 4),
+        SubsetScore(42, "0", 17, ("1", "2", "4"), "3", 3, 0.80, 0.90, 0.70, 4),
+    ]
+    assert _best_subset(tied).dropped_source == "3"
+
+
+def test_source_inner_stats_names_are_not_seed_equal_misnamed() -> None:
+    rows = [
+        {"status": "ok", "experiment_seed": "1", "heldout_center": "A", "bacc": 0.0, "macro_f1": 0.0},
+        {"status": "ok", "experiment_seed": "1", "heldout_center": "B", "bacc": 1.0, "macro_f1": 1.0},
+        {"status": "ok", "experiment_seed": "2", "heldout_center": "A", "bacc": 0.0, "macro_f1": 0.0},
+    ]
+    stats = _method_stats(rows)
+    assert stats["center_equal_mean_bacc"] == 0.5
+    assert stats["seed_equal_mean_bacc"] == 0.25
+    assert stats["replicate_row_mean_bacc"] == (1.0 / 3.0)
+    assert stats["eligible_seed_center_cells"] == 3
