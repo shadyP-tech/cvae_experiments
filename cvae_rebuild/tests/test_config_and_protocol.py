@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from cvae_rebuild.config import load_config
+from cvae_rebuild.decentralized_adaptive_gmm_prior import load_decentralized_adaptive_gmm_prior_config
 from cvae_rebuild.decentralized_k16_gmm_prior import load_decentralized_k16_gmm_prior_config
 from cvae_rebuild.pipeline import run_artifact_contract_smoke, run_synthetic_smoke
 from cvae_rebuild.preservation import load_preservation_config
@@ -65,6 +66,20 @@ def test_locked_decentralized_k16_gmm_prior_config_loads() -> None:
     assert cfg.min_count_for_k4 == 48
     assert cfg.source_weighting == "equal_source_mass"
     assert cfg.support_nelbo_enabled is False
+
+
+def test_locked_decentralized_adaptive_gmm_prior_config_loads() -> None:
+    cfg = load_decentralized_adaptive_gmm_prior_config(
+        "cvae_rebuild/configs/virchow2_cvae_decentralized_adaptive_gmm_prior_v1.yaml"
+    )
+    assert cfg.name == "virchow2_cvae_decentralized_adaptive_gmm_prior_v1"
+    assert cfg.backbone == "virchow2"
+    assert cfg.primary_variant == "pca64_beta001"
+    assert cfg.primary_method == "decentralized_exported_adaptive_k_cc_diag_gmm_late_geom"
+    assert cfg.bic_method == "decentralized_exported_bic_selected_cc_diag_gmm_late_geom"
+    assert cfg.candidate_components_per_source_class == (4, 3, 2, 1)
+    assert cfg.min_samples_per_component == 12
+    assert cfg.source_weighting == "equal_source_mass"
 
 
 def test_budget_splits_are_rank_order_deterministic() -> None:
