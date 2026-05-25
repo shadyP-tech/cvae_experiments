@@ -1,10 +1,14 @@
 from pathlib import Path
 
 import pytest
+import yaml
 
 from cvae_rebuild.config import load_config
 from cvae_rebuild.decentralized_adaptive_gmm_prior import load_decentralized_adaptive_gmm_prior_config
-from cvae_rebuild.decentralized_component_union_prior import load_decentralized_component_union_prior_config
+from cvae_rebuild.decentralized_component_union_prior import (
+    load_decentralized_component_union_prior_config,
+    parse_decentralized_component_union_prior_config,
+)
 from cvae_rebuild.decentralized_pruned_adaptive_equal_all4_prior import load_pruned_adaptive_equal_all4_config
 from cvae_rebuild.decentralized_k16_gmm_prior import load_decentralized_k16_gmm_prior_config
 from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import (
@@ -134,6 +138,32 @@ def test_locked_decentralized_component_union_prior_config_loads() -> None:
     assert cfg.primary_pooling == "pooled_raw_logistic"
     assert cfg.shrink_lambdas == (0.25, 0.5)
     assert cfg.budget_diagnostic_per_class_total == 256
+
+
+def test_locked_decentralized_component_union_shrink025_v2_config_loads() -> None:
+    cfg = load_decentralized_component_union_prior_config(
+        "cvae_rebuild/configs/virchow2_cvae_decentralized_component_union_reliability_shrink025_v2.yaml"
+    )
+    assert cfg.name == "virchow2_cvae_decentralized_component_union_reliability_shrink025_v2"
+    assert cfg.backbone == "virchow2"
+    assert cfg.primary_variant == "pca64_beta001"
+    assert cfg.primary_method == "decentralized_component_union_reliability_shrink025"
+    assert cfg.strict_full_run_matrix is True
+    assert cfg.experiment_seeds == (42, 43, 44)
+    assert cfg.heldout_centers == ("0", "1", "2", "3", "4")
+    assert cfg.replicate_seeds == (17, 23, 31)
+    assert cfg.synthetic_per_class_total == 128
+    assert cfg.budget_diagnostic_per_class_total is None
+    assert cfg.matched_shuffled_reliability_null_permutations == 20
+
+
+def test_locked_decentralized_component_union_shrink025_v2_rejects_changed_seed_grid() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_decentralized_component_union_reliability_shrink025_v2.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["run_matrix"]["experiment_seeds"] = [42]
+
+    with pytest.raises(Exception, match="experiment_seeds=\\[42, 43, 44\\]"):
+        parse_decentralized_component_union_prior_config(payload, base_dir=Path("."))
 
 
 def test_locked_pruned_adaptive_equal_all4_config_loads() -> None:

@@ -38,7 +38,9 @@ from cvae_rebuild.decentralized_adaptive_gmm_prior import (
     run_decentralized_adaptive_gmm_prior,
 )
 from cvae_rebuild.decentralized_component_union_prior import (
+    MATCHED_SHUFFLED_RELIABILITY_PREFIX,
     PRIMARY_COMPONENT_UNION_METHOD,
+    ROW_COMPONENT_UNION_SHRINK025,
     parse_decentralized_component_union_prior_config,
     run_decentralized_component_union_prior,
 )
@@ -1379,6 +1381,8 @@ def test_decentralized_component_union_prior_tiny_cache_writes_expected_artifact
         "tables/component_union_downstream_matrix.csv",
         "tables/component_union_gap_summary.csv",
         "tables/component_union_summary.csv",
+        "tables/shuffled_reliability_null_matrix.csv",
+        "tables/shuffled_reliability_null_summary.csv",
         "tables/component_manifest.csv",
         "tables/prototype_manifest.csv",
         "tables/component_coverage_audit.csv",
@@ -1404,6 +1408,7 @@ def test_decentralized_component_union_prior_tiny_cache_writes_expected_artifact
     component_manifest = list(csv.DictReader(open(root / "tables" / "component_manifest.csv", newline="")))
     weights = list(csv.DictReader(open(root / "tables" / "source_weight_manifest.csv", newline="")))
     summary = list(csv.DictReader(open(root / "tables" / "component_union_summary.csv", newline="")))
+    null_summary = list(csv.DictReader(open(root / "tables" / "shuffled_reliability_null_summary.csv", newline="")))
     ablation = list(csv.DictReader(open(root / "tables" / "source_ablation_audit.csv", newline="")))
     paired = list(csv.DictReader(open(root / "tables" / "paired_generation_audit.csv", newline="")))
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
@@ -1426,8 +1431,69 @@ def test_decentralized_component_union_prior_tiny_cache_writes_expected_artifact
     assert paired and {"paired_generation_invariant_key", "generated_features_hash"}.issubset(paired[0])
     assert "seed_cell_mean_bacc" in summary[0]
     assert "center_equal_mean_bacc" in summary[0]
+    assert "oracle_gap_vs_source_union_k16" in summary[0]
+    assert null_summary and "n_null_permutations" in null_summary[0]
     assert "does not test target-conditioned routing" in report
     assert "not a formal differential privacy claim" in report
+
+
+def test_decentralized_component_union_shrink025_v2_tiny_cache_writes_null_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_decentralized_component_union_payload(tmp_path)
+    payload["experiment"]["name"] = "virchow2_cvae_decentralized_component_union_reliability_shrink025_v2"
+    payload["experiment"]["artifact_root"] = str(tmp_path / "virchow2_cvae_decentralized_component_union_reliability_shrink025_v2")
+    payload["generation"]["budget_diagnostic_per_class_total"] = None
+    payload["component_union_prior"]["primary_method"] = ROW_COMPONENT_UNION_SHRINK025
+    payload["component_union_prior"]["matched_shuffled_reliability_null_permutations"] = 2
+    cfg = parse_decentralized_component_union_prior_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_decentralized_component_union_prior(cfg)
+
+    matrix = list(csv.DictReader(open(root / "tables" / "component_union_downstream_matrix.csv", newline="")))
+    weights = list(csv.DictReader(open(root / "tables" / "source_weight_manifest.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "component_union_summary.csv", newline="")))
+    negative = list(csv.DictReader(open(root / "tables" / "negative_control_summary.csv", newline="")))
+    null_matrix = list(csv.DictReader(open(root / "tables" / "shuffled_reliability_null_matrix.csv", newline="")))
+    null_summary = list(csv.DictReader(open(root / "tables" / "shuffled_reliability_null_summary.csv", newline="")))
+    ablation = list(csv.DictReader(open(root / "tables" / "source_ablation_audit.csv", newline="")))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert any(row["prior_method"] == ROW_COMPONENT_UNION_SHRINK025 and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == PRIMARY_COMPONENT_UNION_METHOD and row["selection_source"] == "diagnostic_only" for row in matrix)
+    assert null_matrix and all(row["prior_method"].startswith(MATCHED_SHUFFLED_RELIABILITY_PREFIX) for row in null_matrix)
+    assert null_summary and null_summary[0]["n_null_permutations"] == "2"
+    assert summary[0]["primary_method"] == ROW_COMPONENT_UNION_SHRINK025
+    assert "oracle_gap_vs_real_feature_dense" in summary[0]
+    assert negative[0]["primary_method"] == ROW_COMPONENT_UNION_SHRINK025
+    assert protocol["matched_shuffled_reliability_null_permutations"] == 2
+    assert "Matched shuffled-null permutations" in report
+
+    first_cell = next(row for row in matrix if row["prior_method"] == ROW_COMPONENT_UNION_SHRINK025 and row["status"] == "ok")
+    cell_key = (first_cell["experiment_seed"], first_cell["heldout_center"], first_cell["replicate_seed"])
+    primary_ablation = [
+        row for row in ablation
+        if (row["experiment_seed"], row["heldout_center"], row["replicate_seed"]) == cell_key
+        and row["status"] == "ok"
+    ]
+    assert primary_ablation
+    assert float(primary_ablation[0]["primary_bacc"]) == pytest.approx(float(first_cell["bacc"]))
+
+    null_method = null_matrix[0]["prior_method"]
+    shrink_scores = sorted(
+        round(float(row["reliability_score"]), 12)
+        for row in weights
+        if row["prior_method"] == ROW_COMPONENT_UNION_SHRINK025
+        and (row["experiment_seed"], row["heldout_center"], row["replicate_seed"]) == cell_key
+    )
+    null_scores = sorted(
+        round(float(row["reliability_score"]), 12)
+        for row in weights
+        if row["prior_method"] == null_method
+        and (row["experiment_seed"], row["heldout_center"], row["replicate_seed"]) == cell_key
+    )
+    assert shrink_scores == null_scores
+    assert any(row["shuffle_mapping_json"] != "{}" for row in weights if row["prior_method"] == null_method)
 
 
 def test_decentralized_component_union_prior_rejects_invalid_backbone(tmp_path: Path) -> None:

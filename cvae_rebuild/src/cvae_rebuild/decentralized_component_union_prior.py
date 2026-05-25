@@ -591,7 +591,6 @@ def run_decentralized_component_union_prior(
                             per_source_runtime=per_source_runtime,
                             candidates=candidates,
                             summaries=gmm_summaries,
-                            rels=rels,
                             experiment_seed=int(experiment_seed),
                             heldout_center=str(heldout_center),
                             replicate_seed=int(replicate_seed),
@@ -734,6 +733,7 @@ def run_decentralized_component_union_prior(
                             all_centers=cfg.heldout_centers,
                             candidates=candidates,
                             summaries=gmm_summaries,
+                            rels=rels,
                             experiment_seed=int(experiment_seed),
                             heldout_center=str(heldout_center),
                             replicate_seed=int(replicate_seed),
@@ -768,7 +768,7 @@ def run_decentralized_component_union_prior(
         oracle_rows_diagnostic_only=True,
         extra_violations=protocol_violations,
     )
-    _populate_negative_control_gaps(matrix_rows)
+    _populate_negative_control_gaps(matrix_rows, cfg)
     gap_rows = [dict(row) for row in matrix_rows if row.get("status") == "ok"]
     decision = _decision(
         matrix_rows,
@@ -2394,14 +2394,20 @@ def _rename_component_rows(rows: Sequence[Mapping[str, object]], old: str, new: 
     return out
 
 
-def _populate_negative_control_gaps(rows: list[dict[str, object]]) -> None:
-    controls: dict[tuple[str, str, str], float] = {}
-    control_methods = {
+def _negative_control_methods(rows: Sequence[Mapping[str, object]]) -> set[str]:
+    controls = {
         ROW_SHUFFLED_SUMMARY_CONTROL,
         ROW_SHUFFLED_LABEL_CONTROL,
         ROW_SHUFFLED_RELIABILITY_CONTROL,
         ROW_RANDOM_SOURCE_MASS_CONTROL,
     }
+    controls.update(str(row.get("prior_method")) for row in rows if _is_matched_shuffled_reliability_method(row.get("prior_method")))
+    return controls
+
+
+def _populate_negative_control_gaps(rows: list[dict[str, object]], cfg: ComponentUnionConfig) -> None:
+    controls: dict[tuple[str, str, str], float] = {}
+    control_methods = _negative_control_methods(rows)
     for row in rows:
         if row.get("prior_method") not in control_methods:
             continue
@@ -2410,13 +2416,82 @@ def _populate_negative_control_gaps(rows: list[dict[str, object]]) -> None:
         if math.isfinite(value):
             controls[key] = max(controls.get(key, -math.inf), value)
     for row in rows:
-        if row.get("prior_method") != PRIMARY_COMPONENT_UNION_METHOD:
+        if row.get("prior_method") != cfg.primary_method:
             continue
         key = (str(row.get("experiment_seed")), str(row.get("heldout_center")), str(row.get("replicate_seed")))
         control = controls.get(key, math.nan)
         value = _float(row.get("bacc"))
         if math.isfinite(value) and math.isfinite(control):
             row["negative_control_gap"] = value - control
+
+
+def _matched_shuffled_reliability_null_rows(rows: Sequence[Mapping[str, object]]) -> list[Mapping[str, object]]:
+    return [row for row in rows if _is_matched_shuffled_reliability_method(row.get("prior_method"))]
+
+
+def _matched_shuffled_reliability_null_summary(
+    rows: Sequence[Mapping[str, object]],
+    cfg: ComponentUnionConfig,
+) -> dict[str, object]:
+    primary = _rows_for(rows, cfg.primary_method)
+    primary_stats = _method_stats(primary)
+    primary_bacc = _float(primary_stats["center_equal_mean_bacc"])
+    null_rows = _matched_shuffled_reliability_null_rows(rows)
+    methods = sorted({str(row.get("prior_method")) for row in null_rows})
+    null_means = [
+        _float(_method_stats(_rows_for(rows, method))["center_equal_mean_bacc"])
+        for method in methods
+    ]
+    null_means = [value for value in null_means if math.isfinite(value)]
+    null_mean = nanmean(null_means) if null_means else math.nan
+    null_p90 = float(np.quantile(null_means, 0.90)) if null_means else math.nan
+    null_p95 = float(np.quantile(null_means, 0.95)) if null_means else math.nan
+    null_max = max(null_means, default=math.nan)
+    empirical_p = (
+        (1.0 + float(sum(value >= primary_bacc for value in null_means))) / (float(len(null_means)) + 1.0)
+        if null_means and math.isfinite(primary_bacc)
+        else math.nan
+    )
+
+    primary_by_cell = {
+        (str(row.get("experiment_seed")), str(row.get("heldout_center")), str(row.get("replicate_seed"))): _float(row.get("bacc"))
+        for row in primary
+    }
+    null_by_cell: dict[tuple[str, str, str], list[float]] = {}
+    pair_wins = 0
+    pair_total = 0
+    for row in null_rows:
+        if row.get("status") != "ok":
+            continue
+        key = (str(row.get("experiment_seed")), str(row.get("heldout_center")), str(row.get("replicate_seed")))
+        null_bacc = _float(row.get("bacc"))
+        primary_cell = primary_by_cell.get(key, math.nan)
+        if math.isfinite(null_bacc):
+            null_by_cell.setdefault(key, []).append(null_bacc)
+        if math.isfinite(null_bacc) and math.isfinite(primary_cell):
+            pair_total += 1
+            if primary_cell > null_bacc:
+                pair_wins += 1
+    paired_deltas = []
+    for key, values in null_by_cell.items():
+        primary_cell = primary_by_cell.get(key, math.nan)
+        null_cell_mean = nanmean(values)
+        if math.isfinite(primary_cell) and math.isfinite(null_cell_mean):
+            paired_deltas.append(primary_cell - null_cell_mean)
+
+    return {
+        "n_null_permutations": len(null_means),
+        "primary_center_equal_mean_bacc": primary_bacc,
+        "null_mean_center_equal_bacc": null_mean,
+        "null_p90_center_equal_bacc": null_p90,
+        "null_p95_center_equal_bacc": null_p95,
+        "null_max_center_equal_bacc": null_max,
+        "empirical_p_value": empirical_p,
+        "primary_minus_null_mean": primary_bacc - null_mean if math.isfinite(primary_bacc) and math.isfinite(null_mean) else math.nan,
+        "primary_minus_null_p95": primary_bacc - null_p95 if math.isfinite(primary_bacc) and math.isfinite(null_p95) else math.nan,
+        "paired_cell_mean_delta_vs_null_mean": nanmean(paired_deltas) if paired_deltas else math.nan,
+        "paired_cell_win_fraction_vs_null": float(pair_wins) / float(pair_total) if pair_total else math.nan,
+    }
 
 
 def _decision(
@@ -2426,26 +2501,21 @@ def _decision(
     leakage_status: str,
     source_ablation_rows: Sequence[Mapping[str, object]],
 ) -> dict[str, object]:
-    primary_all = _rows_for(rows, PRIMARY_COMPONENT_UNION_METHOD, include_non_ok=True)
-    primary = _rows_for(rows, PRIMARY_COMPONENT_UNION_METHOD)
+    primary_all = _rows_for(rows, cfg.primary_method, include_non_ok=True)
+    primary = _rows_for(rows, cfg.primary_method)
     equal = _rows_for(rows, ROW_EQUAL_ALL4_REFERENCE)
     rel_all4 = _rows_for(rows, ROW_RELIABILITY_ALL4_REFERENCE)
     prototype = _rows_for(rows, ROW_PROTOTYPE_UNION)
     source_union = _rows_for(rows, ROW_SOURCE_UNION_K16_REFERENCE)
     center_balanced = _rows_for(rows, ROW_CENTER_BALANCED_K16_REFERENCE)
     real_feature = _rows_for(rows, ROW_REAL_FEATURE_DENSE_REFERENCE)
-    controls_by_method = {
-        method: _method_stats(_rows_for(rows, method))
-        for method in (
-            ROW_SHUFFLED_SUMMARY_CONTROL,
-            ROW_SHUFFLED_LABEL_CONTROL,
-            ROW_SHUFFLED_RELIABILITY_CONTROL,
-            ROW_RANDOM_SOURCE_MASS_CONTROL,
-        )
-    }
+    controls_by_method = {method: _method_stats(_rows_for(rows, method)) for method in sorted(_negative_control_methods(rows))}
     strongest_control_method, strongest_control_stats = max(
         controls_by_method.items(),
-        key=lambda item: (_float(item[1]["center_equal_mean_bacc"]), item[0]),
+        key=lambda item: (
+            _float(item[1]["center_equal_mean_bacc"]) if math.isfinite(_float(item[1]["center_equal_mean_bacc"])) else -math.inf,
+            item[0],
+        ),
     )
     stats = _method_stats(primary)
     equal_stats = _method_stats(equal)
@@ -2455,35 +2525,75 @@ def _decision(
     center_balanced_stats = _method_stats(center_balanced)
     real_stats = _method_stats(real_feature)
     ablation = _source_ablation_stats(source_ablation_rows)
+    null_summary = _matched_shuffled_reliability_null_summary(rows, cfg)
     fit_ineligible = any(row.get("status") == "ineligible_component_fit" for row in primary_all)
     primary_bacc = _float(stats["center_equal_mean_bacc"])
     delta_vs_d12 = primary_bacc - _float(rel_stats["center_equal_mean_bacc"])
+    delta_vs_full_reliability_dense = delta_vs_d12
     delta_vs_equal = primary_bacc - _float(equal_stats["center_equal_mean_bacc"])
     retention_source_union = d1._retention(primary_bacc, _float(source_union_stats["center_equal_mean_bacc"]))
     retention_center_balanced = d1._retention(primary_bacc, _float(center_balanced_stats["center_equal_mean_bacc"]))
     negative_control_gap = primary_bacc - _float(strongest_control_stats["center_equal_mean_bacc"])
-    strong_success = (
-        leakage_status == "PASS"
-        and not fit_ineligible
-        and int(stats["n_heldout_centers"]) >= len(cfg.heldout_centers)
-        and delta_vs_d12 >= 0.015
-        and delta_vs_equal >= 0.010
-        and _float(stats["min_center_bacc"]) >= 0.80
-        and _float(stats["seed_std_bacc"]) <= 0.04
-        and retention_source_union >= 0.97
-        and negative_control_gap > 0.0
-    )
-    useful_success = (
-        leakage_status == "PASS"
-        and not fit_ineligible
-        and int(stats["n_heldout_centers"]) >= len(cfg.heldout_centers)
-        and retention_source_union >= 0.94
-        and delta_vs_d12 > 0.0
-        and delta_vs_equal > 0.0
-        and _float(stats["min_center_bacc"]) >= 0.80
-        and _float(stats["seed_std_bacc"]) <= 0.04
-        and not bool(ablation["source_ablation_dominance_flag"])
-    )
+    if cfg.primary_method == ROW_COMPONENT_UNION_SHRINK025:
+        null_p = _float(null_summary["empirical_p_value"])
+        null_mean_gap = _float(null_summary["primary_minus_null_mean"])
+        null_p95_gap = _float(null_summary["primary_minus_null_p95"])
+        null_max = _float(null_summary["null_max_center_equal_bacc"])
+        strong_success = (
+            leakage_status == "PASS"
+            and not fit_ineligible
+            and int(stats["n_heldout_centers"]) >= len(cfg.heldout_centers)
+            and delta_vs_d12 >= 0.015
+            and delta_vs_full_reliability_dense >= 0.010
+            and delta_vs_equal >= 0.010
+            and _float(stats["min_center_bacc"]) >= 0.80
+            and _float(stats["seed_std_bacc"]) <= 0.04
+            and retention_source_union >= 0.97
+            and negative_control_gap > 0.0
+            and math.isfinite(null_p)
+            and null_p <= (1.0 / 21.0)
+            and null_mean_gap >= 0.005
+            and math.isfinite(null_max)
+            and primary_bacc > null_max
+            and not bool(ablation["source_ablation_dominance_flag"])
+        )
+        useful_success = (
+            leakage_status == "PASS"
+            and not fit_ineligible
+            and int(stats["n_heldout_centers"]) >= len(cfg.heldout_centers)
+            and retention_source_union >= 0.94
+            and delta_vs_d12 >= 0.015
+            and delta_vs_full_reliability_dense >= 0.010
+            and delta_vs_equal >= 0.010
+            and _float(stats["min_center_bacc"]) >= 0.80
+            and _float(stats["seed_std_bacc"]) <= 0.055
+            and null_p95_gap > 0.0
+            and null_mean_gap >= 0.005
+            and not bool(ablation["source_ablation_dominance_flag"])
+        )
+    else:
+        strong_success = (
+            leakage_status == "PASS"
+            and not fit_ineligible
+            and int(stats["n_heldout_centers"]) >= len(cfg.heldout_centers)
+            and delta_vs_d12 >= 0.015
+            and delta_vs_equal >= 0.010
+            and _float(stats["min_center_bacc"]) >= 0.80
+            and _float(stats["seed_std_bacc"]) <= 0.04
+            and retention_source_union >= 0.97
+            and negative_control_gap > 0.0
+        )
+        useful_success = (
+            leakage_status == "PASS"
+            and not fit_ineligible
+            and int(stats["n_heldout_centers"]) >= len(cfg.heldout_centers)
+            and retention_source_union >= 0.94
+            and delta_vs_d12 > 0.0
+            and delta_vs_equal > 0.0
+            and _float(stats["min_center_bacc"]) >= 0.80
+            and _float(stats["seed_std_bacc"]) <= 0.04
+            and not bool(ablation["source_ablation_dominance_flag"])
+        )
     verdict = "COMPONENT_UNION_FAIL"
     if leakage_status != "PASS":
         verdict = "PROTOCOL_FAIL"
@@ -2501,6 +2611,8 @@ def _decision(
         flags.append("INELIGIBLE_COMPONENT_FIT")
     if math.isfinite(delta_vs_d12) and delta_vs_d12 < 0.015:
         flags.append("DELTA_VS_D1_2_BELOW_0P015")
+    if cfg.primary_method == ROW_COMPONENT_UNION_SHRINK025 and math.isfinite(delta_vs_full_reliability_dense) and delta_vs_full_reliability_dense < 0.010:
+        flags.append("DELTA_VS_FULL_RELIABILITY_DENSE_ALL4_BELOW_0P010")
     if math.isfinite(delta_vs_equal) and delta_vs_equal < 0.010:
         flags.append("DELTA_VS_EQUAL_ALL4_BELOW_0P010")
     if math.isfinite(retention_source_union) and retention_source_union < 0.97:
@@ -2509,6 +2621,13 @@ def _decision(
         flags.append("SOURCE_UNION_RETENTION_BELOW_USEFUL_0P94")
     if math.isfinite(negative_control_gap) and negative_control_gap <= 0.0:
         flags.append("NEGATIVE_CONTROL_COMPETITIVE")
+    if cfg.primary_method == ROW_COMPONENT_UNION_SHRINK025:
+        if math.isfinite(_float(null_summary["primary_minus_null_mean"])) and _float(null_summary["primary_minus_null_mean"]) < 0.005:
+            flags.append("PRIMARY_MINUS_MATCHED_NULL_MEAN_BELOW_0P005")
+        if math.isfinite(_float(null_summary["primary_minus_null_p95"])) and _float(null_summary["primary_minus_null_p95"]) <= 0.0:
+            flags.append("MATCHED_NULL_P95_NOT_CLEARED")
+        if math.isfinite(_float(null_summary["empirical_p_value"])) and _float(null_summary["empirical_p_value"]) > (1.0 / 21.0):
+            flags.append("MATCHED_NULL_COMPETITIVE")
     if bool(ablation["source_ablation_dominance_flag"]):
         flags.append("SOURCE_ABLATION_DOMINANCE")
 
@@ -2516,16 +2635,19 @@ def _decision(
         "primary_verdict": verdict,
         "diagnostic_flags": "|".join(flags),
         "leakage_status": leakage_status,
-        "primary_method": PRIMARY_COMPONENT_UNION_METHOD,
+        "primary_method": cfg.primary_method,
         "center_equal_mean_bacc": stats["center_equal_mean_bacc"],
         "seed_cell_mean_bacc": stats["seed_cell_mean_bacc"],
         "center_equal_macro_f1": stats["center_equal_macro_f1"],
         "min_center_bacc": stats["min_center_bacc"],
         "seed_std_bacc": stats["seed_std_bacc"],
         "delta_vs_d1_2_reliability_all4": delta_vs_d12,
+        "delta_vs_full_reliability_weighted_dense_all4": delta_vs_full_reliability_dense,
         "delta_vs_equal_all4": delta_vs_equal,
         "retention_vs_source_union_k16": retention_source_union,
         "retention_vs_center_balanced_k16": retention_center_balanced,
+        "oracle_gap_vs_source_union_k16": _float(source_union_stats["center_equal_mean_bacc"]) - primary_bacc,
+        "oracle_gap_vs_real_feature_dense": _float(real_stats["center_equal_mean_bacc"]) - primary_bacc,
         "delta_vs_real_source_embedding_dense_reference": primary_bacc - _float(real_stats["center_equal_mean_bacc"]),
         "negative_control_gap": negative_control_gap,
         "strongest_negative_control_method": strongest_control_method,
@@ -2538,6 +2660,7 @@ def _decision(
         "real_feature_dense_reference_center_equal_mean_bacc": real_stats["center_equal_mean_bacc"],
         "eligible_heldout_centers": stats["n_heldout_centers"],
         "eligible_seed_center_cells": stats["n_decision_cells"],
+        **null_summary,
         **ablation,
         **stats,
     }
@@ -2639,9 +2762,25 @@ def _write_artifacts(
     protocol_violations: Sequence[str],
     target_expert_excluded: bool,
 ) -> None:
+    matched_null_rows = _matched_shuffled_reliability_null_rows(matrix_rows)
     write_csv_rows(root / "tables" / "component_union_downstream_matrix.csv", matrix_rows)
     write_csv_rows(root / "tables" / "component_union_gap_summary.csv", gap_rows)
     write_csv_rows(root / "tables" / "component_union_summary.csv", [dict(decision)])
+    write_csv_rows(
+        root / "tables" / "shuffled_reliability_null_matrix.csv",
+        matched_null_rows,
+        columns=None if matched_null_rows else (
+            "experiment_seed",
+            "heldout_center",
+            "replicate_seed",
+            "prior_method",
+            "control_permutation_id",
+            "bacc",
+            "macro_f1",
+            "status",
+        ),
+    )
+    write_csv_rows(root / "tables" / "shuffled_reliability_null_summary.csv", [_null_summary_output(decision)])
     write_csv_rows(root / "tables" / "component_manifest.csv", component_manifest_rows)
     write_csv_rows(root / "tables" / "source_summary_diagnostics.csv", source_summary_rows)
     write_csv_rows(root / "tables" / "prototype_manifest.csv", prototype_manifest_rows)
@@ -2683,10 +2822,12 @@ def _write_artifacts(
             "pooled_classifier_frame": "raw_embedding_frame_after_source_inverse_pca",
             "source_union_references_diagnostic_only": True,
             "source_ablation_diagnostic_only": True,
+            "matched_shuffled_reliability_null_permutations": cfg.matched_shuffled_reliability_null_permutations,
             "oracle_rows_diagnostic_only": True,
             "protocol_wording": PROTOCOL_WORDING,
             "claim_boundary": (
-                "component-level prior composition audit only; no target-specific compatibility routing claim, "
+                "component-level generative expert composition using source-only reliability-weighted mass allocation where configured; "
+                "no target-specific compatibility routing claim, "
                 "no support-NELBO downstream claim, and no formal privacy claim"
             ),
         },
@@ -2697,13 +2838,14 @@ def _write_artifacts(
 
 def _negative_control_summary(decision: Mapping[str, object]) -> dict[str, object]:
     return {
-        "primary_method": PRIMARY_COMPONENT_UNION_METHOD,
+        "primary_method": decision.get("primary_method", ""),
         "control_methods": "|".join(
             [
                 ROW_SHUFFLED_SUMMARY_CONTROL,
                 ROW_SHUFFLED_LABEL_CONTROL,
                 ROW_SHUFFLED_RELIABILITY_CONTROL,
                 ROW_RANDOM_SOURCE_MASS_CONTROL,
+                f"{MATCHED_SHUFFLED_RELIABILITY_PREFIX}*",
             ]
         ),
         "primary_center_equal_mean_bacc": decision.get("center_equal_mean_bacc", math.nan),
@@ -2711,7 +2853,27 @@ def _negative_control_summary(decision: Mapping[str, object]) -> dict[str, objec
         "strongest_negative_control_center_equal_mean_bacc": decision.get("strongest_negative_control_center_equal_mean_bacc", math.nan),
         "negative_control_gap": decision.get("negative_control_gap", math.nan),
         "control_competitive": "NEGATIVE_CONTROL_COMPETITIVE" in str(decision.get("diagnostic_flags", "")),
+        "matched_null_empirical_p_value": decision.get("empirical_p_value", math.nan),
+        "primary_minus_null_mean": decision.get("primary_minus_null_mean", math.nan),
+        "primary_minus_null_p95": decision.get("primary_minus_null_p95", math.nan),
     }
+
+
+def _null_summary_output(decision: Mapping[str, object]) -> dict[str, object]:
+    fields = (
+        "n_null_permutations",
+        "primary_center_equal_mean_bacc",
+        "null_mean_center_equal_bacc",
+        "null_p90_center_equal_bacc",
+        "null_p95_center_equal_bacc",
+        "null_max_center_equal_bacc",
+        "empirical_p_value",
+        "primary_minus_null_mean",
+        "primary_minus_null_p95",
+        "paired_cell_mean_delta_vs_null_mean",
+        "paired_cell_win_fraction_vs_null",
+    )
+    return {field: decision.get(field, math.nan) for field in fields}
 
 
 def _write_decision_summary(root: Path, decision: Mapping[str, object], *, leakage_status: str) -> None:
@@ -2721,7 +2883,7 @@ def _write_decision_summary(root: Path, decision: Mapping[str, object], *, leaka
             "",
             "## Summary",
             "",
-            f"- Primary method: `{PRIMARY_COMPONENT_UNION_METHOD}`",
+            f"- Primary method: `{decision.get('primary_method', '')}`",
             f"- Primary verdict: `{decision.get('primary_verdict', 'COMPONENT_UNION_FAIL')}`",
             f"- Diagnostic flags: `{decision.get('diagnostic_flags', '')}`",
             f"- Center-equal mean BACC: {_format_float(decision.get('center_equal_mean_bacc'))}",
@@ -2730,11 +2892,18 @@ def _write_decision_summary(root: Path, decision: Mapping[str, object], *, leaka
             f"- Min center BACC: {_format_float(decision.get('min_center_bacc'))}",
             f"- Seed std BACC: {_format_float(decision.get('seed_std_bacc'))}",
             f"- Delta vs D1.2 reliability all4: {_format_float(decision.get('delta_vs_d1_2_reliability_all4'))}",
+            f"- Delta vs full reliability-weighted dense all4: {_format_float(decision.get('delta_vs_full_reliability_weighted_dense_all4'))}",
             f"- Delta vs equal all4: {_format_float(decision.get('delta_vs_equal_all4'))}",
             f"- Retention vs source-union K16: {_format_float(decision.get('retention_vs_source_union_k16'))}",
             f"- Retention vs center-balanced K16: {_format_float(decision.get('retention_vs_center_balanced_k16'))}",
+            f"- Oracle gap vs source-union K16: {_format_float(decision.get('oracle_gap_vs_source_union_k16'))}",
+            f"- Oracle gap vs real-feature dense: {_format_float(decision.get('oracle_gap_vs_real_feature_dense'))}",
             f"- Delta vs real-feature dense reference: {_format_float(decision.get('delta_vs_real_source_embedding_dense_reference'))}",
             f"- Negative-control gap: {_format_float(decision.get('negative_control_gap'))}",
+            f"- Matched shuffled-null permutations: {decision.get('n_null_permutations', 0)}",
+            f"- Matched shuffled-null empirical p-value: {_format_float(decision.get('empirical_p_value'))}",
+            f"- Primary minus matched null mean: {_format_float(decision.get('primary_minus_null_mean'))}",
+            f"- Primary minus matched null p95: {_format_float(decision.get('primary_minus_null_p95'))}",
             f"- Max source-ablation drop: {_format_float(decision.get('max_source_ablation_drop_bacc'))}",
             f"- Max source-ablation gain: {_format_float(decision.get('max_source_ablation_gain_bacc'))}",
             f"- Leakage status: `{leakage_status}`",
@@ -2746,11 +2915,12 @@ def _write_decision_summary(root: Path, decision: Mapping[str, object], *, leaka
             "This experiment does not test target-conditioned routing.",
             "It tests whether decentralized generative composition should operate at component/prototype granularity rather than whole-source granularity.",
             "The routing decision is fixed: use all non-heldout source experts.",
+            "For shrink025 v2, the deployed decision is source/component mass allocation, not sparse source selection.",
             "Target evaluation labels are used only for final scoring.",
             "",
             "## Supported Claim If Successful",
             "",
-            "Source-local component union preserves intra-source multimodality and improves decentralized generated-embedding utility over source-level dense aggregation without target support or raw data sharing.",
+            "Source-local component union with mild source-local reliability shrinkage improves decentralized generated-embedding utility over source-level dense aggregation and matched shuffled-reliability controls without target support or raw data sharing.",
             "",
         ]
     )
@@ -2772,6 +2942,7 @@ def _resolved_config(cfg: ComponentUnionConfig) -> dict[str, object]:
         "experiment_seeds": list(cfg.experiment_seeds),
         "heldout_centers": list(cfg.heldout_centers),
         "replicate_seeds": list(cfg.replicate_seeds),
+        "strict_full_run_matrix": cfg.strict_full_run_matrix,
         "synthetic_per_class_total": cfg.synthetic_per_class_total,
         "budget_diagnostic_per_class_total": cfg.budget_diagnostic_per_class_total,
         "min_per_source_per_class": cfg.min_per_source_per_class,
@@ -2790,6 +2961,7 @@ def _resolved_config(cfg: ComponentUnionConfig) -> dict[str, object]:
         "primary_pooling": cfg.primary_pooling,
         "reliability_floor_score": cfg.reliability_floor_score,
         "shrink_lambdas": list(cfg.shrink_lambdas),
+        "matched_shuffled_reliability_null_permutations": cfg.matched_shuffled_reliability_null_permutations,
         "prototype_candidate_counts_per_source_class": list(cfg.prototype_candidate_counts_per_source_class),
         "prototype_min_samples_per_component": cfg.prototype_min_samples_per_component,
         "prototype_variance_floor": cfg.prototype_variance_floor,
