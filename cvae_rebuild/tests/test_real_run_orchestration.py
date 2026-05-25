@@ -41,6 +41,11 @@ from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import (
     parse_decentralized_reliability_weighted_gmm_prior_config,
     run_decentralized_reliability_weighted_gmm_prior,
 )
+from cvae_rebuild.decentralized_support_nelbo_reliability_gmm_prior import (
+    PRIMARY_SUPPORT_RELIABILITY_METHOD,
+    parse_decentralized_support_nelbo_reliability_gmm_prior_config,
+    run_decentralized_support_nelbo_reliability_gmm_prior,
+)
 from cvae_rebuild.generation import generate_reference_posterior
 from cvae_rebuild.models import ClassConditionedCVAE
 from cvae_rebuild.pipeline import run_real_cache_backed
@@ -1310,6 +1315,84 @@ def test_decentralized_reliability_weighted_gmm_prior_rejects_invalid_backbone(t
         parse_decentralized_reliability_weighted_gmm_prior_config(payload, base_dir=tmp_path)
 
 
+def test_decentralized_support_nelbo_reliability_gmm_prior_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_decentralized_support_nelbo_reliability_gmm_payload(tmp_path)
+    cfg = parse_decentralized_support_nelbo_reliability_gmm_prior_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_decentralized_support_nelbo_reliability_gmm_prior(cfg)
+
+    expected = [
+        "tables/decentralized_support_nelbo_reliability_downstream_matrix.csv",
+        "tables/decentralized_support_nelbo_reliability_gap_summary.csv",
+        "tables/decentralized_support_nelbo_reliability_summary.csv",
+        "tables/support_eval_split_manifest.csv",
+        "tables/support_nelbo_scores.csv",
+        "tables/support_nelbo_weight_manifest.csv",
+        "tables/combined_weight_manifest.csv",
+        "tables/support_nelbo_alignment_matrix.csv",
+        "tables/source_reliability_manifest.csv",
+        "tables/centerwise_delta_summary.csv",
+        "tables/late_aggregation_matrix.csv",
+        "tables/real_feature_reference_matrix.csv",
+        "tables/negative_control_summary.csv",
+        "tables/generated_component_coverage_audit.csv",
+        "tables/weak_source_audit.csv",
+        "tables/nearest_neighbor_memorization_audit.csv",
+        "manifests/protocol_manifest.json",
+        "manifests/decentralized_support_nelbo_reliability_prior_model_manifest.csv",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "decentralized_support_nelbo_reliability_downstream_matrix.csv", newline="")))
+    splits = list(csv.DictReader(open(root / "tables" / "support_eval_split_manifest.csv", newline="")))
+    support_weights = list(csv.DictReader(open(root / "tables" / "support_nelbo_weight_manifest.csv", newline="")))
+    combined_weights = list(csv.DictReader(open(root / "tables" / "combined_weight_manifest.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "decentralized_support_nelbo_reliability_summary.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert protocol["support_nelbo_uses_unlabeled_target_support_only"] is True
+    assert protocol["decision_baselines_recomputed_on_support_excluded_eval_subset"] is True
+    assert any(row["prior_method"] == PRIMARY_SUPPORT_RELIABILITY_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_exported_adaptive_k_source_reliability_weighted_geom_support_eval_reference" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_exported_adaptive_k_equal_geom_support_eval_reference" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_exported_adaptive_k_support_nelbo_uncalibrated_weighted_geom_diagnostic" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_support_nelbo_tau05_x_reliability_geom_diagnostic" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_support_nelbo_support_size64_x_reliability_geom_diagnostic" for row in matrix)
+    assert splits and all(row["support_labels_used"] == "0" for row in splits)
+    assert support_weights and combined_weights
+    assert all(row["heldout_center"] != row["source_center"] for row in combined_weights)
+    for key in {
+        (row["experiment_seed"], row["heldout_center"], row["replicate_seed"], row["support_size"])
+        for row in combined_weights
+    }:
+        subset = [
+            row for row in combined_weights
+            if (row["experiment_seed"], row["heldout_center"], row["replicate_seed"], row["support_size"]) == key
+        ]
+        assert abs(sum(float(row["combined_weight"]) for row in subset) - 1.0) < 1.0e-6
+        assert sum(int(row["synthetic_per_class_budget"]) for row in subset) == 128
+        assert all(int(row["synthetic_per_class_budget"]) >= 8 for row in subset)
+    assert "spearman_support_nelbo_vs_downstream_utility" in summary[0]
+    assert "support_size_diagnostic_num_valid_cells_json" in summary[0]
+    assert "target-conditioned support-NELBO compatibility-weighted composition" in report
+
+
+def test_decentralized_support_nelbo_reliability_gmm_prior_rejects_unaligned_support_seeds(tmp_path: Path) -> None:
+    payload = _tiny_decentralized_support_nelbo_reliability_gmm_payload(tmp_path)
+    payload["run_matrix"]["support_seeds"] = [18]
+
+    with pytest.raises(Exception, match="support_seeds == replicate_seeds"):
+        parse_decentralized_support_nelbo_reliability_gmm_prior_config(payload, base_dir=tmp_path)
+
+
 def test_source_union_k24_gmm_prior_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
     repair_cfg = _tiny_repair_config(tmp_path)
     _write_tiny_cache(repair_cfg.feature_cache_root, seed=42)
@@ -2177,6 +2260,60 @@ def _tiny_decentralized_reliability_weighted_gmm_payload(tmp_path: Path):
             "primary_pooling": "weighted_geometric",
             "reliability_floor_score": 0.05,
             "softmax_tau": 1.0,
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_decentralized_support_nelbo_reliability_gmm_payload(tmp_path: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_decentralized_support_nelbo_reliability_gmm_prior_v1",
+            "artifact_root": str(tmp_path / "virchow2_cvae_decentralized_support_nelbo_reliability_gmm_prior_v1"),
+            "primary_variant": "pca64_beta001",
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2", "3", "4"],
+            "replicate_seeds": [17],
+            "support_seeds": [17],
+            "support_size": 32,
+            "support_size_diagnostics": [8, 16, 64],
+            "align_support_and_generation_seed": True,
+        },
+        "generation": {
+            "synthetic_per_class_total": 128,
+            "min_per_source_per_class": 8,
+        },
+        "support_nelbo_reliability_gmm_prior": {
+            "primary_method": "decentralized_exported_adaptive_k_support_nelbo_x_reliability_weighted_geom",
+            "candidate_components_per_source_class": [4, 3, 2, 1],
+            "min_samples_per_component": 12,
+            "source_weighting": "support_nelbo_x_source_local_reliability",
+            "gmm_covariance_type": "diag",
+            "gmm_reg_covar": 1.0e-4,
+            "gmm_n_init": 1,
+            "gmm_max_iter": 100,
+            "min_component_weight": 0.001,
+            "variance_floor": 1.0e-5,
+            "primary_pooling": "weighted_geometric",
+            "reliability_floor_score": 0.05,
+            "support_nelbo_tau": 1.0,
+            "tau_diagnostics": [0.5, 2.0],
+            "support_alpha": 1.0,
+            "reliability_alpha": 1.0,
         },
         "classifier": {
             "type": "sklearn_logistic_regression",

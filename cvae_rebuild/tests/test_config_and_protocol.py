@@ -8,6 +8,9 @@ from cvae_rebuild.decentralized_k16_gmm_prior import load_decentralized_k16_gmm_
 from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import (
     load_decentralized_reliability_weighted_gmm_prior_config,
 )
+from cvae_rebuild.decentralized_support_nelbo_reliability_gmm_prior import (
+    load_decentralized_support_nelbo_reliability_gmm_prior_config,
+)
 from cvae_rebuild.pipeline import run_artifact_contract_smoke, run_synthetic_smoke
 from cvae_rebuild.preservation import load_preservation_config
 from cvae_rebuild.preservation_repair import load_repair_config
@@ -98,6 +101,22 @@ def test_locked_decentralized_reliability_weighted_gmm_prior_config_loads() -> N
     assert cfg.source_weighting == "source_local_reliability"
     assert cfg.min_per_source_per_class == 8
     assert cfg.primary_pooling == "weighted_geometric"
+
+
+def test_locked_decentralized_support_nelbo_reliability_gmm_prior_config_loads() -> None:
+    cfg = load_decentralized_support_nelbo_reliability_gmm_prior_config(
+        "cvae_rebuild/configs/virchow2_cvae_decentralized_support_nelbo_reliability_gmm_prior_v1.yaml"
+    )
+    assert cfg.name == "virchow2_cvae_decentralized_support_nelbo_reliability_gmm_prior_v1"
+    assert cfg.backbone == "virchow2"
+    assert cfg.primary_variant == "pca64_beta001"
+    assert cfg.primary_method == "decentralized_exported_adaptive_k_support_nelbo_x_reliability_weighted_geom"
+    assert cfg.support_size == 32
+    assert cfg.support_size_diagnostics == (8, 16, 64)
+    assert cfg.support_seeds == cfg.replicate_seeds
+    assert cfg.source_weighting == "support_nelbo_x_source_local_reliability"
+    assert cfg.support_nelbo_tau == 1.0
+    assert cfg.tau_diagnostics == (0.5, 2.0)
 
 
 def test_budget_splits_are_rank_order_deterministic() -> None:

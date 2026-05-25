@@ -1,4 +1,5 @@
 import math
+from types import SimpleNamespace
 
 from cvae_rebuild.downstream import (
     PredictionBundle,
@@ -6,6 +7,8 @@ from cvae_rebuild.downstream import (
     geometric_probability_pool,
     weighted_geometric_probability_pool,
 )
+from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import SourceReliability
+from cvae_rebuild.decentralized_support_nelbo_reliability_gmm_prior import _combined_weight_plan
 from cvae_rebuild.protocol import ProtocolError
 from cvae_rebuild.splits import candidate_experts, random_unlabeled_support_eval_split
 from cvae_rebuild.support_nelbo import (
@@ -89,3 +92,35 @@ def test_weighted_geometric_pooling_rejects_invalid_weights() -> None:
             pass
         else:
             raise AssertionError(f"Expected invalid weights to fail: {weights}")
+
+
+def test_support_nelbo_weight_plan_prefers_lower_calibrated_nelbo_when_reliability_is_equal() -> None:
+    cfg = SimpleNamespace(
+        support_alpha=1.0,
+        reliability_alpha=1.0,
+        synthetic_per_class_total=128,
+        min_per_source_per_class=8,
+    )
+    rels = {
+        source: SourceReliability(42, 17, source, 0.75, 0.75, 0.5, "ok", "", 20, "", "")
+        for source in ("1", "2", "3", "4")
+    }
+    ranked = rank_support_scores(
+        [
+            SupportScore(42, "0", 17, 32, "1", 10.0, 1.0),
+            SupportScore(42, "0", 17, 32, "2", 10.0, -2.0),
+            SupportScore(42, "0", 17, 32, "3", 10.0, 0.0),
+            SupportScore(42, "0", 17, 32, "4", 10.0, 2.0),
+        ]
+    )
+    plan = _combined_weight_plan(
+        cfg,
+        ("1", "2", "3", "4"),
+        rels,
+        ranked,
+        tau=1.0,
+        use_calibrated=True,
+        include_reliability=True,
+    )
+    assert plan["weights"]["2"] > plan["weights"]["3"] > plan["weights"]["1"] > plan["weights"]["4"]
+    assert sum(plan["budgets"].values()) == 128

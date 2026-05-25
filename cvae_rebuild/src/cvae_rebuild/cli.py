@@ -19,6 +19,10 @@ from .decentralized_reliability_weighted_gmm_prior import (
     load_decentralized_reliability_weighted_gmm_prior_config,
     run_decentralized_reliability_weighted_gmm_prior,
 )
+from .decentralized_support_nelbo_reliability_gmm_prior import (
+    load_decentralized_support_nelbo_reliability_gmm_prior_config,
+    run_decentralized_support_nelbo_reliability_gmm_prior,
+)
 from .pipeline import run_artifact_contract_smoke, run_real_cache_backed, run_synthetic_smoke
 from .preservation import load_preservation_config, run_preservation_diagnosis
 from .preservation_repair import load_repair_config, run_preservation_repair
@@ -131,7 +135,22 @@ def main(argv: list[str] | None = None) -> int:
     decentralized_reliability_gmm.add_argument("--config", required=True)
     decentralized_reliability_gmm.add_argument("--artifact-root", default=None)
 
+    decentralized_support_nelbo_reliability_gmm = sub.add_parser(
+        "diagnose-decentralized-support-nelbo-reliability-gmm-prior",
+        help="Run the Virchow2-CVAE support-NELBO x reliability decentralized composition test.",
+    )
+    decentralized_support_nelbo_reliability_gmm.add_argument("--config", required=True)
+    decentralized_support_nelbo_reliability_gmm.add_argument("--artifact-root", default=None)
+
     args = parser.parse_args(argv)
+    if args.command == "diagnose-decentralized-support-nelbo-reliability-gmm-prior":
+        cfg = load_decentralized_support_nelbo_reliability_gmm_prior_config(args.config)
+        root = run_decentralized_support_nelbo_reliability_gmm_prior(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
     if args.command == "diagnose-decentralized-reliability-weighted-gmm-prior":
         cfg = load_decentralized_reliability_weighted_gmm_prior_config(args.config)
         root = run_decentralized_reliability_weighted_gmm_prior(
