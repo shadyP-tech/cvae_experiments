@@ -36,6 +36,11 @@ from cvae_rebuild.decentralized_adaptive_gmm_prior import (
     parse_decentralized_adaptive_gmm_prior_config,
     run_decentralized_adaptive_gmm_prior,
 )
+from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import (
+    PRIMARY_RELIABILITY_METHOD,
+    parse_decentralized_reliability_weighted_gmm_prior_config,
+    run_decentralized_reliability_weighted_gmm_prior,
+)
 from cvae_rebuild.generation import generate_reference_posterior
 from cvae_rebuild.models import ClassConditionedCVAE
 from cvae_rebuild.pipeline import run_real_cache_backed
@@ -1234,6 +1239,77 @@ def test_decentralized_adaptive_gmm_prior_ineligible_only_when_k1_cannot_fit(tmp
     )
 
 
+def test_decentralized_reliability_weighted_gmm_prior_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_decentralized_reliability_weighted_gmm_payload(tmp_path)
+    cfg = parse_decentralized_reliability_weighted_gmm_prior_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_decentralized_reliability_weighted_gmm_prior(cfg)
+
+    expected = [
+        "tables/decentralized_reliability_downstream_matrix.csv",
+        "tables/decentralized_reliability_gap_summary.csv",
+        "tables/decentralized_reliability_summary.csv",
+        "tables/source_reliability_manifest.csv",
+        "tables/reliability_weight_manifest.csv",
+        "tables/source_reliability_rank_vs_target_utility.csv",
+        "tables/centerwise_delta_summary.csv",
+        "tables/late_aggregation_matrix.csv",
+        "tables/real_feature_reference_matrix.csv",
+        "tables/generated_component_coverage_audit.csv",
+        "tables/weak_source_audit.csv",
+        "tables/nearest_neighbor_memorization_audit.csv",
+        "tables/negative_control_summary.csv",
+        "manifests/protocol_manifest.json",
+        "manifests/decentralized_reliability_prior_model_manifest.csv",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "decentralized_reliability_downstream_matrix.csv", newline="")))
+    reliability_reader = csv.DictReader(open(root / "tables" / "source_reliability_manifest.csv", newline=""))
+    reliability = list(reliability_reader)
+    weights = list(csv.DictReader(open(root / "tables" / "reliability_weight_manifest.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "decentralized_reliability_summary.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert protocol["fold_weight_manifest_excludes_heldout_center"] is True
+    assert "heldout_center" not in (reliability_reader.fieldnames or [])
+    assert reliability and weights
+    assert any(row["prior_method"] == PRIMARY_RELIABILITY_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_exported_adaptive_k_equal_geom_reference" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_exported_adaptive_k_source_reliability_pool_only_geom" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_exported_adaptive_k_source_reliability_budget_only_geom" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_reliability_shuffled_summary_control" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_reliability_shuffled_label_control" for row in matrix)
+    assert all(row["heldout_center"] != row["source_center"] for row in weights)
+    for key in {(row["experiment_seed"], row["heldout_center"], row["replicate_seed"]) for row in weights}:
+        subset = [
+            row for row in weights
+            if (row["experiment_seed"], row["heldout_center"], row["replicate_seed"]) == key
+        ]
+        assert abs(sum(float(row["normalized_reliability_weight"]) for row in subset) - 1.0) < 1.0e-6
+        assert sum(int(row["synthetic_per_class_budget"]) for row in subset) == 128
+        assert all(int(row["synthetic_per_class_budget"]) >= 8 for row in subset)
+    assert "neutral_reliability_fallback_count" in summary[0]
+    assert "mean_l1_distance_from_uniform" in summary[0]
+    assert "not a target-specific compatibility-routing result" in report
+
+
+def test_decentralized_reliability_weighted_gmm_prior_rejects_invalid_backbone(tmp_path: Path) -> None:
+    payload = _tiny_decentralized_reliability_weighted_gmm_payload(tmp_path)
+    payload["inputs"]["backbone"] = "dinov2"
+
+    with pytest.raises(Exception, match="backbone=virchow2"):
+        parse_decentralized_reliability_weighted_gmm_prior_config(payload, base_dir=tmp_path)
+
+
 def test_source_union_k24_gmm_prior_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
     repair_cfg = _tiny_repair_config(tmp_path)
     _write_tiny_cache(repair_cfg.feature_cache_root, seed=42)
@@ -2052,6 +2128,55 @@ def _tiny_decentralized_adaptive_gmm_payload(tmp_path: Path):
             "min_component_weight": 0.001,
             "variance_floor": 1.0e-5,
             "primary_pooling": "geometric",
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_decentralized_reliability_weighted_gmm_payload(tmp_path: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_decentralized_reliability_weighted_gmm_prior_v1",
+            "artifact_root": str(tmp_path / "virchow2_cvae_decentralized_reliability_weighted_gmm_prior_v1"),
+            "primary_variant": "pca64_beta001",
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
+            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
+            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2", "3", "4"],
+            "replicate_seeds": [17],
+        },
+        "generation": {
+            "synthetic_per_class_total": 128,
+            "min_per_source_per_class": 8,
+        },
+        "reliability_weighted_gmm_prior": {
+            "primary_method": "decentralized_exported_adaptive_k_source_reliability_weighted_geom",
+            "candidate_components_per_source_class": [4, 3, 2, 1],
+            "min_samples_per_component": 12,
+            "source_weighting": "source_local_reliability",
+            "gmm_covariance_type": "diag",
+            "gmm_reg_covar": 1.0e-4,
+            "gmm_n_init": 1,
+            "gmm_max_iter": 100,
+            "min_component_weight": 0.001,
+            "variance_floor": 1.0e-5,
+            "primary_pooling": "weighted_geometric",
+            "reliability_floor_score": 0.05,
+            "softmax_tau": 1.0,
         },
         "classifier": {
             "type": "sklearn_logistic_regression",

@@ -54,6 +54,76 @@ def geometric_probability_pool(
     return tuple(pooled)
 
 
+def _normalized_pool_weights(bundles: Sequence[PredictionBundle], weights: Sequence[float]) -> tuple[float, ...]:
+    if not bundles:
+        raise ProtocolError("At least one prediction bundle is required.")
+    if len(weights) != len(bundles):
+        raise ProtocolError("Pooling weights must match prediction bundle count.")
+    values = tuple(float(value) for value in weights)
+    if any((not math.isfinite(value)) or value < 0.0 for value in values):
+        raise ProtocolError("Pooling weights must be non-negative finite values.")
+    total = sum(values)
+    if not math.isfinite(total) or total <= 0.0:
+        raise ProtocolError("Pooling weights must sum to a positive finite value.")
+    return tuple(value / total for value in values)
+
+
+def weighted_geometric_probability_pool(
+    bundles: Sequence[PredictionBundle],
+    weights: Sequence[float],
+    *,
+    eps: float = 1.0e-12,
+) -> tuple[tuple[float, ...], ...]:
+    normalized = _normalized_pool_weights(bundles, weights)
+    classes = bundles[0].classes
+    n_rows = len(bundles[0].probabilities)
+    for bundle in bundles:
+        if bundle.classes != classes:
+            raise ProtocolError("Class order mismatch in weighted geometric pooling.")
+        if len(bundle.probabilities) != n_rows:
+            raise ProtocolError("Prediction row count mismatch in weighted geometric pooling.")
+    pooled: list[tuple[float, ...]] = []
+    for row_idx in range(n_rows):
+        logs = [0.0 for _ in classes]
+        for bundle, weight in zip(bundles, normalized):
+            row = bundle.probabilities[row_idx]
+            if len(row) != len(classes):
+                raise ProtocolError("Probability width mismatch in weighted geometric pooling.")
+            for cls_idx, prob in enumerate(row):
+                logs[cls_idx] += float(weight) * math.log(max(float(prob), float(eps)))
+        max_log = max(logs)
+        exp_vals = [math.exp(value - max_log) for value in logs]
+        denom = sum(exp_vals)
+        pooled.append(tuple(value / denom for value in exp_vals))
+    return tuple(pooled)
+
+
+def weighted_arithmetic_probability_pool(
+    bundles: Sequence[PredictionBundle],
+    weights: Sequence[float],
+) -> tuple[tuple[float, ...], ...]:
+    normalized = _normalized_pool_weights(bundles, weights)
+    classes = bundles[0].classes
+    n_rows = len(bundles[0].probabilities)
+    for bundle in bundles:
+        if bundle.classes != classes:
+            raise ProtocolError("Class order mismatch in weighted arithmetic pooling.")
+        if len(bundle.probabilities) != n_rows:
+            raise ProtocolError("Prediction row count mismatch in weighted arithmetic pooling.")
+    pooled: list[tuple[float, ...]] = []
+    for row_idx in range(n_rows):
+        values = [0.0 for _ in classes]
+        for bundle, weight in zip(bundles, normalized):
+            row = bundle.probabilities[row_idx]
+            if len(row) != len(classes):
+                raise ProtocolError("Probability width mismatch in weighted arithmetic pooling.")
+            for cls_idx, prob in enumerate(row):
+                values[cls_idx] += float(weight) * float(prob)
+        denom = sum(values)
+        pooled.append(tuple((value / denom) if denom else (1.0 / len(values)) for value in values))
+    return tuple(pooled)
+
+
 def predict_from_probabilities(probabilities: Sequence[Sequence[float]], classes: Sequence[int] = (0, 1)) -> tuple[int, ...]:
     preds = []
     for row in probabilities:

@@ -15,6 +15,10 @@ from .decentralized_adaptive_gmm_prior import (
     load_decentralized_adaptive_gmm_prior_config,
     run_decentralized_adaptive_gmm_prior,
 )
+from .decentralized_reliability_weighted_gmm_prior import (
+    load_decentralized_reliability_weighted_gmm_prior_config,
+    run_decentralized_reliability_weighted_gmm_prior,
+)
 from .pipeline import run_artifact_contract_smoke, run_real_cache_backed, run_synthetic_smoke
 from .preservation import load_preservation_config, run_preservation_diagnosis
 from .preservation_repair import load_repair_config, run_preservation_repair
@@ -120,7 +124,22 @@ def main(argv: list[str] | None = None) -> int:
     decentralized_adaptive_gmm.add_argument("--config", required=True)
     decentralized_adaptive_gmm.add_argument("--artifact-root", default=None)
 
+    decentralized_reliability_gmm = sub.add_parser(
+        "diagnose-decentralized-reliability-weighted-gmm-prior",
+        help="Run the Virchow2-CVAE source-local reliability-weighted decentralized composition test.",
+    )
+    decentralized_reliability_gmm.add_argument("--config", required=True)
+    decentralized_reliability_gmm.add_argument("--artifact-root", default=None)
+
     args = parser.parse_args(argv)
+    if args.command == "diagnose-decentralized-reliability-weighted-gmm-prior":
+        cfg = load_decentralized_reliability_weighted_gmm_prior_config(args.config)
+        root = run_decentralized_reliability_weighted_gmm_prior(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
     if args.command == "diagnose-decentralized-adaptive-gmm-prior":
         cfg = load_decentralized_adaptive_gmm_prior_config(args.config)
         root = run_decentralized_adaptive_gmm_prior(

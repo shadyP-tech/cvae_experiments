@@ -4,7 +4,9 @@ from cvae_rebuild.downstream import (
     PredictionBundle,
     evaluate_probability_predictions,
     geometric_probability_pool,
+    weighted_geometric_probability_pool,
 )
+from cvae_rebuild.protocol import ProtocolError
 from cvae_rebuild.splits import candidate_experts, random_unlabeled_support_eval_split
 from cvae_rebuild.support_nelbo import (
     SupportScore,
@@ -69,3 +71,21 @@ def test_geometric_pooling_aggregates_probabilities() -> None:
     result = evaluate_probability_predictions("top2", pooled, [0, 1])
     assert result.bacc == 1.0
     assert result.macro_f1 == 1.0
+
+
+def test_weighted_geometric_pooling_equal_weights_matches_unweighted() -> None:
+    first = PredictionBundle("1", probabilities=((0.9, 0.1), (0.2, 0.8)))
+    second = PredictionBundle("2", probabilities=((0.8, 0.2), (0.3, 0.7)))
+    assert weighted_geometric_probability_pool([first, second], [1.0, 1.0]) == geometric_probability_pool([first, second])
+
+
+def test_weighted_geometric_pooling_rejects_invalid_weights() -> None:
+    first = PredictionBundle("1", probabilities=((0.9, 0.1),))
+    second = PredictionBundle("2", probabilities=((0.8, 0.2),))
+    for weights in ([1.0], [1.0, -1.0], [0.0, 0.0]):
+        try:
+            weighted_geometric_probability_pool([first, second], weights)
+        except ProtocolError:
+            pass
+        else:
+            raise AssertionError(f"Expected invalid weights to fail: {weights}")
