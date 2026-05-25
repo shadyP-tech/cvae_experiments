@@ -24,6 +24,9 @@ from cvae_rebuild.decentralized_support8_top3_tau05_gmm_prior import (
 from cvae_rebuild.paired_dense_all4_reliability_confirmation import (
     load_paired_dense_all4_reliability_config,
 )
+from cvae_rebuild.paired_component_coverage_audit import (
+    load_paired_component_coverage_audit_config,
+)
 from cvae_rebuild.pipeline import run_artifact_contract_smoke, run_synthetic_smoke
 from cvae_rebuild.preservation import load_preservation_config
 from cvae_rebuild.preservation_repair import load_repair_config
@@ -207,6 +210,26 @@ def test_locked_paired_dense_all4_reliability_config_loads() -> None:
     assert cfg.gmm_max_iter == 500
     assert cfg.min_component_weight == 0.02
     assert cfg.shrinkage_values == (0.25, 0.5)
+
+
+def test_locked_paired_component_coverage_audit_config_loads() -> None:
+    cfg = load_paired_component_coverage_audit_config(
+        "cvae_rebuild/configs/virchow2_cvae_paired_component_coverage_audit_v1.yaml"
+    )
+    assert cfg.name == "virchow2_cvae_paired_component_coverage_audit_v1"
+    assert cfg.backbone == "virchow2"
+    assert cfg.primary_variant == "pca64_beta001"
+    assert cfg.primary_method == "paired_reliability_all4_weighted_component_stratified128_geom"
+    assert cfg.experiment_seeds == (42, 43, 44)
+    assert cfg.heldout_centers == ("0", "1", "2", "3", "4")
+    assert cfg.replicate_seeds == (17, 23, 31)
+    assert cfg.synthetic_per_class_total == 128
+    assert cfg.diagnostic_synthetic_per_class_total == 256
+    assert cfg.component_sampling_rules == ("multinomial", "stratified_largest_remainder")
+    assert cfg.candidate_components_per_source_class == (4, 3, 2, 1)
+    assert cfg.gmm_n_init == 5
+    assert cfg.gmm_max_iter == 500
+    assert cfg.min_component_weight == 0.02
 
 
 def test_budget_splits_are_rank_order_deterministic() -> None:

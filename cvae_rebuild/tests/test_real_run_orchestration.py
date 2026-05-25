@@ -83,6 +83,16 @@ from cvae_rebuild.paired_dense_all4_reliability_confirmation import (
     parse_paired_dense_all4_reliability_config,
     run_paired_dense_all4_reliability_confirmation,
 )
+from cvae_rebuild.paired_component_coverage_audit import (
+    ROW_EQUAL_STRATIFIED128,
+    ROW_RELIABILITY_MULTINOMIAL128_REFERENCE,
+    ROW_RELIABILITY_MULTINOMIAL256,
+    ROW_RELIABILITY_STRATIFIED128,
+    ROW_RELIABILITY_STRATIFIED256,
+    _stratified_largest_remainder_component_counts,
+    parse_paired_component_coverage_audit_config,
+    run_paired_component_coverage_audit,
+)
 from cvae_rebuild.generation import generate_reference_posterior
 from cvae_rebuild.models import ClassConditionedCVAE
 from cvae_rebuild.pipeline import run_real_cache_backed
@@ -1536,6 +1546,115 @@ def test_paired_dense_all4_reliability_rejects_support_usage(tmp_path: Path) -> 
         parse_paired_dense_all4_reliability_config(payload, base_dir=tmp_path)
 
 
+def test_paired_component_coverage_stratified_allocation_is_locked() -> None:
+    counts = _stratified_largest_remainder_component_counts([0.5, 0.3, 0.2], 7, min_component_weight=0.02)
+    assert counts == {0: 3, 1: 2, 2: 2}
+
+    tie_counts = _stratified_largest_remainder_component_counts([0.5, 0.5], 3, min_component_weight=0.02)
+    assert tie_counts == {0: 2, 1: 1}
+
+    infeasible_counts = _stratified_largest_remainder_component_counts([0.4, 0.3, 0.2, 0.1], 2, min_component_weight=0.02)
+    assert sum(infeasible_counts.values()) == 2
+    assert sorted(component for component, count in infeasible_counts.items() if count) == [0, 1]
+
+
+def test_paired_component_coverage_audit_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_paired_component_coverage_audit_payload(tmp_path)
+    cfg = parse_paired_component_coverage_audit_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_paired_component_coverage_audit(cfg)
+
+    expected = [
+        "tables/paired_component_coverage_downstream_matrix.csv",
+        "tables/paired_component_coverage_gap_summary.csv",
+        "tables/paired_component_coverage_center_summary.csv",
+        "tables/paired_component_coverage_summary.csv",
+        "tables/source_reliability_manifest.csv",
+        "tables/reliability_weight_manifest.csv",
+        "tables/realized_budget_table.csv",
+        "tables/excluded_cell_report.csv",
+        "tables/component_sampling_pairing_audit.csv",
+        "tables/paired_delta_summary.csv",
+        "tables/generated_component_coverage_audit.csv",
+        "tables/aggregate_component_coverage_audit.csv",
+        "tables/weak_source_audit.csv",
+        "manifests/protocol_manifest.json",
+        "manifests/paired_component_coverage_prior_model_manifest.csv",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "paired_component_coverage_downstream_matrix.csv", newline="")))
+    weights = list(csv.DictReader(open(root / "tables" / "reliability_weight_manifest.csv", newline="")))
+    budgets = list(csv.DictReader(open(root / "tables" / "realized_budget_table.csv", newline="")))
+    aggregate_coverage = list(csv.DictReader(open(root / "tables" / "aggregate_component_coverage_audit.csv", newline="")))
+    audit = list(csv.DictReader(open(root / "tables" / "component_sampling_pairing_audit.csv", newline="")))
+    deltas = list(csv.DictReader(open(root / "tables" / "paired_delta_summary.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "paired_component_coverage_summary.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert protocol["dense_all4_fixed_inclusion"] is True
+    assert protocol["top_k_selection_enabled"] is False
+    assert protocol["weighted_component_mass_coverage_enabled"] is True
+    assert protocol["coverage_denominator_uses_realized_source_class_budget"] is True
+    assert {ROW_RELIABILITY_MULTINOMIAL128_REFERENCE, ROW_RELIABILITY_STRATIFIED128, ROW_EQUAL_STRATIFIED128}.issubset(
+        {row["prior_method"] for row in matrix}
+    )
+    assert {ROW_RELIABILITY_MULTINOMIAL256, ROW_RELIABILITY_STRATIFIED256}.issubset(
+        {row["prior_method"] for row in matrix}
+    )
+    assert audit and {row["audit_status"] for row in audit} == {"PASS"}
+    assert any(row["method"] == ROW_RELIABILITY_STRATIFIED128 for row in deltas)
+    assert "stratified_delta_vs_baseline_center_equal_bacc" in summary[0]
+    assert "CVAE sampling-fidelity audit" in report
+
+    for key in {
+        (row["method"], row["experiment_seed"], row["heldout_center"], row["replicate_seed"])
+        for row in weights
+    }:
+        subset = [
+            row for row in weights
+            if (row["method"], row["experiment_seed"], row["heldout_center"], row["replicate_seed"]) == key
+        ]
+        assert abs(sum(float(row["final_normalized_weight"]) for row in subset) - 1.0) < 1.0e-6
+
+    assert budgets
+    for row in budgets:
+        total = 256 if row["method"] in {ROW_RELIABILITY_MULTINOMIAL256, ROW_RELIABILITY_STRATIFIED256} else 128
+        assert int(row["budget_sum_per_class"]) == total
+
+    assert aggregate_coverage
+    required_coverage_fields = {
+        "active_component_count",
+        "sampled_component_count",
+        "unsampled_component_count",
+        "component_count_coverage",
+        "active_component_weight_mass",
+        "sampled_component_weight_mass",
+        "unsampled_component_weight_mass",
+        "component_weight_mass_coverage",
+        "min_source_class_budget",
+        "num_source_class_budgets_below_active_components",
+    }
+    assert required_coverage_fields.issubset(aggregate_coverage[0])
+    assert all(float(row["component_weight_mass_coverage"]) <= 1.0 for row in aggregate_coverage)
+
+
+def test_paired_component_coverage_audit_rejects_support_usage(tmp_path: Path) -> None:
+    payload = _tiny_paired_component_coverage_audit_payload(tmp_path)
+    payload["run_matrix"]["support_size"] = 8
+
+    with pytest.raises(Exception, match="target support"):
+        parse_paired_component_coverage_audit_config(payload, base_dir=tmp_path)
+
+
 def test_decentralized_reliability_top3_gmm_prior_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
     payload = _tiny_decentralized_reliability_top3_gmm_payload(tmp_path)
     cfg = parse_decentralized_reliability_top3_gmm_prior_config(payload, base_dir=tmp_path)
@@ -2846,6 +2965,56 @@ def _tiny_paired_dense_all4_reliability_payload(tmp_path: Path):
             "reliability_floor_score": 0.05,
             "reliability_epsilon": 1.0e-8,
             "shrinkage_values": [0.25, 0.50],
+            "primary_pooling": "weighted_geometric",
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_paired_component_coverage_audit_payload(tmp_path: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_paired_component_coverage_audit_v1",
+            "artifact_root": str(tmp_path / "virchow2_cvae_paired_component_coverage_audit_v1"),
+            "primary_variant": "pca64_beta001",
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
+            "paired_reliability_artifact_root": str(tmp_path / "missing_paired_reliability_context"),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2", "3", "4"],
+            "replicate_seeds": [17],
+        },
+        "generation": {
+            "synthetic_per_class_total": 128,
+            "diagnostic_synthetic_per_class_total": 256,
+            "min_per_source_per_class": 8,
+        },
+        "paired_component_coverage_audit": {
+            "primary_method": "paired_reliability_all4_weighted_component_stratified128_geom",
+            "candidate_components_per_source_class": [4, 3, 2, 1],
+            "min_samples_per_component": 12,
+            "source_weighting": "heldout_excluded_source_local_reliability_dense_all4",
+            "component_sampling_rules": ["multinomial", "stratified_largest_remainder"],
+            "gmm_covariance_type": "diag",
+            "gmm_reg_covar": 1.0e-4,
+            "gmm_n_init": 5,
+            "gmm_max_iter": 500,
+            "min_component_weight": 0.02,
+            "variance_floor": 1.0e-5,
+            "reliability_floor_score": 0.05,
+            "reliability_epsilon": 1.0e-8,
             "primary_pooling": "weighted_geometric",
         },
         "classifier": {

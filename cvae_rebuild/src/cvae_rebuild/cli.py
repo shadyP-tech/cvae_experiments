@@ -43,6 +43,10 @@ from .paired_dense_all4_reliability_confirmation import (
     load_paired_dense_all4_reliability_config,
     run_paired_dense_all4_reliability_confirmation,
 )
+from .paired_component_coverage_audit import (
+    load_paired_component_coverage_audit_config,
+    run_paired_component_coverage_audit,
+)
 from .pipeline import run_artifact_contract_smoke, run_real_cache_backed, run_synthetic_smoke
 from .preservation import load_preservation_config, run_preservation_diagnosis
 from .preservation_repair import load_repair_config, run_preservation_repair
@@ -197,7 +201,22 @@ def main(argv: list[str] | None = None) -> int:
     paired_dense_all4_reliability.add_argument("--config", required=True)
     paired_dense_all4_reliability.add_argument("--artifact-root", default=None)
 
+    paired_component_coverage = sub.add_parser(
+        "diagnose-paired-component-coverage-audit",
+        help="Run the paired dense-all4 component coverage sampling-fidelity audit.",
+    )
+    paired_component_coverage.add_argument("--config", required=True)
+    paired_component_coverage.add_argument("--artifact-root", default=None)
+
     args = parser.parse_args(argv)
+    if args.command == "diagnose-paired-component-coverage-audit":
+        cfg = load_paired_component_coverage_audit_config(args.config)
+        root = run_paired_component_coverage_audit(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
     if args.command == "diagnose-paired-dense-all4-reliability":
         cfg = load_paired_dense_all4_reliability_config(args.config)
         root = run_paired_dense_all4_reliability_confirmation(
