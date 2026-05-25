@@ -1400,7 +1400,6 @@ def _decision(
     primary = d1a._rows_for(rows, PRIMARY_SUPPORT_RELIABILITY_METHOD)
     d12_ref = d1a._rows_for(rows, ROW_D1_2_REFERENCE)
     equal = d1a._rows_for(rows, ROW_EQUAL_REFERENCE)
-    controls = [row for row in rows if row.get("prior_method") in {ROW_SHUFFLED_SUPPORT_CONTROL, ROW_SHUFFLED_SUMMARY_CONTROL, ROW_SHUFFLED_LABEL_CONTROL} and row.get("status") == "ok"]
     single_mean = d1a._rows_for(rows, ROW_SINGLE_MEAN)
     single_oracle = d1a._rows_for(rows, ROW_SINGLE_ORACLE)
     real_feature = d1a._rows_for(rows, ROW_REAL_FEATURE_DENSE_REFERENCE)
@@ -1410,13 +1409,21 @@ def _decision(
     single_mean_stats = d1a._primary_stats(single_mean)
     single_oracle_stats = d1a._primary_stats(single_oracle)
     real_stats = d1a._primary_stats(real_feature)
-    control_stats = d1a._primary_stats(controls)
+    control_by_method = {
+        ROW_SHUFFLED_SUPPORT_CONTROL: d1a._primary_stats(d1a._rows_for(rows, ROW_SHUFFLED_SUPPORT_CONTROL)),
+        ROW_SHUFFLED_SUMMARY_CONTROL: d1a._primary_stats(d1a._rows_for(rows, ROW_SHUFFLED_SUMMARY_CONTROL)),
+        ROW_SHUFFLED_LABEL_CONTROL: d1a._primary_stats(d1a._rows_for(rows, ROW_SHUFFLED_LABEL_CONTROL)),
+    }
+    strongest_control_method, strongest_control_bacc = _strongest_control(control_by_method)
     delta_vs_d12 = _float(stats["center_equal_mean_bacc"]) - _float(d12_stats["center_equal_mean_bacc"])
     delta_vs_equal = _float(stats["center_equal_mean_bacc"]) - _float(equal_stats["center_equal_mean_bacc"])
     delta_vs_mean_single = _float(stats["center_equal_mean_bacc"]) - _float(single_mean_stats["center_equal_mean_bacc"])
     delta_vs_oracle_single = _float(stats["center_equal_mean_bacc"]) - _float(single_oracle_stats["center_equal_mean_bacc"])
     delta_vs_real = _float(stats["center_equal_mean_bacc"]) - _float(real_stats["center_equal_mean_bacc"])
-    negative_control_gap = _float(stats["center_equal_mean_bacc"]) - _float(control_stats["center_equal_mean_bacc"])
+    negative_control_gap = _float(stats["center_equal_mean_bacc"]) - strongest_control_bacc
+    shuffled_support_gap = _float(stats["center_equal_mean_bacc"]) - _float(
+        control_by_method[ROW_SHUFFLED_SUPPORT_CONTROL]["center_equal_mean_bacc"]
+    )
     center_deltas = {str(row["id"]): _float(row["delta_vs_d1_2_reliability_support_eval_reference"]) for row in centerwise_rows if row.get("axis") == "center"}
     seed_deltas = {str(row["id"]): _float(row["delta_vs_d1_2_reliability_support_eval_reference"]) for row in centerwise_rows if row.get("axis") == "seed"}
     centers_beating = sum(1 for value in center_deltas.values() if math.isfinite(value) and value > 0.0)
@@ -1482,6 +1489,8 @@ def _decision(
         flags.append("TOP2_ORACLE_CONTAINMENT_BELOW_0P70")
     if math.isfinite(negative_control_gap) and negative_control_gap < 0.03:
         flags.append("NEGATIVE_CONTROL_GAP_BELOW_0P03")
+    if math.isfinite(shuffled_support_gap) and shuffled_support_gap < 0.03:
+        flags.append("SHUFFLED_SUPPORT_CONTROL_COMPETITIVE")
     return {
         "primary_verdict": verdict,
         "diagnostic_flags": "|".join(flags),
@@ -1497,6 +1506,12 @@ def _decision(
         "delta_vs_single_source_oracle_adaptive_k": delta_vs_oracle_single,
         "delta_vs_real_feature_dense_support_eval_reference": delta_vs_real,
         "negative_control_gap": negative_control_gap,
+        "strongest_negative_control_method": strongest_control_method,
+        "strongest_negative_control_center_equal_mean_bacc": strongest_control_bacc,
+        "shuffled_support_control_center_equal_mean_bacc": control_by_method[ROW_SHUFFLED_SUPPORT_CONTROL]["center_equal_mean_bacc"],
+        "shuffled_support_control_gap": shuffled_support_gap,
+        "shuffled_summary_control_center_equal_mean_bacc": control_by_method[ROW_SHUFFLED_SUMMARY_CONTROL]["center_equal_mean_bacc"],
+        "shuffled_label_control_center_equal_mean_bacc": control_by_method[ROW_SHUFFLED_LABEL_CONTROL]["center_equal_mean_bacc"],
         "top1_downstream_oracle_hit": top1,
         "top2_downstream_oracle_containment": top2,
         "spearman_support_nelbo_vs_downstream_utility": spearman,
@@ -1512,7 +1527,7 @@ def _decision(
         "mean_single_source_adaptive_k_center_equal_mean_bacc": single_mean_stats["center_equal_mean_bacc"],
         "single_source_oracle_adaptive_k_center_equal_mean_bacc": single_oracle_stats["center_equal_mean_bacc"],
         "real_feature_dense_support_eval_center_equal_mean_bacc": real_stats["center_equal_mean_bacc"],
-        "negative_control_center_equal_mean_bacc": control_stats["center_equal_mean_bacc"],
+        "negative_control_center_equal_mean_bacc": strongest_control_bacc,
         "support_size_diagnostic_num_valid_cells_json": json.dumps(support_size_valid, sort_keys=True),
         "support_score_rows": len(support_score_rows),
         "support_weight_rows": len(support_weight_rows),
@@ -1530,6 +1545,17 @@ def _axis_means(rows: Sequence[Mapping[str, object]], axis: str, field: str) -> 
         if math.isfinite(value):
             grouped.setdefault(str(row.get(axis)), []).append(value)
     return {key: nanmean(values) for key, values in sorted(grouped.items())}
+
+
+def _strongest_control(control_by_method: Mapping[str, Mapping[str, object]]) -> tuple[str, float]:
+    scored = [
+        (method, _float(stats.get("center_equal_mean_bacc")))
+        for method, stats in control_by_method.items()
+        if math.isfinite(_float(stats.get("center_equal_mean_bacc")))
+    ]
+    if not scored:
+        return "", math.nan
+    return max(scored, key=lambda item: (item[1], item[0]))
 
 
 def _combined_weight_diagnostics(rows: Sequence[Mapping[str, object]]) -> dict[str, object]:
@@ -1662,6 +1688,12 @@ def _negative_control_summary(decision: Mapping[str, object]) -> dict[str, objec
         "primary_method": PRIMARY_SUPPORT_RELIABILITY_METHOD,
         "control_methods": f"{ROW_SHUFFLED_SUPPORT_CONTROL}|{ROW_SHUFFLED_SUMMARY_CONTROL}|{ROW_SHUFFLED_LABEL_CONTROL}",
         "primary_center_equal_mean_bacc": decision.get("center_equal_mean_bacc", math.nan),
+        "strongest_negative_control_method": decision.get("strongest_negative_control_method", ""),
+        "strongest_negative_control_center_equal_mean_bacc": decision.get("strongest_negative_control_center_equal_mean_bacc", math.nan),
+        "shuffled_support_control_center_equal_mean_bacc": decision.get("shuffled_support_control_center_equal_mean_bacc", math.nan),
+        "shuffled_support_control_gap": decision.get("shuffled_support_control_gap", math.nan),
+        "shuffled_summary_control_center_equal_mean_bacc": decision.get("shuffled_summary_control_center_equal_mean_bacc", math.nan),
+        "shuffled_label_control_center_equal_mean_bacc": decision.get("shuffled_label_control_center_equal_mean_bacc", math.nan),
         "control_center_equal_mean_bacc": decision.get("negative_control_center_equal_mean_bacc", math.nan),
         "negative_control_gap": decision.get("negative_control_gap", math.nan),
         "control_competitive": _float(decision.get("negative_control_gap")) < 0.03,
@@ -1691,6 +1723,8 @@ def _write_decision_summary(root: Path, decision: Mapping[str, object], *, leaka
             f"- Top-2 downstream oracle containment: {_format_float(decision.get('top2_downstream_oracle_containment'))}",
             f"- Downstream oracle gap: {_format_float(decision.get('downstream_oracle_gap'))}",
             f"- Negative-control gap: {_format_float(decision.get('negative_control_gap'))}",
+            f"- Strongest negative control: `{decision.get('strongest_negative_control_method', '')}` at {_format_float(decision.get('strongest_negative_control_center_equal_mean_bacc'))}",
+            f"- Shuffled-support control gap: {_format_float(decision.get('shuffled_support_control_gap'))}",
             f"- Leakage status: `{leakage_status}`",
             "",
             "## Protocol Boundary",

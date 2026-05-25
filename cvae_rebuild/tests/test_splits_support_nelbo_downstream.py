@@ -8,7 +8,8 @@ from cvae_rebuild.downstream import (
     weighted_geometric_probability_pool,
 )
 from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import SourceReliability
-from cvae_rebuild.decentralized_support_nelbo_reliability_gmm_prior import _combined_weight_plan
+from cvae_rebuild.decentralized_support_nelbo_reliability_gmm_prior import _combined_weight_plan, _strongest_control
+from cvae_rebuild.decentralized_support8_top3_tau05_gmm_prior import _topk_existing_plan
 from cvae_rebuild.protocol import ProtocolError
 from cvae_rebuild.splits import candidate_experts, random_unlabeled_support_eval_split
 from cvae_rebuild.support_nelbo import (
@@ -124,3 +125,49 @@ def test_support_nelbo_weight_plan_prefers_lower_calibrated_nelbo_when_reliabili
     )
     assert plan["weights"]["2"] > plan["weights"]["3"] > plan["weights"]["1"] > plan["weights"]["4"]
     assert sum(plan["budgets"].values()) == 128
+
+
+def test_support_nelbo_decision_audit_uses_strongest_negative_control() -> None:
+    method, value = _strongest_control(
+        {
+            "decentralized_support_nelbo_shuffled_support_control": {"center_equal_mean_bacc": 0.846},
+            "decentralized_support_nelbo_shuffled_summary_control": {"center_equal_mean_bacc": 0.17},
+            "decentralized_support_nelbo_shuffled_label_control": {"center_equal_mean_bacc": 0.51},
+        }
+    )
+    assert method == "decentralized_support_nelbo_shuffled_support_control"
+    assert value == 0.846
+
+
+def test_support8_top3_plan_uses_combined_scores_and_tie_breaks() -> None:
+    cfg = SimpleNamespace(
+        synthetic_per_class_total=128,
+        min_per_source_per_class=8,
+        support_nelbo_tau=0.5,
+    )
+    plan = {
+        "sources": ("1", "2", "3", "4"),
+        "weights": {"1": 0.25, "2": 0.25, "3": 0.25, "4": 0.25},
+        "scores": {"1": 0.4, "2": 0.8, "3": 0.8, "4": 0.2},
+        "support_weights": {"1": 0.25, "2": 0.25, "3": 0.25, "4": 0.25},
+        "support_scores": {"1": -1.0, "2": -2.0, "3": -2.0, "4": -0.5},
+        "raw_support_nelbo": {"1": 1.0, "2": 1.0, "3": 1.0, "4": 1.0},
+        "calibrated_support_nelbo": {"1": 0.0, "2": -0.2, "3": -0.5, "4": 1.0},
+        "reliability_scores": {"1": 0.4, "2": 0.8, "3": 0.8, "4": 0.2},
+        "use_calibrated_support_nelbo": True,
+        "include_reliability": True,
+        "support_nelbo_tau": 0.5,
+    }
+    ranked = rank_support_scores(
+        [
+            SupportScore(42, "0", 17, 8, "1", 10.0, 0.0),
+            SupportScore(42, "0", 17, 8, "2", 10.0, -0.2),
+            SupportScore(42, "0", 17, 8, "3", 10.0, -0.5),
+            SupportScore(42, "0", 17, 8, "4", 10.0, 1.0),
+        ]
+    )
+    out = _topk_existing_plan(cfg, plan, ranked, k=3)
+    assert out["sources"] == ("3", "2", "1")
+    assert abs(sum(out["weights"].values()) - 1.0) < 1.0e-8
+    assert sum(out["budgets"].values()) == 128
+    assert all(value >= 8 for value in out["budgets"].values())
