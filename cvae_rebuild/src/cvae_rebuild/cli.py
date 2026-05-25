@@ -19,6 +19,10 @@ from .decentralized_reliability_weighted_gmm_prior import (
     load_decentralized_reliability_weighted_gmm_prior_config,
     run_decentralized_reliability_weighted_gmm_prior,
 )
+from .decentralized_reliability_top3_gmm_prior import (
+    load_decentralized_reliability_top3_gmm_prior_config,
+    run_decentralized_reliability_top3_gmm_prior,
+)
 from .decentralized_support_nelbo_reliability_gmm_prior import (
     load_decentralized_support_nelbo_reliability_gmm_prior_config,
     run_decentralized_support_nelbo_reliability_gmm_prior,
@@ -139,6 +143,13 @@ def main(argv: list[str] | None = None) -> int:
     decentralized_reliability_gmm.add_argument("--config", required=True)
     decentralized_reliability_gmm.add_argument("--artifact-root", default=None)
 
+    decentralized_reliability_top3_gmm = sub.add_parser(
+        "diagnose-decentralized-reliability-top3-gmm-prior",
+        help="Run the locked D1.4 source-local reliability top-3 decentralized composition test.",
+    )
+    decentralized_reliability_top3_gmm.add_argument("--config", required=True)
+    decentralized_reliability_top3_gmm.add_argument("--artifact-root", default=None)
+
     decentralized_support_nelbo_reliability_gmm = sub.add_parser(
         "diagnose-decentralized-support-nelbo-reliability-gmm-prior",
         help="Run the Virchow2-CVAE support-NELBO x reliability decentralized composition test.",
@@ -157,6 +168,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "diagnose-decentralized-support8-top3-tau05-gmm-prior":
         cfg = load_decentralized_support8_top3_tau05_gmm_prior_config(args.config)
         root = run_decentralized_support8_top3_tau05_gmm_prior(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
+    if args.command == "diagnose-decentralized-reliability-top3-gmm-prior":
+        cfg = load_decentralized_reliability_top3_gmm_prior_config(args.config)
+        root = run_decentralized_reliability_top3_gmm_prior(
             cfg,
             artifact_root=Path(args.artifact_root) if args.artifact_root else None,
         )

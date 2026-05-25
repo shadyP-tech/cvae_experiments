@@ -41,6 +41,11 @@ from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import (
     parse_decentralized_reliability_weighted_gmm_prior_config,
     run_decentralized_reliability_weighted_gmm_prior,
 )
+from cvae_rebuild.decentralized_reliability_top3_gmm_prior import (
+    PRIMARY_RELIABILITY_TOP3_METHOD,
+    parse_decentralized_reliability_top3_gmm_prior_config,
+    run_decentralized_reliability_top3_gmm_prior,
+)
 from cvae_rebuild.decentralized_support_nelbo_reliability_gmm_prior import (
     PRIMARY_SUPPORT_RELIABILITY_METHOD,
     parse_decentralized_support_nelbo_reliability_gmm_prior_config,
@@ -1320,6 +1325,81 @@ def test_decentralized_reliability_weighted_gmm_prior_rejects_invalid_backbone(t
         parse_decentralized_reliability_weighted_gmm_prior_config(payload, base_dir=tmp_path)
 
 
+def test_decentralized_reliability_top3_gmm_prior_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_decentralized_reliability_top3_gmm_payload(tmp_path)
+    cfg = parse_decentralized_reliability_top3_gmm_prior_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_decentralized_reliability_top3_gmm_prior(cfg)
+
+    expected = [
+        "tables/decentralized_reliability_top3_downstream_matrix.csv",
+        "tables/decentralized_reliability_top3_gap_summary.csv",
+        "tables/decentralized_reliability_top3_summary.csv",
+        "tables/source_reliability_manifest.csv",
+        "tables/reliability_top3_selection_manifest.csv",
+        "tables/top3_selection_stability.csv",
+        "tables/centerwise_delta_summary.csv",
+        "tables/late_aggregation_matrix.csv",
+        "tables/real_feature_reference_matrix.csv",
+        "tables/generated_component_coverage_audit.csv",
+        "tables/weak_source_audit.csv",
+        "tables/nearest_neighbor_memorization_audit.csv",
+        "tables/negative_control_summary.csv",
+        "manifests/protocol_manifest.json",
+        "manifests/decentralized_reliability_top3_prior_model_manifest.csv",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "decentralized_reliability_top3_downstream_matrix.csv", newline="")))
+    selections = list(csv.DictReader(open(root / "tables" / "reliability_top3_selection_manifest.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "decentralized_reliability_top3_summary.csv", newline="")))
+    negative = list(csv.DictReader(open(root / "tables" / "negative_control_summary.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert protocol["target_support_features_for_selection"] is False
+    assert protocol["support8_context_rows_decision_excluded"] is True
+    assert any(row["prior_method"] == PRIMARY_RELIABILITY_TOP3_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_reliability_all4_weighted_geom_reference" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_equal_all4_geom_reference" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_reliability_top3_shuffled_reliability_control" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_reliability_top3_random_source_drop_control" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_support8_d1_3_1_primary_context" for row in matrix)
+    assert selections and all(row["heldout_center"] not in row["selected_sources"].split("|") for row in selections)
+    for row in selections:
+        budgets = json.loads(row["synthetic_per_class_budget_json"])
+        assert len(budgets) == 3
+        assert sum(int(value) for value in budgets.values()) == 128
+        assert all(int(value) >= 8 for value in budgets.values())
+    assert "shuffled_reliability_control_gap" in summary[0]
+    assert "random_source_drop_control_gap" in summary[0]
+    assert negative and "shuffled_reliability_control_gap" in negative[0]
+    assert "reliability-based sparse composition, not target-conditioned routing" in report
+
+
+def test_decentralized_reliability_top3_gmm_prior_rejects_support_usage(tmp_path: Path) -> None:
+    payload = _tiny_decentralized_reliability_top3_gmm_payload(tmp_path)
+    payload["run_matrix"]["support_size"] = 8
+
+    with pytest.raises(Exception, match="must not configure or consume target support"):
+        parse_decentralized_reliability_top3_gmm_prior_config(payload, base_dir=tmp_path)
+
+
+def test_decentralized_reliability_top3_gmm_prior_rejects_invalid_top_k(tmp_path: Path) -> None:
+    payload = _tiny_decentralized_reliability_top3_gmm_payload(tmp_path)
+    payload["generation"]["top_k_sources"] = 2
+
+    with pytest.raises(Exception, match="top_k_sources must be locked to 3"):
+        parse_decentralized_reliability_top3_gmm_prior_config(payload, base_dir=tmp_path)
+
+
 def test_decentralized_support_nelbo_reliability_gmm_prior_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
     payload = _tiny_decentralized_support_nelbo_reliability_gmm_payload(tmp_path)
     cfg = parse_decentralized_support_nelbo_reliability_gmm_prior_config(payload, base_dir=tmp_path)
@@ -2355,6 +2435,54 @@ def _tiny_decentralized_reliability_weighted_gmm_payload(tmp_path: Path):
             "primary_pooling": "weighted_geometric",
             "reliability_floor_score": 0.05,
             "softmax_tau": 1.0,
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_decentralized_reliability_top3_gmm_payload(tmp_path: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_decentralized_reliability_top3_gmm_prior_v1",
+            "artifact_root": str(tmp_path / "virchow2_cvae_decentralized_reliability_top3_gmm_prior_v1"),
+            "primary_variant": "pca64_beta001",
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
+            "d1_3_1_artifact_root": str(tmp_path / "missing_d1_3_1_context"),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2", "3", "4"],
+            "replicate_seeds": [17],
+        },
+        "generation": {
+            "synthetic_per_class_total": 128,
+            "min_per_source_per_class": 8,
+            "top_k_sources": 3,
+        },
+        "reliability_top3_gmm_prior": {
+            "primary_method": "decentralized_reliability_top3_geom_confirmation",
+            "candidate_components_per_source_class": [4, 3, 2, 1],
+            "min_samples_per_component": 12,
+            "source_weighting": "source_local_reliability_top3",
+            "gmm_covariance_type": "diag",
+            "gmm_reg_covar": 1.0e-4,
+            "gmm_n_init": 1,
+            "gmm_max_iter": 100,
+            "min_component_weight": 0.001,
+            "variance_floor": 1.0e-5,
+            "primary_pooling": "geometric",
+            "reliability_floor_score": 0.05,
         },
         "classifier": {
             "type": "sklearn_logistic_regression",

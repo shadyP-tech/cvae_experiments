@@ -10,6 +10,7 @@ from cvae_rebuild.downstream import (
 from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import SourceReliability
 from cvae_rebuild.decentralized_support_nelbo_reliability_gmm_prior import _combined_weight_plan, _strongest_control
 from cvae_rebuild.decentralized_support8_top3_tau05_gmm_prior import _topk_existing_plan
+from cvae_rebuild.decentralized_reliability_top3_gmm_prior import _select_topk_reliable
 from cvae_rebuild.protocol import ProtocolError
 from cvae_rebuild.splits import candidate_experts, random_unlabeled_support_eval_split
 from cvae_rebuild.support_nelbo import (
@@ -171,3 +172,13 @@ def test_support8_top3_plan_uses_combined_scores_and_tie_breaks() -> None:
     assert abs(sum(out["weights"].values()) - 1.0) < 1.0e-8
     assert sum(out["budgets"].values()) == 128
     assert all(value >= 8 for value in out["budgets"].values())
+
+
+def test_reliability_top3_selection_uses_raw_bacc_and_source_tie_breaks() -> None:
+    rels = {
+        "1": SourceReliability(42, 17, "1", 0.75, 0.75, 0.6, "ok", "", 20, "", ""),
+        "2": SourceReliability(42, 17, "2", 0.80, 0.75, 0.6, "ok", "", 20, "", ""),
+        "3": SourceReliability(42, 17, "3", 0.70, 0.75, 0.4, "ok", "", 20, "", ""),
+        "4": SourceReliability(42, 17, "4", 0.75, 0.75, 0.6, "ok", "", 20, "", ""),
+    }
+    assert _select_topk_reliable(("1", "2", "3", "4"), rels, k=3) == ("2", "1", "4")
