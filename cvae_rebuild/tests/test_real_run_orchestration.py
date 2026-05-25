@@ -1,5 +1,6 @@
 import csv
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -38,6 +39,7 @@ from cvae_rebuild.decentralized_adaptive_gmm_prior import (
 )
 from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import (
     PRIMARY_RELIABILITY_METHOD,
+    SourceReliability,
     parse_decentralized_reliability_weighted_gmm_prior_config,
     run_decentralized_reliability_weighted_gmm_prior,
 )
@@ -60,6 +62,21 @@ from cvae_rebuild.decentralized_support8_top3_tau05_gmm_prior import (
     PRIMARY_SUPPORT8_TOP3_TAU05_METHOD,
     parse_decentralized_support8_top3_tau05_gmm_prior_config,
     run_decentralized_support8_top3_tau05_gmm_prior,
+)
+from cvae_rebuild.paired_dense_all4_reliability_confirmation import (
+    ROW_BUDGET_ONLY,
+    ROW_EQUAL_ALL4,
+    ROW_INVERSE,
+    ROW_POOL_ONLY,
+    ROW_RELIABILITY_ALL4_WEIGHTED,
+    ROW_SHRINK025,
+    ROW_SHRINK050,
+    ROW_SHUFFLED,
+    _heldout_excluded_reliability_transform,
+    _inverse_rank_reversal_weights,
+    _variant_plans,
+    parse_paired_dense_all4_reliability_config,
+    run_paired_dense_all4_reliability_confirmation,
 )
 from cvae_rebuild.generation import generate_reference_posterior
 from cvae_rebuild.models import ClassConditionedCVAE
@@ -1330,6 +1347,120 @@ def test_decentralized_reliability_weighted_gmm_prior_rejects_invalid_backbone(t
         parse_decentralized_reliability_weighted_gmm_prior_config(payload, base_dir=tmp_path)
 
 
+def test_paired_dense_all4_reliability_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_paired_dense_all4_reliability_payload(tmp_path)
+    cfg = parse_paired_dense_all4_reliability_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_paired_dense_all4_reliability_confirmation(cfg)
+
+    expected = [
+        "tables/paired_dense_all4_downstream_matrix.csv",
+        "tables/paired_dense_all4_gap_summary.csv",
+        "tables/paired_dense_all4_center_summary.csv",
+        "tables/paired_dense_all4_summary.csv",
+        "tables/source_reliability_manifest.csv",
+        "tables/reliability_weight_manifest.csv",
+        "tables/realized_budget_table.csv",
+        "tables/excluded_cell_report.csv",
+        "tables/paired_generation_invariant_audit.csv",
+        "tables/paired_delta_summary.csv",
+        "tables/negative_control_summary.csv",
+        "tables/generated_component_coverage_audit.csv",
+        "tables/weak_source_audit.csv",
+        "manifests/protocol_manifest.json",
+        "manifests/paired_dense_all4_prior_model_manifest.csv",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "paired_dense_all4_downstream_matrix.csv", newline="")))
+    reliability = list(csv.DictReader(open(root / "tables" / "source_reliability_manifest.csv", newline="")))
+    weights = list(csv.DictReader(open(root / "tables" / "reliability_weight_manifest.csv", newline="")))
+    budgets = list(csv.DictReader(open(root / "tables" / "realized_budget_table.csv", newline="")))
+    audit = list(csv.DictReader(open(root / "tables" / "paired_generation_invariant_audit.csv", newline="")))
+    deltas = list(csv.DictReader(open(root / "tables" / "paired_delta_summary.csv", newline="")))
+    gap = list(csv.DictReader(open(root / "tables" / "paired_dense_all4_gap_summary.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "paired_dense_all4_summary.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert protocol["target_center_excluded_from_reliability"] is True
+    assert protocol["dense_all4_fixed_inclusion"] is True
+    assert protocol["top_k_selection_enabled"] is False
+    assert protocol["inverse_reliability_definition"] == "rank_reversal_matched_entropy"
+    assert {ROW_EQUAL_ALL4, ROW_RELIABILITY_ALL4_WEIGHTED, ROW_POOL_ONLY, ROW_BUDGET_ONLY}.issubset(
+        {row["prior_method"] for row in matrix}
+    )
+    assert {ROW_SHRINK025, ROW_SHRINK050, ROW_SHUFFLED, ROW_INVERSE}.issubset(
+        {row["prior_method"] for row in matrix}
+    )
+    assert reliability and all(row["heldout_center"] != row["source_center"] for row in reliability)
+    assert all(row["target_eval_labels_used_for_reliability"] == "False" for row in reliability)
+    assert audit and {row["audit_status"] for row in audit} == {"PASS"}
+    assert any(row["method"] == ROW_SHRINK050 for row in deltas)
+    assert "seed_cell_mean_bacc" in gap[0]
+    assert "center_equal_mean_bacc" in gap[0]
+    assert "best_reliability_method" in summary[0]
+    assert "not sparse expert selection" in protocol["claim_boundary"]
+    assert "Do not claim sparse routing" in report
+
+    for key in {
+        (row["method"], row["experiment_seed"], row["heldout_center"], row["replicate_seed"])
+        for row in weights
+    }:
+        subset = [
+            row for row in weights
+            if (row["method"], row["experiment_seed"], row["heldout_center"], row["replicate_seed"]) == key
+        ]
+        assert abs(sum(float(row["final_normalized_weight"]) for row in subset) - 1.0) < 1.0e-6
+        assert sum(int(row["synthetic_per_class_budget"]) for row in subset) == 128
+    assert budgets and all(int(row["budget_sum_per_class"]) == 128 for row in budgets)
+
+
+def test_paired_dense_all4_reliability_weight_rules_are_locked(tmp_path: Path) -> None:
+    cfg = parse_paired_dense_all4_reliability_config(
+        _tiny_paired_dense_all4_reliability_payload(tmp_path),
+        base_dir=tmp_path,
+    )
+    rels = {
+        "1": SourceReliability(42, 17, "1", 0.90, 0.90, 0.80, "ok", "", 20, "g1", "p1"),
+        "2": SourceReliability(42, 17, "2", 0.80, 0.80, 0.60, "ok", "", 20, "g2", "p2"),
+        "3": SourceReliability(42, 17, "3", 0.70, 0.70, 0.40, "ok", "", 20, "g3", "p3"),
+        "4": SourceReliability(42, 17, "4", 0.60, 0.60, 0.20, "ok", "", 20, "g4", "p4"),
+    }
+    transform = _heldout_excluded_reliability_transform(cfg, "0", ("1", "2", "3", "4"), rels)
+    plans = _variant_plans(cfg, ("1", "2", "3", "4"), transform, experiment_seed=42, heldout_center="0", replicate_seed=17)
+
+    assert plans[ROW_EQUAL_ALL4]["budgets"] == {"1": 32, "2": 32, "3": 32, "4": 32}
+    assert sum(plans[ROW_RELIABILITY_ALL4_WEIGHTED]["budgets"].values()) == 128
+    assert all(value >= 8 for value in plans[ROW_RELIABILITY_ALL4_WEIGHTED]["budgets"].values())
+    assert plans[ROW_POOL_ONLY]["weights"] == plans[ROW_RELIABILITY_ALL4_WEIGHTED]["weights"]
+    assert plans[ROW_POOL_ONLY]["budgets"] == plans[ROW_EQUAL_ALL4]["budgets"]
+    assert plans[ROW_BUDGET_ONLY]["weights"] == plans[ROW_EQUAL_ALL4]["weights"]
+    assert plans[ROW_BUDGET_ONLY]["budgets"] == plans[ROW_RELIABILITY_ALL4_WEIGHTED]["budgets"]
+
+    normal = plans[ROW_RELIABILITY_ALL4_WEIGHTED]["weights"]
+    shrink = plans[ROW_SHRINK050]["weights"]
+    assert math.isclose(shrink["1"], 0.5 * normal["1"] + 0.5 * 0.25)
+    inverse = _inverse_rank_reversal_weights(("1", "2", "3", "4"), normal, transform["imputed_scores"])
+    assert sorted(inverse.values()) == sorted(normal.values())
+    assert inverse["4"] == max(normal.values())
+
+
+def test_paired_dense_all4_reliability_rejects_support_usage(tmp_path: Path) -> None:
+    payload = _tiny_paired_dense_all4_reliability_payload(tmp_path)
+    payload["run_matrix"]["support_size"] = 8
+
+    with pytest.raises(Exception, match="target support"):
+        parse_paired_dense_all4_reliability_config(payload, base_dir=tmp_path)
+
+
 def test_decentralized_reliability_top3_gmm_prior_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
     payload = _tiny_decentralized_reliability_top3_gmm_payload(tmp_path)
     cfg = parse_decentralized_reliability_top3_gmm_prior_config(payload, base_dir=tmp_path)
@@ -2536,6 +2667,56 @@ def _tiny_decentralized_reliability_weighted_gmm_payload(tmp_path: Path):
             "primary_pooling": "weighted_geometric",
             "reliability_floor_score": 0.05,
             "softmax_tau": 1.0,
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_paired_dense_all4_reliability_payload(tmp_path: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_paired_dense_all4_reliability_confirmation_v1",
+            "artifact_root": str(tmp_path / "virchow2_cvae_paired_dense_all4_reliability_confirmation_v1"),
+            "primary_variant": "pca64_beta001",
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
+            "d1_2_artifact_root": str(tmp_path / "missing_d1_2_context"),
+            "d1_4_artifact_root": str(tmp_path / "missing_d1_4_context"),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2", "3", "4"],
+            "replicate_seeds": [17],
+        },
+        "generation": {
+            "synthetic_per_class_total": 128,
+            "min_per_source_per_class": 8,
+        },
+        "paired_dense_all4_reliability": {
+            "primary_method": "paired_reliability_all4_shrink050_geom",
+            "candidate_components_per_source_class": [4, 3, 2, 1],
+            "min_samples_per_component": 12,
+            "source_weighting": "heldout_excluded_source_local_reliability_dense_all4",
+            "gmm_covariance_type": "diag",
+            "gmm_reg_covar": 1.0e-4,
+            "gmm_n_init": 5,
+            "gmm_max_iter": 500,
+            "min_component_weight": 0.02,
+            "variance_floor": 1.0e-5,
+            "reliability_floor_score": 0.05,
+            "reliability_epsilon": 1.0e-8,
+            "shrinkage_values": [0.25, 0.50],
+            "primary_pooling": "weighted_geometric",
         },
         "classifier": {
             "type": "sklearn_logistic_regression",

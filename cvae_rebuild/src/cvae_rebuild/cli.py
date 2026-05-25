@@ -35,6 +35,10 @@ from .decentralized_support8_top3_tau05_gmm_prior import (
     load_decentralized_support8_top3_tau05_gmm_prior_config,
     run_decentralized_support8_top3_tau05_gmm_prior,
 )
+from .paired_dense_all4_reliability_confirmation import (
+    load_paired_dense_all4_reliability_config,
+    run_paired_dense_all4_reliability_confirmation,
+)
 from .pipeline import run_artifact_contract_smoke, run_real_cache_backed, run_synthetic_smoke
 from .preservation import load_preservation_config, run_preservation_diagnosis
 from .preservation_repair import load_repair_config, run_preservation_repair
@@ -175,7 +179,22 @@ def main(argv: list[str] | None = None) -> int:
     decentralized_support8_top3_tau05_gmm.add_argument("--config", required=True)
     decentralized_support8_top3_tau05_gmm.add_argument("--artifact-root", default=None)
 
+    paired_dense_all4_reliability = sub.add_parser(
+        "diagnose-paired-dense-all4-reliability",
+        help="Run the paired dense-all4 source-only reliability confirmation audit.",
+    )
+    paired_dense_all4_reliability.add_argument("--config", required=True)
+    paired_dense_all4_reliability.add_argument("--artifact-root", default=None)
+
     args = parser.parse_args(argv)
+    if args.command == "diagnose-paired-dense-all4-reliability":
+        cfg = load_paired_dense_all4_reliability_config(args.config)
+        root = run_paired_dense_all4_reliability_confirmation(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
     if args.command == "diagnose-decentralized-support8-top3-tau05-gmm-prior":
         cfg = load_decentralized_support8_top3_tau05_gmm_prior_config(args.config)
         root = run_decentralized_support8_top3_tau05_gmm_prior(
