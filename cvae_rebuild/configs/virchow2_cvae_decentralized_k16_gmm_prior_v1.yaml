@@ -30,7 +30,7 @@ decentralized_k16_prior:
   gmm_reg_covar: 1.0e-4
   gmm_n_init: 5
   gmm_max_iter: 500
-  min_count_for_k4: 64
+  min_count_for_k4: 48
   min_component_weight: 0.02
   variance_floor: 1.0e-5
   primary_pooling: geometric

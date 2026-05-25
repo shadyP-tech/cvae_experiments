@@ -749,8 +749,49 @@ def _composition_manifest_rows(
         for source_center in candidates:
             summary = summaries.get((str(source_center), int(cls)))
             if summary is None:
+                rows.append(
+                    _invalid_composition_row(
+                        experiment_seed=experiment_seed,
+                        heldout_center=heldout_center,
+                        candidates=candidates,
+                        class_label=cls,
+                        composed_component_id=composed_id,
+                        source_center=str(source_center),
+                        summary_status="missing_summary",
+                        summary_error_message=f"missing_summary_source_{source_center}_class_{cls}",
+                    )
+                )
                 continue
-            weights = _normalized_weights(summary.weights)
+            if summary.status != "ok":
+                rows.append(
+                    _invalid_composition_row(
+                        experiment_seed=experiment_seed,
+                        heldout_center=heldout_center,
+                        candidates=candidates,
+                        class_label=cls,
+                        composed_component_id=composed_id,
+                        source_center=str(source_center),
+                        summary_status=summary.status,
+                        summary_error_message=summary.error_message,
+                    )
+                )
+                continue
+            try:
+                weights = _normalized_weights(summary.weights)
+            except ProtocolError as exc:
+                rows.append(
+                    _invalid_composition_row(
+                        experiment_seed=experiment_seed,
+                        heldout_center=heldout_center,
+                        candidates=candidates,
+                        class_label=cls,
+                        composed_component_id=composed_id,
+                        source_center=str(source_center),
+                        summary_status="invalid_summary_weights",
+                        summary_error_message=str(exc),
+                    )
+                )
+                continue
             for component_idx, local_weight in enumerate(weights):
                 rows.append(
                     {
@@ -765,10 +806,38 @@ def _composition_manifest_rows(
                         "component_weight_after_equal_source_normalization": float(source_mass * local_weight),
                         "summary_hash": summary.summary_hash,
                         "summary_status": summary.status,
+                        "summary_error_message": summary.error_message,
                     }
                 )
                 composed_id += 1
     return rows
+
+
+def _invalid_composition_row(
+    *,
+    experiment_seed: int,
+    heldout_center: str,
+    candidates: Sequence[str],
+    class_label: int,
+    composed_component_id: int,
+    source_center: str,
+    summary_status: str,
+    summary_error_message: str,
+) -> dict[str, object]:
+    return {
+        "experiment_seed": int(experiment_seed),
+        "heldout_center": str(heldout_center),
+        "included_source_centers": "|".join(str(v) for v in candidates),
+        "class_label": int(class_label),
+        "composed_component_id": int(composed_component_id),
+        "source_center": str(source_center),
+        "source_component_id": "",
+        "component_weight_local": "",
+        "component_weight_after_equal_source_normalization": "",
+        "summary_hash": "",
+        "summary_status": str(summary_status),
+        "summary_error_message": str(summary_error_message),
+    }
 
 
 def _evaluate_primary_and_references(
@@ -2134,6 +2203,7 @@ def _composition_columns() -> tuple[str, ...]:
         "component_weight_after_equal_source_normalization",
         "summary_hash",
         "summary_status",
+        "summary_error_message",
     )
 
 

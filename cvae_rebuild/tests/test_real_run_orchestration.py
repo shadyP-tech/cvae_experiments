@@ -1106,6 +1106,30 @@ def test_decentralized_k16_gmm_prior_config_rejects_non_virchow2(tmp_path: Path)
         parse_decentralized_k16_gmm_prior_config(payload, base_dir=tmp_path)
 
 
+def test_decentralized_k16_gmm_prior_ineligible_summary_does_not_fail_leakage(tmp_path: Path) -> None:
+    payload = _tiny_decentralized_k16_gmm_payload(tmp_path)
+    payload["decentralized_k16_prior"]["min_count_for_k4"] = 999
+    cfg = parse_decentralized_k16_gmm_prior_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_decentralized_k16_gmm_prior(cfg)
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    summary = list(csv.DictReader(open(root / "tables" / "decentralized_k16_summary.csv", newline="")))
+    matrix = list(csv.DictReader(open(root / "tables" / "decentralized_k16_downstream_matrix.csv", newline="")))
+    composition = list(csv.DictReader(open(root / "tables" / "composed_prior_component_manifest.csv", newline="")))
+
+    assert leakage["status"] == "PASS"
+    assert summary[0]["primary_verdict"] == "INELIGIBLE"
+    assert any(
+        row["prior_method"] == PRIMARY_DECENTRALIZED_METHOD
+        and row["status"] == "ineligible_component_fit"
+        for row in matrix
+    )
+    assert any(row["summary_status"] == "ineligible_component_fit" for row in composition)
+    assert all(row["summary_error_message"] for row in composition if row["summary_status"] == "ineligible_component_fit")
+
+
 def test_source_union_k24_gmm_prior_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
     repair_cfg = _tiny_repair_config(tmp_path)
     _write_tiny_cache(repair_cfg.feature_cache_root, seed=42)

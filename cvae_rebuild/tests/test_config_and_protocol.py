@@ -62,6 +62,7 @@ def test_locked_decentralized_k16_gmm_prior_config_loads() -> None:
     assert cfg.primary_method == "decentralized_exported_k4x4_cc_diag_gmm_k16_late_geom"
     assert cfg.local_gmm_components_per_source_class == 4
     assert cfg.composed_components_per_class == 16
+    assert cfg.min_count_for_k4 == 48
     assert cfg.source_weighting == "equal_source_mass"
     assert cfg.support_nelbo_enabled is False
 
