@@ -42,6 +42,12 @@ from cvae_rebuild.decentralized_component_union_prior import (
     parse_decentralized_component_union_prior_config,
     run_decentralized_component_union_prior,
 )
+from cvae_rebuild.decentralized_pruned_adaptive_equal_all4_prior import (
+    PRIMARY_PRUNED_EQUAL_ALL4_METHOD,
+    ROW_UNPRUNED_FIXED_K4,
+    parse_pruned_adaptive_equal_all4_config,
+    run_pruned_adaptive_equal_all4_confirmation,
+)
 from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import (
     PRIMARY_RELIABILITY_METHOD,
     SourceReliability,
@@ -1430,6 +1436,66 @@ def test_decentralized_component_union_prior_rejects_invalid_backbone(tmp_path: 
 
     with pytest.raises(Exception, match="backbone=virchow2"):
         parse_decentralized_component_union_prior_config(payload, base_dir=tmp_path)
+
+
+def test_pruned_adaptive_equal_all4_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_pruned_adaptive_equal_all4_payload(tmp_path)
+    cfg = parse_pruned_adaptive_equal_all4_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_pruned_adaptive_equal_all4_confirmation(cfg)
+
+    expected = [
+        "tables/pruned_adaptive_equal_all4_downstream_matrix.csv",
+        "tables/pruned_adaptive_equal_all4_summary.csv",
+        "tables/pruned_source_summary_diagnostics.csv",
+        "tables/unpruned_fixed_k4_source_summary_diagnostics.csv",
+        "tables/pruned_component_manifest.csv",
+        "tables/unpruned_fixed_k4_component_manifest.csv",
+        "tables/pruning_effect_summary.csv",
+        "tables/negative_control_summary.csv",
+        "tables/reference_comparison_summary.csv",
+        "tables/nearest_neighbor_memorization_audit.csv",
+        "manifests/protocol_manifest.json",
+        "manifests/decentralized_pruned_adaptive_equal_all4_model_manifest.csv",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "pruned_adaptive_equal_all4_downstream_matrix.csv", newline="")))
+    pruning = list(csv.DictReader(open(root / "tables" / "pruning_effect_summary.csv", newline="")))
+    pruned_components = list(csv.DictReader(open(root / "tables" / "pruned_component_manifest.csv", newline="")))
+    unpruned_components = list(csv.DictReader(open(root / "tables" / "unpruned_fixed_k4_component_manifest.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "pruned_adaptive_equal_all4_summary.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert protocol["fixed_all_source_inclusion"] is True
+    assert protocol["tests_target_conditioned_routing"] is False
+    assert protocol["same_run_unpruned_fixed_k4_reference"] is True
+    assert any(row["prior_method"] == PRIMARY_PRUNED_EQUAL_ALL4_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == ROW_UNPRUNED_FIXED_K4 for row in matrix)
+    assert any(row["prior_method"] == "decentralized_pruned_adaptive_k_shuffled_summary_control" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_pruned_adaptive_k_shuffled_label_control" for row in matrix)
+    assert pruning and {"old_or_unpruned_K", "pruned_K", "num_components_removed"}.issubset(pruning[0])
+    assert pruned_components and unpruned_components
+    assert "delta_vs_same_run_unpruned_fixed_k4" in summary[0]
+    assert "seed_cell_mean_bacc" in summary[0]
+    assert "does not test target-conditioned routing" in report
+    assert "not a formal differential privacy claim" in report
+
+
+def test_pruned_adaptive_equal_all4_rejects_invalid_backbone(tmp_path: Path) -> None:
+    payload = _tiny_pruned_adaptive_equal_all4_payload(tmp_path)
+    payload["inputs"]["backbone"] = "dinov2"
+
+    with pytest.raises(Exception, match="backbone=virchow2"):
+        parse_pruned_adaptive_equal_all4_config(payload, base_dir=tmp_path)
 
 
 def test_paired_dense_all4_reliability_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
@@ -2916,6 +2982,57 @@ def _tiny_decentralized_component_union_payload(tmp_path: Path):
             "prototype_candidate_counts_per_source_class": [4, 3, 2, 1],
             "prototype_min_samples_per_component": 12,
             "prototype_variance_floor": 1.0e-5,
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_pruned_adaptive_equal_all4_payload(tmp_path: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_decentralized_pruned_adaptive_equal_all4_v1",
+            "artifact_root": str(tmp_path / "virchow2_cvae_decentralized_pruned_adaptive_equal_all4_v1"),
+            "primary_variant": "pca64_beta001",
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
+            "d1_2_artifact_root": str(tmp_path / "missing_d1_2"),
+            "component_union_artifact_root": str(tmp_path / "missing_component_union"),
+            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
+            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2", "3", "4"],
+            "replicate_seeds": [17],
+        },
+        "generation": {
+            "synthetic_per_class_total": 128,
+            "min_per_source_per_class": 8,
+        },
+        "pruned_adaptive_equal_all4_prior": {
+            "primary_method": "decentralized_pruned_adaptive_k_equal_all4_late_geom",
+            "unpruned_fixed_k": 4,
+            "candidate_components_per_source_class": [4, 3, 2, 1],
+            "min_samples_per_component": 12,
+            "source_weighting": "equal_source_mass",
+            "gmm_covariance_type": "diag",
+            "gmm_reg_covar": 1.0e-4,
+            "gmm_n_init": 1,
+            "gmm_max_iter": 100,
+            "min_component_weight": 0.02,
+            "variance_floor": 1.0e-5,
+            "variance_ceiling_multiplier": 16.0,
+            "primary_pooling": "geometric",
         },
         "classifier": {
             "type": "sklearn_logistic_regression",

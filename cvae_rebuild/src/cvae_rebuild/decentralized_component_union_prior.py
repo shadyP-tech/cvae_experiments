@@ -43,6 +43,7 @@ from . import decentralized_reliability_weighted_gmm_prior as d12
 
 
 COMPONENT_UNION_NAME = "virchow2_cvae_decentralized_component_union_prior_v1"
+COMPONENT_UNION_SHRINK025_V2_NAME = "virchow2_cvae_decentralized_component_union_reliability_shrink025_v2"
 PRIMARY_COMPONENT_UNION_METHOD = "decentralized_component_union_uniform_gmm"
 ROW_COMPONENT_UNION_SHRINK025 = "decentralized_component_union_reliability_shrink025"
 ROW_COMPONENT_UNION_SHRINK050 = "decentralized_component_union_reliability_shrink050"
@@ -58,6 +59,7 @@ ROW_REAL_FEATURE_DENSE_REFERENCE = "real_source_embedding_classifier_dense_refer
 ROW_SHUFFLED_SUMMARY_CONTROL = "decentralized_component_union_shuffled_summary_control"
 ROW_SHUFFLED_LABEL_CONTROL = "decentralized_component_union_shuffled_label_control"
 ROW_SHUFFLED_RELIABILITY_CONTROL = "decentralized_component_union_shuffled_reliability_control"
+MATCHED_SHUFFLED_RELIABILITY_PREFIX = "decentralized_component_union_shuffled_reliability_shrink025_perm"
 ROW_RANDOM_SOURCE_MASS_CONTROL = "decentralized_component_union_random_source_mass_control"
 POOL_COMPONENT_UNION = "decentralized_component_union_raw_pool"
 GMM_SUMMARY_SCHEMA_VERSION = "decentralized_source_local_cc_diag_gmm_component_union_summary_v1"
@@ -82,6 +84,7 @@ class ComponentUnionConfig:
     experiment_seeds: tuple[int, ...]
     heldout_centers: tuple[str, ...]
     replicate_seeds: tuple[int, ...]
+    strict_full_run_matrix: bool
     synthetic_per_class_total: int
     budget_diagnostic_per_class_total: int | None
     min_per_source_per_class: int
@@ -100,6 +103,7 @@ class ComponentUnionConfig:
     primary_pooling: str
     reliability_floor_score: float
     shrink_lambdas: tuple[float, ...]
+    matched_shuffled_reliability_null_permutations: int
     prototype_candidate_counts_per_source_class: tuple[int, ...]
     prototype_min_samples_per_component: int
     prototype_variance_floor: float
@@ -179,6 +183,7 @@ def parse_decentralized_component_union_prior_config(
         experiment_seeds=tuple(int(v) for v in run["experiment_seeds"]),
         heldout_centers=tuple(str(v) for v in run["heldout_centers"]),
         replicate_seeds=tuple(int(v) for v in run["replicate_seeds"]),
+        strict_full_run_matrix=bool(run.get("strict_full_run_matrix", False)),
         synthetic_per_class_total=int(generation["synthetic_per_class_total"]),
         budget_diagnostic_per_class_total=None if budget_diag is None else int(budget_diag),
         min_per_source_per_class=int(generation["min_per_source_per_class"]),
@@ -197,6 +202,7 @@ def parse_decentralized_component_union_prior_config(
         primary_pooling=str(prior["primary_pooling"]),
         reliability_floor_score=float(prior["reliability_floor_score"]),
         shrink_lambdas=tuple(float(v) for v in prior["shrink_lambdas"]),
+        matched_shuffled_reliability_null_permutations=int(prior.get("matched_shuffled_reliability_null_permutations", 0)),
         prototype_candidate_counts_per_source_class=tuple(int(v) for v in prior["prototype_candidate_counts_per_source_class"]),
         prototype_min_samples_per_component=int(prior["prototype_min_samples_per_component"]),
         prototype_variance_floor=float(prior["prototype_variance_floor"]),
@@ -212,24 +218,40 @@ def parse_decentralized_component_union_prior_config(
 
 
 def validate_decentralized_component_union_prior_config(cfg: ComponentUnionConfig) -> None:
-    if cfg.name != COMPONENT_UNION_NAME:
-        raise ProtocolError(f"Component-union experiment name must be {COMPONENT_UNION_NAME!r}.")
+    primary_by_name = {
+        COMPONENT_UNION_NAME: PRIMARY_COMPONENT_UNION_METHOD,
+        COMPONENT_UNION_SHRINK025_V2_NAME: ROW_COMPONENT_UNION_SHRINK025,
+    }
+    if cfg.name not in primary_by_name:
+        raise ProtocolError(
+            "Component-union experiment name must be one of "
+            f"{tuple(primary_by_name)!r}."
+        )
     if cfg.backbone != "virchow2":
         raise ProtocolError("Component-union prior is locked to backbone=virchow2.")
     if cfg.primary_variant != PRIMARY_VARIANT:
         raise ProtocolError(f"primary_variant must be {PRIMARY_VARIANT!r}.")
-    if cfg.primary_method != PRIMARY_COMPONENT_UNION_METHOD:
-        raise ProtocolError(f"primary_method must be {PRIMARY_COMPONENT_UNION_METHOD!r}.")
+    if cfg.primary_method != primary_by_name[cfg.name]:
+        raise ProtocolError(f"primary_method must be {primary_by_name[cfg.name]!r} for {cfg.name}.")
     if cfg.candidate_components_per_source_class != (4, 3, 2, 1):
         raise ProtocolError("candidate_components_per_source_class must be locked to [4, 3, 2, 1].")
     if cfg.prototype_candidate_counts_per_source_class != (4, 3, 2, 1):
         raise ProtocolError("prototype_candidate_counts_per_source_class must be locked to [4, 3, 2, 1].")
     if len(cfg.heldout_centers) != 5:
         raise ProtocolError("Component-union composition expects exactly five centers.")
+    if cfg.strict_full_run_matrix:
+        if cfg.experiment_seeds != (42, 43, 44):
+            raise ProtocolError("strict_full_run_matrix requires experiment_seeds=[42, 43, 44].")
+        if cfg.heldout_centers != ("0", "1", "2", "3", "4"):
+            raise ProtocolError("strict_full_run_matrix requires heldout_centers=['0', '1', '2', '3', '4'].")
+        if cfg.replicate_seeds != (17, 23, 31):
+            raise ProtocolError("strict_full_run_matrix requires replicate_seeds=[17, 23, 31].")
     if cfg.synthetic_per_class_total != 128:
         raise ProtocolError("synthetic_per_class_total must be locked to 128 for the primary row.")
     if cfg.budget_diagnostic_per_class_total not in (None, 256):
         raise ProtocolError("budget_diagnostic_per_class_total may be null or 256 only.")
+    if cfg.name == COMPONENT_UNION_SHRINK025_V2_NAME and cfg.budget_diagnostic_per_class_total is not None:
+        raise ProtocolError("Shrink025 v2 must not run the budget-256 diagnostic.")
     if cfg.min_per_source_per_class != 8:
         raise ProtocolError("min_per_source_per_class must be locked to 8.")
     if cfg.source_weighting != "uniform_source_component_union":
@@ -240,6 +262,11 @@ def validate_decentralized_component_union_prior_config(cfg: ComponentUnionConfi
         raise ProtocolError("primary_pooling must be pooled_raw_logistic.")
     if cfg.shrink_lambdas != (0.25, 0.5):
         raise ProtocolError("shrink_lambdas must be locked to [0.25, 0.5].")
+    if cfg.name == COMPONENT_UNION_SHRINK025_V2_NAME:
+        if cfg.matched_shuffled_reliability_null_permutations < 1:
+            raise ProtocolError("Shrink025 v2 requires matched shuffled-reliability null permutations.")
+        if cfg.strict_full_run_matrix and cfg.matched_shuffled_reliability_null_permutations != 20:
+            raise ProtocolError("Strict shrink025 v2 requires exactly 20 matched shuffled-reliability null permutations.")
     if min(
         cfg.min_samples_per_component,
         cfg.prototype_min_samples_per_component,
@@ -411,6 +438,7 @@ def run_decentralized_component_union_prior(
                     uniform_plan = _uniform_source_plan(cfg, candidates, rels, total=cfg.synthetic_per_class_total)
                     shrink025_plan = _shrink_source_plan(cfg, candidates, rels, shrink_lambda=0.25, total=cfg.synthetic_per_class_total)
                     shrink050_plan = _shrink_source_plan(cfg, candidates, rels, shrink_lambda=0.5, total=cfg.synthetic_per_class_total)
+                    primary_plan = _primary_source_plan(cfg, candidates, rels, total=cfg.synthetic_per_class_total)
                     shuffled_reliability_plan = _shuffled_reliability_plan(
                         cfg,
                         candidates,
@@ -418,8 +446,26 @@ def run_decentralized_component_union_prior(
                         experiment_seed=int(experiment_seed),
                         heldout_center=str(heldout_center),
                         replicate_seed=int(replicate_seed),
+                        shrink_lambda=0.5,
                         total=cfg.synthetic_per_class_total,
                     )
+                    matched_shuffled_plans = [
+                        (
+                            _matched_shuffled_reliability_method(permutation_id),
+                            _shuffled_reliability_plan(
+                                cfg,
+                                candidates,
+                                rels,
+                                experiment_seed=int(experiment_seed),
+                                heldout_center=str(heldout_center),
+                                replicate_seed=int(replicate_seed),
+                                shrink_lambda=0.25,
+                                permutation_id=permutation_id,
+                                total=cfg.synthetic_per_class_total,
+                            ),
+                        )
+                        for permutation_id in range(cfg.matched_shuffled_reliability_null_permutations)
+                    ]
                     random_source_plan = _random_source_mass_plan(
                         cfg,
                         candidates,
@@ -436,6 +482,8 @@ def run_decentralized_component_union_prior(
                         (ROW_RANDOM_SOURCE_MASS_CONTROL, random_source_plan),
                     ):
                         source_weight_rows.extend(_source_weight_manifest_rows(experiment_seed, replicate_seed, heldout_center, method, plan, rels))
+                    for method, plan in matched_shuffled_plans:
+                        source_weight_rows.extend(_source_weight_manifest_rows(experiment_seed, replicate_seed, heldout_center, method, plan, rels))
                     component_manifest_rows.extend(
                         _fold_component_manifest_rows(
                             cfg,
@@ -444,7 +492,7 @@ def run_decentralized_component_union_prior(
                             candidates=candidates,
                             summaries=gmm_summaries,
                             component_details=component_details,
-                            weight_plan=uniform_plan,
+                            weight_plan=primary_plan,
                         )
                     )
 
@@ -530,38 +578,47 @@ def run_decentralized_component_union_prior(
                     weak_rows.extend(weak)
                     nn_rows.extend(nn)
 
-                    primary_row, coverage_row, weak_row, nn_row, paired_row = _evaluate_gmm_component_union(
-                        cfg,
-                        per_source_runtime=per_source_runtime,
-                        candidates=candidates,
-                        summaries=gmm_summaries,
-                        experiment_seed=int(experiment_seed),
-                        heldout_center=str(heldout_center),
-                        replicate_seed=int(replicate_seed),
-                        eval_raw=eval_raw,
-                        eval_labels=eval_labels,
-                        source_union_ref=su_ref,
-                        center_balanced_ref=cb_ref,
-                        real_feature_bacc=real_feature_bacc,
-                        weight_plan=uniform_plan,
-                        prior_method=PRIMARY_COMPONENT_UNION_METHOD,
-                        selection_source=PRIMARY_SELECTION,
-                        claim_role="primary_component_level_prior_composition",
-                    )
-                    matrix_rows.append(primary_row)
-                    component_coverage_rows.append(coverage_row)
-                    if weak_row:
-                        weak_rows.append(weak_row)
-                    if nn_row:
-                        nn_rows.append(nn_row)
-                    paired_generation_rows.append(paired_row)
-
+                    primary_row: dict[str, object] | None = None
                     for method, plan, role in (
+                        (PRIMARY_COMPONENT_UNION_METHOD, uniform_plan, "diagnostic_uniform_component_union"),
                         (ROW_COMPONENT_UNION_SHRINK025, shrink025_plan, "diagnostic_reliability_shrink025_component_union"),
                         (ROW_COMPONENT_UNION_SHRINK050, shrink050_plan, "diagnostic_reliability_shrink050_component_union"),
                         (ROW_SHUFFLED_RELIABILITY_CONTROL, shuffled_reliability_plan, "negative_control"),
                         (ROW_RANDOM_SOURCE_MASS_CONTROL, random_source_plan, "negative_control"),
                     ):
+                        row, coverage_row, weak_row, nn_row, paired_row = _evaluate_gmm_component_union(
+                            cfg,
+                            per_source_runtime=per_source_runtime,
+                            candidates=candidates,
+                            summaries=gmm_summaries,
+                            rels=rels,
+                            experiment_seed=int(experiment_seed),
+                            heldout_center=str(heldout_center),
+                            replicate_seed=int(replicate_seed),
+                            eval_raw=eval_raw,
+                            eval_labels=eval_labels,
+                            source_union_ref=su_ref,
+                            center_balanced_ref=cb_ref,
+                            real_feature_bacc=real_feature_bacc,
+                            weight_plan=plan,
+                            prior_method=method,
+                            selection_source=_selection_source_for_method(cfg, method),
+                            claim_role=_claim_role_for_method(cfg, method, role),
+                        )
+                        matrix_rows.append(row)
+                        component_coverage_rows.append(coverage_row)
+                        if weak_row:
+                            weak_rows.append(weak_row)
+                        if nn_row:
+                            nn_rows.append(nn_row)
+                        paired_generation_rows.append(paired_row)
+                        if _is_primary_method(cfg, method):
+                            primary_row = row
+
+                    if primary_row is None:
+                        raise ProtocolError(f"Primary method {cfg.primary_method!r} was not evaluated.")
+
+                    for method, plan in matched_shuffled_plans:
                         row, coverage_row, weak_row, nn_row, paired_row = _evaluate_gmm_component_union(
                             cfg,
                             per_source_runtime=per_source_runtime,
@@ -578,7 +635,7 @@ def run_decentralized_component_union_prior(
                             weight_plan=plan,
                             prior_method=method,
                             selection_source=DIAGNOSTIC_SELECTION,
-                            claim_role=role,
+                            claim_role="matched_shuffled_reliability_null",
                         )
                         matrix_rows.append(row)
                         component_coverage_rows.append(coverage_row)
@@ -749,6 +806,44 @@ def _optional_path(base: Path, value: object) -> Path | None:
     if value is None or str(value) == "":
         return None
     return _path(base, str(value))
+
+
+def _matched_shuffled_reliability_method(permutation_id: int) -> str:
+    return f"{MATCHED_SHUFFLED_RELIABILITY_PREFIX}{int(permutation_id):03d}"
+
+
+def _is_matched_shuffled_reliability_method(method: object) -> bool:
+    return str(method).startswith(MATCHED_SHUFFLED_RELIABILITY_PREFIX)
+
+
+def _is_primary_method(cfg: ComponentUnionConfig, method: str) -> bool:
+    return str(method) == cfg.primary_method
+
+
+def _selection_source_for_method(cfg: ComponentUnionConfig, method: str) -> str:
+    return PRIMARY_SELECTION if _is_primary_method(cfg, method) else DIAGNOSTIC_SELECTION
+
+
+def _claim_role_for_method(cfg: ComponentUnionConfig, method: str, default_role: str) -> str:
+    if not _is_primary_method(cfg, method):
+        return default_role
+    if method == ROW_COMPONENT_UNION_SHRINK025:
+        return "primary_component_union_reliability_shrink025_confirmation_audit"
+    return "primary_component_level_prior_composition"
+
+
+def _primary_source_plan(
+    cfg: ComponentUnionConfig,
+    sources: Sequence[str],
+    rels: Mapping[str, d12.SourceReliability],
+    *,
+    total: int,
+) -> dict[str, object]:
+    if cfg.primary_method == PRIMARY_COMPONENT_UNION_METHOD:
+        return _uniform_source_plan(cfg, sources, rels, total=total)
+    if cfg.primary_method == ROW_COMPONENT_UNION_SHRINK025:
+        return _shrink_source_plan(cfg, sources, rels, shrink_lambda=0.25, total=total)
+    raise ProtocolError(f"Unsupported component-union primary_method={cfg.primary_method!r}.")
 
 
 def _fit_and_export_pruned_gmm_summaries(
@@ -1564,10 +1659,16 @@ def _shuffled_reliability_plan(
     experiment_seed: int,
     heldout_center: str,
     replicate_seed: int,
+    shrink_lambda: float = 0.5,
+    permutation_id: int | None = None,
     total: int,
 ) -> dict[str, object]:
     sources_tuple = tuple(str(source) for source in sources)
-    rng = np.random.default_rng(d1._latent_seed(experiment_seed, heldout_center, replicate_seed, "component_union_shuffled_reliability"))
+    seed_parts = [experiment_seed, heldout_center, replicate_seed, "component_union_shuffled_reliability"]
+    if permutation_id is not None:
+        seed_parts.extend([f"lambda_{float(shrink_lambda):.2f}", int(permutation_id)])
+    shuffle_seed = d1._latent_seed(*seed_parts)
+    rng = np.random.default_rng(shuffle_seed)
     shuffled = list(sources_tuple)
     rng.shuffle(shuffled)
     raw = {
@@ -1577,9 +1678,28 @@ def _shuffled_reliability_plan(
     total_raw = sum(raw.values())
     reliability = {source: raw[source] / total_raw for source in sources_tuple}
     uniform = 1.0 / float(len(sources_tuple))
-    weights = {source: 0.5 * uniform + 0.5 * reliability[source] for source in sources_tuple}
+    weights = {
+        source: (1.0 - float(shrink_lambda)) * uniform + float(shrink_lambda) * reliability[source]
+        for source in sources_tuple
+    }
     budgets = d12._weighted_budgets(int(total), sources_tuple, weights, cfg.min_per_source_per_class)
-    return _with_weight_diagnostics(sources_tuple, weights, budgets, raw, total=total, mode="shuffled_reliability_shrink_0.50")
+    plan = _with_weight_diagnostics(
+        sources_tuple,
+        weights,
+        budgets,
+        raw,
+        total=total,
+        mode=f"shuffled_reliability_shrink_{float(shrink_lambda):.2f}",
+    )
+    plan.update(
+        {
+            "shrink_lambda": float(shrink_lambda),
+            "control_permutation_id": "" if permutation_id is None else int(permutation_id),
+            "shuffle_seed": int(shuffle_seed),
+            "shuffle_mapping": {source: shuffled[idx] for idx, source in enumerate(sources_tuple)},
+        }
+    )
+    return plan
 
 
 def _random_source_mass_plan(
@@ -1621,6 +1741,7 @@ def _evaluate_source_ablation_diagnostics(
     all_centers: Sequence[str],
     candidates: Sequence[str],
     summaries: Mapping[tuple[str, int], d1a.AdaptiveSourceLocalSummary],
+    rels: Mapping[str, d12.SourceReliability],
     experiment_seed: int,
     heldout_center: str,
     replicate_seed: int,
@@ -1649,15 +1770,13 @@ def _evaluate_source_ablation_diagnostics(
         remaining = tuple(source for source in candidates if str(source) != str(removed))
         if len(remaining) < 1:
             continue
-        plan = {
-            "sources": remaining,
-            "weights": {source: 1.0 / float(len(remaining)) for source in remaining},
-            "budgets": {source: int(value) for source, value in zip(remaining, d1._balanced_counts(cfg.synthetic_per_class_total, len(remaining)))},
-            "scores": {source: 1.0 for source in remaining},
-            "synthetic_per_class_total": cfg.synthetic_per_class_total,
-            "component_union_weight_mode": "source_ablation_uniform",
-        }
-        plan = _with_weight_diagnostics(remaining, plan["weights"], plan["budgets"], plan["scores"], total=cfg.synthetic_per_class_total, mode="source_ablation_uniform")
+        plan = _primary_source_plan(
+            cfg,
+            remaining,
+            {source: rels[source] for source in remaining},
+            total=cfg.synthetic_per_class_total,
+        )
+        plan["component_union_weight_mode"] = f"source_ablation_{plan['component_union_weight_mode']}"
         row, _coverage, _weak, _nn, _paired = _evaluate_gmm_component_union(
             cfg,
             per_source_runtime=per_source_runtime,
@@ -1801,6 +1920,8 @@ def _result_matrix_row(
         "real_feature_dense_bacc": real_feature_bacc,
         "retention_vs_source_union_k16": d1._retention(bacc, source_union_ref.bacc),
         "retention_vs_center_balanced_k16": d1._retention(bacc, center_balanced_ref.bacc),
+        "oracle_gap_vs_source_union_k16": source_union_ref.bacc - bacc if math.isfinite(source_union_ref.bacc) and math.isfinite(bacc) else math.nan,
+        "oracle_gap_vs_real_feature_dense": real_feature_bacc - bacc if math.isfinite(real_feature_bacc) and math.isfinite(bacc) else math.nan,
         "delta_vs_real_source_embedding_dense_reference": bacc - real_feature_bacc if math.isfinite(real_feature_bacc) else math.nan,
         "negative_control_gap": math.nan,
         "selected_k_histogram_json": stats["selected_k_histogram_json"],
@@ -1819,6 +1940,10 @@ def _result_matrix_row(
         "l1_distance_from_uniform": weight_plan["l1_distance_from_uniform"],
         "dominant_source": weight_plan["dominant_source"],
         "dominant_source_weight": weight_plan["dominant_source_weight"],
+        "shrink_lambda": weight_plan.get("shrink_lambda", ""),
+        "control_permutation_id": weight_plan.get("control_permutation_id", ""),
+        "shuffle_seed": weight_plan.get("shuffle_seed", ""),
+        "shuffle_mapping_json": json.dumps(dict(weight_plan.get("shuffle_mapping", {})), sort_keys=True),
         "selection_source": selection_source,
         "status": status,
         "error_message": error_message,
@@ -1937,8 +2062,16 @@ def _ineligible_rows(
             summary_kind=summary_kind,
         )
         for method, role, summary_kind in (
-            (PRIMARY_COMPONENT_UNION_METHOD, "primary_component_level_prior_composition", "gmm_component"),
-            (ROW_COMPONENT_UNION_SHRINK025, "diagnostic_reliability_shrink025_component_union", "gmm_component"),
+            (
+                PRIMARY_COMPONENT_UNION_METHOD,
+                _claim_role_for_method(cfg, PRIMARY_COMPONENT_UNION_METHOD, "diagnostic_uniform_component_union"),
+                "gmm_component",
+            ),
+            (
+                ROW_COMPONENT_UNION_SHRINK025,
+                _claim_role_for_method(cfg, ROW_COMPONENT_UNION_SHRINK025, "diagnostic_reliability_shrink025_component_union"),
+                "gmm_component",
+            ),
             (ROW_COMPONENT_UNION_SHRINK050, "diagnostic_reliability_shrink050_component_union", "gmm_component"),
             (ROW_PROTOTYPE_UNION, "diagnostic_prototype_union", "prototype_codebook"),
             (ROW_SHUFFLED_SUMMARY_CONTROL, "negative_control", "gmm_component"),
@@ -2191,6 +2324,9 @@ def _plan_hash(plan: Mapping[str, object]) -> str:
             json.dumps(dict(plan["budgets"]), sort_keys=True),
             str(plan.get("synthetic_per_class_total", "")),
             str(plan.get("component_union_weight_mode", "")),
+            str(plan.get("shrink_lambda", "")),
+            str(plan.get("control_permutation_id", "")),
+            json.dumps(dict(plan.get("shuffle_mapping", {})), sort_keys=True),
         ]
     )
 
@@ -2226,6 +2362,10 @@ def _source_weight_manifest_rows(
                 "min_weight": plan["min_weight"],
                 "dominant_source": plan["dominant_source"],
                 "dominant_source_weight": plan["dominant_source_weight"],
+                "shrink_lambda": plan.get("shrink_lambda", ""),
+                "control_permutation_id": plan.get("control_permutation_id", ""),
+                "shuffle_seed": plan.get("shuffle_seed", ""),
+                "shuffle_mapping_json": json.dumps(dict(plan.get("shuffle_mapping", {})), sort_keys=True),
             }
         )
     return rows

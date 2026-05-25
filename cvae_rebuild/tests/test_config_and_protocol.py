@@ -5,6 +5,7 @@ import pytest
 from cvae_rebuild.config import load_config
 from cvae_rebuild.decentralized_adaptive_gmm_prior import load_decentralized_adaptive_gmm_prior_config
 from cvae_rebuild.decentralized_component_union_prior import load_decentralized_component_union_prior_config
+from cvae_rebuild.decentralized_pruned_adaptive_equal_all4_prior import load_pruned_adaptive_equal_all4_config
 from cvae_rebuild.decentralized_k16_gmm_prior import load_decentralized_k16_gmm_prior_config
 from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import (
     load_decentralized_reliability_weighted_gmm_prior_config,
@@ -133,6 +134,22 @@ def test_locked_decentralized_component_union_prior_config_loads() -> None:
     assert cfg.primary_pooling == "pooled_raw_logistic"
     assert cfg.shrink_lambdas == (0.25, 0.5)
     assert cfg.budget_diagnostic_per_class_total == 256
+
+
+def test_locked_pruned_adaptive_equal_all4_config_loads() -> None:
+    cfg = load_pruned_adaptive_equal_all4_config(
+        "cvae_rebuild/configs/virchow2_cvae_decentralized_pruned_adaptive_equal_all4_v1.yaml"
+    )
+    assert cfg.name == "virchow2_cvae_decentralized_pruned_adaptive_equal_all4_v1"
+    assert cfg.backbone == "virchow2"
+    assert cfg.primary_variant == "pca64_beta001"
+    assert cfg.primary_method == "decentralized_pruned_adaptive_k_equal_all4_late_geom"
+    assert cfg.unpruned_fixed_k == 4
+    assert cfg.candidate_components_per_source_class == (4, 3, 2, 1)
+    assert cfg.min_samples_per_component == 12
+    assert cfg.source_weighting == "equal_source_mass"
+    assert cfg.primary_pooling == "geometric"
+    assert cfg.synthetic_per_class_total == 128
 
 
 def test_locked_decentralized_reliability_top3_gmm_prior_config_loads() -> None:
