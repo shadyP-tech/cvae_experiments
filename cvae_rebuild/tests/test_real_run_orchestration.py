@@ -37,6 +37,11 @@ from cvae_rebuild.decentralized_adaptive_gmm_prior import (
     parse_decentralized_adaptive_gmm_prior_config,
     run_decentralized_adaptive_gmm_prior,
 )
+from cvae_rebuild.decentralized_component_union_prior import (
+    PRIMARY_COMPONENT_UNION_METHOD,
+    parse_decentralized_component_union_prior_config,
+    run_decentralized_component_union_prior,
+)
 from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import (
     PRIMARY_RELIABILITY_METHOD,
     SourceReliability,
@@ -1345,6 +1350,76 @@ def test_decentralized_reliability_weighted_gmm_prior_rejects_invalid_backbone(t
 
     with pytest.raises(Exception, match="backbone=virchow2"):
         parse_decentralized_reliability_weighted_gmm_prior_config(payload, base_dir=tmp_path)
+
+
+def test_decentralized_component_union_prior_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_decentralized_component_union_payload(tmp_path)
+    cfg = parse_decentralized_component_union_prior_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_decentralized_component_union_prior(cfg)
+
+    expected = [
+        "tables/component_union_downstream_matrix.csv",
+        "tables/component_union_gap_summary.csv",
+        "tables/component_union_summary.csv",
+        "tables/component_manifest.csv",
+        "tables/prototype_manifest.csv",
+        "tables/component_coverage_audit.csv",
+        "tables/source_weight_manifest.csv",
+        "tables/negative_control_summary.csv",
+        "tables/source_ablation_audit.csv",
+        "tables/paired_generation_audit.csv",
+        "tables/source_summary_diagnostics.csv",
+        "tables/source_reliability_manifest.csv",
+        "tables/nearest_neighbor_memorization_audit.csv",
+        "manifests/protocol_manifest.json",
+        "manifests/decentralized_component_union_prior_model_manifest.csv",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "component_union_downstream_matrix.csv", newline="")))
+    component_manifest = list(csv.DictReader(open(root / "tables" / "component_manifest.csv", newline="")))
+    weights = list(csv.DictReader(open(root / "tables" / "source_weight_manifest.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "component_union_summary.csv", newline="")))
+    ablation = list(csv.DictReader(open(root / "tables" / "source_ablation_audit.csv", newline="")))
+    paired = list(csv.DictReader(open(root / "tables" / "paired_generation_audit.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert protocol["fixed_all_source_inclusion"] is True
+    assert protocol["tests_target_conditioned_routing"] is False
+    assert any(row["prior_method"] == PRIMARY_COMPONENT_UNION_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_component_union_reliability_shrink025" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_component_union_reliability_shrink050" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_prototype_union_uniform" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_component_union_shuffled_summary_control" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_component_union_shuffled_label_control" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_exported_adaptive_k_equal_geom_reference" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_exported_adaptive_k_source_reliability_weighted_geom_reference" for row in matrix)
+    assert any(row["row_scope"] == "fold_union_prior" for row in component_manifest)
+    assert all(row["heldout_center"] != row["source_center"] for row in component_manifest if row["row_scope"] == "fold_union_prior")
+    assert weights and all(row["heldout_center"] != row["source_center"] for row in weights)
+    assert ablation and any(row["status"] == "not_applicable_target_source_excluded" for row in ablation)
+    assert paired and {"paired_generation_invariant_key", "generated_features_hash"}.issubset(paired[0])
+    assert "seed_cell_mean_bacc" in summary[0]
+    assert "center_equal_mean_bacc" in summary[0]
+    assert "does not test target-conditioned routing" in report
+    assert "not a formal differential privacy claim" in report
+
+
+def test_decentralized_component_union_prior_rejects_invalid_backbone(tmp_path: Path) -> None:
+    payload = _tiny_decentralized_component_union_payload(tmp_path)
+    payload["inputs"]["backbone"] = "dinov2"
+
+    with pytest.raises(Exception, match="backbone=virchow2"):
+        parse_decentralized_component_union_prior_config(payload, base_dir=tmp_path)
 
 
 def test_paired_dense_all4_reliability_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
@@ -2667,6 +2742,61 @@ def _tiny_decentralized_reliability_weighted_gmm_payload(tmp_path: Path):
             "primary_pooling": "weighted_geometric",
             "reliability_floor_score": 0.05,
             "softmax_tau": 1.0,
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_decentralized_component_union_payload(tmp_path: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_decentralized_component_union_prior_v1",
+            "artifact_root": str(tmp_path / "virchow2_cvae_decentralized_component_union_prior_v1"),
+            "primary_variant": "pca64_beta001",
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
+            "d1_2_artifact_root": str(tmp_path / "missing_d1_2"),
+            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
+            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2", "3", "4"],
+            "replicate_seeds": [17],
+        },
+        "generation": {
+            "synthetic_per_class_total": 128,
+            "budget_diagnostic_per_class_total": 256,
+            "min_per_source_per_class": 8,
+        },
+        "component_union_prior": {
+            "primary_method": "decentralized_component_union_uniform_gmm",
+            "candidate_components_per_source_class": [4, 3, 2, 1],
+            "min_samples_per_component": 12,
+            "source_weighting": "uniform_source_component_union",
+            "gmm_covariance_type": "diag",
+            "gmm_reg_covar": 1.0e-4,
+            "gmm_n_init": 1,
+            "gmm_max_iter": 100,
+            "min_component_weight": 0.02,
+            "variance_floor": 1.0e-5,
+            "variance_ceiling_multiplier": 16.0,
+            "primary_pooling": "pooled_raw_logistic",
+            "reliability_floor_score": 0.05,
+            "shrink_lambdas": [0.25, 0.5],
+            "prototype_candidate_counts_per_source_class": [4, 3, 2, 1],
+            "prototype_min_samples_per_component": 12,
+            "prototype_variance_floor": 1.0e-5,
         },
         "classifier": {
             "type": "sklearn_logistic_regression",

@@ -15,6 +15,10 @@ from .decentralized_adaptive_gmm_prior import (
     load_decentralized_adaptive_gmm_prior_config,
     run_decentralized_adaptive_gmm_prior,
 )
+from .decentralized_component_union_prior import (
+    load_decentralized_component_union_prior_config,
+    run_decentralized_component_union_prior,
+)
 from .decentralized_reliability_weighted_gmm_prior import (
     load_decentralized_reliability_weighted_gmm_prior_config,
     run_decentralized_reliability_weighted_gmm_prior,
@@ -144,6 +148,13 @@ def main(argv: list[str] | None = None) -> int:
     decentralized_adaptive_gmm.add_argument("--config", required=True)
     decentralized_adaptive_gmm.add_argument("--artifact-root", default=None)
 
+    decentralized_component_union = sub.add_parser(
+        "diagnose-decentralized-component-union-prior",
+        help="Run the Virchow2-CVAE decentralized component-level prior composition audit.",
+    )
+    decentralized_component_union.add_argument("--config", required=True)
+    decentralized_component_union.add_argument("--artifact-root", default=None)
+
     decentralized_reliability_gmm = sub.add_parser(
         "diagnose-decentralized-reliability-weighted-gmm-prior",
         help="Run the Virchow2-CVAE source-local reliability-weighted decentralized composition test.",
@@ -230,6 +241,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "diagnose-decentralized-reliability-weighted-gmm-prior":
         cfg = load_decentralized_reliability_weighted_gmm_prior_config(args.config)
         root = run_decentralized_reliability_weighted_gmm_prior(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
+    if args.command == "diagnose-decentralized-component-union-prior":
+        cfg = load_decentralized_component_union_prior_config(args.config)
+        root = run_decentralized_component_union_prior(
             cfg,
             artifact_root=Path(args.artifact_root) if args.artifact_root else None,
         )

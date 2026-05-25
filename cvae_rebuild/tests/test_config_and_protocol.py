@@ -4,6 +4,7 @@ import pytest
 
 from cvae_rebuild.config import load_config
 from cvae_rebuild.decentralized_adaptive_gmm_prior import load_decentralized_adaptive_gmm_prior_config
+from cvae_rebuild.decentralized_component_union_prior import load_decentralized_component_union_prior_config
 from cvae_rebuild.decentralized_k16_gmm_prior import load_decentralized_k16_gmm_prior_config
 from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import (
     load_decentralized_reliability_weighted_gmm_prior_config,
@@ -113,6 +114,22 @@ def test_locked_decentralized_reliability_weighted_gmm_prior_config_loads() -> N
     assert cfg.source_weighting == "source_local_reliability"
     assert cfg.min_per_source_per_class == 8
     assert cfg.primary_pooling == "weighted_geometric"
+
+
+def test_locked_decentralized_component_union_prior_config_loads() -> None:
+    cfg = load_decentralized_component_union_prior_config(
+        "cvae_rebuild/configs/virchow2_cvae_decentralized_component_union_prior_v1.yaml"
+    )
+    assert cfg.name == "virchow2_cvae_decentralized_component_union_prior_v1"
+    assert cfg.backbone == "virchow2"
+    assert cfg.primary_variant == "pca64_beta001"
+    assert cfg.primary_method == "decentralized_component_union_uniform_gmm"
+    assert cfg.candidate_components_per_source_class == (4, 3, 2, 1)
+    assert cfg.min_samples_per_component == 12
+    assert cfg.source_weighting == "uniform_source_component_union"
+    assert cfg.primary_pooling == "pooled_raw_logistic"
+    assert cfg.shrink_lambdas == (0.25, 0.5)
+    assert cfg.budget_diagnostic_per_class_total == 256
 
 
 def test_locked_decentralized_reliability_top3_gmm_prior_config_loads() -> None:
