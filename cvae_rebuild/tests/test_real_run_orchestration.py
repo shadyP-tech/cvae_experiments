@@ -1452,6 +1452,7 @@ def test_decentralized_source_inner_transfer_top3_gmm_prior_tiny_cache_writes_ex
     assert leakage["status"] == "PASS"
     assert protocol["heldout_target_rows_used_for_source_inner_scoring"] is False
     assert protocol["source_inner_uses_non_target_source_eval_rows"] is True
+    assert protocol["method_comparison_uses_method_invariant_generation_seed"] is True
     assert any(row["prior_method"] == PRIMARY_SOURCE_INNER_TRANSFER_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == "decentralized_equal_all4_geom_reference" for row in matrix)
     assert any(row["prior_method"] == "decentralized_reliability_top3_geom_reference" for row in matrix)
@@ -1461,7 +1462,23 @@ def test_decentralized_source_inner_transfer_top3_gmm_prior_tiny_cache_writes_ex
     assert subsets and all(row["heldout_center"] not in row["selected_sources"].split("|") for row in subsets)
     assert selections and all(row["heldout_center"] not in row["selected_sources"].split("|") for row in selections)
     assert drops and {"dropped_source_target_utility_rank", "dropped_source_source_inner_score_rank"} <= set(drops[0])
+    assert all(row["dropped_source_target_utility_rank"] not in {"", "nan"} for row in drops)
     assert target_subsets and len([row for row in target_subsets if row["heldout_center"] == "0"]) == 4
+    equal_all4 = {
+        (row["experiment_seed"], row["heldout_center"], row["replicate_seed"]): row
+        for row in matrix
+        if row["prior_method"] == "decentralized_equal_all4_geom_reference" and row["status"] == "ok"
+    }
+    top4 = {
+        (row["experiment_seed"], row["heldout_center"], row["replicate_seed"]): row
+        for row in matrix
+        if row["prior_method"] == "decentralized_source_inner_transfer_top4_geom_diagnostic" and row["status"] == "ok"
+    }
+    assert equal_all4 and top4
+    for key, equal_row in equal_all4.items():
+        top4_row = top4[key]
+        assert top4_row["generated_features_hash"] == equal_row["generated_features_hash"]
+        assert float(top4_row["bacc"]) == float(equal_row["bacc"])
     assert "seed_equal_mean_bacc" in summary[0]
     assert "replicate_row_mean_bacc" in summary[0]
     assert "shuffled_score_control_gap" in negative[0]

@@ -496,6 +496,7 @@ def run_decentralized_source_inner_transfer_top3_gmm_prior(
                     nn_rows.extend(nn)
 
                     target_subset_rows: list[dict[str, object]] = []
+                    target_subset_audit_rows: list[dict[str, object]] = []
                     for subset in _drop_one_subsets(candidates, cfg.top_k_sources):
                         subset_plan = _equal_plan(cfg, subset, score_label="exhaustive_drop_one")
                         rows, subset_late, coverage, weak, nn = _evaluate_variant(
@@ -518,7 +519,9 @@ def run_decentralized_source_inner_transfer_top3_gmm_prior(
                         )
                         row = rows[0]
                         target_subset_rows.append(row)
-                        drop_one_target_rows.append(_drop_one_target_row(row, subset, candidates, subset_scores))
+                        audit_row = _drop_one_target_row(row, subset, candidates, subset_scores)
+                        target_subset_audit_rows.append(audit_row)
+                        drop_one_target_rows.append(audit_row)
                         late_rows.extend(subset_late)
                         coverage_rows.extend(coverage)
                         weak_rows.extend(weak)
@@ -634,7 +637,7 @@ def run_decentralized_source_inner_transfer_top3_gmm_prior(
                     drop_frequency_rows.append(
                         _drop_frequency_row(
                             primary_subset,
-                            target_subset_rows,
+                            target_subset_audit_rows,
                             subset_scores,
                             experiment_seed=int(experiment_seed),
                             heldout_center=str(heldout_center),
@@ -857,7 +860,15 @@ def _source_inner_bundle(
     control_mode: str,
 ) -> tuple[PredictionBundle, str, str, float, float]:
     runtime = per_source_runtime[str(source_center)].runtime
-    latent_seed = d1._latent_seed(experiment_seed, heldout_center, replicate_seed, prior_method, source_center, control_mode)
+    latent_seed = d1._latent_seed(
+        experiment_seed,
+        heldout_center,
+        replicate_seed,
+        "d1_5_source_inner_scoring",
+        source_center,
+        int(budget_per_class),
+        control_mode,
+    )
     generated, labels, _counts = d1a._sample_source_from_summaries(
         cfg,
         runtime,
@@ -959,6 +970,7 @@ def _evaluate_variant(
 ) -> tuple[list[dict[str, object]], list[dict[str, object]], list[dict[str, object]], list[dict[str, object]], list[dict[str, object]]]:
     kwargs.setdefault("source_union_ref", d1._missing_reference())
     kwargs.setdefault("center_balanced_ref", d1._missing_reference())
+    kwargs.setdefault("generation_seed_method", "d1_5_target_eval_shared_generation")
     rows, late, coverage, weak, nn = d12._evaluate_weighted_variant(cfg, **kwargs)
     return (
         [_extend_source_inner_row(row, source_weighting=source_weighting) for row in rows],
@@ -1696,6 +1708,7 @@ def _write_artifacts(
             "target_expert_excluded": target_expert_excluded,
             "heldout_target_rows_used_for_source_inner_scoring": False,
             "source_inner_uses_non_target_source_eval_rows": True,
+            "method_comparison_uses_method_invariant_generation_seed": True,
             "exported_source_summaries_are_target_agnostic": True,
             "raw_source_embedding_pooling_for_prior_fit": False,
             "adaptive_k_selection_uses_source_local_fit_statistics_only": True,
@@ -1770,6 +1783,7 @@ def _write_decision_summary(root: Path, decision: Mapping[str, object], *, leaka
             "",
             "This is source-inner transfer selection, not target-conditioned routing.",
             "It does not consume target support features. Target labels are final scoring only.",
+            "For target evaluation, rows with the same source, budget, fold, replicate, and control mode use the same synthetic generation seed.",
             "",
             "## Supported Claim If PASS",
             "",

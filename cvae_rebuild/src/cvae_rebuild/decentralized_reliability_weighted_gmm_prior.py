@@ -815,6 +815,7 @@ def _evaluate_weighted_variant(
     selection_source: str,
     claim_role: str,
     control_mode: str = "normal",
+    generation_seed_method: str | None = None,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]], list[dict[str, object]], list[dict[str, object]], list[dict[str, object]]]:
     sources = tuple(str(source) for source in candidates)
     status, error = d1a._composition_status(sources, summaries, control_mode=control_mode)
@@ -849,6 +850,7 @@ def _evaluate_weighted_variant(
         control_mode=control_mode,
         budgets=dict(weight_plan["budgets"]),
         weight_plan=weight_plan,
+        generation_seed_method=generation_seed_method,
     )
     weights = [float(weight_plan["weights"][str(bundle.expert_id)]) for bundle in bundles]
     if pooling_rule == "weighted_geometric":
@@ -899,6 +901,7 @@ def _source_generated_bundles(
     control_mode: str,
     budgets: Mapping[str, int],
     weight_plan: Mapping[str, object],
+    generation_seed_method: str | None = None,
 ) -> tuple[list[PredictionBundle], list[dict[str, object]], list[dict[str, object]], list[dict[str, object]], list[dict[str, object]], str]:
     bundles: list[PredictionBundle] = []
     late_rows: list[dict[str, object]] = []
@@ -909,7 +912,18 @@ def _source_generated_bundles(
     for source_center in candidates:
         runtime = per_source_runtime[str(source_center)].runtime
         budget_per_class = int(budgets[str(source_center)])
-        latent_seed = d1._latent_seed(experiment_seed, heldout_center, replicate_seed, prior_method, source_center, control_mode)
+        if generation_seed_method is None:
+            latent_seed = d1._latent_seed(experiment_seed, heldout_center, replicate_seed, prior_method, source_center, control_mode)
+        else:
+            latent_seed = d1._latent_seed(
+                experiment_seed,
+                heldout_center,
+                replicate_seed,
+                generation_seed_method,
+                source_center,
+                budget_per_class,
+                control_mode,
+            )
         generated, labels, counts = d1a._sample_source_from_summaries(
             cfg,
             runtime,
