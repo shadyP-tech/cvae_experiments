@@ -62,6 +62,10 @@ from .source_union_balanced_gmm_prior import (
 )
 from .source_union_gmm_prior import load_source_union_gmm_prior_config, run_source_union_gmm_prior
 from .source_union_k24_gmm_prior import load_source_union_k24_gmm_prior_config, run_source_union_k24_gmm_prior
+from .source_inner_validated_dense_component_hybrid import (
+    load_source_inner_validated_hybrid_config,
+    run_source_inner_validated_dense_component_hybrid,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -219,7 +223,22 @@ def main(argv: list[str] | None = None) -> int:
     paired_component_coverage.add_argument("--config", required=True)
     paired_component_coverage.add_argument("--artifact-root", default=None)
 
+    source_inner_hybrid = sub.add_parser(
+        "diagnose-source-inner-validated-dense-component-hybrid",
+        help="Run the source-inner validated dense/component binary-gate confirmation audit.",
+    )
+    source_inner_hybrid.add_argument("--config", required=True)
+    source_inner_hybrid.add_argument("--artifact-root", default=None)
+
     args = parser.parse_args(argv)
+    if args.command == "diagnose-source-inner-validated-dense-component-hybrid":
+        cfg = load_source_inner_validated_hybrid_config(args.config)
+        root = run_source_inner_validated_dense_component_hybrid(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
     if args.command == "diagnose-paired-component-coverage-audit":
         cfg = load_paired_component_coverage_audit_config(args.config)
         root = run_paired_component_coverage_audit(

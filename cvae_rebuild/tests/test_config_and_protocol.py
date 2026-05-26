@@ -32,6 +32,10 @@ from cvae_rebuild.paired_dense_all4_reliability_confirmation import (
 from cvae_rebuild.paired_component_coverage_audit import (
     load_paired_component_coverage_audit_config,
 )
+from cvae_rebuild.source_inner_validated_dense_component_hybrid import (
+    load_source_inner_validated_hybrid_config,
+    parse_source_inner_validated_hybrid_config,
+)
 from cvae_rebuild.pipeline import run_artifact_contract_smoke, run_synthetic_smoke
 from cvae_rebuild.preservation import load_preservation_config
 from cvae_rebuild.preservation_repair import load_repair_config
@@ -164,6 +168,32 @@ def test_locked_decentralized_component_union_shrink025_v2_rejects_changed_seed_
 
     with pytest.raises(Exception, match="experiment_seeds=\\[42, 43, 44\\]"):
         parse_decentralized_component_union_prior_config(payload, base_dir=Path("."))
+
+
+def test_locked_source_inner_validated_dense_component_hybrid_config_loads() -> None:
+    cfg = load_source_inner_validated_hybrid_config(
+        "cvae_rebuild/configs/virchow2_cvae_source_inner_validated_dense_component_hybrid_v1.yaml"
+    )
+    assert cfg.name == "virchow2_cvae_source_inner_validated_dense_component_hybrid_v1"
+    assert cfg.backbone == "virchow2"
+    assert cfg.primary_variant == "pca64_beta001"
+    assert cfg.primary_method == "source_inner_validated_dense_component_binary_gate"
+    assert cfg.strict_full_run_matrix is True
+    assert cfg.experiment_seeds == (42, 43, 44)
+    assert cfg.heldout_centers == ("0", "1", "2", "3", "4")
+    assert cfg.replicate_seeds == (17, 23, 31)
+    assert cfg.synthetic_per_class_total == 128
+    assert cfg.component_shrink_lambda == 0.25
+    assert cfg.matched_shuffled_gate_null_permutations == 20
+
+
+def test_source_inner_validated_dense_component_hybrid_rejects_changed_lambda() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_source_inner_validated_dense_component_hybrid_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["source_inner_validated_dense_component_hybrid"]["component_shrink_lambda"] = 0.5
+
+    with pytest.raises(Exception, match="component_shrink_lambda"):
+        parse_source_inner_validated_hybrid_config(payload, base_dir=Path("."))
 
 
 def test_locked_pruned_adaptive_equal_all4_config_loads() -> None:

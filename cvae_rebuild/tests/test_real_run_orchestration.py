@@ -101,6 +101,16 @@ from cvae_rebuild.paired_component_coverage_audit import (
     parse_paired_component_coverage_audit_config,
     run_paired_component_coverage_audit,
 )
+from cvae_rebuild.source_inner_validated_dense_component_hybrid import (
+    MATCHED_SHUFFLED_GATE_PREFIX,
+    METHOD_COMPONENT,
+    METHOD_DENSE,
+    PRIMARY_HYBRID_METHOD,
+    _binary_gate_selection,
+    _shuffle_gate_method_labels,
+    parse_source_inner_validated_hybrid_config,
+    run_source_inner_validated_dense_component_hybrid,
+)
 from cvae_rebuild.generation import generate_reference_posterior
 from cvae_rebuild.models import ClassConditionedCVAE
 from cvae_rebuild.pipeline import run_real_cache_backed
@@ -1494,6 +1504,120 @@ def test_decentralized_component_union_shrink025_v2_tiny_cache_writes_null_artif
     )
     assert shrink_scores == null_scores
     assert any(row["shuffle_mapping_json"] != "{}" for row in weights if row["prior_method"] == null_method)
+
+
+def test_source_inner_validated_dense_component_hybrid_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_source_inner_validated_hybrid_payload(tmp_path)
+    cfg = parse_source_inner_validated_hybrid_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_source_inner_validated_dense_component_hybrid(cfg)
+
+    expected = [
+        "tables/hybrid_downstream_matrix.csv",
+        "tables/hybrid_summary.csv",
+        "tables/hybrid_selection_manifest.csv",
+        "tables/source_inner_gate_matrix.csv",
+        "tables/source_inner_gate_summary.csv",
+        "tables/gate_confusion_summary.csv",
+        "tables/hybrid_source_ablation_audit.csv",
+        "tables/matched_shuffled_gate_null_matrix.csv",
+        "tables/matched_shuffled_gate_null_summary.csv",
+        "tables/negative_control_summary.csv",
+        "tables/component_manifest.csv",
+        "tables/source_weight_manifest.csv",
+        "tables/source_reliability_manifest.csv",
+        "tables/paired_generation_audit.csv",
+        "manifests/protocol_manifest.json",
+        "manifests/source_inner_validated_hybrid_model_manifest.csv",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "hybrid_downstream_matrix.csv", newline="")))
+    selections = list(csv.DictReader(open(root / "tables" / "hybrid_selection_manifest.csv", newline="")))
+    gate = list(csv.DictReader(open(root / "tables" / "source_inner_gate_matrix.csv", newline="")))
+    null_matrix = list(csv.DictReader(open(root / "tables" / "matched_shuffled_gate_null_matrix.csv", newline="")))
+    null_summary = list(csv.DictReader(open(root / "tables" / "matched_shuffled_gate_null_summary.csv", newline="")))
+    confusion = list(csv.DictReader(open(root / "tables" / "gate_confusion_summary.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "hybrid_summary.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert protocol["target_eval_used_for_gate_selection"] is False
+    assert protocol["source_inner_shared_as_aggregate_scores_only"] is True
+    assert any(row["prior_method"] == PRIMARY_HYBRID_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == "paired_reliability_all4_weighted_geom" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_component_union_reliability_shrink025" for row in matrix)
+    assert selections and all(row["gate_selection_level"] == "experiment_seed_x_heldout_center" for row in selections)
+    assert gate and all(row["heldout_center"] != row["pseudo_target_source"] for row in gate)
+    assert null_matrix and all(row["prior_method"].startswith(MATCHED_SHUFFLED_GATE_PREFIX) for row in null_matrix)
+    assert null_summary and "effective_unique_null_patterns" in null_summary[0]
+    assert confusion and all(row["audit_only_target_outcome_used_for_selection"] == "False" for row in confusion)
+    assert "component_selection_rate" in summary[0]
+    assert "not target-conditioned routing" in report
+
+
+def test_source_inner_binary_gate_uses_dense_tie_and_ineligible_fallback() -> None:
+    dense = {
+        "experiment_seed": 42,
+        "heldout_center": "0",
+        "candidate_method": METHOD_DENSE,
+        "mean_pseudo_bacc": 0.80,
+        "min_pseudo_bacc": 0.75,
+        "std_pseudo_bacc": 0.02,
+        "inner_max_abs_source_ablation_delta": 0.04,
+        "robust_score": 1.16,
+    }
+    component = dict(dense)
+    component.update(
+        {
+            "candidate_method": METHOD_COMPONENT,
+            "mean_pseudo_bacc": 0.805,
+            "min_pseudo_bacc": 0.745,
+            "std_pseudo_bacc": 0.035,
+            "inner_max_abs_source_ablation_delta": 0.09,
+            "robust_score": 1.16,
+        }
+    )
+    cfg = parse_source_inner_validated_hybrid_config(
+        _tiny_source_inner_validated_hybrid_payload(Path("/tmp")),
+        base_dir=Path("/tmp"),
+    )
+    selected = _binary_gate_selection(cfg, [dense, component])
+    assert selected["selected_method"] == METHOD_DENSE
+    assert selected["component_eligible"] is False
+
+
+def test_source_inner_shuffled_gate_preserves_scores_and_changes_labels() -> None:
+    rows = [
+        {
+            "experiment_seed": 42,
+            "heldout_center": "0",
+            "replicate_seed": 17,
+            "pseudo_target_source": "1",
+            "candidate_method": METHOD_DENSE,
+            "row_role": "base",
+            "bacc": 0.7,
+        },
+        {
+            "experiment_seed": 42,
+            "heldout_center": "0",
+            "replicate_seed": 17,
+            "pseudo_target_source": "1",
+            "candidate_method": METHOD_COMPONENT,
+            "row_role": "base",
+            "bacc": 0.9,
+        },
+    ]
+    shuffled = _shuffle_gate_method_labels(rows, 42, "0", 0)
+    assert sorted(float(row["bacc"]) for row in shuffled) == [0.7, 0.9]
+    assert {row["candidate_method"] for row in shuffled} == {METHOD_DENSE, METHOD_COMPONENT}
 
 
 def test_decentralized_component_union_prior_rejects_invalid_backbone(tmp_path: Path) -> None:
@@ -3048,6 +3172,65 @@ def _tiny_decentralized_component_union_payload(tmp_path: Path):
             "prototype_candidate_counts_per_source_class": [4, 3, 2, 1],
             "prototype_min_samples_per_component": 12,
             "prototype_variance_floor": 1.0e-5,
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_source_inner_validated_hybrid_payload(tmp_path: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_source_inner_validated_dense_component_hybrid_v1",
+            "artifact_root": str(tmp_path / "virchow2_cvae_source_inner_validated_dense_component_hybrid_v1"),
+            "primary_variant": "pca64_beta001",
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
+            "d1_2_artifact_root": str(tmp_path / "missing_d1_2"),
+            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
+            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "strict_full_run_matrix": False,
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2", "3", "4"],
+            "replicate_seeds": [17],
+        },
+        "generation": {
+            "synthetic_per_class_total": 128,
+            "min_per_source_per_class": 8,
+        },
+        "source_inner_validated_dense_component_hybrid": {
+            "primary_method": "source_inner_validated_dense_component_binary_gate",
+            "candidate_components_per_source_class": [4, 3, 2, 1],
+            "min_samples_per_component": 12,
+            "source_weighting": "source_inner_validated_dense_component_binary_gate",
+            "gmm_covariance_type": "diag",
+            "gmm_reg_covar": 1.0e-4,
+            "gmm_n_init": 1,
+            "gmm_max_iter": 100,
+            "min_component_weight": 0.02,
+            "variance_floor": 1.0e-5,
+            "variance_ceiling_multiplier": 16.0,
+            "primary_pooling": "binary_gate",
+            "reliability_floor_score": 0.05,
+            "reliability_epsilon": 1.0e-8,
+            "component_shrink_lambda": 0.25,
+            "matched_shuffled_gate_null_permutations": 2,
+            "gate_mean_gain_min": 0.005,
+            "gate_min_degradation_floor": -0.005,
+            "gate_std_increase_max": 0.015,
+            "gate_abs_ablation_ceiling": 0.15,
+            "gate_abs_ablation_slack": 0.05,
         },
         "classifier": {
             "type": "sklearn_logistic_regression",
