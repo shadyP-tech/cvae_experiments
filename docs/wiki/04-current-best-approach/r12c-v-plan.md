@@ -101,7 +101,14 @@ Optional: clear positive delta versus R1.2b Virchow2 top-1 or clear weak-center/
 
 ## Next Decision After Pass/Fail
 
-If SAIL passes, run or create R1.3a Vanilla Virchow2 CVAE Rebuild. If it fails, do not use cross-backbone audit success as rebuild readiness.
+If SAIL passes, compare it against the already-run Virchow2 CVAE
+generated-embedding preservation/composition artifacts before adding new CVAE
+complexity. If it fails, do not use cross-backbone audit success as rebuild
+readiness.
+
+The D-series generated-embedding artifacts now provide CVAE preservation and
+dense aggregation evidence, but they do not replace the SAIL real-feature gate
+and do not prove sparse generated-embedding routing.
 
 ## Evidence / Source Artifacts
 
@@ -110,6 +117,8 @@ If SAIL passes, run or create R1.3a Vanilla Virchow2 CVAE Rebuild. If it fails, 
 - `../../../sail/src/sail/`
 - `../../../sail/tests/test_smoke.py`
 - `../../../cvae_downstream_evaluation/legacy/superseded_by_sail/r12c/README.md`
+- `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_decentralized_reliability_weighted_gmm_prior_v1/tables/decentralized_reliability_summary.csv`
+- `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/reports/decision_summary.md`
 
 ## Interpretation
 
@@ -117,7 +126,9 @@ The active SAIL tests cover imports, config loading, CLI help, synthetic evaluat
 
 ## Implication For Thesis
 
-SAIL is the immediate bridge between strong real-feature Virchow2 evidence and any justified CVAE preservation test.
+SAIL is the immediate real-feature bridge. D-series artifacts are the current
+generated-embedding preservation, prior-composition, and dense aggregation
+record.
 
 ## Limitations
 
@@ -128,3 +139,5 @@ No local SAIL output artifact directory is present. TODO: verify against artifac
 - Generate or sync SAIL outputs.
 - Validate `reports/leakage_report.json`.
 - Update this page with verified pass/fail status.
+- Keep D-series generated-embedding conclusions in the D-series and generated
+  CVAE synthesis pages.

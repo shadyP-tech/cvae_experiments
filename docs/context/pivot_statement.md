@@ -8,4 +8,14 @@ SAIL (Source-only Aggregation via Inner-domain Leaveout) now names the current s
 
 SAIL tests whether Virchow2 real-feature transfer is stable enough to justify CVAE rebuilding. R1.2c-V is now only the lineage name for the archived pre-extraction implementation. SAIL does not solve CVAE routing.
 
+The later Virchow2 CVAE rebuild and D-series results add a second pivot inside
+the generative surface: the bottleneck is no longer just whether Virchow2 is a
+useful embedding space, but whether latent priors and decentralized
+source-local summaries can preserve that utility without pooled source fitting.
+The current generated-embedding evidence supports heldout-excluded
+source-local reliability weighting as a dense aggregation compatibility proxy
+under paired generation and prediction invariants. This is a dense all-source
+aggregation result, not sparse expert selection; support-NELBO and source-inner
+transfer remain diagnostic or negative.
+
 Fast-changing result details belong in [current_experimental_state.md](current_experimental_state.md). Stable framing belongs in [thesis_project_context.md](thesis_project_context.md).

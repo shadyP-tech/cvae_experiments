@@ -20,12 +20,18 @@ This wiki gives a navigable research record for the thesis repository: project f
 
 The thesis investigates compatibility-driven routing and aggregation of generative experts for privacy-preserving domain adaptation in multi-domain medical imaging.
 
-The current diagnostic path is:
+The current result record has two layers:
 
 ```text
-R1.2b Virchow2 source-selected evidence
--> SAIL Virchow2 dense source-selected config aggregation
--> R1.3a vanilla Virchow2 CVAE preservation test if gates pass
+real-feature:
+  R1.2b Virchow2 source-selected evidence
+  -> SAIL Virchow2 dense source-selected config aggregation
+
+generated embedding:
+  Virchow2 CVAE repair / source-union K16 diagnostics
+  -> D-series decentralized source-local summary composition
+  -> paired dense all4 reliability PASS for dense aggregation
+  -> D1.3/D1.5 not final selectors
 ```
 
 ## Evidence / Source Artifacts
@@ -35,9 +41,13 @@ R1.2b Virchow2 source-selected evidence
 - `PROTOCOL_STATUS.md`
 - `cvae_downstream_evaluation/artifacts/r12b_source_selector_pathology_screen/reports/r12b_decision_report.md`
 - `sail/configs/sail_virchow2.yaml`
+- `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_decentralized_reliability_weighted_gmm_prior_v1/tables/decentralized_reliability_summary.csv`
+- `cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/reports/decision_summary.md`
 
 ## Next Checks
 
 - Run or sync SAIL artifacts.
 - Verify whether Virchow2-only dense rows pass the rebuild gate.
 - Keep cross-backbone aggregation audit-only.
+- Before adding another generated-embedding selector, reuse paired
+  generation/prediction invariants.

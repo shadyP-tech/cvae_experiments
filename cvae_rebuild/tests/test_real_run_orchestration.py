@@ -39,8 +39,11 @@ from cvae_rebuild.decentralized_adaptive_gmm_prior import (
 )
 from cvae_rebuild.decentralized_component_union_prior import (
     MATCHED_SHUFFLED_RELIABILITY_PREFIX,
+    MATCHED_SHUFFLED_RELIABILITY_SHRINK050_PREFIX,
     PRIMARY_COMPONENT_UNION_METHOD,
     ROW_COMPONENT_UNION_SHRINK025,
+    ROW_COMPONENT_UNION_SHRINK050,
+    ROW_RANDOM_MASS_BAG_CONTROL,
     parse_decentralized_component_union_prior_config,
     run_decentralized_component_union_prior,
 )
@@ -1511,6 +1514,81 @@ def test_decentralized_component_union_shrink025_v2_tiny_cache_writes_null_artif
     )
     assert shrink_scores == null_scores
     assert any(row["shuffle_mapping_json"] != "{}" for row in weights if row["prior_method"] == null_method)
+
+
+def test_decentralized_component_union_shrink050_tiny_cache_writes_confirmation_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_decentralized_component_union_payload(tmp_path)
+    payload["experiment"]["name"] = "virchow2_cvae_decentralized_component_union_reliability_shrink050_confirmation_v1"
+    payload["experiment"]["artifact_root"] = str(tmp_path / "virchow2_cvae_decentralized_component_union_reliability_shrink050_confirmation_v1")
+    payload["inputs"]["paired_dense_artifact_root"] = str(tmp_path / "missing_paired_dense")
+    payload["run_matrix"]["fresh_replicate_seeds"] = [101]
+    payload["generation"]["budget_diagnostic_per_class_total"] = None
+    payload["component_union_prior"]["primary_method"] = ROW_COMPONENT_UNION_SHRINK050
+    payload["component_union_prior"]["primary_shrink_lambda"] = 0.5
+    payload["component_union_prior"]["matched_shuffled_reliability_null_permutations"] = 2
+    payload["component_union_prior"]["random_mass_bag_control_size"] = 11
+    payload["component_union_prior"]["anchor_repro_tolerance"] = 1.0e-4
+    cfg = parse_decentralized_component_union_prior_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_decentralized_component_union_prior(cfg)
+
+    expected = [
+        "tables/component_union_panel_summary.csv",
+        "tables/shuffled_reliability_cell_delta_summary.csv",
+        "tables/shuffled_reliability_center_summary.csv",
+        "tables/random_mass_bag_control_summary.csv",
+        "tables/anchor_reproducibility_audit.csv",
+        "tables/oracle_gap_summary.csv",
+        "tables/eligibility_audit.csv",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    matrix = list(csv.DictReader(open(root / "tables" / "component_union_downstream_matrix.csv", newline="")))
+    weights = list(csv.DictReader(open(root / "tables" / "source_weight_manifest.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "component_union_summary.csv", newline="")))
+    null_matrix = list(csv.DictReader(open(root / "tables" / "shuffled_reliability_null_matrix.csv", newline="")))
+    null_summary = list(csv.DictReader(open(root / "tables" / "shuffled_reliability_null_summary.csv", newline="")))
+    panel_summary = list(csv.DictReader(open(root / "tables" / "component_union_panel_summary.csv", newline="")))
+    cell_delta = list(csv.DictReader(open(root / "tables" / "shuffled_reliability_cell_delta_summary.csv", newline="")))
+    center_summary = list(csv.DictReader(open(root / "tables" / "shuffled_reliability_center_summary.csv", newline="")))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+
+    assert any(row["prior_method"] == ROW_COMPONENT_UNION_SHRINK050 and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == ROW_RANDOM_MASS_BAG_CONTROL for row in matrix)
+    assert {row["panel"] for row in matrix if row["prior_method"] == ROW_COMPONENT_UNION_SHRINK050} == {"canonical", "fresh"}
+    assert null_matrix and all(row["prior_method"].startswith(MATCHED_SHUFFLED_RELIABILITY_SHRINK050_PREFIX) for row in null_matrix)
+    assert null_summary and null_summary[0]["n_null_permutations"] == "2"
+    assert "effective_unique_null_patterns" in null_summary[0]
+    assert cell_delta and {"panel", "delta_primary_minus_null"}.issubset(cell_delta[0])
+    assert center_summary and {"panel", "primary_above_null_p95"}.issubset(center_summary[0])
+    assert any(row["panel"] == "canonical" for row in panel_summary)
+    assert any(row["panel"] == "fresh" for row in panel_summary)
+    assert any(row["panel"] == "combined" for row in panel_summary)
+    assert summary[0]["primary_method"] == ROW_COMPONENT_UNION_SHRINK050
+    assert "delta_vs_random_mass_bag_control" in summary[0]
+    assert "source_ablation_reference_shrink025_v2_max_abs_delta" in summary[0]
+    assert protocol["primary_shrink_lambda"] == 0.5
+    assert protocol["matched_shuffled_reliability_null_lambda"] == 0.5
+
+    first_cell = next(row for row in matrix if row["prior_method"] == ROW_COMPONENT_UNION_SHRINK050 and row["status"] == "ok")
+    cell_key = (first_cell["experiment_seed"], first_cell["heldout_center"], first_cell["replicate_seed"])
+    shrink_scores = sorted(
+        round(float(row["reliability_score"]), 12)
+        for row in weights
+        if row["prior_method"] == ROW_COMPONENT_UNION_SHRINK050
+        and (row["experiment_seed"], row["heldout_center"], row["replicate_seed"]) == cell_key
+    )
+    null_method = null_matrix[0]["prior_method"]
+    null_scores = sorted(
+        round(float(row["reliability_score"]), 12)
+        for row in weights
+        if row["prior_method"] == null_method
+        and (row["experiment_seed"], row["heldout_center"], row["replicate_seed"]) == cell_key
+    )
+    assert shrink_scores == null_scores
+    assert all(row["shrink_lambda"] == "0.5" for row in weights if row["prior_method"] == null_method)
 
 
 def test_mass_bagged_component_union_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:

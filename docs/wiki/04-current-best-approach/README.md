@@ -7,6 +7,7 @@ Document the current empirical synthesis and active SAIL implementation.
 ## Pages
 
 - [Current synthesis](current-synthesis.md)
+- [Generated-embedding CVAE current synthesis](generative-cvae-current-synthesis.md)
 - [R1.2c-V lineage](r12c-v-plan.md)
 - [Virchow2-only rationale](virchow2-only-rationale.md)
 - [Cross-backbone audit](cross-backbone-audit.md)
@@ -19,6 +20,11 @@ Document the current empirical synthesis and active SAIL implementation.
 - Virchow2 is the current backbone instantiation, not the method name.
 - SAIL tests whether source-only dense real-feature aggregation is stable enough to justify a later CVAE preservation test.
 - SAIL does not prove CVAE generation or metadata routing.
+- For generated embeddings, the current best diagnostic is centralized
+  source-union K16; the current best decentralized dense aggregation result is
+  the paired dense all4 reliability confirmation.
+- No D-series experiment currently supports a full PASS target-conditioned
+  compatibility-routing claim.
 
 ## Evidence / Source Artifacts
 
@@ -26,3 +32,5 @@ Document the current empirical synthesis and active SAIL implementation.
 - `../../../sail/configs/sail_virchow2.yaml`
 - `../../../sail/src/sail/`
 - `../../../cvae_downstream_evaluation/legacy/superseded_by_sail/r12c/README.md`
+- `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_decentralized_reliability_weighted_gmm_prior_v1/tables/decentralized_reliability_summary.csv`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/reports/decision_summary.md`

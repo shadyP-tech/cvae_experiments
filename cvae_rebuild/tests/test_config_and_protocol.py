@@ -166,6 +166,44 @@ def test_locked_decentralized_component_union_shrink025_v2_config_loads() -> Non
     assert cfg.matched_shuffled_reliability_null_permutations == 20
 
 
+def test_locked_decentralized_component_union_shrink050_confirmation_config_loads() -> None:
+    cfg = load_decentralized_component_union_prior_config(
+        "cvae_rebuild/configs/virchow2_cvae_decentralized_component_union_reliability_shrink050_confirmation_v1.yaml"
+    )
+    assert cfg.name == "virchow2_cvae_decentralized_component_union_reliability_shrink050_confirmation_v1"
+    assert cfg.backbone == "virchow2"
+    assert cfg.primary_variant == "pca64_beta001"
+    assert cfg.primary_method == "decentralized_component_union_reliability_shrink050"
+    assert cfg.primary_shrink_lambda == 0.5
+    assert cfg.strict_full_run_matrix is True
+    assert cfg.experiment_seeds == (42, 43, 44)
+    assert cfg.heldout_centers == ("0", "1", "2", "3", "4")
+    assert cfg.replicate_seeds == (17, 23, 31)
+    assert cfg.fresh_replicate_seeds == (101, 103, 107)
+    assert cfg.synthetic_per_class_total == 128
+    assert cfg.budget_diagnostic_per_class_total is None
+    assert cfg.matched_shuffled_reliability_null_permutations == 20
+    assert cfg.random_mass_bag_control_size == 11
+
+
+def test_locked_decentralized_component_union_shrink050_rejects_changed_lambda() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_decentralized_component_union_reliability_shrink050_confirmation_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["component_union_prior"]["primary_shrink_lambda"] = 0.25
+
+    with pytest.raises(Exception, match="primary_shrink_lambda=0.50"):
+        parse_decentralized_component_union_prior_config(payload, base_dir=Path("."))
+
+
+def test_locked_decentralized_component_union_shrink050_rejects_changed_fresh_seed_grid() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_decentralized_component_union_reliability_shrink050_confirmation_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["run_matrix"]["fresh_replicate_seeds"] = [101]
+
+    with pytest.raises(Exception, match="fresh_replicate_seeds=\\[101, 103, 107\\]"):
+        parse_decentralized_component_union_prior_config(payload, base_dir=Path("."))
+
+
 def test_locked_decentralized_component_union_shrink025_v2_rejects_changed_seed_grid() -> None:
     path = Path("cvae_rebuild/configs/virchow2_cvae_decentralized_component_union_reliability_shrink025_v2.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))

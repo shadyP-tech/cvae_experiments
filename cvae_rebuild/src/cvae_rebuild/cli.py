@@ -171,6 +171,13 @@ def main(argv: list[str] | None = None) -> int:
     decentralized_component_union.add_argument("--config", required=True)
     decentralized_component_union.add_argument("--artifact-root", default=None)
 
+    decentralized_component_union_shrink050 = sub.add_parser(
+        "diagnose-decentralized-component-union-reliability-shrink050",
+        help="Run the Virchow2-CVAE component-union reliability shrink050 confirmation audit.",
+    )
+    decentralized_component_union_shrink050.add_argument("--config", required=True)
+    decentralized_component_union_shrink050.add_argument("--artifact-root", default=None)
+
     decentralized_component_union_mass_bagged = sub.add_parser(
         "diagnose-decentralized-component-union-mass-bagged",
         help="Run the Virchow2-CVAE mass-uncertainty bagged component-union audit.",
@@ -307,6 +314,14 @@ def main(argv: list[str] | None = None) -> int:
         print(root)
         return 0
     if args.command == "diagnose-decentralized-component-union-prior":
+        cfg = load_decentralized_component_union_prior_config(args.config)
+        root = run_decentralized_component_union_prior(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
+    if args.command == "diagnose-decentralized-component-union-reliability-shrink050":
         cfg = load_decentralized_component_union_prior_config(args.config)
         root = run_decentralized_component_union_prior(
             cfg,

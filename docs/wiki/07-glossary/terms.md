@@ -22,6 +22,17 @@ Define recurring terms used in the thesis wiki.
 | R1.2c-V | Historical name for the Virchow2 dense source-selected config aggregation diagnostic extracted into SAIL. |
 | R1.2c-X | Historical cross-backbone dense audit extension; audit-only. |
 | CVAE preservation | Whether generated embeddings preserve real-feature downstream utility. |
+| Source-union GMM prior | Centralized diagnostic prior fitted over pooled non-target source latent codes; useful as an upper bound, not decentralized deployment evidence. |
+| Source-local latent summary | Target-agnostic GMM-style summary exported by a source expert without sharing raw source embeddings. |
+| Raw-data-free summary exchange | Data-minimizing protocol that exchanges summaries or scores rather than raw images/embeddings; not formal differential privacy. |
+| Source-local reliability | Target-agnostic score measuring whether a source-generated classifier preserves utility on that source's own real rows. |
+| Heldout-excluded reliability | Source-local reliability recomputed for each heldout center using only non-heldout centers, so target-center outcomes do not influence weights, pooling, or synthetic budgets. |
+| Dense all4 aggregation | Camelyon17 LOQDO aggregation that includes all four non-target source experts; it can test weighting, pooling, or budget allocation but not sparse expert selection. |
+| Paired generation invariant | Audit rule requiring compared methods with the same source set, budget policy, heldout center, experiment seed, and replicate seed to share generated-feature and prediction hashes. |
+| Paired dense-all4 reliability confirmation | D-series confirmation experiment showing that heldout-excluded source-local reliability improved dense all-source generated-embedding aggregation under paired generation and prediction invariants. |
+| Support-NELBO weighting | Target-conditioned diagnostic that weights experts using unlabeled target support NELBO; not validated unless it beats matched controls. |
+| Source-inner transfer | Source-only off-diagonal transfer score using non-target source eval centers as pseudo-targets. |
+| Drop-one source selection | In Camelyon17 LOQDO with four candidate sources, top-3 selection is equivalent to excluding one source. |
 
 ## Evidence / Source Artifacts
 

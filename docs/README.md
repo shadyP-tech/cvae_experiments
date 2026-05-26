@@ -23,3 +23,29 @@ This documentation folder is the thesis wiki for the CVAE metadata-routing repos
 Use `context/thesis_project_context.md` for stable framing and `context/current_experimental_state.md` for the current result synthesis. Do not treat audit-only, posthoc, oracle, or target-label-informed evidence as deployable evidence.
 
 When an expected artifact is absent, write `TODO: verify against artifact.`
+
+## Current Artifact Note
+
+The latest Virchow2 CVAE rebuild and D-series decentralized composition
+artifacts were inspected from the synced artifact root:
+
+```text
+/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/
+```
+
+They are documented in:
+
+- [Current experimental state](context/current_experimental_state.md)
+- [D-series decentralized Virchow2 CVAE composition](wiki/03-experiments/d-series-decentralized-cvae.md)
+- [Generated-embedding CVAE current synthesis](wiki/04-current-best-approach/generative-cvae-current-synthesis.md)
+
+The paired dense-all4 reliability confirmation was synced into this working
+repository at:
+
+```text
+cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/
+```
+
+It is the current strongest protocol-clean generated-embedding dense
+aggregation result, but it is not sparse routing or target-conditioned expert
+selection.

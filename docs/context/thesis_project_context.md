@@ -248,6 +248,16 @@ Do not jump from real-feature classifier success to a deployable generative
 claim. Treat CVAE rebuilds as preservation tests unless their generated
 embeddings are evaluated under a protocol-clean downstream utility workflow.
 
+Distinguish centralized prior diagnostics from decentralized thesis methods:
+
+```text
+centralized source-union prior fitting = diagnostic upper bound / bottleneck test
+source-local exported latent summaries = decentralized, raw-data-free composition surface
+```
+
+The latter may be data-minimizing, but it is not a formal differential privacy
+claim unless an explicit DP mechanism and privacy budget are present.
+
 ## Routing and Aggregation Vocabulary
 
 Distinguish these surfaces:
@@ -305,6 +315,8 @@ Relevant baselines include:
 - metadata routing
 - source-only top-1 selection
 - source-only top-k aggregation
+- source-local latent summary exchange
+- centralized source-union GMM prior diagnostics
 - real-feature classifier ceiling
 - oracle config/expert selection
 - posthoc best config

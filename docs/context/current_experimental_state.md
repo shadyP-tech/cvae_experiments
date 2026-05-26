@@ -1,6 +1,6 @@
 # Current Experimental State
 
-Last updated: 2026-05-23
+Last updated: 2026-05-25
 
 ## Purpose
 
@@ -19,7 +19,8 @@ docs/context/thesis_project_context.md
 Labels used below:
 
 - Verified artifact: read from a local report, table, config, source file, or
-  test in this repository.
+  test in this repository, including synced workstation artifacts under
+  `cvae_rebuild/artifacts/`.
 - Existing synthesis note: read from a local narrative note, but not necessarily
   independently revalidated against raw artifacts in this update.
 - Provided synthesis: supplied in the current user prompt; verify against
@@ -28,33 +29,75 @@ Labels used below:
 
 ## Current Readout
 
-The current empirical path is:
+There are now two separate current-state surfaces:
 
 ```text
-R1.2b source-only pathology embedding selector evidence
+real-feature source-only compatibility / aggregation
+generated-embedding CVAE preservation / decentralized composition
+```
+
+Real-feature surface:
+
+```text
+R1.2b Virchow2 source-selected evidence
 -> SAIL Virchow2 dense source-selected config aggregation
--> if stability gates pass, vanilla Virchow2 CVAE preservation test
+-> SAIL artifacts still TODO locally
 ```
 
-Verified artifact: R1.2b shows Virchow2 is currently the strongest
-source-inner-LODO selected pathology backbone, but sparse top-1 config
-selection is brittle at the seed/center level. This motivates a Virchow2-only
-top-k dense aggregation diagnostic rather than an immediate complex CVAE
-rebuild.
-
-Current implementation extraction:
+Generated-embedding CVAE surface:
 
 ```text
-sail/
+Virchow2 CVAE repair showed decoder/source-pool capacity can preserve utility
+-> source-union K16 GMM is the strongest centralized prior diagnostic
+-> decentralized D-series summary-exchange variants gave partial evidence
+-> paired dense-all4 reliability confirmation passes as dense aggregation
+-> support-NELBO and source-inner transfer are not yet validated selectors
 ```
 
-SAIL means Source-only Aggregation via Inner-domain Leaveout. The method name is
-backbone-agnostic; `sail/configs/sail_virchow2.yaml` is the current Virchow2
-instantiation.
+Current best generated-embedding interpretation:
+
+```text
+Best diagnostic upper bound:
+  centralized source-union class-conditional diagonal GMM K16
+
+Best protocol-clean decentralized dense aggregation evidence:
+  paired dense-all4 heldout-excluded reliability confirmation
+
+Not currently supported as final thesis-facing winners:
+  support-NELBO weighting
+  reliability-only sparse top-3
+  source-inner off-diagonal drop-one selection
+```
+
+No D-series experiment currently supports a full PASS claim for deployable
+decentralized compatibility routing or sparse expert selection. The strongest
+safe generated-embedding claim is now narrower but positive: heldout-excluded
+source-local reliability improves dense all-source generated-embedding
+aggregation over equal all-source aggregation under paired generation and
+prediction invariants.
+
+## Synced Artifact Root
+
+The latest CVAE rebuild and D-series artifacts inspected in this update are
+synced under:
+
+```text
+/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/
+```
+
+These artifacts are now present under this working repo's
+`cvae_rebuild/artifacts/` directory.
+
+The paired dense-all4 reliability confirmation artifact was synced into this
+working repository under:
+
+```text
+cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/
+```
 
 ## Verified Source Artifacts
 
-Primary current artifacts:
+Primary real-feature artifacts:
 
 - `cvae_downstream_evaluation/artifacts/r12b_source_selector_pathology_screen/reports/r12b_decision_report.md`
 - `cvae_downstream_evaluation/artifacts/r12b_source_selector_pathology_screen/reports/r12b_leakage_report.json`
@@ -66,6 +109,24 @@ Primary current artifacts:
 - `sail/tests/test_smoke.py`
 - `PROTOCOL_STATUS.md`
 
+Primary generated-embedding artifacts:
+
+- `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_preservation_repair_v1/reports/decision_summary.md`
+- `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_source_union_gmm_prior_v1/tables/gmm_prior_gap_summary.csv`
+- `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_source_union_k24_gmm_prior_v1/tables/source_union_k24_gmm_summary.csv`
+- `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_decentralized_k16_gmm_prior_v1/tables/decentralized_k16_summary.csv`
+- `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_decentralized_adaptive_gmm_prior_v1/tables/decentralized_adaptive_summary.csv`
+- `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_decentralized_reliability_weighted_gmm_prior_v1/tables/decentralized_reliability_summary.csv`
+- `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_decentralized_support_nelbo_reliability_gmm_prior_v1/tables/decentralized_support_nelbo_reliability_summary.csv`
+- `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_decentralized_support8_top3_tau05_gmm_prior_v1/tables/decentralized_support8_top3_tau05_summary.csv`
+- `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_decentralized_reliability_top3_gmm_prior_v1/tables/decentralized_reliability_top3_summary.csv`
+- `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_decentralized_source_inner_transfer_top3_gmm_prior_v1/tables/decentralized_source_inner_transfer_summary.csv`
+- `cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/reports/decision_summary.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/tables/paired_dense_all4_summary.csv`
+- `cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/tables/paired_dense_all4_gap_summary.csv`
+- `cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/tables/paired_delta_summary.csv`
+- `cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/tables/paired_generation_invariant_audit.csv`
+
 Historical and contextual artifacts:
 
 - `cvae_downstream_evaluation/artifacts/reports/r12_decision_report.md`
@@ -74,43 +135,10 @@ Historical and contextual artifacts:
 - `cvae_downstream_evaluation/docs/c63_conceptual_synthesis.md`
 - `cvae_testing/thesis_outline.txt`
 
-## R1.2 Pathology Embedding Screen
-
-Verified artifact:
-`cvae_downstream_evaluation/artifacts/reports/r12_decision_report.md`
-
-Summary:
-
-- Best posthoc target-eval mean BACC: 0.9090.
-- Best source-inner-LODO selected mean BACC: 0.8805.
-- Mean delta vs Z1.1 DINOv2/PCA64: 0.0580.
-- Top source-selected backbone: `phikon`.
-- Top posthoc audit backbone: `phikon`.
-- Weak-center behavior persisted.
-
-Interpretation:
-
-R1.2 supported the direction that pathology foundation embeddings improve the
-real-feature ceiling compared with the earlier DINOv2/PCA64 reference, but it
-did not resolve weak-center stability.
-
-Claim boundary:
-
-Posthoc target-eval rows are audit-only. Source-inner-LODO selected rows are the
-protocol-clean representation-selection evidence for this benchmark.
-
 ## R1.2b Source-Only Compatibility Selector Audit
 
 Verified artifact:
 `cvae_downstream_evaluation/artifacts/r12b_source_selector_pathology_screen/reports/r12b_decision_report.md`
-
-Decision labels:
-
-- `R12B_SOURCE_SELECTOR_SCREEN_COMPLETE`
-- `R12B_SOURCE_SELECTED_090_SUPPORTED`
-- `R12_BACKBONE_MEAN_IMPROVES_WEAK_CENTER_FAILS`
-- `R12_WEAK_CENTER_PERSISTS`
-- `R12_EVAL_CLASS_BALANCE_CAVEAT`
 
 Verified summary:
 
@@ -121,23 +149,6 @@ Verified summary:
 - Top posthoc audit backbone: `virchow2` with mean BACC 0.9474.
 - Mean selector oracle gap: 0.0326.
 - Median selected rank under target utility: 47.0.
-
-Verified from `r12b_backbone_ranking.csv`:
-
-| Backbone | Selection regime | Mean BACC | Worst center BACC | Centers >= 0.85 | Eligibility |
-| --- | --- | ---: | ---: | ---: | --- |
-| virchow2 | source_inner_lodo_selected | 0.9155 | 0.8070 | 4 | deployable_diagnostic |
-| virchow2 | posthoc_target_eval | 0.9474 | 0.8166 | 4 | audit_only |
-
-Verified center means from `r12b_center_summary.csv`:
-
-| Held-out center | Source-selected backbone | Source-selected BACC | Weak-center status |
-| --- | --- | ---: | --- |
-| 0 | virchow2 | 0.9950 | repaired |
-| 1 | virchow2 | 0.9130 | repaired |
-| 2 | uni/virchow2 | 0.9922 | repaired |
-| 3 | virchow2 | 0.8070 | persists |
-| 4 | virchow2 | 0.8703 | repaired |
 
 Verified selector diagnostics from `r12b_selector_oracle_gap.csv`, primary
 robust-penalty rows:
@@ -152,13 +163,6 @@ robust-penalty rows:
 - Seed mean BACC values: seed 42 = 0.8956, seed 43 = 0.8644, seed 44 = 0.9865.
 - Seed mean-BACC sample std: 0.0635.
 
-Observed sparse-selection failures:
-
-| Seed | Held-out center | Source-selected BACC | Posthoc best BACC | Oracle gap |
-| --- | --- | ---: | ---: | ---: |
-| 42 | 3 | 0.5000 | 0.5000 | 0.0000 |
-| 43 | 4 | 0.6250 | 1.0000 | 0.3750 |
-
 Interpretation:
 
 The selector appears to identify a useful neighborhood of high-utility configs,
@@ -166,30 +170,9 @@ because the oracle is always in the top 3 in the inspected primary rows. Exact
 top-1 selection is unstable, because top-1 never matches the oracle and some
 seed/center rows collapse below the SAIL rebuild-stability floor.
 
-This is the direct motivation for SAIL dense top-k aggregation.
+This remains the real-feature motivation for dense top-k aggregation.
 
-## R1.2b Leakage / Protocol Status
-
-Verified artifact:
-`cvae_downstream_evaluation/artifacts/r12b_source_selector_pathology_screen/reports/r12b_leakage_report.json`
-
-Status:
-
-- `status`: `PASS`
-- `target_eval_labels_for_deployable_selection`: false
-- `target_eval_labels_for_scoring_only`: true
-- `diagnostics_used_for_selection`: false
-- `diagnostics_used_for_decision_labels`: false
-- `cvae_experts_modified`: false
-- `violations`: []
-
-Interpretation:
-
-R1.2b source-inner-LODO selected rows are protocol-clean diagnostic evidence for
-source-only representation/config selection. They are not evidence that CVAE
-generation preserves the same utility.
-
-## SAIL Current Implementation
+## SAIL Status
 
 Verified artifacts:
 
@@ -201,8 +184,9 @@ Verified artifacts:
 Current status:
 
 ```text
-SAIL is the active implementation. R1.2c-V code/config/tests have been archived
-as provenance and are no longer active runnable surfaces.
+SAIL is the active real-feature implementation.
+R1.2c-V code/config/tests are archived as provenance.
+SAIL output artifacts are still missing locally.
 ```
 
 Missing expected artifact root:
@@ -222,204 +206,281 @@ TODO: run or sync SAIL artifacts and verify:
 - `reports/leakage_report.json`
 - `reports/decision_report.md`
 
-Primary row role:
+## Virchow2 CVAE Preservation And Prior Diagnostics
+
+Verified synced artifacts under:
+`/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/`
+
+Summary:
+
+| Experiment | Status | Key result | Interpretation |
+| --- | --- | ---: | --- |
+| `virchow2_cvae_preservation_diagnosis_v1` | leakage PASS | mean CVAE prior BACC 0.5425 | vanilla prior is a bottleneck |
+| `virchow2_cvae_preservation_repair_v1` | `REPAIR_PARTIAL` | decode(mu) mean BACC 0.8572 | decoder/source-pool capacity exists, but this is not deployable prior sampling |
+| `virchow2_cvae_latent_prior_calibration_v1` | `PRIOR_CALIBRATION_PARTIAL` | calibrated prior mean BACC 0.7436 | calibration helps but does not solve preservation |
+| `virchow2_cvae_pca64_sampling_continuation_v1` | insufficient decision rows | prior mean BACC 0.7011; posterior/decode around 0.85 | sampling/prior remains bottleneck |
+| `virchow2_cvae_covariance_prior_confirmation_v1` | `COVARIANCE_PRIOR_PARTIAL` | covariance prior mean BACC 0.7908 | improves standard/diag references, but unstable |
+| `virchow2_cvae_covariance_shrinkage_stability_v1` | `SHRINKAGE075_PARTIAL` | center-equal mean BACC 0.8077 | shrinkage helps but tail failures remain |
+
+Interpretation:
+
+Virchow2 embeddings were not the only bottleneck. The CVAE decoder can preserve
+utility under favorable latent inputs, but prior sampling is the limiting
+factor. This motivated source-union and decentralized GMM prior experiments.
+
+## Source-Union GMM Prior Diagnostics
+
+Verified synced artifacts:
+
+- `virchow2_cvae_source_union_gmm_prior_v1`
+- `virchow2_cvae_source_union_center_balanced_gmm_prior_v1`
+- `virchow2_cvae_source_union_k24_gmm_prior_v1`
+
+Key results:
+
+| Row / experiment | Mean BACC | Status / caveat |
+| --- | ---: | --- |
+| `source_union_cc_diag_gmm_k16_prior_sample_diagnostic` | 0.8924 | strongest centralized source-union diagnostic row |
+| `source_union_cc_diag_gmm_k24_prior_sample` | 0.8751 | K24 underperforms K16 and has component-undersampling caveat |
+| `source_union_center_balanced_cc_diag_gmm_k16_prior_sample` | 0.8589 | center-balanced K16 underperforms vanilla K16 |
+| source-union GMM primary K8 summary | 0.8241 | primary verdict `GMM_FIT_INELIGIBLE` |
+
+Interpretation:
+
+The source-union K16 GMM prior is the strongest generated-embedding utility
+diagnostic so far. It is not the thesis-facing deployable method because it
+uses centralized source-union fitting and does not implement decentralized
+expert routing or summary exchange.
+
+Safe claim:
 
 ```text
-source_only_dense_virchow2
+The K16 source-union GMM diagnostic shows that improved latent prior sampling
+can recover much of Virchow2 generated-embedding downstream utility.
 ```
 
-Primary candidate pool:
+Unsafe claim:
 
 ```text
-backbone = virchow2 only
-representation in {raw, PCA64, PCA128, PCA256}
-classifier C in {0.01, 0.1, 1.0, 10.0}
-class_weight in {none, balanced}
-standardization and PCA fit on source training rows only
+Centralized source-union K16 is a deployable MoErging/routing method.
 ```
 
-Source-only robust score:
+## D-Series Decentralized Composition Results
 
-```text
-robust_score =
-    mean_inner_bacc
-    - 0.25 * std_inner_bacc
-    - 0.50 * max(0, 0.85 - min_inner_bacc)
-```
+Verified synced artifacts under:
+`/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/`
 
-Purpose:
+| Experiment | Primary method | Verdict | Mean BACC | Min center | Seed std | Main conclusion |
+| --- | --- | --- | ---: | ---: | ---: | --- |
+| D1 strict K16 | `decentralized_exported_k4x4_cc_diag_gmm_k16_late_geom` | `INELIGIBLE` | 0.8806 | 0.8704 | 0.0384 | High retention but fixed K4 fit ineligible |
+| D1.1 adaptive K | `decentralized_exported_adaptive_k_cc_diag_gmm_late_geom` | `D1_1_PARTIAL_EVIDENCE` | 0.8143 | 0.7380 | 0.0681 | Restores eligibility but loses centralized retention/stability |
+| D1.2 reliability weighted | `decentralized_exported_adaptive_k_source_reliability_weighted_geom` | `D1_2_PARTIAL_EVIDENCE` | 0.8493 | 0.8013 | 0.0382 | Best clean decentralized preservation/reliability evidence so far |
+| D1.3 support-NELBO x reliability | `decentralized_exported_adaptive_k_support_nelbo_x_reliability_weighted_geom` | `D1_3_PARTIAL_EVIDENCE` | 0.8495 | 0.7262 | 0.0297 | Utility improves on support-eval subset, but alignment/stability weak |
+| D1.3.1 support8 top3 tau0.5 | `decentralized_support8_top3_tau05_support_nelbo_x_reliability_geom` | `D1_3_1_WEAK_PASS` | 0.8310 | 0.7804 | 0.0450 | Support-NELBO alignment improves, but shuffled-support control is competitive |
+| D1.4 reliability top3 | `decentralized_reliability_top3_geom_confirmation` | `D1_4_DIAGNOSTIC_ONLY` | 0.8212 | 0.7529 | 0.0498 | Sparse reliability top3 does not beat equal all4 and controls |
+| D1.5 source-inner drop-one | `decentralized_source_inner_transfer_top3_geom_confirmation` | `D1_5_FAIL` | 0.8354 | 0.7092 | 0.0015 | Source-inner transfer does not predict target subset utility and loses to equal all4 |
+| Paired dense all4 reliability confirmation | `paired_reliability_all4_weighted_geom` | `PAIRED_DENSE_ALL4_RELIABILITY_PASS` | 0.8506 | 0.8173 | 0.0308 | Heldout-excluded reliability improves dense all-source aggregation under paired invariants |
 
-```text
-penalize weak-center collapse instead of selecting configs by mean BACC alone
-```
+Important D-series diagnostics:
 
-Primary aggregation:
+- D1 strict K16 retention vs source-union K16: 0.9925, but primary is
+  ineligible due component-fit failure.
+- D1.2 delta vs D1.1 equal adaptive geom: +0.0211.
+- D1.2 source-reliability vs target single-source Spearman: 0.0461, so
+  reliability behaves as a source-quality prior, not target compatibility.
+- D1.3 support-NELBO vs downstream Spearman: 0.2228, but top-2 oracle
+  containment is 0.6429 and Spearman stability is weak.
+- D1.3.1 support-NELBO Spearman: 0.3143 and top-3 oracle containment: 0.8571,
+  but shuffled-support control beats the primary by 0.0096 BACC.
+- D1.4 random-source-drop and shuffled-reliability controls are competitive.
+- D1.5 source-inner score vs target subset utility Spearman: -0.1102.
+- D1.5 shuffled-score control beats the primary by 0.0326 BACC.
+- Paired dense all4 reliability confirmation:
+  - decision report primary method: `paired_reliability_all4_shrink050_geom`.
+  - best reliability method: `paired_reliability_all4_weighted_geom`.
+  - leakage report: `PASS`.
+  - paired generation invariant audit: 420/420 rows `PASS`.
+  - equal all4 center-equal BACC: 0.8235.
+  - full reliability-weighted center-equal BACC: 0.8506.
+  - delta vs equal all4: +0.0271 center-equal BACC.
+  - delta vs strongest negative control: +0.0416.
+  - positive paired cells: 9/14.
+  - centers improved vs equal all4: 4/5.
+  - paired bootstrap CI for mean delta: [-0.0098, 0.0764].
+  - gap vs real-feature dense reference remains -0.0570 BACC.
 
-- fixed k values: 1, 3, 5, 10
-- primary k values: 3, 5, 10
-- aggregation rules: geometric, arithmetic
-- primary calibration rule: none
-- audit calibration rules: none, source_temperature
+Interpretation:
 
-Geometric aggregation:
+The paired dense all4 confirmation supersedes D1.2 as the best protocol-clean
+generated-embedding dense aggregation result. It supports source-local
+reliability as a useful dense aggregation compatibility proxy under paired
+generation and prediction invariants. It does not support sparse expert
+selection or target-specific compatibility routing.
 
-```text
-score_c = mean_i log(max(p_i(c), eps))
-```
+D1.3 and D1.3.1 do not validate support-NELBO as the final target-conditioned
+compatibility signal because shuffled-support controls remain too competitive.
 
-Arithmetic aggregation:
+D1.5 is negative evidence against source-inner off-diagonal transfer as
+implemented here.
 
-```text
-score_c = mean_i p_i(c)
-```
-
-Selection rules:
-
-- k, aggregation rule, and primary calibration are selected using source-inner
-  LODO only.
-- Target eval labels are scoring-only.
-- Cross-backbone rows are not part of the active SAIL Virchow2 instantiation.
-- Source-temperature calibration is not part of the active SAIL primary method.
-- CVAE experts are not retrained or evaluated by SAIL.
-
-Implementation guardrails verified in tests:
-
-- Config loading works for `sail/configs/sail_virchow2.yaml`.
-- CLI help works through `python -m sail.cli`.
-- Synthetic evaluation path verifies source-only selection does not consume
-  target-eval labels before final scoring.
-
-## SAIL Rebuild Gate
+## D1.5 Scientific Audit Notes
 
 Verified artifact:
-`sail/configs/sail_virchow2.yaml`
+`/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_decentralized_source_inner_transfer_top3_gmm_prior_v1/`
 
-The SAIL Virchow2 instantiation can justify a vanilla Virchow2 CVAE
-preservation test only if Virchow2-only primary rows satisfy:
+Protocol status is clean:
+
+- leakage report: `PASS`
+- target expert excluded
+- no target support features or labels
+- target eval labels scoring-only
+- source-inner transfer matrix has no self-transfer rows
+- heldout target rows are not used for source-inner scoring
+
+Empirical status:
+
+- primary mean BACC: 0.8354
+- equal all4 reference: 0.8519
+- reliability top3 reference: 0.8355
+- shuffled-score control: 0.8680
+- source-inner Spearman vs target subset utility: -0.1102
+
+Scientific/audit issues to fix before any D1.5-style rerun:
+
+1. `top4` diagnostic is structurally equivalent to equal all4, but does not
+   reproduce equal all4 because method-specific synthetic sampling seeds change
+   generated features. Future subset-selection confirmations need paired,
+   method-invariant generated prediction bundles for identical source sets.
+2. `source_drop_frequency_summary.csv` has `dropped_source_target_utility_rank`
+   as `nan` for selected rows. The rank field should be repaired if the table
+   is used for thesis diagnostics.
+3. Seed 43 is fully ineligible in D1.5 due mono-class source-inner/target eval
+   cells, leaving only 10 eligible seed-center cells.
+
+These audit issues do not overturn the fail verdict; they make the negative
+interpretation more conservative.
+
+## Current Best Approach
+
+Current best real-feature approach:
 
 ```text
-mean BACC >= 0.92
-worst center BACC >= 0.85
-seed mean-BACC std <= 0.03
-no seed has worst-center BACC < 0.75
-delta vs R1.2b Virchow2 top-1 >= 0.005
+SAIL Virchow2 dense source-selected config aggregation
 ```
 
-Current gate status:
+Status: implemented, but output artifacts still TODO locally.
+
+Current best generated-embedding diagnostic:
 
 ```text
-TODO: verify against SAIL artifacts.
+centralized source-union K16 GMM prior
 ```
 
-R1.2b top-1 sparse selection would not satisfy the seed-stability spirit of
-this gate because inspected primary rows include seed/center BACC values below
-0.75 and seed mean-BACC std of 0.0635.
+Status: strong diagnostic upper bound, not deployable.
 
-## Cross-Backbone Aggregation
-
-Archived provenance:
-`cvae_downstream_evaluation/legacy/superseded_by_sail/r12c/configs/r12c_virchow2_dense_config_aggregation.yaml`
-
-The archived R1.2c-X audit allowed:
+Current best decentralized generated-embedding dense aggregation method:
 
 ```text
-phikon + uni + virchow2
+paired dense all4 heldout-excluded source-local reliability weighting
 ```
 
-but it was audit-only and is not part of the active SAIL Virchow2
-implementation.
+Status: PASS for dense generated-embedding aggregation only; not a sparse
+routing or target-conditioned compatibility-router PASS.
 
-Reason:
+Current rejected or downgraded directions:
 
-```text
-Cross-backbone ensemble diversity may improve real-feature classifier
-performance, but it does not prove that one clean generative feature space is
-sufficient for CVAE expert modeling.
-```
+- strict D1 K16 as primary: ineligible fixed K4 component fits
+- D1.3/D1.3.1 support-NELBO as final selector: controls too competitive
+- D1.4 reliability-only sparse top3: diagnostic-only, controls competitive
+- D1.5 source-inner transfer drop-one: fail
+- K24 source-union GMM: weaker than K16 and component undersampled
+- metadata-only routing: baseline/proxy, not current winner
 
-Therefore:
+## Claim Boundaries
 
-```text
-cross-backbone dense success -/> CVAE rebuild readiness
-```
-
-Only Virchow2-only primary rows may justify the next CVAE preservation test.
-
-## CVAE / C6.3 Context
-
-Existing synthesis note:
-`cvae_downstream_evaluation/docs/c63_conceptual_synthesis.md`
-
-That note frames C6.3 as dense posthoc output aggregation over frozen CVAE-style
-expert/mode classifiers, not as a new compatibility estimator. It reports an
-approximate C6.3 full-context mean BACC of 0.814 with weak centers still present.
-
-Evidence label:
+Supported by current evidence:
 
 ```text
-Existing synthesis note; verify against synced C6.3 decision artifacts before
-using as a final thesis table.
-```
-
-Current interpretation:
-
-- C6.3 supports the value of dense aggregation when sparse top-1 routing is
-  brittle.
-- C6.3 does not prove that a Virchow2 CVAE preserves the R1.2b real-feature
-  utility.
-- SAIL is a real-feature source-only aggregation method upstream of any new
-  CVAE rebuild.
-
-## Not Yet Supported
-
-Current evidence does not yet support:
-
-```text
-Virchow2 CVAEs preserve the observed real-feature utility.
+Virchow2 is a strong pathology feature space for source-selected real-feature
+transfer diagnostics.
 ```
 
 ```text
-Metadata similarity alone is sufficient for compatibility estimation.
+Virchow2 CVAE decoder/source-pool capacity can preserve substantial utility
+when latent inputs are favorable.
 ```
 
 ```text
-Cross-backbone classifier ensembling proves one clean generative feature space.
+Latent prior sampling is a central bottleneck for Virchow2 generated-embedding
+utility.
 ```
 
 ```text
-Posthoc target-eval ranking is deployable.
+Source-local adaptive latent summaries plus source-local reliability weighting
+improve dense generated-embedding aggregation over equal all-source aggregation
+under paired generation and prediction invariants.
+```
+
+Not supported by current evidence:
+
+```text
+Support-NELBO is a validated target-conditioned compatibility router.
+```
+
+```text
+Source-inner off-diagonal transfer is a reliable drop-one source selector.
+```
+
+```text
+Centralized source-union K16 is deployable.
+```
+
+```text
+The thesis has a full PASS decentralized generated-embedding routing method.
+```
+
+```text
+Formal privacy preservation.
 ```
 
 ## Current Next Sequence
 
-1. Run or sync SAIL:
-   Virchow2 dense source-selected config aggregation.
+1. Do not extend D1.5 source-inner transfer directly.
 
-2. Verify SAIL protocol safety:
-   target-eval labels are scoring-only and source-inner selection stays
-   source-only.
+2. The paired dense all4 reliability confirmation has implemented the required
+   paired generation/prediction invariant audit:
 
-3. If SAIL passes the Virchow2-only gate:
-   run a vanilla Virchow2 CVAE preservation test.
+   ```text
+   same source set + same budgets + same replicate seed
+   -> same generated/prediction bundle regardless of method label
+   ```
 
-4. If vanilla Virchow2 CVAE preserves most real-feature utility:
-   keep the CVAE simple and focus the thesis contribution on compatibility and
-   routing.
+   This prevents method-specific random seeds from confounding dense
+   aggregation comparisons. Reuse the same invariant design for any future
+   sparse selector confirmation.
 
-5. If vanilla Virchow2 CVAE loses too much utility:
-   calibrated or composable Virchow2 CVAE work becomes a justified novel
-   contribution.
+3. Repair the D1.5 drop-rank audit field if source-drop tables are reused.
 
-The label `R1.3a Vanilla Virchow2 CVAE Rebuild` is provided synthesis at this
-point. TODO: create or verify a corresponding config/artifact before treating
-that name as an implemented experiment.
+4. Use equal all4, D1.2 reliability-weighted, D1.3 support-eval reference, and
+   source-union K16 as fixed baselines. Do not compare against historical
+   full-target rows when support/eval subsets differ.
+
+5. Treat the paired dense all4 reliability result as the generated-embedding
+   dense aggregation success. Treat support-NELBO and source-inner transfer as
+   negative or diagnostic until they beat matched controls under the same paired
+   invariant discipline.
+
+6. Keep centralized source-union K16 as a CVAE prior-preservation diagnostic
+   upper bound only.
 
 ## Missing Artifacts / TODOs
 
 - TODO: run or sync SAIL output artifacts under
   `sail/artifacts/virchow2_dense_source_selected`.
 - TODO: verify whether SAIL primary rows pass the rebuild gate.
-- TODO: create or verify the vanilla Virchow2 CVAE preservation-test config if
-  SAIL passes.
+- TODO: reuse paired generation-cache/invariant checks if any further D-series
+  sparse selector confirmation is implemented.
+- TODO: repair D1.5 `dropped_source_target_utility_rank` if the drop-frequency
+  table is used in thesis writing.
 - TODO: verify C6.3 numerical synthesis against raw/synced decision artifacts
   before using it as a final thesis result table.
