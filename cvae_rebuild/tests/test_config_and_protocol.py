@@ -9,6 +9,11 @@ from cvae_rebuild.decentralized_component_union_prior import (
     load_decentralized_component_union_prior_config,
     parse_decentralized_component_union_prior_config,
 )
+from cvae_rebuild.component_union_mass_bagged import (
+    PRIMARY_BAG_MEMBERS,
+    load_mass_bagged_component_union_config,
+    parse_mass_bagged_component_union_config,
+)
 from cvae_rebuild.decentralized_pruned_adaptive_equal_all4_prior import load_pruned_adaptive_equal_all4_config
 from cvae_rebuild.decentralized_k16_gmm_prior import load_decentralized_k16_gmm_prior_config
 from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import (
@@ -168,6 +173,34 @@ def test_locked_decentralized_component_union_shrink025_v2_rejects_changed_seed_
 
     with pytest.raises(Exception, match="experiment_seeds=\\[42, 43, 44\\]"):
         parse_decentralized_component_union_prior_config(payload, base_dir=Path("."))
+
+
+def test_locked_mass_bagged_component_union_config_loads() -> None:
+    cfg = load_mass_bagged_component_union_config(
+        "cvae_rebuild/configs/virchow2_cvae_decentralized_component_union_mass_bagged_v1.yaml"
+    )
+    assert cfg.name == "virchow2_cvae_decentralized_component_union_mass_bagged_v1"
+    assert cfg.backbone == "virchow2"
+    assert cfg.primary_variant == "pca64_beta001"
+    assert cfg.primary_method == "decentralized_component_union_mass_uncertainty_bagged_v1"
+    assert cfg.strict_full_run_matrix is True
+    assert cfg.experiment_seeds == (42, 43, 44)
+    assert cfg.heldout_centers == ("0", "1", "2", "3", "4")
+    assert cfg.replicate_seeds == (17, 23, 31)
+    assert cfg.synthetic_per_class_total == 128
+    assert cfg.primary_bag_members == PRIMARY_BAG_MEMBERS
+    assert cfg.control_bag_size == 11
+    assert all("shuffled" not in member for member in cfg.primary_bag_members)
+    assert cfg.primary_pooling == "arithmetic_probability_ensemble"
+
+
+def test_mass_bagged_component_union_rejects_shuffled_primary_member() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_decentralized_component_union_mass_bagged_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["mass_bagged_component_union"]["primary_bag_members"][0] = "shuffled_reliability_shrink025_perm000"
+
+    with pytest.raises(Exception, match="must not contain shuffled"):
+        parse_mass_bagged_component_union_config(payload, base_dir=Path("."))
 
 
 def test_locked_source_inner_validated_dense_component_hybrid_config_loads() -> None:

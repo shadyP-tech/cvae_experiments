@@ -44,6 +44,13 @@ from cvae_rebuild.decentralized_component_union_prior import (
     parse_decentralized_component_union_prior_config,
     run_decentralized_component_union_prior,
 )
+from cvae_rebuild.component_union_mass_bagged import (
+    PRIMARY_MASS_BAGGED_METHOD,
+    ROW_RANDOM_MASS_BAG_CONTROL,
+    ROW_SHUFFLED_RELIABILITY_BAG_CONTROL,
+    parse_mass_bagged_component_union_config,
+    run_mass_bagged_component_union,
+)
 from cvae_rebuild.decentralized_pruned_adaptive_equal_all4_prior import (
     PRIMARY_PRUNED_EQUAL_ALL4_METHOD,
     ROW_UNPRUNED_FIXED_K4,
@@ -1504,6 +1511,62 @@ def test_decentralized_component_union_shrink025_v2_tiny_cache_writes_null_artif
     )
     assert shrink_scores == null_scores
     assert any(row["shuffle_mapping_json"] != "{}" for row in weights if row["prior_method"] == null_method)
+
+
+def test_mass_bagged_component_union_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_mass_bagged_component_union_payload(tmp_path)
+    cfg = parse_mass_bagged_component_union_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_mass_bagged_component_union(cfg)
+
+    expected = [
+        "tables/mass_bagged_downstream_matrix.csv",
+        "tables/mass_bagged_summary.csv",
+        "tables/mass_bag_member_matrix.csv",
+        "tables/mass_bag_member_summary.csv",
+        "tables/source_mass_bag_manifest.csv",
+        "tables/source_weight_manifest.csv",
+        "tables/source_reliability_manifest.csv",
+        "tables/component_manifest.csv",
+        "tables/component_coverage_audit.csv",
+        "tables/mass_bagged_source_ablation_audit.csv",
+        "tables/paired_generation_audit.csv",
+        "tables/negative_control_summary.csv",
+        "tables/oracle_gap_summary.csv",
+        "tables/anchor_reproducibility_audit.csv",
+        "tables/eligibility_audit.csv",
+        "manifests/protocol_manifest.json",
+        "manifests/mass_bagged_component_union_model_manifest.csv",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "mass_bagged_downstream_matrix.csv", newline="")))
+    members = list(csv.DictReader(open(root / "tables" / "mass_bag_member_matrix.csv", newline="")))
+    manifest = list(csv.DictReader(open(root / "tables" / "source_mass_bag_manifest.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "mass_bagged_summary.csv", newline="")))
+    anchors = list(csv.DictReader(open(root / "tables" / "anchor_reproducibility_audit.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert protocol["target_conditioned_point_compatibility_estimate"] is False
+    assert protocol["primary_bag_excludes_shuffled_reliability"] is True
+    assert all("shuffled" not in member for member in protocol["primary_bag_members"])
+    assert any(row["prior_method"] == PRIMARY_MASS_BAGGED_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == ROW_RANDOM_MASS_BAG_CONTROL for row in matrix)
+    assert any(row["prior_method"] == ROW_SHUFFLED_RELIABILITY_BAG_CONTROL for row in matrix)
+    assert any(row["parent_bag_method"] == PRIMARY_MASS_BAGGED_METHOD for row in members)
+    assert manifest and all(row["heldout_center"] != row["source_center"] for row in manifest)
+    assert "effective_generated_samples_per_cell" in summary[0]
+    assert "ensemble_underperforms_best_locked_prior" in summary[0]
+    assert anchors and "anchor_repro_status" in anchors[0]
+    assert "No target-conditioned point compatibility estimate is used" in report
 
 
 def test_source_inner_validated_dense_component_hybrid_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
@@ -3231,6 +3294,69 @@ def _tiny_source_inner_validated_hybrid_payload(tmp_path: Path):
             "gate_std_increase_max": 0.015,
             "gate_abs_ablation_ceiling": 0.15,
             "gate_abs_ablation_slack": 0.05,
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_mass_bagged_component_union_payload(tmp_path: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_decentralized_component_union_mass_bagged_v1",
+            "artifact_root": str(tmp_path / "virchow2_cvae_decentralized_component_union_mass_bagged_v1"),
+            "primary_variant": "pca64_beta001",
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
+            "paired_dense_artifact_root": str(tmp_path / "missing_paired_dense"),
+            "component_union_v2_artifact_root": str(tmp_path / "missing_component_union_v2"),
+            "hybrid_artifact_root": str(tmp_path / "missing_hybrid"),
+            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
+            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "strict_full_run_matrix": False,
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2", "3", "4"],
+            "replicate_seeds": [17],
+        },
+        "generation": {
+            "synthetic_per_class_total": 32,
+            "min_per_source_per_class": 2,
+        },
+        "mass_bagged_component_union": {
+            "primary_method": "decentralized_component_union_mass_uncertainty_bagged_v1",
+            "primary_bag_members": [
+                "uniform_source_mass",
+                "reliability_shrink_0.25",
+                "reliability_shrink_0.50",
+                "dirichlet_uniform_alpha4_perm000",
+            ],
+            "control_bag_size": 2,
+            "candidate_components_per_source_class": [4, 3, 2, 1],
+            "min_samples_per_component": 2,
+            "source_weighting": "mass_uncertainty_bagged_source_component_union",
+            "gmm_covariance_type": "diag",
+            "gmm_reg_covar": 1.0e-4,
+            "gmm_n_init": 1,
+            "gmm_max_iter": 100,
+            "min_component_weight": 0.02,
+            "variance_floor": 1.0e-5,
+            "variance_ceiling_multiplier": 16.0,
+            "primary_pooling": "arithmetic_probability_ensemble",
+            "reliability_floor_score": 0.05,
+            "reliability_epsilon": 1.0e-8,
+            "shrink_lambdas": [0.25, 0.5],
+            "anchor_repro_tolerance": 1.0e-4,
         },
         "classifier": {
             "type": "sklearn_logistic_regression",

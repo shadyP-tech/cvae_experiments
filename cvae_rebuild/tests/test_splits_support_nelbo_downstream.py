@@ -5,6 +5,7 @@ from cvae_rebuild.downstream import (
     PredictionBundle,
     evaluate_probability_predictions,
     geometric_probability_pool,
+    weighted_arithmetic_probability_pool,
     weighted_geometric_probability_pool,
 )
 from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import SourceReliability
@@ -99,6 +100,27 @@ def test_weighted_geometric_pooling_rejects_invalid_weights() -> None:
             pass
         else:
             raise AssertionError(f"Expected invalid weights to fail: {weights}")
+
+
+def test_weighted_arithmetic_pooling_rejects_class_order_mismatch() -> None:
+    first = PredictionBundle("1", probabilities=((0.9, 0.1),), classes=(0, 1))
+    second = PredictionBundle("2", probabilities=((0.8, 0.2),), classes=(1, 0))
+    try:
+        weighted_arithmetic_probability_pool([first, second], [1.0, 1.0])
+    except ProtocolError:
+        pass
+    else:
+        raise AssertionError("Expected class-order mismatch to fail.")
+
+
+def test_weighted_arithmetic_pooling_averages_member_probabilities() -> None:
+    first = PredictionBundle("1", probabilities=((0.9, 0.1), (0.2, 0.8)))
+    second = PredictionBundle("2", probabilities=((0.7, 0.3), (0.6, 0.4)))
+    pooled = weighted_arithmetic_probability_pool([first, second], [1.0, 1.0])
+    assert math.isclose(pooled[0][0], 0.8)
+    assert math.isclose(pooled[0][1], 0.2)
+    assert math.isclose(pooled[1][0], 0.4)
+    assert math.isclose(pooled[1][1], 0.6)
 
 
 def test_support_nelbo_weight_plan_prefers_lower_calibrated_nelbo_when_reliability_is_equal() -> None:
