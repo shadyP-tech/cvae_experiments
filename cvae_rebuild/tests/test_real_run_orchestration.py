@@ -54,6 +54,11 @@ from cvae_rebuild.component_union_mass_bagged import (
     parse_mass_bagged_component_union_config,
     run_mass_bagged_component_union,
 )
+from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
+    PRIMARY_TAILRISK_METHOD,
+    parse_tailrisk_anchored_component_union_config,
+    run_tailrisk_anchored_component_union,
+)
 from cvae_rebuild.decentralized_pruned_adaptive_equal_all4_prior import (
     PRIMARY_PRUNED_EQUAL_ALL4_METHOD,
     ROW_UNPRUNED_FIXED_K4,
@@ -1727,6 +1732,64 @@ def test_mass_bagged_component_union_tiny_cache_writes_expected_artifacts(tmp_pa
     assert "ensemble_underperforms_best_locked_prior" in summary[0]
     assert anchors and "anchor_repro_status" in anchors[0]
     assert "No target-conditioned point compatibility estimate is used" in report
+
+
+def test_tailrisk_anchored_component_union_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_tailrisk_anchored_component_union_payload(tmp_path)
+    cfg = parse_tailrisk_anchored_component_union_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_tailrisk_anchored_component_union(cfg)
+
+    expected = [
+        "tables/tailrisk_downstream_matrix.csv",
+        "tables/tailrisk_summary.csv",
+        "tables/tailrisk_panel_summary.csv",
+        "tables/tailrisk_tail_metric_summary.csv",
+        "tables/tailrisk_probability_blend_manifest.csv",
+        "tables/tailrisk_complementarity_audit.csv",
+        "tables/tailrisk_calibration_audit.csv",
+        "tables/source_weight_manifest.csv",
+        "tables/source_reliability_manifest.csv",
+        "tables/component_manifest.csv",
+        "tables/component_coverage_audit.csv",
+        "tables/paired_generation_audit.csv",
+        "tables/negative_control_summary.csv",
+        "tables/source_ablation_audit.csv",
+        "tables/oracle_gap_summary.csv",
+        "tables/random_mass_bag_control_summary.csv",
+        "tables/shuffled_reliability_null_summary.csv",
+        "tables/anchor_reproducibility_audit.csv",
+        "tables/eligibility_audit.csv",
+        "manifests/protocol_manifest.json",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "tailrisk_downstream_matrix.csv", newline="")))
+    blend = list(csv.DictReader(open(root / "tables" / "tailrisk_probability_blend_manifest.csv", newline="")))
+    complementarity = list(csv.DictReader(open(root / "tables" / "tailrisk_complementarity_audit.csv", newline="")))
+    calibration = list(csv.DictReader(open(root / "tables" / "tailrisk_calibration_audit.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "tailrisk_summary.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert protocol["target_support_used"] is False
+    assert protocol["blend_alpha_locked"] == 0.5
+    assert any(row["prior_method"] == PRIMARY_TAILRISK_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == "decentralized_component_union_reliability_shrink050" for row in matrix)
+    assert any(row["prior_method"] == ROW_RANDOM_MASS_BAG_CONTROL for row in matrix)
+    assert blend and all(row["class_order_match"] == "True" for row in blend)
+    assert complementarity and "anchor_correct_bag_wrong_rate" in complementarity[0]
+    assert calibration and calibration[0]["target_calibration_audit_only"] == "True"
+    assert "bottom20_cell_mean_bacc" in summary[0]
+    assert "center3_delta_vs_random_mass_bag" in summary[0]
+    assert "source-only robustness aggregation audit" in report
 
 
 def test_source_inner_validated_dense_component_hybrid_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
@@ -3579,6 +3642,68 @@ def _tiny_mass_bagged_component_union_payload(tmp_path: Path):
             "reliability_floor_score": 0.05,
             "reliability_epsilon": 1.0e-8,
             "shrink_lambdas": [0.25, 0.5],
+            "anchor_repro_tolerance": 1.0e-4,
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_tailrisk_anchored_component_union_payload(tmp_path: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_component_union_tailrisk_anchored_mass_bagged_v1",
+            "artifact_root": str(tmp_path / "virchow2_cvae_component_union_tailrisk_anchored_mass_bagged_v1"),
+            "primary_variant": "pca64_beta001",
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
+            "paired_dense_artifact_root": str(tmp_path / "missing_paired_dense"),
+            "mass_bagged_artifact_root": str(tmp_path / "missing_mass_bagged"),
+            "support_calibrated_artifact_root": str(tmp_path / "missing_support_calibrated"),
+            "shrink050_artifact_root": str(tmp_path / "missing_shrink050"),
+            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
+            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "strict_full_run_matrix": False,
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2", "3", "4"],
+            "replicate_seeds": [17],
+            "fresh_replicate_seeds": [101],
+        },
+        "generation": {
+            "synthetic_per_class_total": 32,
+            "min_per_source_per_class": 2,
+        },
+        "tailrisk_anchored_component_union": {
+            "primary_method": "component_union_tailrisk_anchored_shrink050_random_mass_bag_blend050",
+            "primary_shrink_lambda": 0.5,
+            "random_mass_bag_size": 3,
+            "random_mass_bag_alpha": 4.0,
+            "blend_alpha": 0.5,
+            "matched_shuffled_reliability_null_permutations": 2,
+            "candidate_components_per_source_class": [4, 3, 2, 1],
+            "min_samples_per_component": 2,
+            "source_weighting": "tailrisk_anchored_shrink050_random_mass_bag_blend050",
+            "gmm_covariance_type": "diag",
+            "gmm_reg_covar": 1.0e-4,
+            "gmm_n_init": 1,
+            "gmm_max_iter": 100,
+            "min_component_weight": 0.02,
+            "variance_floor": 1.0e-5,
+            "variance_ceiling_multiplier": 16.0,
+            "primary_pooling": "fixed_arithmetic_probability_blend",
+            "reliability_floor_score": 0.05,
+            "reliability_epsilon": 1.0e-8,
             "anchor_repro_tolerance": 1.0e-4,
         },
         "classifier": {

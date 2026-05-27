@@ -14,6 +14,11 @@ from cvae_rebuild.component_union_mass_bagged import (
     load_mass_bagged_component_union_config,
     parse_mass_bagged_component_union_config,
 )
+from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
+    PRIMARY_TAILRISK_METHOD,
+    load_tailrisk_anchored_component_union_config,
+    parse_tailrisk_anchored_component_union_config,
+)
 from cvae_rebuild.decentralized_pruned_adaptive_equal_all4_prior import load_pruned_adaptive_equal_all4_config
 from cvae_rebuild.decentralized_k16_gmm_prior import load_decentralized_k16_gmm_prior_config
 from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import (
@@ -249,6 +254,45 @@ def test_mass_bagged_component_union_rejects_shuffled_primary_member() -> None:
 
     with pytest.raises(Exception, match="must not contain shuffled"):
         parse_mass_bagged_component_union_config(payload, base_dir=Path("."))
+
+
+def test_locked_tailrisk_anchored_component_union_config_loads() -> None:
+    cfg = load_tailrisk_anchored_component_union_config(
+        "cvae_rebuild/configs/virchow2_cvae_component_union_tailrisk_anchored_mass_bagged_v1.yaml"
+    )
+    assert cfg.name == "virchow2_cvae_component_union_tailrisk_anchored_mass_bagged_v1"
+    assert cfg.backbone == "virchow2"
+    assert cfg.primary_variant == "pca64_beta001"
+    assert cfg.primary_method == PRIMARY_TAILRISK_METHOD
+    assert cfg.strict_full_run_matrix is True
+    assert cfg.experiment_seeds == (42, 43, 44)
+    assert cfg.heldout_centers == ("0", "1", "2", "3", "4")
+    assert cfg.replicate_seeds == (17, 23, 31)
+    assert cfg.fresh_replicate_seeds == (101, 103, 107)
+    assert cfg.synthetic_per_class_total == 128
+    assert cfg.random_mass_bag_size == 11
+    assert cfg.random_mass_bag_alpha == 4.0
+    assert cfg.blend_alpha == 0.5
+    assert cfg.primary_shrink_lambda == 0.5
+    assert cfg.matched_shuffled_reliability_null_permutations == 20
+
+
+def test_tailrisk_anchored_component_union_rejects_changed_blend_alpha() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_component_union_tailrisk_anchored_mass_bagged_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["tailrisk_anchored_component_union"]["blend_alpha"] = 0.25
+
+    with pytest.raises(Exception, match="blend_alpha"):
+        parse_tailrisk_anchored_component_union_config(payload, base_dir=Path("."))
+
+
+def test_tailrisk_anchored_component_union_rejects_changed_random_bag_size() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_component_union_tailrisk_anchored_mass_bagged_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["tailrisk_anchored_component_union"]["random_mass_bag_size"] = 3
+
+    with pytest.raises(Exception, match="random_mass_bag_size=11"):
+        parse_tailrisk_anchored_component_union_config(payload, base_dir=Path("."))
 
 
 def test_locked_source_inner_validated_dense_component_hybrid_config_loads() -> None:

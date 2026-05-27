@@ -23,6 +23,10 @@ from .component_union_mass_bagged import (
     load_mass_bagged_component_union_config,
     run_mass_bagged_component_union,
 )
+from .component_union_tailrisk_anchored_mass_bagged import (
+    load_tailrisk_anchored_component_union_config,
+    run_tailrisk_anchored_component_union,
+)
 from .decentralized_pruned_adaptive_equal_all4_prior import (
     load_pruned_adaptive_equal_all4_config,
     run_pruned_adaptive_equal_all4_confirmation,
@@ -189,6 +193,13 @@ def main(argv: list[str] | None = None) -> int:
     decentralized_component_union_mass_bagged.add_argument("--config", required=True)
     decentralized_component_union_mass_bagged.add_argument("--artifact-root", default=None)
 
+    component_union_tailrisk = sub.add_parser(
+        "diagnose-component-union-tailrisk-anchored-mass-bagged",
+        help="Run the Virchow2-CVAE tail-risk anchored mass-bagged component-union audit.",
+    )
+    component_union_tailrisk.add_argument("--config", required=True)
+    component_union_tailrisk.add_argument("--artifact-root", default=None)
+
     decentralized_pruned_equal_all4 = sub.add_parser(
         "diagnose-decentralized-pruned-adaptive-equal-all4-prior",
         help="Run the pruned adaptive equal-all4 late-geometric confirmation test.",
@@ -351,6 +362,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "diagnose-decentralized-component-union-mass-bagged":
         cfg = load_mass_bagged_component_union_config(args.config)
         root = run_mass_bagged_component_union(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
+    if args.command == "diagnose-component-union-tailrisk-anchored-mass-bagged":
+        cfg = load_tailrisk_anchored_component_union_config(args.config)
+        root = run_tailrisk_anchored_component_union(
             cfg,
             artifact_root=Path(args.artifact_root) if args.artifact_root else None,
         )
