@@ -86,6 +86,15 @@ from cvae_rebuild.decentralized_support8_top3_tau05_gmm_prior import (
     parse_decentralized_support8_top3_tau05_gmm_prior_config,
     run_decentralized_support8_top3_tau05_gmm_prior,
 )
+from cvae_rebuild.support_calibrated_component_union_prior import (
+    PRIMARY_SUPPORT_CALIBRATED_COMPONENT_UNION_METHOD,
+    ROW_MATCHED_SHUFFLED_SUPPORT_PREFIX,
+    ROW_RANDOM_MASS_BAG_CONTROL as ROW_SUPPORT_RANDOM_MASS_BAG_CONTROL,
+    ROW_RELIABILITY_SHRINK050 as ROW_SUPPORT_RELIABILITY_SHRINK050,
+    ROW_UNIFORM_COMPONENT_UNION as ROW_SUPPORT_UNIFORM_COMPONENT_UNION,
+    parse_support_calibrated_component_union_config,
+    run_support_calibrated_component_union_prior,
+)
 from cvae_rebuild.paired_dense_all4_reliability_confirmation import (
     ROW_BUDGET_ONLY,
     ROW_EQUAL_ALL4,
@@ -1589,6 +1598,79 @@ def test_decentralized_component_union_shrink050_tiny_cache_writes_confirmation_
     )
     assert shrink_scores == null_scores
     assert all(row["shrink_lambda"] == "0.5" for row in weights if row["prior_method"] == null_method)
+
+
+def test_support_calibrated_component_union_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_support_calibrated_component_union_payload(tmp_path)
+    cfg = parse_support_calibrated_component_union_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_support_calibrated_component_union_prior(cfg)
+
+    expected = [
+        "tables/support_calibrated_component_union_downstream_matrix.csv",
+        "tables/support_calibrated_component_union_summary.csv",
+        "tables/support_size_sensitivity_summary.csv",
+        "tables/matched_shuffled_support_null_matrix.csv",
+        "tables/matched_shuffled_support_null_summary.csv",
+        "tables/matched_shuffled_support_cell_delta_summary.csv",
+        "tables/oracle_gap_summary.csv",
+        "tables/eligibility_audit.csv",
+        "tables/support_eval_split_manifest.csv",
+        "tables/support_nelbo_score_manifest.csv",
+        "tables/support_weight_manifest.csv",
+        "tables/source_weight_manifest.csv",
+        "tables/component_manifest.csv",
+        "tables/component_coverage_audit.csv",
+        "tables/paired_generation_audit.csv",
+        "tables/mass_alignment_to_single_source_oracle.csv",
+        "manifests/protocol_manifest.json",
+        "manifests/support_calibrated_component_union_model_manifest.csv",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "support_calibrated_component_union_downstream_matrix.csv", newline="")))
+    splits = list(csv.DictReader(open(root / "tables" / "support_eval_split_manifest.csv", newline="")))
+    scores = list(csv.DictReader(open(root / "tables" / "support_nelbo_score_manifest.csv", newline="")))
+    support_weights = list(csv.DictReader(open(root / "tables" / "support_weight_manifest.csv", newline="")))
+    source_weights = list(csv.DictReader(open(root / "tables" / "source_weight_manifest.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "support_calibrated_component_union_summary.csv", newline="")))
+    null_matrix = list(csv.DictReader(open(root / "tables" / "matched_shuffled_support_null_matrix.csv", newline="")))
+    null_summary = list(csv.DictReader(open(root / "tables" / "matched_shuffled_support_null_summary.csv", newline="")))
+    size_summary = list(csv.DictReader(open(root / "tables" / "support_size_sensitivity_summary.csv", newline="")))
+    alignment = list(csv.DictReader(open(root / "tables" / "mass_alignment_to_single_source_oracle.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert protocol["support_labels_for_selection"] is False
+    assert protocol["target_eval_labels_for_scoring_only"] is True
+    assert protocol["target_expert_excluded"] is True
+    assert protocol["nested_support_diagnostics"] is True
+    assert protocol["fixed_eval_support_size_diagnostics"] is True
+    assert protocol["matched_shuffled_support_null_permutations"] == 2
+    assert protocol["random_mass_bag_control_size"] == 3
+    assert any(row["prior_method"] == PRIMARY_SUPPORT_CALIBRATED_COMPONENT_UNION_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == ROW_SUPPORT_UNIFORM_COMPONENT_UNION for row in matrix)
+    assert any(row["prior_method"] == ROW_SUPPORT_RELIABILITY_SHRINK050 for row in matrix)
+    assert any(row["prior_method"] == ROW_SUPPORT_RANDOM_MASS_BAG_CONTROL for row in matrix)
+    assert null_matrix and all(row["prior_method"].startswith(ROW_MATCHED_SHUFFLED_SUPPORT_PREFIX) for row in null_matrix)
+    assert null_summary and null_summary[0]["n_null_permutations"] == "2"
+    assert splits and any(row["eval_mode"] == "fixed_support32" for row in splits)
+    assert scores and all(row["support_labels_used"] == "0" for row in scores)
+    assert support_weights and source_weights
+    assert all(row["heldout_center"] != row["source_center"] for row in source_weights)
+    assert any(row["prior_method"] == PRIMARY_SUPPORT_CALIBRATED_COMPONENT_UNION_METHOD for row in source_weights)
+    assert any(row["support_size"] == "16" and row["eval_mode"] == "fixed_support32" for row in size_summary)
+    assert alignment and {"support_weight", "single_source_bacc", "top2_weight_contains_oracle"}.issubset(alignment[0])
+    assert "primary_vs_uniform_delta" in summary[0]
+    assert "floor_binding_count" in summary[0]
+    assert "target-support compatibility calibration audit" in report
 
 
 def test_mass_bagged_component_union_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
@@ -3310,6 +3392,69 @@ def _tiny_decentralized_component_union_payload(tmp_path: Path):
             "primary_pooling": "pooled_raw_logistic",
             "reliability_floor_score": 0.05,
             "shrink_lambdas": [0.25, 0.5],
+            "prototype_candidate_counts_per_source_class": [4, 3, 2, 1],
+            "prototype_min_samples_per_component": 12,
+            "prototype_variance_floor": 1.0e-5,
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_support_calibrated_component_union_payload(tmp_path: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_support8_calibrated_component_union_prior_v1",
+            "artifact_root": str(tmp_path / "virchow2_cvae_support8_calibrated_component_union_prior_v1"),
+            "primary_variant": "pca64_beta001",
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
+            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
+            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "strict_full_run_matrix": False,
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2", "3", "4"],
+            "replicate_seeds": [17],
+            "support_seeds": [17],
+            "support_size": 8,
+            "support_size_diagnostics": [16, 32],
+            "nested_support_max_size": 32,
+        },
+        "generation": {
+            "synthetic_per_class_total": 32,
+            "min_per_source_per_class": 2,
+        },
+        "support_calibrated_component_union_prior": {
+            "primary_method": "support8_calibrated_component_union_softmax_shrink050",
+            "candidate_components_per_source_class": [4, 3, 2, 1],
+            "min_samples_per_component": 12,
+            "source_weighting": "support_calibrated_component_union_softmax_shrink050",
+            "gmm_covariance_type": "diag",
+            "gmm_reg_covar": 1.0e-4,
+            "gmm_n_init": 1,
+            "gmm_max_iter": 100,
+            "min_component_weight": 0.02,
+            "variance_floor": 1.0e-5,
+            "variance_ceiling_multiplier": 16.0,
+            "primary_pooling": "pooled_raw_logistic",
+            "support_nelbo_tau": 1.0,
+            "support_shrink_lambda": 0.5,
+            "reliability_floor_score": 0.05,
+            "shrink_lambdas": [0.25, 0.5],
+            "matched_shuffled_support_null_permutations": 2,
+            "random_mass_bag_control_size": 3,
+            "anchor_repro_tolerance": 1.0e-4,
             "prototype_candidate_counts_per_source_class": [4, 3, 2, 1],
             "prototype_min_samples_per_component": 12,
             "prototype_variance_floor": 1.0e-5,

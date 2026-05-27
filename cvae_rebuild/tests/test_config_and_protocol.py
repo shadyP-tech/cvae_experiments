@@ -31,6 +31,16 @@ from cvae_rebuild.decentralized_support_nelbo_reliability_gmm_prior import (
 from cvae_rebuild.decentralized_support8_top3_tau05_gmm_prior import (
     load_decentralized_support8_top3_tau05_gmm_prior_config,
 )
+from cvae_rebuild.support_calibrated_component_union_prior import (
+    PRIMARY_SUPPORT_CALIBRATED_COMPONENT_UNION_METHOD,
+    _constrained_weighted_budgets,
+    _matched_shuffled_support_plan,
+    _support_shrink_plan,
+    load_support_calibrated_component_union_config,
+    nested_unlabeled_support_eval_splits,
+    parse_support_calibrated_component_union_config,
+)
+from cvae_rebuild.support_nelbo import SupportScore
 from cvae_rebuild.paired_dense_all4_reliability_confirmation import (
     load_paired_dense_all4_reliability_config,
 )
@@ -340,6 +350,147 @@ def test_locked_decentralized_support8_top3_tau05_gmm_prior_config_loads() -> No
     assert cfg.source_weighting == "support_nelbo_x_source_local_reliability_top3"
     assert cfg.support_nelbo_tau == 0.5
     assert cfg.top_k_sources == 3
+
+
+def test_locked_support_calibrated_component_union_config_loads() -> None:
+    cfg = load_support_calibrated_component_union_config(
+        "cvae_rebuild/configs/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml"
+    )
+    assert cfg.name == "virchow2_cvae_support8_calibrated_component_union_prior_v1"
+    assert cfg.backbone == "virchow2"
+    assert cfg.primary_variant == "pca64_beta001"
+    assert cfg.primary_method == PRIMARY_SUPPORT_CALIBRATED_COMPONENT_UNION_METHOD
+    assert cfg.support_size == 8
+    assert cfg.support_size_diagnostics == (16, 32)
+    assert cfg.nested_support_max_size == 32
+    assert cfg.support_seeds == cfg.replicate_seeds
+    assert cfg.support_nelbo_tau == 1.0
+    assert cfg.support_shrink_lambda == 0.5
+    assert cfg.matched_shuffled_support_null_permutations == 20
+    assert cfg.random_mass_bag_control_size == 11
+    assert cfg.synthetic_per_class_total == 128
+
+
+def test_support_calibrated_component_union_rejects_changed_support_size() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["run_matrix"]["support_size"] = 32
+
+    with pytest.raises(Exception, match="support_size"):
+        parse_support_calibrated_component_union_config(payload, base_dir=Path("."))
+
+
+def test_support_calibrated_component_union_rejects_strict_changed_null_count() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["support_calibrated_component_union_prior"]["matched_shuffled_support_null_permutations"] = 2
+
+    with pytest.raises(Exception, match="matched_shuffled_support_null_permutations"):
+        parse_support_calibrated_component_union_config(payload, base_dir=Path("."))
+
+
+def test_support_calibrated_component_union_rejects_strict_changed_random_bag_size() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["support_calibrated_component_union_prior"]["random_mass_bag_control_size"] = 3
+
+    with pytest.raises(Exception, match="random_mass_bag_control_size"):
+        parse_support_calibrated_component_union_config(payload, base_dir=Path("."))
+
+
+def test_support_calibrated_component_union_rejects_strict_changed_budget() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["generation"]["synthetic_per_class_total"] = 64
+
+    with pytest.raises(Exception, match="synthetic_per_class_total"):
+        parse_support_calibrated_component_union_config(payload, base_dir=Path("."))
+
+
+def test_nested_support_sets_are_ordered_and_eval_disjoint() -> None:
+    metadata = [
+        {"sample_id": f"c0_{idx}", "center": "0", "label": idx % 2}
+        for idx in range(80)
+    ]
+    metadata += [
+        {"sample_id": f"c1_{idx}", "center": "1", "label": idx % 2}
+        for idx in range(10)
+    ]
+    splits = nested_unlabeled_support_eval_splits(
+        metadata,
+        heldout_center="0",
+        support_seed=17,
+        support_sizes=(8, 16, 32),
+        max_support_size=32,
+    )
+    by_key = {(split.support_size, split.eval_mode): split for split in splits}
+    s8 = set(by_key[(8, "primary_style")].support_sample_ids)
+    s16 = set(by_key[(16, "primary_style")].support_sample_ids)
+    s32 = set(by_key[(32, "primary_style")].support_sample_ids)
+    assert s8 < s16 < s32
+    assert set(by_key[(8, "primary_style")].support_sample_ids).isdisjoint(
+        by_key[(8, "primary_style")].eval_sample_ids
+    )
+    assert set(by_key[(8, "fixed_support32")].eval_sample_ids) == set(
+        by_key[(32, "fixed_support32")].eval_sample_ids
+    )
+    assert by_key[(8, "primary_style")].support_labels_used is False
+
+
+def test_support_shrink_plan_preserves_mass_rule_and_floor_nonbinding() -> None:
+    cfg = load_support_calibrated_component_union_config(
+        "cvae_rebuild/configs/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml"
+    )
+    scores = [
+        SupportScore(42, "0", 17, 8, "1", 10.0, 0.0),
+        SupportScore(42, "0", 17, 8, "2", 10.0, 1.0),
+        SupportScore(42, "0", 17, 8, "3", 10.0, 2.0),
+        SupportScore(42, "0", 17, 8, "4", 10.0, 3.0),
+    ]
+    plan = _support_shrink_plan(cfg, ("1", "2", "3", "4"), scores, total=128)
+    assert sum(plan["weights"].values()) == pytest.approx(1.0)
+    assert sum(plan["budgets"].values()) == 128
+    assert plan["floor_binding_count"] == 0
+    for source in ("1", "2", "3", "4"):
+        expected = 0.5 * 0.25 + 0.5 * plan["support_weights"][source]
+        assert plan["weights"][source] == pytest.approx(expected)
+
+
+def test_support_shuffled_null_preserves_score_multiset() -> None:
+    cfg = load_support_calibrated_component_union_config(
+        "cvae_rebuild/configs/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml"
+    )
+    scores = [
+        SupportScore(42, "0", 17, 8, "1", 10.0, 0.0),
+        SupportScore(42, "0", 17, 8, "2", 11.0, 1.0),
+        SupportScore(42, "0", 17, 8, "3", 12.0, 2.0),
+        SupportScore(42, "0", 17, 8, "4", 13.0, 3.0),
+    ]
+    plan = _matched_shuffled_support_plan(
+        cfg,
+        ("1", "2", "3", "4"),
+        scores,
+        experiment_seed=42,
+        heldout_center="0",
+        support_seed=17,
+        permutation_id=0,
+        total=128,
+    )
+    assert sorted(plan["calibrated_support_nelbo"].values()) == [0.0, 1.0, 2.0, 3.0]
+    assert sum(plan["budgets"].values()) == 128
+    assert plan["control_permutation_id"] == 0
+
+
+def test_constrained_budget_floor_binding_is_reported() -> None:
+    budgets, bindings = _constrained_weighted_budgets(
+        128,
+        ("1", "2", "3", "4"),
+        {"1": 0.01, "2": 0.10, "3": 0.20, "4": 0.69},
+        8,
+    )
+    assert sum(budgets.values()) == 128
+    assert bindings["1"] is True
+    assert all(value >= 8 for value in budgets.values())
 
 
 def test_locked_paired_dense_all4_reliability_config_loads() -> None:

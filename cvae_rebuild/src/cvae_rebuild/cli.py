@@ -47,6 +47,10 @@ from .decentralized_support8_top3_tau05_gmm_prior import (
     load_decentralized_support8_top3_tau05_gmm_prior_config,
     run_decentralized_support8_top3_tau05_gmm_prior,
 )
+from .support_calibrated_component_union_prior import (
+    load_support_calibrated_component_union_config,
+    run_support_calibrated_component_union_prior,
+)
 from .paired_dense_all4_reliability_confirmation import (
     load_paired_dense_all4_reliability_config,
     run_paired_dense_all4_reliability_confirmation,
@@ -227,6 +231,13 @@ def main(argv: list[str] | None = None) -> int:
     decentralized_support8_top3_tau05_gmm.add_argument("--config", required=True)
     decentralized_support8_top3_tau05_gmm.add_argument("--artifact-root", default=None)
 
+    support_calibrated_component_union = sub.add_parser(
+        "diagnose-support-calibrated-component-union-prior",
+        help="Run the support-calibrated component-union prior audit.",
+    )
+    support_calibrated_component_union.add_argument("--config", required=True)
+    support_calibrated_component_union.add_argument("--artifact-root", default=None)
+
     paired_dense_all4_reliability = sub.add_parser(
         "diagnose-paired-dense-all4-reliability",
         help="Run the paired dense-all4 source-only reliability confirmation audit.",
@@ -276,6 +287,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "diagnose-decentralized-support8-top3-tau05-gmm-prior":
         cfg = load_decentralized_support8_top3_tau05_gmm_prior_config(args.config)
         root = run_decentralized_support8_top3_tau05_gmm_prior(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
+    if args.command == "diagnose-support-calibrated-component-union-prior":
+        cfg = load_support_calibrated_component_union_config(args.config)
+        root = run_support_calibrated_component_union_prior(
             cfg,
             artifact_root=Path(args.artifact_root) if args.artifact_root else None,
         )
