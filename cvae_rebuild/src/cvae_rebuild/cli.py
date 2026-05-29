@@ -27,6 +27,10 @@ from .component_union_tailrisk_anchored_mass_bagged import (
     load_tailrisk_anchored_component_union_config,
     run_tailrisk_anchored_component_union,
 )
+from .dense_reliability_tailshield_random_mass_bag import (
+    load_dense_tailshield_random_mass_bag_config,
+    run_dense_reliability_tailshield_random_mass_bag,
+)
 from .decentralized_pruned_adaptive_equal_all4_prior import (
     load_pruned_adaptive_equal_all4_config,
     run_pruned_adaptive_equal_all4_confirmation,
@@ -200,6 +204,13 @@ def main(argv: list[str] | None = None) -> int:
     component_union_tailrisk.add_argument("--config", required=True)
     component_union_tailrisk.add_argument("--artifact-root", default=None)
 
+    dense_tailshield = sub.add_parser(
+        "diagnose-dense-reliability-tailshield-random-mass-bag",
+        help="Run the dense reliability tail-shield over random mass-bag component-union audit.",
+    )
+    dense_tailshield.add_argument("--config", required=True)
+    dense_tailshield.add_argument("--artifact-root", default=None)
+
     decentralized_pruned_equal_all4 = sub.add_parser(
         "diagnose-decentralized-pruned-adaptive-equal-all4-prior",
         help="Run the pruned adaptive equal-all4 late-geometric confirmation test.",
@@ -370,6 +381,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "diagnose-component-union-tailrisk-anchored-mass-bagged":
         cfg = load_tailrisk_anchored_component_union_config(args.config)
         root = run_tailrisk_anchored_component_union(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
+    if args.command == "diagnose-dense-reliability-tailshield-random-mass-bag":
+        cfg = load_dense_tailshield_random_mass_bag_config(args.config)
+        root = run_dense_reliability_tailshield_random_mass_bag(
             cfg,
             artifact_root=Path(args.artifact_root) if args.artifact_root else None,
         )

@@ -59,6 +59,11 @@ from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
     parse_tailrisk_anchored_component_union_config,
     run_tailrisk_anchored_component_union,
 )
+from cvae_rebuild.dense_reliability_tailshield_random_mass_bag import (
+    PRIMARY_DENSE_TAILSHIELD_METHOD,
+    parse_dense_tailshield_random_mass_bag_config,
+    run_dense_reliability_tailshield_random_mass_bag,
+)
 from cvae_rebuild.decentralized_pruned_adaptive_equal_all4_prior import (
     PRIMARY_PRUNED_EQUAL_ALL4_METHOD,
     ROW_UNPRUNED_FIXED_K4,
@@ -1790,6 +1795,71 @@ def test_tailrisk_anchored_component_union_tiny_cache_writes_expected_artifacts(
     assert "bottom20_cell_mean_bacc" in summary[0]
     assert "center3_delta_vs_random_mass_bag" in summary[0]
     assert "source-only robustness aggregation audit" in report
+
+
+def test_dense_tailshield_random_mass_bag_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_dense_tailshield_random_mass_bag_payload(tmp_path)
+    cfg = parse_dense_tailshield_random_mass_bag_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_dense_reliability_tailshield_random_mass_bag(cfg)
+
+    expected = [
+        "tables/dense_tailshield_downstream_matrix.csv",
+        "tables/dense_tailshield_summary.csv",
+        "tables/dense_tailshield_panel_summary.csv",
+        "tables/dense_tailshield_tail_metric_summary.csv",
+        "tables/dense_tailshield_probability_blend_manifest.csv",
+        "tables/dense_tailshield_probability_reconstruction_audit.csv",
+        "tables/dense_tailshield_complementarity_audit.csv",
+        "tables/dense_tailshield_calibration_audit.csv",
+        "tables/dense_tailshield_confidence_audit.csv",
+        "tables/dense_tailshield_rescue_audit.csv",
+        "tables/dense_tailshield_alpha_curve_audit.csv",
+        "tables/source_weight_manifest.csv",
+        "tables/source_reliability_manifest.csv",
+        "tables/component_manifest.csv",
+        "tables/component_coverage_audit.csv",
+        "tables/paired_generation_audit.csv",
+        "tables/negative_control_summary.csv",
+        "tables/source_ablation_audit.csv",
+        "tables/oracle_gap_summary.csv",
+        "tables/random_mass_bag_control_summary.csv",
+        "tables/shuffled_reliability_null_summary.csv",
+        "tables/anchor_reproducibility_audit.csv",
+        "tables/eligibility_audit.csv",
+        "manifests/protocol_manifest.json",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "dense_tailshield_downstream_matrix.csv", newline="")))
+    blend = list(csv.DictReader(open(root / "tables" / "dense_tailshield_probability_blend_manifest.csv", newline="")))
+    reconstruction = list(csv.DictReader(open(root / "tables" / "dense_tailshield_probability_reconstruction_audit.csv", newline="")))
+    confidence = list(csv.DictReader(open(root / "tables" / "dense_tailshield_confidence_audit.csv", newline="")))
+    alpha = list(csv.DictReader(open(root / "tables" / "dense_tailshield_alpha_curve_audit.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "dense_tailshield_summary.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert protocol["target_support_used"] is False
+    assert protocol["center3_definition"] == 'heldout_center == "3"'
+    assert protocol["alpha_curve_diagnostic_only"] is True
+    assert any(row["prior_method"] == PRIMARY_DENSE_TAILSHIELD_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == "paired_reliability_all4_weighted_geom" for row in matrix)
+    assert any(row["prior_method"] == ROW_RANDOM_MASS_BAG_CONTROL for row in matrix)
+    assert blend and all(row["class_order_match"] == "True" and row["sample_order_match"] == "True" for row in blend)
+    assert reconstruction and all(row["dense_probability_reconstruction_status"] == "PASS" for row in reconstruction)
+    assert confidence and confidence[0]["used_for_alpha_or_adoption"] == "False"
+    assert alpha and all(row["diagnostic_only"] == "True" and row["primary_adoption_eligible"] == "False" for row in alpha)
+    assert "bottom20_cell_mean_bacc" in summary[0]
+    assert "Primary Verdict" in report
+    assert "Alpha Curve Audit" in report
 
 
 def test_source_inner_validated_dense_component_hybrid_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
@@ -3694,6 +3764,69 @@ def _tiny_tailrisk_anchored_component_union_payload(tmp_path: Path):
             "candidate_components_per_source_class": [4, 3, 2, 1],
             "min_samples_per_component": 2,
             "source_weighting": "tailrisk_anchored_shrink050_random_mass_bag_blend050",
+            "gmm_covariance_type": "diag",
+            "gmm_reg_covar": 1.0e-4,
+            "gmm_n_init": 1,
+            "gmm_max_iter": 100,
+            "min_component_weight": 0.02,
+            "variance_floor": 1.0e-5,
+            "variance_ceiling_multiplier": 16.0,
+            "primary_pooling": "fixed_arithmetic_probability_blend",
+            "reliability_floor_score": 0.05,
+            "reliability_epsilon": 1.0e-8,
+            "anchor_repro_tolerance": 1.0e-4,
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_dense_tailshield_random_mass_bag_payload(tmp_path: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1",
+            "artifact_root": str(tmp_path / "virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1"),
+            "primary_variant": "pca64_beta001",
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
+            "paired_dense_artifact_root": str(tmp_path / "missing_paired_dense"),
+            "mass_bagged_artifact_root": str(tmp_path / "missing_mass_bagged"),
+            "shrink050_artifact_root": str(tmp_path / "missing_shrink050"),
+            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
+            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "strict_full_run_matrix": False,
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2", "3", "4"],
+            "replicate_seeds": [17],
+            "fresh_replicate_seeds": [101],
+        },
+        "generation": {
+            "synthetic_per_class_total": 32,
+            "min_per_source_per_class": 2,
+        },
+        "dense_tailshield_random_mass_bag": {
+            "primary_method": "dense_reliability_tailshield_random_mass_bag_blend25_75",
+            "random_mass_bag_size": 3,
+            "random_mass_bag_alpha": 4.0,
+            "dense_blend_alpha": 0.25,
+            "bag_blend_alpha": 0.75,
+            "alpha_curve_dense_values": [0.0, 0.25, 1.0],
+            "reconstruction_probability_tolerance": 1.0e-6,
+            "nontrivial_rescue_threshold": 0.02,
+            "candidate_components_per_source_class": [4, 3, 2, 1],
+            "min_samples_per_component": 2,
+            "source_weighting": "dense_reliability_tailshield_random_mass_bag_blend25_75",
             "gmm_covariance_type": "diag",
             "gmm_reg_covar": 1.0e-4,
             "gmm_n_init": 1,

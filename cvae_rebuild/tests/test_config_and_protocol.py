@@ -19,6 +19,11 @@ from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
     load_tailrisk_anchored_component_union_config,
     parse_tailrisk_anchored_component_union_config,
 )
+from cvae_rebuild.dense_reliability_tailshield_random_mass_bag import (
+    PRIMARY_DENSE_TAILSHIELD_METHOD,
+    load_dense_tailshield_random_mass_bag_config,
+    parse_dense_tailshield_random_mass_bag_config,
+)
 from cvae_rebuild.decentralized_pruned_adaptive_equal_all4_prior import load_pruned_adaptive_equal_all4_config
 from cvae_rebuild.decentralized_k16_gmm_prior import load_decentralized_k16_gmm_prior_config
 from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import (
@@ -293,6 +298,46 @@ def test_tailrisk_anchored_component_union_rejects_changed_random_bag_size() -> 
 
     with pytest.raises(Exception, match="random_mass_bag_size=11"):
         parse_tailrisk_anchored_component_union_config(payload, base_dir=Path("."))
+
+
+def test_locked_dense_tailshield_random_mass_bag_config_loads() -> None:
+    cfg = load_dense_tailshield_random_mass_bag_config(
+        "cvae_rebuild/configs/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1.yaml"
+    )
+    assert cfg.name == "virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1"
+    assert cfg.backbone == "virchow2"
+    assert cfg.primary_variant == "pca64_beta001"
+    assert cfg.primary_method == PRIMARY_DENSE_TAILSHIELD_METHOD
+    assert cfg.strict_full_run_matrix is True
+    assert cfg.experiment_seeds == (42, 43, 44)
+    assert cfg.heldout_centers == ("0", "1", "2", "3", "4")
+    assert cfg.replicate_seeds == (17, 23, 31)
+    assert cfg.fresh_replicate_seeds == (101, 103, 107)
+    assert cfg.synthetic_per_class_total == 128
+    assert cfg.random_mass_bag_size == 11
+    assert cfg.random_mass_bag_alpha == 4.0
+    assert cfg.dense_blend_alpha == 0.25
+    assert cfg.bag_blend_alpha == 0.75
+    assert cfg.alpha_curve_dense_values == (0.0, 0.1, 0.25, 0.5, 0.75, 1.0)
+    assert cfg.nontrivial_rescue_threshold == 0.02
+
+
+def test_dense_tailshield_random_mass_bag_rejects_changed_dense_alpha() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["dense_tailshield_random_mass_bag"]["dense_blend_alpha"] = 0.5
+
+    with pytest.raises(Exception, match="dense_blend_alpha"):
+        parse_dense_tailshield_random_mass_bag_config(payload, base_dir=Path("."))
+
+
+def test_dense_tailshield_random_mass_bag_rejects_changed_alpha_curve() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["dense_tailshield_random_mass_bag"]["alpha_curve_dense_values"] = [0.0, 0.25, 1.0]
+
+    with pytest.raises(Exception, match="alpha_curve_dense_values"):
+        parse_dense_tailshield_random_mass_bag_config(payload, base_dir=Path("."))
 
 
 def test_locked_source_inner_validated_dense_component_hybrid_config_loads() -> None:

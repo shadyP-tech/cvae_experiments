@@ -1,0 +1,57 @@
+experiment:
+  name: virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1
+  artifact_root: cvae_rebuild/artifacts/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1
+  primary_variant: pca64_beta001
+
+inputs:
+  feature_cache_root: sail/artifacts/pathology_embeddings/virchow2
+  repair_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_preservation_repair_v1
+  paired_dense_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1
+  mass_bagged_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_mass_bagged_v1
+  shrink050_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_reliability_shrink050_confirmation_v1
+  source_union_gmm_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_source_union_gmm_prior_v1
+  balanced_gmm_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_source_union_center_balanced_gmm_prior_v1
+  backbone: virchow2
+
+run_matrix:
+  strict_full_run_matrix: true
+  experiment_seeds: [42, 43, 44]
+  heldout_centers: ["0", "1", "2", "3", "4"]
+  replicate_seeds: [17, 23, 31]
+  fresh_replicate_seeds: [101, 103, 107]
+
+generation:
+  synthetic_per_class_total: 128
+  min_per_source_per_class: 8
+
+dense_tailshield_random_mass_bag:
+  primary_method: dense_reliability_tailshield_random_mass_bag_blend25_75
+  random_mass_bag_size: 11
+  random_mass_bag_alpha: 4.0
+  dense_blend_alpha: 0.25
+  bag_blend_alpha: 0.75
+  alpha_curve_dense_values: [0.0, 0.1, 0.25, 0.5, 0.75, 1.0]
+  reconstruction_probability_tolerance: 1.0e-6
+  nontrivial_rescue_threshold: 0.02
+  candidate_components_per_source_class: [4, 3, 2, 1]
+  min_samples_per_component: 12
+  source_weighting: dense_reliability_tailshield_random_mass_bag_blend25_75
+  gmm_covariance_type: diag
+  gmm_reg_covar: 1.0e-4
+  gmm_n_init: 5
+  gmm_max_iter: 500
+  min_component_weight: 0.02
+  variance_floor: 1.0e-5
+  variance_ceiling_multiplier: 16.0
+  primary_pooling: fixed_arithmetic_probability_blend
+  reliability_floor_score: 0.05
+  reliability_epsilon: 1.0e-8
+  anchor_repro_tolerance: 1.0e-4
+
+classifier:
+  type: sklearn_logistic_regression
+  solver: lbfgs
+  C: 1.0
+  max_iter: 2000
+  class_weight: balanced
+  classifier_seed: null
