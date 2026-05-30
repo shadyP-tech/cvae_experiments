@@ -82,6 +82,10 @@ from .source_inner_validated_dense_component_hybrid import (
     load_source_inner_validated_hybrid_config,
     run_source_inner_validated_dense_component_hybrid,
 )
+from .source_inner_harmful_source_suppression import (
+    load_harmful_source_suppression_config,
+    run_harmful_source_suppression,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -281,7 +285,22 @@ def main(argv: list[str] | None = None) -> int:
     source_inner_hybrid.add_argument("--config", required=True)
     source_inner_hybrid.add_argument("--artifact-root", default=None)
 
+    harmful_source_suppression = sub.add_parser(
+        "diagnose-source-inner-harmful-source-suppression-random-mass-bag",
+        help="Run the source-inner harmful-source suppression over random mass-bag component-union audit.",
+    )
+    harmful_source_suppression.add_argument("--config", required=True)
+    harmful_source_suppression.add_argument("--artifact-root", default=None)
+
     args = parser.parse_args(argv)
+    if args.command == "diagnose-source-inner-harmful-source-suppression-random-mass-bag":
+        cfg = load_harmful_source_suppression_config(args.config)
+        root = run_harmful_source_suppression(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
     if args.command == "diagnose-source-inner-validated-dense-component-hybrid":
         cfg = load_source_inner_validated_hybrid_config(args.config)
         root = run_source_inner_validated_dense_component_hybrid(

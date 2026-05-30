@@ -64,6 +64,11 @@ from cvae_rebuild.dense_reliability_tailshield_random_mass_bag import (
     parse_dense_tailshield_random_mass_bag_config,
     run_dense_reliability_tailshield_random_mass_bag,
 )
+from cvae_rebuild.source_inner_harmful_source_suppression import (
+    PRIMARY_HARMFUL_SUPPRESSION_METHOD,
+    parse_harmful_source_suppression_config,
+    run_harmful_source_suppression,
+)
 from cvae_rebuild.decentralized_pruned_adaptive_equal_all4_prior import (
     PRIMARY_PRUNED_EQUAL_ALL4_METHOD,
     ROW_UNPRUNED_FIXED_K4,
@@ -1860,6 +1865,61 @@ def test_dense_tailshield_random_mass_bag_tiny_cache_writes_expected_artifacts(t
     assert "bottom20_cell_mean_bacc" in summary[0]
     assert "Primary Verdict" in report
     assert "Alpha Curve Audit" in report
+
+
+def test_harmful_source_suppression_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_harmful_source_suppression_payload(tmp_path)
+    cfg = parse_harmful_source_suppression_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_harmful_source_suppression(cfg)
+
+    expected = [
+        "tables/harmful_source_suppression_downstream_matrix.csv",
+        "tables/harmful_source_suppression_summary.csv",
+        "tables/harmful_source_suppression_panel_summary.csv",
+        "tables/harmful_source_suppression_tail_metric_summary.csv",
+        "tables/source_inner_harmfulness_matrix.csv",
+        "tables/source_inner_harmfulness_summary.csv",
+        "tables/source_inner_suppression_manifest.csv",
+        "tables/source_inner_signal_audit.csv",
+        "tables/realized_bag_mass_audit.csv",
+        "tables/harmfulness_target_oracle_alignment_audit.csv",
+        "tables/source_weight_manifest.csv",
+        "tables/component_manifest.csv",
+        "tables/component_coverage_audit.csv",
+        "tables/source_ablation_audit.csv",
+        "tables/negative_control_summary.csv",
+        "tables/oracle_gap_summary.csv",
+        "tables/eligibility_audit.csv",
+        "manifests/protocol_manifest.json",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "harmful_source_suppression_downstream_matrix.csv", newline="")))
+    suppression = list(csv.DictReader(open(root / "tables" / "source_inner_suppression_manifest.csv", newline="")))
+    realized = list(csv.DictReader(open(root / "tables" / "realized_bag_mass_audit.csv", newline="")))
+    alignment = list(csv.DictReader(open(root / "tables" / "harmfulness_target_oracle_alignment_audit.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "harmful_source_suppression_summary.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert protocol["target_support_used"] is False
+    assert protocol["target_ablation_alignment_audit_only"] is True
+    assert protocol["bottom20_definition"].startswith("lowest 20%")
+    assert any(row["prior_method"] == PRIMARY_HARMFUL_SUPPRESSION_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == ROW_RANDOM_MASS_BAG_CONTROL for row in matrix)
+    assert suppression and suppression[0]["target_eval_metric_used_for_suppression"] == "False"
+    assert realized and "realized_mean_source_mass" in realized[0]
+    assert alignment and alignment[0]["target_oracle_alignment_audit_only"] == "True"
+    assert "bottom20_cell_mean_bacc" in summary[0]
+    assert "Primary Verdict" in report
 
 
 def test_source_inner_validated_dense_component_hybrid_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
@@ -3838,6 +3898,75 @@ def _tiny_dense_tailshield_random_mass_bag_payload(tmp_path: Path):
             "reliability_floor_score": 0.05,
             "reliability_epsilon": 1.0e-8,
             "anchor_repro_tolerance": 1.0e-4,
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_harmful_source_suppression_payload(tmp_path: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1",
+            "artifact_root": str(tmp_path / "virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1"),
+            "primary_variant": "pca64_beta001",
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
+            "paired_dense_artifact_root": str(tmp_path / "missing_paired_dense"),
+            "dense_tailshield_artifact_root": str(tmp_path / "missing_dense_tailshield"),
+            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
+            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "strict_full_run_matrix": False,
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2", "3", "4"],
+            "replicate_seeds": [17],
+            "fresh_replicate_seeds": [101],
+        },
+        "generation": {
+            "synthetic_per_class_total": 32,
+            "min_per_source_per_class": 2,
+        },
+        "harmful_source_suppression": {
+            "primary_method": "source_inner_harm_suppressed_random_mass_bag_component_union_v1",
+            "random_mass_bag_size": 3,
+            "random_mass_bag_alpha": 4.0,
+            "dirichlet_total_concentration": 16.0,
+            "candidate_components_per_source_class": [4, 3, 2, 1],
+            "min_samples_per_component": 2,
+            "source_weighting": "source_inner_harm_suppressed_random_mass_bag_component_union",
+            "gmm_covariance_type": "diag",
+            "gmm_reg_covar": 1.0e-4,
+            "gmm_n_init": 1,
+            "gmm_max_iter": 100,
+            "min_component_weight": 0.02,
+            "variance_floor": 1.0e-5,
+            "variance_ceiling_multiplier": 16.0,
+            "primary_pooling": "arithmetic_probability_ensemble",
+            "reliability_floor_score": 0.05,
+            "reliability_epsilon": 1.0e-8,
+            "anchor_repro_tolerance": 1.0e-4,
+            "min_harmfulness_observations": 6,
+            "moderate_hit_rate_min": 0.50,
+            "moderate_gain_min": 0.015,
+            "moderate_helpful_loss_max": 0.020,
+            "severe_hit_rate_min": 0.75,
+            "severe_gain_min": 0.025,
+            "severe_helpful_loss_max": 0.010,
+            "max_suppressed_sources": 2,
+            "suppression_rate_low": 0.05,
+            "suppression_rate_high": 0.80,
+            "oracle_harm_delta_threshold": 0.02,
         },
         "classifier": {
             "type": "sklearn_logistic_regression",

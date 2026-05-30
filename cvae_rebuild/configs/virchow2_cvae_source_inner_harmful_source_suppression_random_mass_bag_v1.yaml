@@ -1,0 +1,63 @@
+experiment:
+  name: virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1
+  artifact_root: cvae_rebuild/artifacts/virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1
+  primary_variant: pca64_beta001
+
+inputs:
+  feature_cache_root: sail/artifacts/pathology_embeddings/virchow2
+  repair_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_preservation_repair_v1
+  paired_dense_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1
+  dense_tailshield_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1
+  source_union_gmm_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_source_union_gmm_prior_v1
+  balanced_gmm_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_source_union_center_balanced_gmm_prior_v1
+  backbone: virchow2
+
+run_matrix:
+  strict_full_run_matrix: true
+  experiment_seeds: [42, 43, 44]
+  heldout_centers: ["0", "1", "2", "3", "4"]
+  replicate_seeds: [17, 23, 31]
+  fresh_replicate_seeds: [101, 103, 107]
+
+generation:
+  synthetic_per_class_total: 128
+  min_per_source_per_class: 8
+
+harmful_source_suppression:
+  primary_method: source_inner_harm_suppressed_random_mass_bag_component_union_v1
+  random_mass_bag_size: 11
+  random_mass_bag_alpha: 4.0
+  dirichlet_total_concentration: 16.0
+  candidate_components_per_source_class: [4, 3, 2, 1]
+  min_samples_per_component: 12
+  source_weighting: source_inner_harm_suppressed_random_mass_bag_component_union
+  gmm_covariance_type: diag
+  gmm_reg_covar: 1.0e-4
+  gmm_n_init: 5
+  gmm_max_iter: 500
+  min_component_weight: 0.02
+  variance_floor: 1.0e-5
+  variance_ceiling_multiplier: 16.0
+  primary_pooling: arithmetic_probability_ensemble
+  reliability_floor_score: 0.05
+  reliability_epsilon: 1.0e-8
+  anchor_repro_tolerance: 1.0e-4
+  min_harmfulness_observations: 6
+  moderate_hit_rate_min: 0.50
+  moderate_gain_min: 0.015
+  moderate_helpful_loss_max: 0.020
+  severe_hit_rate_min: 0.75
+  severe_gain_min: 0.025
+  severe_helpful_loss_max: 0.010
+  max_suppressed_sources: 2
+  suppression_rate_low: 0.05
+  suppression_rate_high: 0.80
+  oracle_harm_delta_threshold: 0.02
+
+classifier:
+  type: sklearn_logistic_regression
+  solver: lbfgs
+  C: 1.0
+  max_iter: 2000
+  class_weight: balanced
+  classifier_seed: null

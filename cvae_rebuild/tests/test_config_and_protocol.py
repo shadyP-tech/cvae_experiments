@@ -24,6 +24,11 @@ from cvae_rebuild.dense_reliability_tailshield_random_mass_bag import (
     load_dense_tailshield_random_mass_bag_config,
     parse_dense_tailshield_random_mass_bag_config,
 )
+from cvae_rebuild.source_inner_harmful_source_suppression import (
+    PRIMARY_HARMFUL_SUPPRESSION_METHOD,
+    load_harmful_source_suppression_config,
+    parse_harmful_source_suppression_config,
+)
 from cvae_rebuild.decentralized_pruned_adaptive_equal_all4_prior import load_pruned_adaptive_equal_all4_config
 from cvae_rebuild.decentralized_k16_gmm_prior import load_decentralized_k16_gmm_prior_config
 from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import (
@@ -338,6 +343,45 @@ def test_dense_tailshield_random_mass_bag_rejects_changed_alpha_curve() -> None:
 
     with pytest.raises(Exception, match="alpha_curve_dense_values"):
         parse_dense_tailshield_random_mass_bag_config(payload, base_dir=Path("."))
+
+
+def test_locked_harmful_source_suppression_config_loads() -> None:
+    cfg = load_harmful_source_suppression_config(
+        "cvae_rebuild/configs/virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1.yaml"
+    )
+    assert cfg.name == "virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1"
+    assert cfg.backbone == "virchow2"
+    assert cfg.primary_variant == "pca64_beta001"
+    assert cfg.primary_method == PRIMARY_HARMFUL_SUPPRESSION_METHOD
+    assert cfg.strict_full_run_matrix is True
+    assert cfg.experiment_seeds == (42, 43, 44)
+    assert cfg.heldout_centers == ("0", "1", "2", "3", "4")
+    assert cfg.replicate_seeds == (17, 23, 31)
+    assert cfg.fresh_replicate_seeds == (101, 103, 107)
+    assert cfg.synthetic_per_class_total == 128
+    assert cfg.random_mass_bag_size == 11
+    assert cfg.dirichlet_total_concentration == 16.0
+    assert cfg.min_harmfulness_observations == 6
+    assert cfg.suppression_rate_low == 0.05
+    assert cfg.suppression_rate_high == 0.80
+
+
+def test_harmful_source_suppression_rejects_changed_bag_size() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["harmful_source_suppression"]["random_mass_bag_size"] = 3
+
+    with pytest.raises(Exception, match="random_mass_bag_size=11"):
+        parse_harmful_source_suppression_config(payload, base_dir=Path("."))
+
+
+def test_harmful_source_suppression_rejects_target_support_config() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["run_matrix"]["support_size"] = 8
+
+    with pytest.raises(Exception, match="must not configure or consume target support"):
+        parse_harmful_source_suppression_config(payload, base_dir=Path("."))
 
 
 def test_locked_source_inner_validated_dense_component_hybrid_config_loads() -> None:
