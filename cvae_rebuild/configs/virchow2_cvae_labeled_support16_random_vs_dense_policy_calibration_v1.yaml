@@ -1,0 +1,58 @@
+experiment:
+  name: virchow2_cvae_labeled_support16_random_vs_dense_policy_calibration_v1
+  artifact_root: cvae_rebuild/artifacts/virchow2_cvae_labeled_support16_random_vs_dense_policy_calibration_v1
+  primary_variant: pca64_beta001
+
+inputs:
+  feature_cache_root: sail/artifacts/pathology_embeddings/virchow2
+  repair_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_preservation_repair_v1
+  source_union_gmm_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_source_union_gmm_prior_v1
+  balanced_gmm_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_source_union_center_balanced_gmm_prior_v1
+  backbone: virchow2
+
+run_matrix:
+  strict_full_run_matrix: true
+  experiment_seeds: [42, 43, 44]
+  heldout_centers: ["0", "1", "2", "3", "4"]
+  support_seeds: [17, 23, 31]
+  primary_labeled_support_size: 16
+  diagnostic_labeled_support_sizes: [8, 32]
+  nested_support_max_size: 32
+
+generation:
+  synthetic_per_class_total: 128
+  min_per_source_per_class: 8
+
+labeled_support_policy_calibration:
+  primary_method: labeled_support16_random_default_dense_switch_v1
+  candidate_components_per_source_class: [4, 3, 2, 1]
+  min_samples_per_component: 12
+  source_weighting: labeled_support16_random_default_dense_switch
+  gmm_covariance_type: diag
+  gmm_reg_covar: 1.0e-4
+  gmm_n_init: 5
+  gmm_max_iter: 500
+  min_component_weight: 0.02
+  variance_floor: 1.0e-5
+  variance_ceiling_multiplier: 16.0
+  primary_pooling: labeled_support_random_default_dense_switch
+  reliability_floor_score: 0.05
+  reliability_epsilon: 1.0e-8
+  random_mass_bag_size: 11
+  random_mass_bag_alpha: 4.0
+  primary_switch_quantum: 0.0625
+  support_quantum_by_size:
+    8: 0.125
+    16: 0.0625
+    32: 0.03125
+
+memory:
+  skip_nearest_neighbor_audit: true
+
+classifier:
+  type: sklearn_logistic_regression
+  solver: lbfgs
+  C: 1.0
+  max_iter: 2000
+  class_weight: balanced
+  classifier_seed: null

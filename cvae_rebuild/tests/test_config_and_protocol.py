@@ -34,6 +34,12 @@ from cvae_rebuild.target_support_regime_risk_gated_component_union import (
     load_target_support_regime_risk_gate_config,
     parse_target_support_regime_risk_gate_config,
 )
+from cvae_rebuild.labeled_support_random_vs_dense_policy_calibration import (
+    PRIMARY_LABELED_SUPPORT_POLICY_METHOD,
+    load_labeled_support_policy_calibration_config,
+    nested_labeled_support_eval_splits,
+    parse_labeled_support_policy_calibration_config,
+)
 from cvae_rebuild.decentralized_pruned_adaptive_equal_all4_prior import load_pruned_adaptive_equal_all4_config
 from cvae_rebuild.decentralized_k16_gmm_prior import load_decentralized_k16_gmm_prior_config
 from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import (
@@ -436,6 +442,60 @@ def test_target_support_regime_risk_gate_rejects_enabled_nn_audit() -> None:
 
     with pytest.raises(Exception, match="skip nearest-neighbor audit"):
         parse_target_support_regime_risk_gate_config(payload, base_dir=Path("."))
+
+
+def test_locked_labeled_support_policy_calibration_config_loads() -> None:
+    cfg = load_labeled_support_policy_calibration_config(
+        "cvae_rebuild/configs/virchow2_cvae_labeled_support16_random_vs_dense_policy_calibration_v1.yaml"
+    )
+    assert cfg.name == "virchow2_cvae_labeled_support16_random_vs_dense_policy_calibration_v1"
+    assert cfg.backbone == "virchow2"
+    assert cfg.primary_variant == "pca64_beta001"
+    assert cfg.primary_method == PRIMARY_LABELED_SUPPORT_POLICY_METHOD
+    assert cfg.strict_full_run_matrix is True
+    assert cfg.experiment_seeds == (42, 43, 44)
+    assert cfg.heldout_centers == ("0", "1", "2", "3", "4")
+    assert cfg.support_seeds == (17, 23, 31)
+    assert cfg.primary_labeled_support_size == 16
+    assert cfg.diagnostic_labeled_support_sizes == (8, 32)
+    assert cfg.random_mass_bag_size == 11
+    assert cfg.random_mass_bag_alpha == 4.0
+    assert cfg.primary_switch_quantum == 0.0625
+    assert cfg.support_quantum_by_size == {8: 0.125, 16: 0.0625, 32: 0.03125}
+    assert cfg.skip_nearest_neighbor_audit is True
+
+
+def test_labeled_support_policy_calibration_rejects_changed_switch_quantum() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_labeled_support16_random_vs_dense_policy_calibration_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["labeled_support_policy_calibration"]["primary_switch_quantum"] = 0.025
+
+    with pytest.raises(Exception, match="primary_switch_quantum"):
+        parse_labeled_support_policy_calibration_config(payload, base_dir=Path("."))
+
+
+def test_nested_labeled_support_splits_are_class_balanced_and_disjoint() -> None:
+    metadata = []
+    for label in (0, 1):
+        for idx in range(20):
+            metadata.append({"sample_id": f"c3_y{label}_{idx}", "center": "3", "label": label})
+    splits = nested_labeled_support_eval_splits(
+        metadata,
+        heldout_center="3",
+        support_seed=17,
+        support_sizes=(8, 16, 32),
+        max_support_size=32,
+    )
+    by_key = {(split.support_size, split.eval_mode): split for split in splits}
+    assert len(by_key[(8, "primary_style")].support_indices) == 8
+    assert len(by_key[(16, "primary_style")].support_indices) == 16
+    assert len(by_key[(32, "primary_style")].support_indices) == 32
+    assert set(by_key[(8, "primary_style")].support_indices).issubset(by_key[(16, "primary_style")].support_indices)
+    assert set(by_key[(16, "primary_style")].support_indices).issubset(by_key[(32, "primary_style")].support_indices)
+    for split in splits:
+        assert split.support_labels.count(0) == split.support_labels.count(1)
+        assert set(split.support_sample_ids).isdisjoint(split.eval_sample_ids)
+        assert split.support_labels_used is True
 
 
 def test_locked_source_inner_validated_dense_component_hybrid_config_loads() -> None:

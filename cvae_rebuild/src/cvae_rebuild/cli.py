@@ -90,6 +90,10 @@ from .target_support_regime_risk_gated_component_union import (
     load_target_support_regime_risk_gate_config,
     run_target_support_regime_risk_gated_component_union,
 )
+from .labeled_support_random_vs_dense_policy_calibration import (
+    load_labeled_support_policy_calibration_config,
+    run_labeled_support_policy_calibration,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -303,7 +307,22 @@ def main(argv: list[str] | None = None) -> int:
     target_support_risk_gate.add_argument("--config", required=True)
     target_support_risk_gate.add_argument("--artifact-root", default=None)
 
+    labeled_support_policy = sub.add_parser(
+        "diagnose-labeled-support-random-vs-dense-policy-calibration",
+        help="Run the Tier 2 labeled-support random-vs-dense policy calibration audit.",
+    )
+    labeled_support_policy.add_argument("--config", required=True)
+    labeled_support_policy.add_argument("--artifact-root", default=None)
+
     args = parser.parse_args(argv)
+    if args.command == "diagnose-labeled-support-random-vs-dense-policy-calibration":
+        cfg = load_labeled_support_policy_calibration_config(args.config)
+        root = run_labeled_support_policy_calibration(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
     if args.command == "diagnose-target-support-regime-risk-gated-component-union":
         cfg = load_target_support_regime_risk_gate_config(args.config)
         root = run_target_support_regime_risk_gated_component_union(

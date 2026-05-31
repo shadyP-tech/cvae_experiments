@@ -77,6 +77,15 @@ from cvae_rebuild.target_support_regime_risk_gated_component_union import (
     parse_target_support_regime_risk_gate_config,
     run_target_support_regime_risk_gated_component_union,
 )
+from cvae_rebuild.labeled_support_random_vs_dense_policy_calibration import (
+    PRIMARY_LABELED_SUPPORT_POLICY_METHOD,
+    ROW_OFF_TARGET_SUPPORT_CONTROL,
+    ROW_RANDOM_DEFAULT_CONTROL,
+    ROW_RANDOM_SWITCH_MATCHED_RATE,
+    ROW_SHUFFLED_SUPPORT_LABEL_CONTROL,
+    parse_labeled_support_policy_calibration_config,
+    run_labeled_support_policy_calibration,
+)
 from cvae_rebuild.decentralized_pruned_adaptive_equal_all4_prior import (
     PRIMARY_PRUNED_EQUAL_ALL4_METHOD,
     ROW_UNPRUNED_FIXED_K4,
@@ -1769,6 +1778,79 @@ def test_target_support_regime_risk_gate_tiny_cache_writes_expected_artifacts(tm
     assert "selected_random_mass_bag_rate" in summary[0]
     assert "LOPO gate verdict" in report
     assert "Threshold-sensitivity rows are audit-only" in report
+
+
+def test_labeled_support_policy_calibration_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_labeled_support_policy_calibration_payload(tmp_path)
+    cfg = parse_labeled_support_policy_calibration_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_labeled_support_policy_calibration(cfg)
+
+    expected = [
+        "tables/labeled_support_policy_downstream_matrix.csv",
+        "tables/labeled_support_policy_summary.csv",
+        "tables/labeled_support_tail_metric_summary.csv",
+        "tables/labeled_support_split_manifest.csv",
+        "tables/labeled_support_policy_score_matrix.csv",
+        "tables/labeled_support_policy_selection_manifest.csv",
+        "tables/policy_switch_event_table.csv",
+        "tables/candidate_policy_probability_manifest.csv",
+        "tables/random_bag_manifest.csv",
+        "tables/support_to_target_utility_alignment.csv",
+        "tables/support_size_quantization_audit.csv",
+        "tables/support_size_common_eval_audit.csv",
+        "tables/negative_control_summary.csv",
+        "tables/oracle_policy_gap_summary.csv",
+        "tables/labeled_support_target_oracle_audit.csv",
+        "tables/eligibility_audit.csv",
+        "tables/runtime_memory_audit.csv",
+        "tables/component_manifest.csv",
+        "tables/component_coverage_audit.csv",
+        "tables/paired_generation_audit.csv",
+        "manifests/protocol_manifest.json",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "labeled_support_policy_downstream_matrix.csv", newline="")))
+    splits = list(csv.DictReader(open(root / "tables" / "labeled_support_split_manifest.csv", newline="")))
+    scores = list(csv.DictReader(open(root / "tables" / "labeled_support_policy_score_matrix.csv", newline="")))
+    switch_events = list(csv.DictReader(open(root / "tables" / "policy_switch_event_table.csv", newline="")))
+    alignment = list(csv.DictReader(open(root / "tables" / "support_to_target_utility_alignment.csv", newline="")))
+    quantization = list(csv.DictReader(open(root / "tables" / "support_size_quantization_audit.csv", newline="")))
+    common_eval = list(csv.DictReader(open(root / "tables" / "support_size_common_eval_audit.csv", newline="")))
+    negative = list(csv.DictReader(open(root / "tables" / "negative_control_summary.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert leakage["protocol_tier"] == "tier2_labeled_target_support_calibration"
+    assert leakage["target_support_labels_for_policy_selection"] is True
+    assert protocol["protocol_tier"] == "tier2_labeled_target_support_calibration"
+    assert protocol["target_support_labels_for_policy_selection"] is True
+    assert protocol["support_labels_do_not_train_classifiers"] is True
+    assert protocol["support_labels_do_not_modify_generation"] is True
+    assert protocol["primary_labeled_support_size"] == 16
+    assert any(row["prior_method"] == PRIMARY_LABELED_SUPPORT_POLICY_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == ROW_ALWAYS_RANDOM_BAG for row in matrix)
+    assert any(row["prior_method"] == ROW_ALWAYS_DENSE for row in matrix)
+    assert any(row["prior_method"] == ROW_SHUFFLED_SUPPORT_LABEL_CONTROL for row in matrix)
+    assert any(row["prior_method"] == ROW_OFF_TARGET_SUPPORT_CONTROL for row in matrix)
+    assert any(row["control_method"] == ROW_RANDOM_SWITCH_MATCHED_RATE for row in negative)
+    assert any(row["control_method"] == ROW_RANDOM_DEFAULT_CONTROL for row in negative)
+    assert splits and all(row["support_labels_used"] == "1" for row in splits)
+    assert any(row["support_size"] == "16" and row["support_count_class0"] == "8" and row["support_count_class1"] == "8" for row in splits)
+    assert scores and all(row["support_labels_used_for_policy_scoring"] == "True" for row in scores)
+    assert switch_events and "support16_quantum" in switch_events[0]
+    assert alignment and "within_cell_pairwise_policy_auc" in alignment[0]
+    assert quantization and {row["support_size"] for row in quantization} == {"8", "16", "32"}
+    assert common_eval and all(row["diagnostic_only"] == "True" for row in common_eval)
+    assert "Tier 2 few-shot target-local utility calibration" in report
 
 
 def test_mass_bagged_component_union_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
@@ -3799,6 +3881,67 @@ def _tiny_target_support_regime_risk_gate_payload(tmp_path: Path):
             "safer_policy_gain_threshold": 0.025,
             "gate_c": 0.25,
             "reconstruction_probability_tolerance": 1.0e-6,
+        },
+        "memory": {
+            "skip_nearest_neighbor_audit": True,
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_labeled_support_policy_calibration_payload(tmp_path: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_labeled_support16_random_vs_dense_policy_calibration_v1",
+            "artifact_root": str(tmp_path / "virchow2_cvae_labeled_support16_random_vs_dense_policy_calibration_v1"),
+            "primary_variant": "pca64_beta001",
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
+            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
+            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "strict_full_run_matrix": False,
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2", "3", "4"],
+            "support_seeds": [17],
+            "primary_labeled_support_size": 16,
+            "diagnostic_labeled_support_sizes": [8, 32],
+            "nested_support_max_size": 32,
+        },
+        "generation": {
+            "synthetic_per_class_total": 32,
+            "min_per_source_per_class": 2,
+        },
+        "labeled_support_policy_calibration": {
+            "primary_method": "labeled_support16_random_default_dense_switch_v1",
+            "candidate_components_per_source_class": [4, 3, 2, 1],
+            "min_samples_per_component": 2,
+            "source_weighting": "labeled_support16_random_default_dense_switch",
+            "gmm_covariance_type": "diag",
+            "gmm_reg_covar": 1.0e-4,
+            "gmm_n_init": 1,
+            "gmm_max_iter": 100,
+            "min_component_weight": 0.02,
+            "variance_floor": 1.0e-5,
+            "variance_ceiling_multiplier": 16.0,
+            "primary_pooling": "labeled_support_random_default_dense_switch",
+            "reliability_floor_score": 0.05,
+            "reliability_epsilon": 1.0e-8,
+            "random_mass_bag_size": 3,
+            "random_mass_bag_alpha": 4.0,
+            "primary_switch_quantum": 0.0625,
+            "support_quantum_by_size": {8: 0.125, 16: 0.0625, 32: 0.03125},
         },
         "memory": {
             "skip_nearest_neighbor_audit": True,
