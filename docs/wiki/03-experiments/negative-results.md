@@ -18,6 +18,9 @@ Preserve negative findings as part of the research record.
   exclusion.
 - The paired dense all4 reliability confirmation is positive for dense
   aggregation, but it does not overturn the negative sparse-selection evidence.
+- Component-union, random mass-bag, and tail-shield audits show high mean BACC,
+  but several are still negative or diagnostic because random/shuffled controls
+  are competitive and weak-center/tail failures remain.
 
 ## Evidence / Source Artifacts
 
@@ -31,6 +34,10 @@ Preserve negative findings as part of the research record.
 - `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_decentralized_reliability_top3_gmm_prior_v1/tables/decentralized_reliability_top3_summary.csv`
 - `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_decentralized_source_inner_transfer_top3_gmm_prior_v1/tables/decentralized_source_inner_transfer_summary.csv`
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/tables/paired_dense_all4_summary.csv`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_reliability_shrink025_v2/reports/decision_summary.md`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_mass_bagged_v1/reports/decision_summary.md`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_support8_calibrated_component_union_prior_v1/reports/decision_summary.md`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1/reports/decision_summary.md`
 
 ## Interpretation
 
@@ -50,6 +57,11 @@ source-inner off-diagonal transfer is not sufficient if its score is negatively
 correlated with target subset utility
 ```
 
+```text
+high mean BACC is not sufficient if random/shuffled mass controls are
+competitive or weak-center/tail collapse remains
+```
+
 ## Implication For Thesis
 
 The thesis should present negative findings as evidence for claim discipline and for the move toward utility-aligned compatibility.
@@ -62,6 +74,11 @@ The paired dense all4 reliability result narrows this limitation: reliability
 has useful direction for dense aggregation, but the sparse top3/drop-one
 formulations tested so far are not reliable.
 
+The component-union line narrows it again: generated-embedding component
+composition can be high utility, but source-only mass allocation remains
+underidentified. A thesis-facing method must either beat the random/shuffled
+controls or repair weak-center/tail failures in a protocol-clean way.
+
 ## Limitations
 
 Some older artifacts are quarantined or superseded. Do not use quarantined results for method-selection claims.
@@ -73,3 +90,5 @@ Some older artifacts are quarantined or superseded. Do not use quarantined resul
 - Before adding another sparse selector, reuse paired generation/prediction
   invariants so identical source sets are not confounded by method-specific
   sampling seeds.
+- For high-mean component-union methods, require matched controls and
+  weak-tail metrics before calling the method thesis-facing.

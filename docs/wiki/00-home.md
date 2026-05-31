@@ -31,7 +31,8 @@ generated embedding:
   Virchow2 CVAE repair / source-union K16 diagnostics
   -> D-series decentralized source-local summary composition
   -> paired dense all4 reliability PASS for dense aggregation
-  -> D1.3/D1.5 not final selectors
+  -> component-union/random mass-bag high mean but controls competitive
+  -> weak-center/tail robustness is the active bottleneck
 ```
 
 ## Evidence / Source Artifacts
@@ -43,6 +44,8 @@ generated embedding:
 - `sail/configs/sail_virchow2.yaml`
 - `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_decentralized_reliability_weighted_gmm_prior_v1/tables/decentralized_reliability_summary.csv`
 - `cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/reports/decision_summary.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_mass_bagged_v1/reports/decision_summary.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1/reports/decision_summary.md`
 
 ## Next Checks
 
@@ -51,3 +54,5 @@ generated embedding:
 - Keep cross-backbone aggregation audit-only.
 - Before adding another generated-embedding selector, reuse paired
   generation/prediction invariants.
+- Sync and validate the current harmful-source suppression run before treating
+  it as evidence.

@@ -37,6 +37,7 @@ They are documented in:
 
 - [Current experimental state](context/current_experimental_state.md)
 - [D-series decentralized Virchow2 CVAE composition](wiki/03-experiments/d-series-decentralized-cvae.md)
+- [Component-union mass allocation audits](wiki/03-experiments/component-union-mass-allocation.md)
 - [Generated-embedding CVAE current synthesis](wiki/04-current-best-approach/generative-cvae-current-synthesis.md)
 
 The paired dense-all4 reliability confirmation was synced into this working
@@ -46,6 +47,9 @@ repository at:
 cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/
 ```
 
-It is the current strongest protocol-clean generated-embedding dense
-aggregation result, but it is not sparse routing or target-conditioned expert
-selection.
+It is the cleanest protocol-clean generated-embedding dense aggregation result,
+but it is not sparse routing or target-conditioned expert selection.
+
+Newer component-union and random mass-bag artifacts reach higher mean BACC, but
+they are documented as diagnostic/high-capacity surfaces unless they beat
+matched controls and repair weak-center/tail failures.

@@ -15,6 +15,7 @@ Define evidence labels and claim boundaries.
 | Oracle evidence | Upper bound using target outcomes. |
 | Centralized diagnostic upper bound | Uses pooled or source-union information to diagnose feasibility or bottlenecks; not deployable as decentralized routing. |
 | Dense aggregation evidence | Protocol-clean evidence that all available non-target experts can be reweighted or budgeted better than equal weighting; not evidence of sparse expert selection. |
+| High-mean diagnostic surface | A method/control family that reaches high mean BACC but is not adoption-eligible because controls are competitive, source mass is underidentified, or weak-tail gates fail. |
 | Raw-data-free summary exchange | Shares source-local summaries/scores rather than raw images or embeddings; not a formal privacy claim by itself. |
 | Negative result | Valid result showing no useful gain. |
 | Assumption | Plausible but not yet verified. |
@@ -29,6 +30,8 @@ Define evidence labels and claim boundaries.
 - `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_decentralized_reliability_weighted_gmm_prior_v1/manifests/protocol_manifest.json`
 - `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/reports/decision_summary.md`
 - `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/reports/leakage_report.json`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_mass_bagged_v1/reports/decision_summary.md`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1/reports/decision_summary.md`
 
 ## Interpretation
 
@@ -46,6 +49,13 @@ result: heldout-excluded source-local reliability improves how all four
 non-target source experts are weighted and budgeted. It must not be described
 as sparse routing, because no source expert is excluded.
 
+The component-union/random mass-bag results should be labeled as high-mean
+diagnostic surfaces unless the primary method beats matched controls and
+repairs weak-center/tail failures. Random mass-bag performance is especially
+important as a control: it can show that source-mass variation has high utility
+without proving that any proposed mass signal is a valid compatibility
+estimator.
+
 ## Implication For Thesis
 
 Every result section should state the strongest allowable claim and the forbidden overclaim.
@@ -58,3 +68,5 @@ Evidence labels depend on artifact fields. If labels are missing, classify the c
 
 - Add evidence labels to new wiki result pages as SAIL artifacts arrive.
 - Keep dense aggregation labels separate from sparse routing labels.
+- Keep high-mean diagnostic surfaces separate from deployable compatibility
+  methods.

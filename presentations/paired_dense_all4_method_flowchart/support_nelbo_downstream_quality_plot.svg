@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="600" viewBox="0 0 1024 600">
+<rect width="1024" height="600" fill="#ffffff"/>
+<text x="48.0" y="66.0" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#111111" text-anchor="start">Support-NELBO routing did not transfer to downstream utility</text>
+<text x="50.0" y="94.0" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#111111" text-anchor="start">First generated-embedding downstream test: select expert(s), train on generated samples, score held-out target</text>
+<rect x="46" y="118" width="932" height="358" rx="8" fill="#ffffff" stroke="#8a8a8a" stroke-width="1"/>
+<line x1="329.2" y1="174" x2="329.2" y2="438" stroke="#d9d9d9" stroke-width="0.8"/>
+<text x="329.2" y="464.0" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#666666" text-anchor="middle">0.50</text>
+<line x1="475.4" y1="174" x2="475.4" y2="438" stroke="#d9d9d9" stroke-width="0.8"/>
+<text x="475.4" y="464.0" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#666666" text-anchor="middle">0.55</text>
+<line x1="621.6" y1="174" x2="621.6" y2="438" stroke="#d9d9d9" stroke-width="0.8"/>
+<text x="621.6" y="464.0" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#666666" text-anchor="middle">0.60</text>
+<line x1="767.8" y1="174" x2="767.8" y2="438" stroke="#d9d9d9" stroke-width="0.8"/>
+<text x="767.8" y="464.0" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#666666" text-anchor="middle">0.65</text>
+<line x1="914.0" y1="174" x2="914.0" y2="438" stroke="#d9d9d9" stroke-width="0.8"/>
+<text x="914.0" y="464.0" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#666666" text-anchor="middle">0.70</text>
+<text x="607.0" y="490.0" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700" fill="#111111" text-anchor="middle">held-out target BACC</text>
+<line x1="846.4" y1="160" x2="846.4" y2="432" stroke="#8a8a8a" stroke-width="1.2" stroke-dasharray="8 6"/>
+<text x="846.4" y="140.0" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700" fill="#666666" text-anchor="middle">downstream oracle 0.6769</text>
+<text x="846.4" y="156.0" font-family="Arial, Helvetica, sans-serif" font-size="9" font-weight="400" fill="#666666" text-anchor="middle">diagnostic only</text>
+<line x1="329.2" y1="172" x2="329.2" y2="438" stroke="#bdbdbd" stroke-width="1.2"/>
+<text x="323.2" y="156.0" font-family="Arial, Helvetica, sans-serif" font-size="9" font-weight="400" fill="#666666" text-anchor="end">0.50</text>
+<text x="76.0" y="213.0" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#111111" text-anchor="start">random top1</text>
+<text x="76.0" y="232.0" font-family="Arial, Helvetica, sans-serif" font-size="9" font-weight="400" fill="#666666" text-anchor="start">sparse baseline</text>
+<line x1="300" y1="214" x2="914" y2="214" stroke="#ececec" stroke-width="0.8"/>
+<line x1="329.2" y1="214" x2="383.5" y2="214" stroke="#111111" stroke-width="2.2"/>
+<circle cx="383.5" cy="214" r="6" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.4"/>
+<text x="397.5" y="218.0" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700" fill="#111111" text-anchor="start">0.5185</text>
+<text x="76.0" y="259.0" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" fill="#111111" text-anchor="start">support-NELBO top1</text>
+<text x="76.0" y="278.0" font-family="Arial, Helvetica, sans-serif" font-size="9" font-weight="400" fill="#666666" text-anchor="start">single selected expert</text>
+<line x1="300" y1="260" x2="914" y2="260" stroke="#ececec" stroke-width="0.8"/>
+<line x1="329.2" y1="260" x2="402.8" y2="260" stroke="#111111" stroke-width="2.2"/>
+<circle cx="402.8" cy="260" r="6.5" fill="#111111" stroke="#111111" stroke-width="1"/>
+<text x="416.8" y="264.0" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700" fill="#111111" text-anchor="start">0.5252</text>
+<text x="76.0" y="305.0" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" fill="#111111" text-anchor="start">support-NELBO top2 geom</text>
+<text x="76.0" y="324.0" font-family="Arial, Helvetica, sans-serif" font-size="9" font-weight="400" fill="#666666" text-anchor="start">primary support route</text>
+<line x1="300" y1="306" x2="914" y2="306" stroke="#ececec" stroke-width="0.8"/>
+<line x1="329.2" y1="306" x2="464.7" y2="306" stroke="#111111" stroke-width="2.2"/>
+<circle cx="464.7" cy="306" r="6.5" fill="#111111" stroke="#111111" stroke-width="1"/>
+<text x="478.7" y="310.0" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700" fill="#111111" text-anchor="start">0.5463</text>
+<text x="76.0" y="351.0" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" fill="#111111" text-anchor="start">support-NELBO top3 geom</text>
+<text x="76.0" y="370.0" font-family="Arial, Helvetica, sans-serif" font-size="9" font-weight="400" fill="#666666" text-anchor="start">more coverage</text>
+<line x1="300" y1="352" x2="914" y2="352" stroke="#ececec" stroke-width="0.8"/>
+<line x1="329.2" y1="352" x2="551.0" y2="352" stroke="#111111" stroke-width="2.2"/>
+<circle cx="551.0" cy="352" r="6.5" fill="#111111" stroke="#111111" stroke-width="1"/>
+<text x="565.0" y="356.0" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700" fill="#111111" text-anchor="start">0.5758</text>
+<text x="76.0" y="397.0" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" fill="#111111" text-anchor="start">all4 geom</text>
+<text x="76.0" y="416.0" font-family="Arial, Helvetica, sans-serif" font-size="9" font-weight="400" fill="#666666" text-anchor="start">dense all-source composition</text>
+<line x1="300" y1="398" x2="914" y2="398" stroke="#ececec" stroke-width="0.8"/>
+<line x1="329.2" y1="398" x2="588.4" y2="398" stroke="#63c900" stroke-width="2.2"/>
+<circle cx="588.4" cy="398" r="7.5" fill="#63c900" stroke="#111111" stroke-width="1"/>
+<text x="602.4" y="402.0" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700" fill="#63c900" text-anchor="start">0.5887</text>
+<rect x="594" y="146" width="318" height="60" rx="6" fill="#f7f7f7" stroke="#8a8a8a" stroke-width="0.8"/>
+<text x="610.0" y="166.0" font-family="Arial, Helvetica, sans-serif" font-size="9" font-weight="700" fill="#666666" text-anchor="start">routing -> downstream alignment</text>
+<text x="610.0" y="187.0" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" fill="#111111" text-anchor="start">Spearman 0.0077    top1 oracle hit 15.9%</text>
+<rect x="166" y="506" width="692" height="54" fill="#fde6c8" stroke="#f3bd62" stroke-width="1"/>
+<text x="512.0" y="530.0" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700" fill="#111111" text-anchor="middle">Downstream failure mode</text>
+<text x="512.0" y="550.0" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="700" fill="#111111" text-anchor="middle">Sparse support-NELBO selection was near random; useful generated components existed, but dense composition was safer.</text>
+<text x="54.0" y="582.0" font-family="Arial, Helvetica, sans-serif" font-size="8" font-weight="400" fill="#666666" text-anchor="start">n=378 eligible cells; target labels used only for final scoring; leakage audit PASS</text>
+</svg>

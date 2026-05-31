@@ -268,11 +268,21 @@ Distinguish these surfaces:
 - CVAE expert aggregation
 - output aggregation
 - parameter aggregation
+- source-mass allocation over dense source inclusion
+- uncertainty marginalization over a fixed source-mass prior family
+- tail-risk or harmful-source suppression diagnostics
 
 Dense aggregation is aligned with the MoErging design space because multiple
 selected experts, configs, or outputs may be combined rather than selecting one
 winner. The claim depends on the surface being aggregated. Dense real-feature
 classifier aggregation is not the same as CVAE routing.
+
+For generated-embedding CVAE experiments, high downstream BACC from dense
+component composition or randomized source-mass bags is not automatically a
+validated compatibility signal. A mass-allocation method becomes
+thesis-facing only when it beats matched controls and improves weak-domain
+behavior under the locked protocol. Otherwise it is diagnostic evidence about
+composition capacity, underidentified source mass, or tail-risk bottlenecks.
 
 ## Protocol Rules
 

@@ -1,6 +1,6 @@
 # Current Experimental State
 
-Last updated: 2026-05-25
+Last updated: 2026-05-31
 
 ## Purpose
 
@@ -51,7 +51,8 @@ Virchow2 CVAE repair showed decoder/source-pool capacity can preserve utility
 -> source-union K16 GMM is the strongest centralized prior diagnostic
 -> decentralized D-series summary-exchange variants gave partial evidence
 -> paired dense-all4 reliability confirmation passes as dense aggregation
--> support-NELBO and source-inner transfer are not yet validated selectors
+-> component-union and random mass-bag audits reach high mean BACC
+-> mass allocation and weak-center robustness remain the current bottlenecks
 ```
 
 Current best generated-embedding interpretation:
@@ -60,21 +61,36 @@ Current best generated-embedding interpretation:
 Best diagnostic upper bound:
   centralized source-union class-conditional diagonal GMM K16
 
-Best protocol-clean decentralized dense aggregation evidence:
+Best clean source-quality / dense aggregation evidence:
   paired dense-all4 heldout-excluded reliability confirmation
+
+Best high-mean component-composition surface:
+  component-union / random mass-bag family, diagnostic unless controls are beaten
 
 Not currently supported as final thesis-facing winners:
   support-NELBO weighting
   reliability-only sparse top-3
   source-inner off-diagonal drop-one selection
+  point source-mass reliability shrinkage
+  random mass-bag as meaningful compatibility by itself
 ```
 
 No D-series experiment currently supports a full PASS claim for deployable
 decentralized compatibility routing or sparse expert selection. The strongest
-safe generated-embedding claim is now narrower but positive: heldout-excluded
-source-local reliability improves dense all-source generated-embedding
-aggregation over equal all-source aggregation under paired generation and
-prediction invariants.
+safe generated-embedding claims are narrower:
+
+```text
+1. heldout-excluded source-local reliability improves dense all-source
+   generated-embedding aggregation over equal all-source aggregation under
+   paired generation and prediction invariants
+
+2. component-union/random mass-bag composition can reach the source-union K16
+   utility region, but current mass-allocation signals are underidentified
+   because random/shuffled controls remain competitive
+
+3. weak-center and bottom-tail robustness, not mean BACC alone, is now the
+   limiting generated-embedding bottleneck
+```
 
 ## Synced Artifact Root
 
@@ -126,6 +142,24 @@ Primary generated-embedding artifacts:
 - `cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/tables/paired_dense_all4_gap_summary.csv`
 - `cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/tables/paired_delta_summary.csv`
 - `cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/tables/paired_generation_invariant_audit.csv`
+- `cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_reliability_shrink025_v2/reports/decision_summary.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_source_inner_validated_dense_component_hybrid_v1/reports/decision_summary.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_mass_bagged_v1/reports/decision_summary.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_reliability_shrink050_confirmation_v1/reports/decision_summary.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_support8_calibrated_component_union_prior_v1/reports/decision_summary.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_anchored_mass_bagged_v1/reports/decision_summary.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1/reports/decision_summary.md`
+- `cvae_rebuild/configs/virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1.yaml`
+- `cvae_rebuild/src/cvae_rebuild/source_inner_harmful_source_suppression.py`
+
+Current in-progress generated-embedding artifact:
+
+- `cvae_rebuild/artifacts/virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1/`
+
+Status: local synced result reports/tables/manifests are not verified yet. User
+reported the workstation run was OOM-killed after writing cache files and is
+being rerun with thread/memory constraints. Treat harmful-source suppression as
+current implementation/run status, not final evidence.
 
 Historical and contextual artifacts:
 
@@ -360,6 +394,90 @@ Scientific/audit issues to fix before any D1.5-style rerun:
 These audit issues do not overturn the fail verdict; they make the negative
 interpretation more conservative.
 
+## Component-Union And Source-Mass Follow-Up Audits
+
+Verified local artifacts:
+
+- `cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_reliability_shrink025_v2/reports/decision_summary.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_source_inner_validated_dense_component_hybrid_v1/reports/decision_summary.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_mass_bagged_v1/reports/decision_summary.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_reliability_shrink050_confirmation_v1/reports/decision_summary.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_support8_calibrated_component_union_prior_v1/reports/decision_summary.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_anchored_mass_bagged_v1/reports/decision_summary.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1/reports/decision_summary.md`
+
+Summary table:
+
+| Artifact | Primary method | Verdict | Mean BACC | Min center | Seed std | Key interpretation |
+| --- | --- | --- | ---: | ---: | ---: | --- |
+| component-union shrink025 v2 | `decentralized_component_union_reliability_shrink025` | `COMPONENT_UNION_FAIL` | 0.8892 | 0.8168 | 0.0501 | high utility, but matched shuffled reliability and source-ablation dominance block adoption |
+| source-inner dense/component hybrid | `source_inner_validated_dense_component_binary_gate` | `HYBRID_FAIL` | 0.8103 | 0.7192 | 0.0424 | source-inner gate fails to identify when component union is safe |
+| mass-uncertainty bagged component union | `decentralized_component_union_mass_uncertainty_bagged_v1` | `MASS_BAGGED_COMPONENT_UNION_FAIL` | 0.8903 | 0.7931 | 0.0568 | high mean and source-union retention, but random mass-bag and negative controls are competitive |
+| reliability shrink050 confirmation | `decentralized_component_union_reliability_shrink050` | `ANCHOR_MISMATCH` | 0.8800 | 0.8000 | 0.0527 | weak reliability prior is not separated from matched shuffled/random controls |
+| support8 calibrated component union | `support8_calibrated_component_union_softmax_shrink050` | `SUPPORT_CALIBRATED_COMPONENT_UNION_FAIL` | 0.8727 | 0.7886 | 0.0369 | unlabeled target support does not beat shrink050/random mass-bag or shuffled-support null |
+| shrink050/random mass tail-risk blend | `component_union_tailrisk_anchored_shrink050_random_mass_bag_blend050` | `TAILRISK_ANCHORED_COMPONENT_UNION_USEFUL_THESIS_SUCCESS` | 0.8957 | 0.8032 | 0.0510 | useful robustness evidence, but anchor mismatch and bottom-tail limits remain |
+| dense reliability tail shield | `dense_reliability_tailshield_random_mass_bag_blend25_75` | `DENSE_TAILSHIELD_RANDOM_MASS_BAG_FAIL` | 0.8988 | 0.7896 | 0.0403 | high mean and bottom20 gain, but center3/worst-cell failure remains |
+
+Important verified numbers:
+
+- Mass-bagged component union retention vs source-union K16: 0.9960.
+- Mass-bagged oracle gap vs source-union K16: 0.0035.
+- Mass-bagged delta vs random mass-bag control: -0.0016.
+- Support8 calibrated primary minus shuffled-support null mean: -0.0050.
+- Dense tail shield bottom20 delta vs random mass-bag: +0.0244, but center3
+  delta vs random mass-bag: 0.0000 and worst seed-center BACC: 0.4971.
+
+Interpretation:
+
+The component-union family shifts the bottleneck. Mean BACC is no longer the
+main limitation: several rows reach roughly the source-union K16 region. The
+problem is that source-mass allocation is underidentified. Random or shuffled
+mass controls often match the proposed primary method, and weak-center/tail
+failures remain.
+
+Safe claim:
+
+```text
+Component-level source-local summaries expose a high-utility generated
+embedding composition surface, but current source-only or support-calibrated
+mass-allocation signals do not yet provide a clean deployable compatibility
+rule.
+```
+
+Unsafe claim:
+
+```text
+Random mass-bag success proves random source weights are meaningful
+compatibility estimates.
+```
+
+## Current Harmful-Source Suppression Run
+
+Implementation artifacts:
+
+- `cvae_rebuild/src/cvae_rebuild/source_inner_harmful_source_suppression.py`
+- `cvae_rebuild/configs/virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1.yaml`
+
+User-provided run status, not final artifact evidence:
+
+- Workstation run wrote 12,602 generated caches and 12,602 prediction caches
+  before `systemd-oomd` killed the tmux unit.
+- No final reports/tables/manifests were available at that point.
+- The run is being retried with BLAS/thread limits and unbuffered logging.
+
+Current purpose:
+
+```text
+test whether source-inner leave-one-source harmfulness can suppress sources
+that poison target-like regimes before heldout target evaluation
+```
+
+Current evidence label:
+
+```text
+implemented and running; final result TODO: verify against artifact
+```
+
 ## Current Best Approach
 
 Current best real-feature approach:
@@ -378,7 +496,7 @@ centralized source-union K16 GMM prior
 
 Status: strong diagnostic upper bound, not deployable.
 
-Current best decentralized generated-embedding dense aggregation method:
+Current best clean decentralized generated-embedding dense aggregation evidence:
 
 ```text
 paired dense all4 heldout-excluded source-local reliability weighting
@@ -387,12 +505,35 @@ paired dense all4 heldout-excluded source-local reliability weighting
 Status: PASS for dense generated-embedding aggregation only; not a sparse
 routing or target-conditioned compatibility-router PASS.
 
+Current best generated-embedding mean-utility surface:
+
+```text
+component-union / random mass-bag probability ensembles
+```
+
+Status: high-mean diagnostic surface, not adopted as a compatibility method
+because matched controls are competitive and weak-center/tail failures remain.
+
+Current generated-embedding bottleneck:
+
+```text
+source-mass allocation is underidentified;
+weak-center/tail robustness is unresolved;
+harmful source interactions may be the next bottleneck.
+```
+
 Current rejected or downgraded directions:
 
 - strict D1 K16 as primary: ineligible fixed K4 component fits
 - D1.3/D1.3.1 support-NELBO as final selector: controls too competitive
 - D1.4 reliability-only sparse top3: diagnostic-only, controls competitive
 - D1.5 source-inner transfer drop-one: fail
+- component-union shrink025/shrink050 as source-reliability proof: controls
+  remain competitive
+- source-inner dense/component binary gate: fails and underuses component union
+- support8 calibrated component-union prior: shuffled-support/random mass
+  controls are competitive
+- dense reliability tail shield: high mean but fails center3/worst-cell repair
 - K24 source-union GMM: weaker than K16 and component undersampled
 - metadata-only routing: baseline/proxy, not current winner
 
@@ -421,6 +562,18 @@ improve dense generated-embedding aggregation over equal all-source aggregation
 under paired generation and prediction invariants.
 ```
 
+```text
+Component-union/random mass-bag generated-embedding composition can approach
+or exceed the centralized K16 diagnostic region in mean BACC, but this is
+evidence of composition capacity and source-mass underidentification, not a
+validated compatibility estimator.
+```
+
+```text
+Fixed source-only robustness aggregation can improve some tail metrics, but the
+latest dense-tailshield artifact did not solve center3 or worst-cell failure.
+```
+
 Not supported by current evidence:
 
 ```text
@@ -443,9 +596,19 @@ The thesis has a full PASS decentralized generated-embedding routing method.
 Formal privacy preservation.
 ```
 
+```text
+Random mass-bag control performance proves a meaningful routing signal.
+```
+
+```text
+Unlabeled support-NELBO calibration is currently a validated target-support
+mass allocator for component union.
+```
+
 ## Current Next Sequence
 
-1. Do not extend D1.5 source-inner transfer directly.
+1. Do not extend D1.5 source-inner transfer directly as a top-k/drop-one
+   selector.
 
 2. The paired dense all4 reliability confirmation has implemented the required
    paired generation/prediction invariant audit:
@@ -465,13 +628,18 @@ Formal privacy preservation.
    source-union K16 as fixed baselines. Do not compare against historical
    full-target rows when support/eval subsets differ.
 
-5. Treat the paired dense all4 reliability result as the generated-embedding
-   dense aggregation success. Treat support-NELBO and source-inner transfer as
-   negative or diagnostic until they beat matched controls under the same paired
-   invariant discipline.
+5. Treat the paired dense all4 reliability result as the clean
+   generated-embedding dense aggregation success. Treat component-union/random
+   mass-bag rows as high-mean diagnostic surfaces unless they beat matched
+   random/shuffled controls and repair weak-center/tail failures.
 
 6. Keep centralized source-union K16 as a CVAE prior-preservation diagnostic
    upper bound only.
+
+7. Current active run: source-inner harmful-source suppression over random
+   mass-bag component union. This tests whether source-inner leave-one-source
+   effects can identify source poisoning before target evaluation. Final result
+   TODO: verify after reports/tables/manifests are synced.
 
 ## Missing Artifacts / TODOs
 
@@ -484,3 +652,9 @@ Formal privacy preservation.
   table is used in thesis writing.
 - TODO: verify C6.3 numerical synthesis against raw/synced decision artifacts
   before using it as a final thesis result table.
+- TODO: sync and validate final
+  `virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1`
+  reports/tables/manifests after the OOM-safe rerun completes.
+- TODO: if harmful-source suppression fails, document whether the failure is
+  source-inner signal non-transfer, insufficient harmfulness precision, or a
+  need for target-regime information.

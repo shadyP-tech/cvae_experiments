@@ -10,7 +10,10 @@ Summarize the role of CVAEs as source-domain generative experts.
 - CVAE experts should be judged by downstream utility preservation, not only reconstruction.
 - A strong real-feature classifier result does not prove that a CVAE can model the feature space without utility loss.
 - The latest Virchow2 CVAE artifacts show that latent prior sampling and
-  decentralized composition are the main generated-embedding bottlenecks.
+  decentralized composition are key generated-embedding bottlenecks.
+- The newest component-union audits show that mean utility can be high, so the
+  active bottleneck is source-mass underidentification and weak-center/tail
+  robustness rather than CVAE capacity alone.
 
 ## Evidence / Source Artifacts
 
@@ -22,6 +25,7 @@ Summarize the role of CVAEs as source-domain generative experts.
 - `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_source_union_gmm_prior_v1/tables/gmm_prior_gap_summary.csv`
 - `/Users/stephpark/Documents/Master/Thesis/cvae_experiments/cvae_rebuild/artifacts/virchow2_cvae_decentralized_reliability_weighted_gmm_prior_v1/tables/decentralized_reliability_summary.csv`
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/reports/decision_summary.md`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_mass_bagged_v1/reports/decision_summary.md`
 
 ## Interpretation
 
@@ -34,14 +38,16 @@ decode(mu) / source-pool capacity can be useful
 standard prior sampling is weak
 source-union K16 GMM is a strong centralized diagnostic
 paired dense all4 reliability weighting improves dense aggregation
+component-union/random mass-bagging reaches high mean BACC but controls are competitive
 ```
 
 ## Implication For Thesis
 
 The thesis should frame Virchow2 CVAE work as utility-preservation and
 composition evidence. Current results justify discussing prior/composition
-bottlenecks and a dense aggregation win, but not claiming a solved
-target-conditioned router or sparse expert selector.
+bottlenecks, a dense aggregation win, and source-mass underidentification, but
+not claiming a solved target-conditioned router, sparse expert selector, or
+meaningful random-mass compatibility rule.
 
 ## Limitations
 

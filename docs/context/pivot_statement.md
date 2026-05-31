@@ -18,4 +18,11 @@ under paired generation and prediction invariants. This is a dense all-source
 aggregation result, not sparse expert selection; support-NELBO and source-inner
 transfer remain diagnostic or negative.
 
+The newest component-union audits add a third refinement: generated-embedding
+mean utility can be high under source-local component composition and random
+mass-bagging, but source-mass allocation is underidentified because matched
+controls are competitive. The active generated-embedding bottleneck is now
+weak-center/tail robustness and harmful source interaction, not another
+mean-BACC-only allocator.
+
 Fast-changing result details belong in [current_experimental_state.md](current_experimental_state.md). Stable framing belongs in [thesis_project_context.md](thesis_project_context.md).

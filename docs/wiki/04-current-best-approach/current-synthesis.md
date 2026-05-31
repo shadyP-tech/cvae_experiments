@@ -16,9 +16,14 @@ generated-embedding Virchow2 CVAE D-series surface.
   Virchow2 feature quality alone.
 - The active current method is SAIL: Source-only Aggregation via Inner-domain Leaveout.
 - The strongest generated-embedding diagnostic is centralized source-union K16.
-- The strongest decentralized generated-embedding dense aggregation result is
+- The cleanest decentralized generated-embedding dense aggregation result is
   the paired dense all4 heldout-excluded reliability confirmation.
-- Support-NELBO and source-inner transfer are not validated final selectors.
+- Component-union/random mass-bag rows now provide the strongest high-mean
+  generated-embedding surface, but not an adopted compatibility method.
+- Support-NELBO, source-inner transfer, and point source-mass reliability
+  calibration are not validated final selectors.
+- The current generated-embedding bottleneck is weak-center/tail robustness and
+  harmful source interaction.
 
 ## Evidence / Source Artifacts
 
@@ -34,6 +39,9 @@ generated-embedding Virchow2 CVAE D-series surface.
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/tables/paired_dense_all4_summary.csv`
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/tables/paired_delta_summary.csv`
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/tables/paired_generation_invariant_audit.csv`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_mass_bagged_v1/reports/decision_summary.md`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_support8_calibrated_component_union_prior_v1/reports/decision_summary.md`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1/reports/decision_summary.md`
 
 ## Interpretation
 
@@ -67,6 +75,8 @@ vanilla prior failed
 -> source-union K16 GMM diagnosed the prior bottleneck
 -> decentralized reliability-weighted summaries partially preserved utility
 -> paired dense all4 reliability weighting passed as dense aggregation
+-> component-union/random mass-bagging reached high mean utility but exposed
+   source-mass underidentification and weak-tail failures
 ```
 
 Key verified generated-embedding numbers:
@@ -79,6 +89,10 @@ Key verified generated-embedding numbers:
 | D1.3 support-NELBO x reliability | 0.8495 | partial; controls/stability limit claim |
 | D1.5 source-inner transfer | 0.8354 | fail; shuffled-score control beats primary |
 | paired dense all4 reliability weighted | 0.8506 | dense aggregation PASS; not sparse routing |
+| component-union shrink025 v2 | 0.8892 | high utility but fail; matched null/control/source-ablation issues |
+| mass-uncertainty bagged component union | 0.8903 | high utility but fail; random mass-bag control competitive |
+| support8 calibrated component union | 0.8727 | fail; shuffled-support and random mass-bag controls competitive |
+| dense reliability tail shield | 0.8988 | fail; high mean but center3/worst-cell failure remains |
 
 ## Implication For Thesis
 
@@ -92,9 +106,10 @@ D-series:
   generated-embedding CVAE preservation and decentralized composition evidence
 ```
 
-The current generated-embedding evidence now supports a protocol-clean dense
-source-local reliability aggregation claim, not a final target-conditioned
-compatibility router or sparse expert selector.
+The current generated-embedding evidence supports a protocol-clean dense
+source-local reliability aggregation claim and a high-capacity component-union
+diagnostic surface. It does not yet support a final target-conditioned
+compatibility router, sparse expert selector, or clean source-mass allocator.
 
 ## Limitations
 
@@ -109,6 +124,11 @@ different generated feature hashes across method labels. The paired dense all4
 confirmation fixed this for dense all4 comparisons; future selector claims need
 the same method-invariant generation/prediction bundle discipline.
 
+The latest harmful-source suppression run is implemented but not yet a final
+result. User-provided run status indicates the first workstation attempt was
+OOM-killed after cache creation and is being rerun with memory constraints.
+TODO: verify against final artifact.
+
 ## Next Checks
 
 - Run or sync SAIL with `sail/configs/sail_virchow2.yaml`.
@@ -116,3 +136,8 @@ the same method-invariant generation/prediction bundle discipline.
 - Do not extend D1.5 directly.
 - Reuse paired generation-cache invariants before any further
   generated-embedding selector confirmation.
+- Treat component-union/random mass-bag as the high-mean diagnostic surface,
+  not as a final method unless controls are beaten and weak-tail failures are
+  repaired.
+- Validate source-inner harmful-source suppression once final reports are
+  synced.

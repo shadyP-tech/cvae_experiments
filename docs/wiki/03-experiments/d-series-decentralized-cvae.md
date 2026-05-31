@@ -17,6 +17,9 @@ raw-data-free summary exchange and expert aggregation.
   stability.
 - Paired dense all4 source-local reliability weighting is the strongest
   protocol-clean generated-embedding dense aggregation result.
+- Component-union and random mass-bag follow-ups reach higher mean BACC, but
+  are not adopted because matched controls, random mass, and weak-tail failures
+  remain unresolved.
 - Support-NELBO and source-inner transfer are not validated as final
   compatibility selectors because matched controls remain competitive or better.
 - The paired dense all4 confirmation is not sparse routing: all non-target
@@ -42,6 +45,11 @@ Primary files:
 - `virchow2_cvae_decentralized_support8_top3_tau05_gmm_prior_v1/tables/decentralized_support8_top3_tau05_summary.csv`
 - `virchow2_cvae_decentralized_reliability_top3_gmm_prior_v1/tables/decentralized_reliability_top3_summary.csv`
 - `virchow2_cvae_decentralized_source_inner_transfer_top3_gmm_prior_v1/tables/decentralized_source_inner_transfer_summary.csv`
+- `virchow2_cvae_decentralized_component_union_reliability_shrink025_v2/reports/decision_summary.md`
+- `virchow2_cvae_decentralized_component_union_mass_bagged_v1/reports/decision_summary.md`
+- `virchow2_cvae_decentralized_component_union_reliability_shrink050_confirmation_v1/reports/decision_summary.md`
+- `virchow2_cvae_support8_calibrated_component_union_prior_v1/reports/decision_summary.md`
+- `virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1/reports/decision_summary.md`
 
 Verified local paired confirmation artifacts:
 
@@ -68,6 +76,10 @@ All listed D-series leakage reports inspected in the current update reported
 | D1.4 reliability top3 | `decentralized_reliability_top3_geom_confirmation` | `D1_4_DIAGNOSTIC_ONLY` | 0.8212 | 0.7529 | 0.0498 | sparse reliability selection not adopted |
 | D1.5 source-inner transfer top3 | `decentralized_source_inner_transfer_top3_geom_confirmation` | `D1_5_FAIL` | 0.8354 | 0.7092 | 0.0015 | negative evidence for source-inner drop-one selection |
 | Paired dense all4 reliability confirmation | `paired_reliability_all4_weighted_geom` | `PAIRED_DENSE_ALL4_RELIABILITY_PASS` | 0.8506 | 0.8173 | 0.0308 | dense aggregation PASS; not sparse routing |
+| Component-union shrink025 v2 | `decentralized_component_union_reliability_shrink025` | `COMPONENT_UNION_FAIL` | 0.8892 | 0.8168 | 0.0501 | high mean, but matched null/control/source-ablation failures |
+| Mass-bagged component union | `decentralized_component_union_mass_uncertainty_bagged_v1` | `MASS_BAGGED_COMPONENT_UNION_FAIL` | 0.8903 | 0.7931 | 0.0568 | high mean, but random mass-bag control competitive |
+| Support8 calibrated component union | `support8_calibrated_component_union_softmax_shrink050` | `SUPPORT_CALIBRATED_COMPONENT_UNION_FAIL` | 0.8727 | 0.7886 | 0.0369 | target-support calibration fails matched support/random controls |
+| Dense reliability tail shield | `dense_reliability_tailshield_random_mass_bag_blend25_75` | `DENSE_TAILSHIELD_RANDOM_MASS_BAG_FAIL` | 0.8988 | 0.7896 | 0.0403 | high mean, but center3/worst-cell failure remains |
 
 ## Source-Union Diagnostic Context
 
@@ -183,6 +195,30 @@ Interpretation:
 Source-inner off-diagonal transfer, as implemented, does not identify the
 correct drop-one source subset for heldout target utility.
 
+Component-union and mass-allocation follow-ups:
+
+- Component-union shrink025 v2 reached 0.8892 mean BACC and 0.9948 retention
+  vs source-union K16, but failed because matched shuffled reliability,
+  negative controls, and source-ablation dominance remained problematic.
+- Mass-uncertainty bagged component union reached 0.8903 mean BACC and 0.9960
+  retention vs source-union K16, but its delta vs random mass-bag control was
+  -0.0016.
+- Reliability shrink050 confirmation reached 0.8800 mean BACC but had verdict
+  `ANCHOR_MISMATCH` and failed matched-null/random-mass separation.
+- Support8 calibrated component union reached 0.8727 mean BACC, but was below
+  shrink050 and random mass-bag and did not clear the shuffled-support null.
+- Dense reliability tail shield reached 0.8988 mean BACC and improved bottom20
+  vs random mass-bag by +0.0244, but failed because center3 stayed at 0.7896
+  and worst seed-center BACC remained 0.4971.
+
+Interpretation:
+
+```text
+component-level composition has high generated-embedding capacity,
+but source-mass allocation remains underidentified and weak-tail robustness is
+not solved by reliability, support-NELBO, or fixed probability blending.
+```
+
 ## Scientific Audit Notes
 
 D1.5 surfaced two implementation/scientific audit issues:
@@ -211,12 +247,24 @@ generated-embedding aggregation over equal all-source aggregation under paired
 generation and prediction invariants.
 ```
 
+The component-union follow-ups add a second, diagnostic claim:
+
+```text
+source-local component union can approach centralized source-union K16 mean
+utility, but current mass-allocation signals are not clean enough to be adopted
+as compatibility estimators.
+```
+
 ## Limitations
 
 - D1.2 is partial evidence; the paired dense all4 confirmation is the stronger
   dense aggregation result.
 - D1.3/D1.3.1 are not validated support-NELBO routing wins.
 - D1.5 remains negative evidence for source-inner sparse selection.
+- Component-union/random mass-bag rows are high-mean diagnostic surfaces, not
+  final routing methods.
+- Support8 component-union calibration used target support and still failed
+  matched shuffled-support controls.
 - The paired dense all4 confirmation has 14 eligible seed-center cells because
   seed 43 / heldout center 2 was excluded as mono-class target evaluation.
 - Source-union K16 remains centralized and diagnostic.
@@ -230,4 +278,6 @@ generation and prediction invariants.
   generated-embedding baselines.
 - Treat support-NELBO and source-inner transfer as diagnostic/negative until
   they beat matched controls.
+- Treat random mass-bag as a strong control with little mean-BACC headroom.
+- Validate harmful-source suppression once final artifacts are synced.
 - Repair D1.5 drop-rank fields if the source-drop tables are reused.

@@ -1,0 +1,27 @@
+{
+  "output": "/Users/stephpark/Documents/Master/Thesis/cvae_experiments/presentations/paired_dense_all4_method_flowchart/paired_dense_all4_method_flowchart_slide.pptx",
+  "outputBytes": 17053,
+  "slideCount": 1,
+  "slideSize": {
+    "width": 1024,
+    "height": 768
+  },
+  "previewDir": "/Users/stephpark/Documents/Master/Thesis/cvae_experiments/outputs/manual-20260531-paired-dense-flowchart/presentations/paired-dense-all4-flowchart/preview",
+  "previewPaths": [
+    "/Users/stephpark/Documents/Master/Thesis/cvae_experiments/outputs/manual-20260531-paired-dense-flowchart/presentations/paired-dense-all4-flowchart/preview/slide-01.png"
+  ],
+  "layoutDir": "/Users/stephpark/Documents/Master/Thesis/cvae_experiments/outputs/manual-20260531-paired-dense-flowchart/presentations/paired-dense-all4-flowchart/layout/final",
+  "layoutResults": [
+    {
+      "layoutPath": "/Users/stephpark/Documents/Master/Thesis/cvae_experiments/outputs/manual-20260531-paired-dense-flowchart/presentations/paired-dense-all4-flowchart/layout/final/slide-01.layout.json"
+    }
+  ],
+  "slides": [
+    {
+      "index": 1,
+      "requestedSlideNumber": 1,
+      "modulePath": "/Users/stephpark/Documents/Master/Thesis/cvae_experiments/outputs/manual-20260531-paired-dense-flowchart/presentations/paired-dense-all4-flowchart/slides/slide-01.mjs",
+      "exportName": "slide01"
+    }
+  ]
+}
