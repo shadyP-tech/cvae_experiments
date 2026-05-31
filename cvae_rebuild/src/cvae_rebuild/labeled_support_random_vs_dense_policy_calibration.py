@@ -438,8 +438,23 @@ def run_labeled_support_policy_calibration(
                     )
                     split_rows.extend(_split_manifest_rows(splits, experiment_seed, support_seed, "target"))
                     split_by_key = {(split.support_size, split.eval_mode): split for split in splits}
-                    primary_split = split_by_key[(cfg.primary_labeled_support_size, "primary_style")]
-                    support32_split = split_by_key[(32, "primary_style")]
+                    for requested_size in split_sizes:
+                        if (requested_size, "primary_style") not in split_by_key:
+                            eligibility_rows.append(
+                                _eligibility_row(
+                                    experiment_seed,
+                                    heldout_center,
+                                    support_seed,
+                                    f"labeled_support{requested_size}_split",
+                                    "ineligible",
+                                    f"insufficient_class_balanced_target_samples_for_support{requested_size}_with_disjoint_eval",
+                                )
+                            )
+                    primary_split = split_by_key.get((cfg.primary_labeled_support_size, "primary_style"))
+                    if primary_split is None:
+                        matrix_rows.append(_empty_policy_row(cfg, experiment_seed, heldout_center, support_seed, candidates, cfg.primary_method, "primary_support16_split_ineligible"))
+                        eligibility_rows.append(_eligibility_row(experiment_seed, heldout_center, support_seed, cfg.primary_method, "ineligible", "primary_support16_split_ineligible"))
+                        continue
                     su_ref = d1._reference_for_cell(source_union_refs, experiment_seed, heldout_center, support_seed)
                     cb_ref = d1._reference_for_cell(center_balanced_refs, experiment_seed, heldout_center, support_seed)
 
@@ -448,7 +463,9 @@ def run_labeled_support_policy_calibration(
                     support_scores_by_size: dict[int, dict[str, float]] = {}
 
                     for support_size in split_sizes:
-                        eval_split = split_by_key[(support_size, "primary_style")]
+                        eval_split = split_by_key.get((support_size, "primary_style"))
+                        if eval_split is None:
+                            continue
                         eval_raw, eval_meta = select_rows(test_cache.embeddings, test_cache.metadata, eval_split.eval_indices)
                         eval_labels = tuple(_label(row) for row in eval_meta)
                         eval_ids = tuple(_sample_id(row, idx) for idx, row in zip(eval_split.eval_indices, eval_meta))
@@ -542,7 +559,9 @@ def run_labeled_support_policy_calibration(
                             )
 
                     for support_size in split_sizes:
-                        split = split_by_key[(support_size, "primary_style")]
+                        split = split_by_key.get((support_size, "primary_style"))
+                        if split is None:
+                            continue
                         support_raw, support_meta = select_rows(test_cache.embeddings, test_cache.metadata, split.support_indices)
                         support_labels = tuple(_label(row) for row in support_meta)
                         support_ids = tuple(_sample_id(test_cache.metadata[idx], idx) for idx in split.support_indices)
@@ -751,33 +770,41 @@ def nested_labeled_support_eval_splits(
 ) -> tuple[LabeledNestedSupportEvalSplit, ...]:
     if max_support_size % 2 != 0:
         raise ProtocolError("max_support_size must be class-balanced and even.")
+    requested_sizes = tuple(sorted({int(value) for value in support_sizes}))
     target_by_label: dict[int, list[int]] = {0: [], 1: []}
     for idx, row in enumerate(metadata):
         if _row_center(row, center_key=center_key) == str(heldout_center):
             label = int(row[label_key])
             if label in target_by_label:
                 target_by_label[label].append(idx)
-    per_class_max = max_support_size // 2
-    if min(len(values) for values in target_by_label.values()) <= per_class_max:
-        raise ProtocolError(f"Need more than {per_class_max} target samples per class for labeled support32 split.")
+    min_class_count = min(len(values) for values in target_by_label.values())
+    feasible_sizes = tuple(size for size in requested_sizes if size % 2 == 0 and min_class_count > (size // 2))
+    if not feasible_sizes:
+        smallest = min(requested_sizes) if requested_sizes else max_support_size
+        raise ProtocolError(f"Need more than {smallest // 2} target samples per class for labeled support split.")
+    parent_size = max_support_size if max_support_size in feasible_sizes else max(feasible_sizes)
+    per_class_parent = parent_size // 2
     rng = random.Random(int(support_seed))
     parent_by_label: dict[int, tuple[int, ...]] = {}
     for label, values in target_by_label.items():
         shuffled = list(values)
         rng.shuffle(shuffled)
-        parent_by_label[label] = tuple(shuffled[:per_class_max])
+        parent_by_label[label] = tuple(shuffled[:per_class_parent])
     parent_support = tuple(sorted(parent_by_label[0] + parent_by_label[1]))
     target_indices = tuple(sorted(target_by_label[0] + target_by_label[1]))
     parent_eval = tuple(idx for idx in target_indices if idx not in set(parent_support))
-    parent_id = f"target{heldout_center}_seed{support_seed}_nested_labeled_k{max_support_size}"
+    parent_id = f"target{heldout_center}_seed{support_seed}_nested_labeled_k{parent_size}"
     out: list[LabeledNestedSupportEvalSplit] = []
-    for support_size in support_sizes:
-        if support_size % 2 != 0:
-            raise ProtocolError("Labeled support sizes must be even.")
+    for support_size in requested_sizes:
+        if support_size not in feasible_sizes:
+            continue
         per_class = int(support_size) // 2
         support = tuple(sorted(parent_by_label[0][:per_class] + parent_by_label[1][:per_class]))
         primary_eval = tuple(idx for idx in target_indices if idx not in set(support))
-        for eval_mode, eval_indices in (("primary_style", primary_eval), ("fixed_support32", parent_eval)):
+        eval_modes: list[tuple[str, tuple[int, ...]]] = [("primary_style", primary_eval)]
+        if max_support_size in feasible_sizes:
+            eval_modes.append(("fixed_support32", parent_eval))
+        for eval_mode, eval_indices in eval_modes:
             support_ids = tuple(_sample_id(metadata[idx], idx, sample_id_key=sample_id_key) for idx in support)
             eval_ids = tuple(_sample_id(metadata[idx], idx, sample_id_key=sample_id_key) for idx in eval_indices)
             assert_support_eval_disjoint(support_ids, eval_ids)
