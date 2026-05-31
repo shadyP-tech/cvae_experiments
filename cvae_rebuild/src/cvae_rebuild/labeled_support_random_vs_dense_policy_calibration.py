@@ -429,13 +429,33 @@ def run_labeled_support_policy_calibration(
                     print(f"[labeled_support] cell_start seed={experiment_seed} heldout={heldout_center} support_seed={support_seed}", flush=True)
                     rels = {source: reliability[(int(experiment_seed), int(support_seed), str(source))] for source in candidates}
                     split_sizes = (8, 16, 32)
-                    splits = nested_labeled_support_eval_splits(
-                        test_cache.metadata,
-                        heldout_center=str(heldout_center),
-                        support_seed=int(support_seed),
-                        support_sizes=split_sizes,
-                        max_support_size=cfg.nested_support_max_size,
-                    )
+                    try:
+                        splits = nested_labeled_support_eval_splits(
+                            test_cache.metadata,
+                            heldout_center=str(heldout_center),
+                            support_seed=int(support_seed),
+                            support_sizes=split_sizes,
+                            max_support_size=cfg.nested_support_max_size,
+                        )
+                    except ProtocolError as exc:
+                        message = f"labeled_support_split_ineligible:{exc}"
+                        matrix_rows.append(_empty_policy_row(cfg, experiment_seed, heldout_center, support_seed, candidates, cfg.primary_method, message))
+                        for requested_size in split_sizes:
+                            eligibility_rows.append(
+                                _eligibility_row(
+                                    experiment_seed,
+                                    heldout_center,
+                                    support_seed,
+                                    f"labeled_support{requested_size}_split",
+                                    "ineligible",
+                                    message,
+                                )
+                            )
+                        print(
+                            f"[labeled_support] cell_ineligible seed={experiment_seed} heldout={heldout_center} support_seed={support_seed} reason={message}",
+                            flush=True,
+                        )
+                        continue
                     split_rows.extend(_split_manifest_rows(splits, experiment_seed, support_seed, "target"))
                     split_by_key = {(split.support_size, split.eval_mode): split for split in splits}
                     for requested_size in split_sizes:
@@ -670,19 +690,40 @@ def run_labeled_support_policy_calibration(
                     )
                     matrix_rows.append(_selected_policy_row(cfg, primary_policies, shuffled_decision["selected_policy"], experiment_seed, heldout_center, support_seed, candidates, su_ref, cb_ref, method=ROW_SHUFFLED_SUPPORT_LABEL_CONTROL, selection_source=DIAGNOSTIC_SELECTION, claim_role="negative_control_shuffled_support_label_switch", support_size=16, eval_mode="primary_style", decision=shuffled_decision))
 
-                    off_target_decision = _off_target_support_decision(
-                        cfg,
-                        root=root,
-                        test_cache=test_cache,
-                        per_source_runtime=per_source_runtime,
-                        dense_summaries=dense_summaries,
-                        gmm_summaries=gmm_summaries,
-                        candidates=candidates,
-                        rels=rels,
-                        experiment_seed=int(experiment_seed),
-                        real_heldout_center=str(heldout_center),
-                        support_seed=int(support_seed),
-                    )
+                    try:
+                        off_target_decision = _off_target_support_decision(
+                            cfg,
+                            root=root,
+                            test_cache=test_cache,
+                            per_source_runtime=per_source_runtime,
+                            dense_summaries=dense_summaries,
+                            gmm_summaries=gmm_summaries,
+                            candidates=candidates,
+                            rels=rels,
+                            experiment_seed=int(experiment_seed),
+                            real_heldout_center=str(heldout_center),
+                            support_seed=int(support_seed),
+                        )
+                    except ProtocolError as exc:
+                        off_target_decision = {
+                            "selected_policy": POLICY_RANDOM_BAG,
+                            "switch_to_dense": False,
+                            "random_support_bacc": math.nan,
+                            "dense_support_bacc": math.nan,
+                            "dense_minus_random_support_bacc": math.nan,
+                            "support_quantum": cfg.primary_switch_quantum,
+                            "selection_rule": f"off_target_labeled_support_control_ineligible:{exc}",
+                        }
+                        eligibility_rows.append(
+                            _eligibility_row(
+                                experiment_seed,
+                                heldout_center,
+                                support_seed,
+                                ROW_OFF_TARGET_SUPPORT_CONTROL,
+                                "ineligible_control_fallback_random",
+                                str(exc),
+                            )
+                        )
                     matrix_rows.append(_selected_policy_row(cfg, primary_policies, off_target_decision["selected_policy"], experiment_seed, heldout_center, support_seed, candidates, su_ref, cb_ref, method=ROW_OFF_TARGET_SUPPORT_CONTROL, selection_source=DIAGNOSTIC_SELECTION, claim_role="negative_control_off_target_labeled_support_switch", support_size=16, eval_mode="primary_style", decision=off_target_decision))
 
                     switch_event_rows.append(_switch_event_row(experiment_seed, heldout_center, support_seed, primary_scores, primary_decision, primary_policies))
