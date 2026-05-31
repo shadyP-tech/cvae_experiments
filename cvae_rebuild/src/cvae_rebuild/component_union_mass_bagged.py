@@ -1197,7 +1197,7 @@ def _evaluate_member(
     row["source_score_json"] = json.dumps(dict(weight_plan["scores"]), sort_keys=True)
     coverage = cu._component_coverage_row(row, component_counts, cu._expected_component_keys(sources, summaries, control_mode=control_mode))
     weak = cu._weak_row(row) if _float(row.get("bacc")) < 0.75 else None
-    nn = cu._nearest_neighbor_row(row, generated, source_train_raw)
+    nn = None if cu._skip_nearest_neighbor_audit(cfg) else cu._nearest_neighbor_row(row, generated, source_train_raw)
     paired_row = cu._paired_generation_row(row, generated_hash, _hash_strings(source_hashes), "ok")
     return MemberResult(row, coverage, paired_row, weak, nn, bundle, component_counts, generated_hash, str(paired_row["source_generation_hash"]))
 
@@ -1215,6 +1215,7 @@ def _sample_cached(
 ) -> tuple[object, tuple[int, ...], dict[int, dict[str, int]], object, list[str]]:
     key = _hash_strings([str(seed), cu._plan_hash(weight_plan), cu._summary_set_hash(summaries, sources, control_mode=control_mode), control_mode])
     path = root / "cache" / "generated" / f"{key}.npz"
+    skip_nn = cu._skip_nearest_neighbor_audit(cfg)
     if path.exists():
         data = np.load(path, allow_pickle=False)
         counts_raw = json.loads(str(data["component_counts_json"].item()))
@@ -1223,7 +1224,7 @@ def _sample_cached(
             data["generated"],
             tuple(int(v) for v in data["labels"].tolist()),
             counts,
-            data["source_train_raw"],
+            cu._empty_source_train_raw() if skip_nn else data["source_train_raw"],
             [str(v) for v in data["source_hashes"].tolist()],
         )
     generated, labels, component_counts, source_train_raw, source_hashes = cu._sample_gmm_component_union_raw(
@@ -1240,7 +1241,7 @@ def _sample_cached(
         path,
         generated=np.asarray(generated, dtype=np.float32),
         labels=np.asarray(labels, dtype=int),
-        source_train_raw=np.asarray(source_train_raw, dtype=np.float32),
+        source_train_raw=cu._empty_source_train_raw() if skip_nn else np.asarray(source_train_raw, dtype=np.float32),
         source_hashes=np.asarray(source_hashes),
         component_counts_json=np.asarray(json.dumps({str(cls): values for cls, values in component_counts.items()}, sort_keys=True)),
     )

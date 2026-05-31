@@ -107,6 +107,7 @@ class HarmfulSourceSuppressionConfig:
     classifier_max_iter: int
     classifier_class_weight: str
     classifier_seed: int | None
+    skip_nearest_neighbor_audit: bool
 
     @property
     def all_replicate_seeds(self) -> tuple[int, ...]:
@@ -144,6 +145,10 @@ def parse_harmful_source_suppression_config(
     generation = _mapping(data, "generation")
     suppression = _mapping(data, "harmful_source_suppression")
     classifier = _mapping(data, "classifier")
+    memory_raw = data.get("memory", {})
+    if not isinstance(memory_raw, Mapping):
+        raise ProtocolError("memory must be a mapping when provided.")
+    memory = memory_raw
     if "support_size" in run or "support_seeds" in run:
         raise ProtocolError("Harmful-source suppression v1 must not configure or consume target support rows.")
     cfg = HarmfulSourceSuppressionConfig(
@@ -199,6 +204,7 @@ def parse_harmful_source_suppression_config(
         classifier_max_iter=int(classifier["max_iter"]),
         classifier_class_weight=str(classifier["class_weight"]),
         classifier_seed=None if classifier.get("classifier_seed") is None else int(classifier["classifier_seed"]),
+        skip_nearest_neighbor_audit=bool(memory.get("skip_nearest_neighbor_audit", True)),
     )
     validate_harmful_source_suppression_config(cfg)
     return cfg
@@ -267,6 +273,8 @@ def validate_harmful_source_suppression_config(cfg: HarmfulSourceSuppressionConf
         raise ProtocolError("Classifier solver/C/max_iter must remain locked.")
     if cfg.classifier_class_weight != "balanced" or cfg.classifier_seed is not None:
         raise ProtocolError("Classifier must use class_weight=balanced and classifier_seed=null.")
+    if not cfg.skip_nearest_neighbor_audit:
+        raise ProtocolError("Harmful-source suppression v1 must skip nearest-neighbor audit for memory safety.")
 
 
 def run_harmful_source_suppression(
@@ -322,9 +330,16 @@ def run_harmful_source_suppression(
 
     repair_cfg = d1._repair_runtime_config(cfg, root)
     per_source_variant = _per_source_variant()
+    print(
+        f"[harmful_suppression] start artifact={root} seeds={list(cfg.experiment_seeds)} "
+        f"centers={list(cfg.heldout_centers)} reps={list(cfg.all_replicate_seeds)} "
+        f"skip_nearest_neighbor_audit={cfg.skip_nearest_neighbor_audit}",
+        flush=True,
+    )
 
     try:
         for experiment_seed in cfg.experiment_seeds:
+            print(f"[harmful_suppression] seed_start experiment_seed={experiment_seed}", flush=True)
             train_cache = load_feature_cache(_existing_cache_path(cfg.feature_cache_root, seed=experiment_seed, split="train"))
             test_cache = load_feature_cache(_existing_cache_path(cfg.feature_cache_root, seed=experiment_seed, split="test"))
             per_source_runtime: dict[str, RuntimeSource] = {}
@@ -334,6 +349,7 @@ def run_harmful_source_suppression(
             component_details: dict[tuple[str, int, int], dict[str, object]] = {}
 
             for source_center in cfg.heldout_centers:
+                print(f"[harmful_suppression] fit_source_summaries seed={experiment_seed} source={source_center}", flush=True)
                 source_data = _source_data_for_centers(train_cache, centers=(source_center,), experiment_seed=int(experiment_seed))
                 runtime_source = _runtime_source(
                     cfg,
@@ -402,6 +418,7 @@ def run_harmful_source_suppression(
                     reliability_rows.append(row)
 
             for heldout_center in cfg.heldout_centers:
+                print(f"[harmful_suppression] heldout_start seed={experiment_seed} heldout={heldout_center}", flush=True)
                 candidates = candidate_experts(cfg.heldout_centers, str(heldout_center))
                 try:
                     assert_candidate_pool(
@@ -431,6 +448,11 @@ def run_harmful_source_suppression(
                 harmfulness_summary_rows.extend(harm_rows)
                 suppression_rows.extend(_suppression_manifest_rows(cfg, experiment_seed, heldout_center, candidates, suppression_plan, signal))
                 signal_rows.extend(_source_inner_signal_rows(cfg, experiment_seed, heldout_center, candidates, suppression_plan, signal, gmm_summaries, reliability))
+                print(
+                    f"[harmful_suppression] suppression_plan seed={experiment_seed} heldout={heldout_center} "
+                    f"suppressed={sum(1 for row in suppression_plan['ranked'] if float(row['multiplier']) < 1.0)}",
+                    flush=True,
+                )
 
                 target_indices = _target_indices(test_cache.metadata, str(heldout_center))
                 eval_raw, eval_meta = select_rows(test_cache.embeddings, test_cache.metadata, target_indices)
@@ -438,6 +460,10 @@ def run_harmful_source_suppression(
                 eval_error = "mono_class_target_eval" if len(set(eval_labels)) < 2 else ""
 
                 for replicate_seed in cfg.all_replicate_seeds:
+                    print(
+                        f"[harmful_suppression] cell_start seed={experiment_seed} heldout={heldout_center} rep={replicate_seed}",
+                        flush=True,
+                    )
                     panel = _panel_for_replicate_seed(cfg, replicate_seed)
                     su_ref = d1._reference_for_cell(source_union_refs, experiment_seed, heldout_center, replicate_seed)
                     cb_ref = d1._reference_for_cell(center_balanced_refs, experiment_seed, heldout_center, replicate_seed)
@@ -725,6 +751,13 @@ def run_harmful_source_suppression(
                     )
                     matrix_rows.append(cu._reference_matrix_row(cfg, experiment_seed=int(experiment_seed), heldout_center=str(heldout_center), replicate_seed=int(replicate_seed), candidates=candidates, prior_method=cu.ROW_SOURCE_UNION_K16_REFERENCE, reference=su_ref))
                     matrix_rows.append(cu._reference_matrix_row(cfg, experiment_seed=int(experiment_seed), heldout_center=str(heldout_center), replicate_seed=int(replicate_seed), candidates=candidates, prior_method=cu.ROW_CENTER_BALANCED_K16_REFERENCE, reference=cb_ref))
+                    print(
+                        f"[harmful_suppression] cell_done seed={experiment_seed} heldout={heldout_center} rep={replicate_seed} "
+                        f"primary_bacc={_format_float(primary_bacc)}",
+                        flush=True,
+                    )
+                print(f"[harmful_suppression] heldout_done seed={experiment_seed} heldout={heldout_center}", flush=True)
+            print(f"[harmful_suppression] seed_done experiment_seed={experiment_seed}", flush=True)
     except ProtocolError as exc:
         protocol_violations.append(str(exc))
 
@@ -744,6 +777,11 @@ def run_harmful_source_suppression(
         bottom20_keys=bottom20_keys,
         suppression_rows=suppression_rows,
         alignment_rows=alignment_rows,
+    )
+    print(
+        f"[harmful_suppression] writing_artifacts matrix_rows={len(matrix_rows)} bag_member_rows={len(bag_member_rows)} "
+        f"source_inner_rows={len(source_inner_rows)}",
+        flush=True,
     )
     _write_artifacts(
         root,
@@ -774,6 +812,7 @@ def run_harmful_source_suppression(
         target_expert_excluded=target_expert_excluded,
         bottom20_keys=bottom20_keys,
     )
+    print(f"[harmful_suppression] done artifact={root}", flush=True)
     return root
 
 
@@ -1765,7 +1804,13 @@ def _write_artifacts(
     write_csv_rows(root / "tables" / "eligibility_audit.csv", eligibility_rows)
     write_csv_rows(root / "tables" / "source_summary_diagnostics.csv", source_summary_rows)
     write_csv_rows(root / "tables" / "weak_source_audit.csv", weak_rows)
-    write_csv_rows(root / "tables" / "nearest_neighbor_memorization_audit.csv", nn_rows)
+    if cfg.skip_nearest_neighbor_audit:
+        write_csv_rows(
+            root / "tables" / "nearest_neighbor_memorization_audit.csv",
+            [{"audit_skipped": True, "reason": "skip_nearest_neighbor_audit"}],
+        )
+    else:
+        write_csv_rows(root / "tables" / "nearest_neighbor_memorization_audit.csv", nn_rows)
     write_csv_rows(root / "tables" / "mass_bag_member_matrix.csv", bag_member_rows)
     write_csv_rows(root / "manifests" / "harmful_source_suppression_model_manifest.csv", model_manifest_rows)
     write_json(root / "reports" / "leakage_report.json", leakage.to_json_dict())
@@ -1787,6 +1832,8 @@ def _write_artifacts(
             "center3_definition": 'heldout_center == "3"',
             "target_ablation_alignment_audit_only": True,
             "target_ablation_alignment_cannot_change_thresholds_weights_adoption_or_selection": True,
+            "nearest_neighbor_memorization_audit_skipped": bool(cfg.skip_nearest_neighbor_audit),
+            "nearest_neighbor_memorization_audit_skip_reason": "memory_safety" if cfg.skip_nearest_neighbor_audit else "",
             "hard_exclusion_diagnostic_only": True,
             "suppression_rate_low": cfg.suppression_rate_low,
             "suppression_rate_high": cfg.suppression_rate_high,
@@ -1918,5 +1965,8 @@ def _resolved_config(cfg: HarmfulSourceSuppressionConfig) -> dict[str, object]:
             "max_iter": cfg.classifier_max_iter,
             "class_weight": cfg.classifier_class_weight,
             "classifier_seed": cfg.classifier_seed,
+        },
+        "memory": {
+            "skip_nearest_neighbor_audit": cfg.skip_nearest_neighbor_audit,
         },
     }

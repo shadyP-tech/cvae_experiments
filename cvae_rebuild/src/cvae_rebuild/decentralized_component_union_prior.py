@@ -78,6 +78,14 @@ PROTOCOL_WORDING = (
 )
 
 
+def _skip_nearest_neighbor_audit(cfg: object) -> bool:
+    return bool(getattr(cfg, "skip_nearest_neighbor_audit", False))
+
+
+def _empty_source_train_raw() -> np.ndarray:
+    return np.empty((0, 0), dtype=np.float32)
+
+
 @dataclass(frozen=True)
 class ComponentUnionConfig:
     name: str
@@ -1534,7 +1542,7 @@ def _evaluate_gmm_component_union(
     )
     coverage = _component_coverage_row(row, component_counts, _expected_component_keys(sources, summaries, control_mode=control_mode))
     weak = _weak_row(row) if _float(row["bacc"]) < 0.75 else None
-    nn = _nearest_neighbor_row(row, generated, source_train_raw)
+    nn = None if _skip_nearest_neighbor_audit(cfg) else _nearest_neighbor_row(row, generated, source_train_raw)
     paired = _paired_generation_row(row, generated_hash, _hash_strings(source_hashes), "ok")
     return row, coverage, weak, nn, paired
 
@@ -1752,7 +1760,7 @@ def _evaluate_prototype_union(
     )
     coverage = _component_coverage_row(row, component_counts, _expected_prototype_keys(sources, summaries))
     weak = _weak_row(row) if _float(row["bacc"]) < 0.75 else None
-    nn = _nearest_neighbor_row(row, generated, source_train_raw)
+    nn = None if _skip_nearest_neighbor_audit(cfg) else _nearest_neighbor_row(row, generated, source_train_raw)
     paired = _paired_generation_row(row, generated_hash, _hash_strings(source_hashes), "ok")
     return row, coverage, weak, nn, paired
 
@@ -1777,6 +1785,7 @@ def _sample_gmm_component_union_cached(
         ]
     )
     path = root / "cache" / "generated" / f"{key}.npz"
+    skip_nn = _skip_nearest_neighbor_audit(cfg)
     if path.exists():
         data = np.load(path, allow_pickle=False)
         counts_raw = json.loads(str(data["component_counts_json"].item()))
@@ -1785,7 +1794,7 @@ def _sample_gmm_component_union_cached(
             data["generated"],
             tuple(int(v) for v in data["labels"].tolist()),
             counts,
-            data["source_train_raw"],
+            _empty_source_train_raw() if skip_nn else data["source_train_raw"],
             [str(v) for v in data["source_hashes"].tolist()],
         )
     generated, labels, component_counts, source_train_raw, source_hashes = _sample_gmm_component_union_raw(
@@ -1802,7 +1811,7 @@ def _sample_gmm_component_union_cached(
         path,
         generated=np.asarray(generated, dtype=np.float32),
         labels=np.asarray(labels, dtype=int),
-        source_train_raw=np.asarray(source_train_raw, dtype=np.float32),
+        source_train_raw=_empty_source_train_raw() if skip_nn else np.asarray(source_train_raw, dtype=np.float32),
         source_hashes=np.asarray(source_hashes),
         component_counts_json=np.asarray(json.dumps({str(cls): values for cls, values in component_counts.items()}, sort_keys=True)),
     )
@@ -1868,10 +1877,12 @@ def _sample_gmm_component_union_raw(
     source_hashes: list[str] = []
     component_counts: dict[int, dict[str, int]] = {0: {}, 1: {}}
     budgets = {str(k): int(v) for k, v in dict(weight_plan["budgets"]).items()}
+    collect_nn_sources = not _skip_nearest_neighbor_audit(cfg)
     for source in sources:
         runtime = per_source_runtime[str(source)].runtime
-        source_train_raw = _inverse_to_raw(runtime, runtime.source_train_embeddings)
-        source_train_chunks.append(source_train_raw)
+        if collect_nn_sources:
+            source_train_raw = _inverse_to_raw(runtime, runtime.source_train_embeddings)
+            source_train_chunks.append(source_train_raw)
         for label_cls in (0, 1):
             summary_cls = 1 - int(label_cls) if control_mode == "class_flip" else int(label_cls)
             summary = summaries[(str(source), int(summary_cls))]
@@ -1885,7 +1896,8 @@ def _sample_gmm_component_union_raw(
                 component_counts[int(label_cls)][f"{source}:{component}"] = int(count)
         source_hashes.append(_hash_array(chunks[-2]))
         source_hashes.append(_hash_array(chunks[-1]))
-    return np.vstack(chunks), tuple(labels), component_counts, np.vstack(source_train_chunks), source_hashes
+    source_train_raw = np.vstack(source_train_chunks) if source_train_chunks else _empty_source_train_raw()
+    return np.vstack(chunks), tuple(labels), component_counts, source_train_raw, source_hashes
 
 
 def _sample_prototype_union_raw(
@@ -1904,10 +1916,12 @@ def _sample_prototype_union_raw(
     source_hashes: list[str] = []
     component_counts: dict[int, dict[str, int]] = {0: {}, 1: {}}
     budgets = {str(k): int(v) for k, v in dict(weight_plan["budgets"]).items()}
+    collect_nn_sources = not _skip_nearest_neighbor_audit(cfg)
     for source in sources:
         runtime = per_source_runtime[str(source)].runtime
-        source_train_raw = _inverse_to_raw(runtime, runtime.source_train_embeddings)
-        source_train_chunks.append(source_train_raw)
+        if collect_nn_sources:
+            source_train_raw = _inverse_to_raw(runtime, runtime.source_train_embeddings)
+            source_train_chunks.append(source_train_raw)
         for label_cls in (0, 1):
             summary = summaries[(str(source), int(label_cls))]
             budget = int(budgets[str(source)])
@@ -1920,7 +1934,8 @@ def _sample_prototype_union_raw(
                 component_counts[int(label_cls)][f"{source}:{component}"] = int(count)
         source_hashes.append(_hash_array(chunks[-2]))
         source_hashes.append(_hash_array(chunks[-1]))
-    return np.vstack(chunks), tuple(labels), component_counts, np.vstack(source_train_chunks), source_hashes
+    source_train_raw = np.vstack(source_train_chunks) if source_train_chunks else _empty_source_train_raw()
+    return np.vstack(chunks), tuple(labels), component_counts, source_train_raw, source_hashes
 
 
 def _sample_prototype_latents(
