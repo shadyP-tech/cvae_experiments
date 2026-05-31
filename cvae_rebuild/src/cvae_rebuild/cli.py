@@ -86,6 +86,10 @@ from .source_inner_harmful_source_suppression import (
     load_harmful_source_suppression_config,
     run_harmful_source_suppression,
 )
+from .target_support_regime_risk_gated_component_union import (
+    load_target_support_regime_risk_gate_config,
+    run_target_support_regime_risk_gated_component_union,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -292,7 +296,22 @@ def main(argv: list[str] | None = None) -> int:
     harmful_source_suppression.add_argument("--config", required=True)
     harmful_source_suppression.add_argument("--artifact-root", default=None)
 
+    target_support_risk_gate = sub.add_parser(
+        "diagnose-target-support-regime-risk-gated-component-union",
+        help="Run the target-support regime-risk gated component-policy audit.",
+    )
+    target_support_risk_gate.add_argument("--config", required=True)
+    target_support_risk_gate.add_argument("--artifact-root", default=None)
+
     args = parser.parse_args(argv)
+    if args.command == "diagnose-target-support-regime-risk-gated-component-union":
+        cfg = load_target_support_regime_risk_gate_config(args.config)
+        root = run_target_support_regime_risk_gated_component_union(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
     if args.command == "diagnose-source-inner-harmful-source-suppression-random-mass-bag":
         cfg = load_harmful_source_suppression_config(args.config)
         root = run_harmful_source_suppression(

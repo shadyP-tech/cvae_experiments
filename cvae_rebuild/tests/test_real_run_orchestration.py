@@ -69,6 +69,14 @@ from cvae_rebuild.source_inner_harmful_source_suppression import (
     parse_harmful_source_suppression_config,
     run_harmful_source_suppression,
 )
+from cvae_rebuild.target_support_regime_risk_gated_component_union import (
+    PRIMARY_RISK_GATED_METHOD,
+    ROW_ALWAYS_DENSE,
+    ROW_ALWAYS_RANDOM_BAG,
+    ROW_ALWAYS_SHRINK050,
+    parse_target_support_regime_risk_gate_config,
+    run_target_support_regime_risk_gated_component_union,
+)
 from cvae_rebuild.decentralized_pruned_adaptive_equal_all4_prior import (
     PRIMARY_PRUNED_EQUAL_ALL4_METHOD,
     ROW_UNPRUNED_FIXED_K4,
@@ -1686,6 +1694,81 @@ def test_support_calibrated_component_union_tiny_cache_writes_expected_artifacts
     assert "primary_vs_uniform_delta" in summary[0]
     assert "floor_binding_count" in summary[0]
     assert "target-support compatibility calibration audit" in report
+
+
+def test_target_support_regime_risk_gate_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_target_support_regime_risk_gate_payload(tmp_path)
+    cfg = parse_target_support_regime_risk_gate_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+
+    root = run_target_support_regime_risk_gated_component_union(cfg)
+
+    expected = [
+        "tables/risk_gated_downstream_matrix.csv",
+        "tables/risk_gated_summary.csv",
+        "tables/risk_gated_tail_metric_summary.csv",
+        "tables/support_eval_split_manifest.csv",
+        "tables/support_regime_feature_matrix.csv",
+        "tables/source_inner_gate_training_matrix.csv",
+        "tables/source_inner_lopo_gate_audit.csv",
+        "tables/risk_gate_feature_ablation_summary.csv",
+        "tables/risk_gate_threshold_sensitivity_audit.csv",
+        "tables/risk_gate_selection_manifest.csv",
+        "tables/candidate_policy_probability_manifest.csv",
+        "tables/random_bag_manifest.csv",
+        "tables/negative_control_summary.csv",
+        "tables/oracle_policy_gap_summary.csv",
+        "tables/risk_gate_target_oracle_audit.csv",
+        "tables/eligibility_audit.csv",
+        "tables/runtime_memory_audit.csv",
+        "tables/component_manifest.csv",
+        "tables/component_coverage_audit.csv",
+        "tables/paired_generation_audit.csv",
+        "manifests/protocol_manifest.json",
+        "manifests/risk_gate_model_manifest.csv",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "risk_gated_downstream_matrix.csv", newline="")))
+    features = list(csv.DictReader(open(root / "tables" / "support_regime_feature_matrix.csv", newline="")))
+    training = list(csv.DictReader(open(root / "tables" / "source_inner_gate_training_matrix.csv", newline="")))
+    lopo = list(csv.DictReader(open(root / "tables" / "source_inner_lopo_gate_audit.csv", newline="")))
+    selection = list(csv.DictReader(open(root / "tables" / "risk_gate_selection_manifest.csv", newline="")))
+    random_manifest = list(csv.DictReader(open(root / "tables" / "random_bag_manifest.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "risk_gated_summary.csv", newline="")))
+    threshold = list(csv.DictReader(open(root / "tables" / "risk_gate_threshold_sensitivity_audit.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert protocol["support_labels_used"] is False
+    assert protocol["target_eval_labels_for_scoring_only"] is True
+    assert protocol["target_expert_excluded"] is True
+    assert protocol["gate_training_pooling"] == "across_source_inner_support_seeds"
+    assert protocol["center_id_used_as_feature"] is False
+    assert protocol["threshold_sensitivity_diagnostic_only"] is True
+    assert any(row["prior_method"] == PRIMARY_RISK_GATED_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == ROW_ALWAYS_RANDOM_BAG for row in matrix)
+    assert any(row["prior_method"] == ROW_ALWAYS_SHRINK050 for row in matrix)
+    assert any(row["prior_method"] == ROW_ALWAYS_DENSE for row in matrix)
+    assert features and all(row["support_labels_used"] == "False" for row in features)
+    assert training and all(row.get("target_eval_labels_used", "False") in ("False", "0") for row in training if row["status"] == "ok")
+    assert lopo and "leave_one_pseudo_center_out_risk_auc" in lopo[0]
+    assert selection and "selected_policy" in selection[0]
+    assert random_manifest
+    assert "bag_seed" in random_manifest[0]
+    assert "mass_prior_hash" in random_manifest[0]
+    assert all(row["bag_seed"] for row in random_manifest)
+    assert all(row["latent_sample_seed"] for row in random_manifest)
+    assert threshold and all(row["diagnostic_only"] == "True" for row in threshold)
+    assert "selected_random_mass_bag_rate" in summary[0]
+    assert "LOPO gate verdict" in report
+    assert "Threshold-sensitivity rows are audit-only" in report
 
 
 def test_mass_bagged_component_union_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
@@ -3651,6 +3734,74 @@ def _tiny_support_calibrated_component_union_payload(tmp_path: Path):
             "prototype_candidate_counts_per_source_class": [4, 3, 2, 1],
             "prototype_min_samples_per_component": 12,
             "prototype_variance_floor": 1.0e-5,
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _tiny_target_support_regime_risk_gate_payload(tmp_path: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_target_support32_regime_risk_gated_component_union_v1",
+            "artifact_root": str(tmp_path / "virchow2_cvae_target_support32_regime_risk_gated_component_union_v1"),
+            "primary_variant": "pca64_beta001",
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
+            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
+            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "strict_full_run_matrix": False,
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2", "3", "4"],
+            "support_seeds": [17],
+            "support_size": 32,
+            "support_size_diagnostics": [8, 16],
+            "nested_support_max_size": 32,
+        },
+        "generation": {
+            "synthetic_per_class_total": 32,
+            "min_per_source_per_class": 2,
+        },
+        "target_support_regime_risk_gate": {
+            "primary_method": "target_support32_regime_risk_gated_random_bag_tail_safe_policy_v1",
+            "candidate_components_per_source_class": [4, 3, 2, 1],
+            "min_samples_per_component": 2,
+            "source_weighting": "target_support32_regime_risk_policy_gate",
+            "gmm_covariance_type": "diag",
+            "gmm_reg_covar": 1.0e-4,
+            "gmm_n_init": 1,
+            "gmm_max_iter": 100,
+            "min_component_weight": 0.02,
+            "variance_floor": 1.0e-5,
+            "variance_ceiling_multiplier": 16.0,
+            "primary_pooling": "policy_level_gate",
+            "reliability_floor_score": 0.05,
+            "reliability_epsilon": 1.0e-8,
+            "support_nelbo_tau": 1.0,
+            "random_mass_bag_size": 3,
+            "random_mass_bag_alpha": 4.0,
+            "risk_low_threshold": 0.60,
+            "risk_high_threshold": 0.75,
+            "threshold_sensitivity_pairs": [[0.50, 0.70], [0.60, 0.75], [0.70, 0.85]],
+            "min_gate_train_episodes": 8,
+            "tail_risk_bacc_threshold": 0.80,
+            "safer_policy_gain_threshold": 0.025,
+            "gate_c": 0.25,
+            "reconstruction_probability_tolerance": 1.0e-6,
+        },
+        "memory": {
+            "skip_nearest_neighbor_audit": True,
         },
         "classifier": {
             "type": "sklearn_logistic_regression",

@@ -29,6 +29,11 @@ from cvae_rebuild.source_inner_harmful_source_suppression import (
     load_harmful_source_suppression_config,
     parse_harmful_source_suppression_config,
 )
+from cvae_rebuild.target_support_regime_risk_gated_component_union import (
+    PRIMARY_RISK_GATED_METHOD,
+    load_target_support_regime_risk_gate_config,
+    parse_target_support_regime_risk_gate_config,
+)
 from cvae_rebuild.decentralized_pruned_adaptive_equal_all4_prior import load_pruned_adaptive_equal_all4_config
 from cvae_rebuild.decentralized_k16_gmm_prior import load_decentralized_k16_gmm_prior_config
 from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import (
@@ -382,6 +387,55 @@ def test_harmful_source_suppression_rejects_target_support_config() -> None:
 
     with pytest.raises(Exception, match="must not configure or consume target support"):
         parse_harmful_source_suppression_config(payload, base_dir=Path("."))
+
+
+def test_locked_target_support_regime_risk_gate_config_loads() -> None:
+    cfg = load_target_support_regime_risk_gate_config(
+        "cvae_rebuild/configs/virchow2_cvae_target_support32_regime_risk_gated_component_union_v1.yaml"
+    )
+    assert cfg.name == "virchow2_cvae_target_support32_regime_risk_gated_component_union_v1"
+    assert cfg.backbone == "virchow2"
+    assert cfg.primary_variant == "pca64_beta001"
+    assert cfg.primary_method == PRIMARY_RISK_GATED_METHOD
+    assert cfg.strict_full_run_matrix is True
+    assert cfg.experiment_seeds == (42, 43, 44)
+    assert cfg.heldout_centers == ("0", "1", "2", "3", "4")
+    assert cfg.support_seeds == (17, 23, 31)
+    assert cfg.support_size == 32
+    assert cfg.support_size_diagnostics == (8, 16)
+    assert cfg.random_mass_bag_size == 11
+    assert cfg.random_mass_bag_alpha == 4.0
+    assert cfg.risk_low_threshold == 0.60
+    assert cfg.risk_high_threshold == 0.75
+    assert cfg.gate_c == 0.25
+    assert cfg.skip_nearest_neighbor_audit is True
+
+
+def test_target_support_regime_risk_gate_rejects_changed_support_size() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_target_support32_regime_risk_gated_component_union_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["run_matrix"]["support_size"] = 16
+
+    with pytest.raises(Exception, match="support_size"):
+        parse_target_support_regime_risk_gate_config(payload, base_dir=Path("."))
+
+
+def test_target_support_regime_risk_gate_rejects_changed_thresholds() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_target_support32_regime_risk_gated_component_union_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["target_support_regime_risk_gate"]["risk_low_threshold"] = 0.5
+
+    with pytest.raises(Exception, match="risk_low_threshold"):
+        parse_target_support_regime_risk_gate_config(payload, base_dir=Path("."))
+
+
+def test_target_support_regime_risk_gate_rejects_enabled_nn_audit() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_target_support32_regime_risk_gated_component_union_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["memory"]["skip_nearest_neighbor_audit"] = False
+
+    with pytest.raises(Exception, match="skip nearest-neighbor audit"):
+        parse_target_support_regime_risk_gate_config(payload, base_dir=Path("."))
 
 
 def test_locked_source_inner_validated_dense_component_hybrid_config_loads() -> None:
