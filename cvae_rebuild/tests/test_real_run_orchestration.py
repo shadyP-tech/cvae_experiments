@@ -55,8 +55,14 @@ from cvae_rebuild.component_union_mass_bagged import (
     run_mass_bagged_component_union,
 )
 from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
+    MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD,
+    MULTIPANEL_POOLED_ANCHOR_METHOD,
+    MULTIPANEL_POOLED_RANDOM_BAG_METHOD,
+    PRIMARY_MULTIPANEL_TAILRISK_METHOD,
     PRIMARY_TAILRISK_METHOD,
+    parse_multipanel_tailrisk_component_union_config,
     parse_tailrisk_anchored_component_union_config,
+    run_multipanel_tailrisk_component_union,
     run_tailrisk_anchored_component_union,
 )
 from cvae_rebuild.dense_reliability_tailshield_random_mass_bag import (
@@ -1965,6 +1971,61 @@ def test_tailrisk_anchored_component_union_tiny_cache_writes_expected_artifacts(
     assert "bottom20_cell_mean_bacc" in summary[0]
     assert "center3_delta_vs_random_mass_bag" in summary[0]
     assert "source-only robustness aggregation audit" in report
+
+
+def test_multipanel_tailrisk_component_union_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_multipanel_tailrisk_component_union_payload(tmp_path)
+    cfg = parse_multipanel_tailrisk_component_union_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+    _write_tiny_prior_tailrisk_matrix(cfg.prior_tailrisk_artifact_root)
+
+    root = run_multipanel_tailrisk_component_union(cfg)
+
+    expected = [
+        "tables/multipanel_tailrisk_downstream_matrix.csv",
+        "tables/multipanel_tailrisk_summary.csv",
+        "tables/multipanel_tailrisk_failure_decomposition.csv",
+        "tables/multipanel_tailrisk_paired_deltas.csv",
+        "tables/multipanel_tailrisk_panel_disagreement.csv",
+        "tables/panel_ece_source_inner.csv",
+        "tables/panel_confidence_summary.csv",
+        "tables/multipanel_tailrisk_probability_invariants.csv",
+        "tables/multipanel_tailrisk_probability_blend_manifest.csv",
+        "tables/multipanel_tailrisk_seed_diagnostic_matrix.csv",
+        "manifests/protocol_manifest.json",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "multipanel_tailrisk_downstream_matrix.csv", newline="")))
+    seed_matrix = list(csv.DictReader(open(root / "tables" / "multipanel_tailrisk_seed_diagnostic_matrix.csv", newline="")))
+    blend = list(csv.DictReader(open(root / "tables" / "multipanel_tailrisk_probability_blend_manifest.csv", newline="")))
+    invariants = list(csv.DictReader(open(root / "tables" / "multipanel_tailrisk_probability_invariants.csv", newline="")))
+    deltas = list(csv.DictReader(open(root / "tables" / "multipanel_tailrisk_paired_deltas.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "multipanel_tailrisk_summary.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert protocol["target_support_used"] is False
+    assert protocol["target_eval_labels_for_scoring_only"] is True
+    assert protocol["panel_seeds_are_evaluation_replicates"] is False
+    assert protocol["primary_pooling_rule"] == "blend_per_seed_then_equal_probability_pool"
+    assert any(row["prior_method"] == PRIMARY_MULTIPANEL_TAILRISK_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == MULTIPANEL_POOLED_ANCHOR_METHOD for row in matrix)
+    assert any(row["prior_method"] == MULTIPANEL_POOLED_RANDOM_BAG_METHOD for row in matrix)
+    assert any(row["prior_method"] == MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD for row in matrix)
+    assert seed_matrix and all(row["selection_source"] == "diagnostic_only" for row in seed_matrix)
+    assert blend and any(row["aggregation_unit"] == "experiment_seed_x_heldout_center" for row in blend)
+    assert invariants and all(row["sample_id_alignment_pass"] == "True" for row in invariants)
+    assert invariants and all(row["probability_row_sum_pass"] == "True" for row in invariants)
+    assert deltas and all(row["comparison_cell_set"] == "intersection_v2_prior_tailrisk_canonical_random_shrink050" for row in deltas)
+    assert "n_intersection_cells" in summary[0]
+    assert "not a compatibility router" in report
 
 
 def test_dense_tailshield_random_mass_bag_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
@@ -4139,6 +4200,100 @@ def _tiny_tailrisk_anchored_component_union_payload(tmp_path: Path):
             "classifier_seed": None,
         },
     }
+
+
+def _tiny_multipanel_tailrisk_component_union_payload(tmp_path: Path):
+    return {
+        "experiment": {
+            "name": "virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1",
+            "artifact_root": str(tmp_path / "virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1"),
+            "primary_variant": "pca64_beta001",
+        },
+        "inputs": {
+            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
+            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
+            "paired_dense_artifact_root": str(tmp_path / "missing_paired_dense"),
+            "mass_bagged_artifact_root": str(tmp_path / "missing_mass_bagged"),
+            "shrink050_artifact_root": str(tmp_path / "missing_shrink050"),
+            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
+            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
+            "prior_tailrisk_artifact_root": str(tmp_path / "prior_tailrisk"),
+            "backbone": "virchow2",
+        },
+        "run_matrix": {
+            "strict_full_run_matrix": False,
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2", "3", "4"],
+            "replicate_seeds": [17, 23, 31],
+            "fresh_replicate_seeds": [101, 103, 107, 109, 113, 127],
+        },
+        "generation": {
+            "synthetic_per_class_total": 32,
+            "min_per_source_per_class": 2,
+        },
+        "tailrisk_multipanel_component_union": {
+            "primary_method": "component_union_tailrisk_multipanel_shrink050_random_mass_bag_blend050",
+            "primary_shrink_lambda": 0.5,
+            "random_mass_bag_size": 2,
+            "random_mass_bag_alpha": 4.0,
+            "blend_alpha": 0.5,
+            "matched_shuffled_reliability_null_permutations": 0,
+            "panel_seed_groups": {
+                "canonical": [17, 23, 31],
+                "fresh_a": [101, 103, 107],
+                "fresh_b": [109, 113, 127],
+            },
+            "candidate_components_per_source_class": [4, 3, 2, 1],
+            "min_samples_per_component": 2,
+            "source_weighting": "tailrisk_multipanel_shrink050_random_mass_bag_blend050",
+            "gmm_covariance_type": "diag",
+            "gmm_reg_covar": 1.0e-4,
+            "gmm_n_init": 1,
+            "gmm_max_iter": 100,
+            "min_component_weight": 0.02,
+            "variance_floor": 1.0e-5,
+            "variance_ceiling_multiplier": 16.0,
+            "primary_pooling": "seed_blend_then_equal_probability_pool",
+            "reliability_floor_score": 0.05,
+            "reliability_epsilon": 1.0e-8,
+            "anchor_repro_tolerance": 1.0e-4,
+            "primary_noninferiority_margin": 0.005,
+            "weak_pass_noninferiority_margin": 0.010,
+            "tailrisk_transfer_threshold": -0.010,
+        },
+        "classifier": {
+            "type": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+        },
+    }
+
+
+def _write_tiny_prior_tailrisk_matrix(root: Path | None) -> None:
+    assert root is not None
+    path = root / "tables" / "tailrisk_downstream_matrix.csv"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    centers = ["0", "1", "2", "3", "4"]
+    rows = []
+    for idx, center in enumerate(centers):
+        rows.append(
+            {
+                "experiment_seed": 42,
+                "heldout_center": center,
+                "replicate_seed": 17,
+                "prior_method": PRIMARY_TAILRISK_METHOD,
+                "status": "ok",
+                "bacc": 0.60 + 0.02 * idx,
+                "macro_f1": 0.60 + 0.02 * idx,
+            }
+        )
+    with path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def _tiny_dense_tailshield_random_mass_bag_payload(tmp_path: Path):

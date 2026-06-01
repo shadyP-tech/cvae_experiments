@@ -48,9 +48,24 @@ from . import paired_dense_all4_reliability_confirmation as paired
 TAILRISK_NAME = "virchow2_cvae_component_union_tailrisk_anchored_mass_bagged_v1"
 PRIMARY_TAILRISK_METHOD = "component_union_tailrisk_anchored_shrink050_random_mass_bag_blend050"
 TAILRISK_SOURCE_WEIGHTING = "tailrisk_anchored_shrink050_random_mass_bag_blend050"
+MULTIPANEL_TAILRISK_NAME = "virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1"
+PRIMARY_MULTIPANEL_TAILRISK_METHOD = "component_union_tailrisk_multipanel_shrink050_random_mass_bag_blend050"
+MULTIPANEL_SEED_BLEND_METHOD = "component_union_tailrisk_seed_shrink050_random_mass_bag_blend050"
+MULTIPANEL_POOLED_RANDOM_BAG_METHOD = "component_union_tailrisk_multipanel_pooled_random_mass_bag"
+MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD = "same_cell_single_random_mass_bag_canonical"
+MULTIPANEL_POOLED_ANCHOR_METHOD = "component_union_tailrisk_multipanel_pooled_shrink050"
+MULTIPANEL_SOURCE_WEIGHTING = "tailrisk_multipanel_shrink050_random_mass_bag_blend050"
 ANCHOR_METHOD = cu.ROW_COMPONENT_UNION_SHRINK050
 BAG_METHOD = cu.ROW_RANDOM_MASS_BAG_CONTROL
 MATCHED_SHUFFLED_TAILRISK_PREFIX = cu.MATCHED_SHUFFLED_RELIABILITY_SHRINK050_PREFIX
+MULTIPANEL_CANONICAL_PANEL = "canonical"
+MULTIPANEL_FRESH_A_PANEL = "fresh_a"
+MULTIPANEL_FRESH_B_PANEL = "fresh_b"
+MULTIPANEL_PANEL_SEEDS = (
+    (MULTIPANEL_CANONICAL_PANEL, (17, 23, 31)),
+    (MULTIPANEL_FRESH_A_PANEL, (101, 103, 107)),
+    (MULTIPANEL_FRESH_B_PANEL, (109, 113, 127)),
+)
 
 
 @dataclass(frozen=True)
@@ -116,6 +131,26 @@ class TailRiskAnchoredConfig:
     @property
     def composed_components_per_class_nominal(self) -> int:
         return self.max_local_gmm_components_per_source_class * (len(self.heldout_centers) - 1)
+
+
+@dataclass(frozen=True)
+class MultipanelTailRiskConfig(TailRiskAnchoredConfig):
+    prior_tailrisk_artifact_root: Path | None = None
+    panel_seed_groups: tuple[tuple[str, tuple[int, ...]], ...] = MULTIPANEL_PANEL_SEEDS
+    primary_noninferiority_margin: float = 0.005
+    weak_pass_noninferiority_margin: float = 0.010
+    tailrisk_transfer_threshold: float = -0.010
+
+    @property
+    def all_panel_seeds(self) -> tuple[int, ...]:
+        seeds: list[int] = []
+        for _panel, panel_seeds in self.panel_seed_groups:
+            seeds.extend(int(seed) for seed in panel_seeds)
+        return tuple(dict.fromkeys(seeds))
+
+    @property
+    def all_replicate_seeds(self) -> tuple[int, ...]:
+        return self.all_panel_seeds
 
 
 @dataclass(frozen=True)
@@ -275,6 +310,167 @@ def validate_tailrisk_anchored_component_union_config(cfg: TailRiskAnchoredConfi
         cfg.anchor_repro_tolerance,
     ) <= 0.0:
         raise ProtocolError("Tail-risk numeric floors/tolerances must be positive.")
+    if cfg.classifier_type != "sklearn_logistic_regression":
+        raise ProtocolError("classifier.type must be sklearn_logistic_regression.")
+    if cfg.classifier_solver != "lbfgs" or cfg.classifier_c != 1.0 or cfg.classifier_max_iter != 2000:
+        raise ProtocolError("Classifier solver/C/max_iter must remain locked.")
+    if cfg.classifier_class_weight != "balanced" or cfg.classifier_seed is not None:
+        raise ProtocolError("Classifier must use class_weight=balanced and classifier_seed=null.")
+
+
+def load_multipanel_tailrisk_component_union_config(path: str | Path) -> MultipanelTailRiskConfig:
+    source = Path(path).resolve()
+    data = _load_mapping(source)
+    base_dir = source.parents[2] if len(source.parents) >= 3 else source.parent
+    return parse_multipanel_tailrisk_component_union_config(data, base_dir=base_dir)
+
+
+def parse_multipanel_tailrisk_component_union_config(
+    data: Mapping[str, Any],
+    *,
+    base_dir: str | Path = ".",
+) -> MultipanelTailRiskConfig:
+    base = Path(base_dir)
+    experiment = _mapping(data, "experiment")
+    inputs = _mapping(data, "inputs")
+    run = _mapping(data, "run_matrix")
+    generation = _mapping(data, "generation")
+    multipanel = _mapping(data, "tailrisk_multipanel_component_union")
+    classifier = _mapping(data, "classifier")
+    panel_seed_groups = _parse_panel_seed_groups(multipanel.get("panel_seed_groups", {}))
+    if inputs.get("support_calibrated_artifact_root") not in (None, ""):
+        raise ProtocolError("support_calibrated_artifact_root is not allowed for source-only multipanel tail-risk v2.")
+    cfg = MultipanelTailRiskConfig(
+        name=str(experiment["name"]),
+        artifact_root=_path(base, str(experiment["artifact_root"])),
+        repair_artifact_root=_path(base, str(inputs["repair_artifact_root"])),
+        paired_dense_artifact_root=_optional_path(base, inputs.get("paired_dense_artifact_root")),
+        mass_bagged_artifact_root=_optional_path(base, inputs.get("mass_bagged_artifact_root")),
+        support_calibrated_artifact_root=None,
+        shrink050_artifact_root=_optional_path(base, inputs.get("shrink050_artifact_root")),
+        source_union_gmm_artifact_root=_optional_path(base, inputs.get("source_union_gmm_artifact_root")),
+        balanced_gmm_artifact_root=_optional_path(base, inputs.get("balanced_gmm_artifact_root")),
+        feature_cache_root=_path(base, str(inputs["feature_cache_root"])),
+        backbone=str(inputs.get("backbone", "")),
+        experiment_seeds=tuple(int(v) for v in run["experiment_seeds"]),
+        heldout_centers=tuple(str(v) for v in run["heldout_centers"]),
+        replicate_seeds=tuple(int(v) for v in run["replicate_seeds"]),
+        fresh_replicate_seeds=tuple(int(v) for v in run.get("fresh_replicate_seeds", ())),
+        strict_full_run_matrix=bool(run.get("strict_full_run_matrix", False)),
+        synthetic_per_class_total=int(generation["synthetic_per_class_total"]),
+        min_per_source_per_class=int(generation["min_per_source_per_class"]),
+        primary_variant=str(experiment["primary_variant"]),
+        primary_method=str(multipanel["primary_method"]),
+        random_mass_bag_size=int(multipanel["random_mass_bag_size"]),
+        random_mass_bag_alpha=float(multipanel["random_mass_bag_alpha"]),
+        blend_alpha=float(multipanel["blend_alpha"]),
+        primary_shrink_lambda=float(multipanel["primary_shrink_lambda"]),
+        matched_shuffled_reliability_null_permutations=int(multipanel.get("matched_shuffled_reliability_null_permutations", 0)),
+        candidate_components_per_source_class=tuple(int(v) for v in multipanel["candidate_components_per_source_class"]),
+        min_samples_per_component=int(multipanel["min_samples_per_component"]),
+        source_weighting=str(multipanel["source_weighting"]),
+        gmm_covariance_type=str(multipanel["gmm_covariance_type"]),
+        gmm_reg_covar=float(multipanel["gmm_reg_covar"]),
+        gmm_n_init=int(multipanel["gmm_n_init"]),
+        gmm_max_iter=int(multipanel["gmm_max_iter"]),
+        min_component_weight=float(multipanel["min_component_weight"]),
+        variance_floor=float(multipanel["variance_floor"]),
+        variance_ceiling_multiplier=float(multipanel["variance_ceiling_multiplier"]),
+        primary_pooling=str(multipanel["primary_pooling"]),
+        reliability_floor_score=float(multipanel["reliability_floor_score"]),
+        reliability_epsilon=float(multipanel["reliability_epsilon"]),
+        anchor_repro_tolerance=float(multipanel["anchor_repro_tolerance"]),
+        classifier_type=str(classifier["type"]),
+        classifier_solver=str(classifier["solver"]),
+        classifier_c=float(classifier["C"]),
+        classifier_max_iter=int(classifier["max_iter"]),
+        classifier_class_weight=str(classifier["class_weight"]),
+        classifier_seed=None if classifier.get("classifier_seed") is None else int(classifier["classifier_seed"]),
+        prior_tailrisk_artifact_root=_optional_path(base, inputs.get("prior_tailrisk_artifact_root")),
+        panel_seed_groups=panel_seed_groups,
+        primary_noninferiority_margin=float(multipanel.get("primary_noninferiority_margin", 0.005)),
+        weak_pass_noninferiority_margin=float(multipanel.get("weak_pass_noninferiority_margin", 0.010)),
+        tailrisk_transfer_threshold=float(multipanel.get("tailrisk_transfer_threshold", -0.010)),
+    )
+    validate_multipanel_tailrisk_component_union_config(cfg)
+    return cfg
+
+
+def _parse_panel_seed_groups(value: object) -> tuple[tuple[str, tuple[int, ...]], ...]:
+    if not isinstance(value, Mapping):
+        raise ProtocolError("panel_seed_groups must be a mapping of panel name to seed list.")
+    out = []
+    for name in (MULTIPANEL_CANONICAL_PANEL, MULTIPANEL_FRESH_A_PANEL, MULTIPANEL_FRESH_B_PANEL):
+        seeds = value.get(name)
+        if seeds is None:
+            raise ProtocolError(f"Missing panel_seed_groups.{name}.")
+        out.append((name, tuple(int(seed) for seed in seeds)))
+    return tuple(out)
+
+
+def validate_multipanel_tailrisk_component_union_config(cfg: MultipanelTailRiskConfig) -> None:
+    if cfg.name != MULTIPANEL_TAILRISK_NAME:
+        raise ProtocolError(f"Multipanel tail-risk experiment name must be {MULTIPANEL_TAILRISK_NAME!r}.")
+    if cfg.backbone != "virchow2":
+        raise ProtocolError("Multipanel tail-risk component union is locked to backbone=virchow2.")
+    if cfg.primary_variant != PRIMARY_VARIANT:
+        raise ProtocolError(f"primary_variant must be {PRIMARY_VARIANT!r}.")
+    if cfg.primary_method != PRIMARY_MULTIPANEL_TAILRISK_METHOD:
+        raise ProtocolError(f"primary_method must be {PRIMARY_MULTIPANEL_TAILRISK_METHOD!r}.")
+    if cfg.source_weighting != MULTIPANEL_SOURCE_WEIGHTING:
+        raise ProtocolError(f"source_weighting must be {MULTIPANEL_SOURCE_WEIGHTING!r}.")
+    if cfg.candidate_components_per_source_class != (4, 3, 2, 1):
+        raise ProtocolError("candidate_components_per_source_class must be locked to [4, 3, 2, 1].")
+    if len(cfg.heldout_centers) != 5:
+        raise ProtocolError("Multipanel tail-risk component union expects exactly five centers.")
+    if cfg.gmm_covariance_type != "diag":
+        raise ProtocolError("gmm_covariance_type must be diag.")
+    if cfg.primary_pooling != "seed_blend_then_equal_probability_pool":
+        raise ProtocolError("primary_pooling must be seed_blend_then_equal_probability_pool.")
+    if not math.isclose(cfg.primary_shrink_lambda, 0.5, rel_tol=0.0, abs_tol=1.0e-12):
+        raise ProtocolError("primary_shrink_lambda must be locked to 0.50.")
+    if not math.isclose(cfg.blend_alpha, 0.5, rel_tol=0.0, abs_tol=1.0e-12):
+        raise ProtocolError("blend_alpha must be locked to 0.50.")
+    if not math.isclose(cfg.random_mass_bag_alpha, 4.0, rel_tol=0.0, abs_tol=1.0e-12):
+        raise ProtocolError("random_mass_bag_alpha must be locked to Dirichlet-uniform alpha4.")
+    if cfg.random_mass_bag_size < 1:
+        raise ProtocolError("random_mass_bag_size must be positive.")
+    if cfg.matched_shuffled_reliability_null_permutations != 0:
+        raise ProtocolError("matched_shuffled_reliability_null_permutations must be 0 for v2; shuffled null is not part of this stabilization test.")
+    if cfg.replicate_seeds != cfg.panel_seed_groups[0][1]:
+        raise ProtocolError("run_matrix.replicate_seeds must equal the canonical panel seeds.")
+    expected_fresh = tuple(seed for _panel, seeds in cfg.panel_seed_groups[1:] for seed in seeds)
+    if cfg.fresh_replicate_seeds != expected_fresh:
+        raise ProtocolError("run_matrix.fresh_replicate_seeds must equal fresh_a + fresh_b panel seeds.")
+    if cfg.panel_seed_groups != MULTIPANEL_PANEL_SEEDS:
+        raise ProtocolError("panel_seed_groups must be locked to canonical/fresh_a/fresh_b predeclared seeds.")
+    if cfg.strict_full_run_matrix:
+        if cfg.experiment_seeds != (42, 43, 44):
+            raise ProtocolError("strict_full_run_matrix requires experiment_seeds=[42, 43, 44].")
+        if cfg.heldout_centers != ("0", "1", "2", "3", "4"):
+            raise ProtocolError("strict_full_run_matrix requires heldout_centers=['0', '1', '2', '3', '4'].")
+        if cfg.synthetic_per_class_total != 128:
+            raise ProtocolError("strict_full_run_matrix requires synthetic_per_class_total=128.")
+        if cfg.min_per_source_per_class != 8:
+            raise ProtocolError("strict_full_run_matrix requires min_per_source_per_class=8.")
+        if cfg.random_mass_bag_size != 11:
+            raise ProtocolError("strict_full_run_matrix requires random_mass_bag_size=11.")
+    if min(cfg.min_per_source_per_class, cfg.min_samples_per_component, cfg.gmm_n_init, cfg.gmm_max_iter) < 1:
+        raise ProtocolError("Component minimums and GMM iterations must be positive.")
+    if min(
+        cfg.gmm_reg_covar,
+        cfg.min_component_weight,
+        cfg.variance_floor,
+        cfg.variance_ceiling_multiplier,
+        cfg.reliability_floor_score,
+        cfg.reliability_epsilon,
+        cfg.anchor_repro_tolerance,
+        cfg.primary_noninferiority_margin,
+        cfg.weak_pass_noninferiority_margin,
+    ) <= 0.0:
+        raise ProtocolError("Multipanel numeric floors/tolerances must be positive.")
+    if cfg.tailrisk_transfer_threshold >= 0.0:
+        raise ProtocolError("tailrisk_transfer_threshold must be negative.")
     if cfg.classifier_type != "sklearn_logistic_regression":
         raise ProtocolError("classifier.type must be sklearn_logistic_regression.")
     if cfg.classifier_solver != "lbfgs" or cfg.classifier_c != 1.0 or cfg.classifier_max_iter != 2000:
@@ -696,6 +892,1284 @@ def run_tailrisk_anchored_component_union(
         target_expert_excluded=target_expert_excluded,
     )
     return root
+
+
+@dataclass(frozen=True)
+class _MultipanelSeedEvaluation:
+    seed: int
+    panel_group: str
+    evaluated: TailRiskEvaluation
+
+
+def run_multipanel_tailrisk_component_union(
+    cfg: MultipanelTailRiskConfig,
+    *,
+    artifact_root: str | Path | None = None,
+) -> Path:
+    root = prepare_artifact_dirs(Path(artifact_root) if artifact_root is not None else cfg.artifact_root)
+    (root / "checkpoints").mkdir(parents=True, exist_ok=True)
+    (root / "summaries").mkdir(parents=True, exist_ok=True)
+    (root / "dense_anchor_summaries").mkdir(parents=True, exist_ok=True)
+    (root / "cache" / "generated").mkdir(parents=True, exist_ok=True)
+    (root / "cache" / "predictions").mkdir(parents=True, exist_ok=True)
+
+    matrix_rows: list[dict[str, object]] = []
+    seed_diagnostic_rows: list[dict[str, object]] = []
+    source_weight_rows: list[dict[str, object]] = []
+    reliability_rows: list[dict[str, object]] = []
+    source_summary_rows: list[dict[str, object]] = []
+    component_manifest_rows: list[dict[str, object]] = []
+    component_coverage_rows: list[dict[str, object]] = []
+    paired_generation_rows: list[dict[str, object]] = []
+    eligibility_rows: list[dict[str, object]] = []
+    blend_manifest_rows: list[dict[str, object]] = []
+    calibration_rows: list[dict[str, object]] = []
+    panel_disagreement_rows: list[dict[str, object]] = []
+    invariant_rows: list[dict[str, object]] = []
+    confidence_rows: list[dict[str, object]] = []
+    failure_rows: list[dict[str, object]] = []
+    model_manifest_rows: list[dict[str, object]] = []
+    protocol_violations: list[str] = []
+    target_expert_excluded = True
+
+    source_union_refs = d1._load_reference_values(
+        cfg.source_union_gmm_artifact_root,
+        table_name="gmm_prior_gap_summary.csv",
+        method="source_union_cc_diag_gmm_k16_prior_sample_diagnostic",
+        label="source-union K16",
+    )
+    center_balanced_refs = d1._load_reference_values(
+        cfg.balanced_gmm_artifact_root,
+        table_name="balanced_gmm_gap_summary.csv",
+        method="source_union_center_balanced_cc_diag_gmm_k16_prior_sample",
+        label="center-balanced K16",
+    )
+    for optional_root in (
+        cfg.source_union_gmm_artifact_root,
+        cfg.balanced_gmm_artifact_root,
+        cfg.paired_dense_artifact_root,
+        cfg.mass_bagged_artifact_root,
+        cfg.shrink050_artifact_root,
+        cfg.prior_tailrisk_artifact_root,
+    ):
+        d1._validate_optional_leakage_report(optional_root, protocol_violations)
+
+    repair_cfg = d1._repair_runtime_config(cfg, root)
+    per_source_variant = _per_source_variant()
+
+    try:
+        for experiment_seed in cfg.experiment_seeds:
+            train_cache = load_feature_cache(_existing_cache_path(cfg.feature_cache_root, seed=experiment_seed, split="train"))
+            test_cache = load_feature_cache(_existing_cache_path(cfg.feature_cache_root, seed=experiment_seed, split="test"))
+            per_source_runtime: dict[str, RuntimeSource] = {}
+            dense_summaries: dict[tuple[str, int], d1a.AdaptiveSourceLocalSummary] = {}
+            gmm_summaries: dict[tuple[str, int], d1a.AdaptiveSourceLocalSummary] = {}
+            component_details: dict[tuple[str, int, int], dict[str, object]] = {}
+
+            for source_center in cfg.heldout_centers:
+                source_data = _source_data_for_centers(train_cache, centers=(source_center,), experiment_seed=int(experiment_seed))
+                runtime_source = _runtime_source(
+                    cfg,
+                    repair_cfg,
+                    root=root,
+                    experiment_seed=int(experiment_seed),
+                    heldout_center=NA,
+                    expert_id=str(source_center),
+                    source_data=source_data,
+                    variant=per_source_variant,
+                )
+                per_source_runtime[str(source_center)] = runtime_source
+                model_manifest_rows.append(_manifest_row(experiment_seed, NA, runtime_source))
+
+                dense_largest, _dense_bic = d1a._fit_and_export_source_summaries(
+                    cfg,
+                    root / "dense_anchor_summaries",
+                    runtime_source.runtime,
+                    experiment_seed=int(experiment_seed),
+                    shuffled_label_control=False,
+                )
+                for summary in dense_largest:
+                    dense_summaries[(summary.source_center, summary.class_label)] = summary
+                    source_summary_rows.append({**d1a._summary_diagnostic_row(cfg, summary), "summary_use": "dense_anchor"})
+
+                summaries, detail_rows = cu._fit_and_export_pruned_gmm_summaries(
+                    cfg,
+                    root,
+                    runtime_source.runtime,
+                    experiment_seed=int(experiment_seed),
+                    shuffled_label_control=False,
+                )
+                for summary in summaries:
+                    gmm_summaries[(summary.source_center, summary.class_label)] = summary
+                    source_summary_rows.append({**d1a._summary_diagnostic_row(cfg, summary), "summary_use": "component_union"})
+                for row in detail_rows:
+                    component_details[(str(row["source_center"]), int(row["class_label"]), int(row["source_component_id"]))] = row
+                component_manifest_rows.extend(detail_rows)
+
+            reliability: dict[tuple[int, int, str], d12.SourceReliability] = {}
+            for replicate_seed in cfg.all_panel_seeds:
+                for source_center in cfg.heldout_centers:
+                    rel = d12._source_local_reliability(
+                        cfg,
+                        per_source_runtime=per_source_runtime,
+                        summaries=dense_summaries,
+                        test_cache=test_cache,
+                        experiment_seed=int(experiment_seed),
+                        replicate_seed=int(replicate_seed),
+                        source_center=str(source_center),
+                    )
+                    reliability[(int(experiment_seed), int(replicate_seed), str(source_center))] = rel
+                    rel_row = d12._source_reliability_row(rel)
+                    rel_row["panel_group"] = _multipanel_panel_for_seed(cfg, replicate_seed)
+                    reliability_rows.append(rel_row)
+
+            for heldout_center in cfg.heldout_centers:
+                candidates = candidate_experts(cfg.heldout_centers, str(heldout_center))
+                try:
+                    assert_candidate_pool(
+                        heldout_center=str(heldout_center),
+                        candidate_experts=candidates,
+                        expected_count=len(cfg.heldout_centers) - 1,
+                    )
+                except Exception:
+                    target_expert_excluded = False
+                    raise
+
+                target_indices = _target_indices(test_cache.metadata, str(heldout_center))
+                eval_raw, eval_meta = select_rows(test_cache.embeddings, test_cache.metadata, target_indices)
+                eval_labels = tuple(_label(row) for row in eval_meta)
+                eval_sample_ids = tuple(str(row.get("sample_id", "")) for row in eval_meta)
+                eval_sample_hash = _hash_strings(eval_sample_ids)
+                eval_error = "mono_class_target_eval" if len(set(eval_labels)) < 2 else ""
+                if eval_error:
+                    eligibility_rows.append(_eligibility_row(int(experiment_seed), str(heldout_center), 0, "target_eval", "ineligible", eval_error))
+                    continue
+
+                component_manifest_rows.extend(
+                    cu._fold_component_manifest_rows(
+                        cfg,
+                        experiment_seed=int(experiment_seed),
+                        heldout_center=str(heldout_center),
+                        candidates=candidates,
+                        summaries=gmm_summaries,
+                        component_details=component_details,
+                        weight_plan=cu._uniform_source_plan(
+                            cfg,
+                            candidates,
+                            {source: reliability[(int(experiment_seed), cfg.all_panel_seeds[0], str(source))] for source in candidates},
+                            total=cfg.synthetic_per_class_total,
+                        ),
+                    )
+                )
+
+                seed_evaluations: list[_MultipanelSeedEvaluation] = []
+                real_feature_values: list[float] = []
+                source_union_values: list[d1.ReferenceValue] = []
+                center_balanced_values: list[d1.ReferenceValue] = []
+                for replicate_seed in cfg.all_panel_seeds:
+                    panel_group = _multipanel_panel_for_seed(cfg, replicate_seed)
+                    su_ref = d1._reference_for_cell(source_union_refs, experiment_seed, heldout_center, replicate_seed)
+                    cb_ref = d1._reference_for_cell(center_balanced_refs, experiment_seed, heldout_center, replicate_seed)
+                    rels = {
+                        source: reliability[(int(experiment_seed), int(replicate_seed), str(source))]
+                        for source in candidates
+                    }
+                    ref_row, _real_late = d1a._real_feature_reference(
+                        cfg,
+                        per_source_runtime=per_source_runtime,
+                        candidates=candidates,
+                        experiment_seed=int(experiment_seed),
+                        heldout_center=str(heldout_center),
+                        replicate_seed=int(replicate_seed),
+                        eval_raw=eval_raw,
+                        eval_labels=eval_labels,
+                    )
+                    real_feature_values.append(_float(ref_row.get("bacc")))
+                    source_union_values.append(su_ref)
+                    center_balanced_values.append(cb_ref)
+
+                    evaluated = _evaluate_tailrisk_pair(
+                        cfg,
+                        root=root,
+                        per_source_runtime=per_source_runtime,
+                        candidates=candidates,
+                        summaries=gmm_summaries,
+                        rels=rels,
+                        experiment_seed=int(experiment_seed),
+                        heldout_center=str(heldout_center),
+                        replicate_seed=int(replicate_seed),
+                        eval_raw=eval_raw,
+                        eval_labels=eval_labels,
+                        source_union_ref=su_ref,
+                        center_balanced_ref=cb_ref,
+                        real_feature_bacc=_float(ref_row.get("bacc")),
+                    )
+                    seed_evaluations.append(_MultipanelSeedEvaluation(int(replicate_seed), panel_group, evaluated))
+                    _append_multipanel_seed_diagnostics(
+                        cfg,
+                        evaluated,
+                        panel_group=panel_group,
+                        seed_diagnostic_rows=seed_diagnostic_rows,
+                        component_coverage_rows=component_coverage_rows,
+                        paired_generation_rows=paired_generation_rows,
+                        source_weight_rows=source_weight_rows,
+                        blend_manifest_rows=blend_manifest_rows,
+                        calibration_rows=calibration_rows,
+                        eligibility_rows=eligibility_rows,
+                    )
+
+                final = _build_multipanel_cell_outputs(
+                    cfg,
+                    seed_evaluations=seed_evaluations,
+                    experiment_seed=int(experiment_seed),
+                    heldout_center=str(heldout_center),
+                    candidates=candidates,
+                    summaries=gmm_summaries,
+                    eval_labels=eval_labels,
+                    eval_sample_ids=eval_sample_ids,
+                    eval_sample_hash=eval_sample_hash,
+                    source_union_ref=_mean_reference(source_union_values),
+                    center_balanced_ref=_mean_reference(center_balanced_values),
+                    real_feature_bacc=nanmean([value for value in real_feature_values if math.isfinite(value)]),
+                )
+                matrix_rows.extend(final["matrix_rows"])
+                source_weight_rows.extend(final["source_weight_rows"])
+                blend_manifest_rows.extend(final["blend_manifest_rows"])
+                component_coverage_rows.extend(final["component_coverage_rows"])
+                paired_generation_rows.extend(final["paired_generation_rows"])
+                panel_disagreement_rows.extend(final["panel_disagreement_rows"])
+                invariant_rows.extend(final["invariant_rows"])
+                confidence_rows.extend(final["confidence_rows"])
+                failure_rows.extend(final["failure_rows"])
+    except ProtocolError as exc:
+        protocol_violations.append(str(exc))
+
+    leakage = build_leakage_report(
+        target_support_labels_for_selection=False,
+        target_eval_labels_for_scoring_only=True,
+        target_expert_excluded=target_expert_excluded,
+        oracle_rows_diagnostic_only=True,
+        extra_violations=protocol_violations,
+    )
+    historical_rows = _load_prior_tailrisk_matrix_rows(cfg)
+    paired_delta_rows, prior_tail_keys = _multipanel_paired_delta_rows(matrix_rows, historical_rows, cfg)
+    failure_rows = _annotate_failure_rows(failure_rows, paired_delta_rows, prior_tail_keys)
+    panel_disagreement_rows = _annotate_panel_disagreement_rows(panel_disagreement_rows, prior_tail_keys)
+    decision = _multipanel_decision(
+        matrix_rows,
+        paired_delta_rows=paired_delta_rows,
+        prior_tail_keys=prior_tail_keys,
+        leakage_status=leakage.status,
+        cfg=cfg,
+    )
+    _write_multipanel_artifacts(
+        root,
+        cfg,
+        matrix_rows=matrix_rows,
+        seed_diagnostic_rows=seed_diagnostic_rows,
+        source_weight_rows=source_weight_rows,
+        reliability_rows=reliability_rows,
+        source_summary_rows=source_summary_rows,
+        component_manifest_rows=component_manifest_rows,
+        component_coverage_rows=component_coverage_rows,
+        paired_generation_rows=paired_generation_rows,
+        eligibility_rows=eligibility_rows,
+        blend_manifest_rows=blend_manifest_rows,
+        calibration_rows=calibration_rows,
+        panel_disagreement_rows=panel_disagreement_rows,
+        invariant_rows=invariant_rows,
+        confidence_rows=confidence_rows,
+        failure_rows=failure_rows,
+        paired_delta_rows=paired_delta_rows,
+        model_manifest_rows=model_manifest_rows,
+        decision=decision,
+        leakage=leakage,
+        protocol_violations=protocol_violations,
+        target_expert_excluded=target_expert_excluded,
+    )
+    return root
+
+
+def _multipanel_panel_for_seed(cfg: MultipanelTailRiskConfig, seed: int) -> str:
+    for panel, seeds in cfg.panel_seed_groups:
+        if int(seed) in {int(value) for value in seeds}:
+            return str(panel)
+    raise ProtocolError(f"Seed {seed} is not in the locked multipanel seed groups.")
+
+
+def _append_multipanel_seed_diagnostics(
+    cfg: MultipanelTailRiskConfig,
+    evaluated: TailRiskEvaluation,
+    *,
+    panel_group: str,
+    seed_diagnostic_rows: list[dict[str, object]],
+    component_coverage_rows: list[dict[str, object]],
+    paired_generation_rows: list[dict[str, object]],
+    source_weight_rows: list[dict[str, object]],
+    blend_manifest_rows: list[dict[str, object]],
+    calibration_rows: list[dict[str, object]],
+    eligibility_rows: list[dict[str, object]],
+) -> None:
+    for source, row in (
+        ("seed_anchor", evaluated.anchor_result.row),
+        ("seed_random_mass_bag", evaluated.bag_evaluation.ensemble_row),
+        ("seed_blend", evaluated.primary_row),
+    ):
+        out = dict(row)
+        out["selection_source"] = DIAGNOSTIC_SELECTION
+        out["claim_role"] = f"multipanel_{source}_diagnostic_not_primary"
+        out["panel_group"] = panel_group
+        out["aggregation_unit"] = "seed_diagnostic"
+        if source == "seed_blend":
+            out["prior_method"] = MULTIPANEL_SEED_BLEND_METHOD
+            out["primary_method_not_reportable"] = True
+        seed_diagnostic_rows.append(out)
+    for row in evaluated.calibration_rows:
+        out = dict(row)
+        out["panel_group"] = panel_group
+        out["calibration_scope"] = "source_inner_primary_target_eval_diagnostic_only"
+        calibration_rows.append(out)
+    blend_row = dict(evaluated.blend_manifest_row)
+    blend_row["panel_group"] = panel_group
+    blend_row["primary_method"] = MULTIPANEL_SEED_BLEND_METHOD
+    blend_row["aggregation_unit"] = "seed_blend_before_multipanel_pooling"
+    blend_manifest_rows.append(blend_row)
+    component_coverage_rows.extend(
+        [
+            evaluated.anchor_result.coverage_row,
+            evaluated.bag_evaluation.ensemble_coverage,
+            evaluated.primary_coverage,
+        ]
+    )
+    paired_generation_rows.extend(
+        [
+            evaluated.anchor_result.paired_row,
+            evaluated.bag_evaluation.ensemble_paired_row,
+            evaluated.primary_paired_row,
+        ]
+    )
+    source_weight_rows.extend(evaluated.source_weight_rows)
+    eligibility_rows.extend(evaluated.eligibility_rows)
+
+
+def _build_multipanel_cell_outputs(
+    cfg: MultipanelTailRiskConfig,
+    *,
+    seed_evaluations: Sequence[_MultipanelSeedEvaluation],
+    experiment_seed: int,
+    heldout_center: str,
+    candidates: Sequence[str],
+    summaries: Mapping[tuple[str, int], d1a.AdaptiveSourceLocalSummary],
+    eval_labels: Sequence[int],
+    eval_sample_ids: Sequence[str],
+    eval_sample_hash: str,
+    source_union_ref: d1.ReferenceValue,
+    center_balanced_ref: d1.ReferenceValue,
+    real_feature_bacc: float,
+) -> dict[str, list[dict[str, object]]]:
+    out: dict[str, list[dict[str, object]]] = {
+        "matrix_rows": [],
+        "source_weight_rows": [],
+        "blend_manifest_rows": [],
+        "component_coverage_rows": [],
+        "paired_generation_rows": [],
+        "panel_disagreement_rows": [],
+        "invariant_rows": [],
+        "confidence_rows": [],
+        "failure_rows": [],
+    }
+    ok = [
+        item
+        for item in seed_evaluations
+        if item.evaluated.primary_bundle is not None
+        and item.evaluated.anchor_result.bundle is not None
+        and item.evaluated.bag_evaluation.ensemble_bundle is not None
+        and item.evaluated.primary_row.get("status") == "ok"
+    ]
+    if len(ok) != len(seed_evaluations) or len(ok) != len(cfg.all_panel_seeds):
+        for method in (
+            cfg.primary_method,
+            MULTIPANEL_POOLED_ANCHOR_METHOD,
+            MULTIPANEL_POOLED_RANDOM_BAG_METHOD,
+            MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD,
+        ):
+            row = cu._empty_matrix_row(
+                cfg,
+                experiment_seed=experiment_seed,
+                heldout_center=heldout_center,
+                replicate_seed=0,
+                candidates=candidates,
+                prior_method=method,
+                source_union_ref=source_union_ref,
+                center_balanced_ref=center_balanced_ref,
+                real_feature_bacc=real_feature_bacc,
+                status="ineligible",
+                error_message="one_or_more_seed_blends_ineligible",
+                claim_role="multipanel_probability_pool",
+            )
+            row["panel"] = "multipanel"
+            row["aggregation_unit"] = "experiment_seed_x_heldout_center"
+            out["matrix_rows"].append(row)
+        return out
+
+    seed_blend_bundles = [item.evaluated.primary_bundle for item in ok if item.evaluated.primary_bundle is not None]
+    anchor_bundles = [item.evaluated.anchor_result.bundle for item in ok if item.evaluated.anchor_result.bundle is not None]
+    bag_bundles = [item.evaluated.bag_evaluation.ensemble_bundle for item in ok if item.evaluated.bag_evaluation.ensemble_bundle is not None]
+    seed_blend_rows = [item.evaluated.primary_row for item in ok]
+    anchor_rows = [item.evaluated.anchor_result.row for item in ok]
+    bag_rows = [item.evaluated.bag_evaluation.ensemble_row for item in ok]
+    seed_hashes = [str(row.get("prediction_hash", "")) for row in seed_blend_rows]
+    group_json = _panel_seed_groups_json(cfg)
+
+    final_bundle = _pool_bundle(cfg.primary_method, seed_blend_bundles)
+    pooled_anchor = _pool_bundle(MULTIPANEL_POOLED_ANCHOR_METHOD, anchor_bundles)
+    pooled_random = _pool_bundle(MULTIPANEL_POOLED_RANDOM_BAG_METHOD, bag_bundles)
+    canonical_bags = [
+        item.evaluated.bag_evaluation.ensemble_bundle
+        for item in ok
+        if item.panel_group == MULTIPANEL_CANONICAL_PANEL and item.evaluated.bag_evaluation.ensemble_bundle is not None
+    ]
+    canonical_random = _pool_bundle(MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD, canonical_bags)
+
+    panel_blend_bundles: dict[str, PredictionBundle] = {}
+    for panel, _seeds in cfg.panel_seed_groups:
+        panel_bundles = [item.evaluated.primary_bundle for item in ok if item.panel_group == panel and item.evaluated.primary_bundle is not None]
+        panel_blend_bundles[str(panel)] = _pool_bundle(f"{MULTIPANEL_SEED_BLEND_METHOD}_{panel}", panel_bundles)
+
+    row_specs = (
+        (cfg.primary_method, final_bundle, seed_blend_rows, PRIMARY_SELECTION, "primary_multipanel_seed_blend_probability_pool"),
+        (MULTIPANEL_POOLED_ANCHOR_METHOD, pooled_anchor, anchor_rows, DIAGNOSTIC_SELECTION, "pooled_shrink050_comparator"),
+        (MULTIPANEL_POOLED_RANDOM_BAG_METHOD, pooled_random, bag_rows, DIAGNOSTIC_SELECTION, "pooled_random_mass_bag_comparator"),
+        (
+            MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD,
+            canonical_random,
+            [item.evaluated.bag_evaluation.ensemble_row for item in ok if item.panel_group == MULTIPANEL_CANONICAL_PANEL],
+            DIAGNOSTIC_SELECTION,
+            "canonical_single_random_mass_bag_comparator",
+        ),
+    )
+    row_by_method: dict[str, dict[str, object]] = {}
+    for method, bundle, plan_rows, selection_source, claim_role in row_specs:
+        row = _multipanel_result_row(
+            cfg,
+            experiment_seed=experiment_seed,
+            heldout_center=heldout_center,
+            candidates=candidates,
+            summaries=summaries,
+            method=method,
+            bundle=bundle,
+            eval_labels=eval_labels,
+            source_union_ref=source_union_ref,
+            center_balanced_ref=center_balanced_ref,
+            real_feature_bacc=real_feature_bacc,
+            weight_plan=_average_plan_from_rows(cfg, candidates, plan_rows),
+            generated_features_hash=_hash_strings(str(row.get("generated_features_hash", "")) for row in plan_rows),
+            seed_bundle_hashes=seed_hashes if method == cfg.primary_method else [str(row.get("prediction_hash", "")) for row in plan_rows],
+            selection_source=selection_source,
+            claim_role=claim_role,
+            eval_sample_hash=eval_sample_hash,
+            panel_seed_groups_json=group_json,
+        )
+        row_by_method[method] = row
+        out["matrix_rows"].append(row)
+        out["component_coverage_rows"].append(cu._empty_coverage_row(row))
+        out["paired_generation_rows"].append(cu._paired_generation_row(row, str(row.get("generated_features_hash", "")), "", "ok"))
+        out["confidence_rows"].append(_confidence_row(experiment_seed, heldout_center, method, "multipanel", bundle))
+        out["invariant_rows"].append(
+            _probability_invariant_row(
+                experiment_seed,
+                heldout_center,
+                method,
+                bundle,
+                eval_sample_ids=eval_sample_ids,
+                expected_sample_hash=eval_sample_hash,
+                panel="multipanel",
+            )
+        )
+
+    for panel, bundle in panel_blend_bundles.items():
+        panel_method = f"{MULTIPANEL_SEED_BLEND_METHOD}_{panel}"
+        panel_result = evaluate_probability_predictions(panel_method, bundle.probabilities, eval_labels, classes=bundle.classes)
+        out["failure_rows"].append(
+            {
+                "experiment_seed": experiment_seed,
+                "heldout_center": heldout_center,
+                "decomposition_source": f"panel_{panel}",
+                "bacc": panel_result.bacc,
+                "macro_f1": panel_result.macro_f1,
+            }
+        )
+        out["confidence_rows"].append(_confidence_row(experiment_seed, heldout_center, panel_method, panel, bundle))
+        out["invariant_rows"].append(
+            _probability_invariant_row(
+                experiment_seed,
+                heldout_center,
+                panel_method,
+                bundle,
+                eval_sample_ids=eval_sample_ids,
+                expected_sample_hash=eval_sample_hash,
+                panel=panel,
+            )
+        )
+
+    out["panel_disagreement_rows"].append(
+        _panel_disagreement_row(
+            experiment_seed,
+            heldout_center,
+            panel_blend_bundles,
+            eval_labels=eval_labels,
+        )
+    )
+    out["blend_manifest_rows"].append(
+        {
+            "experiment_seed": experiment_seed,
+            "heldout_center": heldout_center,
+            "replicate_seed": 0,
+            "panel": "multipanel",
+            "primary_method": cfg.primary_method,
+            "aggregation_unit": "experiment_seed_x_heldout_center",
+            "pooling_rule": "seed_blend_then_equal_probability_pool",
+            "blend_alpha_anchor": cfg.blend_alpha,
+            "blend_alpha_bag": 1.0 - cfg.blend_alpha,
+            "panel_seed_groups_json": group_json,
+            "seed_blend_prediction_hashes_json": json.dumps(seed_hashes),
+            "final_prediction_hash": row_by_method[cfg.primary_method].get("prediction_hash", ""),
+            "eval_sample_ids_hash": eval_sample_hash,
+            "class_order": "|".join(str(value) for value in final_bundle.classes),
+            "class_order_match": True,
+        }
+    )
+    out["failure_rows"].append(
+        {
+            "experiment_seed": experiment_seed,
+            "heldout_center": heldout_center,
+            "anchor_bacc": row_by_method[MULTIPANEL_POOLED_ANCHOR_METHOD].get("bacc", math.nan),
+            "same_cell_single_random_mass_bag_canonical_bacc": row_by_method[MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD].get("bacc", math.nan),
+            "panel1_bacc": _panel_bacc(out["failure_rows"], MULTIPANEL_CANONICAL_PANEL),
+            "panel2_bacc": _panel_bacc(out["failure_rows"], MULTIPANEL_FRESH_A_PANEL),
+            "panel3_bacc": _panel_bacc(out["failure_rows"], MULTIPANEL_FRESH_B_PANEL),
+            "pooled_random_bag_bacc": row_by_method[MULTIPANEL_POOLED_RANDOM_BAG_METHOD].get("bacc", math.nan),
+            "final_anchor_random_blend_bacc": row_by_method[cfg.primary_method].get("bacc", math.nan),
+            "status": "ok",
+        }
+    )
+    return out
+
+
+def _pool_bundle(method: str, bundles: Sequence[PredictionBundle | None]) -> PredictionBundle:
+    valid = [bundle for bundle in bundles if bundle is not None]
+    if not valid:
+        raise ProtocolError(f"No prediction bundles available for {method}.")
+    pooled = weighted_arithmetic_probability_pool(valid, [1.0] * len(valid))
+    return PredictionBundle(
+        expert_id=str(method),
+        probabilities=tuple(tuple(float(value) for value in row) for row in pooled),
+        classes=valid[0].classes,
+    )
+
+
+def _multipanel_result_row(
+    cfg: MultipanelTailRiskConfig,
+    *,
+    experiment_seed: int,
+    heldout_center: str,
+    candidates: Sequence[str],
+    summaries: Mapping[tuple[str, int], d1a.AdaptiveSourceLocalSummary],
+    method: str,
+    bundle: PredictionBundle,
+    eval_labels: Sequence[int],
+    source_union_ref: d1.ReferenceValue,
+    center_balanced_ref: d1.ReferenceValue,
+    real_feature_bacc: float,
+    weight_plan: Mapping[str, object],
+    generated_features_hash: str,
+    seed_bundle_hashes: Sequence[str],
+    selection_source: str,
+    claim_role: str,
+    eval_sample_hash: str,
+    panel_seed_groups_json: str,
+) -> dict[str, object]:
+    result = evaluate_probability_predictions(method, bundle.probabilities, eval_labels, classes=bundle.classes)
+    prediction_hash = _hash_array(np.asarray(bundle.probabilities, dtype=float))
+    row = cu._result_matrix_row(
+        cfg,
+        experiment_seed=experiment_seed,
+        heldout_center=heldout_center,
+        replicate_seed=0,
+        candidates=candidates,
+        prior_method=method,
+        summary_kind="multipanel_probability_pool",
+        source_union_ref=source_union_ref,
+        center_balanced_ref=center_balanced_ref,
+        real_feature_bacc=real_feature_bacc,
+        weight_plan=weight_plan,
+        bacc=result.bacc,
+        macro_f1=result.macro_f1,
+        generated_features_hash=generated_features_hash,
+        prediction_hash=prediction_hash,
+        selection_source=selection_source,
+        claim_role=claim_role,
+        status="ok",
+        error_message="",
+        control_mode="normal",
+        summaries=summaries,
+    )
+    row["panel"] = "multipanel"
+    row["aggregation_unit"] = "experiment_seed_x_heldout_center"
+    row["panel_seed_groups_json"] = panel_seed_groups_json
+    row["seed_prediction_hashes_json"] = json.dumps(list(seed_bundle_hashes))
+    row["eval_sample_ids_hash"] = eval_sample_hash
+    row["pooling_rule"] = "seed_blend_then_equal_probability_pool" if method == cfg.primary_method else "equal_probability_pool"
+    row["target_eval_labels_used_for_scoring_only"] = True
+    row["selection_used_target_labels"] = False
+    row["target_support_labels_for_selection"] = False
+    return row
+
+
+def _average_plan_from_rows(
+    cfg: MultipanelTailRiskConfig,
+    candidates: Sequence[str],
+    rows: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    if not rows:
+        rels = {
+            str(source): d12.SourceReliability(0, 0, str(source), math.nan, math.nan, cfg.reliability_floor_score, "empty", "empty", 0, "", "")
+            for source in candidates
+        }
+        return cu._uniform_source_plan(cfg, candidates, rels, total=cfg.synthetic_per_class_total)
+    weights_by_source = {str(source): [] for source in candidates}
+    budgets_by_source = {str(source): [] for source in candidates}
+    for row in rows:
+        weights = json.loads(str(row.get("source_weight_json", "{}") or "{}"))
+        budgets = json.loads(str(row.get("source_budget_json", "{}") or "{}"))
+        for source in candidates:
+            source_id = str(source)
+            weights_by_source[source_id].append(_float(weights.get(source_id, math.nan)))
+            budgets_by_source[source_id].append(_float(budgets.get(source_id, math.nan)))
+    weights = {
+        source: nanmean([value for value in values if math.isfinite(value)])
+        for source, values in weights_by_source.items()
+    }
+    total_weight = sum(value for value in weights.values() if math.isfinite(value))
+    if total_weight > 0.0:
+        weights = {source: value / total_weight if math.isfinite(value) else 0.0 for source, value in weights.items()}
+    else:
+        weights = {str(source): 1.0 / float(len(candidates)) for source in candidates}
+    budgets = {
+        source: int(round(nanmean([value for value in values if math.isfinite(value)])))
+        for source, values in budgets_by_source.items()
+    }
+    scores = dict(weights)
+    return cu._with_weight_diagnostics(
+        tuple(str(source) for source in candidates),
+        weights,
+        budgets,
+        scores,
+        total=cfg.synthetic_per_class_total,
+        mode=MULTIPANEL_SOURCE_WEIGHTING,
+    )
+
+
+def _mean_reference(values: Sequence[d1.ReferenceValue]) -> d1.ReferenceValue:
+    ok = [value for value in values if value.status == "ok" and math.isfinite(value.bacc)]
+    if not ok:
+        return d1.ReferenceValue(math.nan, math.nan, "missing", "no_reference_values")
+    return d1.ReferenceValue(
+        bacc=nanmean([value.bacc for value in ok]),
+        macro_f1=nanmean([value.macro_f1 for value in ok if math.isfinite(value.macro_f1)]),
+        status="ok",
+    )
+
+
+def _probability_invariant_row(
+    experiment_seed: int,
+    heldout_center: str,
+    method: str,
+    bundle: PredictionBundle,
+    *,
+    eval_sample_ids: Sequence[str],
+    expected_sample_hash: str,
+    panel: str,
+) -> dict[str, object]:
+    probs = np.asarray(bundle.probabilities, dtype=float)
+    row_sums = probs.sum(axis=1) if probs.ndim == 2 else np.asarray([], dtype=float)
+    sample_hash = _hash_strings(eval_sample_ids)
+    finite = bool(np.isfinite(probs).all()) if probs.size else False
+    row_sum_pass = bool(row_sums.size and np.allclose(row_sums, 1.0, atol=1.0e-6))
+    return {
+        "experiment_seed": int(experiment_seed),
+        "heldout_center": str(heldout_center),
+        "panel": str(panel),
+        "prior_method": str(method),
+        "sample_id_alignment_pass": sample_hash == expected_sample_hash,
+        "sample_id_hash": sample_hash,
+        "expected_sample_id_hash": expected_sample_hash,
+        "class_order": "|".join(str(value) for value in bundle.classes),
+        "class_order_alignment_pass": bundle.classes == (0, 1),
+        "probability_row_sum_pass": row_sum_pass,
+        "probability_no_nan_inf_pass": finite,
+        "min_probability_row_sum": float(row_sums.min()) if row_sums.size else math.nan,
+        "max_probability_row_sum": float(row_sums.max()) if row_sums.size else math.nan,
+        "n_probability_rows": int(probs.shape[0]) if probs.ndim == 2 else 0,
+    }
+
+
+def _confidence_row(
+    experiment_seed: int,
+    heldout_center: str,
+    method: str,
+    panel: str,
+    bundle: PredictionBundle,
+) -> dict[str, object]:
+    probs = np.asarray(bundle.probabilities, dtype=float)
+    if probs.ndim != 2 or probs.shape[0] == 0:
+        return {
+            "experiment_seed": int(experiment_seed),
+            "heldout_center": str(heldout_center),
+            "panel": str(panel),
+            "prior_method": str(method),
+            "mean_confidence": math.nan,
+            "mean_entropy": math.nan,
+            "n_probability_rows": 0,
+        }
+    clipped = np.clip(probs, 1.0e-12, 1.0)
+    entropy = -np.sum(clipped * np.log(clipped), axis=1)
+    return {
+        "experiment_seed": int(experiment_seed),
+        "heldout_center": str(heldout_center),
+        "panel": str(panel),
+        "prior_method": str(method),
+        "mean_confidence": float(np.max(probs, axis=1).mean()),
+        "median_confidence": float(np.median(np.max(probs, axis=1))),
+        "mean_entropy": float(entropy.mean()),
+        "n_probability_rows": int(probs.shape[0]),
+    }
+
+
+def _panel_disagreement_row(
+    experiment_seed: int,
+    heldout_center: str,
+    panel_bundles: Mapping[str, PredictionBundle],
+    *,
+    eval_labels: Sequence[int],
+) -> dict[str, object]:
+    panels = list(panel_bundles)
+    js_values: list[float] = []
+    hard_values: list[float] = []
+    mad_values: list[float] = []
+    for idx, left in enumerate(panels):
+        for right in panels[idx + 1:]:
+            left_probs = np.asarray(panel_bundles[left].probabilities, dtype=float)
+            right_probs = np.asarray(panel_bundles[right].probabilities, dtype=float)
+            js_values.append(_mean_js_divergence(left_probs, right_probs))
+            left_pred = np.argmax(left_probs, axis=1)
+            right_pred = np.argmax(right_probs, axis=1)
+            hard_values.append(float(np.mean(left_pred != right_pred)))
+            mad_values.append(float(np.mean(np.abs(left_probs - right_probs))))
+    return {
+        "experiment_seed": int(experiment_seed),
+        "heldout_center": str(heldout_center),
+        "panel_set": "|".join(panels),
+        "mean_pairwise_js_divergence": nanmean(js_values),
+        "mean_pairwise_hard_label_disagreement": nanmean(hard_values),
+        "mean_pairwise_absolute_probability_deviation": nanmean(mad_values),
+        "n_target_eval": len(tuple(eval_labels)),
+        "is_prior_bottom20_cell": False,
+    }
+
+
+def _mean_js_divergence(left: np.ndarray, right: np.ndarray, *, eps: float = 1.0e-8) -> float:
+    p = np.clip(np.asarray(left, dtype=float), eps, 1.0)
+    q = np.clip(np.asarray(right, dtype=float), eps, 1.0)
+    p = p / p.sum(axis=1, keepdims=True)
+    q = q / q.sum(axis=1, keepdims=True)
+    m = 0.5 * (p + q)
+    kl_pm = np.sum(p * (np.log(p) - np.log(m)), axis=1)
+    kl_qm = np.sum(q * (np.log(q) - np.log(m)), axis=1)
+    return float(np.mean(0.5 * (kl_pm + kl_qm)))
+
+
+def _panel_bacc(rows: Sequence[Mapping[str, object]], panel: str) -> float:
+    key = f"panel_{panel}"
+    values = [_float(row.get("bacc")) for row in rows if row.get("decomposition_source") == key]
+    return nanmean([value for value in values if math.isfinite(value)])
+
+
+def _panel_seed_groups_json(cfg: MultipanelTailRiskConfig) -> str:
+    return json.dumps({panel: list(seeds) for panel, seeds in cfg.panel_seed_groups}, sort_keys=True)
+
+
+def _load_prior_tailrisk_matrix_rows(cfg: MultipanelTailRiskConfig) -> list[dict[str, object]]:
+    if cfg.prior_tailrisk_artifact_root is None:
+        return []
+    path = cfg.prior_tailrisk_artifact_root / "tables" / "tailrisk_downstream_matrix.csv"
+    if not path.exists():
+        return []
+    with path.open("r", encoding="utf-8", newline="") as f:
+        return [dict(row) for row in csv.DictReader(f)]
+
+
+def _collapsed_method_rows(rows: Sequence[Mapping[str, object]], method: str) -> dict[tuple[str, str], dict[str, object]]:
+    grouped: dict[tuple[str, str], list[Mapping[str, object]]] = {}
+    for row in rows:
+        if row.get("prior_method") != method or row.get("status") != "ok":
+            continue
+        grouped.setdefault((str(row.get("experiment_seed")), str(row.get("heldout_center"))), []).append(row)
+    out: dict[tuple[str, str], dict[str, object]] = {}
+    for key, subset in grouped.items():
+        out[key] = {
+            "experiment_seed": key[0],
+            "heldout_center": key[1],
+            "prior_method": method,
+            "status": "ok",
+            "bacc": d1._mean_field(subset, "bacc"),
+            "macro_f1": d1._mean_field(subset, "macro_f1"),
+        }
+    return out
+
+
+def _multipanel_paired_delta_rows(
+    rows: Sequence[Mapping[str, object]],
+    historical_rows: Sequence[Mapping[str, object]],
+    cfg: MultipanelTailRiskConfig,
+) -> tuple[list[dict[str, object]], set[tuple[str, str]]]:
+    primary = _collapsed_method_rows(rows, cfg.primary_method)
+    canonical = _collapsed_method_rows(rows, MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD)
+    anchor = _collapsed_method_rows(rows, MULTIPANEL_POOLED_ANCHOR_METHOD)
+    pooled_random = _collapsed_method_rows(rows, MULTIPANEL_POOLED_RANDOM_BAG_METHOD)
+    prior = _collapsed_method_rows(historical_rows, PRIMARY_TAILRISK_METHOD)
+    intersection = sorted(set(primary) & set(canonical) & set(anchor) & set(prior))
+    prior_values = sorted((_float(prior[key]["bacc"]), key) for key in intersection if math.isfinite(_float(prior[key]["bacc"])))
+    bottom_count = max(1, int(math.ceil(0.20 * len(prior_values)))) if prior_values else 0
+    prior_tail_keys = {key for _value, key in prior_values[:bottom_count]}
+    out = []
+    for key in intersection:
+        p = _float(primary[key]["bacc"])
+        prior_bacc = _float(prior[key]["bacc"])
+        canon_bacc = _float(canonical[key]["bacc"])
+        anchor_bacc = _float(anchor[key]["bacc"])
+        pooled_random_bacc = _float(pooled_random.get(key, {}).get("bacc", math.nan))
+        out.append(
+            {
+                "experiment_seed": key[0],
+                "heldout_center": key[1],
+                "is_frozen_prior_bottom20_cell": key in prior_tail_keys,
+                "v2_primary_bacc": p,
+                "prior_tailrisk_bacc": prior_bacc,
+                "same_cell_single_random_mass_bag_canonical_bacc": canon_bacc,
+                "same_cell_shrink050_bacc": anchor_bacc,
+                "pooled_random_mass_bag_bacc": pooled_random_bacc,
+                "delta_v2_minus_prior_tailrisk": p - prior_bacc if math.isfinite(p) and math.isfinite(prior_bacc) else math.nan,
+                "delta_v2_minus_canonical_random_mass_bag": p - canon_bacc if math.isfinite(p) and math.isfinite(canon_bacc) else math.nan,
+                "delta_v2_minus_shrink050": p - anchor_bacc if math.isfinite(p) and math.isfinite(anchor_bacc) else math.nan,
+                "delta_v2_minus_pooled_random_mass_bag": p - pooled_random_bacc if math.isfinite(p) and math.isfinite(pooled_random_bacc) else math.nan,
+                "comparison_cell_set": "intersection_v2_prior_tailrisk_canonical_random_shrink050",
+                "status": "ok",
+            }
+        )
+    return out, prior_tail_keys
+
+
+def _annotate_failure_rows(
+    rows: Sequence[Mapping[str, object]],
+    paired_delta_rows: Sequence[Mapping[str, object]],
+    prior_tail_keys: set[tuple[str, str]],
+) -> list[dict[str, object]]:
+    prior_by_key = {
+        (str(row.get("experiment_seed")), str(row.get("heldout_center"))): row
+        for row in paired_delta_rows
+    }
+    out = []
+    for row in rows:
+        updated = dict(row)
+        key = (str(updated.get("experiment_seed")), str(updated.get("heldout_center")))
+        prior = prior_by_key.get(key, {})
+        updated["prior_tailrisk_bacc"] = prior.get("prior_tailrisk_bacc", "")
+        updated["delta_final_minus_prior_tailrisk"] = prior.get("delta_v2_minus_prior_tailrisk", "")
+        updated["is_frozen_prior_bottom20_cell"] = key in prior_tail_keys
+        out.append(updated)
+    return out
+
+
+def _annotate_panel_disagreement_rows(
+    rows: Sequence[Mapping[str, object]],
+    prior_tail_keys: set[tuple[str, str]],
+) -> list[dict[str, object]]:
+    out = []
+    for row in rows:
+        updated = dict(row)
+        key = (str(updated.get("experiment_seed")), str(updated.get("heldout_center")))
+        updated["is_prior_bottom20_cell"] = key in prior_tail_keys
+        out.append(updated)
+    return out
+
+
+def _multipanel_tail_metrics(
+    rows: Sequence[Mapping[str, object]],
+    method: str,
+    *,
+    prior_tail_keys: set[tuple[str, str]] | None = None,
+) -> dict[str, object]:
+    subset = cu._rows_for(rows, method)
+    stats = cu._method_stats(subset)
+    grouped = cu._replicate_averaged(subset)
+    bacc_values = sorted(_float(row.get("bacc")) for row in grouped if math.isfinite(_float(row.get("bacc"))))
+    bottom_count = max(1, int(math.ceil(0.20 * len(bacc_values)))) if bacc_values else 0
+    own_bottom20 = nanmean(bacc_values[:bottom_count]) if bacc_values else math.nan
+    if prior_tail_keys:
+        frozen = [
+            _float(row.get("bacc"))
+            for row in grouped
+            if (str(row.get("experiment_seed")), str(row.get("heldout_center"))) in prior_tail_keys
+        ]
+        bottom20 = nanmean([value for value in frozen if math.isfinite(value)])
+    else:
+        bottom20 = own_bottom20
+    center3_rows = [row for row in grouped if str(row.get("heldout_center")) == "3"]
+    center3 = d1._mean_field(center3_rows, "bacc") if center3_rows else math.nan
+    return {
+        **stats,
+        "bottom20_cell_mean_bacc": bottom20,
+        "own_bottom20_cell_mean_bacc": own_bottom20,
+        "worst_seed_center_bacc": min(bacc_values) if bacc_values else math.nan,
+        "center3_bacc": center3,
+    }
+
+
+def _stats_from_paired(
+    paired_delta_rows: Sequence[Mapping[str, object]],
+    value_field: str,
+) -> dict[str, object]:
+    rows = [
+        {
+            "experiment_seed": row["experiment_seed"],
+            "heldout_center": row["heldout_center"],
+            "prior_method": value_field,
+            "status": "ok",
+            "bacc": row.get(value_field, math.nan),
+            "macro_f1": math.nan,
+        }
+        for row in paired_delta_rows
+    ]
+    return _multipanel_tail_metrics(rows, value_field)
+
+
+def _multipanel_decision(
+    rows: Sequence[Mapping[str, object]],
+    *,
+    paired_delta_rows: Sequence[Mapping[str, object]],
+    prior_tail_keys: set[tuple[str, str]],
+    leakage_status: str,
+    cfg: MultipanelTailRiskConfig,
+) -> dict[str, object]:
+    primary = _multipanel_tail_metrics(rows, cfg.primary_method, prior_tail_keys=prior_tail_keys)
+    anchor = _multipanel_tail_metrics(rows, MULTIPANEL_POOLED_ANCHOR_METHOD, prior_tail_keys=prior_tail_keys)
+    canonical = _multipanel_tail_metrics(rows, MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD, prior_tail_keys=prior_tail_keys)
+    pooled_random = _multipanel_tail_metrics(rows, MULTIPANEL_POOLED_RANDOM_BAG_METHOD, prior_tail_keys=prior_tail_keys)
+    prior = _stats_from_paired(paired_delta_rows, "prior_tailrisk_bacc") if paired_delta_rows else {}
+    primary_i = _stats_from_paired(paired_delta_rows, "v2_primary_bacc") if paired_delta_rows else {}
+    canonical_i = _stats_from_paired(paired_delta_rows, "same_cell_single_random_mass_bag_canonical_bacc") if paired_delta_rows else {}
+
+    mean_i = _float(primary_i.get("center_equal_mean_bacc", math.nan))
+    prior_mean = _float(prior.get("center_equal_mean_bacc", math.nan))
+    canonical_mean = _float(canonical_i.get("center_equal_mean_bacc", math.nan))
+    primary_mean = _float(primary["center_equal_mean_bacc"])
+    min_center_delta = _delta(primary_i.get("min_center_bacc", math.nan), prior.get("min_center_bacc", math.nan)) if paired_delta_rows else math.nan
+    center3_delta = _delta(primary_i.get("center3_bacc", math.nan), prior.get("center3_bacc", math.nan)) if paired_delta_rows else math.nan
+    bottom20_delta = _delta(primary_i.get("bottom20_cell_mean_bacc", math.nan), prior.get("bottom20_cell_mean_bacc", math.nan)) if paired_delta_rows else math.nan
+    seed_std_delta = _delta(primary_i.get("seed_std_bacc", math.nan), prior.get("seed_std_bacc", math.nan)) if paired_delta_rows else math.nan
+    tail_deltas = [
+        _float(row.get("delta_v2_minus_prior_tailrisk"))
+        for row in paired_delta_rows
+        if str(row.get("is_frozen_prior_bottom20_cell")) == "True" or row.get("is_frozen_prior_bottom20_cell") is True
+    ]
+    tail_deltas = [value for value in tail_deltas if math.isfinite(value)]
+    tail_positive_fraction = float(sum(value > 0.0 for value in tail_deltas)) / float(len(tail_deltas)) if tail_deltas else math.nan
+    tail_median_delta = float(np.median(np.asarray(tail_deltas, dtype=float))) if tail_deltas else math.nan
+    center_regressions = _per_center_regressions(primary_i, prior) if paired_delta_rows else {}
+    worst_center_regression = min(center_regressions.values(), default=math.nan)
+    flags: list[str] = []
+    if leakage_status != "PASS":
+        flags.append("LEAKAGE_FAIL")
+    if not paired_delta_rows:
+        flags.append("MISSING_PRIOR_TAILRISK_INTERSECTION")
+    if math.isfinite(worst_center_regression) and worst_center_regression < cfg.tailrisk_transfer_threshold:
+        flags.append("TAIL_RISK_TRANSFER")
+    if math.isfinite(mean_i) and math.isfinite(prior_mean) and mean_i < prior_mean - cfg.primary_noninferiority_margin:
+        flags.append("MEAN_INFERIOR_TO_PRIOR_TAILRISK_GT_0P005")
+    if math.isfinite(mean_i) and math.isfinite(canonical_mean) and mean_i < canonical_mean - cfg.primary_noninferiority_margin:
+        flags.append("MEAN_INFERIOR_TO_CANONICAL_RANDOM_GT_0P005")
+    if math.isfinite(min_center_delta) and min_center_delta <= 0.0:
+        flags.append("MIN_CENTER_NOT_IMPROVED")
+    if math.isfinite(center3_delta) and center3_delta < 0.0 and _float(primary_i.get("center3_bacc", math.nan)) < 0.82:
+        flags.append("CENTER3_NOT_IMPROVED_AND_BELOW_0P82")
+    if math.isfinite(bottom20_delta) and bottom20_delta <= 0.0:
+        flags.append("BOTTOM20_NOT_IMPROVED")
+    if math.isfinite(seed_std_delta) and seed_std_delta >= 0.0:
+        flags.append("SEED_STD_NOT_REDUCED")
+    if math.isfinite(tail_median_delta) and tail_median_delta <= 0.0:
+        flags.append("FROZEN_BOTTOM20_MEDIAN_DELTA_NOT_POSITIVE")
+    if math.isfinite(tail_positive_fraction) and tail_positive_fraction <= 0.5:
+        flags.append("FROZEN_BOTTOM20_NOT_MAJORITY_IMPROVED")
+
+    noninferior = (
+        math.isfinite(mean_i)
+        and math.isfinite(prior_mean)
+        and math.isfinite(canonical_mean)
+        and mean_i >= prior_mean - cfg.primary_noninferiority_margin
+        and mean_i >= canonical_mean - cfg.primary_noninferiority_margin
+    )
+    weak_noninferior = (
+        math.isfinite(mean_i)
+        and math.isfinite(prior_mean)
+        and math.isfinite(canonical_mean)
+        and mean_i >= prior_mean - cfg.weak_pass_noninferiority_margin
+        and mean_i >= canonical_mean - cfg.weak_pass_noninferiority_margin
+    )
+    primary_success = (
+        leakage_status == "PASS"
+        and bool(paired_delta_rows)
+        and noninferior
+        and math.isfinite(min_center_delta)
+        and min_center_delta > 0.0
+        and (center3_delta >= 0.0 or _float(primary_i.get("center3_bacc", math.nan)) >= 0.82)
+        and bottom20_delta > 0.0
+        and seed_std_delta < 0.0
+        and tail_median_delta > 0.0
+        and tail_positive_fraction > 0.5
+    )
+    weak_success = (
+        leakage_status == "PASS"
+        and bool(paired_delta_rows)
+        and weak_noninferior
+        and math.isfinite(min_center_delta)
+        and min_center_delta > 0.0
+        and bottom20_delta > 0.0
+        and seed_std_delta < 0.0
+    )
+    strong_success = (
+        primary_success
+        and primary_mean >= 0.90
+        and _float(primary["min_center_bacc"]) >= 0.82
+        and _float(primary["center3_bacc"]) >= 0.82
+        and primary_mean > _float(anchor["center_equal_mean_bacc"])
+        and primary_mean > _float(canonical["center_equal_mean_bacc"])
+    )
+    verdict = "MULTIPANEL_TAILRISK_STABILIZATION_FAIL"
+    if leakage_status != "PASS":
+        verdict = "PROTOCOL_FAIL"
+    elif strong_success:
+        verdict = "MULTIPANEL_TAILRISK_STABILIZATION_STRONG_SUCCESS"
+    elif primary_success:
+        verdict = "MULTIPANEL_TAILRISK_STABILIZATION_PRIMARY_SUCCESS"
+    elif weak_success:
+        verdict = "MULTIPANEL_TAILRISK_STABILIZATION_WEAK_PASS"
+    return {
+        "primary_verdict": verdict,
+        "diagnostic_flags": "|".join(flags),
+        "primary_method": cfg.primary_method,
+        "leakage_status": leakage_status,
+        "claim_boundary": "stabilized source-only dense stochastic generative composition; not compatibility routing",
+        "comparison_cell_set": "intersection_v2_prior_tailrisk_canonical_random_shrink050",
+        "n_intersection_cells": len(paired_delta_rows),
+        "center_equal_mean_bacc": primary["center_equal_mean_bacc"],
+        "intersection_center_equal_mean_bacc": mean_i,
+        "seed_cell_mean_bacc": primary["seed_cell_mean_bacc"],
+        "center_equal_macro_f1": primary["center_equal_macro_f1"],
+        "min_center_bacc": primary["min_center_bacc"],
+        "seed_std_bacc": primary["seed_std_bacc"],
+        "bottom20_cell_mean_bacc": primary["bottom20_cell_mean_bacc"],
+        "worst_seed_center_bacc": primary["worst_seed_center_bacc"],
+        "center3_bacc": primary["center3_bacc"],
+        "prior_tailrisk_center_equal_mean_bacc": prior_mean,
+        "canonical_random_mass_bag_center_equal_mean_bacc": canonical["center_equal_mean_bacc"],
+        "pooled_random_mass_bag_center_equal_mean_bacc": pooled_random["center_equal_mean_bacc"],
+        "shrink050_center_equal_mean_bacc": anchor["center_equal_mean_bacc"],
+        "delta_vs_prior_tailrisk_intersection": mean_i - prior_mean if math.isfinite(mean_i) and math.isfinite(prior_mean) else math.nan,
+        "delta_vs_canonical_random_mass_bag_intersection": mean_i - canonical_mean if math.isfinite(mean_i) and math.isfinite(canonical_mean) else math.nan,
+        "min_center_delta_vs_prior_tailrisk": min_center_delta,
+        "center3_delta_vs_prior_tailrisk": center3_delta,
+        "bottom20_delta_vs_prior_tailrisk": bottom20_delta,
+        "seed_std_delta_vs_prior_tailrisk": seed_std_delta,
+        "frozen_bottom20_median_delta_vs_prior_tailrisk": tail_median_delta,
+        "frozen_bottom20_positive_fraction": tail_positive_fraction,
+        "worst_per_center_regression_vs_prior_tailrisk": worst_center_regression,
+        "tailrisk_transfer_flag": "TAIL_RISK_TRANSFER" in flags,
+        **primary,
+    }
+
+
+def _per_center_regressions(primary_stats: Mapping[str, object], prior_stats: Mapping[str, object]) -> dict[str, float]:
+    try:
+        primary = json.loads(str(primary_stats.get("per_center_bacc", "{}")))
+        prior = json.loads(str(prior_stats.get("per_center_bacc", "{}")))
+    except json.JSONDecodeError:
+        return {}
+    out = {}
+    for center, prior_value in prior.items():
+        p = _float(primary.get(center, math.nan))
+        b = _float(prior_value)
+        if math.isfinite(p) and math.isfinite(b):
+            out[str(center)] = p - b
+    return out
+
+
+def _write_multipanel_artifacts(
+    root: Path,
+    cfg: MultipanelTailRiskConfig,
+    *,
+    matrix_rows: Sequence[Mapping[str, object]],
+    seed_diagnostic_rows: Sequence[Mapping[str, object]],
+    source_weight_rows: Sequence[Mapping[str, object]],
+    reliability_rows: Sequence[Mapping[str, object]],
+    source_summary_rows: Sequence[Mapping[str, object]],
+    component_manifest_rows: Sequence[Mapping[str, object]],
+    component_coverage_rows: Sequence[Mapping[str, object]],
+    paired_generation_rows: Sequence[Mapping[str, object]],
+    eligibility_rows: Sequence[Mapping[str, object]],
+    blend_manifest_rows: Sequence[Mapping[str, object]],
+    calibration_rows: Sequence[Mapping[str, object]],
+    panel_disagreement_rows: Sequence[Mapping[str, object]],
+    invariant_rows: Sequence[Mapping[str, object]],
+    confidence_rows: Sequence[Mapping[str, object]],
+    failure_rows: Sequence[Mapping[str, object]],
+    paired_delta_rows: Sequence[Mapping[str, object]],
+    model_manifest_rows: Sequence[Mapping[str, object]],
+    decision: Mapping[str, object],
+    leakage: object,
+    protocol_violations: Sequence[str],
+    target_expert_excluded: bool,
+) -> None:
+    write_csv_rows(root / "tables" / "multipanel_tailrisk_downstream_matrix.csv", matrix_rows)
+    write_csv_rows(root / "tables" / "multipanel_tailrisk_seed_diagnostic_matrix.csv", seed_diagnostic_rows)
+    write_csv_rows(root / "tables" / "multipanel_tailrisk_summary.csv", [dict(decision)])
+    write_csv_rows(root / "tables" / "multipanel_tailrisk_failure_decomposition.csv", failure_rows)
+    write_csv_rows(root / "tables" / "multipanel_tailrisk_paired_deltas.csv", paired_delta_rows)
+    write_csv_rows(root / "tables" / "multipanel_tailrisk_panel_disagreement.csv", panel_disagreement_rows)
+    write_csv_rows(root / "tables" / "panel_ece_source_inner.csv", _panel_ece_source_inner_rows(calibration_rows))
+    write_csv_rows(root / "tables" / "panel_confidence_summary.csv", confidence_rows)
+    write_csv_rows(root / "tables" / "multipanel_tailrisk_probability_invariants.csv", invariant_rows)
+    write_csv_rows(root / "tables" / "multipanel_tailrisk_probability_blend_manifest.csv", blend_manifest_rows)
+    write_csv_rows(root / "tables" / "source_weight_manifest.csv", source_weight_rows)
+    write_csv_rows(root / "tables" / "source_reliability_manifest.csv", reliability_rows)
+    write_csv_rows(root / "tables" / "component_manifest.csv", component_manifest_rows)
+    write_csv_rows(root / "tables" / "component_coverage_audit.csv", component_coverage_rows)
+    write_csv_rows(root / "tables" / "paired_generation_audit.csv", paired_generation_rows)
+    write_csv_rows(root / "tables" / "eligibility_audit.csv", eligibility_rows)
+    write_csv_rows(root / "tables" / "source_summary_diagnostics.csv", source_summary_rows)
+    write_csv_rows(root / "manifests" / "multipanel_tailrisk_model_manifest.csv", model_manifest_rows)
+    write_json(root / "reports" / "leakage_report.json", leakage.to_json_dict())
+    write_json(
+        root / "manifests" / "protocol_manifest.json",
+        {
+            "schema_version": "cvae_rebuild_tailrisk_multipanel_component_union_protocol_v1",
+            "experiment_name": cfg.name,
+            "primary_method": cfg.primary_method,
+            "experiment_type": "source_only_tailrisk_multipanel_mass_bag_stabilization",
+            "target_expert_excluded": bool(target_expert_excluded),
+            "target_support_used": False,
+            "target_support_labels_for_selection": False,
+            "target_eval_labels_for_scoring_only": True,
+            "selection_used_target_labels": False,
+            "target_calibration_metrics_audit_only": True,
+            "source_inner_calibration_primary": True,
+            "target_conditioned_point_compatibility_estimate": False,
+            "fixed_all_source_inclusion": True,
+            "panel_seeds_are_evaluation_replicates": False,
+            "decision_cell": "experiment_seed_x_heldout_center",
+            "primary_pooling_rule": "blend_per_seed_then_equal_probability_pool",
+            "blend_alpha_locked": cfg.blend_alpha,
+            "random_mass_bag_size": cfg.random_mass_bag_size,
+            "random_mass_bag_distribution": "dirichlet_uniform_alpha4",
+            "panel_seed_groups": {panel: list(seeds) for panel, seeds in cfg.panel_seed_groups},
+            "prior_tailrisk_comparator": "" if cfg.prior_tailrisk_artifact_root is None else str(cfg.prior_tailrisk_artifact_root / "tables" / "tailrisk_downstream_matrix.csv"),
+            "claim_boundary": (
+                "stabilized source-only dense stochastic generative composition; "
+                "not compatibility routing, target adaptation, or target-label-driven method choice"
+            ),
+            "protocol_violations": list(protocol_violations),
+        },
+    )
+    write_json(root / "run_config_resolved.yaml", _resolved_multipanel_config(cfg))
+    _write_multipanel_decision_summary(root, decision)
+
+
+def _panel_ece_source_inner_rows(calibration_rows: Sequence[Mapping[str, object]]) -> list[dict[str, object]]:
+    out = []
+    groups: dict[tuple[str, str, str], list[Mapping[str, object]]] = {}
+    for row in calibration_rows:
+        groups.setdefault((str(row.get("heldout_center")), str(row.get("panel_group", "")), str(row.get("probability_source", ""))), []).append(row)
+    for (center, panel, source), rows in sorted(groups.items()):
+        ece = [_float(row.get("source_inner_ece")) for row in rows]
+        brier = [_float(row.get("source_inner_brier")) for row in rows]
+        log_loss = [_float(row.get("source_inner_log_loss")) for row in rows]
+        out.append(
+            {
+                "heldout_center": center,
+                "panel_group": panel,
+                "probability_source": source,
+                "mean_source_inner_ece": nanmean([value for value in ece if math.isfinite(value)]),
+                "mean_source_inner_brier": nanmean([value for value in brier if math.isfinite(value)]),
+                "mean_source_inner_log_loss": nanmean([value for value in log_loss if math.isfinite(value)]),
+                "source_inner_calibration_available": any(str(row.get("source_inner_calibration_available")) == "True" or row.get("source_inner_calibration_available") is True for row in rows),
+                "target_eval_calibration_audit_only": True,
+            }
+        )
+    return out
+
+
+def _resolved_multipanel_config(cfg: MultipanelTailRiskConfig) -> dict[str, object]:
+    resolved = _resolved_config(cfg)
+    resolved["experiment"]["name"] = cfg.name
+    resolved["experiment"]["artifact_root"] = str(cfg.artifact_root)
+    resolved["tailrisk_multipanel_component_union"] = {
+        "primary_method": cfg.primary_method,
+        "primary_shrink_lambda": cfg.primary_shrink_lambda,
+        "random_mass_bag_size": cfg.random_mass_bag_size,
+        "random_mass_bag_alpha": cfg.random_mass_bag_alpha,
+        "blend_alpha": cfg.blend_alpha,
+        "panel_seed_groups": {panel: list(seeds) for panel, seeds in cfg.panel_seed_groups},
+        "source_weighting": cfg.source_weighting,
+        "primary_pooling": cfg.primary_pooling,
+        "primary_noninferiority_margin": cfg.primary_noninferiority_margin,
+        "weak_pass_noninferiority_margin": cfg.weak_pass_noninferiority_margin,
+        "tailrisk_transfer_threshold": cfg.tailrisk_transfer_threshold,
+    }
+    return resolved
+
+
+def _write_multipanel_decision_summary(root: Path, decision: Mapping[str, object]) -> None:
+    lines = [
+        "# Multi-Panel Tail-Risk Mass-Bag Stabilization v1",
+        "",
+        "## Summary",
+        "",
+        f"- Primary method: `{decision.get('primary_method', PRIMARY_MULTIPANEL_TAILRISK_METHOD)}`",
+        f"- Primary verdict: `{decision.get('primary_verdict', 'MULTIPANEL_TAILRISK_STABILIZATION_FAIL')}`",
+        f"- Diagnostic flags: `{decision.get('diagnostic_flags', '')}`",
+        f"- Center-equal mean BACC: {_format_float(decision.get('center_equal_mean_bacc'))}",
+        f"- Intersection mean BACC: {_format_float(decision.get('intersection_center_equal_mean_bacc'))}",
+        f"- Min center BACC: {_format_float(decision.get('min_center_bacc'))}",
+        f"- Center 3 BACC: {_format_float(decision.get('center3_bacc'))}",
+        f"- Frozen bottom-20 BACC: {_format_float(decision.get('bottom20_cell_mean_bacc'))}",
+        f"- Seed std BACC: {_format_float(decision.get('seed_std_bacc'))}",
+        f"- Delta vs prior tailrisk: {_format_float(decision.get('delta_vs_prior_tailrisk_intersection'))}",
+        f"- Delta vs canonical random mass-bag: {_format_float(decision.get('delta_vs_canonical_random_mass_bag_intersection'))}",
+        f"- Frozen bottom20 median delta: {_format_float(decision.get('frozen_bottom20_median_delta_vs_prior_tailrisk'))}",
+        f"- Worst per-center regression vs prior tailrisk: {_format_float(decision.get('worst_per_center_regression_vs_prior_tailrisk'))}",
+        f"- Tail-risk transfer flag: `{decision.get('tailrisk_transfer_flag')}`",
+        f"- Leakage status: `{decision.get('leakage_status', '')}`",
+        "",
+        "## Protocol Boundary",
+        "",
+        "This is a source-only stochastic-composition stabilization experiment. It is not a compatibility router and does not claim random mass-bag discovers target-compatible experts.",
+        "",
+        "The primary method blends each seed-specific shrink050 anchor with its seed-specific random mass-bag, then probability-pools the nine predeclared seed blends before computing metrics.",
+        "",
+        "Target evaluation labels are scoring/audit only and never choose seeds, alpha, source set, calibration, classifier, or pass/fail policy.",
+        "",
+    ]
+    (root / "reports" / "decision_summary.md").write_text("\n".join(lines), encoding="utf-8")
 
 
 def _evaluate_tailrisk_pair(

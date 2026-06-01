@@ -15,8 +15,13 @@ from cvae_rebuild.component_union_mass_bagged import (
     parse_mass_bagged_component_union_config,
 )
 from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
+    MULTIPANEL_PANEL_SEEDS,
+    MULTIPANEL_TAILRISK_NAME,
+    PRIMARY_MULTIPANEL_TAILRISK_METHOD,
     PRIMARY_TAILRISK_METHOD,
+    load_multipanel_tailrisk_component_union_config,
     load_tailrisk_anchored_component_union_config,
+    parse_multipanel_tailrisk_component_union_config,
     parse_tailrisk_anchored_component_union_config,
 )
 from cvae_rebuild.dense_reliability_tailshield_random_mass_bag import (
@@ -314,6 +319,56 @@ def test_tailrisk_anchored_component_union_rejects_changed_random_bag_size() -> 
 
     with pytest.raises(Exception, match="random_mass_bag_size=11"):
         parse_tailrisk_anchored_component_union_config(payload, base_dir=Path("."))
+
+
+def test_locked_multipanel_tailrisk_component_union_config_loads() -> None:
+    cfg = load_multipanel_tailrisk_component_union_config(
+        "cvae_rebuild/configs/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1.yaml"
+    )
+    assert cfg.name == MULTIPANEL_TAILRISK_NAME
+    assert cfg.backbone == "virchow2"
+    assert cfg.primary_variant == "pca64_beta001"
+    assert cfg.primary_method == PRIMARY_MULTIPANEL_TAILRISK_METHOD
+    assert cfg.strict_full_run_matrix is True
+    assert cfg.experiment_seeds == (42, 43, 44)
+    assert cfg.heldout_centers == ("0", "1", "2", "3", "4")
+    assert cfg.replicate_seeds == (17, 23, 31)
+    assert cfg.fresh_replicate_seeds == (101, 103, 107, 109, 113, 127)
+    assert cfg.panel_seed_groups == MULTIPANEL_PANEL_SEEDS
+    assert cfg.all_panel_seeds == (17, 23, 31, 101, 103, 107, 109, 113, 127)
+    assert cfg.random_mass_bag_size == 11
+    assert cfg.random_mass_bag_alpha == 4.0
+    assert cfg.blend_alpha == 0.5
+    assert cfg.primary_pooling == "seed_blend_then_equal_probability_pool"
+    assert cfg.matched_shuffled_reliability_null_permutations == 0
+
+
+def test_multipanel_tailrisk_rejects_changed_blend_alpha() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["tailrisk_multipanel_component_union"]["blend_alpha"] = 0.25
+
+    with pytest.raises(Exception, match="blend_alpha"):
+        parse_multipanel_tailrisk_component_union_config(payload, base_dir=Path("."))
+
+
+def test_multipanel_tailrisk_rejects_undeclared_panel_seed() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["tailrisk_multipanel_component_union"]["panel_seed_groups"]["fresh_b"][-1] = 131
+    payload["run_matrix"]["fresh_replicate_seeds"][-1] = 131
+
+    with pytest.raises(Exception, match="panel_seed_groups"):
+        parse_multipanel_tailrisk_component_union_config(payload, base_dir=Path("."))
+
+
+def test_multipanel_tailrisk_rejects_target_support_field() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["inputs"]["support_calibrated_artifact_root"] = "cvae_rebuild/artifacts/not_allowed"
+
+    with pytest.raises(Exception, match="support_calibrated_artifact_root"):
+        parse_multipanel_tailrisk_component_union_config(payload, base_dir=Path("."))
 
 
 def test_locked_dense_tailshield_random_mass_bag_config_loads() -> None:
