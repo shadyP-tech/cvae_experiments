@@ -66,6 +66,13 @@ MULTIPANEL_PANEL_SEEDS = (
     (MULTIPANEL_FRESH_A_PANEL, (101, 103, 107)),
     (MULTIPANEL_FRESH_B_PANEL, (109, 113, 127)),
 )
+CENTER3_FAILURE_AUDIT_CELLS = (
+    (42, "3"),
+    (44, "3"),
+    (43, "4"),
+    (43, "1"),
+)
+CENTER3_FAILURE_PRIMARY_CELL = (42, "3")
 
 
 @dataclass(frozen=True)
@@ -928,6 +935,9 @@ def run_multipanel_tailrisk_component_union(
     invariant_rows: list[dict[str, object]] = []
     confidence_rows: list[dict[str, object]] = []
     failure_rows: list[dict[str, object]] = []
+    center3_failure_cell_rows: list[dict[str, object]] = []
+    center3_failure_sample_rows: list[dict[str, object]] = []
+    center3_failure_pooling_rows: list[dict[str, object]] = []
     model_manifest_rows: list[dict[str, object]] = []
     protocol_violations: list[str] = []
     target_expert_excluded = True
@@ -1141,6 +1151,9 @@ def run_multipanel_tailrisk_component_union(
                 invariant_rows.extend(final["invariant_rows"])
                 confidence_rows.extend(final["confidence_rows"])
                 failure_rows.extend(final["failure_rows"])
+                center3_failure_cell_rows.extend(final["center3_failure_cell_rows"])
+                center3_failure_sample_rows.extend(final["center3_failure_sample_rows"])
+                center3_failure_pooling_rows.extend(final["center3_failure_pooling_rows"])
     except ProtocolError as exc:
         protocol_violations.append(str(exc))
 
@@ -1180,6 +1193,9 @@ def run_multipanel_tailrisk_component_union(
         invariant_rows=invariant_rows,
         confidence_rows=confidence_rows,
         failure_rows=failure_rows,
+        center3_failure_cell_rows=center3_failure_cell_rows,
+        center3_failure_sample_rows=center3_failure_sample_rows,
+        center3_failure_pooling_rows=center3_failure_pooling_rows,
         paired_delta_rows=paired_delta_rows,
         model_manifest_rows=model_manifest_rows,
         decision=decision,
@@ -1277,6 +1293,9 @@ def _build_multipanel_cell_outputs(
         "invariant_rows": [],
         "confidence_rows": [],
         "failure_rows": [],
+        "center3_failure_cell_rows": [],
+        "center3_failure_sample_rows": [],
+        "center3_failure_pooling_rows": [],
     }
     ok = [
         item
@@ -1453,6 +1472,22 @@ def _build_multipanel_cell_outputs(
             "status": "ok",
         }
     )
+    audit = _center3_failure_audit_outputs(
+        cfg,
+        experiment_seed=experiment_seed,
+        heldout_center=heldout_center,
+        eval_labels=eval_labels,
+        eval_sample_ids=eval_sample_ids,
+        final_bundle=final_bundle,
+        pooled_anchor=pooled_anchor,
+        pooled_random=pooled_random,
+        canonical_random=canonical_random,
+        panel_blend_bundles=panel_blend_bundles,
+        seed_evaluations=ok,
+    )
+    out["center3_failure_cell_rows"].extend(audit["cell_rows"])
+    out["center3_failure_sample_rows"].extend(audit["sample_rows"])
+    out["center3_failure_pooling_rows"].extend(audit["pooling_rows"])
     return out
 
 
@@ -1466,6 +1501,373 @@ def _pool_bundle(method: str, bundles: Sequence[PredictionBundle | None]) -> Pre
         probabilities=tuple(tuple(float(value) for value in row) for row in pooled),
         classes=valid[0].classes,
     )
+
+
+def _is_center3_failure_audit_cell(experiment_seed: int | str, heldout_center: str) -> bool:
+    key = (int(experiment_seed), str(heldout_center))
+    return key in {(int(seed), str(center)) for seed, center in CENTER3_FAILURE_AUDIT_CELLS}
+
+
+def _center3_failure_audit_role(experiment_seed: int | str, heldout_center: str) -> str:
+    key = (int(experiment_seed), str(heldout_center))
+    if key == CENTER3_FAILURE_PRIMARY_CELL:
+        return "primary_center3_failure"
+    if str(heldout_center) == "3":
+        return "center3_control"
+    if key == (43, "4"):
+        return "tail_repair_control"
+    if key == (43, "1"):
+        return "weak_tail_control"
+    return "diagnostic_control"
+
+
+def _center3_failure_audit_outputs(
+    cfg: MultipanelTailRiskConfig,
+    *,
+    experiment_seed: int,
+    heldout_center: str,
+    eval_labels: Sequence[int],
+    eval_sample_ids: Sequence[str],
+    final_bundle: PredictionBundle,
+    pooled_anchor: PredictionBundle,
+    pooled_random: PredictionBundle,
+    canonical_random: PredictionBundle,
+    panel_blend_bundles: Mapping[str, PredictionBundle],
+    seed_evaluations: Sequence[_MultipanelSeedEvaluation],
+) -> dict[str, list[dict[str, object]]]:
+    if not _is_center3_failure_audit_cell(experiment_seed, heldout_center):
+        return {"cell_rows": [], "sample_rows": [], "pooling_rows": []}
+
+    cell_role = _center3_failure_audit_role(experiment_seed, heldout_center)
+    method_bundles: list[tuple[str, str, str, int, str, PredictionBundle]] = [
+        ("final_v2", cfg.primary_method, "all_seed_final_pool", 0, "all_seed_blend_pool", final_bundle),
+        ("pooled_anchor", MULTIPANEL_POOLED_ANCHOR_METHOD, "all_seed_anchor_pool", 0, "all_seed_anchor_pool", pooled_anchor),
+        ("pooled_random_mass_bag", MULTIPANEL_POOLED_RANDOM_BAG_METHOD, "all_seed_random_pool", 0, "all_seed_random_pool", pooled_random),
+        ("canonical_random_mass_bag", MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD, "canonical_random_pool", 0, "canonical_random_pool", canonical_random),
+    ]
+    for panel, bundle in panel_blend_bundles.items():
+        method_bundles.append(
+            (
+                f"panel_{panel}_blend",
+                f"{MULTIPANEL_SEED_BLEND_METHOD}_{panel}",
+                "panel_seed_blend_pool",
+                0,
+                str(panel),
+                bundle,
+            )
+        )
+    for item in seed_evaluations:
+        if item.evaluated.anchor_result.bundle is not None:
+            method_bundles.append(
+                (
+                    f"seed_{item.seed}_anchor",
+                    ANCHOR_METHOD,
+                    "individual_seed_anchor",
+                    int(item.seed),
+                    item.panel_group,
+                    item.evaluated.anchor_result.bundle,
+                )
+            )
+        if item.evaluated.bag_evaluation.ensemble_bundle is not None:
+            method_bundles.append(
+                (
+                    f"seed_{item.seed}_random_mass_bag",
+                    BAG_METHOD,
+                    "individual_seed_random_mass_bag",
+                    int(item.seed),
+                    item.panel_group,
+                    item.evaluated.bag_evaluation.ensemble_bundle,
+                )
+            )
+        if item.evaluated.primary_bundle is not None:
+            method_bundles.append(
+                (
+                    f"seed_{item.seed}_blend",
+                    MULTIPANEL_SEED_BLEND_METHOD,
+                    "individual_seed_blend",
+                    int(item.seed),
+                    item.panel_group,
+                    item.evaluated.primary_bundle,
+                )
+            )
+
+    cell_rows = [
+        _center3_failure_cell_metric_row(
+            experiment_seed=experiment_seed,
+            heldout_center=heldout_center,
+            cell_role=cell_role,
+            audit_method=audit_method,
+            prior_method=prior_method,
+            pooling_stage=pooling_stage,
+            replicate_seed=replicate_seed,
+            panel=panel,
+            bundle=bundle,
+            eval_labels=eval_labels,
+        )
+        for audit_method, prior_method, pooling_stage, replicate_seed, panel, bundle in method_bundles
+    ]
+    cell_rows = _annotate_center3_failure_metric_deltas(cell_rows)
+    pooling_rows = [dict(row, pooling_path_role=row["pooling_stage"]) for row in cell_rows]
+    sample_rows = _center3_failure_sample_rows(
+        experiment_seed=experiment_seed,
+        heldout_center=heldout_center,
+        cell_role=cell_role,
+        eval_labels=eval_labels,
+        eval_sample_ids=eval_sample_ids,
+        method_bundles=method_bundles,
+    )
+    return {"cell_rows": cell_rows, "sample_rows": sample_rows, "pooling_rows": pooling_rows}
+
+
+def _center3_failure_cell_metric_row(
+    *,
+    experiment_seed: int,
+    heldout_center: str,
+    cell_role: str,
+    audit_method: str,
+    prior_method: str,
+    pooling_stage: str,
+    replicate_seed: int,
+    panel: str,
+    bundle: PredictionBundle,
+    eval_labels: Sequence[int],
+) -> dict[str, object]:
+    probs = np.asarray(bundle.probabilities, dtype=float)
+    preds = predict_from_probabilities(bundle.probabilities, classes=bundle.classes)
+    result = evaluate_probability_predictions(audit_method, bundle.probabilities, eval_labels, classes=bundle.classes)
+    labels = tuple(int(value) for value in eval_labels)
+    row: dict[str, object] = {
+        "audit_only": True,
+        "target_eval_labels_used_for_audit_only": True,
+        "selection_used_target_labels": False,
+        "experiment_seed": int(experiment_seed),
+        "heldout_center": str(heldout_center),
+        "audit_cell_role": cell_role,
+        "audit_method": audit_method,
+        "prior_method": prior_method,
+        "pooling_stage": pooling_stage,
+        "aggregation_unit": "diagnostic_probability_bundle",
+        "replicate_seed": int(replicate_seed),
+        "panel": str(panel),
+        "bacc": result.bacc,
+        "macro_f1": result.macro_f1,
+        "n_target_eval": len(labels),
+        "class_order": "|".join(str(value) for value in bundle.classes),
+        "class_count_json": json.dumps(_count_by_value(labels), sort_keys=True),
+        "predicted_class_count_json": json.dumps(_count_by_value(preds), sort_keys=True),
+        "error_count_json": json.dumps(_error_count_by_class(labels, preds), sort_keys=True),
+        "prediction_hash": _hash_array(probs),
+    }
+    row.update(_binary_class_metric_fields(labels, preds))
+    if probs.ndim == 2 and probs.shape[0]:
+        confidences = np.max(probs, axis=1)
+        margins = _probability_margins(probs)
+        correct = np.asarray([int(t) == int(p) for t, p in zip(labels, preds)], dtype=bool)
+        row.update(
+            {
+                "mean_confidence": float(np.mean(confidences)),
+                "median_confidence": float(np.median(confidences)),
+                "mean_margin": float(np.mean(margins)),
+                "median_margin": float(np.median(margins)),
+                "mean_confidence_correct": float(np.mean(confidences[correct])) if bool(np.any(correct)) else math.nan,
+                "mean_confidence_incorrect": float(np.mean(confidences[~correct])) if bool(np.any(~correct)) else math.nan,
+                "mean_probability_class0": float(np.mean(_probability_column(bundle, 0))),
+                "mean_probability_class1": float(np.mean(_probability_column(bundle, 1))),
+            }
+        )
+    else:
+        row.update(
+            {
+                "mean_confidence": math.nan,
+                "median_confidence": math.nan,
+                "mean_margin": math.nan,
+                "median_margin": math.nan,
+                "mean_confidence_correct": math.nan,
+                "mean_confidence_incorrect": math.nan,
+                "mean_probability_class0": math.nan,
+                "mean_probability_class1": math.nan,
+            }
+        )
+    return row
+
+
+def _annotate_center3_failure_metric_deltas(rows: Sequence[Mapping[str, object]]) -> list[dict[str, object]]:
+    final_bacc = _first_finite(row.get("bacc") for row in rows if row.get("audit_method") == "final_v2")
+    seed_blends = [row for row in rows if row.get("pooling_stage") == "individual_seed_blend"]
+    panels = [row for row in rows if row.get("pooling_stage") == "panel_seed_blend_pool"]
+    best_seed = _best_bacc_row(seed_blends)
+    best_panel = _best_bacc_row(panels)
+    best_seed_bacc = _float(best_seed.get("bacc", math.nan)) if best_seed else math.nan
+    best_panel_bacc = _float(best_panel.get("bacc", math.nan)) if best_panel else math.nan
+    out = []
+    for row in rows:
+        updated = dict(row)
+        bacc = _float(updated.get("bacc"))
+        updated["final_v2_bacc"] = final_bacc
+        updated["delta_bacc_vs_final_v2"] = bacc - final_bacc if math.isfinite(bacc) and math.isfinite(final_bacc) else math.nan
+        updated["best_individual_seed_blend_method"] = best_seed.get("audit_method", "") if best_seed else ""
+        updated["best_individual_seed_blend_bacc"] = best_seed_bacc
+        updated["delta_bacc_vs_best_individual_seed_blend"] = bacc - best_seed_bacc if math.isfinite(bacc) and math.isfinite(best_seed_bacc) else math.nan
+        updated["best_panel_blend_method"] = best_panel.get("audit_method", "") if best_panel else ""
+        updated["best_panel_blend_bacc"] = best_panel_bacc
+        updated["delta_bacc_vs_best_panel_blend"] = bacc - best_panel_bacc if math.isfinite(bacc) and math.isfinite(best_panel_bacc) else math.nan
+        updated["delta_best_individual_seed_blend_minus_final_v2"] = best_seed_bacc - final_bacc if math.isfinite(best_seed_bacc) and math.isfinite(final_bacc) else math.nan
+        updated["delta_best_panel_blend_minus_final_v2"] = best_panel_bacc - final_bacc if math.isfinite(best_panel_bacc) and math.isfinite(final_bacc) else math.nan
+        out.append(updated)
+    return out
+
+
+def _center3_failure_sample_rows(
+    *,
+    experiment_seed: int,
+    heldout_center: str,
+    cell_role: str,
+    eval_labels: Sequence[int],
+    eval_sample_ids: Sequence[str],
+    method_bundles: Sequence[tuple[str, str, str, int, str, PredictionBundle]],
+) -> list[dict[str, object]]:
+    labels = tuple(int(value) for value in eval_labels)
+    bundle_by_audit_method = {audit_method: bundle for audit_method, _prior, _stage, _seed, _panel, bundle in method_bundles}
+    pred_by_method = {
+        audit_method: predict_from_probabilities(bundle.probabilities, classes=bundle.classes)
+        for audit_method, bundle in bundle_by_audit_method.items()
+    }
+    probs_by_method = {
+        audit_method: np.asarray(bundle.probabilities, dtype=float)
+        for audit_method, bundle in bundle_by_audit_method.items()
+    }
+    seed_blend_methods = [audit_method for audit_method, _prior, stage, _seed, _panel, _bundle in method_bundles if stage == "individual_seed_blend"]
+    panel_methods = [audit_method for audit_method, _prior, stage, _seed, _panel, _bundle in method_bundles if stage == "panel_seed_blend_pool"]
+    out = []
+    for idx, true_label in enumerate(labels):
+        row: dict[str, object] = {
+            "audit_only": True,
+            "target_eval_labels_used_for_audit_only": True,
+            "selection_used_target_labels": False,
+            "experiment_seed": int(experiment_seed),
+            "heldout_center": str(heldout_center),
+            "audit_cell_role": cell_role,
+            "sample_index": idx,
+            "sample_id": str(eval_sample_ids[idx]) if idx < len(eval_sample_ids) else "",
+            "true_label": int(true_label),
+        }
+        for audit_method, _prior_method, _stage, _replicate_seed, _panel, bundle in method_bundles:
+            probs = probs_by_method[audit_method]
+            pred = int(pred_by_method[audit_method][idx])
+            prefix = _safe_audit_prefix(audit_method)
+            row[f"{prefix}_pred"] = pred
+            row[f"{prefix}_correct"] = pred == int(true_label)
+            row[f"{prefix}_prob_class0"] = _sample_probability_for_class(bundle, probs, idx, 0)
+            row[f"{prefix}_prob_class1"] = _sample_probability_for_class(bundle, probs, idx, 1)
+            row[f"{prefix}_confidence"] = float(np.max(probs[idx])) if probs.ndim == 2 and idx < probs.shape[0] else math.nan
+            row[f"{prefix}_margin"] = _sample_probability_margin(probs, idx)
+        final_pred = int(pred_by_method.get("final_v2", (math.nan,) * len(labels))[idx])
+        seed_preds = [int(pred_by_method[name][idx]) for name in seed_blend_methods]
+        panel_preds = [int(pred_by_method[name][idx]) for name in panel_methods]
+        seed_class1 = [
+            _sample_probability_for_class(bundle_by_audit_method[name], probs_by_method[name], idx, 1)
+            for name in seed_blend_methods
+        ]
+        panel_class1 = [
+            _sample_probability_for_class(bundle_by_audit_method[name], probs_by_method[name], idx, 1)
+            for name in panel_methods
+        ]
+        row["n_seed_blends"] = len(seed_blend_methods)
+        row["n_seed_blends_disagree_with_final"] = sum(pred != final_pred for pred in seed_preds)
+        row["n_panel_blends_disagree_with_final"] = sum(pred != final_pred for pred in panel_preds)
+        row["seed_blend_probability_spread_class1"] = _finite_range(seed_class1)
+        row["panel_probability_spread_class1"] = _finite_range(panel_class1)
+        for seed in (101, 127):
+            name = f"seed_{seed}_blend"
+            seed_correct = bool(row.get(f"{_safe_audit_prefix(name)}_correct", False))
+            final_correct = bool(row.get("final_v2_correct", False))
+            row[f"seed_{seed}_correct_final_wrong"] = seed_correct and not final_correct
+            row[f"final_correct_seed_{seed}_wrong"] = final_correct and not seed_correct
+        out.append(row)
+    return out
+
+
+def _binary_class_metric_fields(labels: Sequence[int], preds: Sequence[int]) -> dict[str, object]:
+    out: dict[str, object] = {}
+    for cls in (0, 1):
+        total = sum(int(value) == cls for value in labels)
+        correct = sum(int(t) == cls and int(p) == cls for t, p in zip(labels, preds))
+        predicted = sum(int(value) == cls for value in preds)
+        errors = sum(int(t) == cls and int(p) != cls for t, p in zip(labels, preds))
+        negatives = sum(int(value) != cls for value in labels)
+        true_negatives = sum(int(t) != cls and int(p) != cls for t, p in zip(labels, preds))
+        out[f"class{cls}_support"] = total
+        out[f"class{cls}_predicted_count"] = predicted
+        out[f"class{cls}_error_count"] = errors
+        out[f"class{cls}_recall"] = float(correct) / float(total) if total else math.nan
+        out[f"class{cls}_specificity"] = float(true_negatives) / float(negatives) if negatives else math.nan
+    return out
+
+
+def _count_by_value(values: Sequence[int]) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for value in values:
+        key = str(int(value))
+        out[key] = out.get(key, 0) + 1
+    return out
+
+
+def _error_count_by_class(labels: Sequence[int], preds: Sequence[int]) -> dict[str, int]:
+    out = {"0": 0, "1": 0}
+    for true, pred in zip(labels, preds):
+        if int(true) != int(pred):
+            key = str(int(true))
+            out[key] = out.get(key, 0) + 1
+    return out
+
+
+def _probability_column(bundle: PredictionBundle, cls: int) -> np.ndarray:
+    probs = np.asarray(bundle.probabilities, dtype=float)
+    if probs.ndim != 2 or cls not in bundle.classes:
+        return np.asarray([], dtype=float)
+    return probs[:, bundle.classes.index(cls)]
+
+
+def _probability_margins(probs: np.ndarray) -> np.ndarray:
+    if probs.ndim != 2 or probs.shape[1] < 2:
+        return np.asarray([], dtype=float)
+    sorted_probs = np.sort(probs, axis=1)
+    return sorted_probs[:, -1] - sorted_probs[:, -2]
+
+
+def _sample_probability_for_class(bundle: PredictionBundle, probs: np.ndarray, idx: int, cls: int) -> float:
+    if probs.ndim != 2 or idx >= probs.shape[0] or cls not in bundle.classes:
+        return math.nan
+    return float(probs[idx, bundle.classes.index(cls)])
+
+
+def _sample_probability_margin(probs: np.ndarray, idx: int) -> float:
+    if probs.ndim != 2 or idx >= probs.shape[0] or probs.shape[1] < 2:
+        return math.nan
+    values = sorted(float(value) for value in probs[idx])
+    return values[-1] - values[-2]
+
+
+def _safe_audit_prefix(value: str) -> str:
+    return "".join(ch if ch.isalnum() else "_" for ch in str(value)).strip("_")
+
+
+def _finite_range(values: Sequence[float]) -> float:
+    finite = [float(value) for value in values if math.isfinite(float(value))]
+    return max(finite) - min(finite) if finite else math.nan
+
+
+def _best_bacc_row(rows: Sequence[Mapping[str, object]]) -> Mapping[str, object]:
+    finite = [row for row in rows if math.isfinite(_float(row.get("bacc")))]
+    return max(finite, key=lambda row: _float(row.get("bacc"))) if finite else {}
+
+
+def _first_finite(values: Sequence[object]) -> float:
+    for value in values:
+        parsed = _float(value)
+        if math.isfinite(parsed):
+            return parsed
+    return math.nan
 
 
 def _multipanel_result_row(
@@ -2033,6 +2435,9 @@ def _write_multipanel_artifacts(
     invariant_rows: Sequence[Mapping[str, object]],
     confidence_rows: Sequence[Mapping[str, object]],
     failure_rows: Sequence[Mapping[str, object]],
+    center3_failure_cell_rows: Sequence[Mapping[str, object]],
+    center3_failure_sample_rows: Sequence[Mapping[str, object]],
+    center3_failure_pooling_rows: Sequence[Mapping[str, object]],
     paired_delta_rows: Sequence[Mapping[str, object]],
     model_manifest_rows: Sequence[Mapping[str, object]],
     decision: Mapping[str, object],
@@ -2058,6 +2463,14 @@ def _write_multipanel_artifacts(
     write_csv_rows(root / "tables" / "eligibility_audit.csv", eligibility_rows)
     write_csv_rows(root / "tables" / "source_summary_diagnostics.csv", source_summary_rows)
     write_csv_rows(root / "manifests" / "multipanel_tailrisk_model_manifest.csv", model_manifest_rows)
+    _write_center3_failure_audit_artifacts(
+        root,
+        cell_rows=center3_failure_cell_rows,
+        sample_rows=center3_failure_sample_rows,
+        pooling_rows=center3_failure_pooling_rows,
+        source_weight_rows=source_weight_rows,
+        component_coverage_rows=component_coverage_rows,
+    )
     write_json(root / "reports" / "leakage_report.json", leakage.to_json_dict())
     write_json(
         root / "manifests" / "protocol_manifest.json",
@@ -2072,6 +2485,9 @@ def _write_multipanel_artifacts(
             "target_eval_labels_for_scoring_only": True,
             "selection_used_target_labels": False,
             "target_calibration_metrics_audit_only": True,
+            "center3_failure_audit_diagnostic_only": True,
+            "center3_failure_audit_target_labels_post_prediction_only": True,
+            "center3_failure_audit_cells": [f"{seed}xcenter{center}" for seed, center in CENTER3_FAILURE_AUDIT_CELLS],
             "source_inner_calibration_primary": True,
             "target_conditioned_point_compatibility_estimate": False,
             "fixed_all_source_inclusion": True,
@@ -2092,6 +2508,161 @@ def _write_multipanel_artifacts(
     )
     write_json(root / "run_config_resolved.yaml", _resolved_multipanel_config(cfg))
     _write_multipanel_decision_summary(root, decision)
+
+
+def _write_center3_failure_audit_artifacts(
+    root: Path,
+    *,
+    cell_rows: Sequence[Mapping[str, object]],
+    sample_rows: Sequence[Mapping[str, object]],
+    pooling_rows: Sequence[Mapping[str, object]],
+    source_weight_rows: Sequence[Mapping[str, object]],
+    component_coverage_rows: Sequence[Mapping[str, object]],
+) -> None:
+    audit_root = root / "center3_failure_audit"
+    filtered_source_weights = _center3_failure_filtered_existing_rows(source_weight_rows)
+    filtered_component_coverage = _center3_failure_filtered_existing_rows(component_coverage_rows)
+    write_csv_rows(audit_root / "center3_failure_cell_summary.csv", cell_rows)
+    write_csv_rows(audit_root / "center3_failure_sample_audit.csv", sample_rows)
+    write_csv_rows(audit_root / "center3_failure_pooling_path.csv", pooling_rows)
+    write_csv_rows(audit_root / "center3_failure_source_weight_comparison.csv", filtered_source_weights)
+    write_csv_rows(audit_root / "center3_failure_component_coverage_comparison.csv", filtered_component_coverage)
+    _write_center3_failure_conclusion(
+        audit_root / "center3_failure_conclusion.md",
+        cell_rows=cell_rows,
+        sample_rows=sample_rows,
+        source_weight_rows=filtered_source_weights,
+        component_coverage_rows=filtered_component_coverage,
+    )
+
+
+def _center3_failure_filtered_existing_rows(rows: Sequence[Mapping[str, object]]) -> list[dict[str, object]]:
+    out = []
+    for row in rows:
+        experiment_seed = _safe_int(row.get("experiment_seed"), default=-1)
+        heldout_center = str(row.get("heldout_center", ""))
+        if not _is_center3_failure_audit_cell(experiment_seed, heldout_center):
+            continue
+        out.append(
+            {
+                "audit_only": True,
+                "target_eval_labels_used_for_audit_only": True,
+                "selection_used_target_labels": False,
+                "audit_cell_role": _center3_failure_audit_role(experiment_seed, heldout_center),
+                **dict(row),
+            }
+        )
+    return out
+
+
+def _write_center3_failure_conclusion(
+    path: Path,
+    *,
+    cell_rows: Sequence[Mapping[str, object]],
+    sample_rows: Sequence[Mapping[str, object]],
+    source_weight_rows: Sequence[Mapping[str, object]],
+    component_coverage_rows: Sequence[Mapping[str, object]],
+) -> None:
+    primary_cell = [
+        row
+        for row in cell_rows
+        if int(_safe_int(row.get("experiment_seed"), default=-1)) == CENTER3_FAILURE_PRIMARY_CELL[0]
+        and str(row.get("heldout_center")) == CENTER3_FAILURE_PRIMARY_CELL[1]
+    ]
+    final = next((row for row in primary_cell if row.get("audit_method") == "final_v2"), {})
+    best_seed_delta = _float(final.get("delta_best_individual_seed_blend_minus_final_v2", math.nan))
+    class0_recall = _float(final.get("class0_recall", math.nan))
+    class1_recall = _float(final.get("class1_recall", math.nan))
+    class0_pred = _safe_int(final.get("class0_predicted_count"), default=0)
+    class1_pred = _safe_int(final.get("class1_predicted_count"), default=0)
+    n_eval = _safe_int(final.get("n_target_eval"), default=0)
+    seed101_suppressed = sum(
+        1
+        for row in sample_rows
+        if row.get("audit_cell_role") == "primary_center3_failure"
+        and (row.get("seed_101_correct_final_wrong") is True or str(row.get("seed_101_correct_final_wrong")) == "True")
+    )
+    seed127_suppressed = sum(
+        1
+        for row in sample_rows
+        if row.get("audit_cell_role") == "primary_center3_failure"
+        and (row.get("seed_127_correct_final_wrong") is True or str(row.get("seed_127_correct_final_wrong")) == "True")
+    )
+    final_correct_seed101_wrong = sum(
+        1
+        for row in sample_rows
+        if row.get("audit_cell_role") == "primary_center3_failure"
+        and (row.get("final_correct_seed_101_wrong") is True or str(row.get("final_correct_seed_101_wrong")) == "True")
+    )
+    final_correct_seed127_wrong = sum(
+        1
+        for row in sample_rows
+        if row.get("audit_cell_role") == "primary_center3_failure"
+        and (row.get("final_correct_seed_127_wrong") is True or str(row.get("final_correct_seed_127_wrong")) == "True")
+    )
+    flags: list[str] = []
+    if not final:
+        flags.append("insufficient_row_level_evidence")
+    if n_eval and (class0_pred == 0 or class1_pred == 0 or class0_pred == n_eval or class1_pred == n_eval):
+        flags.append("class_collapse")
+    elif math.isfinite(class0_recall) and math.isfinite(class1_recall) and min(class0_recall, class1_recall) <= 0.05:
+        flags.append("near_class_collapse")
+    if math.isfinite(best_seed_delta) and best_seed_delta >= 0.10:
+        flags.append("probability_pooling_suppresses_best_seed")
+    if seed101_suppressed > final_correct_seed101_wrong or seed127_suppressed > final_correct_seed127_wrong:
+        if "probability_pooling_suppresses_best_seed" not in flags:
+            flags.append("probability_pooling_suppresses_best_seed")
+    mean_incorrect_conf = _float(final.get("mean_confidence_incorrect", math.nan))
+    if math.isfinite(mean_incorrect_conf) and mean_incorrect_conf >= 0.65:
+        flags.append("confident_wrong_predictions")
+    if not flags:
+        flags.append("no_single_dominant_failure_mode_from_compact_audit")
+
+    lines = [
+        "# Center3 Failure Audit",
+        "",
+        "## Scope",
+        "",
+        "Diagnostic-only audit of predefined cells. Target labels are used only after fixed prediction bundles exist, for scoring and failure analysis.",
+        "",
+        "## Primary Cell",
+        "",
+        f"- Cell: `{CENTER3_FAILURE_PRIMARY_CELL[0]} x center{CENTER3_FAILURE_PRIMARY_CELL[1]}`",
+        f"- Final v2 BACC: {_format_float(final.get('bacc', math.nan)) if final else 'nan'}",
+        f"- Final class0 recall: {_format_float(class0_recall)}",
+        f"- Final class1 recall: {_format_float(class1_recall)}",
+        f"- Predicted class counts: class0={class0_pred}, class1={class1_pred}, n={n_eval}",
+        f"- Best individual seed-blend delta over final: {_format_float(best_seed_delta)}",
+        f"- Seed101 correct while final wrong: {seed101_suppressed}",
+        f"- Seed127 correct while final wrong: {seed127_suppressed}",
+        f"- Final correct while seed101 wrong: {final_correct_seed101_wrong}",
+        f"- Final correct while seed127 wrong: {final_correct_seed127_wrong}",
+        "",
+        "## Assigned Failure Mode",
+        "",
+        f"- `{ '|'.join(flags) }`",
+        "",
+        "## Artifact Evidence",
+        "",
+        f"- Cell/pooling rows: {len(cell_rows)}",
+        f"- Sample audit rows: {len(sample_rows)}",
+        f"- Source-weight comparison rows: {len(source_weight_rows)}",
+        f"- Component-coverage comparison rows: {len(component_coverage_rows)}",
+        "",
+        "## Protocol Boundary",
+        "",
+        "This audit must not be used to select seeds, calibrate on target labels, change pooling policy, or claim target-compatible expert discovery. Any follow-up method must be predeclared separately.",
+        "",
+    ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _safe_int(value: object, *, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return int(default)
 
 
 def _panel_ece_source_inner_rows(calibration_rows: Sequence[Mapping[str, object]]) -> list[dict[str, object]]:

@@ -2008,12 +2008,20 @@ def test_multipanel_tailrisk_component_union_tiny_cache_writes_expected_artifact
     invariants = list(csv.DictReader(open(root / "tables" / "multipanel_tailrisk_probability_invariants.csv", newline="")))
     deltas = list(csv.DictReader(open(root / "tables" / "multipanel_tailrisk_paired_deltas.csv", newline="")))
     summary = list(csv.DictReader(open(root / "tables" / "multipanel_tailrisk_summary.csv", newline="")))
+    audit_cell = list(csv.DictReader(open(root / "center3_failure_audit" / "center3_failure_cell_summary.csv", newline="")))
+    audit_sample = list(csv.DictReader(open(root / "center3_failure_audit" / "center3_failure_sample_audit.csv", newline="")))
+    audit_pool = list(csv.DictReader(open(root / "center3_failure_audit" / "center3_failure_pooling_path.csv", newline="")))
+    audit_source = list(csv.DictReader(open(root / "center3_failure_audit" / "center3_failure_source_weight_comparison.csv", newline="")))
+    audit_component = list(csv.DictReader(open(root / "center3_failure_audit" / "center3_failure_component_coverage_comparison.csv", newline="")))
+    audit_conclusion = (root / "center3_failure_audit" / "center3_failure_conclusion.md").read_text(encoding="utf-8")
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
     assert leakage["status"] == "PASS"
     assert protocol["target_support_used"] is False
     assert protocol["target_eval_labels_for_scoring_only"] is True
     assert protocol["panel_seeds_are_evaluation_replicates"] is False
+    assert protocol["center3_failure_audit_diagnostic_only"] is True
+    assert protocol["center3_failure_audit_target_labels_post_prediction_only"] is True
     assert protocol["primary_pooling_rule"] == "blend_per_seed_then_equal_probability_pool"
     assert any(row["prior_method"] == PRIMARY_MULTIPANEL_TAILRISK_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == MULTIPANEL_POOLED_ANCHOR_METHOD for row in matrix)
@@ -2025,6 +2033,13 @@ def test_multipanel_tailrisk_component_union_tiny_cache_writes_expected_artifact
     assert invariants and all(row["probability_row_sum_pass"] == "True" for row in invariants)
     assert deltas and all(row["comparison_cell_set"] == "intersection_v2_prior_tailrisk_canonical_random_shrink050" for row in deltas)
     assert "n_intersection_cells" in summary[0]
+    assert audit_cell and any(row["audit_cell_role"] == "primary_center3_failure" and row["audit_method"] == "final_v2" for row in audit_cell)
+    assert audit_sample and all(row["audit_only"] == "True" for row in audit_sample)
+    assert audit_sample and "seed_101_correct_final_wrong" in audit_sample[0]
+    assert audit_pool and any(row["pooling_stage"] == "individual_seed_blend" for row in audit_pool)
+    assert audit_source and all(row["audit_only"] == "True" for row in audit_source)
+    assert audit_component and all(row["audit_only"] == "True" for row in audit_component)
+    assert "Diagnostic-only audit" in audit_conclusion
     assert "not a compatibility router" in report
 
 
