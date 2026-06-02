@@ -55,6 +55,26 @@ MULTIPANEL_POOLED_RANDOM_BAG_METHOD = "component_union_tailrisk_multipanel_poole
 MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD = "same_cell_single_random_mass_bag_canonical"
 MULTIPANEL_POOLED_ANCHOR_METHOD = "component_union_tailrisk_multipanel_pooled_shrink050"
 MULTIPANEL_SOURCE_WEIGHTING = "tailrisk_multipanel_shrink050_random_mass_bag_blend050"
+POSITIVE_UNION_TAILRISK_NAME = "virchow2_cvae_source_inner_class_conditional_positive_union_v1"
+PRIMARY_POSITIVE_UNION_METHOD = "source_inner_class_conditional_positive_union_v1"
+POSITIVE_UNION_SOURCE_WEIGHTING = "source_inner_class_conditional_positive_union"
+POSITIVE_UNION_PRIMARY_POOLING = "source_inner_selected_class_conditional_positive_union"
+POSITIVE_UNION_RULE_ARITHMETIC = "arithmetic_mean"
+POSITIVE_UNION_RULE_BETA025 = "positive_union_beta025"
+POSITIVE_UNION_RULE_BETA050 = "positive_union_beta050"
+POSITIVE_UNION_RULE_BETA100 = "positive_union_beta100"
+POSITIVE_UNION_RULES = (
+    POSITIVE_UNION_RULE_ARITHMETIC,
+    POSITIVE_UNION_RULE_BETA025,
+    POSITIVE_UNION_RULE_BETA050,
+    POSITIVE_UNION_RULE_BETA100,
+)
+POSITIVE_UNION_BETAS = {
+    POSITIVE_UNION_RULE_ARITHMETIC: None,
+    POSITIVE_UNION_RULE_BETA025: 0.25,
+    POSITIVE_UNION_RULE_BETA050: 0.50,
+    POSITIVE_UNION_RULE_BETA100: 1.00,
+}
 ANCHOR_METHOD = cu.ROW_COMPONENT_UNION_SHRINK050
 BAG_METHOD = cu.ROW_RANDOM_MASS_BAG_CONTROL
 MATCHED_SHUFFLED_TAILRISK_PREFIX = cu.MATCHED_SHUFFLED_RELIABILITY_SHRINK050_PREFIX
@@ -161,6 +181,20 @@ class MultipanelTailRiskConfig(TailRiskAnchoredConfig):
 
 
 @dataclass(frozen=True)
+class SourceInnerPositiveUnionConfig(MultipanelTailRiskConfig):
+    candidate_pooling_rules: tuple[str, ...] = POSITIVE_UNION_RULES
+    positive_label: int = 1
+    prediction_threshold: float = 0.50
+    min_source_inner_positive_count: int = 5
+    positive_union_eps: float = 1.0e-8
+    source_inner_bacc_noninferiority_margin: float = 0.010
+    source_inner_class0_recall_margin: float = 0.015
+    source_inner_predicted_positive_rate_delta: float = 0.050
+    beta100_class0_recall_margin: float = 0.005
+    beta100_precision_margin: float = 0.010
+
+
+@dataclass(frozen=True)
 class BagEvaluation:
     ensemble_row: dict[str, object]
     ensemble_bundle: PredictionBundle | None
@@ -187,6 +221,9 @@ class TailRiskEvaluation:
     calibration_rows: tuple[dict[str, object], ...]
     source_weight_rows: tuple[dict[str, object], ...]
     eligibility_rows: tuple[dict[str, object], ...]
+    source_inner_bundles: Mapping[str, PredictionBundle]
+    source_inner_labels: tuple[int, ...]
+    source_inner_source_ids: tuple[str, ...]
 
 
 def load_tailrisk_anchored_component_union_config(path: str | Path) -> TailRiskAnchoredConfig:
@@ -476,6 +513,190 @@ def validate_multipanel_tailrisk_component_union_config(cfg: MultipanelTailRiskC
         cfg.weak_pass_noninferiority_margin,
     ) <= 0.0:
         raise ProtocolError("Multipanel numeric floors/tolerances must be positive.")
+    if cfg.tailrisk_transfer_threshold >= 0.0:
+        raise ProtocolError("tailrisk_transfer_threshold must be negative.")
+    if cfg.classifier_type != "sklearn_logistic_regression":
+        raise ProtocolError("classifier.type must be sklearn_logistic_regression.")
+    if cfg.classifier_solver != "lbfgs" or cfg.classifier_c != 1.0 or cfg.classifier_max_iter != 2000:
+        raise ProtocolError("Classifier solver/C/max_iter must remain locked.")
+    if cfg.classifier_class_weight != "balanced" or cfg.classifier_seed is not None:
+        raise ProtocolError("Classifier must use class_weight=balanced and classifier_seed=null.")
+
+
+def load_source_inner_positive_union_config(path: str | Path) -> SourceInnerPositiveUnionConfig:
+    source = Path(path).resolve()
+    data = _load_mapping(source)
+    base_dir = source.parents[2] if len(source.parents) >= 3 else source.parent
+    return parse_source_inner_positive_union_config(data, base_dir=base_dir)
+
+
+def parse_source_inner_positive_union_config(
+    data: Mapping[str, Any],
+    *,
+    base_dir: str | Path = ".",
+) -> SourceInnerPositiveUnionConfig:
+    base = Path(base_dir)
+    experiment = _mapping(data, "experiment")
+    inputs = _mapping(data, "inputs")
+    run = _mapping(data, "run_matrix")
+    generation = _mapping(data, "generation")
+    positive_union = _mapping(data, "source_inner_class_conditional_positive_union")
+    classifier = _mapping(data, "classifier")
+    panel_seed_groups = _parse_panel_seed_groups(positive_union.get("panel_seed_groups", {}))
+    if inputs.get("support_calibrated_artifact_root") not in (None, ""):
+        raise ProtocolError("support_calibrated_artifact_root is not allowed for source-only positive-union v1.")
+    for forbidden in (
+        "target_support_used",
+        "target_support_labels_for_selection",
+        "target_label_calibration",
+        "target_eval_metric_selection",
+        "target_threshold_selection",
+        "target_eval_calibrated_rule_selection",
+    ):
+        if forbidden in positive_union:
+            raise ProtocolError(f"{forbidden} is not allowed for source-only positive-union v1.")
+    cfg = SourceInnerPositiveUnionConfig(
+        name=str(experiment["name"]),
+        artifact_root=_path(base, str(experiment["artifact_root"])),
+        repair_artifact_root=_path(base, str(inputs["repair_artifact_root"])),
+        paired_dense_artifact_root=_optional_path(base, inputs.get("paired_dense_artifact_root")),
+        mass_bagged_artifact_root=_optional_path(base, inputs.get("mass_bagged_artifact_root")),
+        support_calibrated_artifact_root=None,
+        shrink050_artifact_root=_optional_path(base, inputs.get("shrink050_artifact_root")),
+        source_union_gmm_artifact_root=_optional_path(base, inputs.get("source_union_gmm_artifact_root")),
+        balanced_gmm_artifact_root=_optional_path(base, inputs.get("balanced_gmm_artifact_root")),
+        feature_cache_root=_path(base, str(inputs["feature_cache_root"])),
+        backbone=str(inputs.get("backbone", "")),
+        experiment_seeds=tuple(int(v) for v in run["experiment_seeds"]),
+        heldout_centers=tuple(str(v) for v in run["heldout_centers"]),
+        replicate_seeds=tuple(int(v) for v in run["replicate_seeds"]),
+        fresh_replicate_seeds=tuple(int(v) for v in run.get("fresh_replicate_seeds", ())),
+        strict_full_run_matrix=bool(run.get("strict_full_run_matrix", False)),
+        synthetic_per_class_total=int(generation["synthetic_per_class_total"]),
+        min_per_source_per_class=int(generation["min_per_source_per_class"]),
+        primary_variant=str(experiment["primary_variant"]),
+        primary_method=str(positive_union["primary_method"]),
+        random_mass_bag_size=int(positive_union["random_mass_bag_size"]),
+        random_mass_bag_alpha=float(positive_union["random_mass_bag_alpha"]),
+        blend_alpha=float(positive_union["blend_alpha"]),
+        primary_shrink_lambda=float(positive_union["primary_shrink_lambda"]),
+        matched_shuffled_reliability_null_permutations=int(positive_union.get("matched_shuffled_reliability_null_permutations", 0)),
+        candidate_components_per_source_class=tuple(int(v) for v in positive_union["candidate_components_per_source_class"]),
+        min_samples_per_component=int(positive_union["min_samples_per_component"]),
+        source_weighting=str(positive_union["source_weighting"]),
+        gmm_covariance_type=str(positive_union["gmm_covariance_type"]),
+        gmm_reg_covar=float(positive_union["gmm_reg_covar"]),
+        gmm_n_init=int(positive_union["gmm_n_init"]),
+        gmm_max_iter=int(positive_union["gmm_max_iter"]),
+        min_component_weight=float(positive_union["min_component_weight"]),
+        variance_floor=float(positive_union["variance_floor"]),
+        variance_ceiling_multiplier=float(positive_union["variance_ceiling_multiplier"]),
+        primary_pooling=str(positive_union["primary_pooling"]),
+        reliability_floor_score=float(positive_union["reliability_floor_score"]),
+        reliability_epsilon=float(positive_union["reliability_epsilon"]),
+        anchor_repro_tolerance=float(positive_union["anchor_repro_tolerance"]),
+        classifier_type=str(classifier["type"]),
+        classifier_solver=str(classifier["solver"]),
+        classifier_c=float(classifier["C"]),
+        classifier_max_iter=int(classifier["max_iter"]),
+        classifier_class_weight=str(classifier["class_weight"]),
+        classifier_seed=None if classifier.get("classifier_seed") is None else int(classifier["classifier_seed"]),
+        prior_tailrisk_artifact_root=_optional_path(base, inputs.get("prior_tailrisk_artifact_root")),
+        panel_seed_groups=panel_seed_groups,
+        primary_noninferiority_margin=float(positive_union.get("primary_noninferiority_margin", 0.005)),
+        weak_pass_noninferiority_margin=float(positive_union.get("weak_pass_noninferiority_margin", 0.010)),
+        tailrisk_transfer_threshold=float(positive_union.get("tailrisk_transfer_threshold", -0.010)),
+        candidate_pooling_rules=tuple(str(v) for v in positive_union["candidate_pooling_rules"]),
+        positive_label=int(positive_union["positive_label"]),
+        prediction_threshold=float(positive_union["prediction_threshold"]),
+        min_source_inner_positive_count=int(positive_union["min_source_inner_positive_count"]),
+        positive_union_eps=float(positive_union["positive_union_eps"]),
+        source_inner_bacc_noninferiority_margin=float(positive_union["source_inner_bacc_noninferiority_margin"]),
+        source_inner_class0_recall_margin=float(positive_union["source_inner_class0_recall_margin"]),
+        source_inner_predicted_positive_rate_delta=float(positive_union["source_inner_predicted_positive_rate_delta"]),
+        beta100_class0_recall_margin=float(positive_union["beta100_class0_recall_margin"]),
+        beta100_precision_margin=float(positive_union["beta100_precision_margin"]),
+    )
+    validate_source_inner_positive_union_config(cfg)
+    return cfg
+
+
+def validate_source_inner_positive_union_config(cfg: SourceInnerPositiveUnionConfig) -> None:
+    if cfg.name != POSITIVE_UNION_TAILRISK_NAME:
+        raise ProtocolError(f"Positive-union experiment name must be {POSITIVE_UNION_TAILRISK_NAME!r}.")
+    if cfg.backbone != "virchow2":
+        raise ProtocolError("Positive-union component union is locked to backbone=virchow2.")
+    if cfg.primary_variant != PRIMARY_VARIANT:
+        raise ProtocolError(f"primary_variant must be {PRIMARY_VARIANT!r}.")
+    if cfg.primary_method != PRIMARY_POSITIVE_UNION_METHOD:
+        raise ProtocolError(f"primary_method must be {PRIMARY_POSITIVE_UNION_METHOD!r}.")
+    if cfg.source_weighting != POSITIVE_UNION_SOURCE_WEIGHTING:
+        raise ProtocolError(f"source_weighting must be {POSITIVE_UNION_SOURCE_WEIGHTING!r}.")
+    if cfg.primary_pooling != POSITIVE_UNION_PRIMARY_POOLING:
+        raise ProtocolError(f"primary_pooling must be {POSITIVE_UNION_PRIMARY_POOLING!r}.")
+    if cfg.candidate_pooling_rules != POSITIVE_UNION_RULES:
+        raise ProtocolError("candidate_pooling_rules must be locked to arithmetic_mean/beta025/beta050/beta100.")
+    if cfg.positive_label != 1:
+        raise ProtocolError("positive_label must be locked to 1.")
+    if not math.isclose(cfg.prediction_threshold, 0.5, rel_tol=0.0, abs_tol=1.0e-12):
+        raise ProtocolError("prediction_threshold must be locked to 0.50.")
+    if cfg.min_source_inner_positive_count != 5:
+        raise ProtocolError("min_source_inner_positive_count must be locked to 5.")
+    if not math.isclose(cfg.positive_union_eps, 1.0e-8, rel_tol=0.0, abs_tol=1.0e-14):
+        raise ProtocolError("positive_union_eps must be locked to 1e-8.")
+    if cfg.candidate_components_per_source_class != (4, 3, 2, 1):
+        raise ProtocolError("candidate_components_per_source_class must be locked to [4, 3, 2, 1].")
+    if len(cfg.heldout_centers) != 5:
+        raise ProtocolError("Positive-union component union expects exactly five centers.")
+    if cfg.gmm_covariance_type != "diag":
+        raise ProtocolError("gmm_covariance_type must be diag.")
+    if not math.isclose(cfg.primary_shrink_lambda, 0.5, rel_tol=0.0, abs_tol=1.0e-12):
+        raise ProtocolError("primary_shrink_lambda must be locked to 0.50.")
+    if not math.isclose(cfg.blend_alpha, 0.5, rel_tol=0.0, abs_tol=1.0e-12):
+        raise ProtocolError("blend_alpha must be locked to 0.50.")
+    if not math.isclose(cfg.random_mass_bag_alpha, 4.0, rel_tol=0.0, abs_tol=1.0e-12):
+        raise ProtocolError("random_mass_bag_alpha must be locked to Dirichlet-uniform alpha4.")
+    if cfg.random_mass_bag_size < 1:
+        raise ProtocolError("random_mass_bag_size must be positive.")
+    if cfg.matched_shuffled_reliability_null_permutations != 0:
+        raise ProtocolError("matched_shuffled_reliability_null_permutations must be 0 for positive-union v1.")
+    if cfg.replicate_seeds != cfg.panel_seed_groups[0][1]:
+        raise ProtocolError("run_matrix.replicate_seeds must equal the canonical panel seeds.")
+    expected_fresh = tuple(seed for _panel, seeds in cfg.panel_seed_groups[1:] for seed in seeds)
+    if cfg.fresh_replicate_seeds != expected_fresh:
+        raise ProtocolError("run_matrix.fresh_replicate_seeds must equal fresh_a + fresh_b panel seeds.")
+    if cfg.panel_seed_groups != MULTIPANEL_PANEL_SEEDS:
+        raise ProtocolError("panel_seed_groups must be locked to canonical/fresh_a/fresh_b predeclared seeds.")
+    if cfg.strict_full_run_matrix:
+        if cfg.experiment_seeds != (42, 43, 44):
+            raise ProtocolError("strict_full_run_matrix requires experiment_seeds=[42, 43, 44].")
+        if cfg.heldout_centers != ("0", "1", "2", "3", "4"):
+            raise ProtocolError("strict_full_run_matrix requires heldout_centers=['0', '1', '2', '3', '4'].")
+        if cfg.synthetic_per_class_total != 128:
+            raise ProtocolError("strict_full_run_matrix requires synthetic_per_class_total=128.")
+        if cfg.min_per_source_per_class != 8:
+            raise ProtocolError("strict_full_run_matrix requires min_per_source_per_class=8.")
+        if cfg.random_mass_bag_size != 11:
+            raise ProtocolError("strict_full_run_matrix requires random_mass_bag_size=11.")
+    if min(cfg.min_per_source_per_class, cfg.min_samples_per_component, cfg.gmm_n_init, cfg.gmm_max_iter) < 1:
+        raise ProtocolError("Component minimums and GMM iterations must be positive.")
+    if min(
+        cfg.gmm_reg_covar,
+        cfg.min_component_weight,
+        cfg.variance_floor,
+        cfg.variance_ceiling_multiplier,
+        cfg.reliability_floor_score,
+        cfg.reliability_epsilon,
+        cfg.anchor_repro_tolerance,
+        cfg.primary_noninferiority_margin,
+        cfg.weak_pass_noninferiority_margin,
+        cfg.source_inner_bacc_noninferiority_margin,
+        cfg.source_inner_class0_recall_margin,
+        cfg.source_inner_predicted_positive_rate_delta,
+        cfg.beta100_class0_recall_margin,
+        cfg.beta100_precision_margin,
+    ) <= 0.0:
+        raise ProtocolError("Positive-union numeric floors/tolerances must be positive.")
     if cfg.tailrisk_transfer_threshold >= 0.0:
         raise ProtocolError("tailrisk_transfer_threshold must be negative.")
     if cfg.classifier_type != "sklearn_logistic_regression":
@@ -913,6 +1134,7 @@ def run_multipanel_tailrisk_component_union(
     *,
     artifact_root: str | Path | None = None,
 ) -> Path:
+    positive_union_mode = isinstance(cfg, SourceInnerPositiveUnionConfig)
     root = prepare_artifact_dirs(Path(artifact_root) if artifact_root is not None else cfg.artifact_root)
     (root / "checkpoints").mkdir(parents=True, exist_ok=True)
     (root / "summaries").mkdir(parents=True, exist_ok=True)
@@ -938,6 +1160,12 @@ def run_multipanel_tailrisk_component_union(
     center3_failure_cell_rows: list[dict[str, object]] = []
     center3_failure_sample_rows: list[dict[str, object]] = []
     center3_failure_pooling_rows: list[dict[str, object]] = []
+    positive_union_source_inner_selection_rows: list[dict[str, object]] = []
+    positive_union_candidate_rule_rows: list[dict[str, object]] = []
+    positive_union_class_conditional_rows: list[dict[str, object]] = []
+    positive_union_effective_threshold_rows: list[dict[str, object]] = []
+    positive_union_harm_rows: list[dict[str, object]] = []
+    positive_union_per_source_harm_rows: list[dict[str, object]] = []
     model_manifest_rows: list[dict[str, object]] = []
     protocol_violations: list[str] = []
     target_expert_excluded = True
@@ -1128,32 +1356,54 @@ def run_multipanel_tailrisk_component_union(
                         eligibility_rows=eligibility_rows,
                     )
 
-                final = _build_multipanel_cell_outputs(
-                    cfg,
-                    seed_evaluations=seed_evaluations,
-                    experiment_seed=int(experiment_seed),
-                    heldout_center=str(heldout_center),
-                    candidates=candidates,
-                    summaries=gmm_summaries,
-                    eval_labels=eval_labels,
-                    eval_sample_ids=eval_sample_ids,
-                    eval_sample_hash=eval_sample_hash,
-                    source_union_ref=_mean_reference(source_union_values),
-                    center_balanced_ref=_mean_reference(center_balanced_values),
-                    real_feature_bacc=nanmean([value for value in real_feature_values if math.isfinite(value)]),
-                )
+                if positive_union_mode:
+                    final = _build_positive_union_cell_outputs(
+                        cfg,
+                        seed_evaluations=seed_evaluations,
+                        experiment_seed=int(experiment_seed),
+                        heldout_center=str(heldout_center),
+                        candidates=candidates,
+                        summaries=gmm_summaries,
+                        eval_labels=eval_labels,
+                        eval_sample_ids=eval_sample_ids,
+                        eval_sample_hash=eval_sample_hash,
+                        source_union_ref=_mean_reference(source_union_values),
+                        center_balanced_ref=_mean_reference(center_balanced_values),
+                        real_feature_bacc=nanmean([value for value in real_feature_values if math.isfinite(value)]),
+                    )
+                else:
+                    final = _build_multipanel_cell_outputs(
+                        cfg,
+                        seed_evaluations=seed_evaluations,
+                        experiment_seed=int(experiment_seed),
+                        heldout_center=str(heldout_center),
+                        candidates=candidates,
+                        summaries=gmm_summaries,
+                        eval_labels=eval_labels,
+                        eval_sample_ids=eval_sample_ids,
+                        eval_sample_hash=eval_sample_hash,
+                        source_union_ref=_mean_reference(source_union_values),
+                        center_balanced_ref=_mean_reference(center_balanced_values),
+                        real_feature_bacc=nanmean([value for value in real_feature_values if math.isfinite(value)]),
+                    )
                 matrix_rows.extend(final["matrix_rows"])
                 source_weight_rows.extend(final["source_weight_rows"])
                 blend_manifest_rows.extend(final["blend_manifest_rows"])
                 component_coverage_rows.extend(final["component_coverage_rows"])
                 paired_generation_rows.extend(final["paired_generation_rows"])
-                panel_disagreement_rows.extend(final["panel_disagreement_rows"])
+                panel_disagreement_rows.extend(final.get("panel_disagreement_rows", []))
                 invariant_rows.extend(final["invariant_rows"])
-                confidence_rows.extend(final["confidence_rows"])
-                failure_rows.extend(final["failure_rows"])
-                center3_failure_cell_rows.extend(final["center3_failure_cell_rows"])
-                center3_failure_sample_rows.extend(final["center3_failure_sample_rows"])
-                center3_failure_pooling_rows.extend(final["center3_failure_pooling_rows"])
+                confidence_rows.extend(final.get("confidence_rows", []))
+                failure_rows.extend(final.get("failure_rows", []))
+                center3_failure_cell_rows.extend(final.get("center3_failure_cell_rows", []))
+                center3_failure_sample_rows.extend(final.get("center3_failure_sample_rows", []))
+                center3_failure_pooling_rows.extend(final.get("center3_failure_pooling_rows", []))
+                positive_union_source_inner_selection_rows.extend(final.get("positive_union_source_inner_selection_rows", []))
+                positive_union_candidate_rule_rows.extend(final.get("positive_union_candidate_rule_rows", []))
+                positive_union_class_conditional_rows.extend(final.get("positive_union_class_conditional_rows", []))
+                positive_union_effective_threshold_rows.extend(final.get("positive_union_effective_threshold_rows", []))
+                positive_union_harm_rows.extend(final.get("positive_union_harm_rows", []))
+                positive_union_per_source_harm_rows.extend(final.get("positive_union_per_source_harm_rows", []))
     except ProtocolError as exc:
         protocol_violations.append(str(exc))
 
@@ -1165,45 +1415,92 @@ def run_multipanel_tailrisk_component_union(
         extra_violations=protocol_violations,
     )
     historical_rows = _load_prior_tailrisk_matrix_rows(cfg)
-    paired_delta_rows, prior_tail_keys = _multipanel_paired_delta_rows(matrix_rows, historical_rows, cfg)
-    failure_rows = _annotate_failure_rows(failure_rows, paired_delta_rows, prior_tail_keys)
-    panel_disagreement_rows = _annotate_panel_disagreement_rows(panel_disagreement_rows, prior_tail_keys)
-    decision = _multipanel_decision(
-        matrix_rows,
-        paired_delta_rows=paired_delta_rows,
-        prior_tail_keys=prior_tail_keys,
-        leakage_status=leakage.status,
-        cfg=cfg,
-    )
-    _write_multipanel_artifacts(
-        root,
-        cfg,
-        matrix_rows=matrix_rows,
-        seed_diagnostic_rows=seed_diagnostic_rows,
-        source_weight_rows=source_weight_rows,
-        reliability_rows=reliability_rows,
-        source_summary_rows=source_summary_rows,
-        component_manifest_rows=component_manifest_rows,
-        component_coverage_rows=component_coverage_rows,
-        paired_generation_rows=paired_generation_rows,
-        eligibility_rows=eligibility_rows,
-        blend_manifest_rows=blend_manifest_rows,
-        calibration_rows=calibration_rows,
-        panel_disagreement_rows=panel_disagreement_rows,
-        invariant_rows=invariant_rows,
-        confidence_rows=confidence_rows,
-        failure_rows=failure_rows,
-        center3_failure_cell_rows=center3_failure_cell_rows,
-        center3_failure_sample_rows=center3_failure_sample_rows,
-        center3_failure_pooling_rows=center3_failure_pooling_rows,
-        paired_delta_rows=paired_delta_rows,
-        model_manifest_rows=model_manifest_rows,
-        decision=decision,
-        leakage=leakage,
-        protocol_violations=protocol_violations,
-        target_expert_excluded=target_expert_excluded,
-    )
+    if positive_union_mode:
+        paired_delta_rows, prior_tail_keys = _positive_union_paired_delta_rows(matrix_rows, historical_rows, cfg)
+        positive_union_harm_rows = _annotate_positive_union_harm_rows(positive_union_harm_rows, paired_delta_rows, cfg)
+        decision = _positive_union_decision(
+            matrix_rows,
+            paired_delta_rows=paired_delta_rows,
+            prior_tail_keys=prior_tail_keys,
+            selection_rows=positive_union_source_inner_selection_rows,
+            harm_rows=positive_union_harm_rows,
+            leakage_status=leakage.status,
+            cfg=cfg,
+        )
+        _write_positive_union_artifacts(
+            root,
+            cfg,
+            matrix_rows=matrix_rows,
+            source_inner_selection_rows=positive_union_source_inner_selection_rows,
+            candidate_rule_rows=positive_union_candidate_rule_rows,
+            class_conditional_rows=positive_union_class_conditional_rows,
+            effective_threshold_rows=positive_union_effective_threshold_rows,
+            paired_delta_rows=paired_delta_rows,
+            harm_rows=positive_union_harm_rows,
+            per_source_harm_rows=positive_union_per_source_harm_rows,
+            invariant_rows=invariant_rows,
+            blend_manifest_rows=blend_manifest_rows,
+            source_weight_rows=source_weight_rows,
+            reliability_rows=reliability_rows,
+            source_summary_rows=source_summary_rows,
+            component_manifest_rows=component_manifest_rows,
+            component_coverage_rows=component_coverage_rows,
+            paired_generation_rows=paired_generation_rows,
+            eligibility_rows=eligibility_rows,
+            model_manifest_rows=model_manifest_rows,
+            decision=decision,
+            leakage=leakage,
+            protocol_violations=protocol_violations,
+            target_expert_excluded=target_expert_excluded,
+        )
+    else:
+        paired_delta_rows, prior_tail_keys = _multipanel_paired_delta_rows(matrix_rows, historical_rows, cfg)
+        failure_rows = _annotate_failure_rows(failure_rows, paired_delta_rows, prior_tail_keys)
+        panel_disagreement_rows = _annotate_panel_disagreement_rows(panel_disagreement_rows, prior_tail_keys)
+        decision = _multipanel_decision(
+            matrix_rows,
+            paired_delta_rows=paired_delta_rows,
+            prior_tail_keys=prior_tail_keys,
+            leakage_status=leakage.status,
+            cfg=cfg,
+        )
+        _write_multipanel_artifacts(
+            root,
+            cfg,
+            matrix_rows=matrix_rows,
+            seed_diagnostic_rows=seed_diagnostic_rows,
+            source_weight_rows=source_weight_rows,
+            reliability_rows=reliability_rows,
+            source_summary_rows=source_summary_rows,
+            component_manifest_rows=component_manifest_rows,
+            component_coverage_rows=component_coverage_rows,
+            paired_generation_rows=paired_generation_rows,
+            eligibility_rows=eligibility_rows,
+            blend_manifest_rows=blend_manifest_rows,
+            calibration_rows=calibration_rows,
+            panel_disagreement_rows=panel_disagreement_rows,
+            invariant_rows=invariant_rows,
+            confidence_rows=confidence_rows,
+            failure_rows=failure_rows,
+            center3_failure_cell_rows=center3_failure_cell_rows,
+            center3_failure_sample_rows=center3_failure_sample_rows,
+            center3_failure_pooling_rows=center3_failure_pooling_rows,
+            paired_delta_rows=paired_delta_rows,
+            model_manifest_rows=model_manifest_rows,
+            decision=decision,
+            leakage=leakage,
+            protocol_violations=protocol_violations,
+            target_expert_excluded=target_expert_excluded,
+        )
     return root
+
+
+def run_source_inner_positive_union(
+    cfg: SourceInnerPositiveUnionConfig,
+    *,
+    artifact_root: str | Path | None = None,
+) -> Path:
+    return run_multipanel_tailrisk_component_union(cfg, artifact_root=artifact_root)
 
 
 def _multipanel_panel_for_seed(cfg: MultipanelTailRiskConfig, seed: int) -> str:
@@ -1491,6 +1788,280 @@ def _build_multipanel_cell_outputs(
     return out
 
 
+def _build_positive_union_cell_outputs(
+    cfg: SourceInnerPositiveUnionConfig,
+    *,
+    seed_evaluations: Sequence[_MultipanelSeedEvaluation],
+    experiment_seed: int,
+    heldout_center: str,
+    candidates: Sequence[str],
+    summaries: Mapping[tuple[str, int], d1a.AdaptiveSourceLocalSummary],
+    eval_labels: Sequence[int],
+    eval_sample_ids: Sequence[str],
+    eval_sample_hash: str,
+    source_union_ref: d1.ReferenceValue,
+    center_balanced_ref: d1.ReferenceValue,
+    real_feature_bacc: float,
+) -> dict[str, list[dict[str, object]]]:
+    out: dict[str, list[dict[str, object]]] = {
+        "matrix_rows": [],
+        "source_weight_rows": [],
+        "blend_manifest_rows": [],
+        "component_coverage_rows": [],
+        "paired_generation_rows": [],
+        "invariant_rows": [],
+        "positive_union_source_inner_selection_rows": [],
+        "positive_union_candidate_rule_rows": [],
+        "positive_union_class_conditional_rows": [],
+        "positive_union_effective_threshold_rows": [],
+        "positive_union_harm_rows": [],
+        "positive_union_per_source_harm_rows": [],
+    }
+    ok = [
+        item
+        for item in seed_evaluations
+        if item.evaluated.primary_bundle is not None
+        and item.evaluated.anchor_result.bundle is not None
+        and item.evaluated.bag_evaluation.ensemble_bundle is not None
+        and item.evaluated.primary_row.get("status") == "ok"
+    ]
+    if len(ok) != len(seed_evaluations) or len(ok) != len(cfg.all_panel_seeds):
+        row = cu._empty_matrix_row(
+            cfg,
+            experiment_seed=experiment_seed,
+            heldout_center=heldout_center,
+            replicate_seed=0,
+            candidates=candidates,
+            prior_method=cfg.primary_method,
+            source_union_ref=source_union_ref,
+            center_balanced_ref=center_balanced_ref,
+            real_feature_bacc=real_feature_bacc,
+            status="ineligible",
+            error_message="one_or_more_seed_blends_ineligible",
+            claim_role="positive_union_probability_pool",
+        )
+        row["selection_used_target_labels"] = False
+        row["target_eval_labels_used_for_scoring_only"] = True
+        out["matrix_rows"].append(row)
+        return out
+
+    seed_blend_bundles = [item.evaluated.primary_bundle for item in ok if item.evaluated.primary_bundle is not None]
+    anchor_bundles = [item.evaluated.anchor_result.bundle for item in ok if item.evaluated.anchor_result.bundle is not None]
+    bag_bundles = [item.evaluated.bag_evaluation.ensemble_bundle for item in ok if item.evaluated.bag_evaluation.ensemble_bundle is not None]
+    seed_blend_rows = [item.evaluated.primary_row for item in ok]
+    anchor_rows = [item.evaluated.anchor_result.row for item in ok]
+    bag_rows = [item.evaluated.bag_evaluation.ensemble_row for item in ok]
+    seed_hashes = [str(row.get("prediction_hash", "")) for row in seed_blend_rows]
+    group_json = _panel_seed_groups_json(cfg)
+
+    source_inner_bundles = [
+        item.evaluated.source_inner_bundles.get("primary_blend")
+        for item in ok
+        if item.evaluated.source_inner_bundles.get("primary_blend") is not None
+    ]
+    source_inner_labels = ok[0].evaluated.source_inner_labels
+    source_inner_source_ids = ok[0].evaluated.source_inner_source_ids
+    if len(source_inner_bundles) != len(ok) or not source_inner_labels:
+        selected_rule = POSITIVE_UNION_RULE_ARITHMETIC
+        source_candidate_bundles = _positive_union_candidate_bundles(cfg, seed_blend_bundles)
+        source_rows = {
+            rule: {
+                "scope": "source_inner",
+                "rule": rule,
+                "beta": "" if _positive_union_rule_beta(rule) is None else _positive_union_rule_beta(rule),
+                "source_inner_eligible": rule == POSITIVE_UNION_RULE_ARITHMETIC,
+                "source_inner_ineligible_reason": "missing_source_inner_primary_blend_bundles" if rule != POSITIVE_UNION_RULE_ARITHMETIC else "",
+            }
+            for rule in cfg.candidate_pooling_rules
+        }
+        selection_row = _positive_union_selection_row(
+            cfg,
+            selected_rule=selected_rule,
+            selected_row=source_rows[selected_rule],
+            positive_count=0,
+            negative_count=0,
+            selection_reason="missing_source_inner_primary_blend_bundles",
+        )
+    else:
+        source_candidate_bundles = _positive_union_candidate_bundles(cfg, source_inner_bundles)
+        source_metric_rows = [
+            _positive_union_metrics(rule, bundle, source_inner_labels, scope="source_inner")
+            for rule, bundle in source_candidate_bundles.items()
+        ]
+        selected_rule, selected_source_rows, selection_row = _select_positive_union_rule(cfg, source_rows=source_metric_rows)
+        source_rows = {str(row["rule"]): row for row in selected_source_rows}
+        out["positive_union_per_source_harm_rows"].extend(
+            _positive_union_per_source_harm_rows(
+                cfg,
+                experiment_seed=experiment_seed,
+                heldout_center=heldout_center,
+                source_ids=source_inner_source_ids,
+                source_labels=source_inner_labels,
+                source_bundles_by_rule=source_candidate_bundles,
+            )
+        )
+
+    target_candidate_bundles = _positive_union_candidate_bundles(cfg, seed_blend_bundles)
+    target_rows = {
+        rule: _positive_union_metrics(rule, bundle, eval_labels, scope="target_eval")
+        for rule, bundle in target_candidate_bundles.items()
+    }
+    selected_bundle = target_candidate_bundles[selected_rule]
+    arithmetic_bundle = target_candidate_bundles[POSITIVE_UNION_RULE_ARITHMETIC]
+    pooled_anchor = _pool_bundle(MULTIPANEL_POOLED_ANCHOR_METHOD, anchor_bundles)
+    pooled_random = _pool_bundle(MULTIPANEL_POOLED_RANDOM_BAG_METHOD, bag_bundles)
+    canonical_bags = [
+        item.evaluated.bag_evaluation.ensemble_bundle
+        for item in ok
+        if item.panel_group == MULTIPANEL_CANONICAL_PANEL and item.evaluated.bag_evaluation.ensemble_bundle is not None
+    ]
+    canonical_random = _pool_bundle(MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD, canonical_bags)
+
+    selection_row.update(
+        {
+            "experiment_seed": experiment_seed,
+            "heldout_center": heldout_center,
+            "decision_cell": "experiment_seed_x_heldout_center",
+            "audit_only": False,
+            "primary_adoption_eligible": True,
+        }
+    )
+    out["positive_union_source_inner_selection_rows"].append(selection_row)
+
+    for rule in cfg.candidate_pooling_rules:
+        row = {
+            "experiment_seed": experiment_seed,
+            "heldout_center": heldout_center,
+            "rule": rule,
+            "beta": "" if _positive_union_rule_beta(rule) is None else _positive_union_rule_beta(rule),
+            "selected_rule_for_cell": selected_rule,
+            "is_selected_rule": rule == selected_rule,
+            "selection_used_target_labels": False,
+            "target_eval_labels_used_for_audit_only": True,
+            "audit_only": True,
+            "primary_adoption_eligible": False,
+        }
+        for key, value in source_rows.get(rule, {}).items():
+            row[f"source_inner_{key}"] = value
+        for key, value in target_rows[rule].items():
+            row[f"target_{key}"] = value
+        out["positive_union_candidate_rule_rows"].append(row)
+
+    row_specs = (
+        (cfg.primary_method, selected_bundle, seed_blend_rows, PRIMARY_SELECTION, "source_inner_selected_class_conditional_positive_union_primary", selected_rule),
+        (POSITIVE_UNION_RULE_ARITHMETIC, arithmetic_bundle, seed_blend_rows, DIAGNOSTIC_SELECTION, "arithmetic_multipanel_comparator", POSITIVE_UNION_RULE_ARITHMETIC),
+        (MULTIPANEL_POOLED_ANCHOR_METHOD, pooled_anchor, anchor_rows, DIAGNOSTIC_SELECTION, "pooled_shrink050_comparator", "pooled_anchor"),
+        (MULTIPANEL_POOLED_RANDOM_BAG_METHOD, pooled_random, bag_rows, DIAGNOSTIC_SELECTION, "pooled_random_mass_bag_comparator", "pooled_random"),
+        (
+            MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD,
+            canonical_random,
+            [item.evaluated.bag_evaluation.ensemble_row for item in ok if item.panel_group == MULTIPANEL_CANONICAL_PANEL],
+            DIAGNOSTIC_SELECTION,
+            "canonical_single_random_mass_bag_comparator",
+            "canonical_random_mass_bag",
+        ),
+    )
+    row_by_method: dict[str, dict[str, object]] = {}
+    for method, bundle, plan_rows, selection_source, claim_role, pooling_rule in row_specs:
+        row = _multipanel_result_row(
+            cfg,
+            experiment_seed=experiment_seed,
+            heldout_center=heldout_center,
+            candidates=candidates,
+            summaries=summaries,
+            method=method,
+            bundle=bundle,
+            eval_labels=eval_labels,
+            source_union_ref=source_union_ref,
+            center_balanced_ref=center_balanced_ref,
+            real_feature_bacc=real_feature_bacc,
+            weight_plan=_average_plan_from_rows(cfg, candidates, plan_rows),
+            generated_features_hash=_hash_strings(str(row.get("generated_features_hash", "")) for row in plan_rows),
+            seed_bundle_hashes=seed_hashes if method in {cfg.primary_method, POSITIVE_UNION_RULE_ARITHMETIC} else [str(row.get("prediction_hash", "")) for row in plan_rows],
+            selection_source=selection_source,
+            claim_role=claim_role,
+            eval_sample_hash=eval_sample_hash,
+            panel_seed_groups_json=group_json,
+        )
+        row["pooling_rule"] = pooling_rule
+        row["selected_positive_union_rule"] = selected_rule
+        row["selected_positive_union_beta"] = "" if _positive_union_rule_beta(selected_rule) is None else _positive_union_rule_beta(selected_rule)
+        row["source_inner_selection_reason"] = selection_row.get("selection_reason", "")
+        row["target_support_used"] = False
+        row["primary_adoption_eligible"] = method == cfg.primary_method
+        row["audit_only"] = method != cfg.primary_method
+        row_by_method[method] = row
+        out["matrix_rows"].append(row)
+        out["component_coverage_rows"].append(cu._empty_coverage_row(row))
+        out["paired_generation_rows"].append(cu._paired_generation_row(row, str(row.get("generated_features_hash", "")), "", "ok"))
+        out["invariant_rows"].append(
+            _probability_invariant_row(
+                experiment_seed,
+                heldout_center,
+                method,
+                bundle,
+                eval_sample_ids=eval_sample_ids,
+                expected_sample_hash=eval_sample_hash,
+                panel="positive_union",
+            )
+        )
+
+    out["blend_manifest_rows"].append(
+        {
+            "experiment_seed": experiment_seed,
+            "heldout_center": heldout_center,
+            "replicate_seed": 0,
+            "panel": "positive_union",
+            "primary_method": cfg.primary_method,
+            "aggregation_unit": "experiment_seed_x_heldout_center",
+            "pooling_rule": POSITIVE_UNION_PRIMARY_POOLING,
+            "selected_rule": selected_rule,
+            "selected_beta": "" if _positive_union_rule_beta(selected_rule) is None else _positive_union_rule_beta(selected_rule),
+            "selection_source": "source_inner",
+            "selection_used_target_labels": False,
+            "target_support_used": False,
+            "blend_alpha_anchor": cfg.blend_alpha,
+            "blend_alpha_bag": 1.0 - cfg.blend_alpha,
+            "panel_seed_groups_json": group_json,
+            "seed_blend_prediction_hashes_json": json.dumps(seed_hashes),
+            "final_prediction_hash": row_by_method[cfg.primary_method].get("prediction_hash", ""),
+            "eval_sample_ids_hash": eval_sample_hash,
+            "class_order": "|".join(str(value) for value in selected_bundle.classes),
+            "class_order_match": selected_bundle.classes == (0, 1),
+        }
+    )
+    out["positive_union_class_conditional_rows"].extend(
+        _positive_union_class_conditional_rows(
+            cfg,
+            experiment_seed=experiment_seed,
+            heldout_center=heldout_center,
+            target_rows=target_rows,
+            selected_rule=selected_rule,
+        )
+    )
+    out["positive_union_effective_threshold_rows"].extend(
+        _positive_union_effective_threshold_rows(
+            cfg,
+            experiment_seed=experiment_seed,
+            heldout_center=heldout_center,
+            n_seed_bundles=len(seed_blend_bundles),
+            source_rows=source_rows,
+            target_rows=target_rows,
+        )
+    )
+    out["positive_union_harm_rows"].append(
+        _positive_union_harm_row(
+            experiment_seed=experiment_seed,
+            heldout_center=heldout_center,
+            selected_rule=selected_rule,
+            selected_bundle=selected_bundle,
+            arithmetic_bundle=arithmetic_bundle,
+            eval_labels=eval_labels,
+        )
+    )
+    return out
+
+
 def _pool_bundle(method: str, bundles: Sequence[PredictionBundle | None]) -> PredictionBundle:
     valid = [bundle for bundle in bundles if bundle is not None]
     if not valid:
@@ -1501,6 +2072,434 @@ def _pool_bundle(method: str, bundles: Sequence[PredictionBundle | None]) -> Pre
         probabilities=tuple(tuple(float(value) for value in row) for row in pooled),
         classes=valid[0].classes,
     )
+
+
+def _positive_union_pool_bundle(
+    method: str,
+    bundles: Sequence[PredictionBundle | None],
+    *,
+    beta: float | None,
+    positive_label: int,
+    eps: float,
+) -> PredictionBundle:
+    if beta is None:
+        return _pool_bundle(method, bundles)
+    valid = [bundle for bundle in bundles if bundle is not None]
+    if not valid:
+        raise ProtocolError(f"No prediction bundles available for {method}.")
+    classes = valid[0].classes
+    if classes != (0, 1):
+        raise ProtocolError("Positive-union pooling requires binary class order [0, 1].")
+    if int(positive_label) != 1:
+        raise ProtocolError("Positive-union pooling requires positive_label=1.")
+    n_rows = len(valid[0].probabilities)
+    for bundle in valid:
+        if bundle.classes != classes:
+            raise ProtocolError("Class order mismatch in positive-union pooling.")
+        if len(bundle.probabilities) != n_rows:
+            raise ProtocolError("Prediction row count mismatch in positive-union pooling.")
+    pooled: list[tuple[float, float]] = []
+    for row_idx in range(n_rows):
+        survival = 1.0
+        for bundle in valid:
+            row = bundle.probabilities[row_idx]
+            if len(row) != 2:
+                raise ProtocolError("Probability width mismatch in positive-union pooling.")
+            p_pos = min(max(float(row[1]), float(eps)), 1.0 - float(eps))
+            survival *= (1.0 - p_pos) ** float(beta)
+        p_union = min(max(1.0 - survival, float(eps)), 1.0 - float(eps))
+        pooled.append((1.0 - p_union, p_union))
+    return PredictionBundle(
+        expert_id=str(method),
+        probabilities=tuple(pooled),
+        classes=classes,
+    )
+
+
+def _positive_union_rule_beta(rule: str) -> float | None:
+    if rule not in POSITIVE_UNION_BETAS:
+        raise ProtocolError(f"Unknown positive-union pooling rule: {rule}")
+    return POSITIVE_UNION_BETAS[rule]
+
+
+def _positive_union_candidate_bundles(
+    cfg: SourceInnerPositiveUnionConfig,
+    bundles: Sequence[PredictionBundle | None],
+) -> dict[str, PredictionBundle]:
+    return {
+        rule: _positive_union_pool_bundle(
+            rule,
+            bundles,
+            beta=_positive_union_rule_beta(rule),
+            positive_label=cfg.positive_label,
+            eps=cfg.positive_union_eps,
+        )
+        for rule in cfg.candidate_pooling_rules
+    }
+
+
+def _binary_metrics_from_predictions(labels: Sequence[int], preds: Sequence[int]) -> dict[str, object]:
+    labels_i = [int(value) for value in labels]
+    preds_i = [int(value) for value in preds]
+    support0 = sum(value == 0 for value in labels_i)
+    support1 = sum(value == 1 for value in labels_i)
+    pred0 = sum(value == 0 for value in preds_i)
+    pred1 = sum(value == 1 for value in preds_i)
+    tp0 = sum(true == 0 and pred == 0 for true, pred in zip(labels_i, preds_i))
+    tp1 = sum(true == 1 and pred == 1 for true, pred in zip(labels_i, preds_i))
+    fp1 = sum(true == 0 and pred == 1 for true, pred in zip(labels_i, preds_i))
+    fp0 = sum(true == 1 and pred == 0 for true, pred in zip(labels_i, preds_i))
+    rec0 = float(tp0) / float(support0) if support0 else math.nan
+    rec1 = float(tp1) / float(support1) if support1 else math.nan
+    prec0 = float(tp0) / float(pred0) if pred0 else math.nan
+    prec1 = float(tp1) / float(pred1) if pred1 else math.nan
+    spec0 = float(tp1) / float(support1) if support1 else math.nan
+    spec1 = float(tp0) / float(support0) if support0 else math.nan
+    f1_0 = _f1(prec0, rec0)
+    f1_1 = _f1(prec1, rec1)
+    smoothed_rec0 = (float(tp0) + 0.5) / (float(support0) + 1.0)
+    smoothed_rec1 = (float(tp1) + 0.5) / (float(support1) + 1.0)
+    smoothed_prec0 = (float(tp0) + 0.5) / (float(pred0) + 1.0)
+    smoothed_prec1 = (float(tp1) + 0.5) / (float(pred1) + 1.0)
+    smoothed_f1_0 = _f1(smoothed_prec0, smoothed_rec0)
+    smoothed_f1_1 = _f1(smoothed_prec1, smoothed_rec1)
+    n = len(labels_i)
+    return {
+        "n_eval": n,
+        "class0_support": support0,
+        "class1_support": support1,
+        "class0_predicted_count": pred0,
+        "class1_predicted_count": pred1,
+        "class0_error_count": support0 - tp0,
+        "class1_error_count": support1 - tp1,
+        "class0_recall": rec0,
+        "class1_recall": rec1,
+        "class0_specificity": spec0,
+        "class1_specificity": spec1,
+        "precision_class0": prec0,
+        "precision": prec1,
+        "false_positive_count": fp1,
+        "false_negative_count": fp0,
+        "predicted_positive_rate": float(pred1) / float(n) if n else math.nan,
+        "bacc": nanmean([value for value in (rec0, rec1) if math.isfinite(value)]),
+        "macro_f1": nanmean([value for value in (f1_0, f1_1) if math.isfinite(value)]),
+        "smoothed_class0_recall": smoothed_rec0,
+        "smoothed_class1_recall": smoothed_rec1,
+        "smoothed_min_class_recall": min(smoothed_rec0, smoothed_rec1),
+        "smoothed_precision_class0": smoothed_prec0,
+        "smoothed_precision": smoothed_prec1,
+        "smoothed_bacc": 0.5 * (smoothed_rec0 + smoothed_rec1),
+        "smoothed_macro_f1": 0.5 * (smoothed_f1_0 + smoothed_f1_1),
+    }
+
+
+def _f1(precision: float, recall: float) -> float:
+    if not (math.isfinite(float(precision)) and math.isfinite(float(recall))):
+        return math.nan
+    denom = float(precision) + float(recall)
+    return 0.0 if denom <= 0.0 else 2.0 * float(precision) * float(recall) / denom
+
+
+def _positive_union_metrics(
+    rule: str,
+    bundle: PredictionBundle,
+    labels: Sequence[int],
+    *,
+    scope: str,
+) -> dict[str, object]:
+    preds = predict_from_probabilities(bundle.probabilities, classes=bundle.classes)
+    metrics = _binary_metrics_from_predictions(labels, preds)
+    return {
+        "scope": str(scope),
+        "rule": str(rule),
+        "beta": "" if _positive_union_rule_beta(rule) is None else _positive_union_rule_beta(rule),
+        "class_order": "|".join(str(value) for value in bundle.classes),
+        **metrics,
+    }
+
+
+def _select_positive_union_rule(
+    cfg: SourceInnerPositiveUnionConfig,
+    *,
+    source_rows: Sequence[Mapping[str, object]],
+) -> tuple[str, list[dict[str, object]], dict[str, object]]:
+    rows = [dict(row) for row in source_rows]
+    by_rule = {str(row["rule"]): row for row in rows}
+    arithmetic = by_rule[POSITIVE_UNION_RULE_ARITHMETIC]
+    positive_count = _safe_int(arithmetic.get("class1_support"), default=0)
+    negative_count = _safe_int(arithmetic.get("class0_support"), default=0)
+    if positive_count < cfg.min_source_inner_positive_count:
+        for row in rows:
+            row["source_inner_eligible"] = row["rule"] == POSITIVE_UNION_RULE_ARITHMETIC
+            row["source_inner_ineligible_reason"] = "" if row["rule"] == POSITIVE_UNION_RULE_ARITHMETIC else "insufficient_source_inner_positive_count"
+        selected = POSITIVE_UNION_RULE_ARITHMETIC
+        return selected, rows, _positive_union_selection_row(
+            cfg,
+            selected_rule=selected,
+            selected_row=by_rule[selected],
+            positive_count=positive_count,
+            negative_count=negative_count,
+            selection_reason="insufficient_source_inner_positive_count",
+        )
+
+    arith_bacc = _float(arithmetic.get("smoothed_bacc"))
+    arith_class0 = _float(arithmetic.get("smoothed_class0_recall"))
+    arith_class1 = _float(arithmetic.get("smoothed_class1_recall"))
+    arith_precision = _float(arithmetic.get("smoothed_precision"))
+    arith_ppr = _float(arithmetic.get("predicted_positive_rate"))
+    for row in rows:
+        rule = str(row["rule"])
+        reasons: list[str] = []
+        eligible = True
+        if rule != POSITIVE_UNION_RULE_ARITHMETIC:
+            if _float(row.get("smoothed_bacc")) < arith_bacc - cfg.source_inner_bacc_noninferiority_margin:
+                reasons.append("source_inner_bacc_inferior")
+            if _float(row.get("smoothed_class0_recall")) < arith_class0 - cfg.source_inner_class0_recall_margin:
+                reasons.append("source_inner_class0_recall_harm")
+            if _float(row.get("predicted_positive_rate")) > arith_ppr + cfg.source_inner_predicted_positive_rate_delta:
+                reasons.append("source_inner_predicted_positive_rate_inflation")
+            if rule == POSITIVE_UNION_RULE_BETA100:
+                if _float(row.get("smoothed_class1_recall")) <= arith_class1:
+                    reasons.append("beta100_no_class1_recall_gain")
+                if _float(row.get("smoothed_class0_recall")) < arith_class0 - cfg.beta100_class0_recall_margin:
+                    reasons.append("beta100_class0_recall_harm")
+                if _float(row.get("smoothed_precision")) < arith_precision - cfg.beta100_precision_margin:
+                    reasons.append("beta100_precision_harm")
+            eligible = not reasons
+        row["source_inner_eligible"] = eligible
+        row["source_inner_ineligible_reason"] = "|".join(reasons)
+
+    eligible_rows = [row for row in rows if row.get("source_inner_eligible") is True]
+    if not eligible_rows:
+        selected = POSITIVE_UNION_RULE_ARITHMETIC
+        selected_row = by_rule[selected]
+        reason = "no_eligible_rule_fallback_arithmetic"
+    else:
+        selected_row = max(
+            eligible_rows,
+            key=lambda row: (
+                _float(row.get("smoothed_min_class_recall")),
+                _float(row.get("smoothed_bacc")),
+                _float(row.get("smoothed_macro_f1")),
+                -cfg.candidate_pooling_rules.index(str(row["rule"])),
+            ),
+        )
+        selected = str(selected_row["rule"])
+        reason = "source_inner_selected"
+    return selected, rows, _positive_union_selection_row(
+        cfg,
+        selected_rule=selected,
+        selected_row=selected_row,
+        positive_count=positive_count,
+        negative_count=negative_count,
+        selection_reason=reason,
+    )
+
+
+def _positive_union_selection_row(
+    cfg: SourceInnerPositiveUnionConfig,
+    *,
+    selected_rule: str,
+    selected_row: Mapping[str, object],
+    positive_count: int,
+    negative_count: int,
+    selection_reason: str,
+) -> dict[str, object]:
+    return {
+        "selected_rule": selected_rule,
+        "selected_beta": "" if _positive_union_rule_beta(selected_rule) is None else _positive_union_rule_beta(selected_rule),
+        "selection_reason": selection_reason,
+        "source_inner_positive_count": int(positive_count),
+        "source_inner_negative_count": int(negative_count),
+        "min_source_inner_positive_count": cfg.min_source_inner_positive_count,
+        "selected_source_inner_min_class_recall_smoothed": selected_row.get("smoothed_min_class_recall", math.nan),
+        "selected_source_inner_bacc_smoothed": selected_row.get("smoothed_bacc", math.nan),
+        "selected_source_inner_macro_f1_smoothed": selected_row.get("smoothed_macro_f1", math.nan),
+        "selected_source_inner_precision_smoothed": selected_row.get("smoothed_precision", math.nan),
+        "selected_source_inner_predicted_positive_rate": selected_row.get("predicted_positive_rate", math.nan),
+        "selection_used_target_labels": False,
+        "target_support_used": False,
+    }
+
+
+def _effective_threshold_for_rule(rule: str, n_seed_bundles: int) -> tuple[float, float]:
+    beta = _positive_union_rule_beta(rule)
+    if beta is None:
+        identical = 0.5
+        single = math.nan if n_seed_bundles > 2 else 1.0
+        return identical, single
+    identical = 1.0 - 0.5 ** (1.0 / (float(n_seed_bundles) * float(beta)))
+    single = 1.0 - 0.5 ** (1.0 / float(beta))
+    return identical, single
+
+
+def _row_delta(row: Mapping[str, object], base: Mapping[str, object], key: str) -> float:
+    left = _float(row.get(key))
+    right = _float(base.get(key))
+    return left - right if math.isfinite(left) and math.isfinite(right) else math.nan
+
+
+def _positive_union_effective_threshold_rows(
+    cfg: SourceInnerPositiveUnionConfig,
+    *,
+    experiment_seed: int,
+    heldout_center: str,
+    n_seed_bundles: int,
+    source_rows: Mapping[str, Mapping[str, object]],
+    target_rows: Mapping[str, Mapping[str, object]],
+) -> list[dict[str, object]]:
+    out = []
+    arith_source = source_rows[POSITIVE_UNION_RULE_ARITHMETIC]
+    arith_target = target_rows[POSITIVE_UNION_RULE_ARITHMETIC]
+    for rule in cfg.candidate_pooling_rules:
+        source = source_rows[rule]
+        target = target_rows[rule]
+        identical, single = _effective_threshold_for_rule(rule, n_seed_bundles)
+        out.append(
+            {
+                "experiment_seed": experiment_seed,
+                "heldout_center": heldout_center,
+                "rule": rule,
+                "beta": "" if _positive_union_rule_beta(rule) is None else _positive_union_rule_beta(rule),
+                "n_seed_bundles": n_seed_bundles,
+                "identical_seed_probability_needed_for_positive_flip": identical,
+                "single_seed_probability_needed_for_positive_flip_if_other_seeds_zero": single,
+                "source_inner_predicted_positive_rate": source.get("predicted_positive_rate", math.nan),
+                "target_predicted_positive_rate": target.get("predicted_positive_rate", math.nan),
+                "delta_predicted_positive_rate_vs_arithmetic": _row_delta(target, arith_target, "predicted_positive_rate"),
+                "source_inner_delta_predicted_positive_rate_vs_arithmetic": _row_delta(source, arith_source, "predicted_positive_rate"),
+                "class1_recall_delta": _row_delta(target, arith_target, "class1_recall"),
+                "class0_recall_delta": _row_delta(target, arith_target, "class0_recall"),
+                "precision_delta": _row_delta(target, arith_target, "precision"),
+                "macro_f1_delta": _row_delta(target, arith_target, "macro_f1"),
+                "bacc_delta": _row_delta(target, arith_target, "bacc"),
+                "audit_only": True,
+                "primary_adoption_eligible": False,
+                "selection_used_target_labels": False,
+                "target_eval_labels_used_for_audit_only": True,
+            }
+        )
+    return out
+
+
+def _positive_union_class_conditional_rows(
+    cfg: SourceInnerPositiveUnionConfig,
+    *,
+    experiment_seed: int,
+    heldout_center: str,
+    target_rows: Mapping[str, Mapping[str, object]],
+    selected_rule: str,
+) -> list[dict[str, object]]:
+    out = []
+    for rule in cfg.candidate_pooling_rules:
+        row = dict(target_rows[rule])
+        row.update(
+            {
+                "experiment_seed": experiment_seed,
+                "heldout_center": heldout_center,
+                "selected_rule_for_cell": selected_rule,
+                "is_selected_rule": rule == selected_rule,
+                "audit_only": True,
+                "primary_adoption_eligible": False,
+                "selection_used_target_labels": False,
+                "target_eval_labels_used_for_audit_only": True,
+            }
+        )
+        out.append(row)
+    return out
+
+
+def _positive_union_harm_row(
+    *,
+    experiment_seed: int,
+    heldout_center: str,
+    selected_rule: str,
+    selected_bundle: PredictionBundle,
+    arithmetic_bundle: PredictionBundle,
+    eval_labels: Sequence[int],
+) -> dict[str, object]:
+    selected_preds = predict_from_probabilities(selected_bundle.probabilities, classes=selected_bundle.classes)
+    arithmetic_preds = predict_from_probabilities(arithmetic_bundle.probabilities, classes=arithmetic_bundle.classes)
+    selected_metrics = _binary_metrics_from_predictions(eval_labels, selected_preds)
+    arithmetic_metrics = _binary_metrics_from_predictions(eval_labels, arithmetic_preds)
+    negative_to_positive = sum(int(a) == 0 and int(s) == 1 for a, s in zip(arithmetic_preds, selected_preds))
+    positive_to_negative = sum(int(a) == 1 and int(s) == 0 for a, s in zip(arithmetic_preds, selected_preds))
+    bacc_delta = _row_delta(selected_metrics, arithmetic_metrics, "bacc")
+    return {
+        "experiment_seed": experiment_seed,
+        "heldout_center": heldout_center,
+        "selected_rule": selected_rule,
+        "precision_delta_vs_arithmetic": _row_delta(selected_metrics, arithmetic_metrics, "precision"),
+        "false_positive_count_delta_vs_arithmetic": _safe_int(selected_metrics.get("false_positive_count"), default=0) - _safe_int(arithmetic_metrics.get("false_positive_count"), default=0),
+        "negative_to_positive_flip_count": negative_to_positive,
+        "positive_to_negative_flip_count": positive_to_negative,
+        "bacc_delta_vs_arithmetic": bacc_delta,
+        "worst_per_center_regression": bacc_delta,
+        "worst_seed_center_regression": bacc_delta,
+        "tail_risk_transfer_flag": bool(math.isfinite(bacc_delta) and bacc_delta < -0.010),
+        "audit_only": True,
+        "primary_adoption_eligible": False,
+        "selection_used_target_labels": False,
+        "target_eval_labels_used_for_audit_only": True,
+    }
+
+
+def _positive_union_per_source_harm_rows(
+    cfg: SourceInnerPositiveUnionConfig,
+    *,
+    experiment_seed: int,
+    heldout_center: str,
+    source_ids: Sequence[str],
+    source_labels: Sequence[int],
+    source_bundles_by_rule: Mapping[str, PredictionBundle],
+) -> list[dict[str, object]]:
+    out = []
+    arithmetic_preds = predict_from_probabilities(
+        source_bundles_by_rule[POSITIVE_UNION_RULE_ARITHMETIC].probabilities,
+        classes=source_bundles_by_rule[POSITIVE_UNION_RULE_ARITHMETIC].classes,
+    )
+    preds_by_rule = {
+        rule: predict_from_probabilities(bundle.probabilities, classes=bundle.classes)
+        for rule, bundle in source_bundles_by_rule.items()
+    }
+    for source_center in sorted(set(str(value) for value in source_ids)):
+        indices = [idx for idx, value in enumerate(source_ids) if str(value) == source_center]
+        labels = [int(source_labels[idx]) for idx in indices]
+        arithmetic_metrics = _binary_metrics_from_predictions(labels, [int(arithmetic_preds[idx]) for idx in indices])
+        for rule in cfg.candidate_pooling_rules:
+            preds = [int(preds_by_rule[rule][idx]) for idx in indices]
+            metrics = _binary_metrics_from_predictions(labels, preds)
+            bacc_delta = _row_delta(metrics, arithmetic_metrics, "bacc")
+            class0_delta = _row_delta(metrics, arithmetic_metrics, "class0_recall")
+            class1_delta = _row_delta(metrics, arithmetic_metrics, "class1_recall")
+            precision_delta = _row_delta(metrics, arithmetic_metrics, "precision")
+            ppr_delta = _row_delta(metrics, arithmetic_metrics, "predicted_positive_rate")
+            out.append(
+                {
+                    "experiment_seed": experiment_seed,
+                    "heldout_center": heldout_center,
+                    "source_center": source_center,
+                    "rule": rule,
+                    "beta": "" if _positive_union_rule_beta(rule) is None else _positive_union_rule_beta(rule),
+                    "source_inner_positive_count": metrics["class1_support"],
+                    "source_inner_negative_count": metrics["class0_support"],
+                    "bacc_delta_vs_arithmetic": bacc_delta,
+                    "class0_recall_delta_vs_arithmetic": class0_delta,
+                    "class1_recall_delta_vs_arithmetic": class1_delta,
+                    "precision_delta_vs_arithmetic": precision_delta,
+                    "predicted_positive_rate_delta_vs_arithmetic": ppr_delta,
+                    "worst_per_source_harm_flag": bool(
+                        (math.isfinite(bacc_delta) and bacc_delta < -cfg.source_inner_bacc_noninferiority_margin)
+                        or (math.isfinite(class0_delta) and class0_delta < -cfg.source_inner_class0_recall_margin)
+                        or (math.isfinite(precision_delta) and precision_delta < -cfg.beta100_precision_margin)
+                        or (math.isfinite(ppr_delta) and ppr_delta > cfg.source_inner_predicted_positive_rate_delta)
+                    ),
+                    "audit_only": True,
+                    "primary_adoption_eligible": False,
+                    "selection_used_target_labels": False,
+                }
+            )
+    return out
 
 
 def _is_center3_failure_audit_cell(experiment_seed: int | str, heldout_center: str) -> bool:
@@ -2172,6 +3171,89 @@ def _multipanel_paired_delta_rows(
     return out, prior_tail_keys
 
 
+def _positive_union_paired_delta_rows(
+    rows: Sequence[Mapping[str, object]],
+    historical_rows: Sequence[Mapping[str, object]],
+    cfg: SourceInnerPositiveUnionConfig,
+) -> tuple[list[dict[str, object]], set[tuple[str, str]]]:
+    primary = _collapsed_method_rows(rows, cfg.primary_method)
+    arithmetic = _collapsed_method_rows(rows, POSITIVE_UNION_RULE_ARITHMETIC)
+    canonical = _collapsed_method_rows(rows, MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD)
+    anchor = _collapsed_method_rows(rows, MULTIPANEL_POOLED_ANCHOR_METHOD)
+    pooled_random = _collapsed_method_rows(rows, MULTIPANEL_POOLED_RANDOM_BAG_METHOD)
+    prior = _collapsed_method_rows(historical_rows, PRIMARY_TAILRISK_METHOD)
+    intersection = sorted(set(primary) & set(arithmetic) & set(canonical) & set(anchor) & set(prior))
+    prior_values = sorted((_float(prior[key]["bacc"]), key) for key in intersection if math.isfinite(_float(prior[key]["bacc"])))
+    bottom_count = max(1, int(math.ceil(0.20 * len(prior_values)))) if prior_values else 0
+    prior_tail_keys = {key for _value, key in prior_values[:bottom_count]}
+    out = []
+    for key in intersection:
+        p = _float(primary[key]["bacc"])
+        arithmetic_bacc = _float(arithmetic[key]["bacc"])
+        prior_bacc = _float(prior[key]["bacc"])
+        canon_bacc = _float(canonical[key]["bacc"])
+        anchor_bacc = _float(anchor[key]["bacc"])
+        pooled_random_bacc = _float(pooled_random.get(key, {}).get("bacc", math.nan))
+        out.append(
+            {
+                "experiment_seed": key[0],
+                "heldout_center": key[1],
+                "is_frozen_prior_bottom20_cell": key in prior_tail_keys,
+                "positive_union_bacc": p,
+                "v2_arithmetic_multipanel_bacc": arithmetic_bacc,
+                "prior_tailrisk_bacc": prior_bacc,
+                "same_cell_single_random_mass_bag_canonical_bacc": canon_bacc,
+                "same_cell_shrink050_bacc": anchor_bacc,
+                "pooled_random_mass_bag_bacc": pooled_random_bacc,
+                "delta_positive_union_minus_v2_arithmetic": p - arithmetic_bacc if math.isfinite(p) and math.isfinite(arithmetic_bacc) else math.nan,
+                "delta_positive_union_minus_prior_tailrisk": p - prior_bacc if math.isfinite(p) and math.isfinite(prior_bacc) else math.nan,
+                "delta_positive_union_minus_canonical_random_mass_bag": p - canon_bacc if math.isfinite(p) and math.isfinite(canon_bacc) else math.nan,
+                "delta_positive_union_minus_shrink050": p - anchor_bacc if math.isfinite(p) and math.isfinite(anchor_bacc) else math.nan,
+                "delta_positive_union_minus_pooled_random_mass_bag": p - pooled_random_bacc if math.isfinite(p) and math.isfinite(pooled_random_bacc) else math.nan,
+                "selected_rule": primary[key].get("selected_positive_union_rule", ""),
+                "comparison_cell_set": "intersection_positive_union_v2_arithmetic_prior_tailrisk_canonical_random_shrink050",
+                "status": "ok",
+            }
+        )
+    return out, prior_tail_keys
+
+
+def _annotate_positive_union_harm_rows(
+    rows: Sequence[Mapping[str, object]],
+    paired_delta_rows: Sequence[Mapping[str, object]],
+    cfg: SourceInnerPositiveUnionConfig,
+) -> list[dict[str, object]]:
+    deltas_by_center: dict[str, list[float]] = {}
+    deltas_by_key: dict[tuple[str, str], float] = {}
+    for row in paired_delta_rows:
+        center = str(row.get("heldout_center"))
+        key = (str(row.get("experiment_seed")), center)
+        delta = _float(row.get("delta_positive_union_minus_prior_tailrisk"))
+        if math.isfinite(delta):
+            deltas_by_center.setdefault(center, []).append(delta)
+            deltas_by_key[key] = delta
+    center_means = {
+        center: nanmean([value for value in values if math.isfinite(value)])
+        for center, values in deltas_by_center.items()
+    }
+    worst_center = min(center_means.values(), default=math.nan)
+    worst_seed_center = min(deltas_by_key.values(), default=math.nan)
+    out = []
+    for row in rows:
+        updated = dict(row)
+        key = (str(updated.get("experiment_seed")), str(updated.get("heldout_center")))
+        delta = deltas_by_key.get(key, math.nan)
+        updated["delta_vs_prior_tailrisk"] = delta
+        updated["worst_per_center_regression"] = worst_center
+        updated["worst_seed_center_regression"] = worst_seed_center
+        updated["tail_risk_transfer_flag"] = bool(
+            (math.isfinite(worst_center) and worst_center < cfg.tailrisk_transfer_threshold)
+            or (math.isfinite(worst_seed_center) and worst_seed_center < cfg.tailrisk_transfer_threshold)
+        )
+        out.append(updated)
+    return out
+
+
 def _annotate_failure_rows(
     rows: Sequence[Mapping[str, object]],
     paired_delta_rows: Sequence[Mapping[str, object]],
@@ -2401,6 +3483,172 @@ def _multipanel_decision(
     }
 
 
+def _positive_union_decision(
+    rows: Sequence[Mapping[str, object]],
+    *,
+    paired_delta_rows: Sequence[Mapping[str, object]],
+    prior_tail_keys: set[tuple[str, str]],
+    selection_rows: Sequence[Mapping[str, object]],
+    harm_rows: Sequence[Mapping[str, object]],
+    leakage_status: str,
+    cfg: SourceInnerPositiveUnionConfig,
+) -> dict[str, object]:
+    primary = _multipanel_tail_metrics(rows, cfg.primary_method, prior_tail_keys=prior_tail_keys)
+    arithmetic = _multipanel_tail_metrics(rows, POSITIVE_UNION_RULE_ARITHMETIC, prior_tail_keys=prior_tail_keys)
+    anchor = _multipanel_tail_metrics(rows, MULTIPANEL_POOLED_ANCHOR_METHOD, prior_tail_keys=prior_tail_keys)
+    canonical = _multipanel_tail_metrics(rows, MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD, prior_tail_keys=prior_tail_keys)
+    pooled_random = _multipanel_tail_metrics(rows, MULTIPANEL_POOLED_RANDOM_BAG_METHOD, prior_tail_keys=prior_tail_keys)
+    prior = _stats_from_paired(paired_delta_rows, "prior_tailrisk_bacc") if paired_delta_rows else {}
+    primary_i = _stats_from_paired(paired_delta_rows, "positive_union_bacc") if paired_delta_rows else {}
+    arithmetic_i = _stats_from_paired(paired_delta_rows, "v2_arithmetic_multipanel_bacc") if paired_delta_rows else {}
+    canonical_i = _stats_from_paired(paired_delta_rows, "same_cell_single_random_mass_bag_canonical_bacc") if paired_delta_rows else {}
+
+    mean_i = _float(primary_i.get("center_equal_mean_bacc", math.nan))
+    prior_mean = _float(prior.get("center_equal_mean_bacc", math.nan))
+    arithmetic_mean = _float(arithmetic_i.get("center_equal_mean_bacc", math.nan))
+    canonical_mean = _float(canonical_i.get("center_equal_mean_bacc", math.nan))
+    min_center_delta = _delta(primary_i.get("min_center_bacc", math.nan), prior.get("min_center_bacc", math.nan)) if paired_delta_rows else math.nan
+    center3_delta = _delta(primary_i.get("center3_bacc", math.nan), prior.get("center3_bacc", math.nan)) if paired_delta_rows else math.nan
+    bottom20_delta = _delta(primary_i.get("bottom20_cell_mean_bacc", math.nan), prior.get("bottom20_cell_mean_bacc", math.nan)) if paired_delta_rows else math.nan
+    seed_std_delta = _delta(primary_i.get("seed_std_bacc", math.nan), prior.get("seed_std_bacc", math.nan)) if paired_delta_rows else math.nan
+    arithmetic_delta = mean_i - arithmetic_mean if math.isfinite(mean_i) and math.isfinite(arithmetic_mean) else math.nan
+    tail_deltas = [
+        _float(row.get("delta_positive_union_minus_prior_tailrisk"))
+        for row in paired_delta_rows
+        if str(row.get("is_frozen_prior_bottom20_cell")) == "True" or row.get("is_frozen_prior_bottom20_cell") is True
+    ]
+    tail_deltas = [value for value in tail_deltas if math.isfinite(value)]
+    tail_positive_fraction = float(sum(value > 0.0 for value in tail_deltas)) / float(len(tail_deltas)) if tail_deltas else math.nan
+    tail_median_delta = float(np.median(np.asarray(tail_deltas, dtype=float))) if tail_deltas else math.nan
+    center_regressions = _per_center_regressions(primary_i, prior) if paired_delta_rows else {}
+    worst_center_regression = min(center_regressions.values(), default=math.nan)
+    worst_seed_center_regression = min(
+        (_float(row.get("delta_positive_union_minus_prior_tailrisk")) for row in paired_delta_rows),
+        default=math.nan,
+    )
+    selected_counts: dict[str, int] = {}
+    insufficient_count = 0
+    for row in selection_rows:
+        selected = str(row.get("selected_rule", ""))
+        selected_counts[selected] = selected_counts.get(selected, 0) + 1
+        if row.get("selection_reason") == "insufficient_source_inner_positive_count":
+            insufficient_count += 1
+    flags: list[str] = []
+    if leakage_status != "PASS":
+        flags.append("LEAKAGE_FAIL")
+    if not paired_delta_rows:
+        flags.append("MISSING_PRIOR_TAILRISK_INTERSECTION")
+    if math.isfinite(worst_center_regression) and worst_center_regression < cfg.tailrisk_transfer_threshold:
+        flags.append("TAIL_RISK_TRANSFER")
+    if math.isfinite(mean_i) and math.isfinite(prior_mean) and mean_i < prior_mean - cfg.primary_noninferiority_margin:
+        flags.append("MEAN_INFERIOR_TO_PRIOR_TAILRISK_GT_0P005")
+    if math.isfinite(mean_i) and math.isfinite(arithmetic_mean) and mean_i < arithmetic_mean - cfg.primary_noninferiority_margin:
+        flags.append("MEAN_INFERIOR_TO_V2_ARITHMETIC_GT_0P005")
+    if math.isfinite(min_center_delta) and min_center_delta <= 0.0:
+        flags.append("MIN_CENTER_NOT_IMPROVED")
+    if math.isfinite(center3_delta) and center3_delta <= 0.0:
+        flags.append("CENTER3_NOT_IMPROVED")
+    if math.isfinite(bottom20_delta) and bottom20_delta <= 0.0:
+        flags.append("BOTTOM20_NOT_IMPROVED")
+    if math.isfinite(seed_std_delta) and seed_std_delta > 0.005:
+        flags.append("SEED_STD_INCREASED_GT_0P005")
+    if math.isfinite(tail_median_delta) and tail_median_delta <= 0.0:
+        flags.append("FROZEN_BOTTOM20_MEDIAN_DELTA_NOT_POSITIVE")
+    if math.isfinite(tail_positive_fraction) and tail_positive_fraction <= 0.5:
+        flags.append("FROZEN_BOTTOM20_NOT_MAJORITY_IMPROVED")
+
+    noninferior = (
+        math.isfinite(mean_i)
+        and math.isfinite(prior_mean)
+        and math.isfinite(arithmetic_mean)
+        and mean_i >= prior_mean - cfg.primary_noninferiority_margin
+        and mean_i >= arithmetic_mean - cfg.primary_noninferiority_margin
+    )
+    weak_noninferior = (
+        math.isfinite(mean_i)
+        and math.isfinite(prior_mean)
+        and math.isfinite(arithmetic_mean)
+        and mean_i >= prior_mean - cfg.weak_pass_noninferiority_margin
+        and mean_i >= arithmetic_mean - cfg.weak_pass_noninferiority_margin
+    )
+    primary_success = (
+        leakage_status == "PASS"
+        and bool(paired_delta_rows)
+        and noninferior
+        and math.isfinite(min_center_delta)
+        and min_center_delta > 0.0
+        and center3_delta > 0.0
+        and bottom20_delta > 0.0
+        and (not math.isfinite(seed_std_delta) or seed_std_delta <= 0.005)
+        and tail_median_delta > 0.0
+        and tail_positive_fraction > 0.5
+    )
+    weak_success = (
+        leakage_status == "PASS"
+        and bool(paired_delta_rows)
+        and weak_noninferior
+        and math.isfinite(min_center_delta)
+        and min_center_delta > 0.0
+        and bottom20_delta > 0.0
+    )
+    primary_mean = _float(primary["center_equal_mean_bacc"])
+    strong_success = (
+        primary_success
+        and primary_mean >= 0.90
+        and _float(primary["min_center_bacc"]) >= 0.82
+        and _float(primary["center3_bacc"]) >= 0.82
+        and primary_mean > arithmetic_mean
+        and primary_mean > canonical_mean
+    )
+    verdict = "SOURCE_INNER_POSITIVE_UNION_FAIL"
+    if leakage_status != "PASS":
+        verdict = "PROTOCOL_FAIL"
+    elif strong_success:
+        verdict = "SOURCE_INNER_POSITIVE_UNION_STRONG_SUCCESS"
+    elif primary_success:
+        verdict = "SOURCE_INNER_POSITIVE_UNION_PRIMARY_SUCCESS"
+    elif weak_success:
+        verdict = "SOURCE_INNER_POSITIVE_UNION_WEAK_PASS"
+    return {
+        "primary_verdict": verdict,
+        "diagnostic_flags": "|".join(flags),
+        "primary_method": cfg.primary_method,
+        "leakage_status": leakage_status,
+        "claim_boundary": "source-inner selected class-conditional aggregation repair; not compatibility routing",
+        "comparison_cell_set": "intersection_positive_union_v2_arithmetic_prior_tailrisk_canonical_random_shrink050",
+        "n_intersection_cells": len(paired_delta_rows),
+        "selected_rule_counts_json": json.dumps(selected_counts, sort_keys=True),
+        "insufficient_source_inner_positive_count_cells": insufficient_count,
+        "center_equal_mean_bacc": primary["center_equal_mean_bacc"],
+        "intersection_center_equal_mean_bacc": mean_i,
+        "seed_cell_mean_bacc": primary["seed_cell_mean_bacc"],
+        "center_equal_macro_f1": primary["center_equal_macro_f1"],
+        "min_center_bacc": primary["min_center_bacc"],
+        "seed_std_bacc": primary["seed_std_bacc"],
+        "bottom20_cell_mean_bacc": primary["bottom20_cell_mean_bacc"],
+        "worst_seed_center_bacc": primary["worst_seed_center_bacc"],
+        "center3_bacc": primary["center3_bacc"],
+        "prior_tailrisk_center_equal_mean_bacc": prior_mean,
+        "v2_arithmetic_center_equal_mean_bacc": arithmetic_mean,
+        "canonical_random_mass_bag_center_equal_mean_bacc": canonical["center_equal_mean_bacc"],
+        "pooled_random_mass_bag_center_equal_mean_bacc": pooled_random["center_equal_mean_bacc"],
+        "shrink050_center_equal_mean_bacc": anchor["center_equal_mean_bacc"],
+        "delta_vs_prior_tailrisk_intersection": mean_i - prior_mean if math.isfinite(mean_i) and math.isfinite(prior_mean) else math.nan,
+        "delta_vs_v2_arithmetic_intersection": arithmetic_delta,
+        "delta_vs_canonical_random_mass_bag_intersection": mean_i - canonical_mean if math.isfinite(mean_i) and math.isfinite(canonical_mean) else math.nan,
+        "min_center_delta_vs_prior_tailrisk": min_center_delta,
+        "center3_delta_vs_prior_tailrisk": center3_delta,
+        "bottom20_delta_vs_prior_tailrisk": bottom20_delta,
+        "seed_std_delta_vs_prior_tailrisk": seed_std_delta,
+        "frozen_bottom20_median_delta_vs_prior_tailrisk": tail_median_delta,
+        "frozen_bottom20_positive_fraction": tail_positive_fraction,
+        "worst_per_center_regression_vs_prior_tailrisk": worst_center_regression,
+        "worst_seed_center_regression_vs_prior_tailrisk": worst_seed_center_regression,
+        "tailrisk_transfer_flag": "TAIL_RISK_TRANSFER" in flags or any(str(row.get("tail_risk_transfer_flag")) == "True" for row in harm_rows),
+        **primary,
+    }
+
+
 def _per_center_regressions(primary_stats: Mapping[str, object], prior_stats: Mapping[str, object]) -> dict[str, float]:
     try:
         primary = json.loads(str(primary_stats.get("per_center_bacc", "{}")))
@@ -2508,6 +3756,97 @@ def _write_multipanel_artifacts(
     )
     write_json(root / "run_config_resolved.yaml", _resolved_multipanel_config(cfg))
     _write_multipanel_decision_summary(root, decision)
+
+
+def _write_positive_union_artifacts(
+    root: Path,
+    cfg: SourceInnerPositiveUnionConfig,
+    *,
+    matrix_rows: Sequence[Mapping[str, object]],
+    source_inner_selection_rows: Sequence[Mapping[str, object]],
+    candidate_rule_rows: Sequence[Mapping[str, object]],
+    class_conditional_rows: Sequence[Mapping[str, object]],
+    effective_threshold_rows: Sequence[Mapping[str, object]],
+    paired_delta_rows: Sequence[Mapping[str, object]],
+    harm_rows: Sequence[Mapping[str, object]],
+    per_source_harm_rows: Sequence[Mapping[str, object]],
+    invariant_rows: Sequence[Mapping[str, object]],
+    blend_manifest_rows: Sequence[Mapping[str, object]],
+    source_weight_rows: Sequence[Mapping[str, object]],
+    reliability_rows: Sequence[Mapping[str, object]],
+    source_summary_rows: Sequence[Mapping[str, object]],
+    component_manifest_rows: Sequence[Mapping[str, object]],
+    component_coverage_rows: Sequence[Mapping[str, object]],
+    paired_generation_rows: Sequence[Mapping[str, object]],
+    eligibility_rows: Sequence[Mapping[str, object]],
+    model_manifest_rows: Sequence[Mapping[str, object]],
+    decision: Mapping[str, object],
+    leakage: object,
+    protocol_violations: Sequence[str],
+    target_expert_excluded: bool,
+) -> None:
+    write_csv_rows(root / "tables" / "positive_union_downstream_matrix.csv", matrix_rows)
+    write_csv_rows(root / "tables" / "positive_union_summary.csv", [dict(decision)])
+    write_csv_rows(root / "tables" / "positive_union_source_inner_selection.csv", source_inner_selection_rows)
+    write_csv_rows(root / "tables" / "positive_union_candidate_rule_matrix.csv", candidate_rule_rows)
+    write_csv_rows(root / "tables" / "positive_union_class_conditional_audit.csv", class_conditional_rows)
+    write_csv_rows(root / "tables" / "positive_union_effective_threshold_audit.csv", effective_threshold_rows)
+    write_csv_rows(root / "tables" / "positive_union_paired_deltas.csv", paired_delta_rows)
+    write_csv_rows(root / "tables" / "positive_union_harm_audit.csv", harm_rows)
+    write_csv_rows(root / "tables" / "positive_union_source_inner_per_source_harm_audit.csv", per_source_harm_rows)
+    write_csv_rows(root / "tables" / "positive_union_probability_invariants.csv", invariant_rows)
+    write_csv_rows(root / "tables" / "positive_union_probability_blend_manifest.csv", blend_manifest_rows)
+    write_csv_rows(root / "tables" / "source_weight_manifest.csv", source_weight_rows)
+    write_csv_rows(root / "tables" / "source_reliability_manifest.csv", reliability_rows)
+    write_csv_rows(root / "tables" / "source_summary_diagnostics.csv", source_summary_rows)
+    write_csv_rows(root / "tables" / "component_manifest.csv", component_manifest_rows)
+    write_csv_rows(root / "tables" / "component_coverage_audit.csv", component_coverage_rows)
+    write_csv_rows(root / "tables" / "paired_generation_audit.csv", paired_generation_rows)
+    write_csv_rows(root / "tables" / "eligibility_audit.csv", eligibility_rows)
+    write_csv_rows(root / "manifests" / "positive_union_model_manifest.csv", model_manifest_rows)
+    write_json(root / "reports" / "leakage_report.json", leakage.to_json_dict())
+    write_json(
+        root / "manifests" / "protocol_manifest.json",
+        {
+            "schema_version": "cvae_rebuild_source_inner_positive_union_protocol_v1",
+            "experiment_name": cfg.name,
+            "primary_method": cfg.primary_method,
+            "experiment_type": "source_only_class_conditional_positive_union_tailrisk_repair",
+            "target_expert_excluded": bool(target_expert_excluded),
+            "target_support_used": False,
+            "target_support_labels_for_selection": False,
+            "target_eval_labels_for_scoring_only": True,
+            "selection_used_target_labels": False,
+            "target_calibration_metrics_audit_only": True,
+            "target_eval_candidate_rule_metrics_audit_only": True,
+            "target_conditioned_point_compatibility_estimate": False,
+            "compatibility_router": False,
+            "fixed_all_source_inclusion": True,
+            "panel_seeds_are_evaluation_replicates": False,
+            "decision_cell": "experiment_seed_x_heldout_center",
+            "source_inner_selection_primary": True,
+            "source_inner_validation_scope": "pooled_non_target_source_validation_rows",
+            "source_inner_per_source_harm_audit": True,
+            "positive_label": cfg.positive_label,
+            "prediction_threshold": cfg.prediction_threshold,
+            "minimum_source_inner_positive_count": cfg.min_source_inner_positive_count,
+            "positive_union_eps": cfg.positive_union_eps,
+            "candidate_pooling_rules": list(cfg.candidate_pooling_rules),
+            "primary_pooling_rule": POSITIVE_UNION_PRIMARY_POOLING,
+            "blend_alpha_locked": cfg.blend_alpha,
+            "random_mass_bag_size": cfg.random_mass_bag_size,
+            "random_mass_bag_distribution": "dirichlet_uniform_alpha4",
+            "panel_seed_groups": {panel: list(seeds) for panel, seeds in cfg.panel_seed_groups},
+            "prior_tailrisk_comparator": "" if cfg.prior_tailrisk_artifact_root is None else str(cfg.prior_tailrisk_artifact_root / "tables" / "tailrisk_downstream_matrix.csv"),
+            "claim_boundary": (
+                "source-inner selected class-conditional aggregation repair after fixed dense source-only "
+                "CVAE seed-blend aggregation; not compatibility routing, target adaptation, or target-label tuning"
+            ),
+            "protocol_violations": list(protocol_violations),
+        },
+    )
+    write_json(root / "run_config_resolved.yaml", _resolved_positive_union_config(cfg))
+    _write_positive_union_decision_summary(root, decision)
 
 
 def _write_center3_failure_audit_artifacts(
@@ -2709,6 +4048,36 @@ def _resolved_multipanel_config(cfg: MultipanelTailRiskConfig) -> dict[str, obje
     return resolved
 
 
+def _resolved_positive_union_config(cfg: SourceInnerPositiveUnionConfig) -> dict[str, object]:
+    resolved = _resolved_config(cfg)
+    resolved["experiment"]["name"] = cfg.name
+    resolved["experiment"]["artifact_root"] = str(cfg.artifact_root)
+    resolved["source_inner_class_conditional_positive_union"] = {
+        "primary_method": cfg.primary_method,
+        "primary_shrink_lambda": cfg.primary_shrink_lambda,
+        "random_mass_bag_size": cfg.random_mass_bag_size,
+        "random_mass_bag_alpha": cfg.random_mass_bag_alpha,
+        "blend_alpha": cfg.blend_alpha,
+        "panel_seed_groups": {panel: list(seeds) for panel, seeds in cfg.panel_seed_groups},
+        "source_weighting": cfg.source_weighting,
+        "primary_pooling": cfg.primary_pooling,
+        "candidate_pooling_rules": list(cfg.candidate_pooling_rules),
+        "positive_label": cfg.positive_label,
+        "prediction_threshold": cfg.prediction_threshold,
+        "min_source_inner_positive_count": cfg.min_source_inner_positive_count,
+        "positive_union_eps": cfg.positive_union_eps,
+        "source_inner_bacc_noninferiority_margin": cfg.source_inner_bacc_noninferiority_margin,
+        "source_inner_class0_recall_margin": cfg.source_inner_class0_recall_margin,
+        "source_inner_predicted_positive_rate_delta": cfg.source_inner_predicted_positive_rate_delta,
+        "beta100_class0_recall_margin": cfg.beta100_class0_recall_margin,
+        "beta100_precision_margin": cfg.beta100_precision_margin,
+        "primary_noninferiority_margin": cfg.primary_noninferiority_margin,
+        "weak_pass_noninferiority_margin": cfg.weak_pass_noninferiority_margin,
+        "tailrisk_transfer_threshold": cfg.tailrisk_transfer_threshold,
+    }
+    return resolved
+
+
 def _write_multipanel_decision_summary(root: Path, decision: Mapping[str, object]) -> None:
     lines = [
         "# Multi-Panel Tail-Risk Mass-Bag Stabilization v1",
@@ -2738,6 +4107,41 @@ def _write_multipanel_decision_summary(root: Path, decision: Mapping[str, object
         "The primary method blends each seed-specific shrink050 anchor with its seed-specific random mass-bag, then probability-pools the nine predeclared seed blends before computing metrics.",
         "",
         "Target evaluation labels are scoring/audit only and never choose seeds, alpha, source set, calibration, classifier, or pass/fail policy.",
+        "",
+    ]
+    (root / "reports" / "decision_summary.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def _write_positive_union_decision_summary(root: Path, decision: Mapping[str, object]) -> None:
+    lines = [
+        "# Source-Inner Class-Conditional Positive Union v1",
+        "",
+        "## Summary",
+        "",
+        f"- Primary method: `{decision.get('primary_method', PRIMARY_POSITIVE_UNION_METHOD)}`",
+        f"- Primary verdict: `{decision.get('primary_verdict', 'SOURCE_INNER_POSITIVE_UNION_FAIL')}`",
+        f"- Diagnostic flags: `{decision.get('diagnostic_flags', '')}`",
+        f"- Selected rule counts: `{decision.get('selected_rule_counts_json', '{}')}`",
+        f"- Insufficient source-inner positive-count cells: {decision.get('insufficient_source_inner_positive_count_cells', 0)}",
+        f"- Center-equal mean BACC: {_format_float(decision.get('center_equal_mean_bacc'))}",
+        f"- Intersection mean BACC: {_format_float(decision.get('intersection_center_equal_mean_bacc'))}",
+        f"- Min center BACC: {_format_float(decision.get('min_center_bacc'))}",
+        f"- Center 3 BACC: {_format_float(decision.get('center3_bacc'))}",
+        f"- Frozen bottom-20 BACC: {_format_float(decision.get('bottom20_cell_mean_bacc'))}",
+        f"- Seed std BACC: {_format_float(decision.get('seed_std_bacc'))}",
+        f"- Delta vs prior tailrisk: {_format_float(decision.get('delta_vs_prior_tailrisk_intersection'))}",
+        f"- Delta vs v2 arithmetic multipanel: {_format_float(decision.get('delta_vs_v2_arithmetic_intersection'))}",
+        f"- Frozen bottom20 median delta: {_format_float(decision.get('frozen_bottom20_median_delta_vs_prior_tailrisk'))}",
+        f"- Worst per-center regression vs prior tailrisk: {_format_float(decision.get('worst_per_center_regression_vs_prior_tailrisk'))}",
+        f"- Worst seed-center regression vs prior tailrisk: {_format_float(decision.get('worst_seed_center_regression_vs_prior_tailrisk'))}",
+        f"- Tail-risk transfer flag: `{decision.get('tailrisk_transfer_flag')}`",
+        f"- Leakage status: `{decision.get('leakage_status', '')}`",
+        "",
+        "## Protocol Boundary",
+        "",
+        "This is a source-inner selected class-conditional aggregation repair over fixed CVAE seed-blend probabilities. It is not compatibility routing, target adaptation, target-threshold tuning, or target-compatible expert discovery.",
+        "",
+        "Target labels are used only after the source-inner rule is fixed, for scoring and audit rows.",
         "",
     ]
     (root / "reports" / "decision_summary.md").write_text("\n".join(lines), encoding="utf-8")
@@ -2837,6 +4241,9 @@ def _evaluate_tailrisk_pair(
             calibration_rows=(),
             source_weight_rows=tuple(source_weight_rows),
             eligibility_rows=tuple(eligibility_rows),
+            source_inner_bundles={},
+            source_inner_labels=(),
+            source_inner_source_ids=(),
         )
     class_order_match = anchor_result.bundle.classes == bag_eval.ensemble_bundle.classes
     if not class_order_match:
@@ -2885,7 +4292,7 @@ def _evaluate_tailrisk_pair(
     merged_counts = mb._merge_component_counts([anchor_result.component_counts, bag_eval.component_counts])
     coverage = cu._component_coverage_row(row, merged_counts, cu._expected_component_keys(candidates, summaries, control_mode="normal"))
     paired_row = cu._paired_generation_row(row, str(row["generated_features_hash"]), _hash_strings([anchor_result.source_generation_hash, bag_eval.source_generation_hash]), "ok")
-    source_inner_bundles, source_inner_labels = _source_inner_probability_bundles(
+    source_inner_bundles, source_inner_labels, source_inner_source_ids = _source_inner_probability_bundles(
         cfg,
         root=root,
         per_source_runtime=per_source_runtime,
@@ -2922,6 +4329,9 @@ def _evaluate_tailrisk_pair(
         ),
         source_weight_rows=tuple(source_weight_rows),
         eligibility_rows=tuple(eligibility_rows),
+        source_inner_bundles=source_inner_bundles,
+        source_inner_labels=source_inner_labels,
+        source_inner_source_ids=source_inner_source_ids,
     )
 
 
@@ -3038,8 +4448,8 @@ def _source_inner_probability_bundles(
     experiment_seed: int,
     heldout_center: str,
     replicate_seed: int,
-) -> tuple[dict[str, PredictionBundle], tuple[int, ...]]:
-    source_inner_raw, source_inner_labels = _source_inner_eval_set(per_source_runtime, candidates)
+) -> tuple[dict[str, PredictionBundle], tuple[int, ...], tuple[str, ...]]:
+    source_inner_raw, source_inner_labels, source_inner_source_ids = _source_inner_eval_set_with_sources(per_source_runtime, candidates)
     bundles: dict[str, PredictionBundle] = {}
     anchor_seed = d1._latent_seed(experiment_seed, heldout_center, replicate_seed, ANCHOR_METHOD, cu._plan_hash(anchor_plan), "normal")
     generated, labels, _counts, _train_raw, _hashes = mb._sample_cached(
@@ -3104,20 +4514,31 @@ def _source_inner_probability_bundles(
             probabilities=tuple(tuple(float(v) for v in row) for row in pooled),
             classes=bundles["anchor"].classes,
         )
-    return bundles, source_inner_labels
+    return bundles, source_inner_labels, source_inner_source_ids
 
 
 def _source_inner_eval_set(
     per_source_runtime: Mapping[str, RuntimeSource],
     candidates: Sequence[str],
 ) -> tuple[object, tuple[int, ...]]:
+    raw, labels, _source_ids = _source_inner_eval_set_with_sources(per_source_runtime, candidates)
+    return raw, labels
+
+
+def _source_inner_eval_set_with_sources(
+    per_source_runtime: Mapping[str, RuntimeSource],
+    candidates: Sequence[str],
+) -> tuple[object, tuple[int, ...], tuple[str, ...]]:
     raw_chunks = []
     labels: list[int] = []
+    source_ids: list[str] = []
     for source in candidates:
         runtime = per_source_runtime[str(source)].runtime
         raw_chunks.append(cu._inverse_to_raw(runtime, runtime.source_val_embeddings))
-        labels.extend(int(v) for v in runtime.source_val_labels)
-    return np.vstack(raw_chunks), tuple(labels)
+        source_labels = [int(v) for v in runtime.source_val_labels]
+        labels.extend(source_labels)
+        source_ids.extend([str(source)] * len(source_labels))
+    return np.vstack(raw_chunks), tuple(labels), tuple(source_ids)
 
 
 def _evaluate_single_control_member(

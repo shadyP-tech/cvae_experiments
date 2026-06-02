@@ -24,8 +24,10 @@ from .component_union_mass_bagged import (
     run_mass_bagged_component_union,
 )
 from .component_union_tailrisk_anchored_mass_bagged import (
+    load_source_inner_positive_union_config,
     load_tailrisk_anchored_component_union_config,
     load_multipanel_tailrisk_component_union_config,
+    run_source_inner_positive_union,
     run_tailrisk_anchored_component_union,
     run_multipanel_tailrisk_component_union,
 )
@@ -224,6 +226,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     component_union_tailrisk_multipanel.add_argument("--config", required=True)
     component_union_tailrisk_multipanel.add_argument("--artifact-root", default=None)
+
+    source_inner_positive_union = sub.add_parser(
+        "diagnose-source-inner-class-conditional-positive-union",
+        help="Run the Virchow2-CVAE source-inner class-conditional positive-union audit.",
+    )
+    source_inner_positive_union.add_argument("--config", required=True)
+    source_inner_positive_union.add_argument("--artifact-root", default=None)
 
     dense_tailshield = sub.add_parser(
         "diagnose-dense-reliability-tailshield-random-mass-bag",
@@ -455,6 +464,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "diagnose-component-union-tailrisk-multipanel-mass-bagged":
         cfg = load_multipanel_tailrisk_component_union_config(args.config)
         root = run_multipanel_tailrisk_component_union(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
+    if args.command == "diagnose-source-inner-class-conditional-positive-union":
+        cfg = load_source_inner_positive_union_config(args.config)
+        root = run_source_inner_positive_union(
             cfg,
             artifact_root=Path(args.artifact_root) if args.artifact_root else None,
         )

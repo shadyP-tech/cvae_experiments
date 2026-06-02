@@ -17,11 +17,16 @@ from cvae_rebuild.component_union_mass_bagged import (
 from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
     MULTIPANEL_PANEL_SEEDS,
     MULTIPANEL_TAILRISK_NAME,
+    POSITIVE_UNION_RULES,
+    POSITIVE_UNION_TAILRISK_NAME,
+    PRIMARY_POSITIVE_UNION_METHOD,
     PRIMARY_MULTIPANEL_TAILRISK_METHOD,
     PRIMARY_TAILRISK_METHOD,
     load_multipanel_tailrisk_component_union_config,
+    load_source_inner_positive_union_config,
     load_tailrisk_anchored_component_union_config,
     parse_multipanel_tailrisk_component_union_config,
+    parse_source_inner_positive_union_config,
     parse_tailrisk_anchored_component_union_config,
 )
 from cvae_rebuild.dense_reliability_tailshield_random_mass_bag import (
@@ -369,6 +374,97 @@ def test_multipanel_tailrisk_rejects_target_support_field() -> None:
 
     with pytest.raises(Exception, match="support_calibrated_artifact_root"):
         parse_multipanel_tailrisk_component_union_config(payload, base_dir=Path("."))
+
+
+def test_locked_source_inner_positive_union_config_loads() -> None:
+    cfg = load_source_inner_positive_union_config(
+        "cvae_rebuild/configs/virchow2_cvae_source_inner_class_conditional_positive_union_v1.yaml"
+    )
+    assert cfg.name == POSITIVE_UNION_TAILRISK_NAME
+    assert cfg.backbone == "virchow2"
+    assert cfg.primary_variant == "pca64_beta001"
+    assert cfg.primary_method == PRIMARY_POSITIVE_UNION_METHOD
+    assert cfg.strict_full_run_matrix is True
+    assert cfg.experiment_seeds == (42, 43, 44)
+    assert cfg.heldout_centers == ("0", "1", "2", "3", "4")
+    assert cfg.replicate_seeds == (17, 23, 31)
+    assert cfg.fresh_replicate_seeds == (101, 103, 107, 109, 113, 127)
+    assert cfg.panel_seed_groups == MULTIPANEL_PANEL_SEEDS
+    assert cfg.all_panel_seeds == (17, 23, 31, 101, 103, 107, 109, 113, 127)
+    assert cfg.candidate_pooling_rules == POSITIVE_UNION_RULES
+    assert cfg.positive_label == 1
+    assert cfg.prediction_threshold == 0.5
+    assert cfg.min_source_inner_positive_count == 5
+    assert cfg.positive_union_eps == 1.0e-8
+    assert cfg.random_mass_bag_size == 11
+    assert cfg.random_mass_bag_alpha == 4.0
+    assert cfg.blend_alpha == 0.5
+    assert cfg.primary_pooling == "source_inner_selected_class_conditional_positive_union"
+
+
+def test_source_inner_positive_union_rejects_changed_beta_grid() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_source_inner_class_conditional_positive_union_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["source_inner_class_conditional_positive_union"]["candidate_pooling_rules"][-1] = "positive_union_beta075"
+
+    with pytest.raises(Exception, match="candidate_pooling_rules"):
+        parse_source_inner_positive_union_config(payload, base_dir=Path("."))
+
+
+def test_source_inner_positive_union_rejects_changed_min_positive_count() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_source_inner_class_conditional_positive_union_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["source_inner_class_conditional_positive_union"]["min_source_inner_positive_count"] = 3
+
+    with pytest.raises(Exception, match="min_source_inner_positive_count"):
+        parse_source_inner_positive_union_config(payload, base_dir=Path("."))
+
+
+@pytest.mark.parametrize(
+    ("section", "key", "value", "message"),
+    [
+        ("source_inner_class_conditional_positive_union", "blend_alpha", 0.25, "blend_alpha"),
+        ("source_inner_class_conditional_positive_union", "random_mass_bag_alpha", 2.0, "random_mass_bag_alpha"),
+        ("source_inner_class_conditional_positive_union", "positive_label", 0, "positive_label"),
+        ("source_inner_class_conditional_positive_union", "prediction_threshold", 0.25, "prediction_threshold"),
+        ("source_inner_class_conditional_positive_union", "positive_union_eps", 1.0e-6, "positive_union_eps"),
+    ],
+)
+def test_source_inner_positive_union_rejects_changed_locked_fields(section: str, key: str, value: object, message: str) -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_source_inner_class_conditional_positive_union_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload[section][key] = value
+
+    with pytest.raises(Exception, match=message):
+        parse_source_inner_positive_union_config(payload, base_dir=Path("."))
+
+
+def test_source_inner_positive_union_rejects_undeclared_panel_seed_and_bag_size_in_strict_run() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_source_inner_class_conditional_positive_union_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["source_inner_class_conditional_positive_union"]["panel_seed_groups"]["fresh_b"][-1] = 131
+    payload["run_matrix"]["fresh_replicate_seeds"][-1] = 131
+    with pytest.raises(Exception, match="panel_seed_groups"):
+        parse_source_inner_positive_union_config(payload, base_dir=Path("."))
+
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["source_inner_class_conditional_positive_union"]["random_mass_bag_size"] = 9
+    with pytest.raises(Exception, match="random_mass_bag_size"):
+        parse_source_inner_positive_union_config(payload, base_dir=Path("."))
+
+
+def test_source_inner_positive_union_rejects_target_support_and_target_selection() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_source_inner_class_conditional_positive_union_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["inputs"]["support_calibrated_artifact_root"] = "cvae_rebuild/artifacts/not_allowed"
+
+    with pytest.raises(Exception, match="support_calibrated_artifact_root"):
+        parse_source_inner_positive_union_config(payload, base_dir=Path("."))
+
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["source_inner_class_conditional_positive_union"]["target_eval_metric_selection"] = True
+    with pytest.raises(Exception, match="target_eval_metric_selection"):
+        parse_source_inner_positive_union_config(payload, base_dir=Path("."))
 
 
 def test_locked_dense_tailshield_random_mass_bag_config_loads() -> None:

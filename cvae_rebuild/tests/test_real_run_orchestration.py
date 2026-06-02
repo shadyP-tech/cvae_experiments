@@ -58,13 +58,23 @@ from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
     MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD,
     MULTIPANEL_POOLED_ANCHOR_METHOD,
     MULTIPANEL_POOLED_RANDOM_BAG_METHOD,
+    POSITIVE_UNION_RULE_ARITHMETIC,
+    POSITIVE_UNION_RULE_BETA050,
+    POSITIVE_UNION_RULE_BETA100,
+    PRIMARY_POSITIVE_UNION_METHOD,
     PRIMARY_MULTIPANEL_TAILRISK_METHOD,
     PRIMARY_TAILRISK_METHOD,
+    _effective_threshold_for_rule,
+    _positive_union_pool_bundle,
+    _select_positive_union_rule,
     parse_multipanel_tailrisk_component_union_config,
+    parse_source_inner_positive_union_config,
     parse_tailrisk_anchored_component_union_config,
     run_multipanel_tailrisk_component_union,
+    run_source_inner_positive_union,
     run_tailrisk_anchored_component_union,
 )
+from cvae_rebuild.downstream import PredictionBundle
 from cvae_rebuild.dense_reliability_tailshield_random_mass_bag import (
     PRIMARY_DENSE_TAILSHIELD_METHOD,
     parse_dense_tailshield_random_mass_bag_config,
@@ -2041,6 +2051,159 @@ def test_multipanel_tailrisk_component_union_tiny_cache_writes_expected_artifact
     assert audit_component and all(row["audit_only"] == "True" for row in audit_component)
     assert "Diagnostic-only audit" in audit_conclusion
     assert "not a compatibility router" in report
+
+
+def test_source_inner_positive_union_formula_threshold_and_selector_guard(tmp_path: Path) -> None:
+    payload = _tiny_source_inner_positive_union_payload(tmp_path)
+    cfg = parse_source_inner_positive_union_config(payload, base_dir=tmp_path)
+    bundles = [
+        PredictionBundle(expert_id=f"seed_{idx}", probabilities=((0.80, 0.20),), classes=(0, 1))
+        for idx in range(9)
+    ]
+    pooled = _positive_union_pool_bundle(
+        POSITIVE_UNION_RULE_BETA100,
+        bundles,
+        beta=1.0,
+        positive_label=1,
+        eps=1.0e-8,
+    )
+    expected = 1.0 - (1.0 - 0.20) ** 9
+    assert math.isclose(pooled.probabilities[0][1], expected, rel_tol=0.0, abs_tol=1.0e-12)
+
+    identical, single = _effective_threshold_for_rule(POSITIVE_UNION_RULE_BETA100, 9)
+    assert math.isclose(identical, 1.0 - 0.5 ** (1.0 / 9.0), rel_tol=0.0, abs_tol=1.0e-12)
+    assert math.isclose(single, 0.5, rel_tol=0.0, abs_tol=1.0e-12)
+    identical_beta050, _single_beta050 = _effective_threshold_for_rule(POSITIVE_UNION_RULE_BETA050, 9)
+    assert math.isclose(identical_beta050, 1.0 - 0.5 ** (1.0 / 4.5), rel_tol=0.0, abs_tol=1.0e-12)
+
+    rows = [
+        {
+            "rule": POSITIVE_UNION_RULE_ARITHMETIC,
+            "class1_support": 4,
+            "class0_support": 20,
+            "smoothed_min_class_recall": 0.5,
+            "smoothed_bacc": 0.6,
+            "smoothed_macro_f1": 0.6,
+            "smoothed_class0_recall": 0.8,
+            "smoothed_class1_recall": 0.2,
+            "smoothed_precision": 0.5,
+            "predicted_positive_rate": 0.1,
+        },
+        {
+            "rule": "positive_union_beta025",
+            "class1_support": 4,
+            "class0_support": 20,
+            "smoothed_min_class_recall": 0.7,
+            "smoothed_bacc": 0.7,
+            "smoothed_macro_f1": 0.7,
+            "smoothed_class0_recall": 0.7,
+            "smoothed_class1_recall": 0.8,
+            "smoothed_precision": 0.5,
+            "predicted_positive_rate": 0.1,
+        },
+        {
+            "rule": "positive_union_beta050",
+            "class1_support": 4,
+            "class0_support": 20,
+            "smoothed_min_class_recall": 0.7,
+            "smoothed_bacc": 0.7,
+            "smoothed_macro_f1": 0.7,
+            "smoothed_class0_recall": 0.7,
+            "smoothed_class1_recall": 0.8,
+            "smoothed_precision": 0.5,
+            "predicted_positive_rate": 0.1,
+        },
+        {
+            "rule": POSITIVE_UNION_RULE_BETA100,
+            "class1_support": 4,
+            "class0_support": 20,
+            "smoothed_min_class_recall": 0.7,
+            "smoothed_bacc": 0.7,
+            "smoothed_macro_f1": 0.7,
+            "smoothed_class0_recall": 0.7,
+            "smoothed_class1_recall": 0.8,
+            "smoothed_precision": 0.5,
+            "predicted_positive_rate": 0.1,
+        },
+    ]
+    selected, updated, selection = _select_positive_union_rule(cfg, source_rows=rows)
+    assert selected == POSITIVE_UNION_RULE_ARITHMETIC
+    assert selection["selection_reason"] == "insufficient_source_inner_positive_count"
+    assert all(row["source_inner_eligible"] is (row["rule"] == POSITIVE_UNION_RULE_ARITHMETIC) for row in updated)
+
+    rows[0]["class1_support"] = 5
+    rows[0]["smoothed_class1_recall"] = 0.3
+    rows[1]["class1_support"] = 5
+    rows[2]["class1_support"] = 5
+    rows[3]["class1_support"] = 5
+    rows[3]["smoothed_class0_recall"] = 0.79
+    rows[3]["smoothed_class1_recall"] = 0.9
+    selected, updated, _selection = _select_positive_union_rule(cfg, source_rows=rows)
+    beta100 = next(row for row in updated if row["rule"] == POSITIVE_UNION_RULE_BETA100)
+    assert selected != POSITIVE_UNION_RULE_BETA100
+    assert beta100["source_inner_eligible"] is False
+    assert "beta100_class0_recall_harm" in beta100["source_inner_ineligible_reason"]
+
+
+def test_source_inner_positive_union_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_source_inner_positive_union_payload(tmp_path)
+    cfg = parse_source_inner_positive_union_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=42)
+    _write_tiny_prior_tailrisk_matrix(cfg.prior_tailrisk_artifact_root)
+
+    root = run_source_inner_positive_union(cfg)
+
+    expected = [
+        "tables/positive_union_downstream_matrix.csv",
+        "tables/positive_union_summary.csv",
+        "tables/positive_union_source_inner_selection.csv",
+        "tables/positive_union_candidate_rule_matrix.csv",
+        "tables/positive_union_class_conditional_audit.csv",
+        "tables/positive_union_effective_threshold_audit.csv",
+        "tables/positive_union_paired_deltas.csv",
+        "tables/positive_union_harm_audit.csv",
+        "tables/positive_union_source_inner_per_source_harm_audit.csv",
+        "tables/positive_union_probability_invariants.csv",
+        "tables/positive_union_probability_blend_manifest.csv",
+        "manifests/protocol_manifest.json",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "positive_union_downstream_matrix.csv", newline="")))
+    selection = list(csv.DictReader(open(root / "tables" / "positive_union_source_inner_selection.csv", newline="")))
+    candidates = list(csv.DictReader(open(root / "tables" / "positive_union_candidate_rule_matrix.csv", newline="")))
+    effective = list(csv.DictReader(open(root / "tables" / "positive_union_effective_threshold_audit.csv", newline="")))
+    harm = list(csv.DictReader(open(root / "tables" / "positive_union_harm_audit.csv", newline="")))
+    per_source = list(csv.DictReader(open(root / "tables" / "positive_union_source_inner_per_source_harm_audit.csv", newline="")))
+    invariants = list(csv.DictReader(open(root / "tables" / "positive_union_probability_invariants.csv", newline="")))
+    blend = list(csv.DictReader(open(root / "tables" / "positive_union_probability_blend_manifest.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "positive_union_summary.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert protocol["target_support_used"] is False
+    assert protocol["selection_used_target_labels"] is False
+    assert protocol["target_eval_labels_for_scoring_only"] is True
+    assert protocol["source_inner_selection_primary"] is True
+    assert protocol["candidate_pooling_rules"] == ["arithmetic_mean", "positive_union_beta025", "positive_union_beta050", "positive_union_beta100"]
+    assert any(row["prior_method"] == PRIMARY_POSITIVE_UNION_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == POSITIVE_UNION_RULE_ARITHMETIC and row["selection_source"] == "diagnostic_only" for row in matrix)
+    assert selection and all(row["selection_used_target_labels"] == "False" for row in selection)
+    assert candidates and all(row["audit_only"] == "True" and row["primary_adoption_eligible"] == "False" for row in candidates)
+    assert effective and all(row["n_seed_bundles"] == "9" for row in effective)
+    assert harm and all(row["audit_only"] == "True" for row in harm)
+    assert per_source and {"source_center", "worst_per_source_harm_flag"} <= set(per_source[0])
+    assert invariants and all(row["class_order_alignment_pass"] == "True" for row in invariants)
+    assert invariants and all(row["probability_row_sum_pass"] == "True" for row in invariants)
+    assert blend and any(row["pooling_rule"] == "source_inner_selected_class_conditional_positive_union" for row in blend)
+    assert "delta_vs_v2_arithmetic_intersection" in summary[0]
+    assert "source-inner selected class-conditional aggregation repair" in report
 
 
 def test_dense_tailshield_random_mass_bag_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
@@ -4285,6 +4448,37 @@ def _tiny_multipanel_tailrisk_component_union_payload(tmp_path: Path):
             "classifier_seed": None,
         },
     }
+
+
+def _tiny_source_inner_positive_union_payload(tmp_path: Path):
+    payload = _tiny_multipanel_tailrisk_component_union_payload(tmp_path)
+    payload["experiment"]["name"] = "virchow2_cvae_source_inner_class_conditional_positive_union_v1"
+    payload["experiment"]["artifact_root"] = str(tmp_path / "virchow2_cvae_source_inner_class_conditional_positive_union_v1")
+    section = payload.pop("tailrisk_multipanel_component_union")
+    section.update(
+        {
+            "primary_method": "source_inner_class_conditional_positive_union_v1",
+            "source_weighting": "source_inner_class_conditional_positive_union",
+            "primary_pooling": "source_inner_selected_class_conditional_positive_union",
+            "candidate_pooling_rules": [
+                "arithmetic_mean",
+                "positive_union_beta025",
+                "positive_union_beta050",
+                "positive_union_beta100",
+            ],
+            "positive_label": 1,
+            "prediction_threshold": 0.5,
+            "min_source_inner_positive_count": 5,
+            "positive_union_eps": 1.0e-8,
+            "source_inner_bacc_noninferiority_margin": 0.010,
+            "source_inner_class0_recall_margin": 0.015,
+            "source_inner_predicted_positive_rate_delta": 0.050,
+            "beta100_class0_recall_margin": 0.005,
+            "beta100_precision_margin": 0.010,
+        }
+    )
+    payload["source_inner_class_conditional_positive_union"] = section
+    return payload
 
 
 def _write_tiny_prior_tailrisk_matrix(root: Path | None) -> None:
