@@ -55,7 +55,9 @@ from cvae_rebuild.component_union_mass_bagged import (
     run_mass_bagged_component_union,
 )
 from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
+    HARM_GATED_PRIMARY_SELECTABLE_RULES,
     PRIMARY_FIXED_BETA050_POSITIVE_UNION_METHOD,
+    PRIMARY_HARM_GATED_POSITIVE_UNION_METHOD,
     MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD,
     MULTIPANEL_POOLED_ANCHOR_METHOD,
     MULTIPANEL_POOLED_RANDOM_BAG_METHOD,
@@ -67,12 +69,16 @@ from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
     PRIMARY_TAILRISK_METHOD,
     _effective_threshold_for_rule,
     _positive_union_pool_bundle,
+    _resolve_harm_gated_primary_seed_plan,
+    _select_harm_gated_positive_union_rule,
     _select_positive_union_rule,
     parse_fixed_beta050_positive_union_config,
+    parse_harm_gated_positive_union_config,
     parse_multipanel_tailrisk_component_union_config,
     parse_source_inner_positive_union_config,
     parse_tailrisk_anchored_component_union_config,
     run_fixed_beta050_positive_union,
+    run_harm_gated_positive_union,
     run_multipanel_tailrisk_component_union,
     run_source_inner_positive_union,
     run_tailrisk_anchored_component_union,
@@ -2148,6 +2154,84 @@ def test_source_inner_positive_union_formula_threshold_and_selector_guard(tmp_pa
     assert "beta100_class0_recall_harm" in beta100["source_inner_ineligible_reason"]
 
 
+def test_harm_gated_positive_union_selector_guards_and_beta100_audit_only(tmp_path: Path) -> None:
+    payload = _tiny_harm_gated_positive_union_payload(tmp_path)
+    cfg = parse_harm_gated_positive_union_config(payload, base_dir=tmp_path)
+    assert cfg.primary_selectable_rules == HARM_GATED_PRIMARY_SELECTABLE_RULES
+
+    rows = [
+        {
+            "rule": POSITIVE_UNION_RULE_ARITHMETIC,
+            "class1_support": 4,
+            "class0_support": 20,
+            "smoothed_min_class_recall": 0.55,
+            "smoothed_bacc": 0.60,
+            "smoothed_macro_f1": 0.60,
+            "smoothed_class0_recall": 0.80,
+            "smoothed_class1_recall": 0.40,
+            "smoothed_precision": 0.50,
+            "predicted_positive_rate": 0.10,
+        },
+        {
+            "rule": "positive_union_beta025",
+            "class1_support": 4,
+            "class0_support": 20,
+            "smoothed_min_class_recall": 0.70,
+            "smoothed_bacc": 0.70,
+            "smoothed_macro_f1": 0.70,
+            "smoothed_class0_recall": 0.79,
+            "smoothed_class1_recall": 0.80,
+            "smoothed_precision": 0.50,
+            "predicted_positive_rate": 0.12,
+        },
+        {
+            "rule": POSITIVE_UNION_RULE_BETA050,
+            "class1_support": 4,
+            "class0_support": 20,
+            "smoothed_min_class_recall": 0.75,
+            "smoothed_bacc": 0.75,
+            "smoothed_macro_f1": 0.75,
+            "smoothed_class0_recall": 0.79,
+            "smoothed_class1_recall": 0.85,
+            "smoothed_precision": 0.50,
+            "predicted_positive_rate": 0.12,
+        },
+        {
+            "rule": POSITIVE_UNION_RULE_BETA100,
+            "class1_support": 4,
+            "class0_support": 20,
+            "smoothed_min_class_recall": 0.90,
+            "smoothed_bacc": 0.90,
+            "smoothed_macro_f1": 0.90,
+            "smoothed_class0_recall": 0.90,
+            "smoothed_class1_recall": 0.90,
+            "smoothed_precision": 0.90,
+            "predicted_positive_rate": 0.10,
+        },
+    ]
+    selected, updated, selection = _select_harm_gated_positive_union_rule(cfg, source_rows=rows)
+    assert selected == POSITIVE_UNION_RULE_ARITHMETIC
+    assert selection["selection_reason"] == "insufficient_source_inner_positive_count"
+    assert all(row["source_inner_eligible"] is (row["rule"] == POSITIVE_UNION_RULE_ARITHMETIC) for row in updated)
+
+    for row in rows:
+        row["class1_support"] = 7
+    selected, updated, _selection = _select_harm_gated_positive_union_rule(cfg, source_rows=rows)
+    beta050 = next(row for row in updated if row["rule"] == POSITIVE_UNION_RULE_BETA050)
+    beta100 = next(row for row in updated if row["rule"] == POSITIVE_UNION_RULE_BETA100)
+    assert selected == "positive_union_beta025"
+    assert beta050["source_inner_eligible"] is False
+    assert "beta050_insufficient_source_inner_positive_count" in beta050["source_inner_ineligible_reason"]
+    assert beta100["primary_selectable_rule"] is False
+    assert beta100["source_inner_eligible"] is False
+    assert "audit_only_not_primary_selectable" in beta100["source_inner_ineligible_reason"]
+
+    for row in rows:
+        row["class1_support"] = 10
+    selected, updated, _selection = _select_harm_gated_positive_union_rule(cfg, source_rows=rows)
+    assert selected == POSITIVE_UNION_RULE_BETA050
+
+
 def test_source_inner_positive_union_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
     payload = _tiny_source_inner_positive_union_payload(tmp_path)
     cfg = parse_source_inner_positive_union_config(payload, base_dir=tmp_path)
@@ -2277,6 +2361,88 @@ def test_fixed_beta050_positive_union_tiny_cache_writes_expected_artifacts(tmp_p
     assert source_inner and all(row["source_inner_selection_used"] == "False" for row in source_inner)
     assert "delta_vs_v2_arithmetic_intersection" in summary[0]
     assert "not source-inner selected" in report
+
+
+def test_harm_gated_positive_union_tiny_cache_writes_expected_artifacts_and_replaces_whole_seed(tmp_path: Path) -> None:
+    payload = _tiny_harm_gated_positive_union_payload(tmp_path)
+    cfg = parse_harm_gated_positive_union_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=55)
+
+    resolved, replacement_rows = _resolve_harm_gated_primary_seed_plan(cfg)
+    assert resolved == (55,)
+    assert replacement_rows[-1]["cell_level_reserve_stitching_allowed"] is False
+    assert replacement_rows[-1]["reserve_experiment_seeds_used"] == "[55]"
+
+    root = run_harm_gated_positive_union(cfg)
+
+    expected = [
+        "tables/harm_gated_positive_union_downstream_matrix.csv",
+        "tables/harm_gated_positive_union_summary.csv",
+        "tables/harm_gated_positive_union_source_inner_selection.csv",
+        "tables/harm_gated_positive_union_candidate_rule_matrix.csv",
+        "tables/harm_gated_positive_union_class_conditional_audit.csv",
+        "tables/harm_gated_positive_union_effective_threshold_audit.csv",
+        "tables/harm_gated_positive_union_rare_positive_opportunity_audit.csv",
+        "tables/harm_gated_positive_union_paired_deltas.csv",
+        "tables/harm_gated_positive_union_harm_audit.csv",
+        "tables/harm_gated_positive_union_source_inner_harm_gate_audit.csv",
+        "tables/harm_gated_positive_union_proxy_validity_audit.csv",
+        "tables/harm_gated_positive_union_selected_rule_distribution.csv",
+        "tables/harm_gated_positive_union_replacement_seed_audit.csv",
+        "tables/harm_gated_positive_union_probability_invariants.csv",
+        "tables/harm_gated_positive_union_probability_blend_manifest.csv",
+        "tables/harm_gated_positive_union_retrospective_development_reference.csv",
+        "manifests/protocol_manifest.json",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "harm_gated_positive_union_downstream_matrix.csv", newline="")))
+    selection = list(csv.DictReader(open(root / "tables" / "harm_gated_positive_union_source_inner_selection.csv", newline="")))
+    candidates = list(csv.DictReader(open(root / "tables" / "harm_gated_positive_union_candidate_rule_matrix.csv", newline="")))
+    effective = list(csv.DictReader(open(root / "tables" / "harm_gated_positive_union_effective_threshold_audit.csv", newline="")))
+    rare = list(csv.DictReader(open(root / "tables" / "harm_gated_positive_union_rare_positive_opportunity_audit.csv", newline="")))
+    harm = list(csv.DictReader(open(root / "tables" / "harm_gated_positive_union_harm_audit.csv", newline="")))
+    proxy = list(csv.DictReader(open(root / "tables" / "harm_gated_positive_union_proxy_validity_audit.csv", newline="")))
+    distribution = list(csv.DictReader(open(root / "tables" / "harm_gated_positive_union_selected_rule_distribution.csv", newline="")))
+    replacements = list(csv.DictReader(open(root / "tables" / "harm_gated_positive_union_replacement_seed_audit.csv", newline="")))
+    invariants = list(csv.DictReader(open(root / "tables" / "harm_gated_positive_union_probability_invariants.csv", newline="")))
+    blend = list(csv.DictReader(open(root / "tables" / "harm_gated_positive_union_probability_blend_manifest.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "harm_gated_positive_union_summary.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert protocol["target_support_used"] is False
+    assert protocol["selection_used_target_labels"] is False
+    assert protocol["target_eval_labels_for_scoring_only"] is True
+    assert protocol["beta100_primary_selectable"] is False
+    assert protocol["primary_confirmation_experiment_seeds"] == [55]
+    assert protocol["cell_level_reserve_stitching_allowed"] is False
+    assert any(row["prior_method"] == PRIMARY_HARM_GATED_POSITIVE_UNION_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == POSITIVE_UNION_RULE_ARITHMETIC and row["selection_source"] == "diagnostic_only" for row in matrix)
+    assert any(row["prior_method"] == POSITIVE_UNION_RULE_BETA050 and row["selection_source"] == "diagnostic_only" for row in matrix)
+    assert any(row["prior_method"] == POSITIVE_UNION_RULE_BETA100 and row["selection_source"] == "diagnostic_only" for row in matrix)
+    assert all(row["primary_adoption_eligible"] == "False" for row in matrix if row["prior_method"] == POSITIVE_UNION_RULE_BETA100)
+    assert selection and all(row["selection_used_target_labels"] == "False" for row in selection)
+    assert candidates and all(row["audit_only"] == "True" and row["primary_adoption_eligible"] == "False" for row in candidates)
+    assert candidates and all(row["primary_selectable_rule"] == "False" for row in candidates if row["rule"] == POSITIVE_UNION_RULE_BETA100)
+    assert effective and all(row["n_seed_bundles"] == "9" for row in effective)
+    assert rare and {"rare_positive_cell", "assessable_for_rare_positive_repair", "positive_margin_delta"} <= set(rare[0])
+    assert harm and {"true_positive_count_delta_vs_arithmetic", "specificity_delta_vs_arithmetic", "predicted_positive_rate_delta"} <= set(harm[0])
+    assert proxy and {"source_inner_rank_of_rules", "top1_rule_hit", "oracle_gap_BACC"} <= set(proxy[0])
+    assert distribution and any(row["scope"] == "overall" for row in distribution)
+    assert replacements and replacements[-1]["reserve_experiment_seeds_used"] == "[55]"
+    assert replacements[-1]["cell_level_reserve_stitching_allowed"] == "False"
+    assert invariants and all(row["class_order_alignment_pass"] == "True" for row in invariants)
+    assert invariants and all(row["probability_row_sum_pass"] == "True" for row in invariants)
+    assert blend and any(row["pooling_rule"] == "source_inner_harm_gated_positive_union" for row in blend)
+    assert "delta_vs_fixed_beta050_intersection" in summary[0]
+    assert "source-only harm-gated positive-evidence pooling" in report
 
 
 def test_dense_tailshield_random_mass_bag_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
@@ -4590,6 +4756,61 @@ def _tiny_fixed_beta050_positive_union_payload(tmp_path: Path):
         }
     )
     payload["fixed_beta050_positive_union_confirmation"] = section
+    return payload
+
+
+def _tiny_harm_gated_positive_union_payload(tmp_path: Path):
+    payload = _tiny_multipanel_tailrisk_component_union_payload(tmp_path)
+    payload["experiment"]["name"] = "virchow2_cvae_source_inner_harm_gated_positive_union_v1"
+    payload["experiment"]["artifact_root"] = str(tmp_path / "virchow2_cvae_source_inner_harm_gated_positive_union_v1")
+    payload["run_matrix"]["experiment_seeds"] = [50, 55]
+    section = payload.pop("tailrisk_multipanel_component_union")
+    section.update(
+        {
+            "primary_method": "source_inner_harm_gated_positive_union_v1",
+            "source_weighting": "source_inner_harm_gated_positive_union",
+            "primary_pooling": "source_inner_harm_gated_positive_union",
+            "candidate_pooling_rules": [
+                "arithmetic_mean",
+                "positive_union_beta025",
+                "positive_union_beta050",
+                "positive_union_beta100",
+            ],
+            "primary_selectable_rules": [
+                "arithmetic_mean",
+                "positive_union_beta025",
+                "positive_union_beta050",
+            ],
+            "beta100_primary_selectable": False,
+            "development_experiment_seeds": [42, 43, 44, 45, 46, 47, 48, 49],
+            "primary_requested_experiment_seeds": [50],
+            "reserve_experiment_seeds": [55],
+            "reserve_seed_policy": "replace_incomplete_primary_seed_whole_seed_lowest_available_reserve",
+            "cell_level_reserve_stitching_allowed": False,
+            "selector_thresholds_frozen_before_primary": True,
+            "selector_threshold_source": "retrospective_development_only",
+            "selector_thresholds_may_be_changed_after_primary": False,
+            "positive_label": 1,
+            "prediction_threshold": 0.5,
+            "min_source_inner_positive_count": 5,
+            "beta050_min_source_inner_positive_count": 10,
+            "positive_union_eps": 1.0e-8,
+            "harm_gate_bacc_noninferiority_margin": 0.005,
+            "beta025_class0_recall_margin": 0.020,
+            "beta025_predicted_positive_rate_delta": 0.040,
+            "beta050_class0_recall_margin": 0.015,
+            "beta050_precision_margin": 0.020,
+            "beta050_predicted_positive_rate_delta": 0.060,
+            "rare_positive_count_threshold": 10,
+            "rare_positive_prevalence_threshold": 0.05,
+            "source_inner_bacc_noninferiority_margin": 0.005,
+            "source_inner_class0_recall_margin": 0.015,
+            "source_inner_predicted_positive_rate_delta": 0.060,
+            "beta100_class0_recall_margin": 0.005,
+            "beta100_precision_margin": 0.010,
+        }
+    )
+    payload["source_inner_harm_gated_positive_union"] = section
     return payload
 
 

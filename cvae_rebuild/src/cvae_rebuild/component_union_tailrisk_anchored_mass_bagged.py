@@ -63,6 +63,10 @@ FIXED_BETA050_POSITIVE_UNION_NAME = "virchow2_cvae_fixed_beta050_positive_union_
 PRIMARY_FIXED_BETA050_POSITIVE_UNION_METHOD = "fixed_beta050_positive_union_confirmation_v1"
 FIXED_BETA050_POSITIVE_UNION_SOURCE_WEIGHTING = "fixed_beta050_positive_union_confirmation"
 FIXED_BETA050_POSITIVE_UNION_PRIMARY_POOLING = "fixed_global_positive_union_beta050"
+HARM_GATED_POSITIVE_UNION_NAME = "virchow2_cvae_source_inner_harm_gated_positive_union_v1"
+PRIMARY_HARM_GATED_POSITIVE_UNION_METHOD = "source_inner_harm_gated_positive_union_v1"
+HARM_GATED_POSITIVE_UNION_SOURCE_WEIGHTING = "source_inner_harm_gated_positive_union"
+HARM_GATED_POSITIVE_UNION_PRIMARY_POOLING = "source_inner_harm_gated_positive_union"
 POSITIVE_UNION_RULE_ARITHMETIC = "arithmetic_mean"
 POSITIVE_UNION_RULE_BETA025 = "positive_union_beta025"
 POSITIVE_UNION_RULE_BETA050 = "positive_union_beta050"
@@ -101,6 +105,14 @@ FIXED_BETA050_DEVELOPMENT_EXPERIMENT_SEEDS = (42, 43, 44)
 FIXED_BETA050_CONFIRMATION_EXPERIMENT_SEEDS = (45, 46, 47, 48, 49)
 FIXED_BETA050_RARE_POSITIVE_COUNT_THRESHOLD = 10
 FIXED_BETA050_RARE_POSITIVE_PREVALENCE_THRESHOLD = 0.05
+HARM_GATED_DEVELOPMENT_EXPERIMENT_SEEDS = (42, 43, 44, 45, 46, 47, 48, 49)
+HARM_GATED_REQUESTED_EXPERIMENT_SEEDS = (50, 51, 52, 53, 54)
+HARM_GATED_RESERVE_EXPERIMENT_SEEDS = (55, 56)
+HARM_GATED_PRIMARY_SELECTABLE_RULES = (
+    POSITIVE_UNION_RULE_ARITHMETIC,
+    POSITIVE_UNION_RULE_BETA025,
+    POSITIVE_UNION_RULE_BETA050,
+)
 
 
 @dataclass(frozen=True)
@@ -209,6 +221,29 @@ class FixedBeta050PositiveUnionConfig(SourceInnerPositiveUnionConfig):
     development_experiment_seeds: tuple[int, ...] = FIXED_BETA050_DEVELOPMENT_EXPERIMENT_SEEDS
     confirmation_experiment_seeds: tuple[int, ...] = FIXED_BETA050_CONFIRMATION_EXPERIMENT_SEEDS
     development_positive_union_artifact_root: Path | None = None
+    rare_positive_count_threshold: int = FIXED_BETA050_RARE_POSITIVE_COUNT_THRESHOLD
+    rare_positive_prevalence_threshold: float = FIXED_BETA050_RARE_POSITIVE_PREVALENCE_THRESHOLD
+
+
+@dataclass(frozen=True)
+class SourceInnerHarmGatedPositiveUnionConfig(SourceInnerPositiveUnionConfig):
+    development_experiment_seeds: tuple[int, ...] = HARM_GATED_DEVELOPMENT_EXPERIMENT_SEEDS
+    primary_requested_experiment_seeds: tuple[int, ...] = HARM_GATED_REQUESTED_EXPERIMENT_SEEDS
+    reserve_experiment_seeds: tuple[int, ...] = HARM_GATED_RESERVE_EXPERIMENT_SEEDS
+    primary_selectable_rules: tuple[str, ...] = HARM_GATED_PRIMARY_SELECTABLE_RULES
+    beta100_primary_selectable: bool = False
+    beta050_min_source_inner_positive_count: int = 10
+    harm_gate_bacc_noninferiority_margin: float = 0.005
+    beta025_class0_recall_margin: float = 0.020
+    beta025_predicted_positive_rate_delta: float = 0.040
+    beta050_class0_recall_margin: float = 0.015
+    beta050_precision_margin: float = 0.020
+    beta050_predicted_positive_rate_delta: float = 0.060
+    selector_thresholds_frozen_before_primary: bool = True
+    selector_threshold_source: str = "retrospective_development_only"
+    selector_thresholds_may_be_changed_after_primary: bool = False
+    reserve_seed_policy: str = "replace_incomplete_primary_seed_whole_seed_lowest_available_reserve"
+    cell_level_reserve_stitching_allowed: bool = False
     rare_positive_count_threshold: int = FIXED_BETA050_RARE_POSITIVE_COUNT_THRESHOLD
     rare_positive_prevalence_threshold: float = FIXED_BETA050_RARE_POSITIVE_PREVALENCE_THRESHOLD
 
@@ -932,6 +967,251 @@ def validate_fixed_beta050_positive_union_config(cfg: FixedBeta050PositiveUnionC
         raise ProtocolError("Classifier must use class_weight=balanced and classifier_seed=null.")
 
 
+def load_harm_gated_positive_union_config(path: str | Path) -> SourceInnerHarmGatedPositiveUnionConfig:
+    source = Path(path).resolve()
+    data = _load_mapping(source)
+    base_dir = source.parents[2] if len(source.parents) >= 3 else source.parent
+    return parse_harm_gated_positive_union_config(data, base_dir=base_dir)
+
+
+def parse_harm_gated_positive_union_config(
+    data: Mapping[str, Any],
+    *,
+    base_dir: str | Path = ".",
+) -> SourceInnerHarmGatedPositiveUnionConfig:
+    base = Path(base_dir)
+    experiment = _mapping(data, "experiment")
+    inputs = _mapping(data, "inputs")
+    run = _mapping(data, "run_matrix")
+    generation = _mapping(data, "generation")
+    harm = _mapping(data, "source_inner_harm_gated_positive_union")
+    classifier = _mapping(data, "classifier")
+    panel_seed_groups = _parse_panel_seed_groups(harm.get("panel_seed_groups", {}))
+    if inputs.get("support_calibrated_artifact_root") not in (None, ""):
+        raise ProtocolError("support_calibrated_artifact_root is not allowed for source-only harm-gated positive-union v1.")
+    for forbidden in (
+        "target_support_used",
+        "target_support_labels_for_selection",
+        "target_label_calibration",
+        "target_eval_metric_selection",
+        "target_threshold_selection",
+        "target_eval_calibrated_rule_selection",
+        "target_support_calibration",
+    ):
+        if forbidden in harm:
+            raise ProtocolError(f"{forbidden} is not allowed for source-only harm-gated positive-union v1.")
+    cfg = SourceInnerHarmGatedPositiveUnionConfig(
+        name=str(experiment["name"]),
+        artifact_root=_path(base, str(experiment["artifact_root"])),
+        repair_artifact_root=_path(base, str(inputs["repair_artifact_root"])),
+        paired_dense_artifact_root=_optional_path(base, inputs.get("paired_dense_artifact_root")),
+        mass_bagged_artifact_root=_optional_path(base, inputs.get("mass_bagged_artifact_root")),
+        support_calibrated_artifact_root=None,
+        shrink050_artifact_root=_optional_path(base, inputs.get("shrink050_artifact_root")),
+        source_union_gmm_artifact_root=_optional_path(base, inputs.get("source_union_gmm_artifact_root")),
+        balanced_gmm_artifact_root=_optional_path(base, inputs.get("balanced_gmm_artifact_root")),
+        feature_cache_root=_path(base, str(inputs["feature_cache_root"])),
+        backbone=str(inputs.get("backbone", "")),
+        experiment_seeds=tuple(int(v) for v in run["experiment_seeds"]),
+        heldout_centers=tuple(str(v) for v in run["heldout_centers"]),
+        replicate_seeds=tuple(int(v) for v in run["replicate_seeds"]),
+        fresh_replicate_seeds=tuple(int(v) for v in run.get("fresh_replicate_seeds", ())),
+        strict_full_run_matrix=bool(run.get("strict_full_run_matrix", False)),
+        synthetic_per_class_total=int(generation["synthetic_per_class_total"]),
+        min_per_source_per_class=int(generation["min_per_source_per_class"]),
+        primary_variant=str(experiment["primary_variant"]),
+        primary_method=str(harm["primary_method"]),
+        random_mass_bag_size=int(harm["random_mass_bag_size"]),
+        random_mass_bag_alpha=float(harm["random_mass_bag_alpha"]),
+        blend_alpha=float(harm["blend_alpha"]),
+        primary_shrink_lambda=float(harm["primary_shrink_lambda"]),
+        matched_shuffled_reliability_null_permutations=int(harm.get("matched_shuffled_reliability_null_permutations", 0)),
+        candidate_components_per_source_class=tuple(int(v) for v in harm["candidate_components_per_source_class"]),
+        min_samples_per_component=int(harm["min_samples_per_component"]),
+        source_weighting=str(harm["source_weighting"]),
+        gmm_covariance_type=str(harm["gmm_covariance_type"]),
+        gmm_reg_covar=float(harm["gmm_reg_covar"]),
+        gmm_n_init=int(harm["gmm_n_init"]),
+        gmm_max_iter=int(harm["gmm_max_iter"]),
+        min_component_weight=float(harm["min_component_weight"]),
+        variance_floor=float(harm["variance_floor"]),
+        variance_ceiling_multiplier=float(harm["variance_ceiling_multiplier"]),
+        primary_pooling=str(harm["primary_pooling"]),
+        reliability_floor_score=float(harm["reliability_floor_score"]),
+        reliability_epsilon=float(harm["reliability_epsilon"]),
+        anchor_repro_tolerance=float(harm["anchor_repro_tolerance"]),
+        classifier_type=str(classifier["type"]),
+        classifier_solver=str(classifier["solver"]),
+        classifier_c=float(classifier["C"]),
+        classifier_max_iter=int(classifier["max_iter"]),
+        classifier_class_weight=str(classifier["class_weight"]),
+        classifier_seed=None if classifier.get("classifier_seed") is None else int(classifier["classifier_seed"]),
+        prior_tailrisk_artifact_root=_optional_path(base, inputs.get("prior_tailrisk_artifact_root")),
+        panel_seed_groups=panel_seed_groups,
+        primary_noninferiority_margin=float(harm.get("primary_noninferiority_margin", 0.005)),
+        weak_pass_noninferiority_margin=float(harm.get("weak_pass_noninferiority_margin", 0.010)),
+        tailrisk_transfer_threshold=float(harm.get("tailrisk_transfer_threshold", -0.010)),
+        candidate_pooling_rules=tuple(str(v) for v in harm["candidate_pooling_rules"]),
+        positive_label=int(harm["positive_label"]),
+        prediction_threshold=float(harm["prediction_threshold"]),
+        min_source_inner_positive_count=int(harm["min_source_inner_positive_count"]),
+        positive_union_eps=float(harm["positive_union_eps"]),
+        source_inner_bacc_noninferiority_margin=float(harm.get("source_inner_bacc_noninferiority_margin", 0.005)),
+        source_inner_class0_recall_margin=float(harm.get("source_inner_class0_recall_margin", 0.015)),
+        source_inner_predicted_positive_rate_delta=float(harm.get("source_inner_predicted_positive_rate_delta", 0.060)),
+        beta100_class0_recall_margin=float(harm.get("beta100_class0_recall_margin", 0.005)),
+        beta100_precision_margin=float(harm.get("beta100_precision_margin", 0.010)),
+        development_experiment_seeds=tuple(int(v) for v in harm["development_experiment_seeds"]),
+        primary_requested_experiment_seeds=tuple(int(v) for v in harm["primary_requested_experiment_seeds"]),
+        reserve_experiment_seeds=tuple(int(v) for v in harm["reserve_experiment_seeds"]),
+        primary_selectable_rules=tuple(str(v) for v in harm["primary_selectable_rules"]),
+        beta100_primary_selectable=bool(harm["beta100_primary_selectable"]),
+        beta050_min_source_inner_positive_count=int(harm["beta050_min_source_inner_positive_count"]),
+        harm_gate_bacc_noninferiority_margin=float(harm["harm_gate_bacc_noninferiority_margin"]),
+        beta025_class0_recall_margin=float(harm["beta025_class0_recall_margin"]),
+        beta025_predicted_positive_rate_delta=float(harm["beta025_predicted_positive_rate_delta"]),
+        beta050_class0_recall_margin=float(harm["beta050_class0_recall_margin"]),
+        beta050_precision_margin=float(harm["beta050_precision_margin"]),
+        beta050_predicted_positive_rate_delta=float(harm["beta050_predicted_positive_rate_delta"]),
+        selector_thresholds_frozen_before_primary=bool(harm["selector_thresholds_frozen_before_primary"]),
+        selector_threshold_source=str(harm["selector_threshold_source"]),
+        selector_thresholds_may_be_changed_after_primary=bool(harm["selector_thresholds_may_be_changed_after_primary"]),
+        reserve_seed_policy=str(harm["reserve_seed_policy"]),
+        cell_level_reserve_stitching_allowed=bool(harm["cell_level_reserve_stitching_allowed"]),
+        rare_positive_count_threshold=int(harm["rare_positive_count_threshold"]),
+        rare_positive_prevalence_threshold=float(harm["rare_positive_prevalence_threshold"]),
+    )
+    validate_harm_gated_positive_union_config(cfg)
+    return cfg
+
+
+def validate_harm_gated_positive_union_config(cfg: SourceInnerHarmGatedPositiveUnionConfig) -> None:
+    if cfg.name != HARM_GATED_POSITIVE_UNION_NAME:
+        raise ProtocolError(f"Harm-gated positive-union experiment name must be {HARM_GATED_POSITIVE_UNION_NAME!r}.")
+    if cfg.backbone != "virchow2":
+        raise ProtocolError("Harm-gated positive-union confirmation is locked to backbone=virchow2.")
+    if cfg.primary_variant != PRIMARY_VARIANT:
+        raise ProtocolError(f"primary_variant must be {PRIMARY_VARIANT!r}.")
+    if cfg.primary_method != PRIMARY_HARM_GATED_POSITIVE_UNION_METHOD:
+        raise ProtocolError(f"primary_method must be {PRIMARY_HARM_GATED_POSITIVE_UNION_METHOD!r}.")
+    if cfg.source_weighting != HARM_GATED_POSITIVE_UNION_SOURCE_WEIGHTING:
+        raise ProtocolError(f"source_weighting must be {HARM_GATED_POSITIVE_UNION_SOURCE_WEIGHTING!r}.")
+    if cfg.primary_pooling != HARM_GATED_POSITIVE_UNION_PRIMARY_POOLING:
+        raise ProtocolError(f"primary_pooling must be {HARM_GATED_POSITIVE_UNION_PRIMARY_POOLING!r}.")
+    if cfg.candidate_pooling_rules != POSITIVE_UNION_RULES:
+        raise ProtocolError("candidate_pooling_rules must be locked to arithmetic_mean/beta025/beta050/beta100.")
+    if cfg.primary_selectable_rules != HARM_GATED_PRIMARY_SELECTABLE_RULES:
+        raise ProtocolError("primary_selectable_rules must be locked to arithmetic_mean/beta025/beta050.")
+    if cfg.beta100_primary_selectable:
+        raise ProtocolError("beta100_primary_selectable must be false.")
+    if cfg.positive_label != 1:
+        raise ProtocolError("positive_label must be locked to 1.")
+    if not math.isclose(cfg.prediction_threshold, 0.5, rel_tol=0.0, abs_tol=1.0e-12):
+        raise ProtocolError("prediction_threshold must be locked to 0.50.")
+    if cfg.min_source_inner_positive_count != 5:
+        raise ProtocolError("min_source_inner_positive_count must be locked to 5.")
+    if cfg.beta050_min_source_inner_positive_count != 10:
+        raise ProtocolError("beta050_min_source_inner_positive_count must be locked to 10.")
+    if not math.isclose(cfg.positive_union_eps, 1.0e-8, rel_tol=0.0, abs_tol=1.0e-14):
+        raise ProtocolError("positive_union_eps must be locked to 1e-8.")
+    all_seed_sets = (set(cfg.development_experiment_seeds), set(cfg.primary_requested_experiment_seeds), set(cfg.reserve_experiment_seeds))
+    if any(left & right for idx, left in enumerate(all_seed_sets) for right in all_seed_sets[idx + 1 :]):
+        raise ProtocolError("development, requested primary, and reserve experiment seeds must not overlap.")
+    if cfg.experiment_seeds != (*cfg.primary_requested_experiment_seeds, *cfg.reserve_experiment_seeds):
+        raise ProtocolError("run_matrix.experiment_seeds must equal requested primary seeds followed by reserve seeds.")
+    if cfg.reserve_seed_policy != "replace_incomplete_primary_seed_whole_seed_lowest_available_reserve":
+        raise ProtocolError("reserve_seed_policy must be replace_incomplete_primary_seed_whole_seed_lowest_available_reserve.")
+    if cfg.cell_level_reserve_stitching_allowed:
+        raise ProtocolError("cell_level_reserve_stitching_allowed must be false.")
+    if not cfg.selector_thresholds_frozen_before_primary:
+        raise ProtocolError("selector_thresholds_frozen_before_primary must be true.")
+    if cfg.selector_threshold_source != "retrospective_development_only":
+        raise ProtocolError("selector_threshold_source must be retrospective_development_only.")
+    if cfg.selector_thresholds_may_be_changed_after_primary:
+        raise ProtocolError("selector_thresholds_may_be_changed_after_primary must be false.")
+    if cfg.rare_positive_count_threshold != FIXED_BETA050_RARE_POSITIVE_COUNT_THRESHOLD:
+        raise ProtocolError("rare_positive_count_threshold must be locked to 10.")
+    if not math.isclose(cfg.rare_positive_prevalence_threshold, FIXED_BETA050_RARE_POSITIVE_PREVALENCE_THRESHOLD, rel_tol=0.0, abs_tol=1.0e-12):
+        raise ProtocolError("rare_positive_prevalence_threshold must be locked to 0.05.")
+    if cfg.candidate_components_per_source_class != (4, 3, 2, 1):
+        raise ProtocolError("candidate_components_per_source_class must be locked to [4, 3, 2, 1].")
+    if len(cfg.heldout_centers) != 5 or cfg.heldout_centers != ("0", "1", "2", "3", "4"):
+        raise ProtocolError("Harm-gated positive-union confirmation expects heldout_centers=['0','1','2','3','4'].")
+    if cfg.gmm_covariance_type != "diag":
+        raise ProtocolError("gmm_covariance_type must be diag.")
+    if not math.isclose(cfg.primary_shrink_lambda, 0.5, rel_tol=0.0, abs_tol=1.0e-12):
+        raise ProtocolError("primary_shrink_lambda must be locked to 0.50.")
+    if not math.isclose(cfg.blend_alpha, 0.5, rel_tol=0.0, abs_tol=1.0e-12):
+        raise ProtocolError("blend_alpha must be locked to 0.50.")
+    if not math.isclose(cfg.random_mass_bag_alpha, 4.0, rel_tol=0.0, abs_tol=1.0e-12):
+        raise ProtocolError("random_mass_bag_alpha must be locked to Dirichlet-uniform alpha4.")
+    if cfg.random_mass_bag_size < 1:
+        raise ProtocolError("random_mass_bag_size must be positive.")
+    if cfg.matched_shuffled_reliability_null_permutations != 0:
+        raise ProtocolError("matched_shuffled_reliability_null_permutations must be 0 for harm-gated positive-union v1.")
+    if cfg.replicate_seeds != cfg.panel_seed_groups[0][1]:
+        raise ProtocolError("run_matrix.replicate_seeds must equal the canonical panel seeds.")
+    expected_fresh = tuple(seed for _panel, seeds in cfg.panel_seed_groups[1:] for seed in seeds)
+    if cfg.fresh_replicate_seeds != expected_fresh:
+        raise ProtocolError("run_matrix.fresh_replicate_seeds must equal fresh_a + fresh_b panel seeds.")
+    if cfg.panel_seed_groups != MULTIPANEL_PANEL_SEEDS:
+        raise ProtocolError("panel_seed_groups must be locked to canonical/fresh_a/fresh_b predeclared seeds.")
+    if cfg.strict_full_run_matrix:
+        if cfg.development_experiment_seeds != HARM_GATED_DEVELOPMENT_EXPERIMENT_SEEDS:
+            raise ProtocolError("development_experiment_seeds must be locked to [42,43,44,45,46,47,48,49].")
+        if cfg.primary_requested_experiment_seeds != HARM_GATED_REQUESTED_EXPERIMENT_SEEDS:
+            raise ProtocolError("primary_requested_experiment_seeds must be locked to [50,51,52,53,54].")
+        if cfg.reserve_experiment_seeds != HARM_GATED_RESERVE_EXPERIMENT_SEEDS:
+            raise ProtocolError("reserve_experiment_seeds must be locked to [55,56].")
+        if cfg.experiment_seeds != (*HARM_GATED_REQUESTED_EXPERIMENT_SEEDS, *HARM_GATED_RESERVE_EXPERIMENT_SEEDS):
+            raise ProtocolError("strict_full_run_matrix requires experiment_seeds=[50,51,52,53,54,55,56].")
+        if cfg.synthetic_per_class_total != 128:
+            raise ProtocolError("strict_full_run_matrix requires synthetic_per_class_total=128.")
+        if cfg.min_per_source_per_class != 8:
+            raise ProtocolError("strict_full_run_matrix requires min_per_source_per_class=8.")
+        if cfg.random_mass_bag_size != 11:
+            raise ProtocolError("strict_full_run_matrix requires random_mass_bag_size=11.")
+    if min(cfg.min_per_source_per_class, cfg.min_samples_per_component, cfg.gmm_n_init, cfg.gmm_max_iter) < 1:
+        raise ProtocolError("Component minimums and GMM iterations must be positive.")
+    expected_thresholds = (
+        (cfg.harm_gate_bacc_noninferiority_margin, 0.005, "harm_gate_bacc_noninferiority_margin"),
+        (cfg.beta025_class0_recall_margin, 0.020, "beta025_class0_recall_margin"),
+        (cfg.beta025_predicted_positive_rate_delta, 0.040, "beta025_predicted_positive_rate_delta"),
+        (cfg.beta050_class0_recall_margin, 0.015, "beta050_class0_recall_margin"),
+        (cfg.beta050_precision_margin, 0.020, "beta050_precision_margin"),
+        (cfg.beta050_predicted_positive_rate_delta, 0.060, "beta050_predicted_positive_rate_delta"),
+    )
+    for actual, expected, label in expected_thresholds:
+        if not math.isclose(actual, expected, rel_tol=0.0, abs_tol=1.0e-12):
+            raise ProtocolError(f"{label} must remain locked to {expected}.")
+    if min(
+        cfg.gmm_reg_covar,
+        cfg.min_component_weight,
+        cfg.variance_floor,
+        cfg.variance_ceiling_multiplier,
+        cfg.reliability_floor_score,
+        cfg.reliability_epsilon,
+        cfg.anchor_repro_tolerance,
+        cfg.primary_noninferiority_margin,
+        cfg.weak_pass_noninferiority_margin,
+        cfg.harm_gate_bacc_noninferiority_margin,
+        cfg.beta025_class0_recall_margin,
+        cfg.beta025_predicted_positive_rate_delta,
+        cfg.beta050_class0_recall_margin,
+        cfg.beta050_precision_margin,
+        cfg.beta050_predicted_positive_rate_delta,
+    ) <= 0.0:
+        raise ProtocolError("Harm-gated positive-union numeric floors/tolerances must be positive.")
+    if cfg.tailrisk_transfer_threshold >= 0.0:
+        raise ProtocolError("tailrisk_transfer_threshold must be negative.")
+    if cfg.classifier_type != "sklearn_logistic_regression":
+        raise ProtocolError("classifier.type must be sklearn_logistic_regression.")
+    if cfg.classifier_solver != "lbfgs" or cfg.classifier_c != 1.0 or cfg.classifier_max_iter != 2000:
+        raise ProtocolError("Classifier solver/C/max_iter must remain locked.")
+    if cfg.classifier_class_weight != "balanced" or cfg.classifier_seed is not None:
+        raise ProtocolError("Classifier must use class_weight=balanced and classifier_seed=null.")
+
+
 def run_tailrisk_anchored_component_union(
     cfg: TailRiskAnchoredConfig,
     *,
@@ -1360,7 +1640,8 @@ def run_multipanel_tailrisk_component_union(
     artifact_root: str | Path | None = None,
 ) -> Path:
     fixed_beta050_mode = isinstance(cfg, FixedBeta050PositiveUnionConfig)
-    positive_union_mode = isinstance(cfg, SourceInnerPositiveUnionConfig)
+    harm_gated_mode = isinstance(cfg, SourceInnerHarmGatedPositiveUnionConfig)
+    positive_union_mode = isinstance(cfg, SourceInnerPositiveUnionConfig) and not fixed_beta050_mode and not harm_gated_mode
     root = prepare_artifact_dirs(Path(artifact_root) if artifact_root is not None else cfg.artifact_root)
     (root / "checkpoints").mkdir(parents=True, exist_ok=True)
     (root / "summaries").mkdir(parents=True, exist_ok=True)
@@ -1394,6 +1675,7 @@ def run_multipanel_tailrisk_component_union(
     positive_union_per_source_harm_rows: list[dict[str, object]] = []
     fixed_beta050_rare_positive_rows: list[dict[str, object]] = []
     fixed_beta050_source_inner_rows: list[dict[str, object]] = []
+    harm_gated_replacement_seed_rows: list[dict[str, object]] = []
     model_manifest_rows: list[dict[str, object]] = []
     protocol_violations: list[str] = []
     target_expert_excluded = True
@@ -1422,9 +1704,12 @@ def run_multipanel_tailrisk_component_union(
 
     repair_cfg = d1._repair_runtime_config(cfg, root)
     per_source_variant = _per_source_variant()
+    experiment_seeds_to_run = tuple(cfg.experiment_seeds)
+    if harm_gated_mode:
+        experiment_seeds_to_run, harm_gated_replacement_seed_rows = _resolve_harm_gated_primary_seed_plan(cfg)
 
     try:
-        for experiment_seed in cfg.experiment_seeds:
+        for experiment_seed in experiment_seeds_to_run:
             train_cache = load_feature_cache(_existing_cache_path(cfg.feature_cache_root, seed=experiment_seed, split="train"))
             test_cache = load_feature_cache(_existing_cache_path(cfg.feature_cache_root, seed=experiment_seed, split="test"))
             per_source_runtime: dict[str, RuntimeSource] = {}
@@ -1599,6 +1884,21 @@ def run_multipanel_tailrisk_component_union(
                         center_balanced_ref=_mean_reference(center_balanced_values),
                         real_feature_bacc=nanmean([value for value in real_feature_values if math.isfinite(value)]),
                     )
+                elif harm_gated_mode:
+                    final = _build_harm_gated_positive_union_cell_outputs(
+                        cfg,
+                        seed_evaluations=seed_evaluations,
+                        experiment_seed=int(experiment_seed),
+                        heldout_center=str(heldout_center),
+                        candidates=candidates,
+                        summaries=gmm_summaries,
+                        eval_labels=eval_labels,
+                        eval_sample_ids=eval_sample_ids,
+                        eval_sample_hash=eval_sample_hash,
+                        source_union_ref=_mean_reference(source_union_values),
+                        center_balanced_ref=_mean_reference(center_balanced_values),
+                        real_feature_bacc=nanmean([value for value in real_feature_values if math.isfinite(value)]),
+                    )
                 elif positive_union_mode:
                     final = _build_positive_union_cell_outputs(
                         cfg,
@@ -1686,6 +1986,43 @@ def run_multipanel_tailrisk_component_union(
             blend_manifest_rows=blend_manifest_rows,
             retrospective_reference_rows=_fixed_beta050_retrospective_reference_rows(cfg),
             source_inner_rows=fixed_beta050_source_inner_rows,
+            decision=decision,
+            leakage=leakage,
+            protocol_violations=protocol_violations,
+            target_expert_excluded=target_expert_excluded,
+        )
+    elif harm_gated_mode:
+        paired_delta_rows, arithmetic_tail_keys = _harm_gated_positive_union_paired_delta_rows(matrix_rows, cfg)
+        positive_union_harm_rows = _annotate_harm_gated_positive_union_harm_rows(positive_union_harm_rows, paired_delta_rows, cfg)
+        decision = _harm_gated_positive_union_decision(
+            matrix_rows,
+            paired_delta_rows=paired_delta_rows,
+            arithmetic_tail_keys=arithmetic_tail_keys,
+            selection_rows=positive_union_source_inner_selection_rows,
+            rare_positive_rows=fixed_beta050_rare_positive_rows,
+            harm_rows=positive_union_harm_rows,
+            replacement_seed_rows=harm_gated_replacement_seed_rows,
+            leakage_status=leakage.status,
+            cfg=cfg,
+        )
+        _write_harm_gated_positive_union_artifacts(
+            root,
+            cfg,
+            matrix_rows=matrix_rows,
+            source_inner_selection_rows=positive_union_source_inner_selection_rows,
+            candidate_rule_rows=positive_union_candidate_rule_rows,
+            class_conditional_rows=positive_union_class_conditional_rows,
+            effective_threshold_rows=positive_union_effective_threshold_rows,
+            rare_positive_rows=fixed_beta050_rare_positive_rows,
+            paired_delta_rows=paired_delta_rows,
+            harm_rows=positive_union_harm_rows,
+            source_inner_harm_gate_rows=positive_union_per_source_harm_rows,
+            proxy_validity_rows=_harm_gated_proxy_validity_rows(positive_union_candidate_rule_rows, primary_method=cfg.primary_method),
+            selected_rule_distribution_rows=_harm_gated_selected_rule_distribution_rows(positive_union_source_inner_selection_rows),
+            replacement_seed_rows=harm_gated_replacement_seed_rows,
+            invariant_rows=invariant_rows,
+            blend_manifest_rows=blend_manifest_rows,
+            retrospective_reference_rows=_harm_gated_retrospective_development_reference_rows(cfg),
             decision=decision,
             leakage=leakage,
             protocol_violations=protocol_violations,
@@ -1787,11 +2124,124 @@ def run_fixed_beta050_positive_union(
     return run_multipanel_tailrisk_component_union(cfg, artifact_root=artifact_root)
 
 
+def run_harm_gated_positive_union(
+    cfg: SourceInnerHarmGatedPositiveUnionConfig,
+    *,
+    artifact_root: str | Path | None = None,
+) -> Path:
+    return run_multipanel_tailrisk_component_union(cfg, artifact_root=artifact_root)
+
+
 def _multipanel_panel_for_seed(cfg: MultipanelTailRiskConfig, seed: int) -> str:
     for panel, seeds in cfg.panel_seed_groups:
         if int(seed) in {int(value) for value in seeds}:
             return str(panel)
     raise ProtocolError(f"Seed {seed} is not in the locked multipanel seed groups.")
+
+
+def _resolve_harm_gated_primary_seed_plan(
+    cfg: SourceInnerHarmGatedPositiveUnionConfig,
+) -> tuple[tuple[int, ...], list[dict[str, object]]]:
+    completed: list[int] = []
+    excluded: list[int] = []
+    reserves_used: list[int] = []
+    unused_reserves = list(cfg.reserve_experiment_seeds)
+    rows: list[dict[str, object]] = []
+
+    def _seed_complete(seed: int) -> tuple[bool, str]:
+        try:
+            load_feature_cache(_existing_cache_path(cfg.feature_cache_root, seed=seed, split="train"))
+            test_cache = load_feature_cache(_existing_cache_path(cfg.feature_cache_root, seed=seed, split="test"))
+        except FileNotFoundError as exc:
+            return False, f"missing_feature_cache:{Path(str(exc).split(':')[-1].strip()).name if str(exc) else seed}"
+        except Exception as exc:
+            return False, f"feature_cache_load_error:{type(exc).__name__}"
+        bad_centers: list[str] = []
+        for center in cfg.heldout_centers:
+            try:
+                indices = _target_indices(test_cache.metadata, str(center))
+                labels = tuple(_label(row) for row in select_rows(test_cache.embeddings, test_cache.metadata, indices)[1])
+            except Exception:
+                bad_centers.append(f"{center}:target_eval_unavailable")
+                continue
+            if not labels:
+                bad_centers.append(f"{center}:empty_target_eval")
+            elif len(set(labels)) < 2:
+                bad_centers.append(f"{center}:mono_class_target_eval")
+        if bad_centers:
+            return False, "|".join(bad_centers)
+        return True, "complete_seed_all_heldout_centers_valid"
+
+    for requested_seed in cfg.primary_requested_experiment_seeds:
+        requested_ok, requested_reason = _seed_complete(int(requested_seed))
+        if requested_ok:
+            completed.append(int(requested_seed))
+            rows.append(
+                _harm_gated_replacement_seed_row(
+                    cfg,
+                    requested_seed=int(requested_seed),
+                    resolved_seed=int(requested_seed),
+                    completed=completed,
+                    excluded=excluded,
+                    reserves_used=reserves_used,
+                    reason="primary_seed_complete",
+                )
+            )
+            continue
+        excluded.append(int(requested_seed))
+        replacement = None
+        replacement_reason = requested_reason
+        while unused_reserves and replacement is None:
+            candidate = int(unused_reserves.pop(0))
+            candidate_ok, candidate_reason = _seed_complete(candidate)
+            if candidate_ok:
+                replacement = candidate
+                reserves_used.append(candidate)
+                completed.append(candidate)
+                replacement_reason = f"requested_seed_incomplete:{requested_reason};reserve_seed_complete"
+            else:
+                excluded.append(candidate)
+                replacement_reason = f"requested_seed_incomplete:{requested_reason};reserve_seed_incomplete:{candidate}:{candidate_reason}"
+        rows.append(
+            _harm_gated_replacement_seed_row(
+                cfg,
+                requested_seed=int(requested_seed),
+                resolved_seed=replacement,
+                completed=completed,
+                excluded=excluded,
+                reserves_used=reserves_used,
+                reason=replacement_reason,
+            )
+        )
+    return tuple(completed), rows
+
+
+def _harm_gated_replacement_seed_row(
+    cfg: SourceInnerHarmGatedPositiveUnionConfig,
+    *,
+    requested_seed: int,
+    resolved_seed: int | None,
+    completed: Sequence[int],
+    excluded: Sequence[int],
+    reserves_used: Sequence[int],
+    reason: str,
+) -> dict[str, object]:
+    return {
+        "requested_primary_experiment_seeds": json.dumps(list(cfg.primary_requested_experiment_seeds)),
+        "reserve_experiment_seeds": json.dumps(list(cfg.reserve_experiment_seeds)),
+        "requested_primary_experiment_seed": int(requested_seed),
+        "resolved_experiment_seed": "" if resolved_seed is None else int(resolved_seed),
+        "completed_primary_experiment_seeds": json.dumps(list(completed)),
+        "excluded_incomplete_experiment_seeds": json.dumps(list(excluded)),
+        "reserve_experiment_seeds_used": json.dumps(list(reserves_used)),
+        "seed_replacement_reason": reason,
+        "cell_level_reserve_stitching_allowed": False,
+        "n_valid_primary_cells": int(len(completed) * len(cfg.heldout_centers)),
+        "primary_matrix_status": "COMPLETE_CONFIRMATION_MATRIX" if len(completed) == len(cfg.primary_requested_experiment_seeds) else "INCOMPLETE_CONFIRMATION_MATRIX",
+        "audit_only": True,
+        "primary_adoption_eligible": False,
+        "selection_used_target_labels": False,
+    }
 
 
 def _append_multipanel_seed_diagnostics(
@@ -2341,6 +2791,304 @@ def _build_positive_union_cell_outputs(
             selected_bundle=selected_bundle,
             arithmetic_bundle=arithmetic_bundle,
             eval_labels=eval_labels,
+        )
+    )
+    return out
+
+
+def _build_harm_gated_positive_union_cell_outputs(
+    cfg: SourceInnerHarmGatedPositiveUnionConfig,
+    *,
+    seed_evaluations: Sequence[_MultipanelSeedEvaluation],
+    experiment_seed: int,
+    heldout_center: str,
+    candidates: Sequence[str],
+    summaries: Mapping[tuple[str, int], d1a.AdaptiveSourceLocalSummary],
+    eval_labels: Sequence[int],
+    eval_sample_ids: Sequence[str],
+    eval_sample_hash: str,
+    source_union_ref: d1.ReferenceValue,
+    center_balanced_ref: d1.ReferenceValue,
+    real_feature_bacc: float,
+) -> dict[str, list[dict[str, object]]]:
+    out: dict[str, list[dict[str, object]]] = {
+        "matrix_rows": [],
+        "source_weight_rows": [],
+        "blend_manifest_rows": [],
+        "component_coverage_rows": [],
+        "paired_generation_rows": [],
+        "invariant_rows": [],
+        "positive_union_source_inner_selection_rows": [],
+        "positive_union_candidate_rule_rows": [],
+        "positive_union_class_conditional_rows": [],
+        "positive_union_effective_threshold_rows": [],
+        "positive_union_harm_rows": [],
+        "positive_union_per_source_harm_rows": [],
+        "fixed_beta050_rare_positive_rows": [],
+    }
+    ok = [
+        item
+        for item in seed_evaluations
+        if item.evaluated.primary_bundle is not None
+        and item.evaluated.anchor_result.bundle is not None
+        and item.evaluated.bag_evaluation.ensemble_bundle is not None
+        and item.evaluated.primary_row.get("status") == "ok"
+    ]
+    if len(ok) != len(seed_evaluations) or len(ok) != len(cfg.all_panel_seeds):
+        row = cu._empty_matrix_row(
+            cfg,
+            experiment_seed=experiment_seed,
+            heldout_center=heldout_center,
+            replicate_seed=0,
+            candidates=candidates,
+            prior_method=cfg.primary_method,
+            source_union_ref=source_union_ref,
+            center_balanced_ref=center_balanced_ref,
+            real_feature_bacc=real_feature_bacc,
+            status="ineligible",
+            error_message="one_or_more_seed_blends_ineligible",
+            claim_role="harm_gated_positive_union_probability_pool",
+        )
+        row["selection_used_target_labels"] = False
+        row["target_eval_labels_used_for_scoring_only"] = True
+        out["matrix_rows"].append(row)
+        return out
+
+    seed_blend_bundles = [item.evaluated.primary_bundle for item in ok if item.evaluated.primary_bundle is not None]
+    anchor_bundles = [item.evaluated.anchor_result.bundle for item in ok if item.evaluated.anchor_result.bundle is not None]
+    bag_bundles = [item.evaluated.bag_evaluation.ensemble_bundle for item in ok if item.evaluated.bag_evaluation.ensemble_bundle is not None]
+    seed_blend_rows = [item.evaluated.primary_row for item in ok]
+    anchor_rows = [item.evaluated.anchor_result.row for item in ok]
+    bag_rows = [item.evaluated.bag_evaluation.ensemble_row for item in ok]
+    seed_hashes = [str(row.get("prediction_hash", "")) for row in seed_blend_rows]
+    group_json = _panel_seed_groups_json(cfg)
+
+    source_inner_bundles = [
+        item.evaluated.source_inner_bundles.get("primary_blend")
+        for item in ok
+        if item.evaluated.source_inner_bundles.get("primary_blend") is not None
+    ]
+    source_inner_labels = ok[0].evaluated.source_inner_labels
+    source_inner_source_ids = ok[0].evaluated.source_inner_source_ids
+    if len(source_inner_bundles) != len(ok) or not source_inner_labels:
+        selected_rule = POSITIVE_UNION_RULE_ARITHMETIC
+        source_candidate_bundles = _positive_union_candidate_bundles(cfg, seed_blend_bundles)
+        source_rows = {
+            rule: {
+                **_empty_positive_union_metric_row(rule, scope="source_inner"),
+                "source_inner_eligible": rule == POSITIVE_UNION_RULE_ARITHMETIC,
+                "source_inner_ineligible_reason": "missing_source_inner_primary_blend_bundles" if rule != POSITIVE_UNION_RULE_ARITHMETIC else "",
+                "primary_selectable_rule": rule in cfg.primary_selectable_rules,
+            }
+            for rule in cfg.candidate_pooling_rules
+        }
+        selection_row = _positive_union_selection_row(
+            cfg,
+            selected_rule=selected_rule,
+            selected_row=source_rows[selected_rule],
+            positive_count=0,
+            negative_count=0,
+            selection_reason="missing_source_inner_primary_blend_bundles",
+        )
+    else:
+        source_candidate_bundles = _positive_union_candidate_bundles(cfg, source_inner_bundles)
+        source_metric_rows = [
+            _positive_union_metrics(rule, bundle, source_inner_labels, scope="source_inner")
+            for rule, bundle in source_candidate_bundles.items()
+        ]
+        selected_rule, selected_source_rows, selection_row = _select_harm_gated_positive_union_rule(cfg, source_rows=source_metric_rows)
+        source_rows = {str(row["rule"]): row for row in selected_source_rows}
+        out["positive_union_per_source_harm_rows"].extend(
+            _positive_union_per_source_harm_rows(
+                cfg,
+                experiment_seed=experiment_seed,
+                heldout_center=heldout_center,
+                source_ids=source_inner_source_ids,
+                source_labels=source_inner_labels,
+                source_bundles_by_rule=source_candidate_bundles,
+            )
+        )
+
+    target_candidate_bundles = _positive_union_candidate_bundles(cfg, seed_blend_bundles)
+    target_rows = {
+        rule: _positive_union_metrics(rule, bundle, eval_labels, scope="target_eval")
+        for rule, bundle in target_candidate_bundles.items()
+    }
+    selected_bundle = target_candidate_bundles[selected_rule]
+    arithmetic_bundle = target_candidate_bundles[POSITIVE_UNION_RULE_ARITHMETIC]
+    pooled_anchor = _pool_bundle(MULTIPANEL_POOLED_ANCHOR_METHOD, anchor_bundles)
+    pooled_random = _pool_bundle(MULTIPANEL_POOLED_RANDOM_BAG_METHOD, bag_bundles)
+    canonical_bags = [
+        item.evaluated.bag_evaluation.ensemble_bundle
+        for item in ok
+        if item.panel_group == MULTIPANEL_CANONICAL_PANEL and item.evaluated.bag_evaluation.ensemble_bundle is not None
+    ]
+    canonical_random = _pool_bundle(MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD, canonical_bags)
+
+    selection_row.update(
+        {
+            "experiment_seed": experiment_seed,
+            "heldout_center": heldout_center,
+            "decision_cell": "experiment_seed_x_heldout_center",
+            "audit_only": False,
+            "primary_adoption_eligible": True,
+            "selector_thresholds_frozen_before_primary": True,
+            "selector_threshold_source": cfg.selector_threshold_source,
+            "beta100_primary_selectable": False,
+        }
+    )
+    out["positive_union_source_inner_selection_rows"].append(selection_row)
+
+    for rule in cfg.candidate_pooling_rules:
+        row = {
+            "experiment_seed": experiment_seed,
+            "heldout_center": heldout_center,
+            "rule": rule,
+            "beta": "" if _positive_union_rule_beta(rule) is None else _positive_union_rule_beta(rule),
+            "selected_rule_for_cell": selected_rule,
+            "is_selected_rule": rule == selected_rule,
+            "primary_selectable_rule": rule in cfg.primary_selectable_rules,
+            "beta100_primary_selectable": False,
+            "selection_used_target_labels": False,
+            "target_eval_labels_used_for_audit_only": True,
+            "audit_only": True,
+            "primary_adoption_eligible": False,
+        }
+        for key, value in source_rows.get(rule, {}).items():
+            row[f"source_inner_{key}"] = value
+        for key, value in target_rows[rule].items():
+            row[f"target_{key}"] = value
+        out["positive_union_candidate_rule_rows"].append(row)
+
+    row_specs = (
+        (cfg.primary_method, selected_bundle, seed_blend_rows, PRIMARY_SELECTION, "source_inner_harm_gated_positive_union_primary", selected_rule),
+        (POSITIVE_UNION_RULE_ARITHMETIC, arithmetic_bundle, seed_blend_rows, DIAGNOSTIC_SELECTION, "arithmetic_multipanel_comparator", POSITIVE_UNION_RULE_ARITHMETIC),
+        (POSITIVE_UNION_RULE_BETA025, target_candidate_bundles[POSITIVE_UNION_RULE_BETA025], seed_blend_rows, DIAGNOSTIC_SELECTION, "fixed_beta025_diagnostic", POSITIVE_UNION_RULE_BETA025),
+        (POSITIVE_UNION_RULE_BETA050, target_candidate_bundles[POSITIVE_UNION_RULE_BETA050], seed_blend_rows, DIAGNOSTIC_SELECTION, "fixed_beta050_diagnostic", POSITIVE_UNION_RULE_BETA050),
+        (POSITIVE_UNION_RULE_BETA100, target_candidate_bundles[POSITIVE_UNION_RULE_BETA100], seed_blend_rows, DIAGNOSTIC_SELECTION, "fixed_beta100_audit_only", POSITIVE_UNION_RULE_BETA100),
+        (MULTIPANEL_POOLED_ANCHOR_METHOD, pooled_anchor, anchor_rows, DIAGNOSTIC_SELECTION, "pooled_shrink050_comparator", "pooled_anchor"),
+        (MULTIPANEL_POOLED_RANDOM_BAG_METHOD, pooled_random, bag_rows, DIAGNOSTIC_SELECTION, "pooled_random_mass_bag_comparator", "pooled_random"),
+        (
+            MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD,
+            canonical_random,
+            [item.evaluated.bag_evaluation.ensemble_row for item in ok if item.panel_group == MULTIPANEL_CANONICAL_PANEL],
+            DIAGNOSTIC_SELECTION,
+            "canonical_single_random_mass_bag_comparator",
+            "canonical_random_mass_bag",
+        ),
+    )
+    row_by_method: dict[str, dict[str, object]] = {}
+    for method, bundle, plan_rows, selection_source, claim_role, pooling_rule in row_specs:
+        row = _multipanel_result_row(
+            cfg,
+            experiment_seed=experiment_seed,
+            heldout_center=heldout_center,
+            candidates=candidates,
+            summaries=summaries,
+            method=method,
+            bundle=bundle,
+            eval_labels=eval_labels,
+            source_union_ref=source_union_ref,
+            center_balanced_ref=center_balanced_ref,
+            real_feature_bacc=real_feature_bacc,
+            weight_plan=_average_plan_from_rows(cfg, candidates, plan_rows),
+            generated_features_hash=_hash_strings(str(row.get("generated_features_hash", "")) for row in plan_rows),
+            seed_bundle_hashes=seed_hashes if method in {cfg.primary_method, POSITIVE_UNION_RULE_ARITHMETIC, POSITIVE_UNION_RULE_BETA025, POSITIVE_UNION_RULE_BETA050, POSITIVE_UNION_RULE_BETA100} else [str(row.get("prediction_hash", "")) for row in plan_rows],
+            selection_source=selection_source,
+            claim_role=claim_role,
+            eval_sample_hash=eval_sample_hash,
+            panel_seed_groups_json=group_json,
+        )
+        row["pooling_rule"] = pooling_rule
+        row["selected_positive_union_rule"] = selected_rule
+        row["selected_positive_union_beta"] = "" if _positive_union_rule_beta(selected_rule) is None else _positive_union_rule_beta(selected_rule)
+        row["source_inner_selection_reason"] = selection_row.get("selection_reason", "")
+        row["target_support_used"] = False
+        row["beta100_primary_selectable"] = False
+        row["primary_adoption_eligible"] = method == cfg.primary_method
+        row["audit_only"] = method != cfg.primary_method
+        if method == POSITIVE_UNION_RULE_BETA100:
+            row["primary_adoption_eligible"] = False
+            row["audit_only"] = True
+        row_by_method[method] = row
+        out["matrix_rows"].append(row)
+        out["component_coverage_rows"].append(cu._empty_coverage_row(row))
+        out["paired_generation_rows"].append(cu._paired_generation_row(row, str(row.get("generated_features_hash", "")), "", "ok"))
+        out["invariant_rows"].append(
+            _probability_invariant_row(
+                experiment_seed,
+                heldout_center,
+                method,
+                bundle,
+                eval_sample_ids=eval_sample_ids,
+                expected_sample_hash=eval_sample_hash,
+                panel="harm_gated_positive_union",
+            )
+        )
+
+    out["blend_manifest_rows"].append(
+        {
+            "experiment_seed": experiment_seed,
+            "heldout_center": heldout_center,
+            "replicate_seed": 0,
+            "panel": "harm_gated_positive_union",
+            "primary_method": cfg.primary_method,
+            "aggregation_unit": "experiment_seed_x_heldout_center",
+            "pooling_rule": HARM_GATED_POSITIVE_UNION_PRIMARY_POOLING,
+            "selected_rule": selected_rule,
+            "selected_beta": "" if _positive_union_rule_beta(selected_rule) is None else _positive_union_rule_beta(selected_rule),
+            "selection_source": "source_inner_harm_gate",
+            "selection_used_target_labels": False,
+            "target_support_used": False,
+            "beta100_primary_selectable": False,
+            "selector_thresholds_frozen_before_primary": True,
+            "blend_alpha_anchor": cfg.blend_alpha,
+            "blend_alpha_bag": 1.0 - cfg.blend_alpha,
+            "panel_seed_groups_json": group_json,
+            "seed_blend_prediction_hashes_json": json.dumps(seed_hashes),
+            "final_prediction_hash": row_by_method[cfg.primary_method].get("prediction_hash", ""),
+            "eval_sample_ids_hash": eval_sample_hash,
+            "class_order": "|".join(str(value) for value in selected_bundle.classes),
+            "class_order_match": selected_bundle.classes == (0, 1),
+        }
+    )
+    out["positive_union_class_conditional_rows"].extend(
+        _positive_union_class_conditional_rows(
+            cfg,
+            experiment_seed=experiment_seed,
+            heldout_center=heldout_center,
+            target_rows=target_rows,
+            selected_rule=selected_rule,
+        )
+    )
+    out["positive_union_effective_threshold_rows"].extend(
+        _positive_union_effective_threshold_rows(
+            cfg,
+            experiment_seed=experiment_seed,
+            heldout_center=heldout_center,
+            n_seed_bundles=len(seed_blend_bundles),
+            source_rows=source_rows,
+            target_rows=target_rows,
+        )
+    )
+    out["positive_union_harm_rows"].append(
+        _positive_union_harm_row(
+            experiment_seed=experiment_seed,
+            heldout_center=heldout_center,
+            selected_rule=selected_rule,
+            selected_bundle=selected_bundle,
+            arithmetic_bundle=arithmetic_bundle,
+            eval_labels=eval_labels,
+        )
+    )
+    out["fixed_beta050_rare_positive_rows"].append(
+        _fixed_beta050_rare_positive_opportunity_row(
+            cfg,
+            experiment_seed=experiment_seed,
+            heldout_center=heldout_center,
+            eval_labels=eval_labels,
+            arithmetic_bundle=arithmetic_bundle,
+            beta050_bundle=target_candidate_bundles[POSITIVE_UNION_RULE_BETA050],
         )
     )
     return out
@@ -2955,6 +3703,101 @@ def _select_positive_union_rule(
         negative_count=negative_count,
         selection_reason=reason,
     )
+
+
+def _select_harm_gated_positive_union_rule(
+    cfg: SourceInnerHarmGatedPositiveUnionConfig,
+    *,
+    source_rows: Sequence[Mapping[str, object]],
+) -> tuple[str, list[dict[str, object]], dict[str, object]]:
+    rows = [dict(row) for row in source_rows]
+    by_rule = {str(row["rule"]): row for row in rows}
+    arithmetic = by_rule[POSITIVE_UNION_RULE_ARITHMETIC]
+    positive_count = _safe_int(arithmetic.get("class1_support"), default=0)
+    negative_count = _safe_int(arithmetic.get("class0_support"), default=0)
+    if positive_count < cfg.min_source_inner_positive_count:
+        for row in rows:
+            row["primary_selectable_rule"] = str(row["rule"]) in cfg.primary_selectable_rules
+            row["source_inner_eligible"] = row["rule"] == POSITIVE_UNION_RULE_ARITHMETIC
+            row["source_inner_ineligible_reason"] = "" if row["rule"] == POSITIVE_UNION_RULE_ARITHMETIC else "insufficient_source_inner_positive_count"
+        selected = POSITIVE_UNION_RULE_ARITHMETIC
+        return selected, rows, _positive_union_selection_row(
+            cfg,
+            selected_rule=selected,
+            selected_row=by_rule[selected],
+            positive_count=positive_count,
+            negative_count=negative_count,
+            selection_reason="insufficient_source_inner_positive_count",
+        )
+
+    arith_bacc = _float(arithmetic.get("smoothed_bacc"))
+    arith_class0 = _float(arithmetic.get("smoothed_class0_recall"))
+    arith_precision = _float(arithmetic.get("smoothed_precision"))
+    arith_ppr = _float(arithmetic.get("predicted_positive_rate"))
+    for row in rows:
+        rule = str(row["rule"])
+        reasons: list[str] = []
+        selectable = rule in cfg.primary_selectable_rules
+        if not selectable:
+            reasons.append("audit_only_not_primary_selectable")
+        if rule != POSITIVE_UNION_RULE_ARITHMETIC:
+            if _float(row.get("smoothed_bacc")) < arith_bacc - cfg.harm_gate_bacc_noninferiority_margin:
+                reasons.append("source_inner_bacc_inferior")
+            if rule == POSITIVE_UNION_RULE_BETA025:
+                if _float(row.get("smoothed_class0_recall")) < arith_class0 - cfg.beta025_class0_recall_margin:
+                    reasons.append("beta025_class0_recall_harm")
+                if _float(row.get("predicted_positive_rate")) > arith_ppr + cfg.beta025_predicted_positive_rate_delta:
+                    reasons.append("beta025_predicted_positive_rate_inflation")
+            elif rule == POSITIVE_UNION_RULE_BETA050:
+                if positive_count < cfg.beta050_min_source_inner_positive_count:
+                    reasons.append("beta050_insufficient_source_inner_positive_count")
+                if _float(row.get("smoothed_class0_recall")) < arith_class0 - cfg.beta050_class0_recall_margin:
+                    reasons.append("beta050_class0_recall_harm")
+                if _float(row.get("smoothed_precision")) < arith_precision - cfg.beta050_precision_margin:
+                    reasons.append("beta050_precision_harm")
+                if _float(row.get("predicted_positive_rate")) > arith_ppr + cfg.beta050_predicted_positive_rate_delta:
+                    reasons.append("beta050_predicted_positive_rate_inflation")
+        row["primary_selectable_rule"] = selectable
+        row["source_inner_eligible"] = not reasons
+        row["source_inner_ineligible_reason"] = "|".join(reasons)
+
+    eligible_rows = [row for row in rows if row.get("source_inner_eligible") is True and str(row["rule"]) in cfg.primary_selectable_rules]
+    if not eligible_rows:
+        selected = POSITIVE_UNION_RULE_ARITHMETIC
+        selected_row = by_rule[selected]
+        reason = "no_eligible_rule_fallback_arithmetic"
+    else:
+        selected_row = max(
+            eligible_rows,
+            key=lambda row: (
+                _float(row.get("smoothed_min_class_recall")),
+                _float(row.get("smoothed_bacc")),
+                _float(row.get("smoothed_macro_f1")),
+                -cfg.primary_selectable_rules.index(str(row["rule"])),
+            ),
+        )
+        selected = str(selected_row["rule"])
+        reason = "source_inner_harm_gated_selected"
+    selection = _positive_union_selection_row(
+        cfg,
+        selected_rule=selected,
+        selected_row=selected_row,
+        positive_count=positive_count,
+        negative_count=negative_count,
+        selection_reason=reason,
+    )
+    selection.update(
+        {
+            "beta050_min_source_inner_positive_count": cfg.beta050_min_source_inner_positive_count,
+            "harm_gate_bacc_noninferiority_margin": cfg.harm_gate_bacc_noninferiority_margin,
+            "beta025_class0_recall_margin": cfg.beta025_class0_recall_margin,
+            "beta025_predicted_positive_rate_delta": cfg.beta025_predicted_positive_rate_delta,
+            "beta050_class0_recall_margin": cfg.beta050_class0_recall_margin,
+            "beta050_precision_margin": cfg.beta050_precision_margin,
+            "beta050_predicted_positive_rate_delta": cfg.beta050_predicted_positive_rate_delta,
+        }
+    )
+    return selected, rows, selection
 
 
 def _positive_union_selection_row(
@@ -3935,6 +4778,95 @@ def _fixed_beta050_paired_delta_rows(
     return out, arithmetic_tail_keys
 
 
+def _harm_gated_positive_union_paired_delta_rows(
+    rows: Sequence[Mapping[str, object]],
+    cfg: SourceInnerHarmGatedPositiveUnionConfig,
+) -> tuple[list[dict[str, object]], set[tuple[str, str]]]:
+    primary = _collapsed_method_rows(rows, cfg.primary_method)
+    arithmetic = _collapsed_method_rows(rows, POSITIVE_UNION_RULE_ARITHMETIC)
+    beta025 = _collapsed_method_rows(rows, POSITIVE_UNION_RULE_BETA025)
+    beta050 = _collapsed_method_rows(rows, POSITIVE_UNION_RULE_BETA050)
+    beta100 = _collapsed_method_rows(rows, POSITIVE_UNION_RULE_BETA100)
+    canonical = _collapsed_method_rows(rows, MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD)
+    anchor = _collapsed_method_rows(rows, MULTIPANEL_POOLED_ANCHOR_METHOD)
+    pooled_random = _collapsed_method_rows(rows, MULTIPANEL_POOLED_RANDOM_BAG_METHOD)
+    intersection = sorted(set(primary) & set(arithmetic) & set(beta050) & set(canonical) & set(anchor))
+    arithmetic_values = sorted((_float(arithmetic[key]["bacc"]), key) for key in intersection if math.isfinite(_float(arithmetic[key]["bacc"])))
+    bottom_count = max(1, int(math.ceil(0.20 * len(arithmetic_values)))) if arithmetic_values else 0
+    arithmetic_tail_keys = {key for _value, key in arithmetic_values[:bottom_count]}
+    out = []
+    for key in intersection:
+        p = _float(primary[key]["bacc"])
+        arithmetic_bacc = _float(arithmetic[key]["bacc"])
+        beta025_bacc = _float(beta025.get(key, {}).get("bacc", math.nan))
+        beta050_bacc = _float(beta050.get(key, {}).get("bacc", math.nan))
+        beta100_bacc = _float(beta100.get(key, {}).get("bacc", math.nan))
+        canon_bacc = _float(canonical[key]["bacc"])
+        anchor_bacc = _float(anchor[key]["bacc"])
+        pooled_random_bacc = _float(pooled_random.get(key, {}).get("bacc", math.nan))
+        out.append(
+            {
+                "experiment_seed": key[0],
+                "heldout_center": key[1],
+                "is_frozen_arithmetic_bottom20_cell": key in arithmetic_tail_keys,
+                "selected_rule": primary[key].get("selected_positive_union_rule", ""),
+                "harm_gated_bacc": p,
+                "v2_arithmetic_multipanel_bacc": arithmetic_bacc,
+                "fixed_beta025_diagnostic_bacc": beta025_bacc,
+                "fixed_beta050_diagnostic_bacc": beta050_bacc,
+                "fixed_beta100_diagnostic_bacc": beta100_bacc,
+                "same_cell_single_random_mass_bag_canonical_bacc": canon_bacc,
+                "same_cell_shrink050_bacc": anchor_bacc,
+                "pooled_random_mass_bag_bacc": pooled_random_bacc,
+                "delta_harm_gated_minus_v2_arithmetic": p - arithmetic_bacc if math.isfinite(p) and math.isfinite(arithmetic_bacc) else math.nan,
+                "delta_harm_gated_minus_fixed_beta025": p - beta025_bacc if math.isfinite(p) and math.isfinite(beta025_bacc) else math.nan,
+                "delta_harm_gated_minus_fixed_beta050": p - beta050_bacc if math.isfinite(p) and math.isfinite(beta050_bacc) else math.nan,
+                "delta_harm_gated_minus_fixed_beta100": p - beta100_bacc if math.isfinite(p) and math.isfinite(beta100_bacc) else math.nan,
+                "delta_harm_gated_minus_canonical_random_mass_bag": p - canon_bacc if math.isfinite(p) and math.isfinite(canon_bacc) else math.nan,
+                "delta_harm_gated_minus_shrink050": p - anchor_bacc if math.isfinite(p) and math.isfinite(anchor_bacc) else math.nan,
+                "delta_harm_gated_minus_pooled_random_mass_bag": p - pooled_random_bacc if math.isfinite(p) and math.isfinite(pooled_random_bacc) else math.nan,
+                "comparison_cell_set": "fresh_confirmation_intersection_harm_gated_arithmetic_fixed_beta050_canonical_random_shrink050",
+                "status": "ok",
+            }
+        )
+    return out, arithmetic_tail_keys
+
+
+def _annotate_harm_gated_positive_union_harm_rows(
+    rows: Sequence[Mapping[str, object]],
+    paired_delta_rows: Sequence[Mapping[str, object]],
+    cfg: SourceInnerHarmGatedPositiveUnionConfig,
+) -> list[dict[str, object]]:
+    deltas_by_center: dict[str, list[float]] = {}
+    deltas_by_key: dict[tuple[str, str], float] = {}
+    for row in paired_delta_rows:
+        center = str(row.get("heldout_center"))
+        key = (str(row.get("experiment_seed")), center)
+        delta = _float(row.get("delta_harm_gated_minus_v2_arithmetic"))
+        if math.isfinite(delta):
+            deltas_by_center.setdefault(center, []).append(delta)
+            deltas_by_key[key] = delta
+    center_means = {
+        center: nanmean([value for value in values if math.isfinite(value)])
+        for center, values in deltas_by_center.items()
+    }
+    worst_center = min(center_means.values(), default=math.nan)
+    worst_seed_center = min(deltas_by_key.values(), default=math.nan)
+    out = []
+    for row in rows:
+        updated = dict(row)
+        key = (str(updated.get("experiment_seed")), str(updated.get("heldout_center")))
+        updated["delta_vs_v2_arithmetic"] = deltas_by_key.get(key, math.nan)
+        updated["worst_per_center_regression"] = worst_center
+        updated["worst_seed_center_regression"] = worst_seed_center
+        updated["tail_risk_transfer_flag"] = bool(
+            (math.isfinite(worst_center) and worst_center < cfg.tailrisk_transfer_threshold)
+            or (math.isfinite(worst_seed_center) and worst_seed_center < cfg.tailrisk_transfer_threshold)
+        )
+        out.append(updated)
+    return out
+
+
 def _annotate_fixed_beta050_harm_rows(
     rows: Sequence[Mapping[str, object]],
     paired_delta_rows: Sequence[Mapping[str, object]],
@@ -4603,6 +5535,206 @@ def _fixed_beta050_decision(
     }
 
 
+def _harm_gated_positive_union_decision(
+    rows: Sequence[Mapping[str, object]],
+    *,
+    paired_delta_rows: Sequence[Mapping[str, object]],
+    arithmetic_tail_keys: set[tuple[str, str]],
+    selection_rows: Sequence[Mapping[str, object]],
+    rare_positive_rows: Sequence[Mapping[str, object]],
+    harm_rows: Sequence[Mapping[str, object]],
+    replacement_seed_rows: Sequence[Mapping[str, object]],
+    leakage_status: str,
+    cfg: SourceInnerHarmGatedPositiveUnionConfig,
+) -> dict[str, object]:
+    primary = _multipanel_tail_metrics(rows, cfg.primary_method, prior_tail_keys=arithmetic_tail_keys)
+    arithmetic = _multipanel_tail_metrics(rows, POSITIVE_UNION_RULE_ARITHMETIC, prior_tail_keys=arithmetic_tail_keys)
+    beta025 = _multipanel_tail_metrics(rows, POSITIVE_UNION_RULE_BETA025, prior_tail_keys=arithmetic_tail_keys)
+    beta050 = _multipanel_tail_metrics(rows, POSITIVE_UNION_RULE_BETA050, prior_tail_keys=arithmetic_tail_keys)
+    beta100 = _multipanel_tail_metrics(rows, POSITIVE_UNION_RULE_BETA100, prior_tail_keys=arithmetic_tail_keys)
+    primary_i = _stats_from_paired(paired_delta_rows, "harm_gated_bacc") if paired_delta_rows else {}
+    arithmetic_i = _stats_from_paired(paired_delta_rows, "v2_arithmetic_multipanel_bacc") if paired_delta_rows else {}
+    beta050_i = _stats_from_paired(paired_delta_rows, "fixed_beta050_diagnostic_bacc") if paired_delta_rows else {}
+
+    mean_i = _float(primary_i.get("center_equal_mean_bacc", math.nan))
+    arithmetic_mean = _float(arithmetic_i.get("center_equal_mean_bacc", math.nan))
+    beta050_mean = _float(beta050_i.get("center_equal_mean_bacc", math.nan))
+    min_center_delta = _delta(primary_i.get("min_center_bacc", math.nan), arithmetic_i.get("min_center_bacc", math.nan)) if paired_delta_rows else math.nan
+    center3_delta = _delta(primary_i.get("center3_bacc", math.nan), arithmetic_i.get("center3_bacc", math.nan)) if paired_delta_rows else math.nan
+    bottom20_delta = _delta(primary_i.get("bottom20_cell_mean_bacc", math.nan), arithmetic_i.get("bottom20_cell_mean_bacc", math.nan)) if paired_delta_rows else math.nan
+    seed_std_delta = _delta(primary_i.get("seed_std_bacc", math.nan), arithmetic_i.get("seed_std_bacc", math.nan)) if paired_delta_rows else math.nan
+    arithmetic_delta = mean_i - arithmetic_mean if math.isfinite(mean_i) and math.isfinite(arithmetic_mean) else math.nan
+    beta050_delta = mean_i - beta050_mean if math.isfinite(mean_i) and math.isfinite(beta050_mean) else math.nan
+    tail_deltas = [
+        _float(row.get("delta_harm_gated_minus_v2_arithmetic"))
+        for row in paired_delta_rows
+        if str(row.get("is_frozen_arithmetic_bottom20_cell")) == "True" or row.get("is_frozen_arithmetic_bottom20_cell") is True
+    ]
+    tail_deltas = [value for value in tail_deltas if math.isfinite(value)]
+    tail_positive_fraction = float(sum(value > 0.0 for value in tail_deltas)) / float(len(tail_deltas)) if tail_deltas else math.nan
+    tail_median_delta = float(np.median(np.asarray(tail_deltas, dtype=float))) if tail_deltas else math.nan
+    center_regressions = _per_center_regressions(primary_i, arithmetic_i) if paired_delta_rows else {}
+    worst_center_regression = min(center_regressions.values(), default=math.nan)
+    worst_seed_center_regression = min(
+        (_float(row.get("delta_harm_gated_minus_v2_arithmetic")) for row in paired_delta_rows),
+        default=math.nan,
+    )
+    assessable_rare = [
+        row
+        for row in rare_positive_rows
+        if row.get("assessable_for_rare_positive_repair") is True or str(row.get("assessable_for_rare_positive_repair")) == "True"
+    ]
+    rare_recall_deltas = [
+        _float(row.get("beta050_class1_recall")) - _float(row.get("arithmetic_class1_recall"))
+        for row in assessable_rare
+        if math.isfinite(_float(row.get("beta050_class1_recall"))) and math.isfinite(_float(row.get("arithmetic_class1_recall")))
+    ]
+    rare_recall_mean_delta = nanmean([value for value in rare_recall_deltas if math.isfinite(value)])
+    rare_recall_positive_fraction = (
+        float(sum(value > 0.0 for value in rare_recall_deltas)) / float(len(rare_recall_deltas))
+        if rare_recall_deltas
+        else math.nan
+    )
+    selected_counts: dict[str, int] = {}
+    insufficient_count = 0
+    for row in selection_rows:
+        selected = str(row.get("selected_rule", ""))
+        selected_counts[selected] = selected_counts.get(selected, 0) + 1
+        if row.get("selection_reason") == "insufficient_source_inner_positive_count":
+            insufficient_count += 1
+    completed_seeds = []
+    if replacement_seed_rows:
+        try:
+            completed_seeds = json.loads(str(replacement_seed_rows[-1].get("completed_primary_experiment_seeds", "[]")))
+        except json.JSONDecodeError:
+            completed_seeds = []
+    n_valid_primary_cells = int(len(completed_seeds) * len(cfg.heldout_centers))
+    complete_matrix = n_valid_primary_cells == len(cfg.primary_requested_experiment_seeds) * len(cfg.heldout_centers)
+
+    flags: list[str] = []
+    if leakage_status != "PASS":
+        flags.append("LEAKAGE_FAIL")
+    if not complete_matrix:
+        flags.append("INCOMPLETE_CONFIRMATION_MATRIX")
+    if not paired_delta_rows:
+        flags.append("MISSING_SAME_RUN_ARITHMETIC_INTERSECTION")
+    if not assessable_rare:
+        flags.append("NO_ASSESSABLE_RARE_POSITIVE_CELLS")
+    elif math.isfinite(rare_recall_mean_delta) and rare_recall_mean_delta <= 0.0:
+        flags.append("RARE_POSITIVE_RECALL_NOT_IMPROVED")
+    if math.isfinite(worst_center_regression) and worst_center_regression < cfg.tailrisk_transfer_threshold:
+        flags.append("TAIL_RISK_TRANSFER")
+    if math.isfinite(worst_seed_center_regression) and worst_seed_center_regression < cfg.tailrisk_transfer_threshold:
+        flags.append("SEED_CENTER_TAIL_RISK_TRANSFER")
+    if math.isfinite(mean_i) and math.isfinite(arithmetic_mean) and mean_i < arithmetic_mean - cfg.primary_noninferiority_margin:
+        flags.append("MEAN_INFERIOR_TO_V2_ARITHMETIC_GT_0P005")
+    if math.isfinite(mean_i) and math.isfinite(beta050_mean) and mean_i < beta050_mean - cfg.primary_noninferiority_margin:
+        flags.append("MEAN_INFERIOR_TO_FIXED_BETA050_GT_0P005")
+    if math.isfinite(min_center_delta) and (_float(primary_i.get("min_center_bacc", math.nan)) < 0.82 or min_center_delta <= 0.0):
+        flags.append("MIN_CENTER_NOT_IMPROVED_OR_BELOW_0P82")
+    if math.isfinite(center3_delta) and (_float(primary_i.get("center3_bacc", math.nan)) < 0.82 or center3_delta < -cfg.primary_noninferiority_margin):
+        flags.append("CENTER3_INFERIOR_OR_BELOW_0P82")
+    if math.isfinite(bottom20_delta) and bottom20_delta <= 0.0:
+        flags.append("BOTTOM20_NOT_IMPROVED")
+    if math.isfinite(seed_std_delta) and seed_std_delta > 0.005:
+        flags.append("SEED_STD_INCREASED_GT_0P005")
+    if math.isfinite(tail_median_delta) and tail_median_delta <= 0.0:
+        flags.append("BOTTOM20_MEDIAN_DELTA_NOT_POSITIVE")
+    if math.isfinite(tail_positive_fraction) and tail_positive_fraction <= 0.5:
+        flags.append("BOTTOM20_NOT_MAJORITY_IMPROVED")
+
+    rare_success = bool(rare_recall_deltas) and rare_recall_mean_delta > 0.0
+    clean_pass = (
+        leakage_status == "PASS"
+        and complete_matrix
+        and bool(paired_delta_rows)
+        and mean_i >= 0.90
+        and math.isfinite(beta050_delta)
+        and beta050_delta >= -cfg.primary_noninferiority_margin
+        and math.isfinite(arithmetic_delta)
+        and arithmetic_delta > 0.0
+        and _float(primary_i.get("min_center_bacc", math.nan)) >= 0.82
+        and min_center_delta > 0.0
+        and _float(primary_i.get("center3_bacc", math.nan)) >= 0.82
+        and center3_delta >= -cfg.primary_noninferiority_margin
+        and bottom20_delta > 0.0
+        and rare_success
+        and (not math.isfinite(seed_std_delta) or seed_std_delta <= 0.005)
+        and math.isfinite(worst_seed_center_regression)
+        and worst_seed_center_regression > cfg.tailrisk_transfer_threshold
+        and "TAIL_RISK_TRANSFER" not in flags
+    )
+    strong_pass = (
+        clean_pass
+        and mean_i >= 0.93
+        and _float(primary_i.get("min_center_bacc", math.nan)) >= 0.87
+        and tail_median_delta > 0.0
+        and tail_positive_fraction > 0.5
+        and rare_recall_positive_fraction > 0.5
+    )
+    weak_pass = (
+        leakage_status == "PASS"
+        and complete_matrix
+        and bool(paired_delta_rows)
+        and bottom20_delta > 0.0
+        and rare_success
+        and math.isfinite(arithmetic_delta)
+        and arithmetic_delta >= -cfg.weak_pass_noninferiority_margin
+    )
+    verdict = "HARM_GATED_POSITIVE_UNION_FAIL"
+    if leakage_status != "PASS":
+        verdict = "PROTOCOL_FAIL"
+    elif not complete_matrix:
+        verdict = "INCOMPLETE_CONFIRMATION_MATRIX"
+    elif strong_pass:
+        verdict = "HARM_GATED_POSITIVE_UNION_STRONG_PASS"
+    elif clean_pass:
+        verdict = "HARM_GATED_POSITIVE_UNION_CLEAN_PASS"
+    elif weak_pass:
+        verdict = "HARM_GATED_POSITIVE_UNION_WEAK_PASS"
+    return {
+        "primary_verdict": verdict,
+        "diagnostic_flags": "|".join(flags),
+        "primary_method": cfg.primary_method,
+        "leakage_status": leakage_status,
+        "claim_boundary": "source-only harm-gated positive-evidence pooling; not compatibility routing or target adaptation",
+        "comparison_cell_set": "fresh_confirmation_intersection_harm_gated_arithmetic_fixed_beta050_canonical_random_shrink050",
+        "n_intersection_cells": len(paired_delta_rows),
+        "n_valid_primary_cells": n_valid_primary_cells,
+        "completed_primary_experiment_seeds_json": json.dumps(list(completed_seeds)),
+        "selected_rule_counts_json": json.dumps(selected_counts, sort_keys=True),
+        "insufficient_source_inner_positive_count_cells": insufficient_count,
+        "center_equal_mean_bacc": primary["center_equal_mean_bacc"],
+        "intersection_center_equal_mean_bacc": mean_i,
+        "seed_cell_mean_bacc": primary["seed_cell_mean_bacc"],
+        "center_equal_macro_f1": primary["center_equal_macro_f1"],
+        "min_center_bacc": primary["min_center_bacc"],
+        "seed_std_bacc": primary["seed_std_bacc"],
+        "bottom20_cell_mean_bacc": primary["bottom20_cell_mean_bacc"],
+        "worst_seed_center_bacc": primary["worst_seed_center_bacc"],
+        "center3_bacc": primary["center3_bacc"],
+        "v2_arithmetic_center_equal_mean_bacc": arithmetic_mean,
+        "fixed_beta025_center_equal_mean_bacc": beta025["center_equal_mean_bacc"],
+        "fixed_beta050_center_equal_mean_bacc": beta050_mean,
+        "fixed_beta100_center_equal_mean_bacc": beta100["center_equal_mean_bacc"],
+        "delta_vs_v2_arithmetic_intersection": arithmetic_delta,
+        "delta_vs_fixed_beta050_intersection": beta050_delta,
+        "min_center_delta_vs_v2_arithmetic": min_center_delta,
+        "center3_delta_vs_v2_arithmetic": center3_delta,
+        "bottom20_delta_vs_v2_arithmetic": bottom20_delta,
+        "seed_std_delta_vs_v2_arithmetic": seed_std_delta,
+        "frozen_bottom20_median_delta_vs_v2_arithmetic": tail_median_delta,
+        "frozen_bottom20_positive_fraction": tail_positive_fraction,
+        "n_assessable_rare_positive_cells": len(assessable_rare),
+        "rare_positive_recall_mean_delta_vs_arithmetic": rare_recall_mean_delta,
+        "rare_positive_recall_positive_fraction": rare_recall_positive_fraction,
+        "worst_per_center_regression_vs_v2_arithmetic": worst_center_regression,
+        "worst_seed_center_regression_vs_v2_arithmetic": worst_seed_center_regression,
+        "tailrisk_transfer_flag": "TAIL_RISK_TRANSFER" in flags or "SEED_CENTER_TAIL_RISK_TRANSFER" in flags or any(str(row.get("tail_risk_transfer_flag")) == "True" for row in harm_rows),
+        **primary,
+    }
+
+
 def _per_center_regressions(primary_stats: Mapping[str, object], prior_stats: Mapping[str, object]) -> dict[str, float]:
     try:
         primary = json.loads(str(primary_stats.get("per_center_bacc", "{}")))
@@ -4616,6 +5748,183 @@ def _per_center_regressions(primary_stats: Mapping[str, object], prior_stats: Ma
         if math.isfinite(p) and math.isfinite(b):
             out[str(center)] = p - b
     return out
+
+
+def _harm_gated_proxy_validity_rows(
+    candidate_rows: Sequence[Mapping[str, object]],
+    *,
+    primary_method: str,
+) -> list[dict[str, object]]:
+    groups: dict[tuple[str, str], list[Mapping[str, object]]] = {}
+    for row in candidate_rows:
+        groups.setdefault((str(row.get("experiment_seed")), str(row.get("heldout_center"))), []).append(row)
+    out = []
+    for (seed, center), rows in sorted(groups.items()):
+        selectable = [
+            row
+            for row in rows
+            if str(row.get("rule")) in HARM_GATED_PRIMARY_SELECTABLE_RULES
+        ]
+        if not selectable:
+            continue
+        selected = next((row for row in rows if str(row.get("is_selected_rule")) == "True" or row.get("is_selected_rule") is True), selectable[0])
+        source_bacc_scores = {str(row.get("rule")): _float(row.get("source_inner_smoothed_bacc")) for row in selectable}
+        source_harm_scores = {str(row.get("rule")): _harm_proxy_score(row, prefix="source_inner_") for row in selectable}
+        target_bacc_scores = {str(row.get("rule")): _float(row.get("target_bacc")) for row in selectable}
+        target_tail_scores = {
+            str(row.get("rule")): min(_float(row.get("target_class0_recall")), _float(row.get("target_class1_recall")))
+            for row in selectable
+        }
+        target_harm_scores = {str(row.get("rule")): _harm_proxy_score(row, prefix="target_") for row in selectable}
+        selected_rule = str(selected.get("rule"))
+        target_best_bacc_rule = _best_score_rule(target_bacc_scores)
+        target_best_tail_rule = _best_score_rule(target_tail_scores)
+        out.append(
+            {
+                "experiment_seed": seed,
+                "heldout_center": center,
+                "source_inner_rank_of_rules": json.dumps(_rank_rules(source_bacc_scores)),
+                "target_rank_of_rules_by_BACC": json.dumps(_rank_rules(target_bacc_scores)),
+                "target_rank_of_rules_by_tail_metric": json.dumps(_rank_rules(target_tail_scores)),
+                "target_rank_of_rules_by_harm_metric": json.dumps(_rank_rules(target_harm_scores)),
+                "selected_rule": selected_rule,
+                "top1_rule_hit": selected_rule == target_best_bacc_rule,
+                "oracle_gap_BACC": _score_gap(target_bacc_scores, selected_rule),
+                "oracle_gap_tail_metric": _score_gap(target_tail_scores, selected_rule),
+                "spearman_source_inner_vs_target_BACC": _spearman_for_rule_scores(source_bacc_scores, target_bacc_scores),
+                "spearman_source_inner_vs_target_harm": _spearman_for_rule_scores(source_harm_scores, target_harm_scores),
+                "primary_method": primary_method,
+                "audit_only": True,
+                "primary_adoption_eligible": False,
+                "selection_used_target_labels": False,
+                "target_eval_labels_used_for_audit_only": True,
+            }
+        )
+    return out
+
+
+def _harm_proxy_score(row: Mapping[str, object], *, prefix: str) -> float:
+    class0 = _float(row.get(f"{prefix}smoothed_class0_recall", row.get(f"{prefix}class0_recall", math.nan)))
+    precision = _float(row.get(f"{prefix}smoothed_precision", row.get(f"{prefix}precision", math.nan)))
+    ppr = _float(row.get(f"{prefix}predicted_positive_rate", math.nan))
+    values = [value for value in (class0, precision, -ppr) if math.isfinite(value)]
+    return sum(values) if values else math.nan
+
+
+def _rank_rules(scores: Mapping[str, float]) -> list[str]:
+    finite = [(rule, value) for rule, value in scores.items() if math.isfinite(value)]
+    return [rule for rule, _value in sorted(finite, key=lambda item: (-item[1], HARM_GATED_PRIMARY_SELECTABLE_RULES.index(item[0]) if item[0] in HARM_GATED_PRIMARY_SELECTABLE_RULES else 999))]
+
+
+def _best_score_rule(scores: Mapping[str, float]) -> str:
+    ranked = _rank_rules(scores)
+    return ranked[0] if ranked else ""
+
+
+def _score_gap(scores: Mapping[str, float], selected_rule: str) -> float:
+    best = max((value for value in scores.values() if math.isfinite(value)), default=math.nan)
+    selected = _float(scores.get(selected_rule, math.nan))
+    return best - selected if math.isfinite(best) and math.isfinite(selected) else math.nan
+
+
+def _spearman_for_rule_scores(left: Mapping[str, float], right: Mapping[str, float]) -> float:
+    rules = [rule for rule in HARM_GATED_PRIMARY_SELECTABLE_RULES if math.isfinite(_float(left.get(rule))) and math.isfinite(_float(right.get(rule)))]
+    if len(rules) < 2:
+        return math.nan
+    left_ranks = _numeric_ranks([_float(left[rule]) for rule in rules])
+    right_ranks = _numeric_ranks([_float(right[rule]) for rule in rules])
+    return _pearson(left_ranks, right_ranks)
+
+
+def _numeric_ranks(values: Sequence[float]) -> list[float]:
+    order = sorted(range(len(values)), key=lambda idx: values[idx])
+    ranks = [0.0] * len(values)
+    for rank, idx in enumerate(order, start=1):
+        ranks[idx] = float(rank)
+    return ranks
+
+
+def _pearson(left: Sequence[float], right: Sequence[float]) -> float:
+    if len(left) != len(right) or len(left) < 2:
+        return math.nan
+    left_arr = np.asarray(left, dtype=float)
+    right_arr = np.asarray(right, dtype=float)
+    if float(np.std(left_arr)) == 0.0 or float(np.std(right_arr)) == 0.0:
+        return math.nan
+    return float(np.corrcoef(left_arr, right_arr)[0, 1])
+
+
+def _harm_gated_selected_rule_distribution_rows(
+    selection_rows: Sequence[Mapping[str, object]],
+) -> list[dict[str, object]]:
+    rows = [dict(row) for row in selection_rows]
+    out = [_selected_rule_distribution_row(rows, scope="overall", scope_value="all")]
+    centers = sorted({str(row.get("heldout_center")) for row in rows})
+    seeds = sorted({str(row.get("experiment_seed")) for row in rows}, key=lambda value: int(value) if value.isdigit() else value)
+    for center in centers:
+        out.append(_selected_rule_distribution_row([row for row in rows if str(row.get("heldout_center")) == center], scope="heldout_center", scope_value=center))
+    for seed in seeds:
+        out.append(_selected_rule_distribution_row([row for row in rows if str(row.get("experiment_seed")) == seed], scope="experiment_seed", scope_value=seed))
+    return out
+
+
+def _selected_rule_distribution_row(
+    rows: Sequence[Mapping[str, object]],
+    *,
+    scope: str,
+    scope_value: str,
+) -> dict[str, object]:
+    n = len(rows)
+    counts: dict[str, int] = {}
+    insufficient = 0
+    for row in rows:
+        selected = str(row.get("selected_rule", ""))
+        counts[selected] = counts.get(selected, 0) + 1
+        if row.get("selection_reason") == "insufficient_source_inner_positive_count":
+            insufficient += 1
+    fractions = {rule: float(count) / float(n) for rule, count in counts.items()} if n else {}
+    return {
+        "scope": scope,
+        "scope_value": scope_value,
+        "n_cells": n,
+        "selected_rule_counts": json.dumps(counts, sort_keys=True),
+        "selected_rule_fraction_by_center": json.dumps(fractions, sort_keys=True) if scope == "heldout_center" else "",
+        "selected_rule_fraction_by_seed": json.dumps(fractions, sort_keys=True) if scope == "experiment_seed" else "",
+        "beta050_selection_rate": float(counts.get(POSITIVE_UNION_RULE_BETA050, 0)) / float(n) if n else math.nan,
+        "beta025_selection_rate": float(counts.get(POSITIVE_UNION_RULE_BETA025, 0)) / float(n) if n else math.nan,
+        "arithmetic_fallback_rate": float(counts.get(POSITIVE_UNION_RULE_ARITHMETIC, 0)) / float(n) if n else math.nan,
+        "insufficient_positive_count_rate": float(insufficient) / float(n) if n else math.nan,
+        "audit_only": True,
+        "primary_adoption_eligible": False,
+    }
+
+
+def _harm_gated_retrospective_development_reference_rows(cfg: SourceInnerHarmGatedPositiveUnionConfig) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for root, table_name, label in (
+        (cfg.prior_tailrisk_artifact_root, "tables/tailrisk_downstream_matrix.csv", "prior_tailrisk"),
+        (cfg.artifact_root.parent / POSITIVE_UNION_TAILRISK_NAME, "tables/positive_union_candidate_rule_matrix.csv", "source_inner_positive_union_development"),
+        (cfg.artifact_root.parent / FIXED_BETA050_POSITIVE_UNION_NAME, "tables/fixed_beta050_candidate_rule_matrix.csv", "fixed_beta050_development"),
+    ):
+        if root is None:
+            continue
+        path = root / table_name
+        if not path.exists():
+            continue
+        with path.open("r", encoding="utf-8", newline="") as f:
+            for row in csv.DictReader(f):
+                if _safe_int(row.get("experiment_seed"), default=-1) not in cfg.development_experiment_seeds:
+                    continue
+                rows.append(
+                    {
+                        **dict(row),
+                        "development_reference_source": label,
+                        "retrospective_development_reference_only": True,
+                        "primary_adoption_eligible": False,
+                        "audit_only": True,
+                    }
+                )
+    return rows
 
 
 def _write_multipanel_artifacts(
@@ -4890,6 +6199,119 @@ def _write_fixed_beta050_positive_union_artifacts(
     _write_fixed_beta050_decision_summary(root, decision)
 
 
+def _write_harm_gated_positive_union_artifacts(
+    root: Path,
+    cfg: SourceInnerHarmGatedPositiveUnionConfig,
+    *,
+    matrix_rows: Sequence[Mapping[str, object]],
+    source_inner_selection_rows: Sequence[Mapping[str, object]],
+    candidate_rule_rows: Sequence[Mapping[str, object]],
+    class_conditional_rows: Sequence[Mapping[str, object]],
+    effective_threshold_rows: Sequence[Mapping[str, object]],
+    rare_positive_rows: Sequence[Mapping[str, object]],
+    paired_delta_rows: Sequence[Mapping[str, object]],
+    harm_rows: Sequence[Mapping[str, object]],
+    source_inner_harm_gate_rows: Sequence[Mapping[str, object]],
+    proxy_validity_rows: Sequence[Mapping[str, object]],
+    selected_rule_distribution_rows: Sequence[Mapping[str, object]],
+    replacement_seed_rows: Sequence[Mapping[str, object]],
+    invariant_rows: Sequence[Mapping[str, object]],
+    blend_manifest_rows: Sequence[Mapping[str, object]],
+    retrospective_reference_rows: Sequence[Mapping[str, object]],
+    decision: Mapping[str, object],
+    leakage: object,
+    protocol_violations: Sequence[str],
+    target_expert_excluded: bool,
+) -> None:
+    write_csv_rows(root / "tables" / "harm_gated_positive_union_downstream_matrix.csv", matrix_rows)
+    write_csv_rows(root / "tables" / "harm_gated_positive_union_summary.csv", [dict(decision)])
+    write_csv_rows(root / "tables" / "harm_gated_positive_union_source_inner_selection.csv", source_inner_selection_rows)
+    write_csv_rows(root / "tables" / "harm_gated_positive_union_candidate_rule_matrix.csv", candidate_rule_rows)
+    write_csv_rows(root / "tables" / "harm_gated_positive_union_class_conditional_audit.csv", class_conditional_rows)
+    write_csv_rows(root / "tables" / "harm_gated_positive_union_effective_threshold_audit.csv", effective_threshold_rows)
+    write_csv_rows(root / "tables" / "harm_gated_positive_union_rare_positive_opportunity_audit.csv", rare_positive_rows)
+    write_csv_rows(root / "tables" / "harm_gated_positive_union_paired_deltas.csv", paired_delta_rows)
+    write_csv_rows(root / "tables" / "harm_gated_positive_union_harm_audit.csv", harm_rows)
+    write_csv_rows(root / "tables" / "harm_gated_positive_union_source_inner_harm_gate_audit.csv", source_inner_harm_gate_rows)
+    write_csv_rows(root / "tables" / "harm_gated_positive_union_proxy_validity_audit.csv", proxy_validity_rows)
+    write_csv_rows(root / "tables" / "harm_gated_positive_union_selected_rule_distribution.csv", selected_rule_distribution_rows)
+    write_csv_rows(root / "tables" / "harm_gated_positive_union_replacement_seed_audit.csv", replacement_seed_rows)
+    write_csv_rows(root / "tables" / "harm_gated_positive_union_probability_invariants.csv", invariant_rows)
+    write_csv_rows(root / "tables" / "harm_gated_positive_union_probability_blend_manifest.csv", blend_manifest_rows)
+    write_csv_rows(root / "tables" / "harm_gated_positive_union_retrospective_development_reference.csv", retrospective_reference_rows)
+    write_json(root / "reports" / "leakage_report.json", leakage.to_json_dict())
+    completed = []
+    if replacement_seed_rows:
+        try:
+            completed = json.loads(str(replacement_seed_rows[-1].get("completed_primary_experiment_seeds", "[]")))
+        except json.JSONDecodeError:
+            completed = []
+    write_json(
+        root / "manifests" / "protocol_manifest.json",
+        {
+            "schema_version": "cvae_rebuild_source_inner_harm_gated_positive_union_protocol_v1",
+            "experiment_name": cfg.name,
+            "primary_method": cfg.primary_method,
+            "experiment_type": "source_only_harm_gated_positive_union_confirmation",
+            "target_expert_excluded": bool(target_expert_excluded),
+            "development_experiment_seeds": list(cfg.development_experiment_seeds),
+            "primary_requested_experiment_seeds": list(cfg.primary_requested_experiment_seeds),
+            "reserve_experiment_seeds": list(cfg.reserve_experiment_seeds),
+            "reserve_seed_policy": cfg.reserve_seed_policy,
+            "cell_level_reserve_stitching_allowed": False,
+            "primary_confirmation_experiment_seeds": completed if completed else "resolved_after_reserve_replacement",
+            "selection_used_target_labels": False,
+            "target_support_used": False,
+            "target_eval_labels_for_scoring_only": True,
+            "target_support_labels_for_selection": False,
+            "target_conditioned_point_compatibility_estimate": False,
+            "compatibility_router": False,
+            "target_threshold_tuning": False,
+            "target_label_calibration": False,
+            "fixed_all_source_inclusion": True,
+            "panel_seeds_are_evaluation_replicates": False,
+            "decision_cell": "experiment_seed_x_heldout_center",
+            "positive_class_label": 1,
+            "rare_positive_class_label": 1,
+            "class_order": [0, 1],
+            "probability_column_positive": 1,
+            "positive_label": cfg.positive_label,
+            "prediction_threshold": cfg.prediction_threshold,
+            "candidate_pooling_rules": list(cfg.candidate_pooling_rules),
+            "primary_selectable_rules": list(cfg.primary_selectable_rules),
+            "beta100_primary_selectable": False,
+            "selector_thresholds_frozen_before_primary": True,
+            "selector_threshold_source": cfg.selector_threshold_source,
+            "selector_thresholds_may_be_changed_after_primary": False,
+            "minimum_source_inner_positive_count": cfg.min_source_inner_positive_count,
+            "beta050_min_source_inner_positive_count": cfg.beta050_min_source_inner_positive_count,
+            "harm_gate_bacc_noninferiority_margin": cfg.harm_gate_bacc_noninferiority_margin,
+            "beta025_class0_recall_margin": cfg.beta025_class0_recall_margin,
+            "beta025_predicted_positive_rate_delta": cfg.beta025_predicted_positive_rate_delta,
+            "beta050_class0_recall_margin": cfg.beta050_class0_recall_margin,
+            "beta050_precision_margin": cfg.beta050_precision_margin,
+            "beta050_predicted_positive_rate_delta": cfg.beta050_predicted_positive_rate_delta,
+            "primary_pooling_rule": HARM_GATED_POSITIVE_UNION_PRIMARY_POOLING,
+            "blend_alpha_locked": cfg.blend_alpha,
+            "random_mass_bag_size": cfg.random_mass_bag_size,
+            "random_mass_bag_distribution": "dirichlet_uniform_alpha4",
+            "panel_seed_groups": {panel: list(seeds) for panel, seeds in cfg.panel_seed_groups},
+            "rare_positive_definition": {
+                "class1_count_lte": cfg.rare_positive_count_threshold,
+                "positive_prevalence_lte": cfg.rare_positive_prevalence_threshold,
+            },
+            "claim_boundary": (
+                "source-inner harm-gated positive-evidence pooling after dense source-only CVAE seed-blend "
+                "aggregation; not compatibility routing, not target adaptation, not target-threshold tuning, "
+                "and not target-support calibration"
+            ),
+            "protocol_violations": list(protocol_violations),
+        },
+    )
+    write_json(root / "run_config_resolved.yaml", _resolved_harm_gated_positive_union_config(cfg))
+    _write_harm_gated_positive_union_decision_summary(root, decision)
+
+
 def _write_center3_failure_audit_artifacts(
     root: Path,
     *,
@@ -5150,6 +6572,50 @@ def _resolved_fixed_beta050_config(cfg: FixedBeta050PositiveUnionConfig) -> dict
     return resolved
 
 
+def _resolved_harm_gated_positive_union_config(cfg: SourceInnerHarmGatedPositiveUnionConfig) -> dict[str, object]:
+    resolved = _resolved_config(cfg)
+    resolved["experiment"]["name"] = cfg.name
+    resolved["experiment"]["artifact_root"] = str(cfg.artifact_root)
+    resolved["source_inner_harm_gated_positive_union"] = {
+        "primary_method": cfg.primary_method,
+        "primary_shrink_lambda": cfg.primary_shrink_lambda,
+        "random_mass_bag_size": cfg.random_mass_bag_size,
+        "random_mass_bag_alpha": cfg.random_mass_bag_alpha,
+        "blend_alpha": cfg.blend_alpha,
+        "panel_seed_groups": {panel: list(seeds) for panel, seeds in cfg.panel_seed_groups},
+        "source_weighting": cfg.source_weighting,
+        "primary_pooling": cfg.primary_pooling,
+        "candidate_pooling_rules": list(cfg.candidate_pooling_rules),
+        "primary_selectable_rules": list(cfg.primary_selectable_rules),
+        "beta100_primary_selectable": cfg.beta100_primary_selectable,
+        "development_experiment_seeds": list(cfg.development_experiment_seeds),
+        "primary_requested_experiment_seeds": list(cfg.primary_requested_experiment_seeds),
+        "reserve_experiment_seeds": list(cfg.reserve_experiment_seeds),
+        "reserve_seed_policy": cfg.reserve_seed_policy,
+        "cell_level_reserve_stitching_allowed": cfg.cell_level_reserve_stitching_allowed,
+        "selector_thresholds_frozen_before_primary": cfg.selector_thresholds_frozen_before_primary,
+        "selector_threshold_source": cfg.selector_threshold_source,
+        "selector_thresholds_may_be_changed_after_primary": cfg.selector_thresholds_may_be_changed_after_primary,
+        "positive_label": cfg.positive_label,
+        "prediction_threshold": cfg.prediction_threshold,
+        "min_source_inner_positive_count": cfg.min_source_inner_positive_count,
+        "beta050_min_source_inner_positive_count": cfg.beta050_min_source_inner_positive_count,
+        "positive_union_eps": cfg.positive_union_eps,
+        "harm_gate_bacc_noninferiority_margin": cfg.harm_gate_bacc_noninferiority_margin,
+        "beta025_class0_recall_margin": cfg.beta025_class0_recall_margin,
+        "beta025_predicted_positive_rate_delta": cfg.beta025_predicted_positive_rate_delta,
+        "beta050_class0_recall_margin": cfg.beta050_class0_recall_margin,
+        "beta050_precision_margin": cfg.beta050_precision_margin,
+        "beta050_predicted_positive_rate_delta": cfg.beta050_predicted_positive_rate_delta,
+        "rare_positive_count_threshold": cfg.rare_positive_count_threshold,
+        "rare_positive_prevalence_threshold": cfg.rare_positive_prevalence_threshold,
+        "primary_noninferiority_margin": cfg.primary_noninferiority_margin,
+        "weak_pass_noninferiority_margin": cfg.weak_pass_noninferiority_margin,
+        "tailrisk_transfer_threshold": cfg.tailrisk_transfer_threshold,
+    }
+    return resolved
+
+
 def _write_multipanel_decision_summary(root: Path, decision: Mapping[str, object]) -> None:
     lines = [
         "# Multi-Panel Tail-Risk Mass-Bag Stabilization v1",
@@ -5252,6 +6718,44 @@ def _write_fixed_beta050_decision_summary(root: Path, decision: Mapping[str, obj
         "This is a fixed global beta050 confirmation. The beta was hypothesis-generated from prior diagnostic seeds `[42,43,44]` and is predeclared before evaluating fresh seeds.",
         "",
         "This is not source-inner selected, not compatibility routing, not target adaptation, and not target-threshold tuning. Target labels are scoring/audit only after fixed predictions exist.",
+        "",
+    ]
+    (root / "reports" / "decision_summary.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def _write_harm_gated_positive_union_decision_summary(root: Path, decision: Mapping[str, object]) -> None:
+    lines = [
+        "# Source-Inner Harm-Gated Positive-Union v1",
+        "",
+        "## Summary",
+        "",
+        f"- Primary method: `{decision.get('primary_method', PRIMARY_HARM_GATED_POSITIVE_UNION_METHOD)}`",
+        f"- Primary verdict: `{decision.get('primary_verdict', 'HARM_GATED_POSITIVE_UNION_FAIL')}`",
+        f"- Diagnostic flags: `{decision.get('diagnostic_flags', '')}`",
+        f"- Completed primary seeds: `{decision.get('completed_primary_experiment_seeds_json', '[]')}`",
+        f"- Valid primary cells: {decision.get('n_valid_primary_cells', 0)}",
+        f"- Selected rule counts: `{decision.get('selected_rule_counts_json', '{}')}`",
+        f"- Center-equal mean BACC: {_format_float(decision.get('center_equal_mean_bacc'))}",
+        f"- Intersection mean BACC: {_format_float(decision.get('intersection_center_equal_mean_bacc'))}",
+        f"- Min center BACC: {_format_float(decision.get('min_center_bacc'))}",
+        f"- Center 3 BACC: {_format_float(decision.get('center3_bacc'))}",
+        f"- Frozen arithmetic bottom-20 BACC: {_format_float(decision.get('bottom20_cell_mean_bacc'))}",
+        f"- Seed std BACC: {_format_float(decision.get('seed_std_bacc'))}",
+        f"- Delta vs v2 arithmetic multipanel: {_format_float(decision.get('delta_vs_v2_arithmetic_intersection'))}",
+        f"- Delta vs fixed beta050 diagnostic: {_format_float(decision.get('delta_vs_fixed_beta050_intersection'))}",
+        f"- Frozen bottom20 median delta vs arithmetic: {_format_float(decision.get('frozen_bottom20_median_delta_vs_v2_arithmetic'))}",
+        f"- Assessable rare-positive cells: {decision.get('n_assessable_rare_positive_cells', 0)}",
+        f"- Rare-positive recall mean delta vs arithmetic: {_format_float(decision.get('rare_positive_recall_mean_delta_vs_arithmetic'))}",
+        f"- Worst per-center regression vs arithmetic: {_format_float(decision.get('worst_per_center_regression_vs_v2_arithmetic'))}",
+        f"- Worst seed-center regression vs arithmetic: {_format_float(decision.get('worst_seed_center_regression_vs_v2_arithmetic'))}",
+        f"- Tail-risk transfer flag: `{decision.get('tailrisk_transfer_flag')}`",
+        f"- Leakage status: `{decision.get('leakage_status', '')}`",
+        "",
+        "## Protocol Boundary",
+        "",
+        "This is a source-only harm-gated positive-evidence pooling confirmation. The thresholds are frozen from retrospective development evidence before evaluating primary seeds.",
+        "",
+        "This is not compatibility routing, not target adaptation, not target-support calibration, and not target-threshold tuning. Target labels are scoring/audit only after the source-inner rule is fixed.",
         "",
     ]
     (root / "reports" / "decision_summary.md").write_text("\n".join(lines), encoding="utf-8")

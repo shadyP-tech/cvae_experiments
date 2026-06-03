@@ -18,20 +18,28 @@ from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
     FIXED_BETA050_CONFIRMATION_EXPERIMENT_SEEDS,
     FIXED_BETA050_DEVELOPMENT_EXPERIMENT_SEEDS,
     FIXED_BETA050_POSITIVE_UNION_NAME,
+    HARM_GATED_DEVELOPMENT_EXPERIMENT_SEEDS,
+    HARM_GATED_POSITIVE_UNION_NAME,
+    HARM_GATED_PRIMARY_SELECTABLE_RULES,
+    HARM_GATED_REQUESTED_EXPERIMENT_SEEDS,
+    HARM_GATED_RESERVE_EXPERIMENT_SEEDS,
     MULTIPANEL_PANEL_SEEDS,
     MULTIPANEL_TAILRISK_NAME,
     POSITIVE_UNION_RULES,
     POSITIVE_UNION_TAILRISK_NAME,
     POSITIVE_UNION_RULE_BETA050,
     PRIMARY_FIXED_BETA050_POSITIVE_UNION_METHOD,
+    PRIMARY_HARM_GATED_POSITIVE_UNION_METHOD,
     PRIMARY_POSITIVE_UNION_METHOD,
     PRIMARY_MULTIPANEL_TAILRISK_METHOD,
     PRIMARY_TAILRISK_METHOD,
     load_fixed_beta050_positive_union_config,
+    load_harm_gated_positive_union_config,
     load_multipanel_tailrisk_component_union_config,
     load_source_inner_positive_union_config,
     load_tailrisk_anchored_component_union_config,
     parse_fixed_beta050_positive_union_config,
+    parse_harm_gated_positive_union_config,
     parse_multipanel_tailrisk_component_union_config,
     parse_source_inner_positive_union_config,
     parse_tailrisk_anchored_component_union_config,
@@ -543,6 +551,91 @@ def test_fixed_beta050_positive_union_rejects_target_support_and_target_selectio
     payload["fixed_beta050_positive_union_confirmation"]["target_eval_metric_selection"] = True
     with pytest.raises(Exception, match="target_eval_metric_selection"):
         parse_fixed_beta050_positive_union_config(payload, base_dir=Path("."))
+
+
+def test_locked_harm_gated_positive_union_config_loads() -> None:
+    cfg = load_harm_gated_positive_union_config(
+        "cvae_rebuild/configs/virchow2_cvae_source_inner_harm_gated_positive_union_v1.yaml"
+    )
+    assert cfg.name == HARM_GATED_POSITIVE_UNION_NAME
+    assert cfg.primary_method == PRIMARY_HARM_GATED_POSITIVE_UNION_METHOD
+    assert cfg.strict_full_run_matrix is True
+    assert cfg.experiment_seeds == (*HARM_GATED_REQUESTED_EXPERIMENT_SEEDS, *HARM_GATED_RESERVE_EXPERIMENT_SEEDS)
+    assert cfg.development_experiment_seeds == HARM_GATED_DEVELOPMENT_EXPERIMENT_SEEDS
+    assert cfg.primary_requested_experiment_seeds == HARM_GATED_REQUESTED_EXPERIMENT_SEEDS
+    assert cfg.reserve_experiment_seeds == HARM_GATED_RESERVE_EXPERIMENT_SEEDS
+    assert cfg.heldout_centers == ("0", "1", "2", "3", "4")
+    assert cfg.panel_seed_groups == MULTIPANEL_PANEL_SEEDS
+    assert cfg.candidate_pooling_rules == POSITIVE_UNION_RULES
+    assert cfg.primary_selectable_rules == HARM_GATED_PRIMARY_SELECTABLE_RULES
+    assert cfg.beta100_primary_selectable is False
+    assert cfg.positive_label == 1
+    assert cfg.prediction_threshold == 0.5
+    assert cfg.min_source_inner_positive_count == 5
+    assert cfg.beta050_min_source_inner_positive_count == 10
+    assert cfg.random_mass_bag_size == 11
+    assert cfg.random_mass_bag_alpha == 4.0
+    assert cfg.blend_alpha == 0.5
+    assert cfg.selector_thresholds_frozen_before_primary is True
+    assert cfg.selector_threshold_source == "retrospective_development_only"
+    assert cfg.selector_thresholds_may_be_changed_after_primary is False
+    assert cfg.cell_level_reserve_stitching_allowed is False
+
+
+@pytest.mark.parametrize(
+    ("key", "value", "message"),
+    [
+        ("blend_alpha", 0.25, "blend_alpha"),
+        ("random_mass_bag_alpha", 2.0, "random_mass_bag_alpha"),
+        ("random_mass_bag_size", 9, "random_mass_bag_size"),
+        ("positive_label", 0, "positive_label"),
+        ("prediction_threshold", 0.25, "prediction_threshold"),
+        ("beta050_min_source_inner_positive_count", 9, "beta050_min_source_inner_positive_count"),
+        ("harm_gate_bacc_noninferiority_margin", 0.010, "harm_gate_bacc_noninferiority_margin"),
+        ("beta025_predicted_positive_rate_delta", 0.050, "beta025_predicted_positive_rate_delta"),
+        ("beta050_precision_margin", 0.010, "beta050_precision_margin"),
+    ],
+)
+def test_harm_gated_positive_union_rejects_changed_locked_fields(key: str, value: object, message: str) -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_source_inner_harm_gated_positive_union_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["source_inner_harm_gated_positive_union"][key] = value
+    with pytest.raises(Exception, match=message):
+        parse_harm_gated_positive_union_config(payload, base_dir=Path("."))
+
+
+def test_harm_gated_positive_union_rejects_beta100_primary_target_support_and_seed_overlap() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_source_inner_harm_gated_positive_union_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["source_inner_harm_gated_positive_union"]["beta100_primary_selectable"] = True
+    with pytest.raises(Exception, match="beta100_primary_selectable"):
+        parse_harm_gated_positive_union_config(payload, base_dir=Path("."))
+
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["source_inner_harm_gated_positive_union"]["primary_selectable_rules"].append("positive_union_beta100")
+    with pytest.raises(Exception, match="primary_selectable_rules"):
+        parse_harm_gated_positive_union_config(payload, base_dir=Path("."))
+
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["inputs"]["support_calibrated_artifact_root"] = "cvae_rebuild/artifacts/not_allowed"
+    with pytest.raises(Exception, match="support_calibrated_artifact_root"):
+        parse_harm_gated_positive_union_config(payload, base_dir=Path("."))
+
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["source_inner_harm_gated_positive_union"]["target_threshold_selection"] = True
+    with pytest.raises(Exception, match="target_threshold_selection"):
+        parse_harm_gated_positive_union_config(payload, base_dir=Path("."))
+
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["source_inner_harm_gated_positive_union"]["reserve_experiment_seeds"][0] = 50
+    payload["run_matrix"]["experiment_seeds"][-2] = 50
+    with pytest.raises(Exception, match="must not overlap"):
+        parse_harm_gated_positive_union_config(payload, base_dir=Path("."))
+
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["source_inner_harm_gated_positive_union"]["cell_level_reserve_stitching_allowed"] = True
+    with pytest.raises(Exception, match="cell_level_reserve_stitching_allowed"):
+        parse_harm_gated_positive_union_config(payload, base_dir=Path("."))
 
 
 def test_locked_dense_tailshield_random_mass_bag_config_loads() -> None:
