@@ -24,9 +24,11 @@ from .component_union_mass_bagged import (
     run_mass_bagged_component_union,
 )
 from .component_union_tailrisk_anchored_mass_bagged import (
+    load_fixed_beta050_positive_union_config,
     load_source_inner_positive_union_config,
     load_tailrisk_anchored_component_union_config,
     load_multipanel_tailrisk_component_union_config,
+    run_fixed_beta050_positive_union,
     run_source_inner_positive_union,
     run_tailrisk_anchored_component_union,
     run_multipanel_tailrisk_component_union,
@@ -233,6 +235,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     source_inner_positive_union.add_argument("--config", required=True)
     source_inner_positive_union.add_argument("--artifact-root", default=None)
+
+    fixed_beta050_positive_union = sub.add_parser(
+        "diagnose-fixed-beta050-positive-union-confirmation",
+        help="Run the Virchow2-CVAE fixed beta050 positive-union fresh-seed confirmation.",
+    )
+    fixed_beta050_positive_union.add_argument("--config", required=True)
+    fixed_beta050_positive_union.add_argument("--artifact-root", default=None)
 
     dense_tailshield = sub.add_parser(
         "diagnose-dense-reliability-tailshield-random-mass-bag",
@@ -472,6 +481,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "diagnose-source-inner-class-conditional-positive-union":
         cfg = load_source_inner_positive_union_config(args.config)
         root = run_source_inner_positive_union(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
+    if args.command == "diagnose-fixed-beta050-positive-union-confirmation":
+        cfg = load_fixed_beta050_positive_union_config(args.config)
+        root = run_fixed_beta050_positive_union(
             cfg,
             artifact_root=Path(args.artifact_root) if args.artifact_root else None,
         )

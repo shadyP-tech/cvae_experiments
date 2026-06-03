@@ -55,6 +55,7 @@ from cvae_rebuild.component_union_mass_bagged import (
     run_mass_bagged_component_union,
 )
 from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
+    PRIMARY_FIXED_BETA050_POSITIVE_UNION_METHOD,
     MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD,
     MULTIPANEL_POOLED_ANCHOR_METHOD,
     MULTIPANEL_POOLED_RANDOM_BAG_METHOD,
@@ -67,9 +68,11 @@ from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
     _effective_threshold_for_rule,
     _positive_union_pool_bundle,
     _select_positive_union_rule,
+    parse_fixed_beta050_positive_union_config,
     parse_multipanel_tailrisk_component_union_config,
     parse_source_inner_positive_union_config,
     parse_tailrisk_anchored_component_union_config,
+    run_fixed_beta050_positive_union,
     run_multipanel_tailrisk_component_union,
     run_source_inner_positive_union,
     run_tailrisk_anchored_component_union,
@@ -2204,6 +2207,76 @@ def test_source_inner_positive_union_tiny_cache_writes_expected_artifacts(tmp_pa
     assert blend and any(row["pooling_rule"] == "source_inner_selected_class_conditional_positive_union" for row in blend)
     assert "delta_vs_v2_arithmetic_intersection" in summary[0]
     assert "source-inner selected class-conditional aggregation repair" in report
+
+
+def test_fixed_beta050_positive_union_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
+    payload = _tiny_fixed_beta050_positive_union_payload(tmp_path)
+    cfg = parse_fixed_beta050_positive_union_config(payload, base_dir=tmp_path)
+    _write_tiny_cache(cfg.feature_cache_root, seed=45)
+
+    root = run_fixed_beta050_positive_union(cfg)
+
+    expected = [
+        "tables/fixed_beta050_downstream_matrix.csv",
+        "tables/fixed_beta050_summary.csv",
+        "tables/fixed_beta050_candidate_rule_matrix.csv",
+        "tables/fixed_beta050_class_conditional_audit.csv",
+        "tables/fixed_beta050_effective_threshold_audit.csv",
+        "tables/fixed_beta050_rare_positive_opportunity_audit.csv",
+        "tables/fixed_beta050_paired_deltas.csv",
+        "tables/fixed_beta050_harm_audit.csv",
+        "tables/fixed_beta050_probability_invariants.csv",
+        "tables/fixed_beta050_probability_blend_manifest.csv",
+        "tables/fixed_beta050_retrospective_reference.csv",
+        "tables/fixed_beta050_source_inner_diagnostics.csv",
+        "manifests/protocol_manifest.json",
+        "reports/leakage_report.json",
+        "reports/decision_summary.md",
+        "run_config_resolved.yaml",
+    ]
+    for rel in expected:
+        assert (root / rel).exists()
+
+    leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    matrix = list(csv.DictReader(open(root / "tables" / "fixed_beta050_downstream_matrix.csv", newline="")))
+    candidates = list(csv.DictReader(open(root / "tables" / "fixed_beta050_candidate_rule_matrix.csv", newline="")))
+    effective = list(csv.DictReader(open(root / "tables" / "fixed_beta050_effective_threshold_audit.csv", newline="")))
+    rare = list(csv.DictReader(open(root / "tables" / "fixed_beta050_rare_positive_opportunity_audit.csv", newline="")))
+    harm = list(csv.DictReader(open(root / "tables" / "fixed_beta050_harm_audit.csv", newline="")))
+    invariants = list(csv.DictReader(open(root / "tables" / "fixed_beta050_probability_invariants.csv", newline="")))
+    blend = list(csv.DictReader(open(root / "tables" / "fixed_beta050_probability_blend_manifest.csv", newline="")))
+    deltas = list(csv.DictReader(open(root / "tables" / "fixed_beta050_paired_deltas.csv", newline="")))
+    source_inner = list(csv.DictReader(open(root / "tables" / "fixed_beta050_source_inner_diagnostics.csv", newline="")))
+    summary = list(csv.DictReader(open(root / "tables" / "fixed_beta050_summary.csv", newline="")))
+    report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
+
+    assert leakage["status"] == "PASS"
+    assert protocol["target_support_used"] is False
+    assert protocol["selection_used_target_labels"] is False
+    assert protocol["target_eval_labels_for_scoring_only"] is True
+    assert protocol["beta_rule"] == "fixed_global_beta050"
+    assert protocol["beta_origin"] == "hypothesis_generated_from_prior_positive_union_diagnostic"
+    assert protocol["development_experiment_seeds"] == [42, 43, 44]
+    assert protocol["primary_confirmation_experiment_seeds"] == [45]
+    assert protocol["no_posthoc_beta_selection"] is True
+    assert protocol["old_cells_retrospective_reference_only"] is True
+    assert protocol["source_inner_selection_primary"] is False
+    assert any(row["prior_method"] == PRIMARY_FIXED_BETA050_POSITIVE_UNION_METHOD and row["selection_source"] == "primary" for row in matrix)
+    assert any(row["prior_method"] == POSITIVE_UNION_RULE_ARITHMETIC and row["selection_source"] == "diagnostic_only" for row in matrix)
+    assert any(row["prior_method"] == POSITIVE_UNION_RULE_BETA050 and row["selection_source"] == "primary" for row in matrix) is False
+    assert candidates and all(row["audit_only"] == "True" and row["primary_adoption_eligible"] == "False" for row in candidates)
+    assert candidates and any(row["rule"] == POSITIVE_UNION_RULE_BETA050 and row["is_fixed_primary_rule"] == "True" for row in candidates)
+    assert effective and all(row["n_seed_bundles"] == "9" for row in effective)
+    assert rare and {"rare_positive_cell", "assessable_for_rare_positive_repair", "positive_margin_delta"} <= set(rare[0])
+    assert harm and {"true_positive_count_delta_vs_arithmetic", "specificity_delta_vs_arithmetic", "predicted_positive_rate_delta"} <= set(harm[0])
+    assert invariants and all(row["class_order_alignment_pass"] == "True" for row in invariants)
+    assert invariants and all(row["probability_row_sum_pass"] == "True" for row in invariants)
+    assert blend and any(row["pooling_rule"] == "fixed_global_positive_union_beta050" for row in blend)
+    assert deltas and all(row["fixed_rule"] == POSITIVE_UNION_RULE_BETA050 and row["fixed_beta"] == "0.5" for row in deltas)
+    assert source_inner and all(row["source_inner_selection_used"] == "False" for row in source_inner)
+    assert "delta_vs_v2_arithmetic_intersection" in summary[0]
+    assert "not source-inner selected" in report
 
 
 def test_dense_tailshield_random_mass_bag_tiny_cache_writes_expected_artifacts(tmp_path: Path) -> None:
@@ -4478,6 +4551,45 @@ def _tiny_source_inner_positive_union_payload(tmp_path: Path):
         }
     )
     payload["source_inner_class_conditional_positive_union"] = section
+    return payload
+
+
+def _tiny_fixed_beta050_positive_union_payload(tmp_path: Path):
+    payload = _tiny_multipanel_tailrisk_component_union_payload(tmp_path)
+    payload["experiment"]["name"] = "virchow2_cvae_fixed_beta050_positive_union_confirmation_v1"
+    payload["experiment"]["artifact_root"] = str(tmp_path / "virchow2_cvae_fixed_beta050_positive_union_confirmation_v1")
+    payload["inputs"]["development_positive_union_artifact_root"] = str(tmp_path / "virchow2_cvae_source_inner_class_conditional_positive_union_v1")
+    payload["run_matrix"]["experiment_seeds"] = [45]
+    section = payload.pop("tailrisk_multipanel_component_union")
+    section.update(
+        {
+            "primary_method": "fixed_beta050_positive_union_confirmation_v1",
+            "source_weighting": "fixed_beta050_positive_union_confirmation",
+            "primary_pooling": "fixed_global_positive_union_beta050",
+            "candidate_pooling_rules": [
+                "arithmetic_mean",
+                "positive_union_beta025",
+                "positive_union_beta050",
+                "positive_union_beta100",
+            ],
+            "fixed_pooling_rule": "positive_union_beta050",
+            "fixed_beta": 0.5,
+            "development_experiment_seeds": [42, 43, 44],
+            "primary_confirmation_experiment_seeds": [45],
+            "positive_label": 1,
+            "prediction_threshold": 0.5,
+            "min_source_inner_positive_count": 5,
+            "positive_union_eps": 1.0e-8,
+            "rare_positive_count_threshold": 10,
+            "rare_positive_prevalence_threshold": 0.05,
+            "source_inner_bacc_noninferiority_margin": 0.010,
+            "source_inner_class0_recall_margin": 0.015,
+            "source_inner_predicted_positive_rate_delta": 0.050,
+            "beta100_class0_recall_margin": 0.005,
+            "beta100_precision_margin": 0.010,
+        }
+    )
+    payload["fixed_beta050_positive_union_confirmation"] = section
     return payload
 
 

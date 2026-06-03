@@ -15,16 +15,23 @@ from cvae_rebuild.component_union_mass_bagged import (
     parse_mass_bagged_component_union_config,
 )
 from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
+    FIXED_BETA050_CONFIRMATION_EXPERIMENT_SEEDS,
+    FIXED_BETA050_DEVELOPMENT_EXPERIMENT_SEEDS,
+    FIXED_BETA050_POSITIVE_UNION_NAME,
     MULTIPANEL_PANEL_SEEDS,
     MULTIPANEL_TAILRISK_NAME,
     POSITIVE_UNION_RULES,
     POSITIVE_UNION_TAILRISK_NAME,
+    POSITIVE_UNION_RULE_BETA050,
+    PRIMARY_FIXED_BETA050_POSITIVE_UNION_METHOD,
     PRIMARY_POSITIVE_UNION_METHOD,
     PRIMARY_MULTIPANEL_TAILRISK_METHOD,
     PRIMARY_TAILRISK_METHOD,
+    load_fixed_beta050_positive_union_config,
     load_multipanel_tailrisk_component_union_config,
     load_source_inner_positive_union_config,
     load_tailrisk_anchored_component_union_config,
+    parse_fixed_beta050_positive_union_config,
     parse_multipanel_tailrisk_component_union_config,
     parse_source_inner_positive_union_config,
     parse_tailrisk_anchored_component_union_config,
@@ -465,6 +472,77 @@ def test_source_inner_positive_union_rejects_target_support_and_target_selection
     payload["source_inner_class_conditional_positive_union"]["target_eval_metric_selection"] = True
     with pytest.raises(Exception, match="target_eval_metric_selection"):
         parse_source_inner_positive_union_config(payload, base_dir=Path("."))
+
+
+def test_locked_fixed_beta050_positive_union_config_loads() -> None:
+    cfg = load_fixed_beta050_positive_union_config(
+        "cvae_rebuild/configs/virchow2_cvae_fixed_beta050_positive_union_confirmation_v1.yaml"
+    )
+    assert cfg.name == FIXED_BETA050_POSITIVE_UNION_NAME
+    assert cfg.primary_method == PRIMARY_FIXED_BETA050_POSITIVE_UNION_METHOD
+    assert cfg.strict_full_run_matrix is True
+    assert cfg.experiment_seeds == FIXED_BETA050_CONFIRMATION_EXPERIMENT_SEEDS
+    assert cfg.development_experiment_seeds == FIXED_BETA050_DEVELOPMENT_EXPERIMENT_SEEDS
+    assert set(cfg.experiment_seeds).isdisjoint(cfg.development_experiment_seeds)
+    assert cfg.heldout_centers == ("0", "1", "2", "3", "4")
+    assert cfg.panel_seed_groups == MULTIPANEL_PANEL_SEEDS
+    assert cfg.candidate_pooling_rules == POSITIVE_UNION_RULES
+    assert cfg.fixed_pooling_rule == POSITIVE_UNION_RULE_BETA050
+    assert cfg.fixed_beta == 0.5
+    assert cfg.primary_pooling == "fixed_global_positive_union_beta050"
+    assert cfg.positive_label == 1
+    assert cfg.prediction_threshold == 0.5
+    assert cfg.random_mass_bag_size == 11
+    assert cfg.random_mass_bag_alpha == 4.0
+    assert cfg.blend_alpha == 0.5
+    assert cfg.rare_positive_count_threshold == 10
+    assert cfg.rare_positive_prevalence_threshold == 0.05
+
+
+def test_fixed_beta050_positive_union_rejects_changed_beta_and_seed_overlap() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_fixed_beta050_positive_union_confirmation_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["fixed_beta050_positive_union_confirmation"]["fixed_beta"] = 0.25
+    with pytest.raises(Exception, match="fixed_beta"):
+        parse_fixed_beta050_positive_union_config(payload, base_dir=Path("."))
+
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["run_matrix"]["experiment_seeds"][0] = 42
+    payload["fixed_beta050_positive_union_confirmation"]["primary_confirmation_experiment_seeds"][0] = 42
+    with pytest.raises(Exception, match="must not overlap"):
+        parse_fixed_beta050_positive_union_config(payload, base_dir=Path("."))
+
+
+@pytest.mark.parametrize(
+    ("key", "value", "message"),
+    [
+        ("blend_alpha", 0.25, "blend_alpha"),
+        ("random_mass_bag_alpha", 2.0, "random_mass_bag_alpha"),
+        ("positive_label", 0, "positive_label"),
+        ("prediction_threshold", 0.25, "prediction_threshold"),
+        ("fixed_pooling_rule", "positive_union_beta025", "fixed_pooling_rule"),
+        ("rare_positive_count_threshold", 9, "rare_positive_count_threshold"),
+    ],
+)
+def test_fixed_beta050_positive_union_rejects_changed_locked_fields(key: str, value: object, message: str) -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_fixed_beta050_positive_union_confirmation_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["fixed_beta050_positive_union_confirmation"][key] = value
+    with pytest.raises(Exception, match=message):
+        parse_fixed_beta050_positive_union_config(payload, base_dir=Path("."))
+
+
+def test_fixed_beta050_positive_union_rejects_target_support_and_target_selection() -> None:
+    path = Path("cvae_rebuild/configs/virchow2_cvae_fixed_beta050_positive_union_confirmation_v1.yaml")
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["inputs"]["support_calibrated_artifact_root"] = "cvae_rebuild/artifacts/not_allowed"
+    with pytest.raises(Exception, match="support_calibrated_artifact_root"):
+        parse_fixed_beta050_positive_union_config(payload, base_dir=Path("."))
+
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["fixed_beta050_positive_union_confirmation"]["target_eval_metric_selection"] = True
+    with pytest.raises(Exception, match="target_eval_metric_selection"):
+        parse_fixed_beta050_positive_union_config(payload, base_dir=Path("."))
 
 
 def test_locked_dense_tailshield_random_mass_bag_config_loads() -> None:
