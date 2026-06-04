@@ -4811,6 +4811,7 @@ def _tiny_harm_gated_positive_union_payload(tmp_path: Path):
         }
     )
     payload["source_inner_harm_gated_positive_union"] = section
+    payload["memory"] = {"skip_nearest_neighbor_audit": True}
     return payload
 
 

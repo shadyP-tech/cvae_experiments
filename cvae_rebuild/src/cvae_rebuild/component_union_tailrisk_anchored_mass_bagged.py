@@ -246,6 +246,7 @@ class SourceInnerHarmGatedPositiveUnionConfig(SourceInnerPositiveUnionConfig):
     cell_level_reserve_stitching_allowed: bool = False
     rare_positive_count_threshold: int = FIXED_BETA050_RARE_POSITIVE_COUNT_THRESHOLD
     rare_positive_prevalence_threshold: float = FIXED_BETA050_RARE_POSITIVE_PREVALENCE_THRESHOLD
+    skip_nearest_neighbor_audit: bool = True
 
 
 @dataclass(frozen=True)
@@ -986,6 +987,11 @@ def parse_harm_gated_positive_union_config(
     generation = _mapping(data, "generation")
     harm = _mapping(data, "source_inner_harm_gated_positive_union")
     classifier = _mapping(data, "classifier")
+    memory = data.get("memory", {})
+    if memory is None:
+        memory = {}
+    if not isinstance(memory, Mapping):
+        raise ProtocolError("memory must be a mapping when provided for source-only harm-gated positive-union v1.")
     panel_seed_groups = _parse_panel_seed_groups(harm.get("panel_seed_groups", {}))
     if inputs.get("support_calibrated_artifact_root") not in (None, ""):
         raise ProtocolError("support_calibrated_artifact_root is not allowed for source-only harm-gated positive-union v1.")
@@ -1080,6 +1086,7 @@ def parse_harm_gated_positive_union_config(
         cell_level_reserve_stitching_allowed=bool(harm["cell_level_reserve_stitching_allowed"]),
         rare_positive_count_threshold=int(harm["rare_positive_count_threshold"]),
         rare_positive_prevalence_threshold=float(harm["rare_positive_prevalence_threshold"]),
+        skip_nearest_neighbor_audit=bool(memory.get("skip_nearest_neighbor_audit", True)),
     )
     validate_harm_gated_positive_union_config(cfg)
     return cfg
@@ -1204,6 +1211,8 @@ def validate_harm_gated_positive_union_config(cfg: SourceInnerHarmGatedPositiveU
         raise ProtocolError("Harm-gated positive-union numeric floors/tolerances must be positive.")
     if cfg.tailrisk_transfer_threshold >= 0.0:
         raise ProtocolError("tailrisk_transfer_threshold must be negative.")
+    if not cfg.skip_nearest_neighbor_audit:
+        raise ProtocolError("Harm-gated positive-union v1 must skip nearest-neighbor audit for Virchow2 memory safety.")
     if cfg.classifier_type != "sklearn_logistic_regression":
         raise ProtocolError("classifier.type must be sklearn_logistic_regression.")
     if cfg.classifier_solver != "lbfgs" or cfg.classifier_c != 1.0 or cfg.classifier_max_iter != 2000:
@@ -6295,6 +6304,8 @@ def _write_harm_gated_positive_union_artifacts(
             "blend_alpha_locked": cfg.blend_alpha,
             "random_mass_bag_size": cfg.random_mass_bag_size,
             "random_mass_bag_distribution": "dirichlet_uniform_alpha4",
+            "nearest_neighbor_memorization_audit_skipped": bool(cfg.skip_nearest_neighbor_audit),
+            "nearest_neighbor_memorization_audit_skip_reason": "virchow2_memory_safety" if cfg.skip_nearest_neighbor_audit else "",
             "panel_seed_groups": {panel: list(seeds) for panel, seeds in cfg.panel_seed_groups},
             "rare_positive_definition": {
                 "class1_count_lte": cfg.rare_positive_count_threshold,
@@ -6612,6 +6623,10 @@ def _resolved_harm_gated_positive_union_config(cfg: SourceInnerHarmGatedPositive
         "primary_noninferiority_margin": cfg.primary_noninferiority_margin,
         "weak_pass_noninferiority_margin": cfg.weak_pass_noninferiority_margin,
         "tailrisk_transfer_threshold": cfg.tailrisk_transfer_threshold,
+    }
+    resolved["memory"] = {
+        "skip_nearest_neighbor_audit": cfg.skip_nearest_neighbor_audit,
+        "nearest_neighbor_memorization_audit_skip_reason": "virchow2_memory_safety" if cfg.skip_nearest_neighbor_audit else "",
     }
     return resolved
 

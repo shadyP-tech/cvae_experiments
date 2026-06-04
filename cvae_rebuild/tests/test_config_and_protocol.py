@@ -580,6 +580,7 @@ def test_locked_harm_gated_positive_union_config_loads() -> None:
     assert cfg.selector_threshold_source == "retrospective_development_only"
     assert cfg.selector_thresholds_may_be_changed_after_primary is False
     assert cfg.cell_level_reserve_stitching_allowed is False
+    assert cfg.skip_nearest_neighbor_audit is True
 
 
 @pytest.mark.parametrize(
@@ -635,6 +636,11 @@ def test_harm_gated_positive_union_rejects_beta100_primary_target_support_and_se
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["source_inner_harm_gated_positive_union"]["cell_level_reserve_stitching_allowed"] = True
     with pytest.raises(Exception, match="cell_level_reserve_stitching_allowed"):
+        parse_harm_gated_positive_union_config(payload, base_dir=Path("."))
+
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["memory"]["skip_nearest_neighbor_audit"] = False
+    with pytest.raises(Exception, match="skip nearest-neighbor audit"):
         parse_harm_gated_positive_union_config(payload, base_dir=Path("."))
 
 
