@@ -306,7 +306,27 @@ def _resolve_image_path(manifest_path: Path, raw_path: str) -> Path:
     path = Path(str(raw_path).strip())
     if path.is_absolute():
         return path
-    return Path(manifest_path).resolve().parent.parent / path
+    manifest = Path(manifest_path).resolve()
+    candidates = [
+        Path.cwd().resolve() / path,
+        _find_repo_root(manifest) / path,
+        manifest.parent / path,
+        manifest.parent.parent / path,
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[1]
+
+
+def _find_repo_root(path: Path) -> Path:
+    current = Path(path).resolve()
+    if current.is_file():
+        current = current.parent
+    for candidate in (current, *current.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return Path.cwd().resolve()
 
 
 def _write_cache_report(
