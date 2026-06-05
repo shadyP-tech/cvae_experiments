@@ -1,0 +1,11 @@
+*
+!.gitignore
+!*/
+!*/manifest.csv
+!*/domain_mapping.json
+!*/split_manifest.csv
+!*/domain_feasibility.csv
+!*/class_balance_by_domain.csv
+!*/leakage_report.json
+!*/dataset_contract.json
+!*/README.md

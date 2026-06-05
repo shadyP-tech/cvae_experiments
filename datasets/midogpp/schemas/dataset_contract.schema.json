@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MIDOG++ Annotation Patch Dataset Contract",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_name",
+    "status",
+    "sample_definition",
+    "group_definition",
+    "class_definition",
+    "paths",
+    "hashes",
+    "extraction_policy",
+    "negative_sampling_policy",
+    "split_policy",
+    "domain_policy",
+    "eligibility_thresholds",
+    "row_counts",
+    "class_counts"
+  ],
+  "properties": {
+    "schema_version": {"type": "string"},
+    "artifact_name": {"type": "string"},
+    "status": {"type": "string"},
+    "sample_definition": {"type": "string"},
+    "group_definition": {"type": "string"},
+    "class_definition": {"type": "string"},
+    "paths": {"type": "object"},
+    "hashes": {"type": "object"},
+    "extraction_policy": {"type": "object"},
+    "negative_sampling_policy": {"type": "object"},
+    "split_policy": {"type": "object"},
+    "domain_policy": {"type": "object"},
+    "eligibility_thresholds": {"type": "object"},
+    "row_counts": {"type": "object"},
+    "class_counts": {"type": "object"}
+  }
+}

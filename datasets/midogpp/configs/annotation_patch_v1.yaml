@@ -1,0 +1,45 @@
+artifact:
+  name: midogpp_annotation_patch_v1
+  root: datasets/midogpp/artifacts/midogpp_annotation_patch_v1
+
+inputs:
+  root: cvae_testing/data/MIDOGpp
+  metadata: cvae_testing/data/MIDOGpp/midogpp_scanner_metadata_full_resplit.csv
+  annotations: cvae_testing/data/MIDOGpp/databases/MIDOG++.json
+
+patches:
+  patch_dir: datasets/midogpp/artifacts/midogpp_annotation_patch_v1/patches_224
+  patch_size: 224
+  image_quality: 92
+  bbox_format: coco_xywh
+
+sampling:
+  positive_policy: all_valid_mitotic_annotations
+  negative_policy: matched_1_to_1
+  negative_ratio: 1.0
+  negative_seed: 42
+
+split:
+  seed: 42
+  fractions:
+    train: 0.45
+    val: 0.10
+    test: 0.45
+
+domain:
+  candidate_axes:
+    - scanner_model
+    - tumor_type
+    - tumor_type|lab_or_origin|scanner_model
+  preferred_axis: tumor_type|lab_or_origin|scanner_model
+  final_axis_policy: auto_tumor_lab_scanner
+  min_eligible_domains: 6
+
+eligibility:
+  total_cases_min: 20
+  train_cases_min: 10
+  eval_cases_min: 10
+  train_positives_min: 50
+  train_negatives_min: 50
+  eval_positives_min: 20
+  eval_negatives_min: 20
