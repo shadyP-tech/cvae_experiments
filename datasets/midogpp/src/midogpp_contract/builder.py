@@ -516,49 +516,54 @@ def _write_patches_and_manifest_rows(
     *,
     overwrite: bool,
 ) -> list[dict[str, Any]]:
-    image_cache: dict[Path, Any] = {}
     rows: list[dict[str, Any]] = []
+    records_by_image: dict[Path, list[_SampleRecord]] = {}
     for record in records:
-        patch_path = config.patch_dir / f"{record.sample_id}.jpg"
-        if overwrite or not patch_path.exists():
-            if record.source.image_path not in image_cache:
-                image_cache[record.source.image_path] = _read_image(record.source.image_path)
-            patch = _crop_centered(
-                image_cache[record.source.image_path],
-                record.annotation.patch_center_x,
-                record.annotation.patch_center_y,
-                config.patch_size,
-            )
-            patch_path.parent.mkdir(parents=True, exist_ok=True)
-            patch.save(patch_path, quality=int(config.image_quality))
-        rows.append(
-            {
-                "sample_id": record.sample_id,
-                "case_id": record.source.case_id,
-                "image_path": repo_relative(patch_path, config.repo_root),
-                "annotation_id": record.annotation.annotation_id,
-                "bbox_x": _format_float(record.annotation.bbox_x),
-                "bbox_y": _format_float(record.annotation.bbox_y),
-                "bbox_w": _format_float(record.annotation.bbox_w),
-                "bbox_h": _format_float(record.annotation.bbox_h),
-                "patch_center_x": _format_float(record.annotation.patch_center_x),
-                "patch_center_y": _format_float(record.annotation.patch_center_y),
-                "label": int(record.label),
-                "label_name": record.annotation.label_name,
-                "scanner_model": record.source.scanner_model,
-                "lab_or_origin": record.source.lab_or_origin,
-                "tumor_type": record.source.tumor_type,
-                "species": record.source.species,
-                "resolution": record.source.resolution,
-                "domain_axis": config.preferred_axis,
-                "domain_name": domain_name(_source_as_row(record.source), config.preferred_axis),
-                "domain_id": "",
-                "center": "",
-                "magnification": "",
-                "split": record.split,
-                "negative_match_scope": record.negative_match_scope,
-            }
-        )
+        records_by_image.setdefault(record.source.image_path, []).append(record)
+
+    for image_path in sorted(records_by_image, key=lambda path: str(path)):
+        session = _ImagePatchSession(image_path)
+        try:
+            for record in sorted(records_by_image[image_path], key=_sample_sort_key):
+                patch_path = config.patch_dir / f"{record.sample_id}.jpg"
+                if overwrite or not patch_path.exists():
+                    patch = session.crop(
+                        record.annotation.patch_center_x,
+                        record.annotation.patch_center_y,
+                        config.patch_size,
+                    )
+                    patch_path.parent.mkdir(parents=True, exist_ok=True)
+                    patch.save(patch_path, quality=int(config.image_quality))
+                rows.append(
+                    {
+                        "sample_id": record.sample_id,
+                        "case_id": record.source.case_id,
+                        "image_path": repo_relative(patch_path, config.repo_root),
+                        "annotation_id": record.annotation.annotation_id,
+                        "bbox_x": _format_float(record.annotation.bbox_x),
+                        "bbox_y": _format_float(record.annotation.bbox_y),
+                        "bbox_w": _format_float(record.annotation.bbox_w),
+                        "bbox_h": _format_float(record.annotation.bbox_h),
+                        "patch_center_x": _format_float(record.annotation.patch_center_x),
+                        "patch_center_y": _format_float(record.annotation.patch_center_y),
+                        "label": int(record.label),
+                        "label_name": record.annotation.label_name,
+                        "scanner_model": record.source.scanner_model,
+                        "lab_or_origin": record.source.lab_or_origin,
+                        "tumor_type": record.source.tumor_type,
+                        "species": record.source.species,
+                        "resolution": record.source.resolution,
+                        "domain_axis": config.preferred_axis,
+                        "domain_name": domain_name(_source_as_row(record.source), config.preferred_axis),
+                        "domain_id": "",
+                        "center": "",
+                        "magnification": "",
+                        "split": record.split,
+                        "negative_match_scope": record.negative_match_scope,
+                    }
+                )
+        finally:
+            session.close()
     return rows
 
 
@@ -807,6 +812,162 @@ def _resolve_image_path(config: BuilderConfig, image_ref: str) -> Path:
         if candidate.exists():
             return candidate.resolve()
     raise FileNotFoundError(f"Could not resolve MIDOG++ source image '{image_ref}' under {config.input_root}")
+
+
+class _ImagePatchSession:
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self._reader: Any | None = None
+        self._remaining_factories = list(_patch_reader_factories(path))
+        self._errors: list[str] = []
+
+    def crop(self, center_x: float, center_y: float, patch_size: int) -> Image.Image:
+        while True:
+            if self._reader is None:
+                self._reader = self._open_next_reader()
+            try:
+                return self._reader.crop(center_x, center_y, patch_size)
+            except Exception as exc:
+                backend = getattr(self._reader, "backend", type(self._reader).__name__)
+                self._errors.append(f"{backend} crop failed: {type(exc).__name__}: {exc}")
+                self._close_reader()
+
+    def close(self) -> None:
+        self._close_reader()
+
+    def _open_next_reader(self) -> Any:
+        while self._remaining_factories:
+            backend, factory = self._remaining_factories.pop(0)
+            try:
+                reader = factory()
+                reader.backend = backend
+                return reader
+            except Exception as exc:
+                self._errors.append(f"{backend} open failed: {type(exc).__name__}: {exc}")
+        hint = (
+            "Could not read MIDOG++ source image "
+            f"{self.path}. Tried OpenSlide, tifffile, and PIL where applicable. "
+            "For workstation TIFF extraction, install or activate a backend that can read tiled TIFFs, "
+            "for example openslide-python with the OpenSlide system library, or tifffile plus imagecodecs. "
+            f"Backend errors: {' | '.join(self._errors)}"
+        )
+        raise RuntimeError(hint)
+
+    def _close_reader(self) -> None:
+        if self._reader is not None:
+            close = getattr(self._reader, "close", None)
+            if callable(close):
+                close()
+            self._reader = None
+
+
+class _OpenSlidePatchReader:
+    backend = "openslide"
+
+    def __init__(self, path: Path) -> None:
+        import openslide  # type: ignore
+
+        self.slide = openslide.OpenSlide(str(path))
+        self.width, self.height = self.slide.dimensions
+
+    def crop(self, center_x: float, center_y: float, patch_size: int) -> Image.Image:
+        size = int(patch_size)
+        x0, y0, src_x0, src_y0, src_x1, src_y1, dst_x0, dst_y0 = _crop_bounds(
+            center_x,
+            center_y,
+            size,
+            width=int(self.width),
+            height=int(self.height),
+        )
+        canvas = Image.new("RGB", (size, size), color=(255, 255, 255))
+        if src_x1 > src_x0 and src_y1 > src_y0:
+            region = self.slide.read_region((src_x0, src_y0), 0, (src_x1 - src_x0, src_y1 - src_y0)).convert("RGB")
+            canvas.paste(region, (dst_x0, dst_y0))
+        return canvas
+
+    def close(self) -> None:
+        self.slide.close()
+
+
+class _TiffArrayPatchReader:
+    backend = "tifffile"
+
+    def __init__(self, path: Path) -> None:
+        import tifffile  # type: ignore
+
+        self.array = _normalize_image_array(tifffile.imread(path))
+
+    def crop(self, center_x: float, center_y: float, patch_size: int) -> Image.Image:
+        return _crop_centered(self.array, center_x, center_y, patch_size)
+
+    def close(self) -> None:
+        self.array = None
+
+
+class _PILPatchReader:
+    backend = "pil"
+
+    def __init__(self, path: Path) -> None:
+        self.image = Image.open(path)
+        self.width, self.height = self.image.size
+
+    def crop(self, center_x: float, center_y: float, patch_size: int) -> Image.Image:
+        size = int(patch_size)
+        _x0, _y0, src_x0, src_y0, src_x1, src_y1, dst_x0, dst_y0 = _crop_bounds(
+            center_x,
+            center_y,
+            size,
+            width=int(self.width),
+            height=int(self.height),
+        )
+        canvas = Image.new("RGB", (size, size), color=(255, 255, 255))
+        if src_x1 > src_x0 and src_y1 > src_y0:
+            region = self.image.crop((src_x0, src_y0, src_x1, src_y1)).convert("RGB")
+            canvas.paste(region, (dst_x0, dst_y0))
+        return canvas
+
+    def close(self) -> None:
+        self.image.close()
+
+
+def _patch_reader_factories(path: Path) -> list[tuple[str, Any]]:
+    suffix = path.suffix.lower()
+    if suffix in {".tif", ".tiff", ".svs"}:
+        return [
+            ("openslide", lambda: _OpenSlidePatchReader(path)),
+            ("tifffile", lambda: _TiffArrayPatchReader(path)),
+            ("pil", lambda: _PILPatchReader(path)),
+        ]
+    return [
+        ("pil", lambda: _PILPatchReader(path)),
+        ("openslide", lambda: _OpenSlidePatchReader(path)),
+        ("tifffile", lambda: _TiffArrayPatchReader(path)),
+    ]
+
+
+def _crop_bounds(
+    center_x: float,
+    center_y: float,
+    patch_size: int,
+    *,
+    width: int,
+    height: int,
+) -> tuple[int, int, int, int, int, int, int, int]:
+    size = int(patch_size)
+    half = size // 2
+    cx = int(round(float(center_x)))
+    cy = int(round(float(center_y)))
+    x0 = cx - half
+    y0 = cy - half
+    x1 = x0 + size
+    y1 = y0 + size
+    src_x0 = max(x0, 0)
+    src_y0 = max(y0, 0)
+    src_x1 = min(x1, int(width))
+    src_y1 = min(y1, int(height))
+    dst_x0 = src_x0 - x0
+    dst_y0 = src_y0 - y0
+    return x0, y0, src_x0, src_y0, src_x1, src_y1, dst_x0, dst_y0
 
 
 def _read_image(path: Path) -> Any:
