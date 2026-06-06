@@ -1,0 +1,49 @@
+experiment:
+  name: virchow2_cvae_dense_late_all_sources_midogpp_v1
+  artifact_root: cvae_rebuild/artifacts/midogpp/virchow2_cvae_dense_late_all_sources_midogpp_v1
+  primary_variant: pca64_beta001
+
+inputs:
+  feature_cache_root: sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2
+  repair_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_preservation_repair_v1
+  d1_2_artifact_root:
+  d1_4_artifact_root:
+  dataset_contract_artifact_root: datasets/midogpp/artifacts/midogpp_annotation_patch_v1
+  cache_report_path: sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2/seed42/reports/cache_builder_report.json
+  backbone: virchow2
+
+run_matrix:
+  domain_regime: midogpp_annotation_patch_v1
+  strict_full_run_matrix: false
+  strict_available_seed_domain_coverage: true
+  experiment_seeds: [42]
+  heldout_centers: ["0", "1", "2", "3", "5", "6", "7", "8", "9"]
+  replicate_seeds: [17, 23, 31]
+
+generation:
+  synthetic_per_class_total: 128
+  min_per_source_per_class: 8
+
+dense_late_all_sources_reliability:
+  primary_method: dense_late_all_sources_reliability_shrink050_geom
+  candidate_components_per_source_class: [4, 3, 2, 1]
+  min_samples_per_component: 12
+  source_weighting: heldout_excluded_source_local_reliability_dense_all_sources
+  gmm_covariance_type: diag
+  gmm_reg_covar: 1.0e-4
+  gmm_n_init: 5
+  gmm_max_iter: 500
+  min_component_weight: 0.02
+  variance_floor: 1.0e-5
+  reliability_floor_score: 0.05
+  reliability_epsilon: 1.0e-8
+  shrinkage_values: [0.25, 0.50]
+  primary_pooling: weighted_geometric
+
+classifier:
+  type: sklearn_logistic_regression
+  solver: lbfgs
+  C: 1.0
+  max_iter: 2000
+  class_weight: balanced
+  classifier_seed: null

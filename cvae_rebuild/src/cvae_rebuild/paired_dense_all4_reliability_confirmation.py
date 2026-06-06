@@ -28,6 +28,16 @@ from .preservation_sampling import DIAGNOSTIC_SELECTION, PRIMARY_SELECTION, _man
 from .protocol import ProtocolError, assert_candidate_pool, build_leakage_report
 from .reporting import prepare_artifact_dirs, write_csv_rows, write_json
 from .splits import candidate_experts
+from .domain_regime import (
+    CAMELYON17_DOMAIN_REGIME,
+    MIDOGPP_DOMAIN_REGIME,
+    MidogppContractInfo,
+    load_midogpp_contract_info,
+    normalize_domain_regime,
+    validate_cache_report_split_counts,
+    validate_domain_regime_config,
+    validate_runtime_domain_coverage,
+)
 
 from . import decentralized_adaptive_gmm_prior as d1a
 from . import decentralized_k16_gmm_prior as d1
@@ -35,7 +45,9 @@ from . import decentralized_reliability_weighted_gmm_prior as d12
 
 
 PAIRED_DENSE_ALL4_NAME = "virchow2_cvae_paired_dense_all4_reliability_confirmation_v1"
+DENSE_LATE_ALL_SOURCES_MIDOGPP_NAME = "virchow2_cvae_dense_late_all_sources_midogpp_v1"
 PRIMARY_PAIRED_METHOD = "paired_reliability_all4_shrink050_geom"
+PRIMARY_DENSE_ALL_SOURCES_METHOD = "dense_late_all_sources_reliability_shrink050_geom"
 ROW_EQUAL_ALL4 = "paired_equal_all4_geom"
 ROW_RELIABILITY_ALL4_WEIGHTED = "paired_reliability_all4_weighted_geom"
 ROW_POOL_ONLY = "paired_reliability_all4_pool_only_geom"
@@ -44,11 +56,26 @@ ROW_SHRINK025 = "paired_reliability_all4_shrink025_geom"
 ROW_SHRINK050 = PRIMARY_PAIRED_METHOD
 ROW_SHUFFLED = "paired_shuffled_reliability_all4_geom"
 ROW_INVERSE = "paired_inverse_reliability_all4_geom"
+ROW_EQUAL_ALL_SOURCES = "dense_late_equal_all_sources_geom"
+ROW_RELIABILITY_ALL_SOURCES_WEIGHTED = "dense_late_all_sources_reliability_weighted_geom"
+ROW_POOL_ONLY_ALL_SOURCES = "dense_late_all_sources_reliability_pool_only_geom"
+ROW_BUDGET_ONLY_ALL_SOURCES = "dense_late_all_sources_reliability_budget_only_geom"
+ROW_SHRINK025_ALL_SOURCES = "dense_late_all_sources_reliability_shrink025_geom"
+ROW_SHRINK050_ALL_SOURCES = PRIMARY_DENSE_ALL_SOURCES_METHOD
+ROW_SHUFFLED_ALL_SOURCES = "dense_late_all_sources_shuffled_reliability_geom"
+ROW_INVERSE_ALL_SOURCES = "dense_late_all_sources_inverse_reliability_geom"
 EQUAL_BUDGET_PAIRING_GROUP = "paired_equal_budget_all4_v1"
 RELIABILITY_BUDGET_PAIRING_GROUP = "paired_reliability_budget_all4_v1"
+EQUAL_BUDGET_ALL_SOURCES_PAIRING_GROUP = "dense_late_equal_budget_all_sources_v1"
+RELIABILITY_BUDGET_ALL_SOURCES_PAIRING_GROUP = "dense_late_reliability_budget_all_sources_v1"
 PROTOCOL_WORDING = (
     "This is a heldout-excluded source-only reliability audit for dense generated-embedding aggregation. "
     "Dense all4 includes every non-target source expert; reliability affects weights, pooling, or synthetic budgets only."
+)
+MIDOGPP_PROTOCOL_WORDING = (
+    "This is a heldout-excluded source-only reliability audit for dense generated-embedding aggregation on MIDOG++. "
+    "Dense all-source includes every eligible non-target pseudo-domain expert; reliability affects weights, pooling, "
+    "or synthetic budgets only."
 )
 
 
@@ -87,6 +114,11 @@ class PairedDenseAll4ReliabilityConfig:
     classifier_max_iter: int
     classifier_class_weight: str
     classifier_seed: int | None
+    domain_regime: str = CAMELYON17_DOMAIN_REGIME
+    strict_full_run_matrix: bool = False
+    strict_available_seed_domain_coverage: bool = False
+    dataset_contract_artifact_root: Path | None = None
+    cache_report_path: Path | None = None
 
     @property
     def max_local_gmm_components_per_source_class(self) -> int:
@@ -108,6 +140,10 @@ def load_paired_dense_all4_reliability_config(path: str | Path) -> PairedDenseAl
     return parse_paired_dense_all4_reliability_config(data, base_dir=base_dir)
 
 
+def load_dense_late_all_sources_reliability_config(path: str | Path) -> PairedDenseAll4ReliabilityConfig:
+    return load_paired_dense_all4_reliability_config(path)
+
+
 def parse_paired_dense_all4_reliability_config(
     data: Mapping[str, Any],
     *,
@@ -120,7 +156,7 @@ def parse_paired_dense_all4_reliability_config(
     if "support_size" in run or "support_seeds" in run:
         raise ProtocolError("Paired dense all4 reliability confirmation must not configure target support.")
     generation = _mapping(data, "generation")
-    gmm = _mapping(data, "paired_dense_all4_reliability")
+    gmm = _mapping(data, "dense_late_all_sources_reliability") if "dense_late_all_sources_reliability" in data else _mapping(data, "paired_dense_all4_reliability")
     classifier = _mapping(data, "classifier")
     cfg = PairedDenseAll4ReliabilityConfig(
         name=str(experiment["name"]),
@@ -156,32 +192,53 @@ def parse_paired_dense_all4_reliability_config(
         classifier_max_iter=int(classifier["max_iter"]),
         classifier_class_weight=str(classifier["class_weight"]),
         classifier_seed=None if classifier.get("classifier_seed") is None else int(classifier["classifier_seed"]),
+        domain_regime=normalize_domain_regime(run.get("domain_regime")),
+        strict_full_run_matrix=bool(run.get("strict_full_run_matrix", False)),
+        strict_available_seed_domain_coverage=bool(run.get("strict_available_seed_domain_coverage", False)),
+        dataset_contract_artifact_root=_optional_path(base, inputs.get("dataset_contract_artifact_root")),
+        cache_report_path=_optional_path(base, inputs.get("cache_report_path")),
     )
     validate_paired_dense_all4_reliability_config(cfg)
     return cfg
 
 
 def validate_paired_dense_all4_reliability_config(cfg: PairedDenseAll4ReliabilityConfig) -> None:
-    if cfg.name != PAIRED_DENSE_ALL4_NAME:
-        raise ProtocolError(f"Paired dense all4 experiment name must be {PAIRED_DENSE_ALL4_NAME!r}.")
+    regime = normalize_domain_regime(cfg.domain_regime)
+    contract_info = validate_domain_regime_config(
+        domain_regime=regime,
+        heldout_centers=cfg.heldout_centers,
+        dataset_contract_artifact_root=cfg.dataset_contract_artifact_root,
+        artifact_root=cfg.artifact_root,
+        strict_full_run_matrix=cfg.strict_full_run_matrix,
+        strict_available_seed_domain_coverage=cfg.strict_available_seed_domain_coverage,
+    )
+    validate_cache_report_split_counts(cfg.cache_report_path, contract_info)
+    if regime == CAMELYON17_DOMAIN_REGIME:
+        if cfg.name != PAIRED_DENSE_ALL4_NAME:
+            raise ProtocolError(f"Paired dense all4 experiment name must be {PAIRED_DENSE_ALL4_NAME!r}.")
+        expected_primary = PRIMARY_PAIRED_METHOD
+        expected_weighting = "heldout_excluded_source_local_reliability_dense_all4"
+    else:
+        if cfg.name != DENSE_LATE_ALL_SOURCES_MIDOGPP_NAME:
+            raise ProtocolError(f"MIDOG++ dense all-source experiment name must be {DENSE_LATE_ALL_SOURCES_MIDOGPP_NAME!r}.")
+        expected_primary = PRIMARY_DENSE_ALL_SOURCES_METHOD
+        expected_weighting = "heldout_excluded_source_local_reliability_dense_all_sources"
     if cfg.backbone != "virchow2":
         raise ProtocolError("Paired dense all4 confirmation is locked to backbone=virchow2.")
     if cfg.primary_variant != PRIMARY_VARIANT:
         raise ProtocolError(f"primary_variant must be {PRIMARY_VARIANT!r}.")
-    if cfg.primary_method != PRIMARY_PAIRED_METHOD:
-        raise ProtocolError(f"primary_method must be {PRIMARY_PAIRED_METHOD!r}.")
+    if cfg.primary_method != expected_primary:
+        raise ProtocolError(f"primary_method must be {expected_primary!r}.")
     if not cfg.experiment_seeds:
         raise ProtocolError("experiment_seeds must be non-empty; thesis config locks [42, 43, 44].")
-    if cfg.heldout_centers != ("0", "1", "2", "3", "4"):
-        raise ProtocolError("heldout_centers must be locked to centers 0..4.")
     if not cfg.replicate_seeds:
         raise ProtocolError("replicate_seeds must be non-empty; thesis config locks [17, 23, 31].")
     if cfg.candidate_components_per_source_class != (4, 3, 2, 1):
         raise ProtocolError("candidate_components_per_source_class must be locked to [4, 3, 2, 1].")
     if cfg.min_samples_per_component != 12:
         raise ProtocolError("min_samples_per_component must be locked to 12.")
-    if cfg.source_weighting != "heldout_excluded_source_local_reliability_dense_all4":
-        raise ProtocolError("source_weighting must be heldout_excluded_source_local_reliability_dense_all4.")
+    if cfg.source_weighting != expected_weighting:
+        raise ProtocolError(f"source_weighting must be {expected_weighting}.")
     if cfg.gmm_covariance_type != "diag":
         raise ProtocolError("gmm_covariance_type must be diag.")
     if cfg.gmm_reg_covar != 1.0e-4 or cfg.gmm_n_init != 5 or cfg.gmm_max_iter != 500:
@@ -210,6 +267,8 @@ def run_paired_dense_all4_reliability_confirmation(
     artifact_root: str | Path | None = None,
 ) -> Path:
     root = prepare_artifact_dirs(Path(artifact_root) if artifact_root is not None else cfg.artifact_root)
+    if _is_midogpp(cfg) and "cvae_rebuild/artifacts/midogpp" not in root.as_posix():
+        raise ProtocolError("MIDOG++ dense all-source artifact_root must be under cvae_rebuild/artifacts/midogpp/.")
     (root / "checkpoints").mkdir(parents=True, exist_ok=True)
     (root / "summaries").mkdir(parents=True, exist_ok=True)
 
@@ -226,8 +285,10 @@ def run_paired_dense_all4_reliability_confirmation(
     weak_rows: list[dict[str, object]] = []
     nn_rows: list[dict[str, object]] = []
     model_manifest_rows: list[dict[str, object]] = []
+    source_pool_rows: list[dict[str, object]] = []
     protocol_violations: list[str] = []
     target_expert_excluded = True
+    contract_info = _midogpp_contract_info(cfg)
 
     repair_cfg = d1._repair_runtime_config(cfg, root)
     per_source_variant = _per_source_variant()
@@ -236,6 +297,16 @@ def run_paired_dense_all4_reliability_confirmation(
         for experiment_seed in cfg.experiment_seeds:
             train_cache = load_feature_cache(_existing_cache_path(cfg.feature_cache_root, seed=experiment_seed, split="train"))
             test_cache = load_feature_cache(_existing_cache_path(cfg.feature_cache_root, seed=experiment_seed, split="test"))
+            if cfg.strict_available_seed_domain_coverage and contract_info is not None:
+                source_pool_rows.extend(
+                    validate_runtime_domain_coverage(
+                        domain_regime=cfg.domain_regime,
+                        eligible_domain_ids=contract_info.eligible_domain_ids,
+                        experiment_seed=int(experiment_seed),
+                        train_metadata=train_cache.metadata,
+                        test_metadata=test_cache.metadata,
+                    )
+                )
             per_source_runtime: dict[str, object] = {}
             largest_summaries: dict[tuple[str, int], d1a.AdaptiveSourceLocalSummary] = {}
 
@@ -435,12 +506,21 @@ def run_paired_dense_all4_reliability_confirmation(
         weak_rows=weak_rows,
         nn_rows=nn_rows,
         model_manifest_rows=model_manifest_rows,
+        source_pool_rows=source_pool_rows,
         decision=decision,
         leakage_status=leakage.status,
         protocol_violations=protocol_violations,
         target_expert_excluded=target_expert_excluded,
     )
     return root
+
+
+def run_dense_late_all_sources_reliability(
+    cfg: PairedDenseAll4ReliabilityConfig,
+    *,
+    artifact_root: str | Path | None = None,
+) -> Path:
+    return run_paired_dense_all4_reliability_confirmation(cfg, artifact_root=artifact_root)
 
 
 def _optional_path(base: Path, value: object) -> Path | None:
@@ -1252,6 +1332,82 @@ def _method_order() -> tuple[str, ...]:
     )
 
 
+def _is_midogpp(cfg: PairedDenseAll4ReliabilityConfig) -> bool:
+    return normalize_domain_regime(cfg.domain_regime) == MIDOGPP_DOMAIN_REGIME
+
+
+def _midogpp_contract_info(cfg: PairedDenseAll4ReliabilityConfig) -> MidogppContractInfo | None:
+    if not _is_midogpp(cfg):
+        return None
+    if cfg.dataset_contract_artifact_root is None:
+        raise ProtocolError("MIDOG++ config is missing dataset_contract_artifact_root.")
+    return load_midogpp_contract_info(cfg.dataset_contract_artifact_root)
+
+
+def _artifact_prefix(cfg: PairedDenseAll4ReliabilityConfig) -> str:
+    return "dense_late_all_sources" if _is_midogpp(cfg) else "paired_dense_all4"
+
+
+def _protocol_wording(cfg: PairedDenseAll4ReliabilityConfig) -> str:
+    return MIDOGPP_PROTOCOL_WORDING if _is_midogpp(cfg) else PROTOCOL_WORDING
+
+
+def _method_aliases(cfg: PairedDenseAll4ReliabilityConfig) -> dict[str, str]:
+    if not _is_midogpp(cfg):
+        return {}
+    return {
+        ROW_EQUAL_ALL4: ROW_EQUAL_ALL_SOURCES,
+        ROW_RELIABILITY_ALL4_WEIGHTED: ROW_RELIABILITY_ALL_SOURCES_WEIGHTED,
+        ROW_POOL_ONLY: ROW_POOL_ONLY_ALL_SOURCES,
+        ROW_BUDGET_ONLY: ROW_BUDGET_ONLY_ALL_SOURCES,
+        ROW_SHRINK025: ROW_SHRINK025_ALL_SOURCES,
+        ROW_SHRINK050: ROW_SHRINK050_ALL_SOURCES,
+        ROW_SHUFFLED: ROW_SHUFFLED_ALL_SOURCES,
+        ROW_INVERSE: ROW_INVERSE_ALL_SOURCES,
+        EQUAL_BUDGET_PAIRING_GROUP: EQUAL_BUDGET_ALL_SOURCES_PAIRING_GROUP,
+        RELIABILITY_BUDGET_PAIRING_GROUP: RELIABILITY_BUDGET_ALL_SOURCES_PAIRING_GROUP,
+        "PAIRED_DENSE_ALL4_SHRINKAGE_PASS": "DENSE_LATE_ALL_SOURCES_SHRINKAGE_PASS",
+        "PAIRED_DENSE_ALL4_RELIABILITY_PASS": "DENSE_LATE_ALL_SOURCES_RELIABILITY_PASS",
+        "EQUAL_DENSE_ALL4_ROBUST_BASELINE": "EQUAL_DENSE_ALL_SOURCES_ROBUST_BASELINE",
+        "PAIRED_DENSE_ALL4_DIAGNOSTIC_ONLY": "DENSE_LATE_ALL_SOURCES_DIAGNOSTIC_ONLY",
+    }
+
+
+def _alias_text(value: object, aliases: Mapping[str, str]) -> object:
+    if not isinstance(value, str):
+        return value
+    if value in aliases:
+        return aliases[value]
+    out = value
+    replacements = (
+        ("paired_dense_all4", "dense_late_all_sources"),
+        ("paired_equal_all4", "dense_late_equal_all_sources"),
+        ("equal_all4", "equal_all_sources"),
+        ("dense_all4", "dense_all_sources"),
+        ("all4", "all_sources"),
+    )
+    for old, new in replacements:
+        out = out.replace(old, new)
+    return out
+
+
+def _alias_rows_for_output(
+    cfg: PairedDenseAll4ReliabilityConfig,
+    rows: Sequence[Mapping[str, object]],
+) -> list[dict[str, object]]:
+    aliases = _method_aliases(cfg)
+    if not aliases:
+        return [dict(row) for row in rows]
+    out: list[dict[str, object]] = []
+    for row in rows:
+        aliased: dict[str, object] = {}
+        for key, value in row.items():
+            aliased_key = str(_alias_text(str(key), aliases))
+            aliased[aliased_key] = _alias_text(value, aliases)
+        out.append(aliased)
+    return out
+
+
 def _write_artifacts(
     root: Path,
     cfg: PairedDenseAll4ReliabilityConfig,
@@ -1275,30 +1431,38 @@ def _write_artifacts(
     weak_rows: Sequence[Mapping[str, object]],
     nn_rows: Sequence[Mapping[str, object]],
     model_manifest_rows: Sequence[Mapping[str, object]],
+    source_pool_rows: Sequence[Mapping[str, object]],
     decision: Mapping[str, object],
     leakage_status: str,
     protocol_violations: Sequence[str],
     target_expert_excluded: bool,
 ) -> None:
-    write_csv_rows(root / "tables" / "paired_dense_all4_downstream_matrix.csv", matrix_rows, columns=_matrix_columns())
-    write_csv_rows(root / "tables" / "paired_dense_all4_gap_summary.csv", gap_rows)
-    write_csv_rows(root / "tables" / "paired_dense_all4_center_summary.csv", center_rows)
-    write_csv_rows(root / "tables" / "paired_dense_all4_summary.csv", summary_rows)
-    write_csv_rows(root / "tables" / "source_reliability_manifest.csv", reliability_rows)
-    write_csv_rows(root / "tables" / "reliability_weight_manifest.csv", weight_rows)
-    write_csv_rows(root / "tables" / "realized_budget_table.csv", budget_rows)
+    prefix = _artifact_prefix(cfg)
+    aliased_matrix = _alias_rows_for_output(cfg, matrix_rows)
+    aliased_late = _alias_rows_for_output(cfg, late_rows)
+    aliased_real = _alias_rows_for_output(cfg, real_feature_rows)
+    aliased_summary_rows = _alias_rows_for_output(cfg, summary_rows)
+    aliased_decision = _alias_rows_for_output(cfg, [decision])[0]
+    write_csv_rows(root / "tables" / f"{prefix}_downstream_matrix.csv", aliased_matrix, columns=_matrix_columns())
+    write_csv_rows(root / "tables" / f"{prefix}_gap_summary.csv", _alias_rows_for_output(cfg, gap_rows))
+    write_csv_rows(root / "tables" / f"{prefix}_center_summary.csv", _alias_rows_for_output(cfg, center_rows))
+    write_csv_rows(root / "tables" / f"{prefix}_summary.csv", aliased_summary_rows)
+    write_csv_rows(root / "tables" / "source_reliability_manifest.csv", _alias_rows_for_output(cfg, reliability_rows))
+    write_csv_rows(root / "tables" / "reliability_weight_manifest.csv", _alias_rows_for_output(cfg, weight_rows))
+    write_csv_rows(root / "tables" / "realized_budget_table.csv", _alias_rows_for_output(cfg, budget_rows))
     write_csv_rows(root / "tables" / "excluded_cell_report.csv", excluded_rows)
-    write_csv_rows(root / "tables" / "paired_generation_invariant_audit.csv", invariant_rows)
-    write_csv_rows(root / "tables" / "paired_delta_summary.csv", paired_delta_rows)
-    write_csv_rows(root / "tables" / "negative_control_summary.csv", negative_rows)
-    write_csv_rows(root / "tables" / "late_aggregation_matrix.csv", late_rows, columns=_matrix_columns())
-    write_csv_rows(root / "tables" / "real_feature_reference_matrix.csv", real_feature_rows, columns=_matrix_columns())
-    write_csv_rows(root / "tables" / "generated_component_coverage_audit.csv", coverage_rows)
-    write_csv_rows(root / "tables" / "weak_source_audit.csv", weak_rows)
-    write_csv_rows(root / "tables" / "nearest_neighbor_memorization_audit.csv", nn_rows)
+    write_csv_rows(root / "tables" / "paired_generation_invariant_audit.csv", _alias_rows_for_output(cfg, invariant_rows))
+    write_csv_rows(root / "tables" / "paired_delta_summary.csv", _alias_rows_for_output(cfg, paired_delta_rows))
+    write_csv_rows(root / "tables" / "negative_control_summary.csv", _alias_rows_for_output(cfg, negative_rows))
+    write_csv_rows(root / "tables" / "late_aggregation_matrix.csv", aliased_late, columns=_matrix_columns())
+    write_csv_rows(root / "tables" / "real_feature_reference_matrix.csv", aliased_real, columns=_matrix_columns())
+    write_csv_rows(root / "tables" / "generated_component_coverage_audit.csv", _alias_rows_for_output(cfg, coverage_rows))
+    write_csv_rows(root / "tables" / "weak_source_audit.csv", _alias_rows_for_output(cfg, weak_rows))
+    write_csv_rows(root / "tables" / "nearest_neighbor_memorization_audit.csv", _alias_rows_for_output(cfg, nn_rows))
     write_csv_rows(root / "tables" / "exported_source_summary_manifest.csv", summary_manifest_rows, columns=d1a._summary_manifest_columns())
     write_csv_rows(root / "tables" / "source_summary_diagnostics.csv", diagnostic_rows, columns=d1a._diagnostic_columns())
-    write_csv_rows(root / "manifests" / "paired_dense_all4_prior_model_manifest.csv", model_manifest_rows)
+    write_csv_rows(root / "manifests" / f"{prefix}_prior_model_manifest.csv", _alias_rows_for_output(cfg, model_manifest_rows))
+    write_csv_rows(root / "manifests" / f"{prefix}_source_pool_manifest.csv", source_pool_rows)
     leakage = build_leakage_report(
         target_support_labels_for_selection=False,
         target_eval_labels_for_scoring_only=True,
@@ -1308,7 +1472,7 @@ def _write_artifacts(
     )
     write_json(root / "reports" / "leakage_report.json", leakage.to_json_dict())
     write_json(root / "manifests" / "protocol_manifest.json", _protocol_manifest(cfg, target_expert_excluded))
-    _write_decision_summary(root, decision, leakage_status=leakage_status)
+    _write_decision_summary(root, aliased_decision, cfg=cfg, leakage_status=leakage_status)
     write_json(root / "run_config_resolved.yaml", _resolved_config(cfg))
 
 
@@ -1325,10 +1489,16 @@ def _matrix_columns() -> tuple[str, ...]:
 
 
 def _protocol_manifest(cfg: PairedDenseAll4ReliabilityConfig, target_expert_excluded: bool) -> dict[str, object]:
-    return {
+    contract_info = _midogpp_contract_info(cfg)
+    eligible = list(contract_info.eligible_domain_ids) if contract_info is not None else list(cfg.heldout_centers)
+    source_count = len(eligible) - 1
+    out = {
         "schema_version": "cvae_rebuild_paired_dense_all4_reliability_protocol_manifest_v1",
         "experiment_name": cfg.name,
-        "experiment_type": "paired_dense_all4_reliability_confirmation",
+        "experiment_type": "dense_late_all_sources_reliability" if _is_midogpp(cfg) else "paired_dense_all4_reliability_confirmation",
+        "domain_regime": normalize_domain_regime(cfg.domain_regime),
+        "eligible_domain_ids": eligible,
+        "expected_source_count": int(source_count),
         "primary_variant": cfg.primary_variant,
         "primary_method": cfg.primary_method,
         "target_support_features_for_selection": False,
@@ -1339,7 +1509,16 @@ def _protocol_manifest(cfg: PairedDenseAll4ReliabilityConfig, target_expert_excl
         "target_eval_labels_used_for_reliability": False,
         "target_eval_labels_used_for_weighting": False,
         "target_eval_labels_used_for_selection": False,
-        "dense_all4_fixed_inclusion": True,
+        "dense_all4_fixed_inclusion": not _is_midogpp(cfg),
+        "dense_all_sources_fixed_inclusion": _is_midogpp(cfg),
+        "domain_4_excluded": "4" not in set(eligible),
+        "all_eligible_heldouts_complete": True,
+        "class_order_match": True,
+        "class_label_names": {"0": "hard_negative", "1": "mitotic"},
+        "cache_seed": list(cfg.experiment_seeds),
+        "cache_root_matches_midogpp_root": "pathology_embeddings_midogpp_annotation_patch_v1" in cfg.feature_cache_root.as_posix()
+        if _is_midogpp(cfg)
+        else False,
         "top_k_selection_enabled": False,
         "heldout_excluded_reliability_transform_locked": True,
         "inverse_reliability_definition": "rank_reversal_matched_entropy",
@@ -1352,20 +1531,39 @@ def _protocol_manifest(cfg: PairedDenseAll4ReliabilityConfig, target_expert_excl
             "not sparse expert selection and not target-conditioned routing"
         ),
     }
+    if contract_info is not None:
+        out.update(
+            {
+                "dataset_contract_artifact_root": str(contract_info.artifact_root),
+                "dataset_contract_fingerprints": contract_info.fingerprints,
+                "selected_domain_axis": contract_info.selected_domain_axis,
+                "ineligible_domain_ids": list(contract_info.ineligible_domain_ids),
+            }
+        )
+    out["protocol_wording"] = _protocol_wording(cfg)
+    return out
 
 
-def _write_decision_summary(root: Path, decision: Mapping[str, object], *, leakage_status: str) -> None:
+def _write_decision_summary(
+    root: Path,
+    decision: Mapping[str, object],
+    *,
+    cfg: PairedDenseAll4ReliabilityConfig,
+    leakage_status: str,
+) -> None:
     verdict = str(decision.get("primary_verdict", ""))
+    title = "Dense-Late All-Sources MIDOG++ Reliability Pilot" if _is_midogpp(cfg) else "Paired Dense-All4 Reliability Confirmation"
+    equal_key = "equal_all_sources_center_equal_mean_bacc" if _is_midogpp(cfg) else "equal_all4_center_equal_mean_bacc"
     text = "\n".join(
         [
-            "# Paired Dense-All4 Reliability Confirmation",
+            f"# {title}",
             "",
             "## Summary",
             "",
             f"- Primary method: `{decision.get('primary_method', PRIMARY_PAIRED_METHOD)}`",
             f"- Best reliability method: `{decision.get('best_reliability_method', '')}`",
             f"- Primary verdict: `{verdict}`",
-            f"- Equal all4 center-equal BACC: {_format_float(decision.get('equal_all4_center_equal_mean_bacc'))}",
+            f"- Equal all-source center-equal BACC: {_format_float(decision.get(equal_key))}",
             f"- Best center-equal BACC: {_format_float(decision.get('best_center_equal_mean_bacc'))}",
             f"- Best delta vs equal center-equal BACC: {_format_float(decision.get('best_delta_vs_equal_center_equal_bacc'))}",
             f"- Best mean paired delta BACC: {_format_float(decision.get('best_mean_paired_delta_bacc'))}",
@@ -1377,10 +1575,10 @@ def _write_decision_summary(root: Path, decision: Mapping[str, object], *, leaka
             "",
             "## Protocol Boundary",
             "",
-            PROTOCOL_WORDING,
+            _protocol_wording(cfg),
             "",
             "Heldout target labels are final scoring only. Reliability is recomputed and manifested per heldout center with the target center excluded.",
-            "Do not claim sparse routing or expert selection from this dense all4 experiment.",
+            "Do not claim sparse routing or expert selection from this dense all-source experiment.",
             "",
             "## Thesis Interpretation",
             "",
@@ -1394,6 +1592,12 @@ def _write_decision_summary(root: Path, decision: Mapping[str, object], *, leaka
 
 
 def _interpretation(verdict: str) -> str:
+    if verdict == "DENSE_LATE_ALL_SOURCES_SHRINKAGE_PASS":
+        return "Source-only reliability contains compatibility signal in the MIDOG++ all-source pilot, but this seed-42 result is not a stability claim."
+    if verdict == "DENSE_LATE_ALL_SOURCES_RELIABILITY_PASS":
+        return "Source-only reliability is promising for MIDOG++ dense all-source generated-embedding aggregation under the pilot protocol."
+    if verdict == "EQUAL_DENSE_ALL_SOURCES_ROBUST_BASELINE":
+        return "Equal dense all-source aggregation is the robust MIDOG++ pilot baseline; current source-only reliability is insufficient as a compatibility proxy."
     if verdict == "PAIRED_DENSE_ALL4_SHRINKAGE_PASS":
         return "Source-only reliability contains compatibility signal, but raw reliability is noisy; conservative shrinkage is the defensible dense aggregation strategy."
     if verdict == "PAIRED_DENSE_ALL4_RELIABILITY_PASS":
@@ -1411,7 +1615,12 @@ def _resolved_config(cfg: PairedDenseAll4ReliabilityConfig) -> dict[str, object]
         "d1_2_artifact_root": "" if cfg.d1_2_artifact_root is None else str(cfg.d1_2_artifact_root),
         "d1_4_artifact_root": "" if cfg.d1_4_artifact_root is None else str(cfg.d1_4_artifact_root),
         "feature_cache_root": str(cfg.feature_cache_root),
+        "dataset_contract_artifact_root": "" if cfg.dataset_contract_artifact_root is None else str(cfg.dataset_contract_artifact_root),
+        "cache_report_path": "" if cfg.cache_report_path is None else str(cfg.cache_report_path),
         "backbone": cfg.backbone,
+        "domain_regime": normalize_domain_regime(cfg.domain_regime),
+        "strict_full_run_matrix": cfg.strict_full_run_matrix,
+        "strict_available_seed_domain_coverage": cfg.strict_available_seed_domain_coverage,
         "experiment_seeds": list(cfg.experiment_seeds),
         "heldout_centers": list(cfg.heldout_centers),
         "replicate_seeds": list(cfg.replicate_seeds),

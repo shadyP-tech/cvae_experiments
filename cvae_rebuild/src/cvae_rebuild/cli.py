@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import Mapping
+
+import yaml
 
 from .config import load_config
 from .covariance_prior import load_covariance_prior_config, run_covariance_prior_confirmation
@@ -68,7 +71,9 @@ from .support_calibrated_component_union_prior import (
     run_support_calibrated_component_union_prior,
 )
 from .paired_dense_all4_reliability_confirmation import (
+    load_dense_late_all_sources_reliability_config,
     load_paired_dense_all4_reliability_config,
+    run_dense_late_all_sources_reliability,
     run_paired_dense_all4_reliability_confirmation,
 )
 from .paired_component_coverage_audit import (
@@ -102,6 +107,24 @@ from .labeled_support_random_vs_dense_policy_calibration import (
     load_labeled_support_policy_calibration_config,
     run_labeled_support_policy_calibration,
 )
+
+
+def _load_config_for_validation(path: str | Path) -> object:
+    source = Path(path)
+    with source.open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle) or {}
+    if not isinstance(data, Mapping):
+        raise ValueError(f"Config must be a mapping: {path}")
+    keys = set(str(key) for key in data)
+    if "dense_late_all_sources_reliability" in keys or "paired_dense_all4_reliability" in keys:
+        return load_paired_dense_all4_reliability_config(source)
+    if "source_inner_class_conditional_positive_union" in keys:
+        return load_source_inner_positive_union_config(source)
+    if "fixed_beta050_positive_union_confirmation" in keys:
+        return load_fixed_beta050_positive_union_config(source)
+    if "source_inner_harm_gated_positive_union" in keys:
+        return load_harm_gated_positive_union_config(source)
+    return load_config(source)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -315,6 +338,13 @@ def main(argv: list[str] | None = None) -> int:
     paired_dense_all4_reliability.add_argument("--config", required=True)
     paired_dense_all4_reliability.add_argument("--artifact-root", default=None)
 
+    dense_late_all_sources = sub.add_parser(
+        "diagnose-dense-late-all-sources-reliability",
+        help="Run the MIDOG++ dense-late all-source reliability pilot.",
+    )
+    dense_late_all_sources.add_argument("--config", required=True)
+    dense_late_all_sources.add_argument("--artifact-root", default=None)
+
     paired_component_coverage = sub.add_parser(
         "diagnose-paired-component-coverage-audit",
         help="Run the paired dense-all4 component coverage sampling-fidelity audit.",
@@ -394,6 +424,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "diagnose-paired-dense-all4-reliability":
         cfg = load_paired_dense_all4_reliability_config(args.config)
         root = run_paired_dense_all4_reliability_confirmation(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
+    if args.command == "diagnose-dense-late-all-sources-reliability":
+        cfg = load_dense_late_all_sources_reliability_config(args.config)
+        root = run_dense_late_all_sources_reliability(
             cfg,
             artifact_root=Path(args.artifact_root) if args.artifact_root else None,
         )
@@ -623,10 +661,11 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(root)
         return 0
-    cfg = load_config(args.config)
     if args.command == "validate-config":
+        cfg = _load_config_for_validation(args.config)
         print(f"OK: {cfg.name}")
         return 0
+    cfg = load_config(args.config)
     if args.command == "smoke-artifacts":
         root = run_artifact_contract_smoke(
             cfg,

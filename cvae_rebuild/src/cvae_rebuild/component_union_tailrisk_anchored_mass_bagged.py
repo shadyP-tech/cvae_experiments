@@ -36,6 +36,16 @@ from .preservation_sampling import DIAGNOSTIC_SELECTION, PRIMARY_SELECTION, Runt
 from .protocol import ProtocolError, assert_candidate_pool, build_leakage_report
 from .reporting import prepare_artifact_dirs, write_csv_rows, write_json
 from .splits import candidate_experts
+from .domain_regime import (
+    CAMELYON17_DOMAIN_REGIME,
+    MIDOGPP_DOMAIN_REGIME,
+    MidogppContractInfo,
+    load_midogpp_contract_info,
+    normalize_domain_regime,
+    validate_cache_report_split_counts,
+    validate_domain_regime_config,
+    validate_runtime_domain_coverage,
+)
 
 from . import component_union_mass_bagged as mb
 from . import decentralized_adaptive_gmm_prior as d1a
@@ -56,6 +66,7 @@ MULTIPANEL_CANONICAL_RANDOM_BAG_METHOD = "same_cell_single_random_mass_bag_canon
 MULTIPANEL_POOLED_ANCHOR_METHOD = "component_union_tailrisk_multipanel_pooled_shrink050"
 MULTIPANEL_SOURCE_WEIGHTING = "tailrisk_multipanel_shrink050_random_mass_bag_blend050"
 POSITIVE_UNION_TAILRISK_NAME = "virchow2_cvae_source_inner_class_conditional_positive_union_v1"
+MIDOGPP_POSITIVE_UNION_TAILRISK_NAME = "virchow2_cvae_source_inner_class_conditional_positive_union_midogpp_v1"
 PRIMARY_POSITIVE_UNION_METHOD = "source_inner_class_conditional_positive_union_v1"
 POSITIVE_UNION_SOURCE_WEIGHTING = "source_inner_class_conditional_positive_union"
 POSITIVE_UNION_PRIMARY_POOLING = "source_inner_selected_class_conditional_positive_union"
@@ -162,6 +173,10 @@ class TailRiskAnchoredConfig:
     classifier_max_iter: int
     classifier_class_weight: str
     classifier_seed: int | None
+    domain_regime: str = CAMELYON17_DOMAIN_REGIME
+    strict_available_seed_domain_coverage: bool = False
+    dataset_contract_artifact_root: Path | None = None
+    cache_report_path: Path | None = None
 
     @property
     def all_replicate_seeds(self) -> tuple[int, ...]:
@@ -656,6 +671,10 @@ def parse_source_inner_positive_union_config(
         classifier_max_iter=int(classifier["max_iter"]),
         classifier_class_weight=str(classifier["class_weight"]),
         classifier_seed=None if classifier.get("classifier_seed") is None else int(classifier["classifier_seed"]),
+        domain_regime=normalize_domain_regime(run.get("domain_regime")),
+        strict_available_seed_domain_coverage=bool(run.get("strict_available_seed_domain_coverage", False)),
+        dataset_contract_artifact_root=_optional_path(base, inputs.get("dataset_contract_artifact_root")),
+        cache_report_path=_optional_path(base, inputs.get("cache_report_path")),
         prior_tailrisk_artifact_root=_optional_path(base, inputs.get("prior_tailrisk_artifact_root")),
         panel_seed_groups=panel_seed_groups,
         primary_noninferiority_margin=float(positive_union.get("primary_noninferiority_margin", 0.005)),
@@ -677,8 +696,19 @@ def parse_source_inner_positive_union_config(
 
 
 def validate_source_inner_positive_union_config(cfg: SourceInnerPositiveUnionConfig) -> None:
-    if cfg.name != POSITIVE_UNION_TAILRISK_NAME:
-        raise ProtocolError(f"Positive-union experiment name must be {POSITIVE_UNION_TAILRISK_NAME!r}.")
+    regime = normalize_domain_regime(cfg.domain_regime)
+    contract_info = validate_domain_regime_config(
+        domain_regime=regime,
+        heldout_centers=cfg.heldout_centers,
+        dataset_contract_artifact_root=cfg.dataset_contract_artifact_root,
+        artifact_root=cfg.artifact_root,
+        strict_full_run_matrix=cfg.strict_full_run_matrix,
+        strict_available_seed_domain_coverage=cfg.strict_available_seed_domain_coverage,
+    )
+    validate_cache_report_split_counts(cfg.cache_report_path, contract_info)
+    expected_name = POSITIVE_UNION_TAILRISK_NAME if regime == CAMELYON17_DOMAIN_REGIME else MIDOGPP_POSITIVE_UNION_TAILRISK_NAME
+    if cfg.name != expected_name:
+        raise ProtocolError(f"Positive-union experiment name must be {expected_name!r}.")
     if cfg.backbone != "virchow2":
         raise ProtocolError("Positive-union component union is locked to backbone=virchow2.")
     if cfg.primary_variant != PRIMARY_VARIANT:
@@ -701,8 +731,6 @@ def validate_source_inner_positive_union_config(cfg: SourceInnerPositiveUnionCon
         raise ProtocolError("positive_union_eps must be locked to 1e-8.")
     if cfg.candidate_components_per_source_class != (4, 3, 2, 1):
         raise ProtocolError("candidate_components_per_source_class must be locked to [4, 3, 2, 1].")
-    if len(cfg.heldout_centers) != 5:
-        raise ProtocolError("Positive-union component union expects exactly five centers.")
     if cfg.gmm_covariance_type != "diag":
         raise ProtocolError("gmm_covariance_type must be diag.")
     if not math.isclose(cfg.primary_shrink_lambda, 0.5, rel_tol=0.0, abs_tol=1.0e-12):
@@ -1652,6 +1680,8 @@ def run_multipanel_tailrisk_component_union(
     harm_gated_mode = isinstance(cfg, SourceInnerHarmGatedPositiveUnionConfig)
     positive_union_mode = isinstance(cfg, SourceInnerPositiveUnionConfig) and not fixed_beta050_mode and not harm_gated_mode
     root = prepare_artifact_dirs(Path(artifact_root) if artifact_root is not None else cfg.artifact_root)
+    if _is_midogpp(cfg) and "cvae_rebuild/artifacts/midogpp" not in root.as_posix():
+        raise ProtocolError("MIDOG++ positive-union artifact_root must be under cvae_rebuild/artifacts/midogpp/.")
     (root / "checkpoints").mkdir(parents=True, exist_ok=True)
     (root / "summaries").mkdir(parents=True, exist_ok=True)
     (root / "dense_anchor_summaries").mkdir(parents=True, exist_ok=True)
@@ -1686,8 +1716,10 @@ def run_multipanel_tailrisk_component_union(
     fixed_beta050_source_inner_rows: list[dict[str, object]] = []
     harm_gated_replacement_seed_rows: list[dict[str, object]] = []
     model_manifest_rows: list[dict[str, object]] = []
+    source_pool_rows: list[dict[str, object]] = []
     protocol_violations: list[str] = []
     target_expert_excluded = True
+    contract_info = _midogpp_contract_info(cfg)
 
     source_union_refs = d1._load_reference_values(
         cfg.source_union_gmm_artifact_root,
@@ -1721,6 +1753,16 @@ def run_multipanel_tailrisk_component_union(
         for experiment_seed in experiment_seeds_to_run:
             train_cache = load_feature_cache(_existing_cache_path(cfg.feature_cache_root, seed=experiment_seed, split="train"))
             test_cache = load_feature_cache(_existing_cache_path(cfg.feature_cache_root, seed=experiment_seed, split="test"))
+            if cfg.strict_available_seed_domain_coverage and contract_info is not None:
+                source_pool_rows.extend(
+                    validate_runtime_domain_coverage(
+                        domain_regime=cfg.domain_regime,
+                        eligible_domain_ids=contract_info.eligible_domain_ids,
+                        experiment_seed=int(experiment_seed),
+                        train_metadata=train_cache.metadata,
+                        test_metadata=test_cache.metadata,
+                    )
+                )
             per_source_runtime: dict[str, RuntimeSource] = {}
             dense_summaries: dict[tuple[str, int], d1a.AdaptiveSourceLocalSummary] = {}
             gmm_summaries: dict[tuple[str, int], d1a.AdaptiveSourceLocalSummary] = {}
@@ -2070,6 +2112,7 @@ def run_multipanel_tailrisk_component_union(
             paired_generation_rows=paired_generation_rows,
             eligibility_rows=eligibility_rows,
             model_manifest_rows=model_manifest_rows,
+            source_pool_rows=source_pool_rows,
             decision=decision,
             leakage=leakage,
             protocol_violations=protocol_violations,
@@ -2146,6 +2189,18 @@ def _multipanel_panel_for_seed(cfg: MultipanelTailRiskConfig, seed: int) -> str:
         if int(seed) in {int(value) for value in seeds}:
             return str(panel)
     raise ProtocolError(f"Seed {seed} is not in the locked multipanel seed groups.")
+
+
+def _is_midogpp(cfg: TailRiskAnchoredConfig) -> bool:
+    return normalize_domain_regime(cfg.domain_regime) == MIDOGPP_DOMAIN_REGIME
+
+
+def _midogpp_contract_info(cfg: TailRiskAnchoredConfig) -> MidogppContractInfo | None:
+    if not _is_midogpp(cfg):
+        return None
+    if cfg.dataset_contract_artifact_root is None:
+        raise ProtocolError("MIDOG++ config is missing dataset_contract_artifact_root.")
+    return load_midogpp_contract_info(cfg.dataset_contract_artifact_root)
 
 
 def _resolve_harm_gated_primary_seed_plan(
@@ -6052,6 +6107,7 @@ def _write_positive_union_artifacts(
     paired_generation_rows: Sequence[Mapping[str, object]],
     eligibility_rows: Sequence[Mapping[str, object]],
     model_manifest_rows: Sequence[Mapping[str, object]],
+    source_pool_rows: Sequence[Mapping[str, object]],
     decision: Mapping[str, object],
     leakage: object,
     protocol_violations: Sequence[str],
@@ -6076,7 +6132,17 @@ def _write_positive_union_artifacts(
     write_csv_rows(root / "tables" / "paired_generation_audit.csv", paired_generation_rows)
     write_csv_rows(root / "tables" / "eligibility_audit.csv", eligibility_rows)
     write_csv_rows(root / "manifests" / "positive_union_model_manifest.csv", model_manifest_rows)
+    write_csv_rows(root / "manifests" / "positive_union_source_pool_manifest.csv", source_pool_rows)
+    write_json(
+        root / "manifests" / "positive_union_rule_selection_manifest.json",
+        {
+            "schema_version": "cvae_rebuild_positive_union_rule_selection_manifest_v1",
+            "domain_regime": normalize_domain_regime(cfg.domain_regime),
+            "selection_rows": _positive_union_rule_selection_manifest_rows(cfg, source_inner_selection_rows, source_pool_rows),
+        },
+    )
     write_json(root / "reports" / "leakage_report.json", leakage.to_json_dict())
+    contract_info = _midogpp_contract_info(cfg)
     write_json(
         root / "manifests" / "protocol_manifest.json",
         {
@@ -6084,6 +6150,9 @@ def _write_positive_union_artifacts(
             "experiment_name": cfg.name,
             "primary_method": cfg.primary_method,
             "experiment_type": "source_only_class_conditional_positive_union_tailrisk_repair",
+            "domain_regime": normalize_domain_regime(cfg.domain_regime),
+            "eligible_domain_ids": list(contract_info.eligible_domain_ids) if contract_info is not None else list(cfg.heldout_centers),
+            "dataset_contract_fingerprints": contract_info.fingerprints if contract_info is not None else {},
             "target_expert_excluded": bool(target_expert_excluded),
             "target_support_used": False,
             "target_support_labels_for_selection": False,
@@ -6119,6 +6188,40 @@ def _write_positive_union_artifacts(
     )
     write_json(root / "run_config_resolved.yaml", _resolved_positive_union_config(cfg))
     _write_positive_union_decision_summary(root, decision)
+
+
+def _positive_union_rule_selection_manifest_rows(
+    cfg: SourceInnerPositiveUnionConfig,
+    selection_rows: Sequence[Mapping[str, object]],
+    source_pool_rows: Sequence[Mapping[str, object]],
+) -> list[dict[str, object]]:
+    pool_by_cell = {
+        (str(row.get("experiment_seed")), str(row.get("heldout_domain_id"))): row
+        for row in source_pool_rows
+    }
+    out = []
+    for row in selection_rows:
+        seed = str(row.get("experiment_seed", ""))
+        heldout = str(row.get("heldout_center", ""))
+        fallback_sources = list(candidate_experts(cfg.heldout_centers, heldout))
+        pool = pool_by_cell.get((seed, heldout), {})
+        out.append(
+            {
+                "experiment_seed": seed,
+                "heldout_domain": heldout,
+                "candidate_sources": pool.get("source_domain_ids", json.dumps(fallback_sources)),
+                "expected_source_count": pool.get("expected_source_count", len(cfg.heldout_centers) - 1),
+                "actual_source_count": pool.get("actual_source_count", len(fallback_sources)),
+                "selected_rule": row.get("selected_rule", ""),
+                "selected_beta": row.get("selected_beta", ""),
+                "source_inner_positive_count": row.get("source_inner_positive_count", ""),
+                "source_inner_negative_count": row.get("source_inner_negative_count", ""),
+                "selection_signal": "source_inner_only",
+                "target_labels_used_for_selection": False,
+                "target_support_used": False,
+            }
+        )
+    return out
 
 
 def _write_fixed_beta050_positive_union_artifacts(
@@ -8206,10 +8309,14 @@ def _resolved_config(cfg: TailRiskAnchoredConfig) -> dict[str, object]:
             "shrink050_artifact_root": "" if cfg.shrink050_artifact_root is None else str(cfg.shrink050_artifact_root),
             "source_union_gmm_artifact_root": "" if cfg.source_union_gmm_artifact_root is None else str(cfg.source_union_gmm_artifact_root),
             "balanced_gmm_artifact_root": "" if cfg.balanced_gmm_artifact_root is None else str(cfg.balanced_gmm_artifact_root),
+            "dataset_contract_artifact_root": "" if cfg.dataset_contract_artifact_root is None else str(cfg.dataset_contract_artifact_root),
+            "cache_report_path": "" if cfg.cache_report_path is None else str(cfg.cache_report_path),
             "backbone": cfg.backbone,
         },
         "run_matrix": {
             "strict_full_run_matrix": cfg.strict_full_run_matrix,
+            "strict_available_seed_domain_coverage": cfg.strict_available_seed_domain_coverage,
+            "domain_regime": normalize_domain_regime(cfg.domain_regime),
             "experiment_seeds": list(cfg.experiment_seeds),
             "heldout_centers": list(cfg.heldout_centers),
             "replicate_seeds": list(cfg.replicate_seeds),

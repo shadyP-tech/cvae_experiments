@@ -1,0 +1,82 @@
+experiment:
+  name: virchow2_cvae_source_inner_class_conditional_positive_union_midogpp_v1
+  artifact_root: cvae_rebuild/artifacts/midogpp/virchow2_cvae_source_inner_class_conditional_positive_union_midogpp_v1
+  primary_variant: pca64_beta001
+
+inputs:
+  feature_cache_root: sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2
+  repair_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_preservation_repair_v1
+  paired_dense_artifact_root: cvae_rebuild/artifacts/midogpp/virchow2_cvae_dense_late_all_sources_midogpp_v1
+  mass_bagged_artifact_root:
+  shrink050_artifact_root:
+  source_union_gmm_artifact_root:
+  balanced_gmm_artifact_root:
+  prior_tailrisk_artifact_root:
+  support_calibrated_artifact_root:
+  dataset_contract_artifact_root: datasets/midogpp/artifacts/midogpp_annotation_patch_v1
+  cache_report_path: sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2/seed42/reports/cache_builder_report.json
+  backbone: virchow2
+
+run_matrix:
+  domain_regime: midogpp_annotation_patch_v1
+  strict_full_run_matrix: false
+  strict_available_seed_domain_coverage: true
+  experiment_seeds: [42]
+  heldout_centers: ["0", "1", "2", "3", "5", "6", "7", "8", "9"]
+  replicate_seeds: [17, 23, 31]
+  fresh_replicate_seeds: [101, 103, 107, 109, 113, 127]
+
+generation:
+  synthetic_per_class_total: 128
+  min_per_source_per_class: 8
+
+source_inner_class_conditional_positive_union:
+  primary_method: source_inner_class_conditional_positive_union_v1
+  primary_shrink_lambda: 0.5
+  random_mass_bag_size: 11
+  random_mass_bag_alpha: 4.0
+  blend_alpha: 0.5
+  matched_shuffled_reliability_null_permutations: 0
+  panel_seed_groups:
+    canonical: [17, 23, 31]
+    fresh_a: [101, 103, 107]
+    fresh_b: [109, 113, 127]
+  candidate_pooling_rules:
+    - arithmetic_mean
+    - positive_union_beta025
+    - positive_union_beta050
+    - positive_union_beta100
+  positive_label: 1
+  prediction_threshold: 0.5
+  min_source_inner_positive_count: 5
+  positive_union_eps: 1.0e-8
+  source_inner_bacc_noninferiority_margin: 0.010
+  source_inner_class0_recall_margin: 0.015
+  source_inner_predicted_positive_rate_delta: 0.050
+  beta100_class0_recall_margin: 0.005
+  beta100_precision_margin: 0.010
+  candidate_components_per_source_class: [4, 3, 2, 1]
+  min_samples_per_component: 8
+  source_weighting: source_inner_class_conditional_positive_union
+  gmm_covariance_type: diag
+  gmm_reg_covar: 1.0e-4
+  gmm_n_init: 1
+  gmm_max_iter: 100
+  min_component_weight: 0.02
+  variance_floor: 1.0e-5
+  variance_ceiling_multiplier: 16.0
+  primary_pooling: source_inner_selected_class_conditional_positive_union
+  reliability_floor_score: 0.05
+  reliability_epsilon: 1.0e-8
+  anchor_repro_tolerance: 1.0e-4
+  primary_noninferiority_margin: 0.005
+  weak_pass_noninferiority_margin: 0.010
+  tailrisk_transfer_threshold: -0.010
+
+classifier:
+  type: sklearn_logistic_regression
+  solver: lbfgs
+  C: 1.0
+  max_iter: 2000
+  class_weight: balanced
+  classifier_seed: null
