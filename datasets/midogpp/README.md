@@ -57,6 +57,15 @@ PYTHONPATH=datasets/midogpp/src conda run -n thesis python \
   --artifact-root datasets/midogpp/artifacts/midogpp_annotation_patch_v1
 ```
 
+Inspect eligible domains and downstream cache hints:
+
+```bash
+PYTHONPATH=datasets/midogpp/src conda run -n thesis python \
+  datasets/midogpp/scripts/inspect_cache_and_domains.py \
+  --artifact-root datasets/midogpp/artifacts/midogpp_annotation_patch_v1 \
+  --cache-report sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2/seed42/reports/cache_builder_report.json
+```
+
 Run tests:
 
 ```bash

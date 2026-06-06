@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="455" viewBox="0 0 980 455">
+  <rect width="980" height="455" fill="#ffffff"/>
+
+  <text x="28" y="166" transform="rotate(-90 28 166)" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#111111" text-anchor="middle">BACC</text>
+
+  <line x1="118" y1="36" x2="950" y2="36" stroke="#d9d9d9" stroke-width="1.1"/>
+  <text x="84" y="42" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="end">1.00</text>
+  <line x1="118" y1="101" x2="950" y2="101" stroke="#d9d9d9" stroke-width="1.1"/>
+  <text x="84" y="107" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="end">0.75</text>
+  <line x1="118" y1="166" x2="950" y2="166" stroke="#d9d9d9" stroke-width="1.1"/>
+  <text x="84" y="172" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="end">0.50</text>
+  <line x1="118" y1="231" x2="950" y2="231" stroke="#d9d9d9" stroke-width="1.1"/>
+  <text x="84" y="237" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="end">0.25</text>
+  <line x1="118" y1="296" x2="950" y2="296" stroke="#bdbdbd" stroke-width="1.5"/>
+  <text x="84" y="302" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="end">0.00</text>
+  <text x="534" y="442" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#111111" text-anchor="middle">Experiments</text>
+
+  <rect x="147" y="86.1" width="76" height="209.9" fill="#1F5F8B" stroke="#0B1F3A" stroke-width="1.7"/>
+  <text x="185" y="75.5" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#1F5F8B" text-anchor="middle">0.8073</text>
+  <text x="185" y="345" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#111111" text-anchor="middle"><tspan x="185" dy="0">PCA64 GMM</tspan><tspan x="185" dy="17">selected</tspan></text>
+  <text x="185" y="407" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#666666" text-anchor="middle">non-CVAE diagnostic</text>
+
+  <rect x="377" y="76.5" width="76" height="219.5" fill="#ffffff" stroke="#6F879D" stroke-width="1.7"/>
+  <text x="415" y="65.9" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#111111" text-anchor="middle">0.8442</text>
+  <text x="415" y="345" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#111111" text-anchor="middle"><tspan x="415" dy="0">PCA64 GMM</tspan><tspan x="415" dy="17">oracle</tspan></text>
+  <text x="415" y="407" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#666666" text-anchor="middle">diagnostic upper</text>
+
+  <rect x="607" y="91.0" width="76" height="205.0" fill="#82B6CF" stroke="#1F5F8B" stroke-width="1.7"/>
+  <text x="645" y="80.4" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#1F5F8B" text-anchor="middle">0.7883</text>
+  <text x="645" y="345" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#111111" text-anchor="middle"><tspan x="645" dy="0">C6.2 dense</tspan><tspan x="645" dy="17">probability</tspan><tspan x="645" dy="17">average</tspan></text>
+  <text x="645" y="407" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#666666" text-anchor="middle">dense CVAE composition</text>
+
+  <rect x="837" y="84.3" width="76" height="211.7" fill="#0B1F3A" stroke="#0B1F3A" stroke-width="1.7"/>
+  <text x="875" y="73.7" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#0B1F3A" text-anchor="middle">0.8144</text>
+  <text x="875" y="345" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#111111" text-anchor="middle"><tspan x="875" dy="0">C6.3 dense</tspan><tspan x="875" dy="17">geometric</tspan><tspan x="875" dy="17">pooling</tspan></text>
+  <text x="875" y="407" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#666666" text-anchor="middle">dense CVAE composition</text>
+  <line x1="118" y1="88" x2="950" y2="88" stroke="#8a8a8a" stroke-width="1.5" stroke-dasharray="9 7"/>
+</svg>

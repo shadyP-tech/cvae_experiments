@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="640" viewBox="0 0 1600 640" role="img" aria-label="C6.3 dense late composition over frozen CVAE-generated classifiers">
+  <defs>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#82B6CF"/>
+    </marker>
+    <marker id="arrow-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6F879D"/>
+    </marker>
+    <style>
+      .bg { fill: #000000; }
+      .panel { fill: #ffffff; stroke: #ffffff; stroke-width: 1.4; rx: 28; }
+      .panel-soft { fill: #f7f7f7; stroke: #111111; stroke-width: 1.2; rx: 10; }
+      .chip { fill: #f7fbfd; stroke: #1F5F8B; stroke-width: 1.4; rx: 8; }
+      .accent { fill: #eaf5fa; stroke: #1F5F8B; stroke-width: 2.2; rx: 10; }
+      .title { font: 700 30px Arial, Helvetica, sans-serif; fill: #ffffff; }
+      .head { font: 400 25px Arial, Helvetica, sans-serif; fill: #000000; }
+      .head-bold { font: 700 25px Arial, Helvetica, sans-serif; fill: #000000; }
+      .body { font: 400 17px Arial, Helvetica, sans-serif; fill: #111111; }
+      .small { font: 400 14px Arial, Helvetica, sans-serif; fill: #333333; }
+      .tiny { font: 400 12px Arial, Helvetica, sans-serif; fill: #555555; }
+      .callout-head { font: 700 23px Arial, Helvetica, sans-serif; fill: #0B1F3A; }
+      .callout-body { font: 700 18px Arial, Helvetica, sans-serif; fill: #111111; }
+      .callout-small { font: 400 15px Arial, Helvetica, sans-serif; fill: #333333; }
+      .rule { stroke: #9a9a9a; stroke-width: 1.1; }
+      .arrow { stroke: #82B6CF; stroke-width: 2.5; fill: none; marker-end: url(#arrow-blue); }
+      .arrow-muted { stroke: #6F879D; stroke-width: 2.2; fill: none; marker-end: url(#arrow-muted); }
+      .pipe { stroke: #0B1F3A; stroke-width: 2.4; fill: none; }
+      .pool-line { stroke: #1F5F8B; stroke-width: 2; fill: none; }
+      .dot-dark { fill: #0B1F3A; stroke: #0B1F3A; stroke-width: 1.4; }
+      .dot-light { fill: #82B6CF; stroke: #1F5F8B; stroke-width: 1.8; }
+      .footer { font: 700 22px Arial, Helvetica, sans-serif; fill: #ffffff; }
+      .footer-soft { font: 400 17px Arial, Helvetica, sans-serif; fill: #b9c8d4; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1600" height="640"/>
+  <text x="800" y="48" class="title" text-anchor="middle">C6.3: dense late composition over frozen CVAE-generated classifiers</text>
+
+  <rect x="30" y="96" width="220" height="190" class="panel"/>
+  <text x="140" y="133" class="head" text-anchor="middle">Frozen source</text>
+  <text x="140" y="163" class="head-bold" text-anchor="middle">CVAE experts</text>
+  <line x1="62" y1="181" x2="218" y2="181" class="rule"/>
+  <g transform="translate(46 210)">
+    <rect x="0" y="0" width="52" height="30" class="chip"/>
+    <text x="26" y="20" class="small" text-anchor="middle">e1</text>
+    <rect x="68" y="0" width="52" height="30" class="chip"/>
+    <text x="94" y="20" class="small" text-anchor="middle">e2</text>
+    <rect x="136" y="0" width="52" height="30" class="chip"/>
+    <text x="162" y="20" class="small" text-anchor="middle">e3</text>
+  </g>
+  <text x="140" y="264" class="tiny" text-anchor="middle">trained independently, kept frozen</text>
+
+  <rect x="290" y="96" width="220" height="190" class="panel"/>
+  <text x="400" y="133" class="head" text-anchor="middle">Generate</text>
+  <text x="400" y="163" class="head-bold" text-anchor="middle">embeddings</text>
+  <line x1="322" y1="181" x2="478" y2="181" class="rule"/>
+  <g transform="translate(344 207)">
+    <circle cx="0" cy="0" r="8" class="dot-dark"/>
+    <circle cx="30" cy="0" r="8" class="dot-light"/>
+    <circle cx="60" cy="0" r="8" class="dot-dark"/>
+    <circle cx="90" cy="0" r="8" class="dot-light"/>
+    <circle cx="15" cy="34" r="8" class="dot-light"/>
+    <circle cx="45" cy="34" r="8" class="dot-dark"/>
+    <circle cx="75" cy="34" r="8" class="dot-light"/>
+    <circle cx="105" cy="34" r="8" class="dot-dark"/>
+  </g>
+  <text x="400" y="267" class="tiny" text-anchor="middle">per source expert / mode</text>
+
+  <rect x="550" y="96" width="230" height="190" class="panel"/>
+  <text x="665" y="133" class="head" text-anchor="middle">Locked classifier</text>
+  <text x="665" y="163" class="head-bold" text-anchor="middle">per component</text>
+  <line x1="582" y1="181" x2="748" y2="181" class="rule"/>
+  <rect x="592" y="201" width="62" height="30" class="panel-soft"/>
+  <text x="623" y="221" class="tiny" text-anchor="middle">clf 1</text>
+  <rect x="676" y="201" width="62" height="30" class="panel-soft"/>
+  <text x="707" y="221" class="tiny" text-anchor="middle">clf 2</text>
+  <rect x="634" y="240" width="62" height="30" class="panel-soft"/>
+  <text x="665" y="260" class="tiny" text-anchor="middle">clf k</text>
+  <text x="665" y="278" class="tiny" text-anchor="middle">train on generated 0/1</text>
+
+  <rect x="820" y="96" width="220" height="190" class="panel"/>
+  <text x="930" y="133" class="head" text-anchor="middle">Source-safe</text>
+  <text x="930" y="163" class="head-bold" text-anchor="middle">candidate pool</text>
+  <line x1="852" y1="181" x2="1008" y2="181" class="rule"/>
+  <path d="M880 203 H980 M900 225 H960 M920 247 H940" class="pool-line"/>
+  <text x="930" y="269" class="tiny" text-anchor="middle">held-out target excluded</text>
+
+  <rect x="1080" y="96" width="230" height="190" class="panel"/>
+  <text x="1195" y="133" class="head" text-anchor="middle">Geometric late</text>
+  <text x="1195" y="163" class="head-bold" text-anchor="middle">ensemble</text>
+  <line x1="1112" y1="181" x2="1278" y2="181" class="rule"/>
+  <rect x="1113" y="204" width="164" height="48" class="accent"/>
+  <text x="1195" y="225" class="small" text-anchor="middle">sum log p_i(c)</text>
+  <text x="1195" y="244" class="tiny" text-anchor="middle">consensus pooling</text>
+  <text x="1195" y="271" class="tiny" text-anchor="middle">aggregate predictions, not weights</text>
+
+  <rect x="1350" y="96" width="220" height="190" class="panel"/>
+  <text x="1460" y="133" class="head" text-anchor="middle">Held-out target</text>
+  <text x="1460" y="163" class="head-bold" text-anchor="middle">evaluation</text>
+  <line x1="1382" y1="181" x2="1538" y2="181" class="rule"/>
+  <text x="1460" y="215" class="body" text-anchor="middle">BACC</text>
+  <text x="1460" y="240" class="body" text-anchor="middle">macro-F1</text>
+  <text x="1460" y="267" class="tiny" text-anchor="middle">target labels hidden until scoring</text>
+
+  <path d="M250 191 H290" class="arrow"/>
+  <path d="M510 191 H550" class="arrow"/>
+  <path d="M780 191 H820" class="arrow"/>
+  <path d="M1040 191 H1080" class="arrow"/>
+  <path d="M1310 191 H1350" class="arrow"/>
+
+  <rect x="110" y="360" width="585" height="140" class="panel"/>
+  <text x="402" y="398" class="callout-head" text-anchor="middle">Conceptual shift</text>
+  <line x1="160" y1="416" x2="645" y2="416" class="rule"/>
+  <text x="185" y="448" class="callout-small">old idea:</text>
+  <text x="270" y="448" class="callout-body">choose one best expert</text>
+  <path d="M495 443 H572" class="arrow-muted"/>
+  <text x="185" y="479" class="callout-small">C6.3 idea:</text>
+  <text x="290" y="479" class="callout-body">compose useful components densely</text>
+
+  <rect x="860" y="340" width="610" height="180" class="panel"/>
+  <text x="1165" y="378" class="callout-head" text-anchor="middle">Result callout</text>
+  <line x1="910" y1="396" x2="1420" y2="396" class="rule"/>
+  <circle cx="930" cy="424" r="6" class="dot-dark"/>
+  <text x="952" y="430" class="callout-body">C6.3 dense geometric ensemble</text>
+  <text x="952" y="459" class="callout-small">mean BACC = 0.8144</text>
+  <text x="952" y="486" class="callout-small">delta vs C6.2 = +0.0261</text>
+  <text x="1215" y="459" class="callout-small">paired positives = 12/15</text>
+  <text x="1215" y="486" class="callout-small">strong center degrade = 0</text>
+
+  <path d="M1460 286 V321 C1460 332 1448 332 1435 332 H1195 C1176 332 1165 340 1165 340" class="arrow-muted"/>
+
+  <text x="800" y="581" class="footer" text-anchor="middle">C6.3 converted sparse-routing failure into a dense-composition design rule.</text>
+  <text x="800" y="610" class="footer-soft" text-anchor="middle">Supported claim: reduced routing regret through post-hoc output aggregation, not learned target-expert compatibility.</text>
+</svg>

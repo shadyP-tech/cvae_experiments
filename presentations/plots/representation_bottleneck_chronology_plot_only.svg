@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1686" height="723" viewBox="0 0 1686 723">
+<rect width="1686" height="723" fill="#ffffff"/>
+<line x1="112" y1="434.0" x2="1592" y2="434.0" stroke="#d9d9d9" stroke-width="1.1"/>
+<text x="78.0" y="440.0" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#666666" text-anchor="end">0.50</text>
+<line x1="112" y1="341.9" x2="1592" y2="341.9" stroke="#d9d9d9" stroke-width="1.1"/>
+<text x="78.0" y="347.9" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#666666" text-anchor="end">0.60</text>
+<line x1="112" y1="249.8" x2="1592" y2="249.8" stroke="#d9d9d9" stroke-width="1.1"/>
+<text x="78.0" y="255.8" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#666666" text-anchor="end">0.70</text>
+<line x1="112" y1="157.7" x2="1592" y2="157.7" stroke="#d9d9d9" stroke-width="1.1"/>
+<text x="78.0" y="163.7" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#666666" text-anchor="end">0.80</text>
+<line x1="112" y1="157.7" x2="1592" y2="157.7" stroke="#8a8a8a" stroke-width="1.8" stroke-dasharray="12 10"/>
+<text x="144.0" y="131.7" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#666666" text-anchor="start">0.80 utility gate</text>
+<text x="852.0" y="691.0" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#111111" text-anchor="middle">chronological experiment path</text>
+<text x="1592.0" y="44.0" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700" fill="#666666" text-anchor="end">after PCA64 retained signal  |  CVAE preservation and sparse routing limited utility</text>
+<text x="112.0" y="32.0" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#111111" text-anchor="start">held-out target mean BACC</text>
+<line x1="112.0" y1="333.3" x2="358.7" y2="456.0" stroke="#b6b6b6" stroke-width="2.4"/>
+<line x1="358.7" y1="456.0" x2="605.3" y2="239.9" stroke="#b6b6b6" stroke-width="2.4"/>
+<line x1="605.3" y1="239.9" x2="852.0" y2="186.5" stroke="#b6b6b6" stroke-width="2.4"/>
+<line x1="852.0" y1="186.5" x2="1098.7" y2="151.0" stroke="#b6b6b6" stroke-width="2.4"/>
+<line x1="1098.7" y1="151.0" x2="1345.3" y2="117.0" stroke="#b6b6b6" stroke-width="2.4"/>
+<line x1="1345.3" y1="117.0" x2="1592.0" y2="144.4" stroke="#b6b6b6" stroke-width="2.4"/>
+<circle cx="112.0" cy="333.3" r="9.8" fill="#2468b3" stroke="#2468b3" stroke-width="1.7"/>
+<text x="112.0" y="363.3" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#111111" text-anchor="middle">0.6093</text>
+<text x="112.0" y="522.0" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#111111" text-anchor="middle"><tspan x="112.0" dy="0">PCA64</tspan><tspan x="112.0" dy="17">CVAE</tspan><tspan x="112.0" dy="17">oracle</tspan></text>
+<text x="112.0" y="600.0" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#666666" text-anchor="middle">generator capacity</text>
+<circle cx="358.7" cy="456.0" r="9.8" fill="#c66a1a" stroke="#c66a1a" stroke-width="1.7"/>
+<text x="358.7" y="421.0" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#111111" text-anchor="middle">0.4761</text>
+<text x="358.7" y="522.0" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#111111" text-anchor="middle"><tspan x="358.7" dy="0">PCA64</tspan><tspan x="358.7" dy="17">CVAE</tspan><tspan x="358.7" dy="17">selected</tspan></text>
+<text x="358.7" y="600.0" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#666666" text-anchor="middle">sparse route</text>
+<circle cx="605.3" cy="239.9" r="9.8" fill="#f1b47b" stroke="#c66a1a" stroke-width="1.7"/>
+<text x="605.3" y="269.9" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#111111" text-anchor="middle">0.7107</text>
+<text x="605.3" y="522.0" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#111111" text-anchor="middle"><tspan x="605.3" dy="0">class-cond.</tspan><tspan x="605.3" dy="17">CVAE</tspan><tspan x="605.3" dy="17">selected</tspan></text>
+<text x="605.3" y="600.0" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#666666" text-anchor="middle">conditioning helps</text>
+<circle cx="852.0" cy="186.5" r="9.8" fill="#2468b3" stroke="#2468b3" stroke-width="1.7"/>
+<text x="852.0" y="216.5" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#111111" text-anchor="middle">0.7687</text>
+<text x="852.0" y="522.0" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#111111" text-anchor="middle"><tspan x="852.0" dy="0">class-cond.</tspan><tspan x="852.0" dy="17">CVAE</tspan><tspan x="852.0" dy="17">oracle</tspan></text>
+<text x="852.0" y="600.0" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#666666" text-anchor="middle">useful components</text>
+<circle cx="1098.7" cy="151.0" r="11" fill="#63c900" stroke="#111111" stroke-width="1.7"/>
+<text x="1098.7" y="181.0" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#63c900" text-anchor="middle">0.8073</text>
+<text x="1098.7" y="522.0" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#111111" text-anchor="middle"><tspan x="1098.7" dy="0">PCA64 GMM</tspan><tspan x="1098.7" dy="17">selected</tspan></text>
+<text x="1098.7" y="600.0" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#666666" text-anchor="middle">non-CVAE diagnostic</text>
+<circle cx="1345.3" cy="117.0" r="9.8" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.7"/>
+<text x="1345.3" y="147.0" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#111111" text-anchor="middle">0.8442</text>
+<text x="1345.3" y="522.0" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#111111" text-anchor="middle"><tspan x="1345.3" dy="0">PCA64 GMM</tspan><tspan x="1345.3" dy="17">oracle</tspan></text>
+<text x="1345.3" y="600.0" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#666666" text-anchor="middle">diagnostic upper</text>
+<circle cx="1592.0" cy="144.4" r="11" fill="#63c900" stroke="#111111" stroke-width="1.7"/>
+<text x="1592.0" y="174.4" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#63c900" text-anchor="middle">0.8144</text>
+<text x="1592.0" y="522.0" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#111111" text-anchor="middle"><tspan x="1592.0" dy="0">C6.3 dense</tspan><tspan x="1592.0" dy="17">geometric</tspan><tspan x="1592.0" dy="17">ensemble</tspan></text>
+<text x="1592.0" y="600.0" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#666666" text-anchor="middle">dense CVAE composition</text>
+</svg>

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1686" height="723" viewBox="0 0 1686 723">
+<rect width="1686" height="723" fill="#ffffff"/>
+<text x="86.0" y="58.0" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#111111" text-anchor="start">first bottleneck hunt: dimensionality / noise</text>
+<text x="1596.0" y="58.0" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700" fill="#666666" text-anchor="end">PCA64 reconstruction upper is separated from the CVAE chronology</text>
+<rect x="92" y="154" width="356" height="252" rx="18" ry="18" fill="#ffffff" stroke="#b8b8b8" stroke-width="1.4"/>
+<rect x="662" y="154" width="362" height="252" rx="18" ry="18" fill="#ffffff" stroke="#b8b8b8" stroke-width="1.4"/>
+<rect x="1234" y="154" width="360" height="252" rx="18" ry="18" fill="#ffffff" stroke="#8ebf66" stroke-width="1.4"/>
+<line x1="482" y1="280" x2="628" y2="280" stroke="#9a9a9a" stroke-width="2.2"/>
+<polygon points="628,280 619,275 619,285" fill="#9a9a9a"/>
+<line x1="1058" y1="280" x2="1200" y2="280" stroke="#9a9a9a" stroke-width="2.2"/>
+<polygon points="1200,280 1191,275 1191,285" fill="#9a9a9a"/>
+<text x="124.0" y="208.0" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#111111" text-anchor="start">direct support-NELBO</text>
+<text x="270.0" y="297.0" font-family="Arial, Helvetica, sans-serif" font-size="54" font-weight="700" fill="#111111" text-anchor="middle">0.525</text>
+<text x="270.0" y="352.0" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#666666" text-anchor="middle">random 0.519  |  oracle 0.677</text>
+<text x="694.0" y="208.0" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#666666" text-anchor="start">hypothesis</text>
+<text x="843.0" y="286.0" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="700" fill="#111111" text-anchor="middle">758-D</text>
+<text x="843.0" y="335.0" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#111111" text-anchor="middle">DINOv2 latent space</text>
+<text x="843.0" y="370.0" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#666666" text-anchor="middle">too noisy for downstream utility?</text>
+<text x="1266.0" y="208.0" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#111111" text-anchor="start">PCA64 reconstruction upper</text>
+<text x="1414.0" y="297.0" font-family="Arial, Helvetica, sans-serif" font-size="54" font-weight="700" fill="#63c900" text-anchor="middle">0.862</text>
+<text x="1414.0" y="352.0" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#666666" text-anchor="middle">signal survives compression</text>
+<line x1="130.0" y1="494" x2="130.0" y2="578" stroke="#d9d9d9" stroke-width="1"/>
+<text x="130.0" y="608.0" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#666666" text-anchor="middle">0.50</text>
+<line x1="505.3" y1="494" x2="505.3" y2="578" stroke="#d9d9d9" stroke-width="1"/>
+<text x="505.3" y="608.0" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#666666" text-anchor="middle">0.60</text>
+<line x1="880.5" y1="494" x2="880.5" y2="578" stroke="#d9d9d9" stroke-width="1"/>
+<text x="880.5" y="608.0" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#666666" text-anchor="middle">0.70</text>
+<line x1="1255.8" y1="494" x2="1255.8" y2="578" stroke="#d9d9d9" stroke-width="1"/>
+<text x="1255.8" y="608.0" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#666666" text-anchor="middle">0.80</text>
+<line x1="130" y1="536" x2="1556" y2="536" stroke="#b6b6b6" stroke-width="2"/>
+<line x1="1255.8" y1="488" x2="1255.8" y2="584" stroke="#8a8a8a" stroke-width="1.8"/>
+<text x="1273.8" y="478.0" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#666666" text-anchor="start">0.80 utility gate</text>
+<circle cx="224.4" cy="536" r="12" fill="#c66a1a" stroke="#c66a1a" stroke-width="1.8"/>
+<text x="224.4" y="502.0" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#111111" text-anchor="middle">0.525</text>
+<text x="224.4" y="586.0" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="middle">support-NELBO top1</text>
+<circle cx="793.7" cy="536" r="12" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.8"/>
+<text x="793.7" y="566.0" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#111111" text-anchor="middle">0.677</text>
+<text x="793.7" y="484.0" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="middle">downstream oracle</text>
+<circle cx="1488.5" cy="536" r="12" fill="#63c900" stroke="#111111" stroke-width="1.8"/>
+<text x="1488.5" y="502.0" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#63c900" text-anchor="middle">0.862</text>
+<text x="1488.5" y="586.0" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#111111" text-anchor="middle">PCA64 recon. upper</text>
+<text x="843.0" y="693.0" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700" fill="#111111" text-anchor="middle">held-out target BACC</text>
+</svg>

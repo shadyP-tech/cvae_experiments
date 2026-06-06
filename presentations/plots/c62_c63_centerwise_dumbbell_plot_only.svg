@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="455" viewBox="0 0 980 455">
+  <rect width="980" height="455" fill="#ffffff"/>
+
+  <text x="20" y="192" transform="rotate(-90 20 192)" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#111111" text-anchor="middle">Held-out center</text>
+  <text x="495" y="427" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#111111" text-anchor="middle">Held-out target BACC</text>
+
+  <text x="160" y="32" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#0B1F3A">Mean BACC gain: +0.0261</text>
+
+  <circle cx="552" cy="29" r="7" fill="#82B6CF" stroke="#1F5F8B" stroke-width="2"/>
+  <text x="568" y="34" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#111111">C6.2 probability average</text>
+  <circle cx="750" cy="29" r="7" fill="#0B1F3A" stroke="#0B1F3A" stroke-width="2"/>
+  <text x="766" y="34" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#111111">C6.3 geometric pooling</text>
+
+  <line x1="221" y1="62" x2="221" y2="332" stroke="#d9d9d9" stroke-width="1.1"/>
+  <line x1="373" y1="62" x2="373" y2="332" stroke="#d9d9d9" stroke-width="1.1"/>
+  <line x1="525" y1="62" x2="525" y2="332" stroke="#d9d9d9" stroke-width="1.1"/>
+  <line x1="678" y1="62" x2="678" y2="332" stroke="#d9d9d9" stroke-width="1.1"/>
+  <line x1="830" y1="62" x2="830" y2="332" stroke="#d9d9d9" stroke-width="1.1"/>
+
+  <line x1="160" y1="332" x2="830" y2="332" stroke="#bdbdbd" stroke-width="1.5"/>
+  <text x="221" y="358" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="middle">0.70</text>
+  <text x="373" y="358" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="middle">0.75</text>
+  <text x="525" y="358" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="middle">0.80</text>
+  <text x="678" y="358" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="middle">0.85</text>
+  <text x="830" y="358" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="middle">0.90</text>
+
+  <text x="122" y="96" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#111111" text-anchor="end">center 0</text>
+  <text x="122" y="146" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#111111" text-anchor="end">center 1</text>
+  <text x="122" y="196" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#111111" text-anchor="end">center 2</text>
+  <text x="122" y="246" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#111111" text-anchor="end">center 3</text>
+  <text x="122" y="296" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#111111" text-anchor="end">center 4</text>
+
+  <line x1="692" y1="92" x2="787" y2="92" stroke="#1F5F8B" stroke-width="4" stroke-linecap="round"/>
+  <line x1="282" y1="142" x2="437" y2="142" stroke="#1F5F8B" stroke-width="4" stroke-linecap="round"/>
+  <line x1="626" y1="192" x2="643" y2="192" stroke="#6F879D" stroke-width="4" stroke-linecap="round"/>
+  <line x1="280" y1="242" x2="348" y2="242" stroke="#1F5F8B" stroke-width="4" stroke-linecap="round"/>
+  <line x1="552" y1="292" x2="647" y2="292" stroke="#1F5F8B" stroke-width="4" stroke-linecap="round"/>
+
+  <circle cx="692" cy="92" r="8" fill="#82B6CF" stroke="#1F5F8B" stroke-width="2.3"/>
+  <circle cx="787" cy="92" r="8" fill="#0B1F3A" stroke="#0B1F3A" stroke-width="2.3"/>
+  <text x="806" y="97" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#0B1F3A">+0.0314</text>
+
+  <circle cx="282" cy="142" r="8" fill="#82B6CF" stroke="#1F5F8B" stroke-width="2.3"/>
+  <circle cx="437" cy="142" r="8" fill="#0B1F3A" stroke="#0B1F3A" stroke-width="2.3"/>
+  <text x="456" y="147" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#0B1F3A">+0.0511</text>
+
+  <circle cx="643" cy="192" r="8" fill="#82B6CF" stroke="#1F5F8B" stroke-width="2.3"/>
+  <circle cx="626" cy="192" r="8" fill="#0B1F3A" stroke="#0B1F3A" stroke-width="2.3"/>
+  <text x="662" y="197" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#6F879D">-0.0055</text>
+
+  <circle cx="280" cy="242" r="8" fill="#82B6CF" stroke="#1F5F8B" stroke-width="2.3"/>
+  <circle cx="348" cy="242" r="8" fill="#0B1F3A" stroke="#0B1F3A" stroke-width="2.3"/>
+  <text x="367" y="247" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#0B1F3A">+0.0225</text>
+
+  <circle cx="552" cy="292" r="8" fill="#82B6CF" stroke="#1F5F8B" stroke-width="2.3"/>
+  <circle cx="647" cy="292" r="8" fill="#0B1F3A" stroke="#0B1F3A" stroke-width="2.3"/>
+  <text x="666" y="297" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#0B1F3A">+0.0310</text>
+
+  <line x1="525" y1="62" x2="525" y2="332" stroke="#6F879D" stroke-width="1.6" stroke-dasharray="9 7"/>
+</svg>
