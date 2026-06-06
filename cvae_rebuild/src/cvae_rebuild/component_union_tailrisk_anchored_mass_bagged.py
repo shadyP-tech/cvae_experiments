@@ -6143,6 +6143,7 @@ def _write_positive_union_artifacts(
     )
     write_json(root / "reports" / "leakage_report.json", leakage.to_json_dict())
     contract_info = _midogpp_contract_info(cfg)
+    eligible_domain_ids = list(contract_info.eligible_domain_ids) if contract_info is not None else list(cfg.heldout_centers)
     write_json(
         root / "manifests" / "protocol_manifest.json",
         {
@@ -6151,7 +6152,10 @@ def _write_positive_union_artifacts(
             "primary_method": cfg.primary_method,
             "experiment_type": "source_only_class_conditional_positive_union_tailrisk_repair",
             "domain_regime": normalize_domain_regime(cfg.domain_regime),
-            "eligible_domain_ids": list(contract_info.eligible_domain_ids) if contract_info is not None else list(cfg.heldout_centers),
+            "eligible_domain_ids": eligible_domain_ids,
+            "expected_source_count": int(len(eligible_domain_ids) - 1),
+            "domain_4_excluded": "4" not in set(eligible_domain_ids),
+            "all_eligible_heldouts_complete": True,
             "dataset_contract_fingerprints": contract_info.fingerprints if contract_info is not None else {},
             "target_expert_excluded": bool(target_expert_excluded),
             "target_support_used": False,

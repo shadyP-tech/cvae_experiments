@@ -180,10 +180,12 @@ def validate_runtime_domain_coverage(
             "MIDOG++ cache coverage is incomplete for seed "
             f"{experiment_seed}: missing_train={missing_train}, missing_test={missing_test}."
         )
-    if "4" in train_centers or "4" in test_centers:
-        raise ProtocolError("MIDOG++ ineligible domain 4 appeared in cache metadata.")
     if not labels.issubset({"0", "1"}):
         raise ProtocolError(f"MIDOG++ cache labels must be 0/1, got {sorted(labels)}.")
+
+    extra_train = sorted(train_centers - set(eligible), key=_domain_sort_key)
+    extra_test = sorted(test_centers - set(eligible), key=_domain_sort_key)
+    extra_any = sorted(set(extra_train).union(extra_test), key=_domain_sort_key)
 
     rows = []
     for heldout in eligible:
@@ -198,9 +200,12 @@ def validate_runtime_domain_coverage(
                 "source_domain_ids": json.dumps(list(sources)),
                 "expected_source_count": int(len(eligible) - 1),
                 "actual_source_count": int(len(sources)),
-                "domain_4_excluded": True,
+                "domain_4_excluded": "4" not in set(sources) and heldout != "4",
                 "all_eligible_heldouts_complete": True,
                 "target_expert_excluded": True,
+                "cache_extra_domain_ids": json.dumps(extra_any),
+                "cache_extra_train_domain_ids": json.dumps(extra_train),
+                "cache_extra_test_domain_ids": json.dumps(extra_test),
             }
         )
     return rows

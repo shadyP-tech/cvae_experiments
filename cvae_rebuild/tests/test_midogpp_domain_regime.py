@@ -132,6 +132,32 @@ def test_midogpp_runtime_coverage_rejects_partial_seed_domain_cache(tmp_path: Pa
         )
 
 
+def test_midogpp_runtime_coverage_allows_unused_ineligible_cached_domain(tmp_path: Path) -> None:
+    artifact, _cache_report = _write_midogpp_contract_fixture(tmp_path)
+    info = load_midogpp_contract_info(artifact)
+    train_meta = [_cache_meta(center, 0) for center in (*info.eligible_domain_ids, "4")]
+    test_meta = [_cache_meta(center, 1) for center in (*info.eligible_domain_ids, "4")]
+
+    rows = validate_runtime_domain_coverage(
+        domain_regime=MIDOGPP_DOMAIN_REGIME,
+        eligible_domain_ids=info.eligible_domain_ids,
+        experiment_seed=42,
+        train_metadata=train_meta,
+        test_metadata=test_meta,
+    )
+
+    assert len(rows) == len(ELIGIBLE_MIDOGPP_IDS)
+    assert {row["heldout_domain_id"] for row in rows} == set(ELIGIBLE_MIDOGPP_IDS)
+    for row in rows:
+        sources = json.loads(str(row["source_domain_ids"]))
+        assert "4" not in sources
+        assert row["heldout_domain_id"] not in sources
+        assert row["expected_source_count"] == 8
+        assert row["actual_source_count"] == 8
+        assert row["domain_4_excluded"] is True
+        assert json.loads(str(row["cache_extra_domain_ids"])) == ["4"]
+
+
 def test_midogpp_positive_union_config_and_rule_manifest(tmp_path: Path) -> None:
     artifact, cache_report = _write_midogpp_contract_fixture(tmp_path)
     cfg = parse_source_inner_positive_union_config(
