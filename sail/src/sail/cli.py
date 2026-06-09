@@ -12,12 +12,17 @@ from .midogpp_multiaxis import (
     load_midogpp_multiaxis_config,
     run_midogpp_multiaxis_baseline,
 )
+from .midogpp_signal_controls import (
+    load_midogpp_signal_controls_config,
+    run_midogpp_signal_controls,
+)
 from .pipeline import run_pipeline
 from .protocol import ProtocolError
 
 
 DEFAULT_CONFIG = "sail/configs/sail_virchow2.yaml"
 DEFAULT_MIDOGPP_MULTIAXIS_CONFIG = "sail/configs/midogpp_virchow2_real_feature_multiaxis_baseline.yaml"
+DEFAULT_MIDOGPP_SIGNAL_CONTROLS_CONFIG = "sail/configs/midogpp_virchow2_real_feature_signal_controls.yaml"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -57,6 +62,17 @@ def build_parser() -> argparse.ArgumentParser:
     midogpp.add_argument("--feature-cache-path", default=None)
     midogpp.add_argument("--artifacts-root", default=None)
     midogpp.add_argument("--allow-npz-test-cache", action="store_true")
+
+    signal = sub.add_parser(
+        "run-midogpp-signal-controls",
+        help="Run MIDOG++ Virchow2 real-feature signal-control diagnostic.",
+    )
+    signal.add_argument("--config", default=DEFAULT_MIDOGPP_SIGNAL_CONTROLS_CONFIG)
+    signal.add_argument("--manifest-path", default=None)
+    signal.add_argument("--feature-cache-path", default=None)
+    signal.add_argument("--artifacts-root", default=None)
+    signal.add_argument("--prior-lodo-axis-summary-path", default=None)
+    signal.add_argument("--allow-npz-test-cache", action="store_true")
     return parser
 
 
@@ -139,6 +155,42 @@ def main() -> None:
             json.dumps(
                 {
                     "status": "midogpp_virchow2_real_feature_multiaxis_complete",
+                    "decision_labels": list(result.decision_labels),
+                    "outputs": {key: str(value) for key, value in result.output_paths.items()},
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return
+    if args.command == "run-midogpp-signal-controls":
+        config = load_midogpp_signal_controls_config(Path(args.config))
+        if (
+            args.manifest_path is not None
+            or args.feature_cache_path is not None
+            or args.artifacts_root is not None
+            or args.prior_lodo_axis_summary_path is not None
+            or args.allow_npz_test_cache
+        ):
+            from dataclasses import replace
+
+            config = replace(
+                config,
+                manifest_path=str(args.manifest_path or config.manifest_path),
+                feature_cache_path=str(args.feature_cache_path or config.feature_cache_path),
+                artifacts_root=str(args.artifacts_root or config.artifacts_root),
+                prior_lodo_axis_summary_path=(
+                    str(args.prior_lodo_axis_summary_path)
+                    if args.prior_lodo_axis_summary_path is not None
+                    else config.prior_lodo_axis_summary_path
+                ),
+                allow_npz_test_cache=bool(args.allow_npz_test_cache or config.allow_npz_test_cache),
+            )
+        result = run_midogpp_signal_controls(config=config, repo_root=repo_root)
+        print(
+            json.dumps(
+                {
+                    "status": "midogpp_virchow2_real_feature_signal_controls_complete",
                     "decision_labels": list(result.decision_labels),
                     "outputs": {key: str(value) for key, value in result.output_paths.items()},
                 },

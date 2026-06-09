@@ -106,6 +106,20 @@ This diagnostic requires a locked MIDOG++ manifest and row-aligned Virchow2
 train cache. It does not build caches, does not use target-domain rows for
 fitting, and reports each metadata axis independently.
 
+Run the MIDOG++ real-feature signal-control diagnostic:
+
+```bash
+PYTHONPATH=sail/src conda run -n thesis python -m sail.cli run-midogpp-signal-controls \
+  --config sail/configs/midogpp_virchow2_real_feature_signal_controls.yaml \
+  --manifest-path path/to/locked_midogpp_manifest.csv \
+  --feature-cache-path path/to/row_aligned_virchow2_train_cache.pt
+```
+
+This control reuses the same train cache to test pooled, tumor-class-balanced,
+and within-tumor case-disjoint discrimination. Negative controls shuffle fit
+labels or fit feature rows only. It does not make CVAE preservation, routing, or
+metadata-compatibility claims.
+
 Run the smoke tests:
 
 ```bash
@@ -144,6 +158,22 @@ sail/artifacts/midogpp_virchow2_real_feature_multiaxis_baseline/
   manifests/protocol_manifest.json
   reports/leakage_report.json
   reports/per_axis_decision_report.md
+  reports/decision_report.md
+```
+
+The MIDOG++ signal-control diagnostic writes:
+
+```text
+sail/artifacts/midogpp_virchow2_real_feature_signal_controls/
+  tables/control_metrics.csv
+  tables/domain_control_metrics.csv
+  tables/negative_control_metrics.csv
+  tables/stratified_metrics.csv
+  tables/split_manifest.csv
+  tables/identity_overlap_audit.csv
+  tables/predictions.csv
+  manifests/protocol_manifest.json
+  reports/leakage_report.json
   reports/decision_report.md
 ```
 
