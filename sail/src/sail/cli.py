@@ -8,11 +8,16 @@ from pathlib import Path
 
 from .config import RunLimits, load_config
 from .features import CacheBuildRequest, build_virchow2_cache
+from .midogpp_multiaxis import (
+    load_midogpp_multiaxis_config,
+    run_midogpp_multiaxis_baseline,
+)
 from .pipeline import run_pipeline
 from .protocol import ProtocolError
 
 
 DEFAULT_CONFIG = "sail/configs/sail_virchow2.yaml"
+DEFAULT_MIDOGPP_MULTIAXIS_CONFIG = "sail/configs/midogpp_virchow2_real_feature_multiaxis_baseline.yaml"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -42,17 +47,28 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--k-values", default=None)
     run.add_argument("--aggregation-rules", default=None)
     run.add_argument("--representations", default=None)
+
+    midogpp = sub.add_parser(
+        "run-midogpp-multiaxis",
+        help="Run MIDOG++ Virchow2 real-feature multi-axis LODO diagnostic.",
+    )
+    midogpp.add_argument("--config", default=DEFAULT_MIDOGPP_MULTIAXIS_CONFIG)
+    midogpp.add_argument("--manifest-path", default=None)
+    midogpp.add_argument("--feature-cache-path", default=None)
+    midogpp.add_argument("--artifacts-root", default=None)
+    midogpp.add_argument("--allow-npz-test-cache", action="store_true")
     return parser
 
 
 def main() -> None:
     args = build_parser().parse_args()
     repo_root = Path.cwd()
-    config = load_config(Path(args.config))
     if args.command == "validate-config":
+        config = load_config(Path(args.config))
         print("Config validation passed for SAIL source-only aggregation.")
         return
     if args.command == "build-cache":
+        config = load_config(Path(args.config))
         output_root = Path(args.output_root) if args.output_root is not None else repo_root / config.cache_root
         result = build_virchow2_cache(
             CacheBuildRequest(
@@ -82,6 +98,7 @@ def main() -> None:
         )
         return
     if args.command == "run":
+        config = load_config(Path(args.config))
         result = run_pipeline(
             config=config,
             repo_root=repo_root,
@@ -104,6 +121,32 @@ def main() -> None:
                 sort_keys=True,
             )
         )
+        return
+    if args.command == "run-midogpp-multiaxis":
+        config = load_midogpp_multiaxis_config(Path(args.config))
+        if args.manifest_path is not None or args.feature_cache_path is not None or args.artifacts_root is not None or args.allow_npz_test_cache:
+            from dataclasses import replace
+
+            config = replace(
+                config,
+                manifest_path=str(args.manifest_path or config.manifest_path),
+                feature_cache_path=str(args.feature_cache_path or config.feature_cache_path),
+                artifacts_root=str(args.artifacts_root or config.artifacts_root),
+                allow_npz_test_cache=bool(args.allow_npz_test_cache or config.allow_npz_test_cache),
+            )
+        result = run_midogpp_multiaxis_baseline(config=config, repo_root=repo_root)
+        print(
+            json.dumps(
+                {
+                    "status": "midogpp_virchow2_real_feature_multiaxis_complete",
+                    "decision_labels": list(result.decision_labels),
+                    "outputs": {key: str(value) for key, value in result.output_paths.items()},
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return
 
 
 def _parse_int_limit(raw: str | None) -> tuple[int, ...] | None:

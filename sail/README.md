@@ -93,6 +93,19 @@ PYTHONPATH=sail/src conda run -n thesis python -m sail.cli run \
   --config sail/configs/sail_virchow2.yaml
 ```
 
+Run the MIDOG++ real-feature multi-axis learnability diagnostic:
+
+```bash
+PYTHONPATH=sail/src conda run -n thesis python -m sail.cli run-midogpp-multiaxis \
+  --config sail/configs/midogpp_virchow2_real_feature_multiaxis_baseline.yaml \
+  --manifest-path path/to/locked_midogpp_manifest.csv \
+  --feature-cache-path path/to/row_aligned_virchow2_train_cache.pt
+```
+
+This diagnostic requires a locked MIDOG++ manifest and row-aligned Virchow2
+train cache. It does not build caches, does not use target-domain rows for
+fitting, and reports each metadata axis independently.
+
 Run the smoke tests:
 
 ```bash
@@ -116,6 +129,23 @@ sail/artifacts/virchow2_dense_source_selected/
 ```
 
 Generated artifacts are ignored by `sail/artifacts/.gitignore`.
+
+The MIDOG++ multi-axis diagnostic writes:
+
+```text
+sail/artifacts/midogpp_virchow2_real_feature_multiaxis_baseline/
+  tables/per_axis_domain_metrics.csv
+  tables/axis_summary.csv
+  tables/domain_axis_counts.csv
+  tables/domain_metadata_map.csv
+  tables/source_target_identity_overlap.csv
+  tables/predictions.csv
+  manifests/domain_axis_manifest.json
+  manifests/protocol_manifest.json
+  reports/leakage_report.json
+  reports/per_axis_decision_report.md
+  reports/decision_report.md
+```
 
 ## Protocol Safety
 
