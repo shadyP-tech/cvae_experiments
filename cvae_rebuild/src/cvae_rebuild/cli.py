@@ -81,6 +81,10 @@ from .paired_component_coverage_audit import (
     run_paired_component_coverage_audit,
 )
 from .pipeline import run_artifact_contract_smoke, run_real_cache_backed, run_synthetic_smoke
+from .midogpp_preservation_sanity import (
+    load_midogpp_preservation_sanity_config,
+    run_midogpp_preservation_sanity,
+)
 from .preservation import load_preservation_config, run_preservation_diagnosis
 from .preservation_repair import load_repair_config, run_preservation_repair
 from .preservation_sampling import load_sampling_config, run_preservation_sampling
@@ -124,6 +128,8 @@ def _load_config_for_validation(path: str | Path) -> object:
         return load_fixed_beta050_positive_union_config(source)
     if "source_inner_harm_gated_positive_union" in keys:
         return load_harm_gated_positive_union_config(source)
+    if str(data.get("experiment", {}).get("name", "")) == "virchow2_cvae_midogpp_preservation_sanity_v1":
+        return load_midogpp_preservation_sanity_config(source)
     return load_config(source)
 
 
@@ -158,6 +164,13 @@ def main(argv: list[str] | None = None) -> int:
     sampling = sub.add_parser("diagnose-preservation-sampling", help="Run the Virchow2-CVAE PCA64 sampling continuation.")
     sampling.add_argument("--config", required=True)
     sampling.add_argument("--artifact-root", default=None)
+
+    midogpp_preservation = sub.add_parser(
+        "diagnose-midogpp-preservation-sanity",
+        help="Run the MIDOG++ Virchow2-CVAE preservation sanity diagnostic.",
+    )
+    midogpp_preservation.add_argument("--config", required=True)
+    midogpp_preservation.add_argument("--artifact-root", default=None)
 
     prior = sub.add_parser("diagnose-latent-prior-calibration", help="Run the Virchow2-CVAE latent prior calibration diagnostic.")
     prior.add_argument("--config", required=True)
@@ -640,6 +653,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "diagnose-preservation-sampling":
         cfg = load_sampling_config(args.config)
         root = run_preservation_sampling(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
+    if args.command == "diagnose-midogpp-preservation-sanity":
+        cfg = load_midogpp_preservation_sanity_config(args.config)
+        root = run_midogpp_preservation_sanity(
             cfg,
             artifact_root=Path(args.artifact_root) if args.artifact_root else None,
         )
