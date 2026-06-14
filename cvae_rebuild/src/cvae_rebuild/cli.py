@@ -89,6 +89,10 @@ from .midogpp_condition_audit import (
     load_midogpp_condition_audit_config,
     run_midogpp_condition_audit,
 )
+from .midogpp_preservation_gate import (
+    load_midogpp_preservation_gate_config,
+    run_midogpp_preservation_gate,
+)
 from .preservation import load_preservation_config, run_preservation_diagnosis
 from .preservation_repair import load_repair_config, run_preservation_repair
 from .preservation_sampling import load_sampling_config, run_preservation_sampling
@@ -136,6 +140,8 @@ def _load_config_for_validation(path: str | Path) -> object:
         return load_midogpp_preservation_sanity_config(source)
     if str(data.get("experiment", {}).get("name", "")) == "virchow2_cvae_midogpp_preservation_condition_audit_v1":
         return load_midogpp_condition_audit_config(source)
+    if str(data.get("experiment", {}).get("name", "")) == "virchow2_cvae_midogpp_preservation_gate_pca128_v1":
+        return load_midogpp_preservation_gate_config(source)
     return load_config(source)
 
 
@@ -184,6 +190,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     midogpp_condition_audit.add_argument("--config", required=True)
     midogpp_condition_audit.add_argument("--artifact-root", default=None)
+
+    midogpp_preservation_gate = sub.add_parser(
+        "diagnose-midogpp-preservation-gate-pca128",
+        help="Run the MIDOG++ pca128 CVAE preservation gate.",
+    )
+    midogpp_preservation_gate.add_argument("--config", required=True)
+    midogpp_preservation_gate.add_argument("--artifact-root", default=None)
 
     prior = sub.add_parser("diagnose-latent-prior-calibration", help="Run the Virchow2-CVAE latent prior calibration diagnostic.")
     prior.add_argument("--config", required=True)
@@ -682,6 +695,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "diagnose-midogpp-preservation-condition-audit":
         cfg = load_midogpp_condition_audit_config(args.config)
         root = run_midogpp_condition_audit(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
+    if args.command == "diagnose-midogpp-preservation-gate-pca128":
+        cfg = load_midogpp_preservation_gate_config(args.config)
+        root = run_midogpp_preservation_gate(
             cfg,
             artifact_root=Path(args.artifact_root) if args.artifact_root else None,
         )
