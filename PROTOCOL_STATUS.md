@@ -16,6 +16,10 @@ but only protocol-safe paths are thesis-facing.
   - Protocol: moved assets preserve target-local support/evaluation separation and keep held-out NELBO utility as evaluation-only.
 - `cvae_testing/src/eval/evaluators/domain_query_oracle_gap.py`
   - Diagnostic protocol: target expert is excluded from candidate baselines; oracle values are reporting-only.
+- `sail/src/sail/midogpp_multiaxis.py` and `sail/src/sail/midogpp_signal_controls.py`
+  - Protocol: MIDOG++ real Virchow2 train-cache diagnostics.
+  - Claim boundary: real-feature learnability and preservation reference only; not CVAE preservation, metadata routing, or expert selection.
+  - Required invariant: locked manifest, row-aligned feature cache, case/sample identity disjointness, fixed/fit-only preprocessing, and near-chance negative controls.
 
 ## Quarantined Paths
 
@@ -48,6 +52,9 @@ Thesis-facing compatibility artifacts must satisfy:
 - Adoption-eligible methods have `routing_uses_eval_nelbo == 0`.
 - Adoption-eligible methods have `routing_uses_eval_domain_statistics == 0`.
 - Diagnostic/oracle methods are not adoption-eligible.
+- Feature-cache learnability diagnostics require cache sanity before metric
+  interpretation: row count/order alignment, feature provenance, crop/input
+  validity, and no unexplained large duplicate/near-duplicate feature clusters.
 
 ## Current Cleanup Decision
 

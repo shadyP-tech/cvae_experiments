@@ -85,6 +85,10 @@ from .midogpp_preservation_sanity import (
     load_midogpp_preservation_sanity_config,
     run_midogpp_preservation_sanity,
 )
+from .midogpp_condition_audit import (
+    load_midogpp_condition_audit_config,
+    run_midogpp_condition_audit,
+)
 from .preservation import load_preservation_config, run_preservation_diagnosis
 from .preservation_repair import load_repair_config, run_preservation_repair
 from .preservation_sampling import load_sampling_config, run_preservation_sampling
@@ -130,6 +134,8 @@ def _load_config_for_validation(path: str | Path) -> object:
         return load_harm_gated_positive_union_config(source)
     if str(data.get("experiment", {}).get("name", "")) == "virchow2_cvae_midogpp_preservation_sanity_v1":
         return load_midogpp_preservation_sanity_config(source)
+    if str(data.get("experiment", {}).get("name", "")) == "virchow2_cvae_midogpp_preservation_condition_audit_v1":
+        return load_midogpp_condition_audit_config(source)
     return load_config(source)
 
 
@@ -171,6 +177,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     midogpp_preservation.add_argument("--config", required=True)
     midogpp_preservation.add_argument("--artifact-root", default=None)
+
+    midogpp_condition_audit = sub.add_parser(
+        "diagnose-midogpp-preservation-condition-audit",
+        help="Run the MIDOG++ CVAE condition and PCA capacity audit.",
+    )
+    midogpp_condition_audit.add_argument("--config", required=True)
+    midogpp_condition_audit.add_argument("--artifact-root", default=None)
 
     prior = sub.add_parser("diagnose-latent-prior-calibration", help="Run the Virchow2-CVAE latent prior calibration diagnostic.")
     prior.add_argument("--config", required=True)
@@ -661,6 +674,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "diagnose-midogpp-preservation-sanity":
         cfg = load_midogpp_preservation_sanity_config(args.config)
         root = run_midogpp_preservation_sanity(
+            cfg,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(root)
+        return 0
+    if args.command == "diagnose-midogpp-preservation-condition-audit":
+        cfg = load_midogpp_condition_audit_config(args.config)
+        root = run_midogpp_condition_audit(
             cfg,
             artifact_root=Path(args.artifact_root) if args.artifact_root else None,
         )
