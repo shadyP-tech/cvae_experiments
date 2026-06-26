@@ -14,8 +14,9 @@ frozen feature caches
 
 The current instantiation uses Virchow2 feature caches, but the method title is
 backbone-agnostic. The pipeline is real-feature evaluation. It does not claim
-that CVAE generation preserves Virchow2 utility. CVAE preservation is the next
-diagnostic only after this real-feature gate is verified.
+that CVAE generation preserves Virchow2 utility. For MIDOG++, the downstream
+pca128 CVAE preservation gate is a separate `cvae_rebuild` diagnostic that was
+run after the corrected real-feature gate.
 
 ## Why This Is Current Best
 
@@ -120,6 +121,16 @@ and within-tumor case-disjoint discrimination. Negative controls shuffle fit
 labels or fit feature rows only. It does not make CVAE preservation, routing, or
 metadata-compatibility claims.
 
+The corresponding MIDOG++ pca128 CVAE preservation gate lives outside SAIL:
+
+```text
+cvae_rebuild/artifacts/midogpp/virchow2_cvae_midogpp_preservation_gate_pca128_v1/
+```
+
+That artifact supports pca128 `decode_mu` reconstruction-preservation mechanics
+only. It does not validate prior sampling, GMM composition, routing, or
+controllable class-conditional generation.
+
 Run the smoke tests:
 
 ```bash
@@ -214,6 +225,7 @@ Excluded from this folder:
 - cross-backbone aggregation audit rows
 - source-temperature calibration audit rows
 - CVAE training, CVAE generation, and CVAE preservation claims
+- MIDOG++ pca128 GMM feasibility, composition, or routing claims
 - failed or quarantined legacy branches
 - exploratory notebooks
 - cached embeddings, model weights, generated tables, and large artifacts
@@ -226,5 +238,5 @@ selection signal; metadata remains a baseline or interpretability layer.
 
 CVAE experiments ask whether generated embeddings preserve utility. This
 extraction does not generate embeddings. It tests whether the real Virchow2
-feature-space method is stable enough to justify a later CVAE preservation
-experiment.
+feature-space method is stable enough to justify separate CVAE preservation,
+prior, or composition experiments.
