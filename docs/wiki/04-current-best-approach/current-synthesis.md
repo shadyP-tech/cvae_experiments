@@ -20,6 +20,9 @@ generated-embedding Virchow2 CVAE D-series surface.
   the paired dense all4 heldout-excluded reliability confirmation.
 - Component-union/random mass-bag rows now provide the strongest high-mean
   generated-embedding surface, but not an adopted compatibility method.
+- Multipanel tail-risk mass-bagging crosses 0.90 mean BACC, but still fails
+  center3/min-center and is therefore a diagnostic high-mean surface, not an
+  adopted method.
 - Support-NELBO, source-inner transfer, and point source-mass reliability
   calibration are not validated final selectors.
 - The current generated-embedding bottleneck is weak-center/tail robustness and
@@ -42,6 +45,8 @@ generated-embedding Virchow2 CVAE D-series surface.
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_mass_bagged_v1/reports/decision_summary.md`
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_support8_calibrated_component_union_prior_v1/reports/decision_summary.md`
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1/reports/decision_summary.md`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/reports/decision_summary.md`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/center3_failure_audit/center3_failure_conclusion.md`
 
 ## Interpretation
 
@@ -93,6 +98,7 @@ Key verified generated-embedding numbers:
 | mass-uncertainty bagged component union | 0.8903 | high utility but fail; random mass-bag control competitive |
 | support8 calibrated component union | 0.8727 | fail; shuffled-support and random mass-bag controls competitive |
 | dense reliability tail shield | 0.8988 | fail; high mean but center3/worst-cell failure remains |
+| multipanel tail-risk mass-bag stabilization | 0.9087 | fail; high mean but center3/min-center failure and tail-risk transfer remain |
 
 ## Implication For Thesis
 
@@ -111,6 +117,12 @@ source-local reliability aggregation claim and a high-capacity component-union
 diagnostic surface. It does not yet support a final target-conditioned
 compatibility router, sparse expert selector, or clean source-mass allocator.
 
+The latest multipanel artifact makes the generated-embedding bottleneck more
+specific: 0.90 mean BACC is reachable, but the `42 x center3` audit shows a
+confident rare-positive class collapse that probability pooling does not fix.
+This is audit-only evidence and cannot be used to select a new policy without a
+separately predeclared follow-up.
+
 ## Limitations
 
 SAIL output artifacts are not present locally yet. TODO: verify against artifact.
@@ -124,10 +136,10 @@ different generated feature hashes across method labels. The paired dense all4
 confirmation fixed this for dense all4 comparisons; future selector claims need
 the same method-invariant generation/prediction bundle discipline.
 
-The latest harmful-source suppression run is implemented but not yet a final
-result. User-provided run status indicates the first workstation attempt was
-OOM-killed after cache creation and is being rerun with memory constraints.
-TODO: verify against final artifact.
+The earlier harmful-source suppression run is implemented but not yet a final
+result. User-provided run status indicated the first workstation attempt was
+OOM-killed after cache creation. TODO: verify only if final artifacts are
+resumed and synced.
 
 ## Next Checks
 
@@ -139,5 +151,8 @@ TODO: verify against final artifact.
 - Treat component-union/random mass-bag as the high-mean diagnostic surface,
   not as a final method unless controls are beaten and weak-tail failures are
   repaired.
-- Validate source-inner harmful-source suppression once final reports are
+- Predeclare any Center3 follow-up before evaluation; target source-only
+  calibration, minority-class decision stability, or rare useful seed-signal
+  preservation.
+- Validate source-inner harmful-source suppression only if final reports are
   synced.

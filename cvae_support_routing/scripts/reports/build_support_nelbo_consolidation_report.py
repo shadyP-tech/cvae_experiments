@@ -897,52 +897,6 @@ def build_pass_rule_summary(
             ),
         },
     }
-    context = str(DATASET_CONTEXT).strip().lower()
-    if context == "midogpp_scanner":
-        gap_all = checks["no_seed_oracle_gap_sign_reversal_against_metadata"]["status"] == "pass"
-        top1_improving = sum(int(row["pass"]) for row in per_seed_top1)
-        spearman_improving = sum(int(row["pass"]) for row in per_seed_spearman)
-        n_seed_pairs = max(len(per_seed_gap), 1)
-        strong = (
-            gap_all
-            and top1_improving == n_seed_pairs
-            and spearman_improving == n_seed_pairs
-            and checks["top1_meaningfully_above_random_floor"]["status"] == "pass"
-        )
-        passed = (
-            gap_all
-            and (top1_improving >= 2 or spearman_improving >= 2)
-            and checks["top1_meaningfully_above_random_floor"]["status"] == "pass"
-        )
-        weak = (
-            direct_gap < metadata_gap
-            or (direct_spearman > metadata_spearman and direct_spearman > 0.0)
-        )
-        if strong:
-            verdict = "STRONG PASS"
-        elif passed:
-            verdict = "PASS"
-        elif weak:
-            verdict = "WEAK PASS"
-        else:
-            verdict = "FAIL"
-        return {
-            "verdict": verdict,
-            "checks": checks,
-            "metric_priority": ["mean_oracle_gap_pct", "spearman", "top1_oracle_hit"],
-            "decision_tiers": {
-                "STRONG PASS": "beats metadata on top1, Spearman, and oracle gap in all seeds",
-                "PASS": "beats metadata on oracle gap in all seeds, improves top1 or Spearman in at least 2/3 seeds, and clears random floor",
-                "WEAK PASS": "improves oracle gap or Spearman, but top1 or selection stability is weak",
-                "DIAGNOSTIC ONLY": "protocol passes but confounding, degeneracy, or fold instability limits claims",
-                "FAIL": "support-NELBO is worse than metadata on oracle gap",
-                "REJECTED": "missing preflight validity, utility matrix, protocol audit, or split validity",
-            },
-            "interpretation": (
-                "MIDOG++ scanner-indexed PASS is conditional on preflight fold validity and confounding diagnostics; "
-                "it is acquisition-domain evidence, not pure scanner-shift evidence."
-            ),
-        }
     first_five = [
         "top1_beats_metadata_consistent_seed_margin",
         "spearman_beats_metadata_and_positive",
@@ -1543,7 +1497,7 @@ def build_outputs(experiment_root: Path, output_dir: Path, decision_table: Path)
     context = str(DATASET_CONTEXT).strip().lower()
     pass_rule = (
         build_pass_rule_summary(summary_rows, seed_stability_rows)
-        if context in {"breakhis", "midogpp_scanner"}
+        if context == "breakhis"
         else {
             "verdict": "NOT_APPLICABLE_CAMELYON17_DEFAULT",
             "checks": {},
@@ -1780,7 +1734,6 @@ def build_outputs(experiment_root: Path, output_dir: Path, decision_table: Path)
     _write_dynamic_csv(outputs["selection_entropy"], selection_entropy_rows)
 
     is_breakhis = context == "breakhis"
-    is_midogpp = context == "midogpp_scanner"
     if is_breakhis:
         allowed_claim = (
             "Direct support-set NELBO was stress-tested as a target-local utility estimator "
@@ -1791,18 +1744,6 @@ def build_outputs(experiment_root: Path, output_dir: Path, decision_table: Path)
             "This experiment does not prove general support-NELBO robustness across all medical domain shifts.",
             "BreakHis magnification shift is equivalent to Camelyon17 hospital or site shift.",
             "A BreakHis failure invalidates the Camelyon17 support-NELBO result.",
-        ]
-    elif is_midogpp:
-        allowed_claim = (
-            "Direct support-set NELBO is stress-tested as a compatibility estimator under "
-            "scanner-indexed MIDOG++ acquisition-domain shift, using group-disjoint "
-            "unlabeled support/evaluation splits and held-out NELBO utility evaluation."
-        )
-        disallowed_claims = [
-            "Direct support-NELBO solves pure scanner shift.",
-            "Scanner identity is true compatibility rather than an acquisition-domain proxy.",
-            "A result is thesis-facing without the MIDOG++ preflight scanner/confounding gates.",
-            "Tumor, lab, species, or resolution confounding is absent unless the confounding table proves it.",
         ]
     else:
         allowed_claim = (
@@ -1822,21 +1763,12 @@ def build_outputs(experiment_root: Path, output_dir: Path, decision_table: Path)
             "protocol_validity": audit_summary,
             "utility_performance": {
                 "summary_rows": summary_rows,
-                "metric_priority": (
-                    [
-                        "mean_oracle_gap_pct",
-                        "spearman",
-                        "top1_oracle_hit",
-                        "margin_and_entropy_diagnostics",
-                    ]
-                    if is_midogpp
-                    else [
-                        "top1_oracle_hit",
-                        "spearman",
-                        "oracle_gap_pct",
-                        "selected_heldout_eval_nelbo",
-                    ]
-                ),
+                "metric_priority": [
+                    "top1_oracle_hit",
+                    "spearman",
+                    "oracle_gap_pct",
+                    "selected_heldout_eval_nelbo",
+                ],
             },
             "stability_diagnostics": {
                 "rows": stability_rows,

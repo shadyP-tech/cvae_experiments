@@ -6,7 +6,6 @@ from typing import Any, Dict, Tuple
 from src.app.bootstrap import resolve_config_path
 from src.data.datasets.breakhis import prepare_breakhis_records
 from src.data.datasets.camelyon17 import prepare_camelyon17_records
-from src.data.datasets.midogpp import prepare_midogpp_records
 
 
 def _resolve_split_domain_caps(cfg: Dict[str, Any]) -> Dict[str, int] | None:
@@ -69,28 +68,9 @@ def _prepare_camelyon17(project_root: Path, cfg: Dict[str, Any]) -> Tuple[list[A
     )
 
 
-def _prepare_midogpp(project_root: Path, cfg: Dict[str, Any]) -> Tuple[list[Any], Dict[str, Any]]:
-    root = resolve_config_path(project_root, str(cfg["data"]["root"]))
-    split_domain_caps = _resolve_split_domain_caps(cfg)
-    cap_per_domain_raw = cfg["data"].get("max_samples_per_domain")
-    return prepare_midogpp_records(
-        root=root,
-        extensions=cfg["data"]["image_extensions"],
-        split=cfg["data"]["split"],
-        cap_per_domain=int(cap_per_domain_raw) if cap_per_domain_raw is not None else None,
-        seed=int(cfg["seed"]),
-        require_patient_ids=bool(cfg["data"]["require_patient_ids"]),
-        metadata_file=str(cfg["data"].get("metadata_file", "")) or None,
-        midogpp_domain_axis=str(cfg["data"].get("midogpp_domain_axis", "scanner_model")),
-        split_domain_caps=split_domain_caps,
-        configured_domains=cfg["data"].get("magnifications", []),
-    )
-
-
 DATASET_REGISTRY = {
     "breakhis": _prepare_breakhis,
     "camelyon17": _prepare_camelyon17,
-    "midogpp": _prepare_midogpp,
 }
 
 

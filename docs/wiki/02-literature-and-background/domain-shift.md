@@ -16,7 +16,7 @@ Summarize the domain-shift settings used to test routing and aggregation.
 - `../../../cvae_testing/README_BREAKHIS_EXPERIMENT.md`
 - `../../../cvae_support_routing/artifacts/comparison_tables/breakhis_support_estimated_utility_routing_v1.md`
 - `../../../cvae_support_routing/artifacts/comparison_tables/camelyon17_support_estimated_utility_routing_v2.md`
-- `../../../cvae_testing/results/comparison_tables/midogpp_scanner_patch_support_estimated_utility_routing_v1.md`
+- `../../../legacy/midogpp_limited_domain_support_routing/cvae_testing/results/comparison_tables/midogpp_scanner_patch_support_estimated_utility_routing_v1.md` (legacy; not thesis-facing)
 
 ## Interpretation
 
@@ -28,7 +28,7 @@ Domain-specific failure analysis should remain part of the evidence, especially 
 
 ## Limitations
 
-This page indexes known artifact surfaces but does not revalidate every MIDOG table. TODO: verify MIDOG claim status against artifact before thesis-facing use.
+This page indexes known artifact surfaces. The old MIDOG++ scanner support-routing tables are archived as legacy because they used a limited-domain, partial-sample setup and should not be used as thesis-facing evidence.
 
 ## Next Checks
 

@@ -12,6 +12,7 @@ Index experiment families and connect their conclusions to the current best next
 - [C-series CVAE experts](c-series-cvae-experts.md)
 - [D-series decentralized Virchow2 CVAE composition](d-series-decentralized-cvae.md)
 - [Component-union mass allocation audits](component-union-mass-allocation.md)
+- [Multipanel tail-risk and Center3 audit](multipanel-tailrisk-center3-audit.md)
 - [F-series residual generators](f-series-residual-generators.md)
 - [Negative results](negative-results.md)
 
@@ -26,6 +27,9 @@ Index experiment families and connect their conclusions to the current best next
 - Component-union follow-ups show high mean BACC but expose source-mass
   underidentification and weak-center/tail robustness as the current
   generated-embedding bottlenecks.
+- The multipanel tail-risk follow-up crosses 0.90 mean BACC but fails the
+  weak-center gate; its Center3 audit points to confident minority-class
+  collapse rather than simple component undersampling.
 - F/residual-style work is diagnostic unless protocol-clean and adoption-eligible.
 
 ## Evidence / Source Artifacts
@@ -39,3 +43,5 @@ Index experiment families and connect their conclusions to the current best next
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/tables/paired_dense_all4_summary.csv`
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_mass_bagged_v1/reports/decision_summary.md`
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1/reports/decision_summary.md`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/reports/decision_summary.md`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/center3_failure_audit/center3_failure_conclusion.md`

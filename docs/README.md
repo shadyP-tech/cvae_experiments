@@ -38,6 +38,7 @@ They are documented in:
 - [Current experimental state](context/current_experimental_state.md)
 - [D-series decentralized Virchow2 CVAE composition](wiki/03-experiments/d-series-decentralized-cvae.md)
 - [Component-union mass allocation audits](wiki/03-experiments/component-union-mass-allocation.md)
+- [Multipanel tail-risk and Center3 audit](wiki/03-experiments/multipanel-tailrisk-center3-audit.md)
 - [Generated-embedding CVAE current synthesis](wiki/04-current-best-approach/generative-cvae-current-synthesis.md)
 
 The paired dense-all4 reliability confirmation was synced into this working
@@ -53,3 +54,8 @@ but it is not sparse routing or target-conditioned expert selection.
 Newer component-union and random mass-bag artifacts reach higher mean BACC, but
 they are documented as diagnostic/high-capacity surfaces unless they beat
 matched controls and repair weak-center/tail failures.
+
+The multipanel tail-risk mass-bag artifact reaches 0.9087 mean BACC but remains
+a negative stabilization result because center3/min-center fail. Its Center3
+audit is diagnostic-only and points to confident rare-class collapse rather
+than simple component undersampling.

@@ -1,6 +1,6 @@
 # Current Experimental State
 
-Last updated: 2026-05-31
+Last updated: 2026-06-22
 
 ## Purpose
 
@@ -52,7 +52,10 @@ Virchow2 CVAE repair showed decoder/source-pool capacity can preserve utility
 -> decentralized D-series summary-exchange variants gave partial evidence
 -> paired dense-all4 reliability confirmation passes as dense aggregation
 -> component-union and random mass-bag audits reach high mean BACC
--> mass allocation and weak-center robustness remain the current bottlenecks
+-> multipanel tail-risk mass-bagging reaches >0.90 mean BACC but fails
+   weak-center gates
+-> mass allocation, weak-center robustness, and minority-class confidence
+   collapse remain the current bottlenecks
 ```
 
 Current best generated-embedding interpretation:
@@ -65,7 +68,8 @@ Best clean source-quality / dense aggregation evidence:
   paired dense-all4 heldout-excluded reliability confirmation
 
 Best high-mean component-composition surface:
-  component-union / random mass-bag family, diagnostic unless controls are beaten
+  component-union / random mass-bag / multipanel tail-risk family,
+  diagnostic unless controls are beaten and weak-center failures are repaired
 
 Not currently supported as final thesis-facing winners:
   support-NELBO weighting
@@ -90,6 +94,10 @@ safe generated-embedding claims are narrower:
 
 3. weak-center and bottom-tail robustness, not mean BACC alone, is now the
    limiting generated-embedding bottleneck
+
+4. the latest multipanel tail-risk run shows that source-only probability
+   pooling can clear 0.90 mean BACC, but this is not thesis-facing success
+   when center3/min-center remains below gate and tail-risk transfer appears
 ```
 
 ## Synced Artifact Root
@@ -149,17 +157,26 @@ Primary generated-embedding artifacts:
 - `cvae_rebuild/artifacts/virchow2_cvae_support8_calibrated_component_union_prior_v1/reports/decision_summary.md`
 - `cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_anchored_mass_bagged_v1/reports/decision_summary.md`
 - `cvae_rebuild/artifacts/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1/reports/decision_summary.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/reports/decision_summary.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/tables/multipanel_tailrisk_summary.csv`
+- `cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/tables/multipanel_tailrisk_paired_deltas.csv`
+- `cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/tables/multipanel_tailrisk_panel_disagreement.csv`
+- `cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/tables/multipanel_tailrisk_probability_invariants.csv`
+- `cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/center3_failure_audit/center3_failure_conclusion.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/center3_failure_audit/center3_failure_cell_summary.csv`
+- `cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/center3_failure_audit/center3_failure_pooling_path.csv`
+- `cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/center3_failure_audit/center3_failure_source_weight_comparison.csv`
+- `cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/center3_failure_audit/center3_failure_component_coverage_comparison.csv`
 - `cvae_rebuild/configs/virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1.yaml`
-- `cvae_rebuild/src/cvae_rebuild/source_inner_harmful_source_suppression.py`
+- `cvae_rebuild/src/source_inner_harmful_source_suppression.py`
 
-Current in-progress generated-embedding artifact:
+Earlier in-progress generated-embedding artifact:
 
 - `cvae_rebuild/artifacts/virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1/`
 
-Status: local synced result reports/tables/manifests are not verified yet. User
-reported the workstation run was OOM-killed after writing cache files and is
-being rerun with thread/memory constraints. Treat harmful-source suppression as
-current implementation/run status, not final evidence.
+Status: local synced result reports/tables/manifests are not verified yet.
+Treat harmful-source suppression as earlier implementation/run status, not
+latest final evidence, unless the final rerun artifacts are later synced.
 
 Historical and contextual artifacts:
 
@@ -417,6 +434,7 @@ Summary table:
 | support8 calibrated component union | `support8_calibrated_component_union_softmax_shrink050` | `SUPPORT_CALIBRATED_COMPONENT_UNION_FAIL` | 0.8727 | 0.7886 | 0.0369 | unlabeled target support does not beat shrink050/random mass-bag or shuffled-support null |
 | shrink050/random mass tail-risk blend | `component_union_tailrisk_anchored_shrink050_random_mass_bag_blend050` | `TAILRISK_ANCHORED_COMPONENT_UNION_USEFUL_THESIS_SUCCESS` | 0.8957 | 0.8032 | 0.0510 | useful robustness evidence, but anchor mismatch and bottom-tail limits remain |
 | dense reliability tail shield | `dense_reliability_tailshield_random_mass_bag_blend25_75` | `DENSE_TAILSHIELD_RANDOM_MASS_BAG_FAIL` | 0.8988 | 0.7896 | 0.0403 | high mean and bottom20 gain, but center3/worst-cell failure remains |
+| multipanel tail-risk mass-bag stabilization | `component_union_tailrisk_multipanel_shrink050_random_mass_bag_blend050` | `MULTIPANEL_TAILRISK_STABILIZATION_FAIL` | 0.9087 | 0.7897 | 0.0431 | clears 0.90 mean and improves bottom20/seed std, but center3/min-center fail and tail-risk transfer appears |
 
 Important verified numbers:
 
@@ -426,6 +444,13 @@ Important verified numbers:
 - Support8 calibrated primary minus shuffled-support null mean: -0.0050.
 - Dense tail shield bottom20 delta vs random mass-bag: +0.0244, but center3
   delta vs random mass-bag: 0.0000 and worst seed-center BACC: 0.4971.
+- Multipanel tail-risk stabilization delta vs prior tailrisk: +0.0130, delta
+  vs canonical random mass-bag: +0.0103, bottom20 delta vs prior tailrisk:
+  +0.0408, seed std delta vs prior tailrisk: -0.0079, but center3/min-center
+  delta vs prior tailrisk: -0.0136 and worst seed-center BACC: 0.4975.
+- Multipanel leakage report: `PASS`; protocol manifest states no target
+  support, no target-label selection, source-inner calibration primary, and
+  target evaluation labels scoring/audit only.
 
 Interpretation:
 
@@ -434,6 +459,12 @@ main limitation: several rows reach roughly the source-union K16 region. The
 problem is that source-mass allocation is underidentified. Random or shuffled
 mass controls often match the proposed primary method, and weak-center/tail
 failures remain.
+
+The multipanel tail-risk run sharpens this conclusion. It is the first
+source-only full-matrix CVAE/component-union variant in this record to clear
+0.90 center-equal mean BACC, but it still fails the locked stabilization claim
+because the weak center is not repaired. The result supports a high-capacity
+composition claim, not method adoption.
 
 Safe claim:
 
@@ -451,11 +482,69 @@ Random mass-bag success proves random source weights are meaningful
 compatibility estimates.
 ```
 
-## Current Harmful-Source Suppression Run
+## Center3 Multipanel Failure Audit
+
+Verified audit artifacts:
+
+- `cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/center3_failure_audit/center3_failure_conclusion.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/center3_failure_audit/center3_failure_cell_summary.csv`
+- `cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/center3_failure_audit/center3_failure_pooling_path.csv`
+- `cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/center3_failure_audit/center3_failure_source_weight_comparison.csv`
+- `cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/center3_failure_audit/center3_failure_component_coverage_comparison.csv`
+
+Protocol label:
+
+```text
+diagnostic / audit-only; target labels are post-prediction scoring and failure
+analysis only
+```
+
+Assigned failure mode for `experiment_seed=42 x heldout_center=3`:
+
+```text
+near_class_collapse | probability_pooling_suppresses_best_seed |
+confident_wrong_predictions
+```
+
+Verified audit details:
+
+- Final v2 BACC in `42 x center3`: 0.4975.
+- Target eval class counts: class0 = 198, class1 = 2.
+- Final predicted counts: class0 = 199, class1 = 1.
+- Final class1 recall: 0.0000, mean confidence: 0.9795, mean margin: 0.9590.
+- Pooled anchor and pooled random mass-bag also score 0.4975 BACC.
+- Canonical random mass-bag scores 0.5000 BACC by predicting class0 for all
+  200 samples.
+- Seed 101 anchor BACC: 0.9949; seed 101 blend BACC: 0.7475.
+- Seed 127 blend BACC: 0.7323.
+- All panel/final pools suppress the rare useful seed-level minority-class
+  signal.
+- Panel disagreement at `42 x center3` is low, with mean pairwise JS divergence
+  0.0019 and hard-label disagreement 0.0033, so the panels mostly agree on the
+  wrong majority-class decision.
+- Component coverage does not explain the failure: the primary failed cell has
+  full component mass coverage and no unsampled active components.
+- The `44 x center3` control reaches 0.9823 BACC with class counts class0 = 87
+  and class1 = 113, so center3 is not globally impossible; the observed failure
+  is a specific rare-positive/seed-regime collapse.
+- The `43 x center4` tail-repair control shows the same machinery can improve
+  a weak-tail cell, reaching 0.7923 BACC versus 0.5923 for pooled anchor and
+  0.6923 for pooled random mass-bag.
+
+Interpretation:
+
+The failed center3 cell is not mainly explained by stochastic panel diversity
+or component undersampling. The evidence points to a systematic minority-class
+decision-boundary or calibration failure under extreme class imbalance. More
+random panels alone are unlikely to solve this unless the fixed, source-only
+method also changes how rare useful seed-level minority-class evidence is
+calibrated or pooled.
+
+## Earlier Harmful-Source Suppression Run Status
 
 Implementation artifacts:
 
-- `cvae_rebuild/src/cvae_rebuild/source_inner_harmful_source_suppression.py`
+- `cvae_rebuild/src/source_inner_harmful_source_suppression.py`
 - `cvae_rebuild/configs/virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1.yaml`
 
 User-provided run status, not final artifact evidence:
@@ -465,17 +554,18 @@ User-provided run status, not final artifact evidence:
 - No final reports/tables/manifests were available at that point.
 - The run is being retried with BLAS/thread limits and unbuffered logging.
 
-Current purpose:
+Earlier purpose:
 
 ```text
 test whether source-inner leave-one-source harmfulness can suppress sources
 that poison target-like regimes before heldout target evaluation
 ```
 
-Current evidence label:
+Evidence label:
 
 ```text
-implemented and running; final result TODO: verify against artifact
+implemented/running at prior update; final result TODO: verify against artifact
+if this line is resumed
 ```
 
 ## Current Best Approach
@@ -508,7 +598,7 @@ routing or target-conditioned compatibility-router PASS.
 Current best generated-embedding mean-utility surface:
 
 ```text
-component-union / random mass-bag probability ensembles
+component-union / random mass-bag / multipanel tail-risk probability ensembles
 ```
 
 Status: high-mean diagnostic surface, not adopted as a compatibility method
@@ -519,7 +609,7 @@ Current generated-embedding bottleneck:
 ```text
 source-mass allocation is underidentified;
 weak-center/tail robustness is unresolved;
-harmful source interactions may be the next bottleneck.
+minority-class confidence collapse can survive probability pooling.
 ```
 
 Current rejected or downgraded directions:
@@ -534,6 +624,9 @@ Current rejected or downgraded directions:
 - support8 calibrated component-union prior: shuffled-support/random mass
   controls are competitive
 - dense reliability tail shield: high mean but fails center3/worst-cell repair
+- multipanel tail-risk mass-bag stabilization: mean BACC exceeds 0.90, but
+  center3/min-center fail, tail-risk transfer is flagged, and audit shows
+  confident rare-class collapse in `42 x center3`
 - K24 source-union GMM: weaker than K16 and component undersampled
 - metadata-only routing: baseline/proxy, not current winner
 
@@ -570,8 +663,15 @@ validated compatibility estimator.
 ```
 
 ```text
-Fixed source-only robustness aggregation can improve some tail metrics, but the
-latest dense-tailshield artifact did not solve center3 or worst-cell failure.
+Fixed source-only robustness aggregation can improve mean, bottom-tail, and
+seed-stability metrics, but the latest multipanel artifact did not solve
+center3/min-center failure.
+```
+
+```text
+Audit-only evidence suggests that the worst center3 failure is a confident
+minority-class collapse under extreme class imbalance, not merely component
+undersampling or insufficient panel diversity.
 ```
 
 Not supported by current evidence:
@@ -636,10 +736,15 @@ mass allocator for component union.
 6. Keep centralized source-union K16 as a CVAE prior-preservation diagnostic
    upper bound only.
 
-7. Current active run: source-inner harmful-source suppression over random
-   mass-bag component union. This tests whether source-inner leave-one-source
-   effects can identify source poisoning before target evaluation. Final result
-   TODO: verify after reports/tables/manifests are synced.
+7. Do not treat more random panels as the default next step. The latest
+   multipanel audit suggests the next generated-embedding work should target
+   source-only calibration, minority-class decision stability, and pooling
+   rules that preserve rare useful seed-level evidence without target-label
+   seed selection.
+
+8. Any Center3 follow-up method must be predeclared separately. The current
+   audit is target-label-informed after predictions and cannot be used to
+   choose seeds, thresholds, calibration, routing, or method policy.
 
 ## Missing Artifacts / TODOs
 
@@ -654,7 +759,9 @@ mass allocator for component union.
   before using it as a final thesis result table.
 - TODO: sync and validate final
   `virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1`
-  reports/tables/manifests after the OOM-safe rerun completes.
+  reports/tables/manifests if that earlier run is resumed.
 - TODO: if harmful-source suppression fails, document whether the failure is
   source-inner signal non-transfer, insufficient harmfulness precision, or a
   need for target-regime information.
+- TODO: predeclare any Center3 follow-up before evaluation; do not use the
+  audit-only row-level target labels to tune method choices.

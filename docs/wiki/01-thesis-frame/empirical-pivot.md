@@ -15,6 +15,10 @@ Explain the pivot from metadata-first routing to compatibility-driven routing an
   robustness; the paired dense all4 reliability confirmation is a dense
   aggregation PASS, while support-NELBO, source-inner transfer, and current
   point mass-allocation signals are not validated final signals.
+- Multipanel tail-risk mass-bagging shows that the current Virchow2 CVAE
+  component-union surface can exceed 0.90 mean BACC, but the thesis-facing
+  bottleneck is now weak-center/minority-class robustness rather than mean BACC
+  alone.
 
 ## Evidence / Source Artifacts
 
@@ -27,6 +31,8 @@ Explain the pivot from metadata-first routing to compatibility-driven routing an
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/tables/paired_dense_all4_summary.csv`
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_mass_bagged_v1/reports/decision_summary.md`
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1/reports/decision_summary.md`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/reports/decision_summary.md`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/center3_failure_audit/center3_failure_conclusion.md`
 
 ## Interpretation
 
@@ -38,8 +44,9 @@ preserved and that component-level composition has high mean-utility capacity.
 The deployable decentralized composition story is now sharper: source-union
 K16 is strong but centralized, paired dense all4 reliability weighting improves
 clean dense aggregation, component-union/random mass-bagging exposes
-underidentified source mass, and D1.3/D1.5/support8 do not validate their
-proposed compatibility signals.
+underidentified source mass, multipanel probability pooling exposes a
+rare-positive Center3 confidence-collapse bottleneck, and D1.3/D1.5/support8
+do not validate their proposed compatibility signals.
 
 ## Implication For Thesis
 
@@ -57,5 +64,6 @@ Provided synthesis says older DINOv2/PCA64 likely did not support 0.90 BACC. Whe
 - Verify SAIL output artifacts once generated or synced.
 - Reuse paired generation/prediction invariants before any further D-series
   selector confirmation.
-- Validate the current harmful-source suppression run before treating it as
-  source-inner evidence.
+- Predeclare any Center3/weak-tail follow-up before evaluation.
+- Validate harmful-source suppression only if final artifacts are resumed and
+  synced.

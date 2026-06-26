@@ -25,6 +25,8 @@ Document the current empirical synthesis and active SAIL implementation.
   paired dense all4 reliability confirmation.
 - Component-union/random mass-bag runs reach high mean BACC, but remain
   diagnostic unless matched controls are beaten and weak-tail failures improve.
+- Multipanel tail-risk mass-bagging reaches 0.9087 mean BACC, but fails
+  center3/min-center and is diagnostic, not adopted.
 - No D-series experiment currently supports a full PASS target-conditioned
   compatibility-routing claim.
 
@@ -38,3 +40,4 @@ Document the current empirical synthesis and active SAIL implementation.
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/reports/decision_summary.md`
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_mass_bagged_v1/reports/decision_summary.md`
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1/reports/decision_summary.md`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/reports/decision_summary.md`

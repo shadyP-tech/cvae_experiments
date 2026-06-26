@@ -25,76 +25,6 @@ from src.eval.evaluators.learned_utility_reporting import (
 from src.eval.evaluators.support_response_routing import (
     evaluate_support_response_routing_for_checkpoints,
 )
-from src.torch_utils import safe_torch_load
-
-
-def _is_midogpp_scanner_protocol(data_cfg: Dict[str, Any] | None) -> bool:
-    data_cfg = data_cfg or {}
-    return str(data_cfg.get("dataset_domain_semantics", "")).strip().lower() == "midogpp_scanner"
-
-
-def _feature_extractor_fingerprint(payload: Dict[str, Any]) -> str:
-    feature_extractor = payload.get("feature_extractor", {}) or {}
-    return "|".join(
-        str(feature_extractor.get(key, ""))
-        for key in [
-            "backbone_type",
-            "embedding_dim",
-            "image_size",
-            "feature_extractor_name",
-            "feature_extractor_checkpoint",
-            "feature_extractor_layer",
-            "embedding_pooling",
-        ]
-    )
-
-
-def _write_all_split_support_response_cache(
-    *,
-    cache_paths: Dict[str, Path],
-    out_path: Path,
-) -> Path:
-    embeddings: List[torch.Tensor] = []
-    metadata: List[Dict[str, Any]] = []
-    feature_extractor: Dict[str, Any] | None = None
-    fingerprint: str | None = None
-
-    for split in ["train", "val", "test"]:
-        path = cache_paths.get(split)
-        if path is None:
-            raise ValueError(f"Missing embedding cache path for split '{split}'")
-        payload = safe_torch_load(path, map_location="cpu")
-        current_fingerprint = _feature_extractor_fingerprint(payload)
-        if fingerprint is None:
-            fingerprint = current_fingerprint
-            feature_extractor = dict(payload.get("feature_extractor", {}) or {})
-        elif current_fingerprint != fingerprint:
-            raise ValueError("Cannot merge embedding caches with different feature extractor metadata")
-
-        split_embeddings = payload["embeddings"]
-        embeddings.append(split_embeddings)
-        for row in payload.get("metadata", []):
-            meta = dict(row)
-            meta.setdefault("split", split)
-            meta["support_response_pool_split"] = split
-            metadata.append(meta)
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    merged = torch.cat(embeddings, dim=0) if embeddings else torch.empty((0, 0))
-    torch.save(
-        {
-            "embeddings": merged,
-            "metadata": metadata,
-            "feature_extractor": feature_extractor or {},
-            "support_response_pool": {
-                "pool_scope": "all_splits",
-                "source_splits": ["train", "val", "test"],
-                "n_samples": int(merged.shape[0]),
-            },
-        },
-        out_path,
-    )
-    return out_path
 
 
 def evaluate_learned_utility_loqdo(
@@ -332,44 +262,6 @@ def evaluate_learned_utility_loqdo(
         support_metadata = metadata
         support_nelbo = true_nelbo
         support_expert_domains = expert_domains
-
-        if _is_midogpp_scanner_protocol(data_cfg) and cache_paths is not None:
-            support_cache = _write_all_split_support_response_cache(
-                cache_paths=cache_paths,
-                out_path=reports_dir.parent / "embeddings" / "support_response_all_splits.pt",
-            )
-            print(
-                "[learned_utility] MIDOG++ scanner support-response routing uses all-split "
-                f"evaluation pool: {support_cache}"
-            )
-            (
-                support_embeddings,
-                _support_sample_domains,
-                support_nelbo,
-                support_expert_domains,
-                support_metadata,
-            ) = _score_experts_batched(
-                test_cache=support_cache,
-                expert_checkpoints=expert_checkpoints,
-                hidden_dim=int(hidden_dim),
-                latent_dim=int(latent_dim),
-                pair_batch_size=int(eval_cfg.pair_batch_size),
-                conditioning_cfg=conditioning_cfg,
-                configured_domains=configured_domains,
-                metadata_constraint_cfg=metadata_constraint_cfg,
-            )
-            if [int(v) for v in support_expert_domains] != [int(v) for v in expert_domains]:
-                raise ValueError("Support-response all-split scoring changed expert domain order")
-            support_response_pool = {
-                "pool_scope": "all_splits",
-                "cache_path": str(support_cache),
-                "source_splits": ["train", "val", "test"],
-                "n_samples": int(support_embeddings.shape[0]),
-                "protocol_note": (
-                    "MIDOG++ support/eval routing uses all scanner-domain samples because "
-                    "candidate source experts exclude the query scanner expert at routing time."
-                ),
-            }
 
         support_response_results = evaluate_support_response_routing_for_checkpoints(
             embeddings=support_embeddings,

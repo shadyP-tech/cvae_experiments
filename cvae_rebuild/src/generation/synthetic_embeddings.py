@@ -1,0 +1,1 @@
+"""Synthetic embedding generation utilities."""

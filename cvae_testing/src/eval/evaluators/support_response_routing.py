@@ -646,7 +646,7 @@ def _privacy_fields(data_cfg: Mapping[str, Any] | None) -> Dict[str, Any]:
 def _requires_patient_disjoint_support(data_cfg: Mapping[str, Any] | None) -> bool:
     data_cfg = data_cfg or {}
     semantics = str(data_cfg.get("dataset_domain_semantics", "")).strip().lower()
-    return semantics in {"breakhis_magnification", "midogpp_scanner"}
+    return semantics == "breakhis_magnification"
 
 
 def _patient_ids_by_index(metadata: Sequence[Mapping[str, object]]) -> Dict[int, str]:
@@ -654,119 +654,6 @@ def _patient_ids_by_index(metadata: Sequence[Mapping[str, object]]) -> Dict[int,
         int(idx): str(row.get("patient_id", "") or "").strip()
         for idx, row in enumerate(metadata)
     }
-
-
-def _is_midogpp_scanner(data_cfg: Mapping[str, Any] | None) -> bool:
-    data_cfg = data_cfg or {}
-    return str(data_cfg.get("dataset_domain_semantics", "")).strip().lower() == "midogpp_scanner"
-
-
-def _meta_text(meta: Mapping[str, object], *keys: str) -> str:
-    for key in keys:
-        value = str(meta.get(key, "") or "").strip()
-        if value:
-            return value
-    return ""
-
-
-def _most_common(values: Iterable[str]) -> str:
-    counts: Dict[str, int] = {}
-    for value in values:
-        text = str(value).strip()
-        if not text:
-            continue
-        counts[text] = counts.get(text, 0) + 1
-    if not counts:
-        return ""
-    return sorted(counts.items(), key=lambda item: (-int(item[1]), str(item[0])))[0][0]
-
-
-def _domain_profile(
-    *,
-    metadata: Sequence[Mapping[str, object]],
-    sample_domains: np.ndarray,
-    domain: int,
-    indices: Sequence[int] | None = None,
-) -> Dict[str, Any]:
-    if indices is None:
-        domain_indices = [int(i) for i, value in enumerate(sample_domains.tolist()) if int(value) == int(domain)]
-    else:
-        domain_indices = [int(i) for i in indices]
-    rows = [metadata[int(i)] for i in domain_indices]
-    scanner_models = [_meta_text(row, "scanner_model", "raw_scanner_label", "domain_name") for row in rows]
-    vendors = [_meta_text(row, "scanner_family", "scanner_vendor", "scanner_model", "raw_scanner_label") for row in rows]
-    resolutions = [_meta_text(row, "resolution_bin", "resolution") for row in rows]
-    return {
-        "domain": int(domain),
-        "scanner_model": _most_common(scanner_models),
-        "scanner_vendor_or_family": _most_common(vendors),
-        "resolution_bin": _most_common(resolutions),
-        "n_rows": int(len(rows)),
-    }
-
-
-def _midogpp_scanner_resolution_metadata_scores(
-    *,
-    metadata: Sequence[Mapping[str, object]],
-    sample_domains: np.ndarray,
-    support_indices: Sequence[int],
-    target_domain: int,
-    candidate_experts: Sequence[int],
-) -> Tuple[List[float], Dict[str, Any]]:
-    target_profile = _domain_profile(
-        metadata=metadata,
-        sample_domains=sample_domains,
-        domain=int(target_domain),
-        indices=support_indices,
-    )
-    scores: List[float] = []
-    candidate_profiles: Dict[int, Dict[str, Any]] = {}
-    missing_vendor_count = 0
-    resolution_only_count = 0
-    for expert in candidate_experts:
-        profile = _domain_profile(
-            metadata=metadata,
-            sample_domains=sample_domains,
-            domain=int(expert),
-        )
-        candidate_profiles[int(expert)] = profile
-        target_vendor = str(target_profile.get("scanner_vendor_or_family", "") or "")
-        candidate_vendor = str(profile.get("scanner_vendor_or_family", "") or "")
-        target_resolution = str(target_profile.get("resolution_bin", "") or "")
-        candidate_resolution = str(profile.get("resolution_bin", "") or "")
-        vendor_missing = not target_vendor or not candidate_vendor
-        resolution_missing = not target_resolution or not candidate_resolution
-        if vendor_missing:
-            missing_vendor_count += 1
-        if vendor_missing and not resolution_missing:
-            resolution_only_count += 1
-        vendor_mismatch = 1.0 if vendor_missing or target_vendor != candidate_vendor else 0.0
-        resolution_mismatch = 1.0 if resolution_missing or target_resolution != candidate_resolution else 0.0
-        scores.append(float(2.0 * vendor_mismatch + 1.0 * resolution_mismatch))
-    unique_scores = sorted({round(float(score), 12) for score in scores})
-    min_score = min(scores) if scores else float("inf")
-    n_min = sum(1 for score in scores if abs(float(score) - float(min_score)) <= 1.0e-12)
-    selected_expert = int(candidate_experts[_stable_argmin(scores, candidate_experts)]) if candidate_experts else -1
-    diag = {
-        "metadata_baseline_variant": "scanner_resolution_metadata_v1",
-        "metadata_baseline_limited": int(
-            bool(scores)
-            and (
-                n_min > 1
-                or missing_vendor_count / max(len(scores), 1) >= 0.50
-            )
-        ),
-        "metadata_baseline_tie_rate": float(n_min / max(len(scores), 1)),
-        "metadata_effective_candidate_count": int(len(unique_scores)),
-        "metadata_missing_vendor_rate": float(missing_vendor_count / max(len(scores), 1)),
-        "metadata_resolution_only_rate": float(resolution_only_count / max(len(scores), 1)),
-        "metadata_selected_expert": int(selected_expert),
-        "metadata_selected_expert_distribution": json.dumps({str(selected_expert): 1}, separators=(",", ":")),
-        "metadata_target_vendor_or_family": str(target_profile.get("scanner_vendor_or_family", "")),
-        "metadata_target_resolution_bin": str(target_profile.get("resolution_bin", "")),
-        "metadata_candidate_profiles_json": json.dumps(candidate_profiles, sort_keys=True, separators=(",", ":")),
-    }
-    return scores, diag
 
 
 def _score_margin(values: Sequence[float]) -> float:
@@ -2357,17 +2244,7 @@ def evaluate_support_response_routing_from_arrays(
                     )
 
                     # Matched non-learned baselines.
-                    metadata_extra: Dict[str, Any] = {}
-                    if _is_midogpp_scanner(data_cfg):
-                        metadata_scores, metadata_extra = _midogpp_scanner_resolution_metadata_scores(
-                            metadata=metadata,
-                            sample_domains=sample_domains,
-                            support_indices=target_split.support_indices,
-                            target_domain=int(outer_target),
-                            candidate_experts=target_candidates,
-                        )
-                    else:
-                        metadata_scores = [float(row["metadata_distance"]) for row in target_rows]
+                    metadata_scores = [float(row["metadata_distance"]) for row in target_rows]
                     sample_rows.append(
                         _score_method_row(
                             method="support_metadata_routing",
@@ -2387,21 +2264,8 @@ def evaluate_support_response_routing_from_arrays(
                             privacy_fields=privacy,
                             support_n=int(target_split.support_size_actual),
                             support_labels_used_for_routing=0,
-                            extra_fields=metadata_extra,
                         )
                     )
-                    if metadata_extra:
-                        metadata_diagnostic_rows.append(
-                            {
-                                **dict(privacy),
-                                "seed": int(seed),
-                                "query_domain": int(outer_target),
-                                "support_seed": int(support_seed),
-                                "support_size_requested": int(support_size),
-                                "candidate_experts": target_fold.label(),
-                                **metadata_extra,
-                            }
-                        )
                     sample_index_counter += 1
 
                     embedding_scores = [float(row["embedding_distance"]) for row in target_rows]

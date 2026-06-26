@@ -1,0 +1,40 @@
+experiment:
+  name: pca128_posthoc_gmm_prior_v1
+  artifact_root: cvae_rebuild/artifacts/pca128_posthoc_gmm_prior_v1
+
+inputs:
+  posterior_latents_path: cvae_rebuild/artifacts/pca128_posthoc_gmm_prior_v1/inputs/posterior_latents_fit_eval.npz
+  frozen_checkpoint_path: cvae_rebuild/artifacts/pca128_preservation_repair_v1/checkpoints/frozen_pca128_cvae.pt
+  target_eval_path: cvae_rebuild/artifacts/pca128_posthoc_gmm_prior_v1/inputs/target_eval_embeddings.npz
+  reference_metrics_path: cvae_rebuild/artifacts/pca128_preservation_repair_v1/reports/reference_metrics.json
+
+protocol:
+  pca_dim: 128
+  fit_split: fit
+  eval_split: eval
+  forbid_eval_encoding: true
+
+prior:
+  type: class_conditional_gmm
+  gmm_components: 8
+  covariance_type: diag
+  reg_covar: 1.0e-6
+  n_init: 3
+  max_iter: 300
+  min_class_fit_count: 16
+
+generation:
+  synthetic_per_class_total: 128
+  generation_seed: 17
+
+classifier:
+  type: sklearn_logistic_regression
+  solver: lbfgs
+  C: 1.0
+  max_iter: 2000
+  class_weight: balanced
+  classifier_seed: null
+
+references:
+  real_pca128_reference_key: real_pca128_reference
+  decode_mu_key: decode_mu

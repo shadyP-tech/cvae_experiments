@@ -21,6 +21,9 @@ Preserve negative findings as part of the research record.
 - Component-union, random mass-bag, and tail-shield audits show high mean BACC,
   but several are still negative or diagnostic because random/shuffled controls
   are competitive and weak-center/tail failures remain.
+- Multipanel tail-risk mass-bagging is a high-mean negative stabilization
+  result: it reaches 0.9087 mean BACC but fails center3/min-center and tail-risk
+  transfer gates.
 
 ## Evidence / Source Artifacts
 
@@ -38,6 +41,8 @@ Preserve negative findings as part of the research record.
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_mass_bagged_v1/reports/decision_summary.md`
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_support8_calibrated_component_union_prior_v1/reports/decision_summary.md`
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1/reports/decision_summary.md`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/reports/decision_summary.md`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/center3_failure_audit/center3_failure_conclusion.md`
 
 ## Interpretation
 
@@ -62,6 +67,11 @@ high mean BACC is not sufficient if random/shuffled mass controls are
 competitive or weak-center/tail collapse remains
 ```
 
+```text
+0.90 mean BACC is not sufficient if center3/min-center remains below gate and
+the worst seed-center still collapses near chance
+```
+
 ## Implication For Thesis
 
 The thesis should present negative findings as evidence for claim discipline and for the move toward utility-aligned compatibility.
@@ -79,6 +89,11 @@ composition can be high utility, but source-only mass allocation remains
 underidentified. A thesis-facing method must either beat the random/shuffled
 controls or repair weak-center/tail failures in a protocol-clean way.
 
+The multipanel line adds that more stochastic panels are not enough by
+themselves. The primary Center3 failure has low panel disagreement and full
+component coverage, but still collapses on the rare positive class with high
+confidence.
+
 ## Limitations
 
 Some older artifacts are quarantined or superseded. Do not use quarantined results for method-selection claims.
@@ -92,3 +107,5 @@ Some older artifacts are quarantined or superseded. Do not use quarantined resul
   sampling seeds.
 - For high-mean component-union methods, require matched controls and
   weak-tail metrics before calling the method thesis-facing.
+- Treat the multipanel Center3 audit as diagnostic-only; any follow-up method
+  must be predeclared before evaluation.

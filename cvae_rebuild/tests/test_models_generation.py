@@ -3,8 +3,8 @@ import pytest
 torch = pytest.importorskip("torch")
 np = pytest.importorskip("numpy")
 
-from cvae_rebuild.generation import generate_reference_posterior
-from cvae_rebuild.models import ClassConditionedCVAE, loss_for_batch
+from generation import generate_reference_posterior
+from models import ClassConditionedCVAE, loss_for_batch
 
 
 def test_class_conditioned_cvae_scores_every_class_label() -> None:

@@ -32,7 +32,9 @@ generated embedding:
   -> D-series decentralized source-local summary composition
   -> paired dense all4 reliability PASS for dense aggregation
   -> component-union/random mass-bag high mean but controls competitive
-  -> weak-center/tail robustness is the active bottleneck
+  -> multipanel tail-risk reaches 0.9087 mean but fails center3/min-center
+  -> weak-center/tail robustness and minority-class confidence collapse are
+     the active bottleneck
 ```
 
 ## Evidence / Source Artifacts
@@ -46,6 +48,8 @@ generated embedding:
 - `cvae_rebuild/artifacts/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1/reports/decision_summary.md`
 - `cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_mass_bagged_v1/reports/decision_summary.md`
 - `cvae_rebuild/artifacts/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1/reports/decision_summary.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/reports/decision_summary.md`
+- `cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/center3_failure_audit/center3_failure_conclusion.md`
 
 ## Next Checks
 
@@ -54,5 +58,7 @@ generated embedding:
 - Keep cross-backbone aggregation audit-only.
 - Before adding another generated-embedding selector, reuse paired
   generation/prediction invariants.
-- Sync and validate the current harmful-source suppression run before treating
-  it as evidence.
+- Predeclare any Center3 follow-up before treating audit-only target-label
+  findings as a method change.
+- Sync and validate harmful-source suppression only if final artifacts are
+  resumed and synced.

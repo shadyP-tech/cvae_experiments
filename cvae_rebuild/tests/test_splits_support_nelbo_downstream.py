@@ -1,25 +1,25 @@
 import math
 from types import SimpleNamespace
 
-from cvae_rebuild.downstream import (
+from downstream import (
     PredictionBundle,
     evaluate_probability_predictions,
     geometric_probability_pool,
     weighted_arithmetic_probability_pool,
     weighted_geometric_probability_pool,
 )
-from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import SourceReliability
-from cvae_rebuild.decentralized_support_nelbo_reliability_gmm_prior import _combined_weight_plan, _strongest_control
-from cvae_rebuild.decentralized_support8_top3_tau05_gmm_prior import _topk_existing_plan
-from cvae_rebuild.decentralized_reliability_top3_gmm_prior import _select_topk_reliable
-from cvae_rebuild.decentralized_source_inner_transfer_top3_gmm_prior import (
+from decentralized_reliability_weighted_gmm_prior import SourceReliability
+from decentralized_support_nelbo_reliability_gmm_prior import _combined_weight_plan, _strongest_control
+from decentralized_support8_top3_tau05_gmm_prior import _topk_existing_plan
+from decentralized_reliability_top3_gmm_prior import _select_topk_reliable
+from decentralized_source_inner_transfer_top3_gmm_prior import (
     SubsetScore,
     _best_subset,
     _method_stats,
 )
-from cvae_rebuild.protocol import ProtocolError
-from cvae_rebuild.splits import candidate_experts, random_unlabeled_support_eval_split
-from cvae_rebuild.support_nelbo import (
+from protocol import ProtocolError
+from splits import candidate_experts, random_unlabeled_support_eval_split
+from support_nelbo import (
     SupportScore,
     annotate_selection_fraction,
     calibration_stats,

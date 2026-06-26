@@ -14,6 +14,10 @@ but only protocol-safe paths are thesis-facing.
 - `cvae_support_routing/`
   - Owns direct support-NELBO experiment configs, run scripts, report builders, tests, and tracked comparison artifacts.
   - Protocol: moved assets preserve target-local support/evaluation separation and keep held-out NELBO utility as evaluation-only.
+- `cvae_rebuild/src/experiments/support_selection/midogpp_support_nelbo_routing.py`
+  - Owns the MIDOG++ routing-stage support-NELBO surface after schema/leakage/provenance validation.
+  - Protocol: unlabeled target support selects heldout-excluded frozen source experts; held-out eval NELBO and oracle rows are diagnostic-only.
+  - Artifact root: `cvae_rebuild/artifacts/midogpp/support_nelbo_routing_v1/`.
 - `cvae_testing/src/eval/evaluators/domain_query_oracle_gap.py`
   - Diagnostic protocol: target expert is excluded from candidate baselines; oracle values are reporting-only.
 
@@ -48,6 +52,10 @@ Thesis-facing compatibility artifacts must satisfy:
 - Adoption-eligible methods have `routing_uses_eval_nelbo == 0`.
 - Adoption-eligible methods have `routing_uses_eval_domain_statistics == 0`.
 - Diagnostic/oracle methods are not adoption-eligible.
+- MIDOG++ support-NELBO adoption rows have `support_labels_used == false`,
+  `routing_uses_eval_nelbo == 0`, and contract-derived candidate counts.
+- MIDOG++ diagnostic oracle rows have `adoption_eligible == false` and
+  `routing_uses_eval_nelbo == 1`.
 
 ## Current Cleanup Decision
 

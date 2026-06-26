@@ -14,8 +14,8 @@ embedding utility gap.
 - High mean BACC is no longer enough for adoption, because random and shuffled
   source-mass controls often match the proposed primary methods.
 - The dominant bottleneck has shifted from mean utility to source-mass
-  underidentification, weak-center/tail robustness, and harmful source
-  interactions.
+  underidentification, weak-center/tail robustness, minority-class confidence
+  collapse, and harmful source interactions.
 - These experiments are dense composition and robustness audits. They do not
   prove learned routing, sparse expert selection, formal privacy, or causal
   reliability validation.
@@ -31,14 +31,16 @@ Verified local reports:
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_support8_calibrated_component_union_prior_v1/reports/decision_summary.md`
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_anchored_mass_bagged_v1/reports/decision_summary.md`
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1/reports/decision_summary.md`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/reports/decision_summary.md`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/center3_failure_audit/center3_failure_conclusion.md`
 
-Implemented / running, not final evidence:
+Earlier implemented / running, not final evidence unless resumed:
 
 - `../../../cvae_rebuild/configs/virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1.yaml`
-- `../../../cvae_rebuild/src/cvae_rebuild/source_inner_harmful_source_suppression.py`
+- `../../../cvae_rebuild/src/source_inner_harmful_source_suppression.py`
 
-TODO: verify final harmful-source suppression reports after the workstation
-rerun writes `reports/`, `tables/`, and `manifests/`.
+TODO: verify final harmful-source suppression reports if that run is resumed
+and writes `reports/`, `tables/`, and `manifests/`.
 
 ## Result Matrix
 
@@ -51,6 +53,7 @@ rerun writes `reports/`, `tables/`, and `manifests/`.
 | Support8 calibrated component union | `support8_calibrated_component_union_softmax_shrink050` | `SUPPORT_CALIBRATED_COMPONENT_UNION_FAIL` | 0.8727 | 0.7886 | 0.0369 | Unlabeled support-NELBO calibration does not beat shrink050/random mass-bag or shuffled-support null. |
 | Shrink050/random mass tail-risk blend | `component_union_tailrisk_anchored_shrink050_random_mass_bag_blend050` | `TAILRISK_ANCHORED_COMPONENT_UNION_USEFUL_THESIS_SUCCESS` | 0.8957 | 0.8032 | 0.0510 | Useful robustness evidence, but anchor mismatch and bottom-tail limitations remain. |
 | Dense reliability tail shield | `dense_reliability_tailshield_random_mass_bag_blend25_75` | `DENSE_TAILSHIELD_RANDOM_MASS_BAG_FAIL` | 0.8988 | 0.7896 | 0.0403 | High mean and bottom20 gain, but center3 and worst-cell failure remain unresolved. |
+| Multipanel tail-risk mass-bag stabilization | `component_union_tailrisk_multipanel_shrink050_random_mass_bag_blend050` | `MULTIPANEL_TAILRISK_STABILIZATION_FAIL` | 0.9087 | 0.7897 | 0.0431 | Clears 0.90 mean and improves bottom20/seed std, but center3/min-center fail and tail-risk transfer appears. |
 
 ## Interpretation
 
@@ -77,17 +80,45 @@ That is high utility but not method adoption. It supports a ceiling/diagnostic
 claim: random mass uncertainty already occupies most of the headroom, so a new
 method must improve weak-center or tail robustness, not merely mean BACC.
 
+The multipanel artifact makes this stricter. It reaches:
+
+```text
+center-equal mean BACC: 0.9087
+delta vs prior tailrisk: +0.0130
+delta vs canonical random mass-bag: +0.0103
+bottom20 delta vs prior tailrisk: +0.0408
+seed std delta vs prior tailrisk: -0.0079
+```
+
+but it still fails because:
+
+```text
+center3/min-center BACC: 0.7897
+center3 delta vs prior tailrisk: -0.0136
+worst seed-center BACC: 0.4975
+tail-risk transfer: true
+```
+
+The Center3 audit shows the failure is a high-confidence rare-positive collapse
+in `42 x center3`: class counts are class0 = 198 and class1 = 2, final v2
+predicts class0 for 199 samples, and class1 recall is 0.0000. Low panel
+disagreement and full component coverage point away from simple stochastic
+panel noise or component undersampling as the main cause.
+
 ## Implication
 
 The next generated-embedding question is:
 
 ```text
-Can source-only diagnostics predict when a source poisons a target-like regime?
+Can source-only diagnostics prevent rare-class weak-center collapse or predict
+when a source poisons a target-like regime?
 ```
 
-This is why the current implementation/run is source-inner harmful-source
-suppression over random mass-bag component union. It tests source interaction
-and poisoning, not another generic mass allocator.
+This is why the next generated-embedding direction should not be another
+mean-only mass allocator. Any follow-up should target source-only calibration,
+minority-class decision stability, pooling preservation of rare useful
+seed-level evidence, or source interaction/poisoning, with the method
+predeclared before evaluation.
 
 ## Limitations
 
@@ -97,15 +128,17 @@ and poisoning, not another generic mass allocator.
   is not source-only. It also failed against the matched shuffled-support null.
 - Tail-risk and dense-tailshield probability blends are robustness aggregation
   audits, not learned routing.
-- Harmful-source suppression is not yet documented as a result because the
-  final reports are not verified locally.
+- Harmful-source suppression is not documented as a result because final
+  reports are not verified locally.
+- The Center3 audit is target-label-informed after fixed predictions and is
+  diagnostic-only.
 
 ## Next Checks
 
-- Sync and validate final harmful-source suppression artifacts.
-- If harmful-source suppression passes, document whether source-inner removal
-  effects identify target-ablation-confirmed harmful sources.
-- If it fails, distinguish source-inner signal failure from target-regime
-  identification failure.
+- Predeclare any Center3 follow-up before evaluation.
+- Sync and validate final harmful-source suppression artifacts only if that
+  earlier run is resumed.
+- If harmful-source suppression is resumed and fails, distinguish source-inner
+  signal failure from target-regime identification failure.
 - Keep random mass-bag, shrink050, paired dense reliability, source-union K16,
   and real-feature dense references as fixed comparators.

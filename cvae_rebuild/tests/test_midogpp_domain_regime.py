@@ -5,27 +5,27 @@ from pathlib import Path
 import pytest
 import yaml
 
-from cvae_rebuild.cli import _load_config_for_validation
-from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
+from cli import _load_config_for_validation
+from component_union_tailrisk_anchored_mass_bagged import (
     MIDOGPP_POSITIVE_UNION_TAILRISK_NAME,
     PRIMARY_POSITIVE_UNION_METHOD,
     POSITIVE_UNION_RULE_BETA050,
     _positive_union_rule_selection_manifest_rows,
     parse_source_inner_positive_union_config,
 )
-from cvae_rebuild.domain_regime import (
+from domain_regime import (
     MIDOGPP_DOMAIN_REGIME,
     load_midogpp_contract_info,
     validate_runtime_domain_coverage,
 )
-from cvae_rebuild.paired_dense_all4_reliability_confirmation import (
+from paired_dense_all4_reliability_confirmation import (
     DENSE_LATE_ALL_SOURCES_MIDOGPP_NAME,
     PRIMARY_DENSE_ALL_SOURCES_METHOD,
     _alias_rows_for_output,
     _artifact_prefix,
     parse_paired_dense_all4_reliability_config,
 )
-from cvae_rebuild.protocol import ProtocolError
+from protocol import ProtocolError
 
 
 ELIGIBLE_MIDOGPP_IDS = ("0", "1", "2", "3", "5", "6", "7", "8", "9")

@@ -54,48 +54,6 @@ def _fixture() -> tuple[np.ndarray, list[dict], np.ndarray, list[int]]:
     return np.asarray(embeddings, dtype=np.float64), metadata, nelbo, domains
 
 
-def _midog_fixture() -> tuple[np.ndarray, list[dict], np.ndarray, list[int]]:
-    domains = [0, 1, 2, 3]
-    scanner_labels = {
-        0: ("Hamamatsu XR", "hamamatsu", "<=0.30"),
-        1: ("Hamamatsu S360", "hamamatsu", "0.31-0.50"),
-        2: ("Leica CS2", "leica", "<=0.30"),
-        3: ("3DHistech Pannoramic", "3dhistech", ">0.50"),
-    }
-    metadata: list[dict] = []
-    embeddings: list[list[float]] = []
-    for domain in domains:
-        scanner_model, vendor, resolution_bin = scanner_labels[domain]
-        for offset in range(6):
-            metadata.append(
-                {
-                    "sample_id": f"midog-{domain}-{offset}",
-                    "magnification": int(domain),
-                    "domain_name": scanner_model,
-                    "label": int(offset % 2),
-                    "patient_id": f"case_{domain}_{offset}",
-                    "scanner_model": scanner_model,
-                    "scanner_vendor": vendor,
-                    "scanner_family": vendor,
-                    "lab_or_origin": f"lab_{offset % 3}",
-                    "tumor_type": f"tumor_{offset % 3}",
-                    "species": f"species_{offset % 2}",
-                    "resolution": resolution_bin,
-                    "resolution_bin": resolution_bin,
-                }
-            )
-            embeddings.append([float(domain), float(offset % 2), float(offset) / 10.0])
-
-    preferred = {0: 1, 1: 0, 2: 3, 3: 2}
-    nelbo = np.zeros((len(metadata), len(domains)), dtype=np.float64)
-    for row_idx, row in enumerate(metadata):
-        q = int(row["magnification"])
-        for col, expert in enumerate(domains):
-            rank = (int(expert) - int(preferred[q])) % len(domains)
-            nelbo[row_idx, col] = 1.0 + rank + (row_idx % 3) * 0.01
-    return np.asarray(embeddings, dtype=np.float64), metadata, nelbo, domains
-
-
 def _support_cfg() -> SupportResponseConfig:
     return SupportResponseConfig(
         enabled=True,
@@ -272,40 +230,6 @@ def _run_support_utility(
         response_feature_fn=response_feature_fn,
         data_cfg={
             "dataset_domain_semantics": "camelyon17_center",
-            "legacy_domain_field_alias": "magnification",
-        },
-    )
-
-
-def _run_midog_support_utility(tmp_path: Path) -> dict:
-    embeddings, metadata, nelbo, expert_domains = _midog_fixture()
-    domain_by_index = {idx: int(row["magnification"]) for idx, row in enumerate(metadata)}
-    preferred = {0: 1, 1: 0, 2: 3, 3: 2}
-
-    def response_feature_fn(support_indices, expert_domain: int, split_id: str):
-        assert support_indices
-        query_domain = domain_by_index[int(support_indices[0])]
-        assert all(domain_by_index[int(i)] == query_domain for i in support_indices)
-        rank = (int(expert_domain) - int(preferred[query_domain])) % len(expert_domains)
-        return {
-            "response_posterior_mu_mean": float(rank),
-            "response_decode_repeat_variance_mean": float(rank) / 10.0,
-        }
-
-    return evaluate_support_response_routing_from_arrays(
-        embeddings=embeddings,
-        metadata=metadata,
-        nelbo_matrix=nelbo,
-        expert_domains=expert_domains,
-        seed=42,
-        dataset_name="midogpp",
-        strategy="categorical_exact",
-        tau=1.0,
-        support_cfg=_support_utility_cfg(random_floor_enabled=True),
-        reports_dir=tmp_path,
-        response_feature_fn=response_feature_fn,
-        data_cfg={
-            "dataset_domain_semantics": "midogpp_scanner",
             "legacy_domain_field_alias": "magnification",
         },
     )
@@ -534,42 +458,6 @@ def test_support_utility_conservative_writes_alpha_and_unlabeled_protocol_fields
         assert row["high_regret_selection"] in {"0", "1"}
         assert row["catastrophic_mistake"] in {"0", "1"}
 
-
-def test_midogpp_support_utility_writes_scanner_diagnostics_and_isolation_audit(tmp_path: Path) -> None:
-    results = _run_midog_support_utility(tmp_path)
-
-    assert results["protocol_lock"]["patient_disjoint_support_eval_required"] is True
-    assert results["protocol_lock"]["heldout_expert_checkpoint_used_only_for_oracle_diagnostic"] is True
-    for artifact_key in [
-        "metadata_baseline_diagnostics",
-        "protocol_audit",
-        "support_size_monotonicity",
-        "margin_diagnostics",
-        "selection_entropy",
-    ]:
-        assert artifact_key in results["artifacts"]
-
-    metadata_rows = _read_csv(tmp_path / "support_response_metadata_baseline_diagnostics.csv")
-    assert len(metadata_rows) == 4
-    assert {row["metadata_baseline_variant"] for row in metadata_rows} == {
-        "scanner_resolution_metadata_v1"
-    }
-    for row in metadata_rows:
-        assert row["dataset_domain_semantics"] == "midogpp_scanner"
-        assert row["storage_field"] == "magnification"
-        assert float(row["metadata_baseline_tie_rate"]) > 0.0
-        assert int(row["metadata_effective_candidate_count"]) >= 1
-        assert 0.0 <= float(row["metadata_missing_vendor_rate"]) <= 1.0
-        assert 0.0 <= float(row["metadata_resolution_only_rate"]) <= 1.0
-        assert json.loads(row["metadata_selected_expert_distribution"])
-
-    audit_rows = _read_csv(tmp_path / "support_response_protocol_audit.csv")
-    assert audit_rows
-    for row in audit_rows:
-        assert row["target_expert_excluded_ok"] == "1"
-        assert row["candidate_pool_excludes_target_expert_ok"] == "1"
-        assert row["routing_time_scores_exclude_heldout_expert_ok"] == "1"
-        assert row["heldout_expert_checkpoint_used_only_for_oracle_diagnostic"] == "1"
 
     monotonicity_rows = _read_csv(tmp_path / "support_response_support_size_monotonicity.csv")
     assert monotonicity_rows

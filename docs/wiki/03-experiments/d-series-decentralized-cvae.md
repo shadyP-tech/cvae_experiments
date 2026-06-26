@@ -20,6 +20,9 @@ raw-data-free summary exchange and expert aggregation.
 - Component-union and random mass-bag follow-ups reach higher mean BACC, but
   are not adopted because matched controls, random mass, and weak-tail failures
   remain unresolved.
+- Multipanel probability-level tail-risk bagging reaches 0.9087 mean BACC, but
+  fails because center3/min-center stays 0.7897 and the Center3 audit shows
+  confident minority-class collapse.
 - Support-NELBO and source-inner transfer are not validated as final
   compatibility selectors because matched controls remain competitive or better.
 - The paired dense all4 confirmation is not sparse routing: all non-target
@@ -50,6 +53,8 @@ Primary files:
 - `virchow2_cvae_decentralized_component_union_reliability_shrink050_confirmation_v1/reports/decision_summary.md`
 - `virchow2_cvae_support8_calibrated_component_union_prior_v1/reports/decision_summary.md`
 - `virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1/reports/decision_summary.md`
+- `virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/reports/decision_summary.md`
+- `virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/center3_failure_audit/center3_failure_conclusion.md`
 
 Verified local paired confirmation artifacts:
 
@@ -80,6 +85,7 @@ All listed D-series leakage reports inspected in the current update reported
 | Mass-bagged component union | `decentralized_component_union_mass_uncertainty_bagged_v1` | `MASS_BAGGED_COMPONENT_UNION_FAIL` | 0.8903 | 0.7931 | 0.0568 | high mean, but random mass-bag control competitive |
 | Support8 calibrated component union | `support8_calibrated_component_union_softmax_shrink050` | `SUPPORT_CALIBRATED_COMPONENT_UNION_FAIL` | 0.8727 | 0.7886 | 0.0369 | target-support calibration fails matched support/random controls |
 | Dense reliability tail shield | `dense_reliability_tailshield_random_mass_bag_blend25_75` | `DENSE_TAILSHIELD_RANDOM_MASS_BAG_FAIL` | 0.8988 | 0.7896 | 0.0403 | high mean, but center3/worst-cell failure remains |
+| Multipanel tail-risk mass-bag stabilization | `component_union_tailrisk_multipanel_shrink050_random_mass_bag_blend050` | `MULTIPANEL_TAILRISK_STABILIZATION_FAIL` | 0.9087 | 0.7897 | 0.0431 | high mean and bottom20 gain, but center3/min-center failure and tail-risk transfer remain |
 
 ## Source-Union Diagnostic Context
 
@@ -210,14 +216,42 @@ Component-union and mass-allocation follow-ups:
 - Dense reliability tail shield reached 0.8988 mean BACC and improved bottom20
   vs random mass-bag by +0.0244, but failed because center3 stayed at 0.7896
   and worst seed-center BACC remained 0.4971.
+- Multipanel tail-risk stabilization reached 0.9087 mean BACC, improved
+  bottom20 vs prior tailrisk by +0.0408, and reduced seed std by -0.0079, but
+  failed because center3/min-center stayed at 0.7897, center3 regressed by
+  -0.0136 versus prior tailrisk, tail-risk transfer was flagged, and the worst
+  seed-center BACC was 0.4975.
 
 Interpretation:
 
 ```text
 component-level composition has high generated-embedding capacity,
 but source-mass allocation remains underidentified and weak-tail robustness is
-not solved by reliability, support-NELBO, or fixed probability blending.
+not solved by reliability, support-NELBO, fixed probability blending, or
+more predeclared random mass-bag panels.
 ```
+
+Center3 failure audit:
+
+```text
+42 x center3 final v2 BACC: 0.4975
+class counts: class0 = 198, class1 = 2
+final predicted counts: class0 = 199, class1 = 1
+final class1 recall: 0.0000
+mean confidence: 0.9795
+seed101 anchor BACC: 0.9949
+seed101 blend BACC: 0.7475
+seed127 blend BACC: 0.7323
+component mass coverage: 1.0
+unsampled active components: 0
+```
+
+Interpretation:
+
+The primary center3 failure is not simply missing component coverage or
+insufficient panel diversity. It is a rare-positive, high-confidence
+majority-class collapse where probability pooling suppresses rare useful
+seed-level signal.
 
 ## Scientific Audit Notes
 
@@ -255,6 +289,14 @@ utility, but current mass-allocation signals are not clean enough to be adopted
 as compatibility estimators.
 ```
 
+The multipanel tail-risk follow-up adds a third, more specific diagnostic
+claim:
+
+```text
+source-only dense stochastic composition can cross 0.90 mean BACC, but
+rare-positive weak-center collapse can survive probability-level pooling.
+```
+
 ## Limitations
 
 - D1.2 is partial evidence; the paired dense all4 confirmation is the stronger
@@ -263,6 +305,8 @@ as compatibility estimators.
 - D1.5 remains negative evidence for source-inner sparse selection.
 - Component-union/random mass-bag rows are high-mean diagnostic surfaces, not
   final routing methods.
+- The multipanel Center3 audit is diagnostic-only and cannot be used to select
+  seeds, thresholds, calibration, or pooling policy.
 - Support8 component-union calibration used target support and still failed
   matched shuffled-support controls.
 - The paired dense all4 confirmation has 14 eligible seed-center cells because
@@ -278,6 +322,10 @@ as compatibility estimators.
   generated-embedding baselines.
 - Treat support-NELBO and source-inner transfer as diagnostic/negative until
   they beat matched controls.
-- Treat random mass-bag as a strong control with little mean-BACC headroom.
-- Validate harmful-source suppression once final artifacts are synced.
+- Treat random mass-bag and multipanel bagging as strong controls/surfaces with
+  little mean-BACC headroom.
+- Predeclare any Center3 follow-up; target source-only calibration,
+  minority-class decision stability, or pooling preservation of rare useful
+  seed-level evidence.
+- Validate harmful-source suppression only if final artifacts are synced.
 - Repair D1.5 drop-rank fields if the source-drop tables are reused.

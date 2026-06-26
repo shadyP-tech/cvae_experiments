@@ -1,0 +1,1 @@
+"""Latent-prior diagnostics."""

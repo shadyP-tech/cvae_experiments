@@ -11,50 +11,59 @@ pytest.importorskip("sklearn")
 
 import numpy as np
 
-from cvae_rebuild.config import parse_config
-from cvae_rebuild.covariance_prior import (
+from config import parse_config
+from covariance_prior import (
     PRIMARY_COVARIANCE_METHOD,
     _stabilized_covariance_psd,
     parse_covariance_prior_config,
     run_covariance_prior_confirmation,
 )
-from cvae_rebuild.covariance_shrinkage import (
+from covariance_shrinkage import (
     PRIMARY_SHRINKAGE_METHOD,
+    ROW_ROLES as SHRINKAGE_ROW_ROLES,
     parse_covariance_shrinkage_config,
     run_covariance_shrinkage_stability,
 )
-from cvae_rebuild.covariance_viability import (
+from covariance_viability import (
     parse_covariance_viability_config,
     run_covariance_prior_viability_audit,
 )
-from cvae_rebuild.decentralized_k16_gmm_prior import (
+from decentralized_k16_gmm_prior import (
     PRIMARY_DECENTRALIZED_METHOD,
+    PROTOCOL_WORDING as DECENTRALIZED_K16_PROTOCOL_WORDING,
     parse_decentralized_k16_gmm_prior_config,
     run_decentralized_k16_gmm_prior,
 )
-from cvae_rebuild.decentralized_adaptive_gmm_prior import (
+from decentralized_adaptive_gmm_prior import (
     PRIMARY_ADAPTIVE_METHOD,
+    PROTOCOL_WORDING as ADAPTIVE_PROTOCOL_WORDING,
+    _resolved_config as _adaptive_resolved_config,
     parse_decentralized_adaptive_gmm_prior_config,
     run_decentralized_adaptive_gmm_prior,
 )
-from cvae_rebuild.decentralized_component_union_prior import (
+from decentralized_component_union_prior import (
     MATCHED_SHUFFLED_RELIABILITY_PREFIX,
     MATCHED_SHUFFLED_RELIABILITY_SHRINK050_PREFIX,
     PRIMARY_COMPONENT_UNION_METHOD,
+    PROTOCOL_WORDING as COMPONENT_UNION_PROTOCOL_WORDING,
     ROW_COMPONENT_UNION_SHRINK025,
     ROW_COMPONENT_UNION_SHRINK050,
     ROW_RANDOM_MASS_BAG_CONTROL,
+    _matched_shuffled_reliability_lambda,
+    _resolved_config as _component_union_resolved_config,
     parse_decentralized_component_union_prior_config,
     run_decentralized_component_union_prior,
 )
-from cvae_rebuild.component_union_mass_bagged import (
+from component_union_mass_bagged import (
     PRIMARY_MASS_BAGGED_METHOD,
+    PROTOCOL_WORDING as MASS_BAGGED_PROTOCOL_WORDING,
     ROW_RANDOM_MASS_BAG_CONTROL,
     ROW_SHUFFLED_RELIABILITY_BAG_CONTROL,
+    _resolved_config as _mass_bagged_resolved_config,
     parse_mass_bagged_component_union_config,
     run_mass_bagged_component_union,
 )
-from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
+from component_union_tailrisk_anchored_mass_bagged import (
     HARM_GATED_PRIMARY_SELECTABLE_RULES,
     PRIMARY_FIXED_BETA050_POSITIVE_UNION_METHOD,
     PRIMARY_HARM_GATED_POSITIVE_UNION_METHOD,
@@ -68,10 +77,20 @@ from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
     PRIMARY_MULTIPANEL_TAILRISK_METHOD,
     PRIMARY_TAILRISK_METHOD,
     _effective_threshold_for_rule,
+    _fixed_beta050_protocol_manifest_payload,
+    _harm_gated_protocol_manifest_payload,
+    _multipanel_protocol_manifest_payload,
     _positive_union_pool_bundle,
+    _positive_union_protocol_manifest_payload,
+    _resolved_config as _tailrisk_anchored_resolved_config,
+    _resolved_fixed_beta050_config,
+    _resolved_harm_gated_positive_union_config,
+    _resolved_multipanel_config,
+    _resolved_positive_union_config,
     _resolve_harm_gated_primary_seed_plan,
     _select_harm_gated_positive_union_rule,
     _select_positive_union_rule,
+    _tailrisk_anchored_protocol_manifest_payload,
     parse_fixed_beta050_positive_union_config,
     parse_harm_gated_positive_union_config,
     parse_multipanel_tailrisk_component_union_config,
@@ -83,18 +102,24 @@ from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
     run_source_inner_positive_union,
     run_tailrisk_anchored_component_union,
 )
-from cvae_rebuild.downstream import PredictionBundle
-from cvae_rebuild.dense_reliability_tailshield_random_mass_bag import (
+from downstream import PredictionBundle
+from dense_reliability_tailshield_random_mass_bag import (
+    BAG_METHOD as DENSE_TAILSHIELD_BAG_METHOD,
+    DENSE_ANCHOR_METHOD as DENSE_TAILSHIELD_ANCHOR_METHOD,
     PRIMARY_DENSE_TAILSHIELD_METHOD,
+    _resolved_config as _dense_tailshield_resolved_config,
     parse_dense_tailshield_random_mass_bag_config,
     run_dense_reliability_tailshield_random_mass_bag,
 )
-from cvae_rebuild.source_inner_harmful_source_suppression import (
+from source_inner_harmful_source_suppression import (
     PRIMARY_HARMFUL_SUPPRESSION_METHOD,
+    PROTOCOL_WORDING as HARMFUL_SUPPRESSION_PROTOCOL_WORDING,
+    _resolved_config as _harmful_suppression_resolved_config,
     parse_harmful_source_suppression_config,
     run_harmful_source_suppression,
 )
-from cvae_rebuild.target_support_regime_risk_gated_component_union import (
+from target_support_regime_risk_gated_component_union import (
+    COMPACT_FEATURES,
     PRIMARY_RISK_GATED_METHOD,
     ROW_ALWAYS_DENSE,
     ROW_ALWAYS_RANDOM_BAG,
@@ -102,7 +127,7 @@ from cvae_rebuild.target_support_regime_risk_gated_component_union import (
     parse_target_support_regime_risk_gate_config,
     run_target_support_regime_risk_gated_component_union,
 )
-from cvae_rebuild.labeled_support_random_vs_dense_policy_calibration import (
+from labeled_support_random_vs_dense_policy_calibration import (
     PRIMARY_LABELED_SUPPORT_POLICY_METHOD,
     ROW_OFF_TARGET_SUPPORT_CONTROL,
     ROW_RANDOM_DEFAULT_CONTROL,
@@ -111,48 +136,56 @@ from cvae_rebuild.labeled_support_random_vs_dense_policy_calibration import (
     parse_labeled_support_policy_calibration_config,
     run_labeled_support_policy_calibration,
 )
-from cvae_rebuild.decentralized_pruned_adaptive_equal_all4_prior import (
+from decentralized_pruned_adaptive_equal_all4_prior import (
     PRIMARY_PRUNED_EQUAL_ALL4_METHOD,
     ROW_UNPRUNED_FIXED_K4,
     parse_pruned_adaptive_equal_all4_config,
     run_pruned_adaptive_equal_all4_confirmation,
 )
-from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import (
+from decentralized_reliability_weighted_gmm_prior import (
     PRIMARY_RELIABILITY_METHOD,
+    PROTOCOL_WORDING as RELIABILITY_WEIGHTED_PROTOCOL_WORDING,
     SourceReliability,
+    _resolved_config as _reliability_weighted_resolved_config,
     parse_decentralized_reliability_weighted_gmm_prior_config,
     run_decentralized_reliability_weighted_gmm_prior,
 )
-from cvae_rebuild.decentralized_reliability_top3_gmm_prior import (
+from decentralized_reliability_top3_gmm_prior import (
     PRIMARY_RELIABILITY_TOP3_METHOD,
     parse_decentralized_reliability_top3_gmm_prior_config,
     run_decentralized_reliability_top3_gmm_prior,
 )
-from cvae_rebuild.decentralized_source_inner_transfer_top3_gmm_prior import (
+from decentralized_source_inner_transfer_top3_gmm_prior import (
+    DROP_ONE_CLAIM_BOUNDARY as SOURCE_INNER_TRANSFER_DROP_ONE_CLAIM_BOUNDARY,
     PRIMARY_SOURCE_INNER_TRANSFER_METHOD,
+    PROTOCOL_WORDING as SOURCE_INNER_TRANSFER_PROTOCOL_WORDING,
     parse_decentralized_source_inner_transfer_top3_gmm_prior_config,
     run_decentralized_source_inner_transfer_top3_gmm_prior,
 )
-from cvae_rebuild.decentralized_support_nelbo_reliability_gmm_prior import (
+from decentralized_support_nelbo_reliability_gmm_prior import (
     PRIMARY_SUPPORT_RELIABILITY_METHOD,
+    PROTOCOL_WORDING as SUPPORT_RELIABILITY_PROTOCOL_WORDING,
     parse_decentralized_support_nelbo_reliability_gmm_prior_config,
     run_decentralized_support_nelbo_reliability_gmm_prior,
 )
-from cvae_rebuild.decentralized_support8_top3_tau05_gmm_prior import (
+from decentralized_support8_top3_tau05_gmm_prior import (
     PRIMARY_SUPPORT8_TOP3_TAU05_METHOD,
+    PROTOCOL_WORDING as SUPPORT8_TOP3_TAU05_PROTOCOL_WORDING,
     parse_decentralized_support8_top3_tau05_gmm_prior_config,
     run_decentralized_support8_top3_tau05_gmm_prior,
 )
-from cvae_rebuild.support_calibrated_component_union_prior import (
+from support_calibrated_component_union_prior import (
     PRIMARY_SUPPORT_CALIBRATED_COMPONENT_UNION_METHOD,
+    PROTOCOL_WORDING as SUPPORT_CALIBRATED_PROTOCOL_WORDING,
     ROW_MATCHED_SHUFFLED_SUPPORT_PREFIX,
     ROW_RANDOM_MASS_BAG_CONTROL as ROW_SUPPORT_RANDOM_MASS_BAG_CONTROL,
     ROW_RELIABILITY_SHRINK050 as ROW_SUPPORT_RELIABILITY_SHRINK050,
     ROW_UNIFORM_COMPONENT_UNION as ROW_SUPPORT_UNIFORM_COMPONENT_UNION,
+    _resolved_config as _support_calibrated_resolved_config,
     parse_support_calibrated_component_union_config,
     run_support_calibrated_component_union_prior,
 )
-from cvae_rebuild.paired_dense_all4_reliability_confirmation import (
+from paired_dense_all4_reliability_confirmation import (
     ROW_BUDGET_ONLY,
     ROW_EQUAL_ALL4,
     ROW_INVERSE,
@@ -167,7 +200,7 @@ from cvae_rebuild.paired_dense_all4_reliability_confirmation import (
     parse_paired_dense_all4_reliability_config,
     run_paired_dense_all4_reliability_confirmation,
 )
-from cvae_rebuild.paired_component_coverage_audit import (
+from paired_component_coverage_audit import (
     ROW_EQUAL_STRATIFIED128,
     ROW_RELIABILITY_MULTINOMIAL128_REFERENCE,
     ROW_RELIABILITY_MULTINOMIAL256,
@@ -177,64 +210,121 @@ from cvae_rebuild.paired_component_coverage_audit import (
     parse_paired_component_coverage_audit_config,
     run_paired_component_coverage_audit,
 )
-from cvae_rebuild.source_inner_validated_dense_component_hybrid import (
+from source_inner_validated_dense_component_hybrid import (
     MATCHED_SHUFFLED_GATE_PREFIX,
     METHOD_COMPONENT,
     METHOD_DENSE,
     PRIMARY_HYBRID_METHOD,
+    ROW_COMPONENT_CHALLENGER,
+    ROW_DENSE_ANCHOR,
     _binary_gate_selection,
+    _resolved_config as _hybrid_resolved_config,
     _shuffle_gate_method_labels,
     parse_source_inner_validated_hybrid_config,
     run_source_inner_validated_dense_component_hybrid,
 )
-from cvae_rebuild.generation import generate_reference_posterior
-from cvae_rebuild.models import ClassConditionedCVAE
-from cvae_rebuild.pipeline import run_real_cache_backed
-from cvae_rebuild.preservation import (
+from generation import generate_reference_posterior
+from models import ClassConditionedCVAE
+from pipeline import run_real_cache_backed
+from preservation import (
     ROW_DECODE_MU,
     ROW_POSTERIOR,
     ROW_PRIOR,
     ROW_REAL_BUDGET,
     ROW_REAL_FULL,
+    _protocol_manifest_payload as _preservation_protocol_manifest_payload,
+    _resolved_config_dict as _preservation_resolved_config,
     parse_preservation_config,
     run_preservation_diagnosis,
 )
-from cvae_rebuild.preservation_repair import (
+from preservation_repair import (
     PRIMARY_VARIANT,
     _beta_for_epoch,
     _decision,
     _decision_rows,
+    _protocol_manifest_payload as _repair_protocol_manifest_payload,
+    _resolved_config as _repair_resolved_config,
     parse_repair_config,
     run_preservation_repair,
 )
-from cvae_rebuild.preservation_sampling import (
+from preservation_sampling import (
     ROW_DECODE_MU as SAMPLING_ROW_DECODE_MU,
     ROW_POSTERIOR as SAMPLING_ROW_POSTERIOR,
     ROW_PRIOR as SAMPLING_ROW_PRIOR,
+    ROW_ROLES as SAMPLING_ROW_ROLES,
     parse_sampling_config,
     run_preservation_sampling,
 )
-from cvae_rebuild.prior_calibration import (
+from prior_calibration import (
     PRIMARY_PRIOR_METHOD,
+    ROW_ROLES as PRIOR_CALIBRATION_ROW_ROLES,
     parse_prior_calibration_config,
     run_prior_calibration,
 )
-from cvae_rebuild.source_union_gmm_prior import (
+from source_union_gmm_prior import (
     PRIMARY_GMM_METHOD,
     parse_source_union_gmm_prior_config,
     run_source_union_gmm_prior,
 )
-from cvae_rebuild.source_union_balanced_gmm_prior import (
+from source_union_balanced_gmm_prior import (
     PRIMARY_BALANCED_METHOD,
     parse_source_union_balanced_gmm_prior_config,
     run_source_union_balanced_gmm_prior,
 )
-from cvae_rebuild.source_union_k24_gmm_prior import (
+import source_union_k24_gmm_prior as source_union_k24_gmm_prior
+from source_union_k24_gmm_prior import (
     PRIMARY_K24_GMM_METHOD,
+    _validate_imported_artifacts as _validate_source_union_k24_gmm_imports,
     parse_source_union_k24_gmm_prior_config,
     run_source_union_k24_gmm_prior,
 )
-from cvae_rebuild.splits import stratified_source_train_val_split
+from splits import stratified_source_train_val_split
+from tiny_run_fixtures import (
+    _tiny_config,
+    _tiny_covariance_prior_config,
+    _tiny_covariance_prior_payload,
+    _tiny_covariance_shrinkage_config,
+    _tiny_covariance_shrinkage_payload,
+    _tiny_covariance_viability_config,
+    _tiny_covariance_viability_payload,
+    _tiny_decentralized_adaptive_gmm_payload,
+    _tiny_decentralized_component_union_payload,
+    _tiny_decentralized_k16_gmm_payload,
+    _tiny_decentralized_reliability_top3_gmm_payload,
+    _tiny_decentralized_reliability_weighted_gmm_payload,
+    _tiny_decentralized_source_inner_transfer_top3_gmm_payload,
+    _tiny_decentralized_support8_top3_tau05_gmm_payload,
+    _tiny_decentralized_support_nelbo_reliability_gmm_payload,
+    _tiny_dense_tailshield_random_mass_bag_payload,
+    _tiny_fixed_beta050_positive_union_payload,
+    _tiny_harm_gated_positive_union_payload,
+    _tiny_harmful_source_suppression_payload,
+    _tiny_labeled_support_policy_calibration_payload,
+    _tiny_mass_bagged_component_union_payload,
+    _tiny_multipanel_tailrisk_component_union_payload,
+    _tiny_paired_component_coverage_audit_payload,
+    _tiny_paired_dense_all4_reliability_payload,
+    _tiny_preservation_config,
+    _tiny_prior_calibration_config,
+    _tiny_prior_calibration_payload,
+    _tiny_pruned_adaptive_equal_all4_payload,
+    _tiny_repair_config,
+    _tiny_sampling_config,
+    _tiny_sampling_payload,
+    _tiny_source_inner_positive_union_payload,
+    _tiny_source_inner_validated_hybrid_payload,
+    _tiny_source_union_balanced_gmm_config,
+    _tiny_source_union_balanced_gmm_payload,
+    _tiny_source_union_gmm_config,
+    _tiny_source_union_gmm_payload,
+    _tiny_source_union_k24_gmm_config,
+    _tiny_source_union_k24_gmm_payload,
+    _tiny_support_calibrated_component_union_payload,
+    _tiny_tailrisk_anchored_component_union_payload,
+    _tiny_target_support_regime_risk_gate_payload,
+    _write_tiny_cache,
+    _write_tiny_prior_tailrisk_matrix,
+)
 
 
 def test_real_run_tiny_npz_cache_writes_protocol_artifacts(tmp_path: Path) -> None:
@@ -347,9 +437,36 @@ def test_preservation_diagnosis_tiny_cache_writes_expected_artifacts(tmp_path: P
     gaps = list(csv.DictReader(open(root / "tables" / "preservation_gap_summary.csv", newline="")))
     sampling = list(csv.DictReader(open(root / "tables" / "reference_sampling_diagnostics.csv", newline="")))
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
 
-    assert leakage["status"] == "PASS"
+    observed_ineligible = sum(1 for row in downstream if row.get("status") == "ineligible")
+    expected_total = 100
+    expected_ineligible = observed_ineligible
+    expected_eligible = expected_total - expected_ineligible
+
     assert len(downstream) == 100
+    assert leakage == {
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "violations": [],
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "oracle_rows_diagnostic_only": True,
+        "expected_total_rows": expected_total,
+        "expected_ineligible_rows": expected_ineligible,
+        "expected_eligible_rows": expected_eligible,
+        "observed_total_rows": len(downstream),
+        "observed_ineligible_rows": observed_ineligible,
+    }
+    assert protocol == _preservation_protocol_manifest_payload(
+        cfg,
+        expected_total=expected_total,
+        expected_ineligible=expected_ineligible,
+        expected_eligible=expected_eligible,
+    )
+    assert resolved == _preservation_resolved_config(cfg)
     assert len([row for row in downstream if row["row_role"] == ROW_REAL_FULL]) == 20
     assert all(row["replicate_seed"] == "NA" for row in downstream if row["row_role"] == ROW_REAL_FULL)
     assert any(row["row_role"] == ROW_PRIOR and row["reference_sample_seed"] == "NA" for row in downstream)
@@ -449,11 +566,23 @@ def test_preservation_repair_tiny_cache_writes_protocol_artifacts(tmp_path: Path
         assert (root / rel).exists()
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "decode_mu_repair_matrix.csv", newline="")))
     gaps = list(csv.DictReader(open(root / "tables" / "repair_gap_summary.csv", newline="")))
     manifest = list(csv.DictReader(open(root / "manifests" / "expert_variant_manifest.csv", newline="")))
 
-    assert leakage["status"] == "PASS"
+    assert leakage == {
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "oracle_rows_diagnostic_only": True,
+        "violations": [],
+    }
+    assert protocol == _repair_protocol_manifest_payload(cfg)
+    assert resolved == _repair_resolved_config(cfg)
     assert any(row["variant_id"] == PRIMARY_VARIANT and row["selection_source"] == "primary" for row in matrix)
     assert any(row["variant_id"] == "pca64_beta001_probe025" and row["selection_source"] == "diagnostic_only" for row in matrix)
     assert any(row["expert_pool_type"] == "source_union_excluding_target" for row in matrix)
@@ -550,11 +679,57 @@ def test_preservation_sampling_tiny_cache_writes_expected_artifacts(tmp_path: Pa
         assert (root / rel).exists()
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "sampling_downstream_matrix.csv", newline="")))
     gaps = list(csv.DictReader(open(root / "tables" / "sampling_gap_summary.csv", newline="")))
     manifest = list(csv.DictReader(open(root / "manifests" / "sampling_model_manifest.csv", newline="")))
 
     assert leakage["status"] == "PASS"
+    assert leakage == {
+        "oracle_rows_diagnostic_only": True,
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+        "violations": [],
+    }
+    assert protocol == {
+        "claim_boundary": "sampling utility preservation only; no routing or formal privacy claim",
+        "experiment_name": "virchow2_cvae_pca64_sampling_continuation_v1",
+        "experiment_type": "preservation_sampling_continuation",
+        "primary_variant": "pca64_beta001",
+        "row_roles": list(SAMPLING_ROW_ROLES),
+        "schema_version": "cvae_rebuild_preservation_sampling_protocol_manifest_v1",
+        "source_union_diagnostic_only": True,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+    }
+    assert resolved == {
+        "artifact_root": str(sampling_cfg.artifact_root),
+        "classifier_c": 1.0,
+        "classifier_class_weight": "balanced",
+        "classifier_max_iter": 2000,
+        "classifier_seed": None,
+        "classifier_solver": "lbfgs",
+        "classifier_type": "sklearn_logistic_regression",
+        "empirical_posterior_temperature": 1.0,
+        "experiment_seeds": [42],
+        "feature_cache_root": str(sampling_cfg.feature_cache_root),
+        "heldout_centers": ["0", "1", "2"],
+        "min_decision_cells": 1,
+        "name": "virchow2_cvae_pca64_sampling_continuation_v1",
+        "posterior_temperatures_diagnostic": [0.25, 0.5],
+        "posterior_temperatures_primary": [1.0],
+        "primary_variant": "pca64_beta001",
+        "prior_scales_diagnostic": [0.25, 0.5],
+        "prior_scales_primary": [1.0],
+        "repair_artifact_root": str(sampling_cfg.repair_artifact_root),
+        "replicate_seeds": [17],
+        "synthetic_per_class_total": 128,
+    }
     assert any(row["row_role"] == SAMPLING_ROW_POSTERIOR and row["posterior_temperature"] == "1.0" for row in matrix)
     assert any(row["row_role"] == SAMPLING_ROW_PRIOR and row["prior_scale"] == "1.0" for row in matrix)
     assert any(row["row_role"] == "cvae_empirical_mu_sample_diagnostic" for row in matrix)
@@ -660,11 +835,63 @@ def test_prior_calibration_tiny_cache_writes_expected_artifacts(tmp_path: Path) 
         assert (root / rel).exists()
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "calibrated_prior_downstream_matrix.csv", newline="")))
     gaps = list(csv.DictReader(open(root / "tables" / "calibrated_prior_gap_summary.csv", newline="")))
     manifest = list(csv.DictReader(open(root / "tables" / "latent_prior_parameter_manifest.csv", newline="")))
 
     assert leakage["status"] == "PASS"
+    assert leakage == {
+        "oracle_rows_diagnostic_only": True,
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+        "violations": [],
+    }
+    assert protocol["schema_version"] == "cvae_rebuild_latent_prior_calibration_protocol_manifest_v1"
+    assert protocol["experiment_name"] == "virchow2_cvae_latent_prior_calibration_v1"
+    assert protocol["experiment_type"] == "latent_prior_calibration_diagnostic"
+    assert protocol["primary_variant"] == "pca64_beta001"
+    assert protocol["primary_method"] == PRIMARY_PRIOR_METHOD
+    assert protocol["row_roles"] == list(PRIOR_CALIBRATION_ROW_ROLES)
+    assert protocol["target_support_labels_for_selection"] is False
+    assert protocol["target_eval_labels_for_scoring_only"] is True
+    assert protocol["target_expert_excluded"] is True
+    assert protocol["source_union_diagnostic_only"] is True
+    assert protocol["claim_boundary"] == "latent prior calibration diagnostic only; no routing or formal privacy claim"
+    assert protocol["decision_cell_set_hash"]
+    assert resolved == {
+        "artifact_root": str(cfg.artifact_root),
+        "classifier_c": 1.0,
+        "classifier_class_weight": "balanced",
+        "classifier_max_iter": 2000,
+        "classifier_seed": None,
+        "classifier_solver": "lbfgs",
+        "classifier_type": "sklearn_logistic_regression",
+        "experiment_seeds": [42],
+        "feature_cache_root": str(cfg.feature_cache_root),
+        "full_cov_eigenvalue_floor": 0.0001,
+        "full_cov_fallback_if_singular": "diag",
+        "full_cov_min_records_per_class": 32,
+        "full_cov_shrinkage_alpha": 0.1,
+        "heldout_centers": ["0", "1", "2"],
+        "min_decision_cells": 9,
+        "min_prior_fit_records_per_class": 8,
+        "name": "virchow2_cvae_latent_prior_calibration_v1",
+        "primary_method": PRIMARY_PRIOR_METHOD,
+        "primary_variant": "pca64_beta001",
+        "repair_artifact_root": str(cfg.repair_artifact_root),
+        "replicate_seeds": [17],
+        "sampling_artifact_root": str(cfg.sampling_artifact_root),
+        "shrinkage_alphas": [0.25, 0.5],
+        "standard_prior_repro_abs_tol_bacc": 1.0,
+        "synthetic_per_class_total": 128,
+        "variance_ddof": 0,
+        "variance_floor": 0.0001,
+    }
     assert any(row["prior_method"] == PRIMARY_PRIOR_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == "cvae_cc_diag_shrinkage_gaussian_prior_sample_diagnostic" for row in matrix)
     assert any(row["prior_method"] == "cvae_standard_prior_sample_reference" for row in matrix)
@@ -743,12 +970,72 @@ def test_covariance_prior_tiny_cache_writes_expected_artifacts(tmp_path: Path) -
         assert (root / rel).exists()
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "covariance_prior_downstream_matrix.csv", newline="")))
     params = list(csv.DictReader(open(root / "tables" / "covariance_prior_parameter_manifest.csv", newline="")))
     fallback = list(csv.DictReader(open(root / "tables" / "covariance_fallback_audit.csv", newline="")))
     summary = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
     assert leakage["status"] == "PASS"
+    assert leakage == {
+        "oracle_rows_diagnostic_only": True,
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+        "violations": [],
+    }
+    decision_hashes = {row["decision_cell_set_hash"] for row in matrix}
+    assert len(decision_hashes) == 1
+    assert protocol == {
+        "claim_boundary": "covariance-aware sampled-feature utility confirmation only; no routing or formal privacy claim",
+        "decision_cell_set_hash": next(iter(decision_hashes)),
+        "experiment_name": "virchow2_cvae_covariance_prior_confirmation_v1",
+        "experiment_type": "covariance_prior_confirmation_diagnostic",
+        "primary_method": PRIMARY_COVARIANCE_METHOD,
+        "primary_variant": "pca64_beta001",
+        "row_roles": [
+            "cvae_standard_prior_sample_reference",
+            "cvae_cc_diag_aggregate_prior_reference",
+            PRIMARY_COVARIANCE_METHOD,
+            "cvae_empirical_mu_codebook_prior_diagnostic",
+        ],
+        "schema_version": "cvae_rebuild_covariance_prior_confirmation_protocol_manifest_v1",
+        "source_union_diagnostic_only": True,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+    }
+    assert resolved == {
+        "artifact_root": str(cfg.artifact_root),
+        "classifier_c": 1.0,
+        "classifier_class_weight": "balanced",
+        "classifier_max_iter": 2000,
+        "classifier_seed": None,
+        "classifier_solver": "lbfgs",
+        "classifier_type": "sklearn_logistic_regression",
+        "covariance_eigenvalue_floor": 0.0001,
+        "covariance_shrinkage_alpha": 0.1,
+        "diag_prior_repro_abs_tol_bacc": 1.0,
+        "experiment_seeds": [42],
+        "fallback_if_under_ranked": "diag",
+        "feature_cache_root": str(cfg.feature_cache_root),
+        "full_cov_diagnostic_repro_abs_tol_bacc": 1.0,
+        "full_cov_min_records_per_class": 32,
+        "heldout_centers": ["0", "1", "2"],
+        "min_decision_cells": 9,
+        "name": "virchow2_cvae_covariance_prior_confirmation_v1",
+        "primary_method": PRIMARY_COVARIANCE_METHOD,
+        "primary_variant": "pca64_beta001",
+        "prior_calibration_artifact_root": str(cfg.prior_calibration_artifact_root),
+        "repair_artifact_root": str(cfg.repair_artifact_root),
+        "replicate_seeds": [17],
+        "sampling_artifact_root": str(cfg.sampling_artifact_root),
+        "standard_prior_repro_abs_tol_bacc": 1.0,
+        "synthetic_per_class_total": 128,
+    }
     assert any(row["prior_method"] == PRIMARY_COVARIANCE_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == "cvae_cc_diag_aggregate_prior_reference" for row in matrix)
     assert any(row["prior_method"] == "cvae_standard_prior_sample_reference" for row in matrix)
@@ -827,12 +1114,58 @@ def test_covariance_viability_audit_tiny_artifact_writes_expected_outputs(tmp_pa
         assert (root / rel).exists()
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     conditional = list(csv.DictReader(open(root / "tables" / "conditional_viability_cells.csv", newline="")))
     strata = list(csv.DictReader(open(root / "tables" / "variant_real_stratum_summary.csv", newline="")))
     original = list(csv.DictReader(open(root / "tables" / "original_9_cell_failure_audit.csv", newline="")))
     summary = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
     assert leakage["status"] == "PASS"
+    assert leakage == {
+        "oracle_rows_diagnostic_only": True,
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+        "violations": [],
+    }
+    assert protocol == {
+        "claim_boundary": (
+            "conditional diagnostic viability only; does not replace covariance confirmation "
+            "verdict and does not evaluate routing"
+        ),
+        "experiment_name": "virchow2_cvae_covariance_prior_viability_audit_v1",
+        "experiment_type": "read_only_variant_ceiling_viability_audit",
+        "imported_artifact": str(cfg.covariance_confirmation_artifact_root),
+        "schema_version": "cvae_rebuild_covariance_prior_viability_audit_protocol_manifest_v1",
+        "target_eval_labels_for_scoring_only": True,
+        "target_scored_variant_real_budget_used_for_diagnostic_stratification": True,
+    }
+    assert resolved == {
+        "artifact_root": str(cfg.artifact_root),
+        "borderline_real_threshold": 0.65,
+        "covariance_beats_diag_cell_fraction_min": 0.7,
+        "covariance_beats_diag_center_fraction_min": 0.75,
+        "covariance_confirmation_artifact_root": str(cfg.covariance_confirmation_artifact_root),
+        "delta_bacc_vs_diag_prior_min": 0.03,
+        "delta_bacc_vs_standard_prior_min": 0.05,
+        "global_center_equal_mean_bacc_min": 0.85,
+        "heldout_centers": ["0", "1", "2", "3", "4"],
+        "high_real_threshold": 0.8,
+        "mean_clipped_preservation_gap_max": 0.08,
+        "mean_preservation_ratio_min": 0.92,
+        "min_cell_bacc_min": 0.6,
+        "min_center_mean_bacc_min": 0.75,
+        "min_viable_cells": 30,
+        "min_viable_cells_per_center": 3,
+        "min_viable_seeds_per_center": 2,
+        "name": "virchow2_cvae_covariance_prior_viability_audit_v1",
+        "seed_std_max": 0.07,
+        "viable_real_threshold": 0.75,
+        "worst_delta_vs_diag_prior_min": -0.05,
+    }
     assert all(float(row["variant_real_budget_bacc"]) >= 0.80 for row in conditional)
     assert any(row["variant_real_stratum"] == "selection_denominator" for row in strata)
     assert original
@@ -893,11 +1226,71 @@ def test_covariance_shrinkage_tiny_cache_writes_expected_artifacts(tmp_path: Pat
         assert (root / rel).exists()
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "shrinkage_prior_downstream_matrix.csv", newline="")))
     health = list(csv.DictReader(open(root / "tables" / "covariance_health_by_alpha.csv", newline="")))
     summary = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
     assert leakage["status"] == "PASS"
+    assert leakage == {
+        "oracle_rows_diagnostic_only": True,
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+        "violations": [],
+    }
+    decision_hashes = {row["decision_cell_set_hash"] for row in matrix}
+    assert len(decision_hashes) == 1
+    assert protocol == {
+        "claim_boundary": "covariance-shrinkage sampled-feature utility diagnostic only; no routing or formal privacy claim",
+        "decision_cell_set_hash": next(iter(decision_hashes)),
+        "experiment_name": "virchow2_cvae_covariance_shrinkage_stability_v1",
+        "experiment_type": "covariance_shrinkage_stability_diagnostic",
+        "primary_method": PRIMARY_SHRINKAGE_METHOD,
+        "primary_variant": "pca64_beta001",
+        "row_roles": list(SHRINKAGE_ROW_ROLES),
+        "schema_version": "cvae_rebuild_covariance_shrinkage_stability_protocol_manifest_v1",
+        "source_union_diagnostic_only": True,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+    }
+    assert resolved == {
+        "artifact_root": str(cfg.artifact_root),
+        "classifier_c": 1.0,
+        "classifier_class_weight": "balanced",
+        "classifier_max_iter": 2000,
+        "classifier_seed": None,
+        "classifier_solver": "lbfgs",
+        "classifier_type": "sklearn_logistic_regression",
+        "covariance_confirmation_artifact_root": str(cfg.covariance_confirmation_artifact_root),
+        "covariance_eigenvalue_floor": 0.0001,
+        "covariance_viability_artifact_root": str(cfg.covariance_viability_artifact_root),
+        "diag_prior_repro_abs_tol_bacc": 1.0,
+        "diagnostic_covariance_shrinkage_alphas": [0.5, 0.9],
+        "diagonal_reference_alpha": 1.0,
+        "experiment_seeds": [42],
+        "fallback_if_under_ranked": "diag",
+        "feature_cache_root": str(cfg.feature_cache_root),
+        "full_cov_diagnostic_repro_abs_tol_bacc": 1.0,
+        "full_cov_min_records_per_class": 32,
+        "heldout_centers": ["0", "1", "2"],
+        "min_decision_cells": 9,
+        "name": "virchow2_cvae_covariance_shrinkage_stability_v1",
+        "primary_covariance_shrinkage_alpha": 0.75,
+        "primary_method": PRIMARY_SHRINKAGE_METHOD,
+        "primary_variant": "pca64_beta001",
+        "prior_calibration_artifact_root": str(cfg.prior_calibration_artifact_root),
+        "reference_covariance_shrinkage_alpha": 0.1,
+        "repair_artifact_root": str(cfg.repair_artifact_root),
+        "replicate_seeds": [17],
+        "sampling_artifact_root": str(cfg.sampling_artifact_root),
+        "standard_prior_repro_abs_tol_bacc": 1.0,
+        "synthetic_per_class_total": 128,
+    }
     assert any(row["prior_method"] == PRIMARY_SHRINKAGE_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == "cvae_cc_cov_diag_shrinkage050_prior_sample_diagnostic" for row in matrix)
     assert any(row["prior_method"] == "cvae_cc_cov_diag_shrinkage090_prior_sample_diagnostic" for row in matrix)
@@ -1015,6 +1408,8 @@ def test_source_union_gmm_prior_tiny_cache_writes_expected_artifacts(tmp_path: P
         assert (root / rel).exists()
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "gmm_prior_downstream_matrix.csv", newline="")))
     summary = list(csv.DictReader(open(root / "tables" / "source_union_gmm_summary.csv", newline="")))
     diagnostics = list(csv.DictReader(open(root / "tables" / "gmm_component_diagnostics.csv", newline="")))
@@ -1022,6 +1417,74 @@ def test_source_union_gmm_prior_tiny_cache_writes_expected_artifacts(tmp_path: P
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
     assert leakage["status"] == "PASS"
+    assert leakage == {
+        "oracle_rows_diagnostic_only": True,
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+        "violations": [],
+    }
+    decision_hashes = {row["decision_cell_set_hash"] for row in matrix}
+    assert len(decision_hashes) == 1
+    assert protocol == {
+        "claim_boundary": (
+            "source-union sampled-feature utility diagnostic only; no routing, decentralized "
+            "per-source expert selection, or formal privacy claim"
+        ),
+        "decision_cell_set_hash": next(iter(decision_hashes)),
+        "experiment_name": "virchow2_cvae_source_union_gmm_prior_v1",
+        "experiment_type": "source_union_gmm_prior_diagnostic",
+        "primary_method": PRIMARY_GMM_METHOD,
+        "primary_population_does_not_filter_on_variant_real_budget_bacc": True,
+        "primary_population_filters": [
+            "expert_pool_type=source_union_excluding_target",
+            "variant_id=source_union_pca64_beta001_diagnostic",
+            "prior_method=source_union_cc_diag_gmm_k8_prior_sample",
+            "selection_source=primary",
+            "status=ok",
+        ],
+        "primary_variant": "source_union_pca64_beta001_diagnostic",
+        "schema_version": "cvae_rebuild_source_union_gmm_prior_protocol_manifest_v1",
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+    }
+    assert resolved == {
+        "artifact_root": str(cfg.artifact_root),
+        "classifier": {
+            "C": 1.0,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+            "max_iter": 2000,
+            "solver": "lbfgs",
+            "type": "sklearn_logistic_regression",
+        },
+        "covariance_confirmation_artifact_root": str(cfg.covariance_confirmation_artifact_root),
+        "diagnostic_gmm_components": [4, 16],
+        "diagnostic_posterior_noise_scales": [0.25],
+        "experiment_seeds": [42],
+        "feature_cache_root": str(cfg.feature_cache_root),
+        "gmm_components": 8,
+        "gmm_covariance_type": "diag",
+        "gmm_max_iter": 200,
+        "gmm_n_init": 2,
+        "gmm_reg_covar": 0.0001,
+        "gmm_weight_floor": 0.01,
+        "heldout_centers": ["0", "1", "2"],
+        "min_class_train_count": 8,
+        "min_effective_gmm_components": 1,
+        "name": "virchow2_cvae_source_union_gmm_prior_v1",
+        "posterior_noise_scale": 0.0,
+        "primary_method": PRIMARY_GMM_METHOD,
+        "primary_variant": "source_union_pca64_beta001_diagnostic",
+        "prior_calibration_artifact_root": str(cfg.prior_calibration_artifact_root),
+        "repair_artifact_root": str(cfg.repair_artifact_root),
+        "replicate_seeds": [17],
+        "sampling_artifact_root": str(cfg.sampling_artifact_root),
+        "synthetic_per_class_total": 128,
+    }
     assert any(row["prior_method"] == PRIMARY_GMM_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == "source_union_cc_diag_gmm_k8_shuffled_label_control_diagnostic" for row in matrix)
     assert any(row["prior_method"] == "per_source_cc_diag_gmm_k8_prior_sample_diagnostic" for row in matrix)
@@ -1148,6 +1611,8 @@ def test_source_union_balanced_gmm_prior_tiny_cache_writes_expected_artifacts(tm
         assert (root / rel).exists()
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "balanced_gmm_downstream_matrix.csv", newline="")))
     balance = list(csv.DictReader(open(root / "tables" / "source_center_balance_audit.csv", newline="")))
     coverage = list(csv.DictReader(open(root / "tables" / "generated_component_coverage_audit.csv", newline="")))
@@ -1156,6 +1621,67 @@ def test_source_union_balanced_gmm_prior_tiny_cache_writes_expected_artifacts(tm
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
     assert leakage["status"] == "PASS"
+    assert leakage == {
+        "oracle_rows_diagnostic_only": True,
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+        "violations": [],
+    }
+    assert protocol == {
+        "claim_boundary": (
+            "source-union center-balanced sampled-feature utility diagnostic only; no routing, "
+            "decentralized per-source expert selection, or formal privacy claim"
+        ),
+        "experiment_name": "virchow2_cvae_source_union_center_balanced_gmm_prior_v1",
+        "experiment_type": "source_union_center_balanced_gmm_prior_diagnostic",
+        "primary_method": PRIMARY_BALANCED_METHOD,
+        "primary_population_does_not_filter_on_variant_real_budget_bacc": True,
+        "primary_variant": "source_union_pca64_beta001_diagnostic",
+        "schema_version": "cvae_rebuild_source_union_center_balanced_gmm_prior_protocol_manifest_v1",
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+    }
+    assert resolved == {
+        "artifact_root": str(cfg.artifact_root),
+        "balanced_fit_samples_per_center_class": 8,
+        "classifier": {
+            "C": 1.0,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+            "max_iter": 2000,
+            "solver": "lbfgs",
+            "type": "sklearn_logistic_regression",
+        },
+        "covariance_confirmation_artifact_root": str(cfg.covariance_confirmation_artifact_root),
+        "diagnostic_gmm_components": [8, 24],
+        "experiment_seeds": [42],
+        "feature_cache_root": str(cfg.feature_cache_root),
+        "gmm_components": 16,
+        "gmm_covariance_type": "diag",
+        "gmm_max_iter": 200,
+        "gmm_n_init": 2,
+        "gmm_reg_covar": 0.0001,
+        "gmm_weight_floor": 0.005,
+        "heldout_centers": ["0", "1", "2"],
+        "max_center_class_replacement_rate": 1.0,
+        "mean_center_class_replacement_rate": 1.0,
+        "min_effective_gmm_components": 1,
+        "min_source_center_class_count": 8,
+        "name": "virchow2_cvae_source_union_center_balanced_gmm_prior_v1",
+        "posterior_noise_scale": 0.0,
+        "primary_method": PRIMARY_BALANCED_METHOD,
+        "primary_variant": "source_union_pca64_beta001_diagnostic",
+        "prior_calibration_artifact_root": str(cfg.prior_calibration_artifact_root),
+        "repair_artifact_root": str(cfg.repair_artifact_root),
+        "replicate_seeds": [17],
+        "sampling_artifact_root": str(cfg.sampling_artifact_root),
+        "source_union_gmm_artifact_root": str(cfg.source_union_gmm_artifact_root),
+        "synthetic_per_class_total": 128,
+    }
     assert any(row["prior_method"] == PRIMARY_BALANCED_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == "source_union_center_balanced_cc_diag_gmm_k16_shuffled_label_control_diagnostic" for row in matrix)
     assert any(row["prior_method"] == "per_source_center_balanced_cc_diag_gmm_k16_prior_sample_diagnostic" for row in matrix)
@@ -1222,6 +1748,8 @@ def test_decentralized_k16_gmm_prior_tiny_cache_writes_expected_artifacts(tmp_pa
         assert (root / rel).exists()
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "decentralized_k16_downstream_matrix.csv", newline="")))
     summary_manifest_reader = csv.DictReader(open(root / "tables" / "exported_source_summary_manifest.csv", newline=""))
     summary_manifest = list(summary_manifest_reader)
@@ -1231,6 +1759,75 @@ def test_decentralized_k16_gmm_prior_tiny_cache_writes_expected_artifacts(tmp_pa
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
     assert leakage["status"] == "PASS"
+    assert leakage == {
+        "oracle_rows_diagnostic_only": True,
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+        "violations": [],
+    }
+    assert protocol == {
+        "claim_boundary": (
+            "decentralized prior-composition preservation test only; no target-specific "
+            "compatibility routing claim, no support-NELBO downstream claim, and no formal privacy claim"
+        ),
+        "composition_manifests_are_fold_specific": True,
+        "experiment_name": "virchow2_cvae_decentralized_k16_gmm_prior_v1",
+        "experiment_type": "decentralized_k16_prior_composition_preservation_test",
+        "exported_source_summaries_are_target_agnostic": True,
+        "oracle_rows_diagnostic_only": True,
+        "primary_method": PRIMARY_DECENTRALIZED_METHOD,
+        "primary_variant": "pca64_beta001",
+        "protocol_wording": DECENTRALIZED_K16_PROTOCOL_WORDING,
+        "raw_source_embedding_pooling_for_prior_fit": False,
+        "schema_version": "cvae_rebuild_decentralized_k16_gmm_prior_protocol_manifest_v1",
+        "source_union_references_diagnostic_only": True,
+        "support_nelbo_weighting_diagnostic_enabled": False,
+        "support_nelbo_weighting_primary": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+    }
+    assert resolved == {
+        "artifact_root": str(cfg.artifact_root),
+        "backbone": "virchow2",
+        "balanced_gmm_artifact_root": str(cfg.balanced_gmm_artifact_root),
+        "classifier": {
+            "C": 1.0,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+            "max_iter": 2000,
+            "solver": "lbfgs",
+            "type": "sklearn_logistic_regression",
+        },
+        "composed_components_per_class": 16,
+        "covariance_confirmation_artifact_root": "",
+        "experiment_seeds": [42],
+        "feature_cache_root": str(cfg.feature_cache_root),
+        "gmm_covariance_type": "diag",
+        "gmm_max_iter": 100,
+        "gmm_n_init": 1,
+        "gmm_reg_covar": 0.0001,
+        "heldout_centers": ["0", "1", "2", "3", "4"],
+        "local_gmm_components_per_source_class": 4,
+        "min_component_weight": 0.001,
+        "min_count_for_k4": 8,
+        "name": "virchow2_cvae_decentralized_k16_gmm_prior_v1",
+        "primary_method": PRIMARY_DECENTRALIZED_METHOD,
+        "primary_pooling": "geometric",
+        "primary_variant": "pca64_beta001",
+        "prior_calibration_artifact_root": "",
+        "repair_artifact_root": str(cfg.repair_artifact_root),
+        "replicate_seeds": [17],
+        "sampling_artifact_root": "",
+        "source_union_gmm_artifact_root": str(cfg.source_union_gmm_artifact_root),
+        "source_weighting": "equal_source_mass",
+        "support_nelbo_diagnostic": {"enabled": False},
+        "synthetic_per_class_total": 128,
+        "variance_floor": 1.0e-5,
+    }
     assert "heldout_center" not in (summary_manifest_reader.fieldnames or [])
     assert summary_manifest
     assert diagnostics and all(row["heldout_center"] != row["source_center"] for row in composition)
@@ -1318,6 +1915,8 @@ def test_decentralized_adaptive_gmm_prior_tiny_cache_writes_expected_artifacts(t
         assert (root / rel).exists()
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "decentralized_adaptive_downstream_matrix.csv", newline="")))
     summary_manifest_reader = csv.DictReader(open(root / "tables" / "exported_source_summary_manifest.csv", newline=""))
     summary_manifest = list(summary_manifest_reader)
@@ -1327,7 +1926,39 @@ def test_decentralized_adaptive_gmm_prior_tiny_cache_writes_expected_artifacts(t
     intervention = list(csv.DictReader(open(root / "tables" / "adaptive_k_intervention_audit.csv", newline="")))
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
-    assert leakage["status"] == "PASS"
+    assert leakage == {
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "oracle_rows_diagnostic_only": True,
+        "violations": [],
+    }
+    assert protocol == {
+        "schema_version": "cvae_rebuild_decentralized_adaptive_gmm_prior_protocol_manifest_v1",
+        "experiment_name": cfg.name,
+        "experiment_type": "adaptive_source_local_latent_summary_preservation_test",
+        "primary_variant": cfg.primary_variant,
+        "primary_method": cfg.primary_method,
+        "bic_method": cfg.bic_method,
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "exported_source_summaries_are_target_agnostic": True,
+        "composition_manifests_are_fold_specific": True,
+        "raw_source_embedding_pooling_for_prior_fit": False,
+        "adaptive_k_selection_uses_source_local_fit_statistics_only": True,
+        "source_union_references_diagnostic_only": True,
+        "oracle_rows_diagnostic_only": True,
+        "protocol_wording": ADAPTIVE_PROTOCOL_WORDING,
+        "claim_boundary": (
+            "adaptive decentralized prior-composition preservation test only; no target-specific "
+            "compatibility routing claim, no metadata-routing claim, no support-NELBO downstream claim, "
+            "and no formal privacy claim"
+        ),
+    }
+    assert resolved == _adaptive_resolved_config(cfg)
     assert "heldout_center" not in (summary_manifest_reader.fieldnames or [])
     assert summary_manifest
     assert diagnostics and any(
@@ -1417,6 +2048,7 @@ def test_decentralized_reliability_weighted_gmm_prior_tiny_cache_writes_expected
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "decentralized_reliability_downstream_matrix.csv", newline="")))
     reliability_reader = csv.DictReader(open(root / "tables" / "source_reliability_manifest.csv", newline=""))
     reliability = list(reliability_reader)
@@ -1424,8 +2056,40 @@ def test_decentralized_reliability_weighted_gmm_prior_tiny_cache_writes_expected
     summary = list(csv.DictReader(open(root / "tables" / "decentralized_reliability_summary.csv", newline="")))
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
-    assert leakage["status"] == "PASS"
-    assert protocol["fold_weight_manifest_excludes_heldout_center"] is True
+    assert leakage == {
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "oracle_rows_diagnostic_only": True,
+        "violations": [],
+    }
+    assert protocol == {
+        "schema_version": "cvae_rebuild_decentralized_reliability_weighted_gmm_prior_protocol_manifest_v1",
+        "experiment_name": cfg.name,
+        "experiment_type": "source_local_reliability_weighted_decentralized_composition",
+        "primary_variant": cfg.primary_variant,
+        "primary_method": cfg.primary_method,
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "exported_source_summaries_are_target_agnostic": True,
+        "source_reliability_manifest_has_no_heldout_center": True,
+        "fold_weight_manifest_excludes_heldout_center": True,
+        "raw_source_embedding_pooling_for_prior_fit": False,
+        "adaptive_k_selection_uses_source_local_fit_statistics_only": True,
+        "source_reliability_uses_source_local_eval_only": True,
+        "source_union_references_diagnostic_only": True,
+        "oracle_rows_diagnostic_only": True,
+        "protocol_wording": RELIABILITY_WEIGHTED_PROTOCOL_WORDING,
+        "claim_boundary": (
+            "source-local reliability-weighted decentralized composition only; no target-specific "
+            "compatibility routing claim, no metadata-routing claim, no support-NELBO downstream claim, "
+            "and no formal privacy claim"
+        ),
+    }
+    assert resolved == _reliability_weighted_resolved_config(cfg)
     assert "heldout_center" not in (reliability_reader.fieldnames or [])
     assert reliability and weights
     assert any(row["prior_method"] == PRIMARY_RELIABILITY_METHOD and row["selection_source"] == "primary" for row in matrix)
@@ -1490,6 +2154,7 @@ def test_decentralized_component_union_prior_tiny_cache_writes_expected_artifact
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "component_union_downstream_matrix.csv", newline="")))
     component_manifest = list(csv.DictReader(open(root / "tables" / "component_manifest.csv", newline="")))
     weights = list(csv.DictReader(open(root / "tables" / "source_weight_manifest.csv", newline="")))
@@ -1499,9 +2164,56 @@ def test_decentralized_component_union_prior_tiny_cache_writes_expected_artifact
     paired = list(csv.DictReader(open(root / "tables" / "paired_generation_audit.csv", newline="")))
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
-    assert leakage["status"] == "PASS"
-    assert protocol["fixed_all_source_inclusion"] is True
-    assert protocol["tests_target_conditioned_routing"] is False
+    assert leakage == {
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "oracle_rows_diagnostic_only": True,
+        "violations": [],
+    }
+    assert protocol == {
+        "schema_version": "cvae_rebuild_decentralized_component_union_prior_protocol_manifest_v1",
+        "experiment_name": cfg.name,
+        "experiment_type": "decentralized_component_level_generative_expert_composition",
+        "primary_variant": cfg.primary_variant,
+        "primary_method": cfg.primary_method,
+        "primary_shrink_lambda": cfg.primary_shrink_lambda,
+        "canonical_replicate_seeds": list(cfg.replicate_seeds),
+        "fresh_replicate_seeds": list(cfg.fresh_replicate_seeds),
+        "random_mass_bag_control_size": cfg.random_mass_bag_control_size,
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "fixed_all_source_inclusion": True,
+        "tests_target_conditioned_routing": False,
+        "tests_composition_granularity": True,
+        "exported_source_summaries_are_target_agnostic": True,
+        "raw_source_embedding_pooling_for_prior_fit": False,
+        "pooled_classifier_frame": "raw_embedding_frame_after_source_inverse_pca",
+        "source_union_references_diagnostic_only": True,
+        "source_ablation_diagnostic_only": True,
+        "matched_shuffled_reliability_null_permutations": cfg.matched_shuffled_reliability_null_permutations,
+        "matched_shuffled_reliability_null_lambda": (
+            _matched_shuffled_reliability_lambda(cfg)
+            if cfg.matched_shuffled_reliability_null_permutations
+            else ""
+        ),
+        "oracle_rows_diagnostic_only": True,
+        "protocol_wording": COMPONENT_UNION_PROTOCOL_WORDING,
+        "claim_boundary": (
+            "component-level generative expert composition using source-only reliability-weighted dense mass allocation where configured; "
+            "no target-specific compatibility routing claim, "
+            "no support-NELBO downstream claim, and no formal privacy claim"
+        ),
+        "cache_policy": {
+            "component_summaries": "source/seed/class/config",
+            "generated_pools": "source_weight_hash+latent_seed+component_summary_hash",
+            "classifier_predictions": "generated_pool_hash+classifier_config+eval_fold",
+        },
+    }
+    assert resolved == _component_union_resolved_config(cfg)
     assert any(row["prior_method"] == PRIMARY_COMPONENT_UNION_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == "decentralized_component_union_reliability_shrink025" for row in matrix)
     assert any(row["prior_method"] == "decentralized_component_union_reliability_shrink050" for row in matrix)
@@ -1692,6 +2404,7 @@ def test_support_calibrated_component_union_tiny_cache_writes_expected_artifacts
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "support_calibrated_component_union_downstream_matrix.csv", newline="")))
     splits = list(csv.DictReader(open(root / "tables" / "support_eval_split_manifest.csv", newline="")))
     scores = list(csv.DictReader(open(root / "tables" / "support_nelbo_score_manifest.csv", newline="")))
@@ -1704,14 +2417,38 @@ def test_support_calibrated_component_union_tiny_cache_writes_expected_artifacts
     alignment = list(csv.DictReader(open(root / "tables" / "mass_alignment_to_single_source_oracle.csv", newline="")))
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
-    assert leakage["status"] == "PASS"
-    assert protocol["support_labels_for_selection"] is False
-    assert protocol["target_eval_labels_for_scoring_only"] is True
-    assert protocol["target_expert_excluded"] is True
-    assert protocol["nested_support_diagnostics"] is True
-    assert protocol["fixed_eval_support_size_diagnostics"] is True
-    assert protocol["matched_shuffled_support_null_permutations"] == 2
-    assert protocol["random_mass_bag_control_size"] == 3
+    assert leakage == {
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "oracle_rows_diagnostic_only": True,
+        "violations": [],
+    }
+    assert protocol == {
+        "schema_version": "cvae_rebuild_support_calibrated_component_union_protocol_manifest_v1",
+        "experiment_name": cfg.name,
+        "experiment_type": "target_support_compatibility_calibrated_component_union",
+        "primary_variant": cfg.primary_variant,
+        "primary_method": cfg.primary_method,
+        "support_size": cfg.support_size,
+        "support_size_diagnostics": list(cfg.support_size_diagnostics),
+        "nested_support_max_size": cfg.nested_support_max_size,
+        "nested_support_diagnostics": True,
+        "fixed_eval_support_size_diagnostics": True,
+        "support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "support_nelbo_tau": cfg.support_nelbo_tau,
+        "support_shrink_lambda": cfg.support_shrink_lambda,
+        "matched_shuffled_support_null_permutations": cfg.matched_shuffled_support_null_permutations,
+        "random_mass_bag_control_size": cfg.random_mass_bag_control_size,
+        "oracle_rows_diagnostic_only": True,
+        "source_union_reference_eval_scope": "external_full_target_eval_diagnostic",
+        "protocol_wording": SUPPORT_CALIBRATED_PROTOCOL_WORDING,
+    }
+    assert resolved == _support_calibrated_resolved_config(cfg)
     assert any(row["prior_method"] == PRIMARY_SUPPORT_CALIBRATED_COMPONENT_UNION_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == ROW_SUPPORT_UNIFORM_COMPONENT_UNION for row in matrix)
     assert any(row["prior_method"] == ROW_SUPPORT_RELIABILITY_SHRINK050 for row in matrix)
@@ -1769,6 +2506,7 @@ def test_target_support_regime_risk_gate_tiny_cache_writes_expected_artifacts(tm
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "risk_gated_downstream_matrix.csv", newline="")))
     features = list(csv.DictReader(open(root / "tables" / "support_regime_feature_matrix.csv", newline="")))
     training = list(csv.DictReader(open(root / "tables" / "source_inner_gate_training_matrix.csv", newline="")))
@@ -1786,6 +2524,19 @@ def test_target_support_regime_risk_gate_tiny_cache_writes_expected_artifacts(tm
     assert protocol["gate_training_pooling"] == "across_source_inner_support_seeds"
     assert protocol["center_id_used_as_feature"] is False
     assert protocol["threshold_sensitivity_diagnostic_only"] is True
+    assert resolved == {
+        "artifact_root": str(cfg.artifact_root),
+        "compact_features": list(COMPACT_FEATURES),
+        "experiment_seeds": [42],
+        "heldout_centers": ["0", "1", "2", "3", "4"],
+        "name": "virchow2_cvae_target_support32_regime_risk_gated_component_union_v1",
+        "random_mass_bag_size": 3,
+        "risk_thresholds": [0.6, 0.75],
+        "support_seeds": [17],
+        "support_size": 32,
+        "support_size_diagnostics": [8, 16],
+        "synthetic_per_class_total": 32,
+    }
     assert any(row["prior_method"] == PRIMARY_RISK_GATED_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == ROW_ALWAYS_RANDOM_BAG for row in matrix)
     assert any(row["prior_method"] == ROW_ALWAYS_SHRINK050 for row in matrix)
@@ -1843,6 +2594,7 @@ def test_labeled_support_policy_calibration_tiny_cache_writes_expected_artifacts
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "labeled_support_policy_downstream_matrix.csv", newline="")))
     splits = list(csv.DictReader(open(root / "tables" / "labeled_support_split_manifest.csv", newline="")))
     scores = list(csv.DictReader(open(root / "tables" / "labeled_support_policy_score_matrix.csv", newline="")))
@@ -1861,6 +2613,18 @@ def test_labeled_support_policy_calibration_tiny_cache_writes_expected_artifacts
     assert protocol["support_labels_do_not_train_classifiers"] is True
     assert protocol["support_labels_do_not_modify_generation"] is True
     assert protocol["primary_labeled_support_size"] == 16
+    assert resolved == {
+        "artifact_root": str(cfg.artifact_root),
+        "diagnostic_labeled_support_sizes": [8, 32],
+        "experiment_seeds": [42],
+        "heldout_centers": ["0", "1", "2", "3", "4"],
+        "name": "virchow2_cvae_labeled_support16_random_vs_dense_policy_calibration_v1",
+        "primary_labeled_support_size": 16,
+        "primary_switch_quantum": 0.0625,
+        "random_mass_bag_size": 3,
+        "support_seeds": [17],
+        "synthetic_per_class_total": 32,
+    }
     assert any(row["prior_method"] == PRIMARY_LABELED_SUPPORT_POLICY_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == ROW_ALWAYS_RANDOM_BAG for row in matrix)
     assert any(row["prior_method"] == ROW_ALWAYS_DENSE for row in matrix)
@@ -1912,6 +2676,7 @@ def test_mass_bagged_component_union_tiny_cache_writes_expected_artifacts(tmp_pa
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "mass_bagged_downstream_matrix.csv", newline="")))
     members = list(csv.DictReader(open(root / "tables" / "mass_bag_member_matrix.csv", newline="")))
     manifest = list(csv.DictReader(open(root / "tables" / "source_mass_bag_manifest.csv", newline="")))
@@ -1919,9 +2684,38 @@ def test_mass_bagged_component_union_tiny_cache_writes_expected_artifacts(tmp_pa
     anchors = list(csv.DictReader(open(root / "tables" / "anchor_reproducibility_audit.csv", newline="")))
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
-    assert leakage["status"] == "PASS"
-    assert protocol["target_conditioned_point_compatibility_estimate"] is False
-    assert protocol["primary_bag_excludes_shuffled_reliability"] is True
+    assert leakage == {
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "oracle_rows_diagnostic_only": True,
+        "violations": [],
+    }
+    assert protocol == {
+        "schema_version": "cvae_rebuild_mass_bagged_component_union_protocol_v1",
+        "experiment_name": cfg.name,
+        "primary_method": cfg.primary_method,
+        "experiment_type": "source_only_mass_uncertainty_bagged_component_union",
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_conditioned_point_compatibility_estimate": False,
+        "fixed_all_source_inclusion": True,
+        "primary_bag_members": list(cfg.primary_bag_members),
+        "primary_bag_excludes_shuffled_reliability": True,
+        "primary_pooling": cfg.primary_pooling,
+        "source_ablation_diagnostic_only": True,
+        "oracle_rows_diagnostic_only": True,
+        "claim_boundary": (
+            "source-only uncertainty-aware dense component composition; not learned routing, "
+            "target adaptation, reliability-causal validation, or formal privacy"
+        ),
+        "protocol_wording": MASS_BAGGED_PROTOCOL_WORDING,
+        "protocol_violations": [],
+    }
+    assert resolved == _mass_bagged_resolved_config(cfg)
     assert all("shuffled" not in member for member in protocol["primary_bag_members"])
     assert any(row["prior_method"] == PRIMARY_MASS_BAGGED_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == ROW_RANDOM_MASS_BAG_CONTROL for row in matrix)
@@ -1971,6 +2765,7 @@ def test_tailrisk_anchored_component_union_tiny_cache_writes_expected_artifacts(
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "tailrisk_downstream_matrix.csv", newline="")))
     blend = list(csv.DictReader(open(root / "tables" / "tailrisk_probability_blend_manifest.csv", newline="")))
     complementarity = list(csv.DictReader(open(root / "tables" / "tailrisk_complementarity_audit.csv", newline="")))
@@ -1978,7 +2773,21 @@ def test_tailrisk_anchored_component_union_tiny_cache_writes_expected_artifacts(
     summary = list(csv.DictReader(open(root / "tables" / "tailrisk_summary.csv", newline="")))
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
-    assert leakage["status"] == "PASS"
+    assert leakage == {
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "violations": [],
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "oracle_rows_diagnostic_only": True,
+    }
+    assert protocol == _tailrisk_anchored_protocol_manifest_payload(
+        cfg,
+        protocol_violations=[],
+        target_expert_excluded=True,
+    )
+    assert resolved == _tailrisk_anchored_resolved_config(cfg)
     assert protocol["target_support_used"] is False
     assert protocol["blend_alpha_locked"] == 0.5
     assert any(row["prior_method"] == PRIMARY_TAILRISK_METHOD and row["selection_source"] == "primary" for row in matrix)
@@ -2021,6 +2830,7 @@ def test_multipanel_tailrisk_component_union_tiny_cache_writes_expected_artifact
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "multipanel_tailrisk_downstream_matrix.csv", newline="")))
     seed_matrix = list(csv.DictReader(open(root / "tables" / "multipanel_tailrisk_seed_diagnostic_matrix.csv", newline="")))
     blend = list(csv.DictReader(open(root / "tables" / "multipanel_tailrisk_probability_blend_manifest.csv", newline="")))
@@ -2035,7 +2845,21 @@ def test_multipanel_tailrisk_component_union_tiny_cache_writes_expected_artifact
     audit_conclusion = (root / "center3_failure_audit" / "center3_failure_conclusion.md").read_text(encoding="utf-8")
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
-    assert leakage["status"] == "PASS"
+    assert leakage == {
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "violations": [],
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "oracle_rows_diagnostic_only": True,
+    }
+    assert protocol == _multipanel_protocol_manifest_payload(
+        cfg,
+        protocol_violations=[],
+        target_expert_excluded=True,
+    )
+    assert resolved == _resolved_multipanel_config(cfg)
     assert protocol["target_support_used"] is False
     assert protocol["target_eval_labels_for_scoring_only"] is True
     assert protocol["panel_seeds_are_evaluation_replicates"] is False
@@ -2262,6 +3086,7 @@ def test_source_inner_positive_union_tiny_cache_writes_expected_artifacts(tmp_pa
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "positive_union_downstream_matrix.csv", newline="")))
     selection = list(csv.DictReader(open(root / "tables" / "positive_union_source_inner_selection.csv", newline="")))
     candidates = list(csv.DictReader(open(root / "tables" / "positive_union_candidate_rule_matrix.csv", newline="")))
@@ -2273,7 +3098,21 @@ def test_source_inner_positive_union_tiny_cache_writes_expected_artifacts(tmp_pa
     summary = list(csv.DictReader(open(root / "tables" / "positive_union_summary.csv", newline="")))
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
-    assert leakage["status"] == "PASS"
+    assert leakage == {
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "violations": [],
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "oracle_rows_diagnostic_only": True,
+    }
+    assert protocol == _positive_union_protocol_manifest_payload(
+        cfg,
+        protocol_violations=[],
+        target_expert_excluded=True,
+    )
+    assert resolved == _resolved_positive_union_config(cfg)
     assert protocol["target_support_used"] is False
     assert protocol["selection_used_target_labels"] is False
     assert protocol["target_eval_labels_for_scoring_only"] is True
@@ -2323,6 +3162,7 @@ def test_fixed_beta050_positive_union_tiny_cache_writes_expected_artifacts(tmp_p
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "fixed_beta050_downstream_matrix.csv", newline="")))
     candidates = list(csv.DictReader(open(root / "tables" / "fixed_beta050_candidate_rule_matrix.csv", newline="")))
     effective = list(csv.DictReader(open(root / "tables" / "fixed_beta050_effective_threshold_audit.csv", newline="")))
@@ -2335,7 +3175,21 @@ def test_fixed_beta050_positive_union_tiny_cache_writes_expected_artifacts(tmp_p
     summary = list(csv.DictReader(open(root / "tables" / "fixed_beta050_summary.csv", newline="")))
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
-    assert leakage["status"] == "PASS"
+    assert leakage == {
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "violations": [],
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "oracle_rows_diagnostic_only": True,
+    }
+    assert protocol == _fixed_beta050_protocol_manifest_payload(
+        cfg,
+        protocol_violations=[],
+        target_expert_excluded=True,
+    )
+    assert resolved == _resolved_fixed_beta050_config(cfg)
     assert protocol["target_support_used"] is False
     assert protocol["selection_used_target_labels"] is False
     assert protocol["target_eval_labels_for_scoring_only"] is True
@@ -2402,6 +3256,7 @@ def test_harm_gated_positive_union_tiny_cache_writes_expected_artifacts_and_repl
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved_config = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "harm_gated_positive_union_downstream_matrix.csv", newline="")))
     selection = list(csv.DictReader(open(root / "tables" / "harm_gated_positive_union_source_inner_selection.csv", newline="")))
     candidates = list(csv.DictReader(open(root / "tables" / "harm_gated_positive_union_candidate_rule_matrix.csv", newline="")))
@@ -2416,7 +3271,22 @@ def test_harm_gated_positive_union_tiny_cache_writes_expected_artifacts_and_repl
     summary = list(csv.DictReader(open(root / "tables" / "harm_gated_positive_union_summary.csv", newline="")))
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
-    assert leakage["status"] == "PASS"
+    assert leakage == {
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "violations": [],
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "oracle_rows_diagnostic_only": True,
+    }
+    assert protocol == _harm_gated_protocol_manifest_payload(
+        cfg,
+        replacement_seed_rows=replacements,
+        protocol_violations=[],
+        target_expert_excluded=True,
+    )
+    assert resolved_config == _resolved_harm_gated_positive_union_config(cfg)
     assert protocol["target_support_used"] is False
     assert protocol["selection_used_target_labels"] is False
     assert protocol["target_eval_labels_for_scoring_only"] is True
@@ -2486,6 +3356,7 @@ def test_dense_tailshield_random_mass_bag_tiny_cache_writes_expected_artifacts(t
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "dense_tailshield_downstream_matrix.csv", newline="")))
     blend = list(csv.DictReader(open(root / "tables" / "dense_tailshield_probability_blend_manifest.csv", newline="")))
     reconstruction = list(csv.DictReader(open(root / "tables" / "dense_tailshield_probability_reconstruction_audit.csv", newline="")))
@@ -2494,10 +3365,48 @@ def test_dense_tailshield_random_mass_bag_tiny_cache_writes_expected_artifacts(t
     summary = list(csv.DictReader(open(root / "tables" / "dense_tailshield_summary.csv", newline="")))
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
-    assert leakage["status"] == "PASS"
-    assert protocol["target_support_used"] is False
-    assert protocol["center3_definition"] == 'heldout_center == "3"'
-    assert protocol["alpha_curve_diagnostic_only"] is True
+    assert leakage == {
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "oracle_rows_diagnostic_only": True,
+        "violations": [],
+    }
+    assert protocol == {
+        "schema_version": "cvae_rebuild_dense_reliability_tailshield_random_mass_bag_protocol_v1",
+        "experiment_name": cfg.name,
+        "primary_method": cfg.primary_method,
+        "experiment_type": "source_only_dense_reliability_tailshield_random_mass_bag_component_union",
+        "target_expert_excluded": True,
+        "target_support_used": False,
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_calibration_metrics_audit_only": True,
+        "target_conditioned_point_compatibility_estimate": False,
+        "fixed_all_source_inclusion": True,
+        "dense_anchor_method": DENSE_TAILSHIELD_ANCHOR_METHOD,
+        "bag_method": DENSE_TAILSHIELD_BAG_METHOD,
+        "blend_alpha_dense_locked": cfg.dense_blend_alpha,
+        "blend_alpha_bag_locked": cfg.bag_blend_alpha,
+        "random_mass_bag_size": cfg.random_mass_bag_size,
+        "random_mass_bag_distribution": "dirichlet_uniform_alpha4",
+        "center3_definition": 'heldout_center == "3"',
+        "bottom20_definition": "lowest 20% eligible seed-center-replicate cells by random_mass_bag_control BACC",
+        "nontrivial_rescue_threshold": "dense_correct_bag_wrong_rate >= 0.02",
+        "alpha_curve_diagnostic_only": True,
+        "alpha_curve_can_rescue_primary": False,
+        "source_ablation_diagnostic_only": True,
+        "oracle_rows_diagnostic_only": True,
+        "claim_boundary": (
+            "source-only robustness aggregation under component/source-mass uncertainty; "
+            "not learned routing, source selection, target adaptation, formal privacy, "
+            "or causal reliability validation"
+        ),
+        "protocol_violations": [],
+    }
+    assert resolved == _dense_tailshield_resolved_config(cfg)
     assert any(row["prior_method"] == PRIMARY_DENSE_TAILSHIELD_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == "paired_reliability_all4_weighted_geom" for row in matrix)
     assert any(row["prior_method"] == ROW_RANDOM_MASS_BAG_CONTROL for row in matrix)
@@ -2545,6 +3454,7 @@ def test_harmful_source_suppression_tiny_cache_writes_expected_artifacts(tmp_pat
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "harmful_source_suppression_downstream_matrix.csv", newline="")))
     suppression = list(csv.DictReader(open(root / "tables" / "source_inner_suppression_manifest.csv", newline="")))
     realized = list(csv.DictReader(open(root / "tables" / "realized_bag_mass_audit.csv", newline="")))
@@ -2552,10 +3462,44 @@ def test_harmful_source_suppression_tiny_cache_writes_expected_artifacts(tmp_pat
     summary = list(csv.DictReader(open(root / "tables" / "harmful_source_suppression_summary.csv", newline="")))
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
-    assert leakage["status"] == "PASS"
-    assert protocol["target_support_used"] is False
-    assert protocol["target_ablation_alignment_audit_only"] is True
-    assert protocol["bottom20_definition"].startswith("lowest 20%")
+    assert leakage == {
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "oracle_rows_diagnostic_only": True,
+        "violations": [],
+    }
+    assert protocol == {
+        "schema_version": "cvae_rebuild_source_inner_harmful_source_suppression_protocol_v1",
+        "experiment_name": cfg.name,
+        "primary_method": cfg.primary_method,
+        "experiment_type": "source_only_harmful_source_suppression_random_mass_bag_component_union",
+        "target_expert_excluded": True,
+        "target_support_used": False,
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "heldout_target_rows_used_for_source_inner_scoring": False,
+        "source_inner_uses_non_target_source_eval_rows": True,
+        "source_inner_harmfulness_aggregation": "experiment_seed_x_heldout_center_over_pseudo_target_x_canonical_replicate_seed",
+        "bottom20_definition": "lowest 20% eligible seed-center-replicate cells by unsuppressed random_mass_bag_control BACC",
+        "center3_definition": 'heldout_center == "3"',
+        "target_ablation_alignment_audit_only": True,
+        "target_ablation_alignment_cannot_change_thresholds_weights_adoption_or_selection": True,
+        "nearest_neighbor_memorization_audit_skipped": bool(cfg.skip_nearest_neighbor_audit),
+        "nearest_neighbor_memorization_audit_skip_reason": "memory_safety" if cfg.skip_nearest_neighbor_audit else "",
+        "hard_exclusion_diagnostic_only": True,
+        "suppression_rate_low": cfg.suppression_rate_low,
+        "suppression_rate_high": cfg.suppression_rate_high,
+        "claim_boundary": (
+            "source-inner leave-one-source diagnostics for robust source-only component composition; "
+            "not target-conditioned routing, target adaptation, learned routing, or post-hoc source removal"
+        ),
+        "protocol_wording": HARMFUL_SUPPRESSION_PROTOCOL_WORDING,
+        "protocol_violations": [],
+    }
+    assert resolved == _harmful_suppression_resolved_config(cfg)
     assert any(row["prior_method"] == PRIMARY_HARMFUL_SUPPRESSION_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == ROW_RANDOM_MASS_BAG_CONTROL for row in matrix)
     assert suppression and suppression[0]["target_eval_metric_used_for_suppression"] == "False"
@@ -2598,6 +3542,7 @@ def test_source_inner_validated_dense_component_hybrid_tiny_cache_writes_expecte
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "hybrid_downstream_matrix.csv", newline="")))
     selections = list(csv.DictReader(open(root / "tables" / "hybrid_selection_manifest.csv", newline="")))
     gate = list(csv.DictReader(open(root / "tables" / "source_inner_gate_matrix.csv", newline="")))
@@ -2607,9 +3552,39 @@ def test_source_inner_validated_dense_component_hybrid_tiny_cache_writes_expecte
     summary = list(csv.DictReader(open(root / "tables" / "hybrid_summary.csv", newline="")))
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
-    assert leakage["status"] == "PASS"
-    assert protocol["target_eval_used_for_gate_selection"] is False
-    assert protocol["source_inner_shared_as_aggregate_scores_only"] is True
+    assert leakage == {
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_support_labels_for_selection": False,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "oracle_rows_diagnostic_only": True,
+        "violations": [],
+    }
+    assert protocol == {
+        "schema_version": "cvae_rebuild_source_inner_validated_dense_component_hybrid_protocol_v1",
+        "experiment_name": cfg.name,
+        "primary_method": cfg.primary_method,
+        "experiment_type": "source_inner_validated_dense_component_binary_gate",
+        "target_expert_excluded": True,
+        "target_eval_labels_for_scoring_only": True,
+        "target_eval_used_for_gate_selection": False,
+        "source_inner_uses_non_target_source_eval_rows": True,
+        "source_inner_shared_as_aggregate_scores_only": True,
+        "gate_selection_level": "experiment_seed_x_heldout_center",
+        "dense_anchor": ROW_DENSE_ANCHOR,
+        "component_challenger": ROW_COMPONENT_CHALLENGER,
+        "component_shrink_lambda": cfg.component_shrink_lambda,
+        "matched_shuffled_gate_null_permutations": cfg.matched_shuffled_gate_null_permutations,
+        "gate_confusion_audit_only": True,
+        "tests_target_conditioned_routing": False,
+        "claim_boundary": (
+            "source-only pseudo-target validation for dense-versus-component composition; "
+            "not learned compatibility routing, sparse expert selection, formal privacy, or causal validation of reliability mass allocation"
+        ),
+        "protocol_violations": [],
+    }
+    assert resolved == _hybrid_resolved_config(cfg)
     assert any(row["prior_method"] == PRIMARY_HYBRID_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == "paired_reliability_all4_weighted_geom" for row in matrix)
     assert any(row["prior_method"] == "decentralized_component_union_reliability_shrink025" for row in matrix)
@@ -2716,6 +3691,7 @@ def test_pruned_adaptive_equal_all4_tiny_cache_writes_expected_artifacts(tmp_pat
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "pruned_adaptive_equal_all4_downstream_matrix.csv", newline="")))
     pruning = list(csv.DictReader(open(root / "tables" / "pruning_effect_summary.csv", newline="")))
     pruned_components = list(csv.DictReader(open(root / "tables" / "pruned_component_manifest.csv", newline="")))
@@ -2727,6 +3703,55 @@ def test_pruned_adaptive_equal_all4_tiny_cache_writes_expected_artifacts(tmp_pat
     assert protocol["fixed_all_source_inclusion"] is True
     assert protocol["tests_target_conditioned_routing"] is False
     assert protocol["same_run_unpruned_fixed_k4_reference"] is True
+    assert protocol["target_eval_labels_for_scoring_only"] is True
+    assert protocol["target_expert_excluded"] is True
+    assert leakage == {
+        "oracle_rows_diagnostic_only": True,
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+        "violations": [],
+    }
+    assert resolved == {
+        "artifact_root": str(cfg.artifact_root),
+        "backbone": "virchow2",
+        "balanced_gmm_artifact_root": str(cfg.balanced_gmm_artifact_root),
+        "candidate_components_per_source_class": [4, 3, 2, 1],
+        "classifier": {
+            "C": 1.0,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+            "max_iter": 2000,
+            "solver": "lbfgs",
+            "type": "sklearn_logistic_regression",
+        },
+        "component_union_artifact_root": str(cfg.component_union_artifact_root),
+        "d1_2_artifact_root": str(cfg.d1_2_artifact_root),
+        "experiment_seeds": [42],
+        "feature_cache_root": str(cfg.feature_cache_root),
+        "gmm_covariance_type": "diag",
+        "gmm_max_iter": 100,
+        "gmm_n_init": 1,
+        "gmm_reg_covar": 0.0001,
+        "heldout_centers": ["0", "1", "2", "3", "4"],
+        "min_component_weight": 0.02,
+        "min_per_source_per_class": 8,
+        "min_samples_per_component": 12,
+        "name": "virchow2_cvae_decentralized_pruned_adaptive_equal_all4_v1",
+        "primary_method": "decentralized_pruned_adaptive_k_equal_all4_late_geom",
+        "primary_pooling": "geometric",
+        "primary_variant": "pca64_beta001",
+        "repair_artifact_root": str(cfg.repair_artifact_root),
+        "replicate_seeds": [17],
+        "source_union_gmm_artifact_root": str(cfg.source_union_gmm_artifact_root),
+        "source_weighting": "equal_source_mass",
+        "synthetic_per_class_total": 128,
+        "unpruned_fixed_k": 4,
+        "variance_ceiling_multiplier": 16.0,
+        "variance_floor": 1.0e-5,
+    }
     assert any(row["prior_method"] == PRIMARY_PRUNED_EQUAL_ALL4_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == ROW_UNPRUNED_FIXED_K4 for row in matrix)
     assert any(row["prior_method"] == "decentralized_pruned_adaptive_k_shuffled_summary_control" for row in matrix)
@@ -2779,6 +3804,7 @@ def test_paired_dense_all4_reliability_tiny_cache_writes_expected_artifacts(tmp_
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "paired_dense_all4_downstream_matrix.csv", newline="")))
     reliability = list(csv.DictReader(open(root / "tables" / "source_reliability_manifest.csv", newline="")))
     weights = list(csv.DictReader(open(root / "tables" / "reliability_weight_manifest.csv", newline="")))
@@ -2794,6 +3820,48 @@ def test_paired_dense_all4_reliability_tiny_cache_writes_expected_artifacts(tmp_
     assert protocol["dense_all4_fixed_inclusion"] is True
     assert protocol["top_k_selection_enabled"] is False
     assert protocol["inverse_reliability_definition"] == "rank_reversal_matched_entropy"
+    assert resolved == {
+        "artifact_root": str(cfg.artifact_root),
+        "backbone": "virchow2",
+        "cache_report_path": "",
+        "candidate_components_per_source_class": [4, 3, 2, 1],
+        "classifier": {
+            "C": 1.0,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+            "max_iter": 2000,
+            "solver": "lbfgs",
+            "type": "sklearn_logistic_regression",
+        },
+        "d1_2_artifact_root": str(cfg.d1_2_artifact_root),
+        "d1_4_artifact_root": str(cfg.d1_4_artifact_root),
+        "dataset_contract_artifact_root": "",
+        "domain_regime": "camelyon17_center5",
+        "experiment_seeds": [42],
+        "feature_cache_root": str(cfg.feature_cache_root),
+        "gmm_covariance_type": "diag",
+        "gmm_max_iter": 500,
+        "gmm_n_init": 5,
+        "gmm_reg_covar": 0.0001,
+        "heldout_centers": ["0", "1", "2", "3", "4"],
+        "min_component_weight": 0.02,
+        "min_per_source_per_class": 8,
+        "min_samples_per_component": 12,
+        "name": "virchow2_cvae_paired_dense_all4_reliability_confirmation_v1",
+        "primary_method": "paired_reliability_all4_shrink050_geom",
+        "primary_pooling": "weighted_geometric",
+        "primary_variant": "pca64_beta001",
+        "reliability_epsilon": 1.0e-8,
+        "reliability_floor_score": 0.05,
+        "repair_artifact_root": str(cfg.repair_artifact_root),
+        "replicate_seeds": [17],
+        "shrinkage_values": [0.25, 0.5],
+        "source_weighting": "heldout_excluded_source_local_reliability_dense_all4",
+        "strict_available_seed_domain_coverage": False,
+        "strict_full_run_matrix": False,
+        "synthetic_per_class_total": 128,
+        "variance_floor": 1.0e-5,
+    }
     assert {ROW_EQUAL_ALL4, ROW_RELIABILITY_ALL4_WEIGHTED, ROW_POOL_ONLY, ROW_BUDGET_ONLY}.issubset(
         {row["prior_method"] for row in matrix}
     )
@@ -2905,6 +3973,7 @@ def test_paired_component_coverage_audit_tiny_cache_writes_expected_artifacts(tm
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "paired_component_coverage_downstream_matrix.csv", newline="")))
     weights = list(csv.DictReader(open(root / "tables" / "reliability_weight_manifest.csv", newline="")))
     budgets = list(csv.DictReader(open(root / "tables" / "realized_budget_table.csv", newline="")))
@@ -2919,6 +3988,52 @@ def test_paired_component_coverage_audit_tiny_cache_writes_expected_artifacts(tm
     assert protocol["top_k_selection_enabled"] is False
     assert protocol["weighted_component_mass_coverage_enabled"] is True
     assert protocol["coverage_denominator_uses_realized_source_class_budget"] is True
+    assert leakage == {
+        "oracle_rows_diagnostic_only": True,
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+        "violations": [],
+    }
+    assert resolved == {
+        "artifact_root": str(cfg.artifact_root),
+        "backbone": "virchow2",
+        "candidate_components_per_source_class": [4, 3, 2, 1],
+        "classifier": {
+            "C": 1.0,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+            "max_iter": 2000,
+            "solver": "lbfgs",
+            "type": "sklearn_logistic_regression",
+        },
+        "component_sampling_rules": ["multinomial", "stratified_largest_remainder"],
+        "diagnostic_synthetic_per_class_total": 256,
+        "experiment_seeds": [42],
+        "feature_cache_root": str(cfg.feature_cache_root),
+        "gmm_covariance_type": "diag",
+        "gmm_max_iter": 500,
+        "gmm_n_init": 5,
+        "gmm_reg_covar": 0.0001,
+        "heldout_centers": ["0", "1", "2", "3", "4"],
+        "min_component_weight": 0.02,
+        "min_per_source_per_class": 8,
+        "min_samples_per_component": 12,
+        "name": "virchow2_cvae_paired_component_coverage_audit_v1",
+        "paired_reliability_artifact_root": str(cfg.paired_reliability_artifact_root),
+        "primary_method": "paired_reliability_all4_weighted_component_stratified128_geom",
+        "primary_pooling": "weighted_geometric",
+        "primary_variant": "pca64_beta001",
+        "reliability_epsilon": 1.0e-8,
+        "reliability_floor_score": 0.05,
+        "repair_artifact_root": str(cfg.repair_artifact_root),
+        "replicate_seeds": [17],
+        "source_weighting": "heldout_excluded_source_local_reliability_dense_all4",
+        "synthetic_per_class_total": 128,
+        "variance_floor": 1.0e-5,
+    }
     assert {ROW_RELIABILITY_MULTINOMIAL128_REFERENCE, ROW_RELIABILITY_STRATIFIED128, ROW_EQUAL_STRATIFIED128}.issubset(
         {row["prior_method"] for row in matrix}
     )
@@ -3002,6 +4117,7 @@ def test_decentralized_reliability_top3_gmm_prior_tiny_cache_writes_expected_art
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "decentralized_reliability_top3_downstream_matrix.csv", newline="")))
     selections = list(csv.DictReader(open(root / "tables" / "reliability_top3_selection_manifest.csv", newline="")))
     summary = list(csv.DictReader(open(root / "tables" / "decentralized_reliability_top3_summary.csv", newline="")))
@@ -3011,6 +4127,51 @@ def test_decentralized_reliability_top3_gmm_prior_tiny_cache_writes_expected_art
     assert leakage["status"] == "PASS"
     assert protocol["target_support_features_for_selection"] is False
     assert protocol["support8_context_rows_decision_excluded"] is True
+    assert protocol["oracle_rows_diagnostic_only"] is True
+    assert leakage == {
+        "oracle_rows_diagnostic_only": True,
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+        "violations": [],
+    }
+    assert resolved == {
+        "artifact_root": str(cfg.artifact_root),
+        "backbone": "virchow2",
+        "candidate_components_per_source_class": [4, 3, 2, 1],
+        "classifier": {
+            "C": 1.0,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+            "max_iter": 2000,
+            "solver": "lbfgs",
+            "type": "sklearn_logistic_regression",
+        },
+        "d1_3_1_artifact_root": str(cfg.d1_3_1_artifact_root),
+        "experiment_seeds": [42],
+        "feature_cache_root": str(cfg.feature_cache_root),
+        "gmm_covariance_type": "diag",
+        "gmm_max_iter": 100,
+        "gmm_n_init": 1,
+        "gmm_reg_covar": 0.0001,
+        "heldout_centers": ["0", "1", "2", "3", "4"],
+        "min_component_weight": 0.001,
+        "min_per_source_per_class": 8,
+        "min_samples_per_component": 12,
+        "name": "virchow2_cvae_decentralized_reliability_top3_gmm_prior_v1",
+        "primary_method": "decentralized_reliability_top3_geom_confirmation",
+        "primary_pooling": "geometric",
+        "primary_variant": "pca64_beta001",
+        "reliability_floor_score": 0.05,
+        "repair_artifact_root": str(cfg.repair_artifact_root),
+        "replicate_seeds": [17],
+        "source_weighting": "source_local_reliability_top3",
+        "synthetic_per_class_total": 128,
+        "top_k_sources": 3,
+        "variance_floor": 1.0e-5,
+    }
     assert any(row["prior_method"] == PRIMARY_RELIABILITY_TOP3_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == "decentralized_reliability_all4_weighted_geom_reference" for row in matrix)
     assert any(row["prior_method"] == "decentralized_equal_all4_geom_reference" for row in matrix)
@@ -3079,6 +4240,7 @@ def test_decentralized_source_inner_transfer_top3_gmm_prior_tiny_cache_writes_ex
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "decentralized_source_inner_transfer_downstream_matrix.csv", newline="")))
     transfer = list(csv.DictReader(open(root / "tables" / "source_inner_transfer_matrix.csv", newline="")))
     subsets = list(csv.DictReader(open(root / "tables" / "source_inner_subset_score_manifest.csv", newline="")))
@@ -3090,9 +4252,73 @@ def test_decentralized_source_inner_transfer_top3_gmm_prior_tiny_cache_writes_ex
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
     assert leakage["status"] == "PASS"
-    assert protocol["heldout_target_rows_used_for_source_inner_scoring"] is False
-    assert protocol["source_inner_uses_non_target_source_eval_rows"] is True
-    assert protocol["method_comparison_uses_method_invariant_generation_seed"] is True
+    assert leakage == {
+        "oracle_rows_diagnostic_only": True,
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+        "violations": [],
+    }
+    assert protocol == {
+        "adaptive_k_selection_uses_source_local_fit_statistics_only": True,
+        "claim_boundary": (
+            "source-inner off-diagonal transfer drop-one confirmation only; no target-conditioned routing, "
+            "no metadata-routing claim, no large-pool sparse MoErging claim, and no formal privacy claim"
+        ),
+        "drop_one_claim_boundary": SOURCE_INNER_TRANSFER_DROP_ONE_CLAIM_BOUNDARY,
+        "experiment_name": "virchow2_cvae_decentralized_source_inner_transfer_top3_gmm_prior_v1",
+        "experiment_type": "source_inner_off_diagonal_transfer_drop_one_confirmation",
+        "exported_source_summaries_are_target_agnostic": True,
+        "heldout_target_rows_used_for_source_inner_scoring": False,
+        "method_comparison_uses_method_invariant_generation_seed": True,
+        "oracle_rows_diagnostic_only": True,
+        "primary_method": PRIMARY_SOURCE_INNER_TRANSFER_METHOD,
+        "primary_variant": "pca64_beta001",
+        "protocol_wording": SOURCE_INNER_TRANSFER_PROTOCOL_WORDING,
+        "raw_source_embedding_pooling_for_prior_fit": False,
+        "schema_version": "cvae_rebuild_decentralized_source_inner_transfer_protocol_manifest_v1",
+        "source_inner_uses_non_target_source_eval_rows": True,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_features_for_selection": False,
+        "target_support_labels_for_selection": False,
+        "top_k_sources": 3,
+    }
+    assert resolved == {
+        "artifact_root": str(cfg.artifact_root),
+        "backbone": "virchow2",
+        "candidate_components_per_source_class": [4, 3, 2, 1],
+        "classifier": {
+            "C": 1.0,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+            "max_iter": 2000,
+            "solver": "lbfgs",
+            "type": "sklearn_logistic_regression",
+        },
+        "experiment_seeds": [42],
+        "feature_cache_root": str(cfg.feature_cache_root),
+        "gmm_covariance_type": "diag",
+        "gmm_max_iter": 100,
+        "gmm_n_init": 1,
+        "gmm_reg_covar": 0.0001,
+        "heldout_centers": ["0", "1", "2", "3", "4"],
+        "min_component_weight": 0.001,
+        "min_per_source_per_class": 8,
+        "name": "virchow2_cvae_decentralized_source_inner_transfer_top3_gmm_prior_v1",
+        "primary_method": PRIMARY_SOURCE_INNER_TRANSFER_METHOD,
+        "primary_pooling": "geometric",
+        "primary_variant": "pca64_beta001",
+        "reliability_floor_score": 0.05,
+        "repair_artifact_root": str(cfg.repair_artifact_root),
+        "replicate_seeds": [17],
+        "source_weighting": "source_inner_transfer_top3",
+        "synthetic_per_class_total": 128,
+        "top_k_sources": 3,
+        "variance_floor": 1.0e-5,
+    }
     assert any(row["prior_method"] == PRIMARY_SOURCE_INNER_TRANSFER_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == "decentralized_equal_all4_geom_reference" for row in matrix)
     assert any(row["prior_method"] == "decentralized_reliability_top3_geom_reference" for row in matrix)
@@ -3176,6 +4402,7 @@ def test_decentralized_support_nelbo_reliability_gmm_prior_tiny_cache_writes_exp
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "decentralized_support_nelbo_reliability_downstream_matrix.csv", newline="")))
     splits = list(csv.DictReader(open(root / "tables" / "support_eval_split_manifest.csv", newline="")))
     support_weights = list(csv.DictReader(open(root / "tables" / "support_nelbo_weight_manifest.csv", newline="")))
@@ -3184,8 +4411,79 @@ def test_decentralized_support_nelbo_reliability_gmm_prior_tiny_cache_writes_exp
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
     assert leakage["status"] == "PASS"
-    assert protocol["support_nelbo_uses_unlabeled_target_support_only"] is True
-    assert protocol["decision_baselines_recomputed_on_support_excluded_eval_subset"] is True
+    assert leakage == {
+        "oracle_rows_diagnostic_only": True,
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+        "violations": [],
+    }
+    assert protocol == {
+        "adaptive_k_selection_uses_source_local_fit_statistics_only": True,
+        "claim_boundary": (
+            "target-conditioned support-NELBO compatibility-weighted composition; no metadata-routing claim, "
+            "no formal privacy claim, no centralized source-union deployability claim, and no exact utility-prediction claim"
+        ),
+        "decision_baselines_recomputed_on_support_excluded_eval_subset": True,
+        "experiment_name": "virchow2_cvae_decentralized_support_nelbo_reliability_gmm_prior_v1",
+        "experiment_type": "target_conditioned_support_nelbo_x_reliability_decentralized_composition",
+        "exported_source_summaries_are_target_agnostic": True,
+        "oracle_rows_diagnostic_only": True,
+        "primary_method": PRIMARY_SUPPORT_RELIABILITY_METHOD,
+        "primary_variant": "pca64_beta001",
+        "protocol_wording": SUPPORT_RELIABILITY_PROTOCOL_WORDING,
+        "raw_source_embedding_pooling_for_prior_fit": False,
+        "schema_version": "cvae_rebuild_decentralized_support_nelbo_reliability_gmm_prior_protocol_manifest_v1",
+        "source_reliability_uses_source_local_eval_only": True,
+        "support_eval_disjoint": True,
+        "support_nelbo_uses_unlabeled_target_support_only": True,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+    }
+    assert resolved == {
+        "align_support_and_generation_seed": True,
+        "artifact_root": str(cfg.artifact_root),
+        "backbone": "virchow2",
+        "candidate_components_per_source_class": [4, 3, 2, 1],
+        "classifier": {
+            "C": 1.0,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+            "max_iter": 2000,
+            "solver": "lbfgs",
+            "type": "sklearn_logistic_regression",
+        },
+        "experiment_seeds": [42],
+        "feature_cache_root": str(cfg.feature_cache_root),
+        "gmm_covariance_type": "diag",
+        "gmm_max_iter": 100,
+        "gmm_n_init": 1,
+        "gmm_reg_covar": 0.0001,
+        "heldout_centers": ["0", "1", "2", "3", "4"],
+        "min_component_weight": 0.001,
+        "min_per_source_per_class": 8,
+        "min_samples_per_component": 12,
+        "name": "virchow2_cvae_decentralized_support_nelbo_reliability_gmm_prior_v1",
+        "primary_method": PRIMARY_SUPPORT_RELIABILITY_METHOD,
+        "primary_pooling": "weighted_geometric",
+        "primary_variant": "pca64_beta001",
+        "reliability_alpha": 1.0,
+        "reliability_floor_score": 0.05,
+        "repair_artifact_root": str(cfg.repair_artifact_root),
+        "replicate_seeds": [17],
+        "source_weighting": "support_nelbo_x_source_local_reliability",
+        "support_alpha": 1.0,
+        "support_nelbo_tau": 1.0,
+        "support_seeds": [17],
+        "support_size": 32,
+        "support_size_diagnostics": [8, 16, 64],
+        "synthetic_per_class_total": 128,
+        "tau_diagnostics": [0.5, 2.0],
+        "variance_floor": 1.0e-5,
+    }
     assert any(row["prior_method"] == PRIMARY_SUPPORT_RELIABILITY_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == "decentralized_exported_adaptive_k_source_reliability_weighted_geom_support_eval_reference" for row in matrix)
     assert any(row["prior_method"] == "decentralized_exported_adaptive_k_equal_geom_support_eval_reference" for row in matrix)
@@ -3258,6 +4556,7 @@ def test_decentralized_support8_top3_tau05_gmm_prior_tiny_cache_writes_expected_
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "decentralized_support8_top3_tau05_downstream_matrix.csv", newline="")))
     splits = list(csv.DictReader(open(root / "tables" / "support_eval_split_manifest.csv", newline="")))
     combined_weights = list(csv.DictReader(open(root / "tables" / "combined_weight_manifest.csv", newline="")))
@@ -3272,6 +4571,83 @@ def test_decentralized_support8_top3_tau05_gmm_prior_tiny_cache_writes_expected_
     assert protocol["support_nelbo_tau"] == 0.5
     assert protocol["support_nelbo_uses_unlabeled_target_support_only"] is True
     assert protocol["decision_baselines_recomputed_on_support8_excluded_eval_subset"] is True
+    assert leakage == {
+        "oracle_rows_diagnostic_only": True,
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+        "violations": [],
+    }
+    assert protocol == {
+        "adaptive_k_selection_uses_source_local_fit_statistics_only": True,
+        "claim_boundary": (
+            "bounded support-size-8/top-3/tau-0.5 support-NELBO x reliability composition; no metadata-routing claim, "
+            "no formal privacy claim, no centralized source-union deployability claim, and no general support-NELBO claim"
+        ),
+        "context_support32_rows_decision_excluded": True,
+        "decision_baselines_recomputed_on_support8_excluded_eval_subset": True,
+        "experiment_name": "virchow2_cvae_decentralized_support8_top3_tau05_gmm_prior_v1",
+        "experiment_type": "locked_support8_top3_tau05_target_conditioned_support_nelbo_x_reliability_composition",
+        "exported_source_summaries_are_target_agnostic": True,
+        "oracle_rows_diagnostic_only": True,
+        "primary_method": "decentralized_support8_top3_tau05_support_nelbo_x_reliability_geom",
+        "primary_variant": "pca64_beta001",
+        "protocol_wording": SUPPORT8_TOP3_TAU05_PROTOCOL_WORDING,
+        "raw_source_embedding_pooling_for_prior_fit": False,
+        "schema_version": "cvae_rebuild_decentralized_support8_top3_tau05_protocol_manifest_v1",
+        "source_reliability_uses_source_local_eval_only": True,
+        "support_eval_disjoint": True,
+        "support_nelbo_tau": 0.5,
+        "support_nelbo_uses_unlabeled_target_support_only": True,
+        "support_size": 8,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+        "top_k_sources": 3,
+    }
+    assert resolved == {
+        "align_support_and_generation_seed": True,
+        "artifact_root": str(cfg.artifact_root),
+        "backbone": "virchow2",
+        "candidate_components_per_source_class": [4, 3, 2, 1],
+        "classifier": {
+            "C": 1.0,
+            "class_weight": "balanced",
+            "classifier_seed": None,
+            "max_iter": 2000,
+            "solver": "lbfgs",
+            "type": "sklearn_logistic_regression",
+        },
+        "d1_3_artifact_root": str(cfg.d1_3_artifact_root),
+        "experiment_seeds": [42],
+        "feature_cache_root": str(cfg.feature_cache_root),
+        "gmm_covariance_type": "diag",
+        "gmm_max_iter": 100,
+        "gmm_n_init": 1,
+        "gmm_reg_covar": 0.0001,
+        "heldout_centers": ["0", "1", "2", "3", "4"],
+        "min_component_weight": 0.001,
+        "min_per_source_per_class": 8,
+        "min_samples_per_component": 12,
+        "name": "virchow2_cvae_decentralized_support8_top3_tau05_gmm_prior_v1",
+        "primary_method": "decentralized_support8_top3_tau05_support_nelbo_x_reliability_geom",
+        "primary_pooling": "weighted_geometric",
+        "primary_variant": "pca64_beta001",
+        "reliability_alpha": 1.0,
+        "reliability_floor_score": 0.05,
+        "repair_artifact_root": str(cfg.repair_artifact_root),
+        "replicate_seeds": [17],
+        "source_weighting": "support_nelbo_x_source_local_reliability_top3",
+        "support_alpha": 1.0,
+        "support_nelbo_tau": 0.5,
+        "support_seeds": [17],
+        "support_size": 8,
+        "synthetic_per_class_total": 128,
+        "top_k_sources": 3,
+        "variance_floor": 1.0e-5,
+    }
     assert any(row["prior_method"] == PRIMARY_SUPPORT8_TOP3_TAU05_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == "decentralized_support8_d1_2_reliability_all4_geom_reference" for row in matrix)
     assert any(row["prior_method"] == "decentralized_support8_equal_all4_geom_reference" for row in matrix)
@@ -3362,6 +4738,8 @@ def test_source_union_k24_gmm_prior_tiny_cache_writes_expected_artifacts(tmp_pat
         assert (root / rel).exists()
 
     leakage = json.loads((root / "reports" / "leakage_report.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "manifests" / "protocol_manifest.json").read_text(encoding="utf-8"))
+    resolved = json.loads((root / "run_config_resolved.yaml").read_text(encoding="utf-8"))
     matrix = list(csv.DictReader(open(root / "tables" / "k24_gmm_downstream_matrix.csv", newline="")))
     summary = list(csv.DictReader(open(root / "tables" / "source_union_k24_gmm_summary.csv", newline="")))
     coverage = list(csv.DictReader(open(root / "tables" / "generated_component_coverage_audit.csv", newline="")))
@@ -3369,6 +4747,71 @@ def test_source_union_k24_gmm_prior_tiny_cache_writes_expected_artifacts(tmp_pat
     report = (root / "reports" / "decision_summary.md").read_text(encoding="utf-8")
 
     assert leakage["status"] == "PASS"
+    assert leakage == {
+        "oracle_rows_diagnostic_only": True,
+        "schema_version": "cvae_rebuild_leakage_report_v1",
+        "status": "PASS",
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+        "violations": [],
+    }
+    assert protocol == {
+        "adaptive_locked_followup": True,
+        "claim_boundary": (
+            "source-union sampled-feature utility diagnostic only; no routing, support-NELBO, "
+            "decentralized per-source expert selection, top-k composition, or formal privacy claim"
+        ),
+        "experiment_name": "virchow2_cvae_source_union_k24_gmm_prior_v1",
+        "experiment_type": "source_union_k24_gmm_prior_locked_followup_diagnostic",
+        "primary_method": PRIMARY_K24_GMM_METHOD,
+        "primary_population_does_not_filter_on_variant_real_budget_bacc": True,
+        "primary_variant": "source_union_pca64_beta001_diagnostic",
+        "schema_version": "cvae_rebuild_source_union_k24_gmm_prior_protocol_manifest_v1",
+        "source_union_only_not_decentralized_expert_selection": True,
+        "target_eval_labels_for_scoring_only": True,
+        "target_expert_excluded": True,
+        "target_support_labels_for_selection": False,
+    }
+    assert resolved == {
+        "experiment": {
+            "artifact_root": str(cfg.artifact_root),
+            "name": "virchow2_cvae_source_union_k24_gmm_prior_v1",
+            "primary_method": PRIMARY_K24_GMM_METHOD,
+            "primary_variant": "source_union_pca64_beta001_diagnostic",
+        },
+        "generation": {
+            "budget256_synthetic_per_class_total": 256,
+            "synthetic_per_class_total": 128,
+        },
+        "inputs": {
+            "balanced_gmm_artifact_root": str(cfg.balanced_gmm_artifact_root),
+            "covariance_confirmation_artifact_root": str(cfg.covariance_confirmation_artifact_root),
+            "feature_cache_root": str(cfg.feature_cache_root),
+            "prior_calibration_artifact_root": str(cfg.prior_calibration_artifact_root),
+            "repair_artifact_root": str(cfg.repair_artifact_root),
+            "sampling_artifact_root": str(cfg.sampling_artifact_root),
+            "source_union_gmm_artifact_root": str(cfg.source_union_gmm_artifact_root),
+        },
+        "k24_gmm_prior": {
+            "diagnostic_gmm_components": [20, 32],
+            "gmm_components": 24,
+            "gmm_covariance_type": "diag",
+            "gmm_max_iter": 200,
+            "gmm_n_init": 2,
+            "gmm_reg_covar": 0.0001,
+            "gmm_weight_floor": 0.005,
+            "min_class_train_count": 24,
+            "min_effective_gmm_components": 1,
+            "min_train_count_per_effective_component": 1,
+            "posterior_noise_scale": 0.0,
+        },
+        "run_matrix": {
+            "experiment_seeds": [42],
+            "heldout_centers": ["0", "1", "2"],
+            "replicate_seeds": [17],
+        },
+    }
     assert any(row["prior_method"] == PRIMARY_K24_GMM_METHOD and row["selection_source"] == "primary" for row in matrix)
     assert any(row["prior_method"] == "source_union_cc_diag_gmm_k16_prior_sample_reference" for row in matrix)
     assert any(row["prior_method"] == "source_union_center_balanced_cc_diag_gmm_k16_prior_sample_reference" for row in matrix)
@@ -3405,6 +4848,46 @@ def test_source_union_k24_gmm_prior_config_rejects_noncanonical_primary(tmp_path
 
     with pytest.raises(Exception, match="primary_method"):
         parse_source_union_k24_gmm_prior_config(payload, base_dir=tmp_path)
+
+
+def test_source_union_k24_gmm_prior_validates_expected_imported_artifact_payload(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cfg = _tiny_source_union_k24_gmm_config(
+        tmp_path,
+        tmp_path / "repair",
+        tmp_path / "sampling",
+        tmp_path / "prior",
+        tmp_path / "virchow2_cvae_covariance_prior_confirmation_v1",
+        tmp_path / "virchow2_cvae_source_union_gmm_prior_v1",
+        tmp_path / "virchow2_cvae_source_union_center_balanced_gmm_prior_v1",
+    )
+    captured: dict[str, object] = {}
+
+    def fake_validate_imported_artifacts(required, *, missing_message: str) -> None:
+        captured["required"] = tuple(required)
+        captured["missing_message"] = missing_message
+
+    monkeypatch.setattr(
+        source_union_k24_gmm_prior,
+        "validate_imported_artifacts",
+        fake_validate_imported_artifacts,
+    )
+
+    _validate_source_union_k24_gmm_imports(cfg)
+
+    assert captured == {
+        "required": (
+            cfg.sampling_artifact_root / "reports" / "leakage_report.json",
+            cfg.prior_calibration_artifact_root / "reports" / "leakage_report.json",
+            cfg.covariance_confirmation_artifact_root / "reports" / "leakage_report.json",
+            cfg.source_union_gmm_artifact_root / "reports" / "leakage_report.json",
+            cfg.source_union_gmm_artifact_root / "tables" / "gmm_prior_gap_summary.csv",
+            cfg.balanced_gmm_artifact_root / "reports" / "leakage_report.json",
+            cfg.balanced_gmm_artifact_root / "tables" / "balanced_gmm_gap_summary.csv",
+        ),
+        "missing_message": "Missing imported K24 GMM reference artifacts: {missing}",
+    }
 
 
 def test_source_union_k24_gmm_prior_mono_class_target_eval_is_target_eval_insufficient(tmp_path: Path) -> None:
@@ -3450,1988 +4933,3 @@ def test_source_union_k24_gmm_prior_mono_class_target_eval_is_target_eval_insuff
         and row["error_message"] == "mono_class_target_eval"
         for row in matrix
     )
-
-
-def _tiny_config(tmp_path: Path):
-    return parse_config(
-        {
-            "experiment": {
-                "name": "target_support32_calibrated_unlabeled_marginal_nelbo_top2_geom_virchow2_cvae_pca256_v1",
-                "artifact_root": str(tmp_path / "artifacts"),
-                "primary_method": "support_nelbo_top2_geom",
-            },
-            "inputs": {
-                "feature_cache_root": str(tmp_path / "cache" / "virchow2"),
-                "backbone": "virchow2",
-            },
-            "run_matrix": {
-                "experiment_seeds": [42],
-                "heldout_centers": ["0", "1", "2", "3", "4"],
-                "support_size": 32,
-                "support_seeds": [17],
-                "generation_seeds": [17],
-                "classifier_seeds": [17],
-                "candidate_count_per_cell": 4,
-            },
-            "feature_frame": {"pca_dim": 256, "fit_scope": "per_expert_source_train"},
-            "model": {
-                "hidden_dim": 512,
-                "latent_dim": 64,
-                "num_hidden_layers": 2,
-                "train_epochs": 1,
-                "batch_size": 16,
-                "learning_rate": 0.001,
-                "class_conditioning": "encoder_decoder_one_hot",
-            },
-            "routing": {
-                "primary_score": "calibrated_marginal_support_nelbo",
-                "support_sampler": "random_unlabeled_sample_ids",
-            },
-            "generation": {
-                "mode": "class_stratified_reference_posterior",
-                "synthetic_per_class_total": 128,
-            },
-            "downstream": {
-                "classifier": "sklearn_logistic_regression",
-                "aggregation": "geometric_probability_pooling",
-                "eps": 1e-12,
-            },
-        },
-        base_dir=tmp_path,
-    )
-
-
-def _tiny_preservation_config(tmp_path: Path):
-    return parse_preservation_config(
-        {
-            "experiment": {
-                "name": "virchow2_cvae_preservation_diagnosis_v1",
-                "artifact_root": str(tmp_path / "preservation_artifacts"),
-            },
-            "inputs": {
-                "feature_cache_root": str(tmp_path / "preservation_cache" / "virchow2"),
-                "backbone": "virchow2",
-            },
-            "run_matrix": {
-                "experiment_seeds": [42],
-                "heldout_centers": ["0", "1", "2", "3", "4"],
-                "replicate_seeds": [17],
-                "candidate_count_per_cell": 4,
-            },
-            "feature_frame": {"pca_dim": 256, "fit_scope": "per_expert_source_train"},
-            "model": {
-                "hidden_dim": 512,
-                "latent_dim": 64,
-                "num_hidden_layers": 2,
-                "train_epochs": 1,
-                "batch_size": 16,
-                "learning_rate": 0.001,
-                "class_conditioning": "encoder_decoder_one_hot",
-            },
-            "generation": {
-                "synthetic_per_class_total": 128,
-                "class_prior_for_generation": "uniform",
-            },
-            "classifier": {
-                "type": "sklearn_logistic_regression",
-                "solver": "lbfgs",
-                "C": 1.0,
-                "max_iter": 2000,
-                "class_weight": "balanced",
-                "classifier_seed": None,
-            },
-        },
-        base_dir=tmp_path,
-    )
-
-
-def _tiny_repair_config(tmp_path: Path):
-    variants = [
-        ("current_pca200_beta1_reference", "per_source", 256, 64, 1.0, 0.0, "legacy_sum_mse_kl", "reference_only", "adam"),
-        ("pca64_beta001", "per_source", 64, 16, 0.001, 0.0, "normalized_repair", "primary", "adamw"),
-        ("pca128_beta001", "per_source", 128, 32, 0.001, 0.0, "normalized_repair", "diagnostic_only", "adamw"),
-        ("pca64_beta001_probe025", "per_source", 64, 16, 0.001, 0.25, "normalized_repair", "diagnostic_only", "adamw"),
-        ("pca128_beta001_probe025", "per_source", 128, 32, 0.001, 0.25, "normalized_repair", "diagnostic_only", "adamw"),
-        (
-            "source_union_pca64_beta001_diagnostic",
-            "source_union_excluding_target",
-            64,
-            16,
-            0.001,
-            0.0,
-            "normalized_repair",
-            "diagnostic_only",
-            "adamw",
-        ),
-        (
-            "source_union_pca64_beta001_probe025_diagnostic",
-            "source_union_excluding_target",
-            64,
-            16,
-            0.001,
-            0.25,
-            "normalized_repair",
-            "diagnostic_only",
-            "adamw",
-        ),
-    ]
-    return parse_repair_config(
-        {
-            "experiment": {
-                "name": "virchow2_cvae_preservation_repair_v1",
-                "artifact_root": str(tmp_path / "repair_artifacts"),
-                "primary_variant": "pca64_beta001",
-                "min_decision_rows": 1,
-            },
-            "inputs": {
-                "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-                "backbone": "virchow2",
-            },
-            "run_matrix": {
-                "experiment_seeds": [42],
-                "heldout_centers": ["0", "1", "2"],
-                "replicate_seeds": [17],
-            },
-            "generation": {
-                "synthetic_per_class_total": 128,
-            },
-            "classifier": {
-                "type": "sklearn_logistic_regression",
-                "solver": "lbfgs",
-                "C": 1.0,
-                "max_iter": 2000,
-                "class_weight": "balanced",
-                "classifier_seed": None,
-            },
-            "source_probe": {
-                "type": "torch_linear_classifier",
-                "optimizer": "adamw",
-                "learning_rate": 0.001,
-                "weight_decay": 0.0001,
-                "epochs": 1,
-                "batch_size": 16,
-                "class_weight": "balanced",
-                "early_stopping": False,
-            },
-            "variants": [
-                {
-                    "variant_id": variant_id,
-                    "expert_pool_type": pool,
-                    "requested_pca_dim": pca,
-                    "hidden_dim": 512,
-                    "latent_dim": latent,
-                    "num_hidden_layers": 2,
-                    "train_epochs": 1,
-                    "batch_size": 16,
-                    "learning_rate": 0.001,
-                    "optimizer": optimizer,
-                    "weight_decay": 0.0 if optimizer == "adam" else 0.0001,
-                    "gradient_clip_norm": 5.0,
-                    "beta_final": beta,
-                    "kl_warmup_epochs": 1 if variant_id == "current_pca200_beta1_reference" else 2,
-                    "probe_ce_weight": probe,
-                    "loss_style": loss_style,
-                    "selection_source": selection,
-                }
-                for variant_id, pool, pca, latent, beta, probe, loss_style, selection, optimizer in variants
-            ],
-        },
-        base_dir=tmp_path,
-    )
-
-
-def _tiny_sampling_config(tmp_path: Path, repair_root: Path):
-    return parse_sampling_config(_tiny_sampling_payload(tmp_path, repair_root), base_dir=tmp_path)
-
-
-def _tiny_sampling_payload(tmp_path: Path, repair_root: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_pca64_sampling_continuation_v1",
-            "artifact_root": str(tmp_path / "sampling_artifacts"),
-            "primary_variant": "pca64_beta001",
-            "min_decision_cells": 1,
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(repair_root),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2"],
-            "replicate_seeds": [17],
-        },
-        "generation": {
-            "synthetic_per_class_total": 128,
-        },
-        "sampling": {
-            "posterior_temperatures_primary": [1.0],
-            "posterior_temperatures_diagnostic": [0.25, 0.5],
-            "prior_scales_primary": [1.0],
-            "prior_scales_diagnostic": [0.25, 0.5],
-            "empirical_posterior_temperature": 1.0,
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_prior_calibration_config(tmp_path: Path, repair_root: Path, sampling_root: Path):
-    return parse_prior_calibration_config(
-        _tiny_prior_calibration_payload(tmp_path, repair_root, sampling_root),
-        base_dir=tmp_path,
-    )
-
-
-def _tiny_prior_calibration_payload(tmp_path: Path, repair_root: Path, sampling_root: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_latent_prior_calibration_v1",
-            "artifact_root": str(tmp_path / "prior_calibration_artifacts"),
-            "primary_variant": "pca64_beta001",
-            "min_decision_cells": 9,
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(repair_root),
-            "sampling_artifact_root": str(sampling_root),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2"],
-            "replicate_seeds": [17],
-        },
-        "generation": {
-            "synthetic_per_class_total": 128,
-        },
-        "prior_calibration": {
-            "primary_method": "cvae_cc_diag_gaussian_prior_sample",
-            "min_prior_fit_records_per_class": 8,
-            "variance_floor": 1.0e-4,
-            "variance_ddof": 0,
-            "shrinkage_alphas": [0.25, 0.5],
-            "standard_prior_repro_abs_tol_bacc": 1.0,
-            "full_cov_min_records_per_class": 32,
-            "full_cov_shrinkage_alpha": 0.1,
-            "full_cov_eigenvalue_floor": 1.0e-4,
-            "full_cov_fallback_if_singular": "diag",
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_covariance_prior_config(tmp_path: Path, repair_root: Path, sampling_root: Path, prior_root: Path):
-    return parse_covariance_prior_config(
-        _tiny_covariance_prior_payload(tmp_path, repair_root, sampling_root, prior_root),
-        base_dir=tmp_path,
-    )
-
-
-def _tiny_covariance_prior_payload(tmp_path: Path, repair_root: Path, sampling_root: Path, prior_root: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_covariance_prior_confirmation_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_covariance_prior_confirmation_v1"),
-            "primary_variant": "pca64_beta001",
-            "min_decision_cells": 9,
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(repair_root),
-            "sampling_artifact_root": str(sampling_root),
-            "prior_calibration_artifact_root": str(prior_root),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2"],
-            "replicate_seeds": [17],
-        },
-        "generation": {
-            "synthetic_per_class_total": 128,
-        },
-        "covariance_prior": {
-            "primary_method": "cvae_cc_cov_shrinkage_prior_sample",
-            "covariance_shrinkage_alpha": 0.10,
-            "covariance_eigenvalue_floor": 1.0e-4,
-            "full_cov_min_records_per_class": 32,
-            "fallback_if_under_ranked": "diag",
-            "standard_prior_repro_abs_tol_bacc": 1.0,
-            "diag_prior_repro_abs_tol_bacc": 1.0,
-            "full_cov_diagnostic_repro_abs_tol_bacc": 1.0,
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_covariance_viability_config(tmp_path: Path, covariance_root: Path):
-    return parse_covariance_viability_config(
-        _tiny_covariance_viability_payload(tmp_path, covariance_root),
-        base_dir=tmp_path,
-    )
-
-
-def _tiny_covariance_viability_payload(tmp_path: Path, covariance_root: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_covariance_prior_viability_audit_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_covariance_prior_viability_audit_v1"),
-        },
-        "inputs": {
-            "covariance_confirmation_artifact_root": str(covariance_root),
-        },
-        "viability_audit": {
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "min_viable_cells": 30,
-            "min_viable_cells_per_center": 3,
-            "min_viable_seeds_per_center": 2,
-            "high_real_threshold": 0.80,
-            "viable_real_threshold": 0.75,
-            "borderline_real_threshold": 0.65,
-            "global_center_equal_mean_bacc_min": 0.85,
-            "mean_clipped_preservation_gap_max": 0.08,
-            "mean_preservation_ratio_min": 0.92,
-            "seed_std_max": 0.07,
-            "delta_bacc_vs_standard_prior_min": 0.05,
-            "delta_bacc_vs_diag_prior_min": 0.03,
-            "covariance_beats_diag_cell_fraction_min": 0.70,
-            "covariance_beats_diag_center_fraction_min": 0.75,
-            "worst_delta_vs_diag_prior_min": -0.05,
-            "min_cell_bacc_min": 0.60,
-            "min_center_mean_bacc_min": 0.75,
-        },
-    }
-
-
-def _tiny_covariance_shrinkage_config(
-    tmp_path: Path,
-    repair_root: Path,
-    sampling_root: Path,
-    prior_root: Path,
-    covariance_root: Path,
-    viability_root: Path,
-):
-    return parse_covariance_shrinkage_config(
-        _tiny_covariance_shrinkage_payload(tmp_path, repair_root, sampling_root, prior_root, covariance_root, viability_root),
-        base_dir=tmp_path,
-    )
-
-
-def _tiny_covariance_shrinkage_payload(
-    tmp_path: Path,
-    repair_root: Path,
-    sampling_root: Path,
-    prior_root: Path,
-    covariance_root: Path,
-    viability_root: Path,
-):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_covariance_shrinkage_stability_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_covariance_shrinkage_stability_v1"),
-            "primary_variant": "pca64_beta001",
-            "min_decision_cells": 9,
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(repair_root),
-            "sampling_artifact_root": str(sampling_root),
-            "prior_calibration_artifact_root": str(prior_root),
-            "covariance_confirmation_artifact_root": str(covariance_root),
-            "covariance_viability_artifact_root": str(viability_root),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2"],
-            "replicate_seeds": [17],
-        },
-        "generation": {
-            "synthetic_per_class_total": 128,
-        },
-        "covariance_shrinkage": {
-            "primary_method": "cvae_cc_cov_diag_shrinkage075_prior_sample",
-            "primary_covariance_shrinkage_alpha": 0.75,
-            "diagnostic_covariance_shrinkage_alphas": [0.50, 0.90],
-            "reference_covariance_shrinkage_alpha": 0.10,
-            "diagonal_reference_alpha": 1.00,
-            "covariance_eigenvalue_floor": 1.0e-4,
-            "full_cov_min_records_per_class": 32,
-            "fallback_if_under_ranked": "diag",
-            "standard_prior_repro_abs_tol_bacc": 1.0,
-            "diag_prior_repro_abs_tol_bacc": 1.0,
-            "alpha010_repro_abs_tol_bacc": 1.0,
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_source_union_gmm_config(
-    tmp_path: Path,
-    repair_root: Path,
-    sampling_root: Path,
-    prior_root: Path,
-    covariance_root: Path,
-):
-    return parse_source_union_gmm_prior_config(
-        _tiny_source_union_gmm_payload(tmp_path, repair_root, sampling_root, prior_root, covariance_root),
-        base_dir=tmp_path,
-    )
-
-
-def _tiny_source_union_gmm_payload(
-    tmp_path: Path,
-    repair_root: Path,
-    sampling_root: Path,
-    prior_root: Path,
-    covariance_root: Path,
-):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_source_union_gmm_prior_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_source_union_gmm_prior_v1"),
-            "primary_variant": "source_union_pca64_beta001_diagnostic",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(repair_root),
-            "sampling_artifact_root": str(sampling_root),
-            "prior_calibration_artifact_root": str(prior_root),
-            "covariance_confirmation_artifact_root": str(covariance_root),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2"],
-            "replicate_seeds": [17],
-        },
-        "generation": {
-            "synthetic_per_class_total": 128,
-        },
-        "gmm_prior": {
-            "primary_method": "source_union_cc_diag_gmm_k8_prior_sample",
-            "gmm_components": 8,
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 2,
-            "gmm_max_iter": 200,
-            "gmm_weight_floor": 0.01,
-            "min_class_train_count": 8,
-            "min_effective_gmm_components": 1,
-            "posterior_noise_scale": 0.0,
-            "diagnostic_gmm_components": [4, 16],
-            "diagnostic_posterior_noise_scales": [0.25],
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_source_union_balanced_gmm_config(
-    tmp_path: Path,
-    repair_root: Path,
-    sampling_root: Path,
-    prior_root: Path,
-    covariance_root: Path,
-    source_union_gmm_root: Path,
-):
-    return parse_source_union_balanced_gmm_prior_config(
-        _tiny_source_union_balanced_gmm_payload(
-            tmp_path,
-            repair_root,
-            sampling_root,
-            prior_root,
-            covariance_root,
-            source_union_gmm_root,
-        ),
-        base_dir=tmp_path,
-    )
-
-
-def _tiny_source_union_balanced_gmm_payload(
-    tmp_path: Path,
-    repair_root: Path,
-    sampling_root: Path,
-    prior_root: Path,
-    covariance_root: Path,
-    source_union_gmm_root: Path,
-):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_source_union_center_balanced_gmm_prior_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_source_union_center_balanced_gmm_prior_v1"),
-            "primary_variant": "source_union_pca64_beta001_diagnostic",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(repair_root),
-            "sampling_artifact_root": str(sampling_root),
-            "prior_calibration_artifact_root": str(prior_root),
-            "covariance_confirmation_artifact_root": str(covariance_root),
-            "source_union_gmm_artifact_root": str(source_union_gmm_root),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2"],
-            "replicate_seeds": [17],
-        },
-        "generation": {
-            "synthetic_per_class_total": 128,
-        },
-        "balanced_gmm_prior": {
-            "primary_method": "source_union_center_balanced_cc_diag_gmm_k16_prior_sample",
-            "gmm_components": 16,
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 2,
-            "gmm_max_iter": 200,
-            "gmm_weight_floor": 0.005,
-            "min_source_center_class_count": 8,
-            "min_effective_gmm_components": 1,
-            "balanced_fit_samples_per_center_class": 8,
-            "max_center_class_replacement_rate": 1.0,
-            "mean_center_class_replacement_rate": 1.0,
-            "posterior_noise_scale": 0.0,
-            "diagnostic_gmm_components": [8, 24],
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_decentralized_k16_gmm_payload(tmp_path: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_decentralized_k16_gmm_prior_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_decentralized_k16_gmm_prior_v1"),
-            "primary_variant": "pca64_beta001",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
-            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
-            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "replicate_seeds": [17],
-        },
-        "generation": {
-            "synthetic_per_class_total": 128,
-        },
-        "decentralized_k16_prior": {
-            "primary_method": "decentralized_exported_k4x4_cc_diag_gmm_k16_late_geom",
-            "local_gmm_components_per_source_class": 4,
-            "composed_components_per_class": 16,
-            "source_weighting": "equal_source_mass",
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 1,
-            "gmm_max_iter": 100,
-            "min_count_for_k4": 8,
-            "min_component_weight": 0.001,
-            "variance_floor": 1.0e-5,
-            "primary_pooling": "geometric",
-        },
-        "support_nelbo_diagnostic": {
-            "enabled": False,
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_decentralized_adaptive_gmm_payload(tmp_path: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_decentralized_adaptive_gmm_prior_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_decentralized_adaptive_gmm_prior_v1"),
-            "primary_variant": "pca64_beta001",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
-            "strict_d1_artifact_root": str(tmp_path / "missing_decentralized_k16"),
-            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
-            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "replicate_seeds": [17],
-        },
-        "generation": {
-            "synthetic_per_class_total": 128,
-        },
-        "adaptive_gmm_prior": {
-            "primary_method": "decentralized_exported_adaptive_k_cc_diag_gmm_late_geom",
-            "bic_method": "decentralized_exported_bic_selected_cc_diag_gmm_late_geom",
-            "candidate_components_per_source_class": [4, 3, 2, 1],
-            "min_samples_per_component": 12,
-            "source_weighting": "equal_source_mass",
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 1,
-            "gmm_max_iter": 100,
-            "min_component_weight": 0.001,
-            "variance_floor": 1.0e-5,
-            "primary_pooling": "geometric",
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_decentralized_reliability_weighted_gmm_payload(tmp_path: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_decentralized_reliability_weighted_gmm_prior_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_decentralized_reliability_weighted_gmm_prior_v1"),
-            "primary_variant": "pca64_beta001",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
-            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
-            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "replicate_seeds": [17],
-        },
-        "generation": {
-            "synthetic_per_class_total": 128,
-            "min_per_source_per_class": 8,
-        },
-        "reliability_weighted_gmm_prior": {
-            "primary_method": "decentralized_exported_adaptive_k_source_reliability_weighted_geom",
-            "candidate_components_per_source_class": [4, 3, 2, 1],
-            "min_samples_per_component": 12,
-            "source_weighting": "source_local_reliability",
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 1,
-            "gmm_max_iter": 100,
-            "min_component_weight": 0.001,
-            "variance_floor": 1.0e-5,
-            "primary_pooling": "weighted_geometric",
-            "reliability_floor_score": 0.05,
-            "softmax_tau": 1.0,
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_decentralized_component_union_payload(tmp_path: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_decentralized_component_union_prior_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_decentralized_component_union_prior_v1"),
-            "primary_variant": "pca64_beta001",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
-            "d1_2_artifact_root": str(tmp_path / "missing_d1_2"),
-            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
-            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "replicate_seeds": [17],
-        },
-        "generation": {
-            "synthetic_per_class_total": 128,
-            "budget_diagnostic_per_class_total": 256,
-            "min_per_source_per_class": 8,
-        },
-        "component_union_prior": {
-            "primary_method": "decentralized_component_union_uniform_gmm",
-            "candidate_components_per_source_class": [4, 3, 2, 1],
-            "min_samples_per_component": 12,
-            "source_weighting": "uniform_source_component_union",
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 1,
-            "gmm_max_iter": 100,
-            "min_component_weight": 0.02,
-            "variance_floor": 1.0e-5,
-            "variance_ceiling_multiplier": 16.0,
-            "primary_pooling": "pooled_raw_logistic",
-            "reliability_floor_score": 0.05,
-            "shrink_lambdas": [0.25, 0.5],
-            "prototype_candidate_counts_per_source_class": [4, 3, 2, 1],
-            "prototype_min_samples_per_component": 12,
-            "prototype_variance_floor": 1.0e-5,
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_support_calibrated_component_union_payload(tmp_path: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_support8_calibrated_component_union_prior_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_support8_calibrated_component_union_prior_v1"),
-            "primary_variant": "pca64_beta001",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
-            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
-            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "strict_full_run_matrix": False,
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "replicate_seeds": [17],
-            "support_seeds": [17],
-            "support_size": 8,
-            "support_size_diagnostics": [16, 32],
-            "nested_support_max_size": 32,
-        },
-        "generation": {
-            "synthetic_per_class_total": 32,
-            "min_per_source_per_class": 2,
-        },
-        "support_calibrated_component_union_prior": {
-            "primary_method": "support8_calibrated_component_union_softmax_shrink050",
-            "candidate_components_per_source_class": [4, 3, 2, 1],
-            "min_samples_per_component": 12,
-            "source_weighting": "support_calibrated_component_union_softmax_shrink050",
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 1,
-            "gmm_max_iter": 100,
-            "min_component_weight": 0.02,
-            "variance_floor": 1.0e-5,
-            "variance_ceiling_multiplier": 16.0,
-            "primary_pooling": "pooled_raw_logistic",
-            "support_nelbo_tau": 1.0,
-            "support_shrink_lambda": 0.5,
-            "reliability_floor_score": 0.05,
-            "shrink_lambdas": [0.25, 0.5],
-            "matched_shuffled_support_null_permutations": 2,
-            "random_mass_bag_control_size": 3,
-            "anchor_repro_tolerance": 1.0e-4,
-            "prototype_candidate_counts_per_source_class": [4, 3, 2, 1],
-            "prototype_min_samples_per_component": 12,
-            "prototype_variance_floor": 1.0e-5,
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_target_support_regime_risk_gate_payload(tmp_path: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_target_support32_regime_risk_gated_component_union_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_target_support32_regime_risk_gated_component_union_v1"),
-            "primary_variant": "pca64_beta001",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
-            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
-            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "strict_full_run_matrix": False,
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "support_seeds": [17],
-            "support_size": 32,
-            "support_size_diagnostics": [8, 16],
-            "nested_support_max_size": 32,
-        },
-        "generation": {
-            "synthetic_per_class_total": 32,
-            "min_per_source_per_class": 2,
-        },
-        "target_support_regime_risk_gate": {
-            "primary_method": "target_support32_regime_risk_gated_random_bag_tail_safe_policy_v1",
-            "candidate_components_per_source_class": [4, 3, 2, 1],
-            "min_samples_per_component": 2,
-            "source_weighting": "target_support32_regime_risk_policy_gate",
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 1,
-            "gmm_max_iter": 100,
-            "min_component_weight": 0.02,
-            "variance_floor": 1.0e-5,
-            "variance_ceiling_multiplier": 16.0,
-            "primary_pooling": "policy_level_gate",
-            "reliability_floor_score": 0.05,
-            "reliability_epsilon": 1.0e-8,
-            "support_nelbo_tau": 1.0,
-            "random_mass_bag_size": 3,
-            "random_mass_bag_alpha": 4.0,
-            "risk_low_threshold": 0.60,
-            "risk_high_threshold": 0.75,
-            "threshold_sensitivity_pairs": [[0.50, 0.70], [0.60, 0.75], [0.70, 0.85]],
-            "min_gate_train_episodes": 8,
-            "tail_risk_bacc_threshold": 0.80,
-            "safer_policy_gain_threshold": 0.025,
-            "gate_c": 0.25,
-            "reconstruction_probability_tolerance": 1.0e-6,
-        },
-        "memory": {
-            "skip_nearest_neighbor_audit": True,
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_labeled_support_policy_calibration_payload(tmp_path: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_labeled_support16_random_vs_dense_policy_calibration_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_labeled_support16_random_vs_dense_policy_calibration_v1"),
-            "primary_variant": "pca64_beta001",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
-            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
-            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "strict_full_run_matrix": False,
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "support_seeds": [17],
-            "primary_labeled_support_size": 16,
-            "diagnostic_labeled_support_sizes": [8, 32],
-            "nested_support_max_size": 32,
-        },
-        "generation": {
-            "synthetic_per_class_total": 32,
-            "min_per_source_per_class": 2,
-        },
-        "labeled_support_policy_calibration": {
-            "primary_method": "labeled_support16_random_default_dense_switch_v1",
-            "candidate_components_per_source_class": [4, 3, 2, 1],
-            "min_samples_per_component": 2,
-            "source_weighting": "labeled_support16_random_default_dense_switch",
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 1,
-            "gmm_max_iter": 100,
-            "min_component_weight": 0.02,
-            "variance_floor": 1.0e-5,
-            "variance_ceiling_multiplier": 16.0,
-            "primary_pooling": "labeled_support_random_default_dense_switch",
-            "reliability_floor_score": 0.05,
-            "reliability_epsilon": 1.0e-8,
-            "random_mass_bag_size": 3,
-            "random_mass_bag_alpha": 4.0,
-            "primary_switch_quantum": 0.0625,
-            "support_quantum_by_size": {8: 0.125, 16: 0.0625, 32: 0.03125},
-        },
-        "memory": {
-            "skip_nearest_neighbor_audit": True,
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_source_inner_validated_hybrid_payload(tmp_path: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_source_inner_validated_dense_component_hybrid_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_source_inner_validated_dense_component_hybrid_v1"),
-            "primary_variant": "pca64_beta001",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
-            "d1_2_artifact_root": str(tmp_path / "missing_d1_2"),
-            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
-            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "strict_full_run_matrix": False,
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "replicate_seeds": [17],
-        },
-        "generation": {
-            "synthetic_per_class_total": 128,
-            "min_per_source_per_class": 8,
-        },
-        "source_inner_validated_dense_component_hybrid": {
-            "primary_method": "source_inner_validated_dense_component_binary_gate",
-            "candidate_components_per_source_class": [4, 3, 2, 1],
-            "min_samples_per_component": 12,
-            "source_weighting": "source_inner_validated_dense_component_binary_gate",
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 1,
-            "gmm_max_iter": 100,
-            "min_component_weight": 0.02,
-            "variance_floor": 1.0e-5,
-            "variance_ceiling_multiplier": 16.0,
-            "primary_pooling": "binary_gate",
-            "reliability_floor_score": 0.05,
-            "reliability_epsilon": 1.0e-8,
-            "component_shrink_lambda": 0.25,
-            "matched_shuffled_gate_null_permutations": 2,
-            "gate_mean_gain_min": 0.005,
-            "gate_min_degradation_floor": -0.005,
-            "gate_std_increase_max": 0.015,
-            "gate_abs_ablation_ceiling": 0.15,
-            "gate_abs_ablation_slack": 0.05,
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_mass_bagged_component_union_payload(tmp_path: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_decentralized_component_union_mass_bagged_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_decentralized_component_union_mass_bagged_v1"),
-            "primary_variant": "pca64_beta001",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
-            "paired_dense_artifact_root": str(tmp_path / "missing_paired_dense"),
-            "component_union_v2_artifact_root": str(tmp_path / "missing_component_union_v2"),
-            "hybrid_artifact_root": str(tmp_path / "missing_hybrid"),
-            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
-            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "strict_full_run_matrix": False,
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "replicate_seeds": [17],
-        },
-        "generation": {
-            "synthetic_per_class_total": 32,
-            "min_per_source_per_class": 2,
-        },
-        "mass_bagged_component_union": {
-            "primary_method": "decentralized_component_union_mass_uncertainty_bagged_v1",
-            "primary_bag_members": [
-                "uniform_source_mass",
-                "reliability_shrink_0.25",
-                "reliability_shrink_0.50",
-                "dirichlet_uniform_alpha4_perm000",
-            ],
-            "control_bag_size": 2,
-            "candidate_components_per_source_class": [4, 3, 2, 1],
-            "min_samples_per_component": 2,
-            "source_weighting": "mass_uncertainty_bagged_source_component_union",
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 1,
-            "gmm_max_iter": 100,
-            "min_component_weight": 0.02,
-            "variance_floor": 1.0e-5,
-            "variance_ceiling_multiplier": 16.0,
-            "primary_pooling": "arithmetic_probability_ensemble",
-            "reliability_floor_score": 0.05,
-            "reliability_epsilon": 1.0e-8,
-            "shrink_lambdas": [0.25, 0.5],
-            "anchor_repro_tolerance": 1.0e-4,
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_tailrisk_anchored_component_union_payload(tmp_path: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_component_union_tailrisk_anchored_mass_bagged_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_component_union_tailrisk_anchored_mass_bagged_v1"),
-            "primary_variant": "pca64_beta001",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
-            "paired_dense_artifact_root": str(tmp_path / "missing_paired_dense"),
-            "mass_bagged_artifact_root": str(tmp_path / "missing_mass_bagged"),
-            "support_calibrated_artifact_root": str(tmp_path / "missing_support_calibrated"),
-            "shrink050_artifact_root": str(tmp_path / "missing_shrink050"),
-            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
-            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "strict_full_run_matrix": False,
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "replicate_seeds": [17],
-            "fresh_replicate_seeds": [101],
-        },
-        "generation": {
-            "synthetic_per_class_total": 32,
-            "min_per_source_per_class": 2,
-        },
-        "tailrisk_anchored_component_union": {
-            "primary_method": "component_union_tailrisk_anchored_shrink050_random_mass_bag_blend050",
-            "primary_shrink_lambda": 0.5,
-            "random_mass_bag_size": 3,
-            "random_mass_bag_alpha": 4.0,
-            "blend_alpha": 0.5,
-            "matched_shuffled_reliability_null_permutations": 2,
-            "candidate_components_per_source_class": [4, 3, 2, 1],
-            "min_samples_per_component": 2,
-            "source_weighting": "tailrisk_anchored_shrink050_random_mass_bag_blend050",
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 1,
-            "gmm_max_iter": 100,
-            "min_component_weight": 0.02,
-            "variance_floor": 1.0e-5,
-            "variance_ceiling_multiplier": 16.0,
-            "primary_pooling": "fixed_arithmetic_probability_blend",
-            "reliability_floor_score": 0.05,
-            "reliability_epsilon": 1.0e-8,
-            "anchor_repro_tolerance": 1.0e-4,
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_multipanel_tailrisk_component_union_payload(tmp_path: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1"),
-            "primary_variant": "pca64_beta001",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
-            "paired_dense_artifact_root": str(tmp_path / "missing_paired_dense"),
-            "mass_bagged_artifact_root": str(tmp_path / "missing_mass_bagged"),
-            "shrink050_artifact_root": str(tmp_path / "missing_shrink050"),
-            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
-            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
-            "prior_tailrisk_artifact_root": str(tmp_path / "prior_tailrisk"),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "strict_full_run_matrix": False,
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "replicate_seeds": [17, 23, 31],
-            "fresh_replicate_seeds": [101, 103, 107, 109, 113, 127],
-        },
-        "generation": {
-            "synthetic_per_class_total": 32,
-            "min_per_source_per_class": 2,
-        },
-        "tailrisk_multipanel_component_union": {
-            "primary_method": "component_union_tailrisk_multipanel_shrink050_random_mass_bag_blend050",
-            "primary_shrink_lambda": 0.5,
-            "random_mass_bag_size": 2,
-            "random_mass_bag_alpha": 4.0,
-            "blend_alpha": 0.5,
-            "matched_shuffled_reliability_null_permutations": 0,
-            "panel_seed_groups": {
-                "canonical": [17, 23, 31],
-                "fresh_a": [101, 103, 107],
-                "fresh_b": [109, 113, 127],
-            },
-            "candidate_components_per_source_class": [4, 3, 2, 1],
-            "min_samples_per_component": 2,
-            "source_weighting": "tailrisk_multipanel_shrink050_random_mass_bag_blend050",
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 1,
-            "gmm_max_iter": 100,
-            "min_component_weight": 0.02,
-            "variance_floor": 1.0e-5,
-            "variance_ceiling_multiplier": 16.0,
-            "primary_pooling": "seed_blend_then_equal_probability_pool",
-            "reliability_floor_score": 0.05,
-            "reliability_epsilon": 1.0e-8,
-            "anchor_repro_tolerance": 1.0e-4,
-            "primary_noninferiority_margin": 0.005,
-            "weak_pass_noninferiority_margin": 0.010,
-            "tailrisk_transfer_threshold": -0.010,
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_source_inner_positive_union_payload(tmp_path: Path):
-    payload = _tiny_multipanel_tailrisk_component_union_payload(tmp_path)
-    payload["experiment"]["name"] = "virchow2_cvae_source_inner_class_conditional_positive_union_v1"
-    payload["experiment"]["artifact_root"] = str(tmp_path / "virchow2_cvae_source_inner_class_conditional_positive_union_v1")
-    section = payload.pop("tailrisk_multipanel_component_union")
-    section.update(
-        {
-            "primary_method": "source_inner_class_conditional_positive_union_v1",
-            "source_weighting": "source_inner_class_conditional_positive_union",
-            "primary_pooling": "source_inner_selected_class_conditional_positive_union",
-            "candidate_pooling_rules": [
-                "arithmetic_mean",
-                "positive_union_beta025",
-                "positive_union_beta050",
-                "positive_union_beta100",
-            ],
-            "positive_label": 1,
-            "prediction_threshold": 0.5,
-            "min_source_inner_positive_count": 5,
-            "positive_union_eps": 1.0e-8,
-            "source_inner_bacc_noninferiority_margin": 0.010,
-            "source_inner_class0_recall_margin": 0.015,
-            "source_inner_predicted_positive_rate_delta": 0.050,
-            "beta100_class0_recall_margin": 0.005,
-            "beta100_precision_margin": 0.010,
-        }
-    )
-    payload["source_inner_class_conditional_positive_union"] = section
-    return payload
-
-
-def _tiny_fixed_beta050_positive_union_payload(tmp_path: Path):
-    payload = _tiny_multipanel_tailrisk_component_union_payload(tmp_path)
-    payload["experiment"]["name"] = "virchow2_cvae_fixed_beta050_positive_union_confirmation_v1"
-    payload["experiment"]["artifact_root"] = str(tmp_path / "virchow2_cvae_fixed_beta050_positive_union_confirmation_v1")
-    payload["inputs"]["development_positive_union_artifact_root"] = str(tmp_path / "virchow2_cvae_source_inner_class_conditional_positive_union_v1")
-    payload["run_matrix"]["experiment_seeds"] = [45]
-    section = payload.pop("tailrisk_multipanel_component_union")
-    section.update(
-        {
-            "primary_method": "fixed_beta050_positive_union_confirmation_v1",
-            "source_weighting": "fixed_beta050_positive_union_confirmation",
-            "primary_pooling": "fixed_global_positive_union_beta050",
-            "candidate_pooling_rules": [
-                "arithmetic_mean",
-                "positive_union_beta025",
-                "positive_union_beta050",
-                "positive_union_beta100",
-            ],
-            "fixed_pooling_rule": "positive_union_beta050",
-            "fixed_beta": 0.5,
-            "development_experiment_seeds": [42, 43, 44],
-            "primary_confirmation_experiment_seeds": [45],
-            "positive_label": 1,
-            "prediction_threshold": 0.5,
-            "min_source_inner_positive_count": 5,
-            "positive_union_eps": 1.0e-8,
-            "rare_positive_count_threshold": 10,
-            "rare_positive_prevalence_threshold": 0.05,
-            "source_inner_bacc_noninferiority_margin": 0.010,
-            "source_inner_class0_recall_margin": 0.015,
-            "source_inner_predicted_positive_rate_delta": 0.050,
-            "beta100_class0_recall_margin": 0.005,
-            "beta100_precision_margin": 0.010,
-        }
-    )
-    payload["fixed_beta050_positive_union_confirmation"] = section
-    return payload
-
-
-def _tiny_harm_gated_positive_union_payload(tmp_path: Path):
-    payload = _tiny_multipanel_tailrisk_component_union_payload(tmp_path)
-    payload["experiment"]["name"] = "virchow2_cvae_source_inner_harm_gated_positive_union_v1"
-    payload["experiment"]["artifact_root"] = str(tmp_path / "virchow2_cvae_source_inner_harm_gated_positive_union_v1")
-    payload["run_matrix"]["experiment_seeds"] = [50, 55]
-    section = payload.pop("tailrisk_multipanel_component_union")
-    section.update(
-        {
-            "primary_method": "source_inner_harm_gated_positive_union_v1",
-            "source_weighting": "source_inner_harm_gated_positive_union",
-            "primary_pooling": "source_inner_harm_gated_positive_union",
-            "candidate_pooling_rules": [
-                "arithmetic_mean",
-                "positive_union_beta025",
-                "positive_union_beta050",
-                "positive_union_beta100",
-            ],
-            "primary_selectable_rules": [
-                "arithmetic_mean",
-                "positive_union_beta025",
-                "positive_union_beta050",
-            ],
-            "beta100_primary_selectable": False,
-            "development_experiment_seeds": [42, 43, 44, 45, 46, 47, 48, 49],
-            "primary_requested_experiment_seeds": [50],
-            "reserve_experiment_seeds": [55],
-            "reserve_seed_policy": "replace_incomplete_primary_seed_whole_seed_lowest_available_reserve",
-            "cell_level_reserve_stitching_allowed": False,
-            "selector_thresholds_frozen_before_primary": True,
-            "selector_threshold_source": "retrospective_development_only",
-            "selector_thresholds_may_be_changed_after_primary": False,
-            "positive_label": 1,
-            "prediction_threshold": 0.5,
-            "min_source_inner_positive_count": 5,
-            "beta050_min_source_inner_positive_count": 10,
-            "positive_union_eps": 1.0e-8,
-            "harm_gate_bacc_noninferiority_margin": 0.005,
-            "beta025_class0_recall_margin": 0.020,
-            "beta025_predicted_positive_rate_delta": 0.040,
-            "beta050_class0_recall_margin": 0.015,
-            "beta050_precision_margin": 0.020,
-            "beta050_predicted_positive_rate_delta": 0.060,
-            "rare_positive_count_threshold": 10,
-            "rare_positive_prevalence_threshold": 0.05,
-            "source_inner_bacc_noninferiority_margin": 0.005,
-            "source_inner_class0_recall_margin": 0.015,
-            "source_inner_predicted_positive_rate_delta": 0.060,
-            "beta100_class0_recall_margin": 0.005,
-            "beta100_precision_margin": 0.010,
-        }
-    )
-    payload["source_inner_harm_gated_positive_union"] = section
-    payload["memory"] = {"skip_nearest_neighbor_audit": True}
-    return payload
-
-
-def _write_tiny_prior_tailrisk_matrix(root: Path | None) -> None:
-    assert root is not None
-    path = root / "tables" / "tailrisk_downstream_matrix.csv"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    centers = ["0", "1", "2", "3", "4"]
-    rows = []
-    for idx, center in enumerate(centers):
-        rows.append(
-            {
-                "experiment_seed": 42,
-                "heldout_center": center,
-                "replicate_seed": 17,
-                "prior_method": PRIMARY_TAILRISK_METHOD,
-                "status": "ok",
-                "bacc": 0.60 + 0.02 * idx,
-                "macro_f1": 0.60 + 0.02 * idx,
-            }
-        )
-    with path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0]))
-        writer.writeheader()
-        writer.writerows(rows)
-
-
-def _tiny_dense_tailshield_random_mass_bag_payload(tmp_path: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1"),
-            "primary_variant": "pca64_beta001",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
-            "paired_dense_artifact_root": str(tmp_path / "missing_paired_dense"),
-            "mass_bagged_artifact_root": str(tmp_path / "missing_mass_bagged"),
-            "shrink050_artifact_root": str(tmp_path / "missing_shrink050"),
-            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
-            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "strict_full_run_matrix": False,
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "replicate_seeds": [17],
-            "fresh_replicate_seeds": [101],
-        },
-        "generation": {
-            "synthetic_per_class_total": 32,
-            "min_per_source_per_class": 2,
-        },
-        "dense_tailshield_random_mass_bag": {
-            "primary_method": "dense_reliability_tailshield_random_mass_bag_blend25_75",
-            "random_mass_bag_size": 3,
-            "random_mass_bag_alpha": 4.0,
-            "dense_blend_alpha": 0.25,
-            "bag_blend_alpha": 0.75,
-            "alpha_curve_dense_values": [0.0, 0.25, 1.0],
-            "reconstruction_probability_tolerance": 1.0e-6,
-            "nontrivial_rescue_threshold": 0.02,
-            "candidate_components_per_source_class": [4, 3, 2, 1],
-            "min_samples_per_component": 2,
-            "source_weighting": "dense_reliability_tailshield_random_mass_bag_blend25_75",
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 1,
-            "gmm_max_iter": 100,
-            "min_component_weight": 0.02,
-            "variance_floor": 1.0e-5,
-            "variance_ceiling_multiplier": 16.0,
-            "primary_pooling": "fixed_arithmetic_probability_blend",
-            "reliability_floor_score": 0.05,
-            "reliability_epsilon": 1.0e-8,
-            "anchor_repro_tolerance": 1.0e-4,
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_harmful_source_suppression_payload(tmp_path: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1"),
-            "primary_variant": "pca64_beta001",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
-            "paired_dense_artifact_root": str(tmp_path / "missing_paired_dense"),
-            "dense_tailshield_artifact_root": str(tmp_path / "missing_dense_tailshield"),
-            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
-            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "strict_full_run_matrix": False,
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "replicate_seeds": [17],
-            "fresh_replicate_seeds": [101],
-        },
-        "generation": {
-            "synthetic_per_class_total": 32,
-            "min_per_source_per_class": 2,
-        },
-        "harmful_source_suppression": {
-            "primary_method": "source_inner_harm_suppressed_random_mass_bag_component_union_v1",
-            "random_mass_bag_size": 3,
-            "random_mass_bag_alpha": 4.0,
-            "dirichlet_total_concentration": 16.0,
-            "candidate_components_per_source_class": [4, 3, 2, 1],
-            "min_samples_per_component": 2,
-            "source_weighting": "source_inner_harm_suppressed_random_mass_bag_component_union",
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 1,
-            "gmm_max_iter": 100,
-            "min_component_weight": 0.02,
-            "variance_floor": 1.0e-5,
-            "variance_ceiling_multiplier": 16.0,
-            "primary_pooling": "arithmetic_probability_ensemble",
-            "reliability_floor_score": 0.05,
-            "reliability_epsilon": 1.0e-8,
-            "anchor_repro_tolerance": 1.0e-4,
-            "min_harmfulness_observations": 6,
-            "moderate_hit_rate_min": 0.50,
-            "moderate_gain_min": 0.015,
-            "moderate_helpful_loss_max": 0.020,
-            "severe_hit_rate_min": 0.75,
-            "severe_gain_min": 0.025,
-            "severe_helpful_loss_max": 0.010,
-            "max_suppressed_sources": 2,
-            "suppression_rate_low": 0.05,
-            "suppression_rate_high": 0.80,
-            "oracle_harm_delta_threshold": 0.02,
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_pruned_adaptive_equal_all4_payload(tmp_path: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_decentralized_pruned_adaptive_equal_all4_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_decentralized_pruned_adaptive_equal_all4_v1"),
-            "primary_variant": "pca64_beta001",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
-            "d1_2_artifact_root": str(tmp_path / "missing_d1_2"),
-            "component_union_artifact_root": str(tmp_path / "missing_component_union"),
-            "source_union_gmm_artifact_root": str(tmp_path / "missing_source_union_gmm"),
-            "balanced_gmm_artifact_root": str(tmp_path / "missing_balanced_gmm"),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "replicate_seeds": [17],
-        },
-        "generation": {
-            "synthetic_per_class_total": 128,
-            "min_per_source_per_class": 8,
-        },
-        "pruned_adaptive_equal_all4_prior": {
-            "primary_method": "decentralized_pruned_adaptive_k_equal_all4_late_geom",
-            "unpruned_fixed_k": 4,
-            "candidate_components_per_source_class": [4, 3, 2, 1],
-            "min_samples_per_component": 12,
-            "source_weighting": "equal_source_mass",
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 1,
-            "gmm_max_iter": 100,
-            "min_component_weight": 0.02,
-            "variance_floor": 1.0e-5,
-            "variance_ceiling_multiplier": 16.0,
-            "primary_pooling": "geometric",
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_paired_dense_all4_reliability_payload(tmp_path: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_paired_dense_all4_reliability_confirmation_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_paired_dense_all4_reliability_confirmation_v1"),
-            "primary_variant": "pca64_beta001",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
-            "d1_2_artifact_root": str(tmp_path / "missing_d1_2_context"),
-            "d1_4_artifact_root": str(tmp_path / "missing_d1_4_context"),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "replicate_seeds": [17],
-        },
-        "generation": {
-            "synthetic_per_class_total": 128,
-            "min_per_source_per_class": 8,
-        },
-        "paired_dense_all4_reliability": {
-            "primary_method": "paired_reliability_all4_shrink050_geom",
-            "candidate_components_per_source_class": [4, 3, 2, 1],
-            "min_samples_per_component": 12,
-            "source_weighting": "heldout_excluded_source_local_reliability_dense_all4",
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 5,
-            "gmm_max_iter": 500,
-            "min_component_weight": 0.02,
-            "variance_floor": 1.0e-5,
-            "reliability_floor_score": 0.05,
-            "reliability_epsilon": 1.0e-8,
-            "shrinkage_values": [0.25, 0.50],
-            "primary_pooling": "weighted_geometric",
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_paired_component_coverage_audit_payload(tmp_path: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_paired_component_coverage_audit_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_paired_component_coverage_audit_v1"),
-            "primary_variant": "pca64_beta001",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
-            "paired_reliability_artifact_root": str(tmp_path / "missing_paired_reliability_context"),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "replicate_seeds": [17],
-        },
-        "generation": {
-            "synthetic_per_class_total": 128,
-            "diagnostic_synthetic_per_class_total": 256,
-            "min_per_source_per_class": 8,
-        },
-        "paired_component_coverage_audit": {
-            "primary_method": "paired_reliability_all4_weighted_component_stratified128_geom",
-            "candidate_components_per_source_class": [4, 3, 2, 1],
-            "min_samples_per_component": 12,
-            "source_weighting": "heldout_excluded_source_local_reliability_dense_all4",
-            "component_sampling_rules": ["multinomial", "stratified_largest_remainder"],
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 5,
-            "gmm_max_iter": 500,
-            "min_component_weight": 0.02,
-            "variance_floor": 1.0e-5,
-            "reliability_floor_score": 0.05,
-            "reliability_epsilon": 1.0e-8,
-            "primary_pooling": "weighted_geometric",
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_decentralized_reliability_top3_gmm_payload(tmp_path: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_decentralized_reliability_top3_gmm_prior_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_decentralized_reliability_top3_gmm_prior_v1"),
-            "primary_variant": "pca64_beta001",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
-            "d1_3_1_artifact_root": str(tmp_path / "missing_d1_3_1_context"),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "replicate_seeds": [17],
-        },
-        "generation": {
-            "synthetic_per_class_total": 128,
-            "min_per_source_per_class": 8,
-            "top_k_sources": 3,
-        },
-        "reliability_top3_gmm_prior": {
-            "primary_method": "decentralized_reliability_top3_geom_confirmation",
-            "candidate_components_per_source_class": [4, 3, 2, 1],
-            "min_samples_per_component": 12,
-            "source_weighting": "source_local_reliability_top3",
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 1,
-            "gmm_max_iter": 100,
-            "min_component_weight": 0.001,
-            "variance_floor": 1.0e-5,
-            "primary_pooling": "geometric",
-            "reliability_floor_score": 0.05,
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_decentralized_source_inner_transfer_top3_gmm_payload(tmp_path: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_decentralized_source_inner_transfer_top3_gmm_prior_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_decentralized_source_inner_transfer_top3_gmm_prior_v1"),
-            "primary_variant": "pca64_beta001",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "replicate_seeds": [17],
-        },
-        "generation": {
-            "synthetic_per_class_total": 128,
-            "min_per_source_per_class": 8,
-            "top_k_sources": 3,
-        },
-        "source_inner_transfer_top3_gmm_prior": {
-            "primary_method": "decentralized_source_inner_transfer_top3_geom_confirmation",
-            "candidate_components_per_source_class": [4, 3, 2, 1],
-            "min_samples_per_component": 12,
-            "source_weighting": "source_inner_transfer_top3",
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 1,
-            "gmm_max_iter": 100,
-            "min_component_weight": 0.001,
-            "variance_floor": 1.0e-5,
-            "primary_pooling": "geometric",
-            "reliability_floor_score": 0.05,
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_decentralized_support_nelbo_reliability_gmm_payload(tmp_path: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_decentralized_support_nelbo_reliability_gmm_prior_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_decentralized_support_nelbo_reliability_gmm_prior_v1"),
-            "primary_variant": "pca64_beta001",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "replicate_seeds": [17],
-            "support_seeds": [17],
-            "support_size": 32,
-            "support_size_diagnostics": [8, 16, 64],
-            "align_support_and_generation_seed": True,
-        },
-        "generation": {
-            "synthetic_per_class_total": 128,
-            "min_per_source_per_class": 8,
-        },
-        "support_nelbo_reliability_gmm_prior": {
-            "primary_method": "decentralized_exported_adaptive_k_support_nelbo_x_reliability_weighted_geom",
-            "candidate_components_per_source_class": [4, 3, 2, 1],
-            "min_samples_per_component": 12,
-            "source_weighting": "support_nelbo_x_source_local_reliability",
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 1,
-            "gmm_max_iter": 100,
-            "min_component_weight": 0.001,
-            "variance_floor": 1.0e-5,
-            "primary_pooling": "weighted_geometric",
-            "reliability_floor_score": 0.05,
-            "support_nelbo_tau": 1.0,
-            "tau_diagnostics": [0.5, 2.0],
-            "support_alpha": 1.0,
-            "reliability_alpha": 1.0,
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_decentralized_support8_top3_tau05_gmm_payload(tmp_path: Path):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_decentralized_support8_top3_tau05_gmm_prior_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_decentralized_support8_top3_tau05_gmm_prior_v1"),
-            "primary_variant": "pca64_beta001",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(tmp_path / "virchow2_cvae_preservation_repair_v1"),
-            "d1_3_artifact_root": str(tmp_path / "missing_d1_3_context"),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2", "3", "4"],
-            "replicate_seeds": [17],
-            "support_seeds": [17],
-            "support_size": 8,
-            "align_support_and_generation_seed": True,
-        },
-        "generation": {
-            "synthetic_per_class_total": 128,
-            "min_per_source_per_class": 8,
-        },
-        "support8_top3_tau05_gmm_prior": {
-            "primary_method": "decentralized_support8_top3_tau05_support_nelbo_x_reliability_geom",
-            "candidate_components_per_source_class": [4, 3, 2, 1],
-            "min_samples_per_component": 12,
-            "source_weighting": "support_nelbo_x_source_local_reliability_top3",
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 1,
-            "gmm_max_iter": 100,
-            "min_component_weight": 0.001,
-            "variance_floor": 1.0e-5,
-            "primary_pooling": "weighted_geometric",
-            "reliability_floor_score": 0.05,
-            "support_nelbo_tau": 0.5,
-            "top_k_sources": 3,
-            "support_alpha": 1.0,
-            "reliability_alpha": 1.0,
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _tiny_source_union_k24_gmm_config(
-    tmp_path: Path,
-    repair_root: Path,
-    sampling_root: Path,
-    prior_root: Path,
-    covariance_root: Path,
-    source_union_gmm_root: Path,
-    balanced_gmm_root: Path,
-):
-    return parse_source_union_k24_gmm_prior_config(
-        _tiny_source_union_k24_gmm_payload(
-            tmp_path,
-            repair_root,
-            sampling_root,
-            prior_root,
-            covariance_root,
-            source_union_gmm_root,
-            balanced_gmm_root,
-        ),
-        base_dir=tmp_path,
-    )
-
-
-def _tiny_source_union_k24_gmm_payload(
-    tmp_path: Path,
-    repair_root: Path,
-    sampling_root: Path,
-    prior_root: Path,
-    covariance_root: Path,
-    source_union_gmm_root: Path,
-    balanced_gmm_root: Path,
-):
-    return {
-        "experiment": {
-            "name": "virchow2_cvae_source_union_k24_gmm_prior_v1",
-            "artifact_root": str(tmp_path / "virchow2_cvae_source_union_k24_gmm_prior_v1"),
-            "primary_variant": "source_union_pca64_beta001_diagnostic",
-        },
-        "inputs": {
-            "feature_cache_root": str(tmp_path / "repair_cache" / "virchow2"),
-            "repair_artifact_root": str(repair_root),
-            "sampling_artifact_root": str(sampling_root),
-            "prior_calibration_artifact_root": str(prior_root),
-            "covariance_confirmation_artifact_root": str(covariance_root),
-            "source_union_gmm_artifact_root": str(source_union_gmm_root),
-            "balanced_gmm_artifact_root": str(balanced_gmm_root),
-            "backbone": "virchow2",
-        },
-        "run_matrix": {
-            "experiment_seeds": [42],
-            "heldout_centers": ["0", "1", "2"],
-            "replicate_seeds": [17],
-        },
-        "generation": {
-            "synthetic_per_class_total": 128,
-        },
-        "k24_gmm_prior": {
-            "primary_method": "source_union_cc_diag_gmm_k24_prior_sample",
-            "gmm_components": 24,
-            "gmm_covariance_type": "diag",
-            "gmm_reg_covar": 1.0e-4,
-            "gmm_n_init": 2,
-            "gmm_max_iter": 200,
-            "gmm_weight_floor": 0.005,
-            "min_class_train_count": 24,
-            "min_effective_gmm_components": 1,
-            "min_train_count_per_effective_component": 1,
-            "posterior_noise_scale": 0.0,
-            "diagnostic_gmm_components": [20, 32],
-            "budget256_synthetic_per_class_total": 256,
-            "center_cap_samples_per_center_class": 8,
-        },
-        "classifier": {
-            "type": "sklearn_logistic_regression",
-            "solver": "lbfgs",
-            "C": 1.0,
-            "max_iter": 2000,
-            "class_weight": "balanced",
-            "classifier_seed": None,
-        },
-    }
-
-
-def _write_tiny_cache(root: Path, *, seed: int, mono_test_centers: set[str] | None = None) -> None:
-    rng = np.random.default_rng(123)
-    mono_test_centers = set(mono_test_centers or set())
-    for split, per_class in (("train", 24), ("test", 26)):
-        embeddings = []
-        metadata = []
-        for center_idx, center in enumerate(["0", "1", "2", "3", "4"]):
-            for label in (0, 1):
-                mean = np.array([center_idx * 0.5, label * 1.2, center_idx * 0.1, label * 0.3])
-                for idx in range(per_class):
-                    embeddings.append(mean + rng.normal(0.0, 0.05, size=4))
-                    observed_label = 0 if split == "test" and center in mono_test_centers else label
-                    metadata.append(
-                        {
-                            "sample_id": f"{split}_c{center}_y{observed_label}_{label}_{idx}",
-                            "center": center,
-                            "label": observed_label,
-                            "split": split,
-                        }
-                    )
-        path = root / f"seed{seed}" / "embeddings" / f"{split}.npz"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        np.savez(
-            path,
-            embeddings=np.asarray(embeddings, dtype=float),
-            metadata_json=json.dumps(metadata, sort_keys=True),
-        )

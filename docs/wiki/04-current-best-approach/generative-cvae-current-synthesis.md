@@ -17,6 +17,9 @@ experiments.
 - Component-union and random mass-bag audits now provide the strongest
   high-mean generated-embedding composition surface, but they are not adopted
   because matched controls remain competitive.
+- Multipanel tail-risk mass-bagging crosses 0.90 mean BACC, but fails the
+  locked robustness claim because center3/min-center remains below gate and
+  the Center3 audit shows confident minority-class collapse.
 - D1.3/D1.3.1 do not validate support-NELBO as the final compatibility signal
   because shuffled-support controls remain competitive.
 - D1.5 provides negative evidence for source-inner off-diagonal transfer as a
@@ -40,6 +43,7 @@ Primary synced artifact roots:
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_decentralized_component_union_reliability_shrink050_confirmation_v1/`
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_support8_calibrated_component_union_prior_v1/`
 - `../../../cvae_rebuild/artifacts/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1/`
+- `../../../cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/`
 
 ## Interpretation
 
@@ -76,6 +80,7 @@ paired dense all4 reliability-weighted mean BACC: 0.8506
 component-union shrink025 v2 mean BACC: 0.8892
 mass-uncertainty bagged component union mean BACC: 0.8903
 dense reliability tail shield mean BACC: 0.8988
+multipanel tail-risk mass-bag mean BACC: 0.9087
 ```
 
 ## Current Best Generated-Embedding Method
@@ -134,6 +139,12 @@ dense reliability tail shield:
   min center 0.7896
   worst seed-center 0.4971
   verdict DENSE_TAILSHIELD_RANDOM_MASS_BAG_FAIL
+
+multipanel tail-risk mass-bag stabilization:
+  mean BACC 0.9087
+  min center 0.7897
+  worst seed-center 0.4975
+  verdict MULTIPANEL_TAILRISK_STABILIZATION_FAIL
 ```
 
 Interpretation:
@@ -147,6 +158,13 @@ and weak-center/tail robustness remains unresolved.
 Random mass-bag performance should be treated as a control and diagnostic
 surface, not as evidence that random source weights are meaningful
 compatibility estimates.
+
+The multipanel result changes the numeric ceiling but not the adoption status.
+It improves mean BACC, bottom20, and seed std versus prior tailrisk, but the
+Center3 audit shows `42 x center3` collapsing to 0.4975 BACC with class1 recall
+0.0000 and high confidence. Low panel disagreement and full component coverage
+mean the next bottleneck is not simply more stochastic panels or more component
+coverage.
 
 ## What Failed
 
@@ -225,10 +243,11 @@ vanilla prior failed
 -> K16 source-union prior diagnoses the prior bottleneck
 -> paired dense all4 reliability weighting improves dense aggregation
 -> component union/random mass-bagging exposes high mean capacity
+-> multipanel tail-risk bagging crosses 0.90 mean BACC but fails center3
 -> target-conditioned support-NELBO, source-inner transfer, and point mass
    allocation remain negative/mixed
--> weak-center/tail robustness and harmful source interactions are the active
-   bottleneck
+-> weak-center/tail robustness, minority-class confidence collapse, and
+   harmful source interactions are the active bottleneck
 ```
 
 This is a coherent thesis contribution: it identifies a protocol-clean dense
@@ -244,8 +263,10 @@ target-conditioned compatibility routing remains unresolved.
   reuse the same invariant discipline.
 - High mean BACC from random mass-bag/component union is not an adoption claim
   unless matched controls are beaten and weak-center/tail failures improve.
-- The current harmful-source suppression experiment is implemented/running but
-  final reports are not yet verified.
+- The multipanel Center3 audit is diagnostic-only and cannot be used to select
+  seeds, thresholds, calibration, or pooling policy.
+- The earlier harmful-source suppression experiment is not a result unless
+  final reports are later verified.
 - No formal differential privacy claim is supported.
 
 ## Next Checks
@@ -255,9 +276,12 @@ target-conditioned compatibility routing remains unresolved.
    generated-embedding baselines.
 3. Treat support-NELBO, source-inner transfer, and support8 mass calibration as
    diagnostic until they beat matched controls.
-4. Treat random mass-bag/component-union as a high-mean diagnostic surface.
-5. Validate harmful-source suppression as the next test of source poisoning and
-   weak-tail robustness.
-6. Decide whether the thesis contribution should emphasize partial
+4. Treat random mass-bag/component-union/multipanel bagging as a high-mean
+   diagnostic surface.
+5. Predeclare any Center3 follow-up; target source-only calibration,
+   minority-class decision stability, or pooling preservation of rare useful
+   seed-level evidence.
+6. Validate harmful-source suppression only if final artifacts are synced.
+7. Decide whether the thesis contribution should emphasize partial
    data-minimizing composition evidence and bottleneck analysis rather than a
    final target-conditioned router.

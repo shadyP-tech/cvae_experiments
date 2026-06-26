@@ -45,16 +45,11 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
     breakhis_support_response_protocols = {
         "breakhis_support_estimated_utility_routing_v1",
     }
-    midogpp_support_response_protocols = {
-        "midogpp_scanner_support_estimated_utility_routing_v1",
-    }
     is_camelyon17_support_response_protocol = experiment_name in camelyon17_support_response_protocols
     is_breakhis_support_response_protocol = experiment_name in breakhis_support_response_protocols
-    is_midogpp_support_response_protocol = experiment_name in midogpp_support_response_protocols
     is_support_response_routing_protocol = (
         is_camelyon17_support_response_protocol
         or is_breakhis_support_response_protocol
-        or is_midogpp_support_response_protocol
     )
     is_learned_utility_v2 = experiment_name in {
         "learned_utility_routing_v2",
@@ -119,36 +114,6 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             )
         if bool(data_cfg.get("require_patient_ids", False)) is not True:
             raise ValueError("data.require_patient_ids must be true for breakhis_support_estimated_utility_routing_v1")
-    if is_midogpp_support_response_protocol:
-        if str(data_cfg.get("dataset_type", "")).strip().lower() != "midogpp":
-            raise ValueError(
-                "data.dataset_type must be 'midogpp' for midogpp_scanner_support_estimated_utility_routing_v1"
-            )
-        if str(data_cfg.get("dataset_domain_semantics", "")).strip().lower() != "midogpp_scanner":
-            raise ValueError(
-                "data.dataset_domain_semantics must be 'midogpp_scanner' "
-                "for midogpp_scanner_support_estimated_utility_routing_v1"
-            )
-        if str(data_cfg.get("midogpp_domain_axis", "")).strip().lower() != "scanner_model":
-            raise ValueError(
-                "data.midogpp_domain_axis must be 'scanner_model' "
-                "for midogpp_scanner_support_estimated_utility_routing_v1"
-            )
-        if str(data_cfg.get("legacy_domain_field_alias", "magnification")).strip().lower() != "magnification":
-            raise ValueError(
-                "data.legacy_domain_field_alias must be 'magnification' "
-                "for midogpp_scanner_support_estimated_utility_routing_v1"
-            )
-        if bool(data_cfg.get("require_patient_ids", False)) is not True:
-            raise ValueError(
-                "data.require_patient_ids must be true for midogpp_scanner_support_estimated_utility_routing_v1"
-            )
-        configured_domains = data_cfg.get("magnifications", [])
-        if not isinstance(configured_domains, list) or len(configured_domains) < 3:
-            raise ValueError(
-                "data.magnifications must list at least 3 scanner-domain IDs for "
-                "midogpp_scanner_support_estimated_utility_routing_v1"
-            )
     split_cap_profile = str(data_cfg.get("split_cap_profile", "legacy")).strip().lower()
     allowed_split_cap_profiles = {"legacy", "development", "final", "custom"}
     if split_cap_profile not in allowed_split_cap_profiles:
@@ -723,9 +688,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             for value in support_sizes:
                 if int(value) <= 0:
                     raise ValueError("learned_utility.support_response_routing.support_sizes must be positive")
-            if (is_breakhis_support_response_protocol or is_midogpp_support_response_protocol) and [
-                int(v) for v in support_sizes
-            ] != [4, 8, 16, 32]:
+            if is_breakhis_support_response_protocol and [int(v) for v in support_sizes] != [4, 8, 16, 32]:
                 raise ValueError(
                     "learned_utility.support_response_routing.support_sizes must be exactly [4, 8, 16, 32] "
                     "for support-estimated utility thesis-facing configs"
@@ -737,9 +700,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
             for value in support_seeds:
                 if int(value) < 0:
                     raise ValueError("learned_utility.support_response_routing.support_seeds must be non-negative")
-            if (is_breakhis_support_response_protocol or is_midogpp_support_response_protocol) and [
-                int(v) for v in support_seeds
-            ] != [17, 23, 31]:
+            if is_breakhis_support_response_protocol and [int(v) for v in support_seeds] != [17, 23, 31]:
                 raise ValueError(
                     "learned_utility.support_response_routing.support_seeds must be exactly [17, 23, 31] "
                     "for support-estimated utility thesis-facing configs"
@@ -757,9 +718,9 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                     "learned_utility.support_response_routing.sampling_policies must be subset of "
                     f"{sorted(allowed_sampling)}, got unknown {bad_sampling}"
                 )
-            if (
-                is_breakhis_support_response_protocol or is_midogpp_support_response_protocol
-            ) and [str(v).strip().lower() for v in sampling_policies] != ["random"]:
+            if is_breakhis_support_response_protocol and [
+                str(v).strip().lower() for v in sampling_policies
+            ] != ["random"]:
                 raise ValueError(
                     "learned_utility.support_response_routing.sampling_policies must be exactly ['random'] "
                     "for support-estimated utility thesis-facing configs"
@@ -846,9 +807,7 @@ def validate_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
                     raise ValueError("support random floor must be diagnostic_only")
                 if not bool(random_floor_cfg.get("report_only", True)):
                     raise ValueError("support random floor must be report_only")
-            if (
-                is_breakhis_support_response_protocol or is_midogpp_support_response_protocol
-            ) and not bool(random_floor_cfg.get("enabled", False)):
+            if is_breakhis_support_response_protocol and not bool(random_floor_cfg.get("enabled", False)):
                 raise ValueError(
                     "learned_utility.support_response_routing.random_floor.enabled must be true "
                     "for support-estimated utility thesis-facing configs"

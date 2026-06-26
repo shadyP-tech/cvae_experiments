@@ -1,0 +1,42 @@
+experiment:
+  name: midogpp_support_nelbo_routing_v1
+  artifact_root: cvae_rebuild/artifacts/midogpp/support_nelbo_routing_v1
+  primary_method: support_nelbo_top1_marginal_unlabeled
+
+inputs:
+  feature_cache_root: sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2
+  dataset_contract_artifact_root: datasets/midogpp/artifacts/midogpp_annotation_patch_v1
+  cache_report_path: sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2/seed42/reports/cache_builder_report.json
+  source_expert_manifest_path: cvae_rebuild/artifacts/midogpp/support_nelbo_routing_v1/inputs/source_expert_manifest.csv
+  support_nelbo_scores_path: cvae_rebuild/artifacts/midogpp/support_nelbo_routing_v1/inputs/frozen_support_nelbo_scores.csv
+  eval_nelbo_matrix_path: cvae_rebuild/artifacts/midogpp/support_nelbo_routing_v1/inputs/frozen_eval_nelbo_matrix.csv
+  backbone: virchow2
+
+run_matrix:
+  domain_regime: midogpp_annotation_patch_v1
+  strict_full_run_matrix: false
+  strict_available_seed_domain_coverage: true
+  experiment_seeds: [42]
+  heldout_centers: ["0", "1", "2", "3", "5", "6", "7", "8", "9"]
+  support_size: 32
+  support_seeds: [101, 103, 107]
+
+routing:
+  primary_score: calibrated_marginal_support_nelbo
+  support_sampler: random_unlabeled_sample_ids
+  selection_rule: min_calibrated_support_nelbo
+  tie_breaking: expert_id_ascending
+  weighting_policy: none
+  softmax_tau:
+  top_k:
+  weight_aggregation_target: none
+
+scoring:
+  nelbo_target: marginal_unlabeled
+  class_prior_source: uniform
+  calibration_source: source_validation_only
+  scorer_config_hash: locked_marginal_unlabeled_uniform_prior_v1
+  feature_frame_policy: expert_local_source_only
+
+midogpp_support_nelbo_routing:
+  enabled: true
