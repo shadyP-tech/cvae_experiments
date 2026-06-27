@@ -20,6 +20,15 @@ but only protocol-safe paths are thesis-facing.
   - Artifact root: `cvae_rebuild/artifacts/midogpp/support_nelbo_routing_v1/`.
 - `cvae_testing/src/eval/evaluators/domain_query_oracle_gap.py`
   - Diagnostic protocol: target expert is excluded from candidate baselines; oracle values are reporting-only.
+- `sail/src/sail/midogpp_multiaxis.py` and `sail/src/sail/midogpp_signal_controls.py`
+  - Protocol: MIDOG++ real Virchow2 train-cache diagnostics.
+  - Claim boundary: real-feature learnability and preservation reference only; not CVAE preservation, metadata routing, or expert selection.
+  - Required invariant: locked manifest, row-aligned feature cache, case/sample identity disjointness, fixed/fit-only preprocessing, and near-chance negative controls.
+- `cvae_rebuild/src/midogpp_preservation_gate.py`
+  - Protocol: MIDOG++ pca128 Virchow2-CVAE preservation gate under SAIL signal-control splits.
+  - Claim boundary: pca128 `decode_mu` preservation mechanics only; not GMM composition, routing, expert selection, or controllable class-conditional generation.
+  - Current synced decision: `PCA128_CVAE_DECODE_PRESERVATION_PASS`, `PCA128_CVAE_STRONG_PRESERVATION`, and `GMM_FEASIBILITY_ALLOWED_NEXT`, with `LATENT_CLASS_SIGNAL_DOMINATES_CONDITION_WARNING`.
+  - Required invariant: corrected manifest/cache lineage, fit-only PCA/CVAE training, eval labels scoring-only, identity-overlap PASS, and real/decoded negative controls not above the locked threshold.
 
 ## Quarantined Paths
 
@@ -56,6 +65,14 @@ Thesis-facing compatibility artifacts must satisfy:
   `routing_uses_eval_nelbo == 0`, and contract-derived candidate counts.
 - MIDOG++ diagnostic oracle rows have `adoption_eligible == false` and
   `routing_uses_eval_nelbo == 1`.
+- Feature-cache learnability diagnostics require cache sanity before metric
+  interpretation: row count/order alignment, feature provenance, crop/input
+  validity, and no unexplained large duplicate/near-duplicate feature clusters.
+- MIDOG++ CVAE preservation claims require an explicit generated-vs-real
+  reference row. The current thesis-facing preservation claim is limited to
+  pca128 `decode_mu` synthetic embeddings preserving tumor-balanced
+  signal-control utility; latent-prior sampling, GMM composition, and routing
+  require separate gates.
 
 ## Current Cleanup Decision
 

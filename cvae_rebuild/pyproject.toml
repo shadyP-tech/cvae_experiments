@@ -49,6 +49,9 @@ py-modules = [
   "labeled_support_policy_calibration_artifacts",
   "labeled_support_random_vs_dense_policy_calibration",
   "metrics",
+  "midogpp_condition_audit",
+  "midogpp_preservation_gate",
+  "midogpp_preservation_sanity",
   "paired_component_coverage_audit",
   "paired_dense_all4_reliability_confirmation",
   "pipeline",
@@ -78,6 +81,8 @@ py-modules = [
 [tool.setuptools.packages.find]
 where = ["src"]
 include = [
+  "cvae_rebuild",
+  "cvae_rebuild.*",
   "artifacts",
   "artifacts.*",
   "core",

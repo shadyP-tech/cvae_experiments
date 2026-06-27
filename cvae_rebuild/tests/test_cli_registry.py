@@ -17,6 +17,9 @@ from labeled_support_random_vs_dense_policy_calibration import (
     load_labeled_support_policy_calibration_config,
     run_labeled_support_policy_calibration,
 )
+from midogpp_condition_audit import load_midogpp_condition_audit_config, run_midogpp_condition_audit
+from midogpp_preservation_gate import load_midogpp_preservation_gate_config, run_midogpp_preservation_gate
+from midogpp_preservation_sanity import load_midogpp_preservation_sanity_config, run_midogpp_preservation_sanity
 from experiments.prior_sampling.posthoc_gmm_pca128 import (
     load_pca128_posthoc_gmm_config,
     run_pca128_posthoc_gmm_prior,
@@ -24,6 +27,7 @@ from experiments.prior_sampling.posthoc_gmm_pca128 import (
 from experiments.support_selection.midogpp_support_nelbo_routing import (
     load_midogpp_support_nelbo_routing_config,
     run_midogpp_support_nelbo_routing,
+    scaffold_midogpp_support_nelbo_routing_inputs,
 )
 from support_calibrated_component_union_prior import (
     load_support_calibrated_component_union_config,
@@ -71,8 +75,12 @@ EXPECTED_DIAGNOSIS_COMMANDS = {
     "diagnose-source-inner-harmful-source-suppression-random-mass-bag",
     "diagnose-target-support-regime-risk-gated-component-union",
     "diagnose-labeled-support-random-vs-dense-policy-calibration",
+    "diagnose-midogpp-preservation-sanity",
+    "diagnose-midogpp-preservation-condition-audit",
+    "diagnose-midogpp-preservation-gate-pca128",
     "diagnose-pca128-posthoc-gmm-prior",
     "diagnose-midogpp-support-nelbo-routing",
+    "scaffold-midogpp-support-nelbo-routing-inputs",
 }
 
 
@@ -150,7 +158,23 @@ def test_cli_registry_wires_pca128_posthoc_gmm_audit() -> None:
 
 def test_cli_registry_wires_midogpp_support_nelbo_routing() -> None:
     command = COMMANDS_BY_NAME["diagnose-midogpp-support-nelbo-routing"]
+    scaffold = COMMANDS_BY_NAME["scaffold-midogpp-support-nelbo-routing-inputs"]
 
     assert command.load_config is load_midogpp_support_nelbo_routing_config
     assert command.run is run_midogpp_support_nelbo_routing
+    assert scaffold.load_config is load_midogpp_support_nelbo_routing_config
+    assert scaffold.run is scaffold_midogpp_support_nelbo_routing_inputs
     assert VALIDATION_COMMANDS_BY_KEY["midogpp_support_nelbo_routing"] is command
+
+
+def test_cli_registry_wires_midogpp_preservation_diagnostics() -> None:
+    sanity = COMMANDS_BY_NAME["diagnose-midogpp-preservation-sanity"]
+    condition = COMMANDS_BY_NAME["diagnose-midogpp-preservation-condition-audit"]
+    gate = COMMANDS_BY_NAME["diagnose-midogpp-preservation-gate-pca128"]
+
+    assert sanity.load_config is load_midogpp_preservation_sanity_config
+    assert sanity.run is run_midogpp_preservation_sanity
+    assert condition.load_config is load_midogpp_condition_audit_config
+    assert condition.run is run_midogpp_condition_audit
+    assert gate.load_config is load_midogpp_preservation_gate_config
+    assert gate.run is run_midogpp_preservation_gate

@@ -11,6 +11,7 @@ from experiments.support_selection.midogpp_support_nelbo_routing import (
     MIDOGPP_SUPPORT_NELBO_ROUTING_NAME,
     parse_midogpp_support_nelbo_routing_config,
     run_midogpp_support_nelbo_routing,
+    scaffold_midogpp_support_nelbo_routing_inputs,
 )
 from protocol import ProtocolError
 from test_midogpp_domain_regime import ELIGIBLE_MIDOGPP_IDS, _write_midogpp_contract_fixture
@@ -85,7 +86,55 @@ def test_midogpp_support_nelbo_routing_validation_dispatch(tmp_path: Path) -> No
     assert cfg.name == MIDOGPP_SUPPORT_NELBO_ROUTING_NAME
 
 
-def _payload_with_inputs(tmp_path: Path) -> dict:
+def test_midogpp_support_nelbo_routing_config_loads_before_frozen_inputs_exist(tmp_path: Path) -> None:
+    payload = _payload_with_inputs(tmp_path, write_inputs=False)
+
+    cfg = parse_midogpp_support_nelbo_routing_config(payload, base_dir=tmp_path)
+
+    assert cfg.name == MIDOGPP_SUPPORT_NELBO_ROUTING_NAME
+    with pytest.raises(ProtocolError, match="scaffold-midogpp-support-nelbo-routing-inputs"):
+        run_midogpp_support_nelbo_routing(cfg)
+
+
+def test_midogpp_support_nelbo_routing_scaffolds_input_templates(tmp_path: Path) -> None:
+    payload = _payload_with_inputs(tmp_path, write_inputs=False)
+    cfg = parse_midogpp_support_nelbo_routing_config(payload, base_dir=tmp_path)
+
+    inputs_root = scaffold_midogpp_support_nelbo_routing_inputs(cfg)
+
+    assert inputs_root == cfg.artifact_root / "inputs"
+    assert _read_csv_header(cfg.source_expert_manifest_path) == [
+        "experiment_seed",
+        "expert_id",
+        "source_domain_id",
+        "checkpoint_path",
+        "checkpoint_hash",
+        "source_only",
+        "frozen",
+        "feature_frame_hash",
+    ]
+    assert _read_csv_header(cfg.support_nelbo_scores_path) == [
+        "experiment_seed",
+        "heldout_center",
+        "support_seed",
+        "support_size",
+        "expert_id",
+        "raw_support_nelbo",
+        "calibrated_support_nelbo",
+        "support_n",
+        "support_se",
+    ]
+    assert _read_csv_header(cfg.eval_nelbo_matrix_path) == [
+        "experiment_seed",
+        "heldout_center",
+        "expert_id",
+        "eval_mean_nelbo",
+        "eval_n",
+    ]
+    assert (inputs_root / "README.json").exists()
+
+
+def _payload_with_inputs(tmp_path: Path, *, write_inputs: bool = True) -> dict:
     artifact, cache_report = _write_midogpp_contract_fixture(tmp_path)
     feature_cache_root = tmp_path / "sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2"
     _write_feature_cache(feature_cache_root)
@@ -94,9 +143,10 @@ def _payload_with_inputs(tmp_path: Path) -> dict:
     expert_manifest = inputs_root / "source_expert_manifest.csv"
     support_scores = inputs_root / "frozen_support_nelbo_scores.csv"
     eval_matrix = inputs_root / "frozen_eval_nelbo_matrix.csv"
-    _write_expert_manifest(expert_manifest)
-    _write_support_scores(support_scores)
-    _write_eval_matrix(eval_matrix)
+    if write_inputs:
+        _write_expert_manifest(expert_manifest)
+        _write_support_scores(support_scores)
+        _write_eval_matrix(eval_matrix)
     return {
         "experiment": {
             "name": MIDOGPP_SUPPORT_NELBO_ROUTING_NAME,
@@ -232,3 +282,8 @@ def _write_csv(path: Path, rows: list[dict]) -> None:
 def _read_csv(path: Path) -> list[dict[str, str]]:
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         return list(csv.DictReader(handle))
+
+
+def _read_csv_header(path: Path) -> list[str]:
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+        return next(csv.reader(handle))

@@ -70,6 +70,21 @@ from labeled_support_random_vs_dense_policy_calibration import (
     load_labeled_support_policy_calibration_config,
     run_labeled_support_policy_calibration,
 )
+from midogpp_condition_audit import (
+    EXPERIMENT_NAME as MIDOGPP_CONDITION_AUDIT_NAME,
+    load_midogpp_condition_audit_config,
+    run_midogpp_condition_audit,
+)
+from midogpp_preservation_gate import (
+    EXPERIMENT_NAME as MIDOGPP_PRESERVATION_GATE_NAME,
+    load_midogpp_preservation_gate_config,
+    run_midogpp_preservation_gate,
+)
+from midogpp_preservation_sanity import (
+    EXPERIMENT_NAME as MIDOGPP_PRESERVATION_SANITY_NAME,
+    load_midogpp_preservation_sanity_config,
+    run_midogpp_preservation_sanity,
+)
 from experiments.prior_sampling.posthoc_gmm_pca128 import (
     PCA128_POSTHOC_GMM_NAME,
     load_pca128_posthoc_gmm_config,
@@ -78,6 +93,7 @@ from experiments.prior_sampling.posthoc_gmm_pca128 import (
 from experiments.support_selection.midogpp_support_nelbo_routing import (
     load_midogpp_support_nelbo_routing_config,
     run_midogpp_support_nelbo_routing,
+    scaffold_midogpp_support_nelbo_routing_inputs,
 )
 from paired_component_coverage_audit import (
     load_paired_component_coverage_audit_config,
@@ -346,6 +362,27 @@ DIAGNOSIS_COMMANDS: tuple[DiagnosisCommand, ...] = (
         run_labeled_support_policy_calibration,
     ),
     DiagnosisCommand(
+        "diagnose-midogpp-preservation-sanity",
+        "Run the MIDOG++ Virchow2-CVAE preservation sanity diagnostic.",
+        load_midogpp_preservation_sanity_config,
+        run_midogpp_preservation_sanity,
+        validation_keys=(MIDOGPP_PRESERVATION_SANITY_NAME,),
+    ),
+    DiagnosisCommand(
+        "diagnose-midogpp-preservation-condition-audit",
+        "Run the MIDOG++ CVAE condition and PCA capacity audit.",
+        load_midogpp_condition_audit_config,
+        run_midogpp_condition_audit,
+        validation_keys=(MIDOGPP_CONDITION_AUDIT_NAME,),
+    ),
+    DiagnosisCommand(
+        "diagnose-midogpp-preservation-gate-pca128",
+        "Run the MIDOG++ pca128 CVAE preservation gate.",
+        load_midogpp_preservation_gate_config,
+        run_midogpp_preservation_gate,
+        validation_keys=(MIDOGPP_PRESERVATION_GATE_NAME,),
+    ),
+    DiagnosisCommand(
         "diagnose-pca128-posthoc-gmm-prior",
         "Run the pca128 post-hoc class-conditional GMM prior feasibility audit.",
         load_pca128_posthoc_gmm_config,
@@ -357,6 +394,12 @@ DIAGNOSIS_COMMANDS: tuple[DiagnosisCommand, ...] = (
         load_midogpp_support_nelbo_routing_config,
         run_midogpp_support_nelbo_routing,
         validation_keys=("midogpp_support_nelbo_routing",),
+    ),
+    DiagnosisCommand(
+        "scaffold-midogpp-support-nelbo-routing-inputs",
+        "Write empty MIDOG++ support-NELBO routing input CSV templates.",
+        load_midogpp_support_nelbo_routing_config,
+        scaffold_midogpp_support_nelbo_routing_inputs,
     ),
 )
 
@@ -383,6 +426,11 @@ def load_config_for_validation(path: str | Path) -> object:
         if command is not None:
             return command.load_config(source)
     experiment = data.get("experiment")
-    if isinstance(experiment, Mapping) and str(experiment.get("name")) == PCA128_POSTHOC_GMM_NAME:
-        return COMMANDS_BY_NAME["diagnose-pca128-posthoc-gmm-prior"].load_config(source)
+    if isinstance(experiment, Mapping):
+        experiment_name = str(experiment.get("name"))
+        if experiment_name == PCA128_POSTHOC_GMM_NAME:
+            return COMMANDS_BY_NAME["diagnose-pca128-posthoc-gmm-prior"].load_config(source)
+        command = VALIDATION_COMMANDS_BY_KEY.get(experiment_name)
+        if command is not None:
+            return command.load_config(source)
     return load_config(source)

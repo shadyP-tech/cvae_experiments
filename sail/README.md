@@ -14,8 +14,9 @@ frozen feature caches
 
 The current instantiation uses Virchow2 feature caches, but the method title is
 backbone-agnostic. The pipeline is real-feature evaluation. It does not claim
-that CVAE generation preserves Virchow2 utility. CVAE preservation is the next
-diagnostic only after this real-feature gate is verified.
+that CVAE generation preserves Virchow2 utility. For MIDOG++, the downstream
+pca128 CVAE preservation gate is a separate `cvae_rebuild` diagnostic that was
+run after the corrected real-feature gate.
 
 ## Why This Is Current Best
 
@@ -93,6 +94,43 @@ PYTHONPATH=sail/src conda run -n thesis python -m sail.cli run \
   --config sail/configs/sail_virchow2.yaml
 ```
 
+Run the MIDOG++ real-feature multi-axis learnability diagnostic:
+
+```bash
+PYTHONPATH=sail/src conda run -n thesis python -m sail.cli run-midogpp-multiaxis \
+  --config sail/configs/midogpp_virchow2_real_feature_multiaxis_baseline.yaml \
+  --manifest-path path/to/locked_midogpp_manifest.csv \
+  --feature-cache-path path/to/row_aligned_virchow2_train_cache.pt
+```
+
+This diagnostic requires a locked MIDOG++ manifest and row-aligned Virchow2
+train cache. It does not build caches, does not use target-domain rows for
+fitting, and reports each metadata axis independently.
+
+Run the MIDOG++ real-feature signal-control diagnostic:
+
+```bash
+PYTHONPATH=sail/src conda run -n thesis python -m sail.cli run-midogpp-signal-controls \
+  --config sail/configs/midogpp_virchow2_real_feature_signal_controls.yaml \
+  --manifest-path path/to/locked_midogpp_manifest.csv \
+  --feature-cache-path path/to/row_aligned_virchow2_train_cache.pt
+```
+
+This control reuses the same train cache to test pooled, tumor-class-balanced,
+and within-tumor case-disjoint discrimination. Negative controls shuffle fit
+labels or fit feature rows only. It does not make CVAE preservation, routing, or
+metadata-compatibility claims.
+
+The corresponding MIDOG++ pca128 CVAE preservation gate lives outside SAIL:
+
+```text
+cvae_rebuild/artifacts/midogpp/virchow2_cvae_midogpp_preservation_gate_pca128_v1/
+```
+
+That artifact supports pca128 `decode_mu` reconstruction-preservation mechanics
+only. It does not validate prior sampling, GMM composition, routing, or
+controllable class-conditional generation.
+
 Run the smoke tests:
 
 ```bash
@@ -116,6 +154,39 @@ sail/artifacts/virchow2_dense_source_selected/
 ```
 
 Generated artifacts are ignored by `sail/artifacts/.gitignore`.
+
+The MIDOG++ multi-axis diagnostic writes:
+
+```text
+sail/artifacts/midogpp_virchow2_real_feature_multiaxis_baseline/
+  tables/per_axis_domain_metrics.csv
+  tables/axis_summary.csv
+  tables/domain_axis_counts.csv
+  tables/domain_metadata_map.csv
+  tables/source_target_identity_overlap.csv
+  tables/predictions.csv
+  manifests/domain_axis_manifest.json
+  manifests/protocol_manifest.json
+  reports/leakage_report.json
+  reports/per_axis_decision_report.md
+  reports/decision_report.md
+```
+
+The MIDOG++ signal-control diagnostic writes:
+
+```text
+sail/artifacts/midogpp_virchow2_real_feature_signal_controls/
+  tables/control_metrics.csv
+  tables/domain_control_metrics.csv
+  tables/negative_control_metrics.csv
+  tables/stratified_metrics.csv
+  tables/split_manifest.csv
+  tables/identity_overlap_audit.csv
+  tables/predictions.csv
+  manifests/protocol_manifest.json
+  reports/leakage_report.json
+  reports/decision_report.md
+```
 
 ## Protocol Safety
 
@@ -154,6 +225,7 @@ Excluded from this folder:
 - cross-backbone aggregation audit rows
 - source-temperature calibration audit rows
 - CVAE training, CVAE generation, and CVAE preservation claims
+- MIDOG++ pca128 GMM feasibility, composition, or routing claims
 - failed or quarantined legacy branches
 - exploratory notebooks
 - cached embeddings, model weights, generated tables, and large artifacts
@@ -166,5 +238,5 @@ selection signal; metadata remains a baseline or interpretability layer.
 
 CVAE experiments ask whether generated embeddings preserve utility. This
 extraction does not generate embeddings. It tests whether the real Virchow2
-feature-space method is stable enough to justify a later CVAE preservation
-experiment.
+feature-space method is stable enough to justify separate CVAE preservation,
+prior, or composition experiments.

@@ -29,6 +29,34 @@ DEFAULT_ARTIFACT_ROOT = "cvae_rebuild/artifacts/midogpp/support_nelbo_routing_v1
 SUPPORTED_WEIGHTING_POLICIES = ("none", "dense_all_source_softmax", "topk_softmax")
 SUPPORTED_CLASS_PRIOR_SOURCES = ("uniform", "source_validation", "contract_metadata")
 GROUP_ID_KEYS = ("patient_id", "case_id", "slide_id", "group_id")
+SOURCE_EXPERT_MANIFEST_COLUMNS = (
+    "experiment_seed",
+    "expert_id",
+    "source_domain_id",
+    "checkpoint_path",
+    "checkpoint_hash",
+    "source_only",
+    "frozen",
+    "feature_frame_hash",
+)
+SUPPORT_NELBO_INPUT_COLUMNS = (
+    "experiment_seed",
+    "heldout_center",
+    "support_seed",
+    "support_size",
+    "expert_id",
+    "raw_support_nelbo",
+    "calibrated_support_nelbo",
+    "support_n",
+    "support_se",
+)
+EVAL_NELBO_INPUT_COLUMNS = (
+    "experiment_seed",
+    "heldout_center",
+    "expert_id",
+    "eval_mean_nelbo",
+    "eval_n",
+)
 
 
 @dataclass(frozen=True)
@@ -176,13 +204,6 @@ def validate_midogpp_support_nelbo_routing_config(cfg: MidogppSupportNelboRoutin
     if info is None:
         raise ProtocolError("MIDOG++ support-NELBO routing requires a MIDOG++ contract.")
     validate_cache_report_split_counts(cfg.cache_report_path, info)
-    for required in (
-        cfg.source_expert_manifest_path,
-        cfg.support_nelbo_scores_path,
-        cfg.eval_nelbo_matrix_path,
-    ):
-        if not required.exists():
-            raise ProtocolError(f"Required frozen routing input is missing: {required}")
     return info
 
 
@@ -192,6 +213,7 @@ def run_midogpp_support_nelbo_routing(
     artifact_root: str | Path | None = None,
 ) -> Path:
     contract_info = validate_midogpp_support_nelbo_routing_config(cfg)
+    _assert_frozen_inputs_available(cfg)
     root = prepare_artifact_dirs(artifact_root or cfg.artifact_root)
     if "cvae_rebuild/artifacts/midogpp" not in root.as_posix():
         raise ProtocolError("MIDOG++ support-NELBO routing artifact root must remain under cvae_rebuild/artifacts/midogpp/.")
@@ -225,6 +247,59 @@ def run_midogpp_support_nelbo_routing(
     write_json(root / "run_config_resolved.yaml", _resolved_config_payload(cfg))
     _write_decision_summary(root)
     return root
+
+
+def scaffold_midogpp_support_nelbo_routing_inputs(
+    cfg: MidogppSupportNelboRoutingConfig,
+    *,
+    artifact_root: str | Path | None = None,
+) -> Path:
+    validate_midogpp_support_nelbo_routing_config(cfg)
+    root = prepare_artifact_dirs(artifact_root or cfg.artifact_root)
+    for path, columns in (
+        (cfg.source_expert_manifest_path, SOURCE_EXPERT_MANIFEST_COLUMNS),
+        (cfg.support_nelbo_scores_path, SUPPORT_NELBO_INPUT_COLUMNS),
+        (cfg.eval_nelbo_matrix_path, EVAL_NELBO_INPUT_COLUMNS),
+    ):
+        if not path.exists():
+            write_csv_rows(path, [], columns=columns)
+    write_json(
+        root / "inputs" / "README.json",
+        {
+            "schema_version": "midogpp_support_nelbo_routing_input_templates_v1",
+            "source_expert_manifest_path": str(cfg.source_expert_manifest_path),
+            "source_expert_manifest_columns": list(SOURCE_EXPERT_MANIFEST_COLUMNS),
+            "support_nelbo_scores_path": str(cfg.support_nelbo_scores_path),
+            "support_nelbo_scores_columns": list(SUPPORT_NELBO_INPUT_COLUMNS),
+            "eval_nelbo_matrix_path": str(cfg.eval_nelbo_matrix_path),
+            "eval_nelbo_matrix_columns": list(EVAL_NELBO_INPUT_COLUMNS),
+            "note": "Populate these frozen source-expert, support-NELBO, and held-out eval-NELBO tables before running diagnose-midogpp-support-nelbo-routing.",
+        },
+    )
+    return root / "inputs"
+
+
+def _assert_frozen_inputs_available(cfg: MidogppSupportNelboRoutingConfig) -> None:
+    required = (
+        cfg.source_expert_manifest_path,
+        cfg.support_nelbo_scores_path,
+        cfg.eval_nelbo_matrix_path,
+    )
+    missing = [path for path in required if not path.exists()]
+    if not missing:
+        return
+    details = "\n".join(f"- {path}" for path in missing)
+    raise ProtocolError(
+        "Required frozen routing input CSVs are missing. "
+        "Create templates with:\n"
+        "PYTHONPATH=cvae_rebuild/src python -m cli scaffold-midogpp-support-nelbo-routing-inputs "
+        "--config cvae_rebuild/configs/virchow2_cvae_midogpp_support_nelbo_routing_v1.yaml\n"
+        "Then populate the frozen input tables before running diagnose-midogpp-support-nelbo-routing.\n"
+        f"Missing paths:\n{details}\n"
+        f"source_expert_manifest columns: {list(SOURCE_EXPERT_MANIFEST_COLUMNS)}\n"
+        f"support_nelbo_scores columns: {list(SUPPORT_NELBO_INPUT_COLUMNS)}\n"
+        f"eval_nelbo_matrix columns: {list(EVAL_NELBO_INPUT_COLUMNS)}"
+    )
 
 
 def _validate_expert_manifest(
