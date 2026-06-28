@@ -1175,6 +1175,45 @@ def test_midogpp_phase1_script_rejects_stale_explicit_hash(tmp_path: Path) -> No
     assert "does not match generated frozen value" in result.stderr
 
 
+def test_midogpp_late_aggregation_import_script_materializes_valid_phase1_artifacts(tmp_path: Path) -> None:
+    late_matrix = _write_late_aggregation_fixture(tmp_path)
+    dense_matrix = _write_dense_late_fixture(tmp_path)
+    out_dir = tmp_path / "imported"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "import_midogpp_late_aggregation_phase1.py"),
+            "--late-aggregation-matrix",
+            str(late_matrix),
+            "--dense-matrix",
+            str(dense_matrix),
+            "--out-dir",
+            str(out_dir),
+            "--experiment-seed",
+            "42",
+            "--heldout-centers",
+            "0",
+            "--synthetic-per-class-total",
+            "128",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    report = validate_midogpp_phase1_artifacts(out_dir, expected_heldout_centers=("0",))
+    assert report["status"] == "PASS"
+    assert report["diagnostic_rows"] == 9
+    assert report["candidate_manifest_rows"] == 8
+    assert report["oracle_summary_rows"] == 1
+    assert report["baseline_comparison_rows"] == 1
+    provenance = json.loads((out_dir / "reports" / "import_provenance_report.json").read_text(encoding="utf-8"))
+    assert provenance["schema_version"] == "midogpp_late_aggregation_import_v1"
+    assert "no deployable selection" in provenance["claim_boundary"]
+
+
 def test_source_summary_backend_rejects_missing_target_or_summary(tmp_path: Path) -> None:
     manifest = _write_source_summary_fixture(tmp_path, source_centers=("1",))
     cache = _write_feature_cache_fixture(tmp_path, heldout_center="2")
@@ -1620,6 +1659,76 @@ def _write_external_baseline_fixture(
             "selection_used_target_labels": selection_used_target_labels,
             "support_labels_used": "false",
             "target_eval_labels_used_for_scoring_only": "true",
+        }
+    ]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
+
+
+def _write_late_aggregation_fixture(tmp_path: Path) -> Path:
+    path = tmp_path / "late_aggregation_matrix.csv"
+    rows: list[dict[str, object]] = []
+    for idx, source in enumerate(("1", "2", "3", "5", "6", "7", "8", "9")):
+        rows.append(
+            {
+                "experiment_seed": 42,
+                "heldout_center": "0",
+                "expert_id": source,
+                "expert_pool_type": "per_source",
+                "variant_id": "pca64_beta001",
+                "prior_method": "dense_late_equal_all_sources_geom",
+                "gmm_components": 31,
+                "source_weighting": "equal_source_mass",
+                "pooling_rule": "single_source",
+                "replicate_seed": 17,
+                "latent_sample_seed": 1000 + idx,
+                "synthetic_per_class_total": 16,
+                "bacc": 0.50 + idx / 100,
+                "macro_f1": 0.49 + idx / 100,
+                "generated_features_hash": f"generated-{source}",
+                "prediction_hash": f"prediction-{source}",
+                "composed_prior_hash": f"prior-{source}",
+                "summary_set_hash": f"summary-{source}",
+                "status": "ok",
+                "error_message": "",
+                "claim_role": "single_source_component_for_dense_aggregation",
+            }
+        )
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
+
+
+def _write_dense_late_fixture(tmp_path: Path) -> Path:
+    path = tmp_path / "dense_late_all_sources_downstream_matrix.csv"
+    rows = [
+        {
+            "experiment_seed": 42,
+            "heldout_center": "0",
+            "expert_id": "dense_all_sources",
+            "expert_pool_type": "decentralized_source_summary",
+            "variant_id": "pca64_beta001",
+            "prior_method": "dense_late_equal_all_sources_geom",
+            "gmm_components": 31,
+            "source_weighting": "equal_source_mass",
+            "pooling_rule": "geometric",
+            "replicate_seed": 17,
+            "latent_sample_seed": 2000,
+            "synthetic_per_class_total": 128,
+            "bacc": 0.57,
+            "macro_f1": 0.55,
+            "generated_features_hash": "generated-dense",
+            "prediction_hash": "prediction-dense",
+            "composed_prior_hash": "prior-dense",
+            "summary_set_hash": "summary-dense",
+            "status": "ok",
+            "error_message": "",
+            "claim_role": "primary_equal_all_sources_baseline",
         }
     ]
     with path.open("w", encoding="utf-8", newline="") as handle:
