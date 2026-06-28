@@ -1677,6 +1677,10 @@ def _resolve_config_path(path: Path) -> Path:
             collapsed = Path(*parts[: idx + 1], *parts[idx + 2 :])
             if collapsed.exists():
                 return collapsed
+        if parts[idx] == "configs":
+            repo_local = Path(__file__).resolve().parents[1] / Path(*parts[idx:])
+            if repo_local.exists():
+                return repo_local
     if not parts or parts[0] != "cvae_rebuild":
         return path
     local = Path(*path.parts[1:])

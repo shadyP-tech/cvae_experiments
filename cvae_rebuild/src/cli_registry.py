@@ -85,6 +85,11 @@ from midogpp_preservation_sanity import (
     load_midogpp_preservation_sanity_config,
     run_midogpp_preservation_sanity,
 )
+from experiments.midogpp.midogpp_pca128_posthoc_gmm_prior import (
+    EXPERIMENT_NAME as MIDOGPP_POSTHOC_GMM_NAME,
+    load_midogpp_posthoc_gmm_prior_config,
+    run_midogpp_posthoc_gmm_prior,
+)
 from experiments.prior_sampling.posthoc_gmm_pca128 import (
     PCA128_POSTHOC_GMM_NAME,
     load_pca128_posthoc_gmm_config,
@@ -381,6 +386,13 @@ DIAGNOSIS_COMMANDS: tuple[DiagnosisCommand, ...] = (
         load_midogpp_preservation_gate_config,
         run_midogpp_preservation_gate,
         validation_keys=(MIDOGPP_PRESERVATION_GATE_NAME,),
+    ),
+    DiagnosisCommand(
+        "diagnose-midogpp-pca128-posthoc-gmm-prior",
+        "Run the MIDOG++ pca128 post-hoc GMM prior audit.",
+        load_midogpp_posthoc_gmm_prior_config,
+        run_midogpp_posthoc_gmm_prior,
+        validation_keys=(MIDOGPP_POSTHOC_GMM_NAME,),
     ),
     DiagnosisCommand(
         "diagnose-pca128-posthoc-gmm-prior",

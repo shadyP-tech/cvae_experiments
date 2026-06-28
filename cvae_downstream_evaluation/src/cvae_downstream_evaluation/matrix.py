@@ -43,6 +43,7 @@ from .schemas import (
     SINGLE_EXPERT_ROW_TYPE,
 )
 from .splits import assert_disjoint_ids
+from .utility_matrix import assert_diagnostic_matrix_path, diagnostic_matrix_path
 
 
 @dataclass(frozen=True)
@@ -195,10 +196,19 @@ def build_all_expert_downstream_matrix(
     device: str,
     resume: bool,
     limits: MatrixBuildLimits = MatrixBuildLimits(),
+    output_path: Path | None = None,
+    diagnostic_output: bool = False,
 ) -> Path:
-    """Build or resume ``all_expert_downstream_matrix.csv``."""
+    """Build or resume an all-candidate downstream utility matrix."""
 
-    matrix_path = artifacts_root / "tables" / "all_expert_downstream_matrix.csv"
+    if output_path is not None:
+        matrix_path = Path(output_path)
+    elif diagnostic_output:
+        matrix_path = diagnostic_matrix_path(artifacts_root)
+    else:
+        matrix_path = artifacts_root / "tables" / "all_expert_downstream_matrix.csv"
+    if diagnostic_output or "diagnostic_downstream_utility" in matrix_path.name:
+        assert_diagnostic_matrix_path(matrix_path)
     matrix_path.parent.mkdir(parents=True, exist_ok=True)
     write_matrix_schema(matrix_path.with_suffix(".schema.json"))
 

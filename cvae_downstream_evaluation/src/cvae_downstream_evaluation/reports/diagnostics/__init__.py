@@ -1,0 +1,2 @@
+"""Diagnostic-only report helpers."""
+

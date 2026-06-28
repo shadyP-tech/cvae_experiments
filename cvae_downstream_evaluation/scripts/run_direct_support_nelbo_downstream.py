@@ -66,7 +66,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--build-matrix",
         action="store_true",
-        help="Generate all_expert_downstream_matrix.csv from frozen artifacts.",
+        help="Generate downstream utility matrix from frozen artifacts.",
+    )
+    parser.add_argument(
+        "--diagnostic-matrix",
+        action="store_true",
+        help="Write tables/diagnostic_downstream_utility.csv instead of the legacy all_expert_downstream_matrix.csv.",
+    )
+    parser.add_argument(
+        "--matrix-path",
+        default=None,
+        help="Optional explicit matrix output path. Diagnostic paths must be named diagnostic_downstream_utility.*.",
     )
     parser.add_argument(
         "--build-reports",
@@ -141,6 +151,8 @@ def main() -> None:
             support_units=units,
             device=args.device,
             resume=bool(args.resume),
+            output_path=Path(args.matrix_path) if args.matrix_path else None,
+            diagnostic_output=bool(args.diagnostic_matrix),
             limits=MatrixBuildLimits(
                 experiment_seeds=_parse_int_limit(args.limit_experiment_seeds),
                 heldout_centers=_parse_str_limit(args.limit_heldout_centers),
@@ -162,7 +174,8 @@ def main() -> None:
 
 def _build_reports(artifacts_root: Path) -> None:
     support_path = artifacts_root / "tables" / "support_selection_units.csv"
-    matrix_path = artifacts_root / "tables" / "all_expert_downstream_matrix.csv"
+    diagnostic_path = artifacts_root / "tables" / "diagnostic_downstream_utility.csv"
+    matrix_path = diagnostic_path if diagnostic_path.exists() else artifacts_root / "tables" / "all_expert_downstream_matrix.csv"
     assert_matrix_schema(matrix_path)
     selections = support_units_from_csv(support_path)
     downstream_rows = read_candidate_downstream_matrix(matrix_path)

@@ -1,0 +1,23 @@
+experiment:
+  name: learned_utility_source_inner
+  stage: source_inner_learned_downstream_utility
+
+training:
+  fold_role: source_inner_pseudo_target
+  label: source_inner_heldout_bacc
+  forbidden_labels:
+    - target_bacc
+    - target_macro_f1
+    - downstream_oracle_expert
+    - oracle_rank
+
+routing:
+  primary_metric: bacc
+  top1_tie_breakers:
+    - lower_support_nelbo
+    - higher_source_inner_stability
+    - deterministic_candidate_id
+  soft_aggregation:
+    temperature_selection: source_inner_only
+    weights_apply_to: generated_sample_allocation
+

@@ -20,6 +20,10 @@ from labeled_support_random_vs_dense_policy_calibration import (
 from midogpp_condition_audit import load_midogpp_condition_audit_config, run_midogpp_condition_audit
 from midogpp_preservation_gate import load_midogpp_preservation_gate_config, run_midogpp_preservation_gate
 from midogpp_preservation_sanity import load_midogpp_preservation_sanity_config, run_midogpp_preservation_sanity
+from experiments.midogpp.midogpp_pca128_posthoc_gmm_prior import (
+    load_midogpp_posthoc_gmm_prior_config,
+    run_midogpp_posthoc_gmm_prior,
+)
 from experiments.prior_sampling.posthoc_gmm_pca128 import (
     load_pca128_posthoc_gmm_config,
     run_pca128_posthoc_gmm_prior,
@@ -78,6 +82,7 @@ EXPECTED_DIAGNOSIS_COMMANDS = {
     "diagnose-midogpp-preservation-sanity",
     "diagnose-midogpp-preservation-condition-audit",
     "diagnose-midogpp-preservation-gate-pca128",
+    "diagnose-midogpp-pca128-posthoc-gmm-prior",
     "diagnose-pca128-posthoc-gmm-prior",
     "diagnose-midogpp-support-nelbo-routing",
     "scaffold-midogpp-support-nelbo-routing-inputs",
@@ -154,6 +159,13 @@ def test_cli_registry_wires_pca128_posthoc_gmm_audit() -> None:
 
     assert command.load_config is load_pca128_posthoc_gmm_config
     assert command.run is run_pca128_posthoc_gmm_prior
+
+
+def test_cli_registry_wires_midogpp_posthoc_gmm_audit() -> None:
+    command = COMMANDS_BY_NAME["diagnose-midogpp-pca128-posthoc-gmm-prior"]
+
+    assert command.load_config is load_midogpp_posthoc_gmm_prior_config
+    assert command.run is run_midogpp_posthoc_gmm_prior
 
 
 def test_cli_registry_wires_midogpp_support_nelbo_routing() -> None:

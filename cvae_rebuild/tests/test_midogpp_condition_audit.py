@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from cvae_rebuild.midogpp_condition_audit import (
+from experiments.midogpp.midogpp_condition_audit import (
     BALANCED_CONTROL,
     CONDITION_ROW_IDS,
     FULL_DIM_VARIANT,
@@ -259,7 +259,7 @@ variants:
         [
             sys.executable,
             "-m",
-            "cvae_rebuild.cli",
+            "cli",
             "diagnose-midogpp-preservation-condition-audit",
             "--config",
             str(config),
