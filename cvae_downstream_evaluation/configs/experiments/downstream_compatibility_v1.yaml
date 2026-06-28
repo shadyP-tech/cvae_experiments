@@ -1,0 +1,111 @@
+experiment:
+  name: downstream_compatibility_v1
+  stage: source_only_downstream_selection_aggregation
+  objective: improve_or_diagnose_bacc_macro_f1_without_generator_changes
+
+protocol:
+  target_support_eval_disjoint: required
+  target_expert_exclusion: required_for_selection_eligible
+  source_checkpoints_frozen_before_eval: required
+  generation_classifier_config_frozen_before_eval: required
+  downstream_oracle_quarantine: required
+  source_inner_only_selector_training: required
+
+locked_before_target_eval:
+  candidate_modes: required
+  synthetic_budget: required
+  class_prior: required
+  sampling_temperature: required
+  generation_seeds: required
+  classifier_family: required
+  classifier_hyperparameters: required
+  classifier_seeds: required
+  aggregation_weights_or_rules: required
+  tie_breaking: required
+
+artifacts:
+  run_root: artifacts/downstream_compatibility_v1
+  configs:
+    resolved_config: configs/resolved_config.yaml
+    generation_config: configs/generation_config.json
+    classifier_config: configs/classifier_config.json
+  manifests:
+    folds: manifests/folds.csv
+    support_samples: manifests/support_samples.csv
+    eval_samples: manifests/eval_samples.csv
+    candidate_experts: manifests/candidate_experts.csv
+    checkpoint_provenance: manifests/checkpoint_provenance.csv
+    leakage_report: manifests/leakage_report.json
+  features:
+    candidate_features: features/candidate_features.csv
+    feature_schema: features/feature_schema.json
+  compatibility:
+    source_inner_training_rows: compatibility/source_inner_training_rows.csv
+    estimator_config: compatibility/estimator_config.json
+    compatibility_predictions: compatibility/compatibility_predictions.csv
+    estimator_metrics_source_inner: compatibility/estimator_metrics_source_inner.csv
+  selections:
+    selection_results: selections/selection_results.csv
+    baseline_results: selections/baseline_results.csv
+    oracle_gap_summary: selections/oracle_gap_summary.csv
+  diagnostics:
+    oracle_matrix: diagnostics/oracle/all_candidate_downstream_matrix.csv
+    oracle_schema: diagnostics/oracle/all_candidate_downstream_matrix_schema.json
+    oracle_rankings: diagnostics/oracle/oracle_rankings.csv
+    oracle_readme: diagnostics/oracle/README_QUARANTINED.md
+    reconstruction_preservation: diagnostics/fidelity/reconstruction_preservation.csv
+    distributional_distance: diagnostics/fidelity/distributional_distance.csv
+  reports:
+    downstream_summary: reports/downstream_summary.md
+    reproducibility_manifest: reports/reproducibility_manifest.json
+
+selection_eligible_features:
+  - support_nelbo
+  - support_nelbo_rank
+  - support_nelbo_z
+  - metadata_match
+  - source_inner_stability
+  - source_inner_candidate_stability
+  - source_support_distributional_distance
+  - source_support_reconstruction_preservation
+
+forbidden_selection_inputs:
+  - target_bacc
+  - target_macro_f1
+  - selected_bacc
+  - selected_macro_f1
+  - oracle_bacc
+  - oracle_macro_f1
+  - oracle_rank
+  - downstream_oracle_expert
+  - target_eval_classifier_result
+  - target_eval_fidelity_result
+
+baselines:
+  selection:
+    - metadata_top1
+    - random_expert
+    - support_nelbo_top1
+    - learned_predicted_downstream_utility_top1
+  aggregation:
+    - dense_all_source_equal_budget_equal_weight
+    - fixed_topk_by_allowed_pre_eval_score
+    - source_inner_learned_weighting_optional
+  diagnostic_only:
+    - downstream_oracle_top1
+
+metrics:
+  heldout_target_eval:
+    - bacc
+    - macro_f1
+  oracle_alignment:
+    - top1_downstream_oracle_hit
+    - spearman_with_downstream_utility
+    - normalized_downstream_oracle_gap
+    - mean_rank
+  stability:
+    - target_fold
+    - support_seed
+    - generation_seed
+    - classifier_seed
+

@@ -4,7 +4,7 @@ experiment:
   primary_variant: pca64_beta001
 
 inputs:
-  feature_cache_root: sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2
+  feature_cache_root: cvae_rebuild/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2
   repair_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_preservation_repair_v1
   paired_dense_artifact_root: cvae_rebuild/artifacts/midogpp/virchow2_cvae_dense_late_all_sources_midogpp_v1
   mass_bagged_artifact_root:
@@ -13,8 +13,8 @@ inputs:
   balanced_gmm_artifact_root:
   prior_tailrisk_artifact_root:
   support_calibrated_artifact_root:
-  dataset_contract_artifact_root: datasets/midogpp/artifacts/midogpp_annotation_patch_v1
-  cache_report_path: sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2/seed42/reports/cache_builder_report.json
+  dataset_contract_artifact_root: cvae_rebuild/datasets/midogpp/artifacts/midogpp_annotation_patch_v1
+  cache_report_path: cvae_rebuild/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2/seed42/reports/cache_builder_report.json
   backbone: virchow2
 
 run_matrix:

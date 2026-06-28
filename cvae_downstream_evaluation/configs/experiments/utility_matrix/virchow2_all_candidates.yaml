@@ -1,0 +1,15 @@
+experiment:
+  name: virchow2_all_candidates
+  stage: diagnostic_downstream_utility_matrix
+  role: diagnostic_only
+
+protocol:
+  target_support_eval_disjoint: required
+  target_expert_exclusion: required_for_selection_eligible
+  downstream_matrix_quarantine: required
+  generation_classifier_config_frozen_before_eval: required
+
+artifacts:
+  output_matrix: matrices/diagnostic_downstream_utility.parquet
+  frozen_snapshot: configs/frozen_protocol_snapshot.json
+

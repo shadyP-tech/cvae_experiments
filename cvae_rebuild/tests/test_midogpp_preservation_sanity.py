@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from cvae_rebuild.midogpp_preservation_sanity import (
+from experiments.midogpp.midogpp_preservation_sanity import (
     BALANCED_CONTROL,
     CVAE_CONDITION_LABEL_PERMUTATION,
     CVAE_DECODED_ROW_SHUFFLE,
@@ -205,7 +205,7 @@ variants:
         [
             sys.executable,
             "-m",
-            "cvae_rebuild.cli",
+            "cli",
             "diagnose-midogpp-preservation-sanity",
             "--config",
             str(config),
@@ -231,7 +231,7 @@ variants:
 
 
 def _cfg():
-    from cvae_rebuild.midogpp_preservation_sanity import MidogPPPreservationSanityConfig, VariantConfig
+    from experiments.midogpp.midogpp_preservation_sanity import MidogPPPreservationSanityConfig, VariantConfig
 
     return MidogPPPreservationSanityConfig(
         name="virchow2_cvae_midogpp_preservation_sanity_v1",

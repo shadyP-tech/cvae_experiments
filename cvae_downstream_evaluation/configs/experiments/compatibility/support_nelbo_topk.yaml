@@ -1,0 +1,10 @@
+experiment:
+  name: support_nelbo_topk
+  stage: adoption_eligible_support_nelbo_aggregation
+
+routing:
+  score: support_NELBO
+  score_direction: lower_is_better
+  k_selection: source_inner_only
+  budget_policy: equal_total_budget_split_across_topk
+

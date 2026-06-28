@@ -4,7 +4,7 @@ experiment:
   primary_variant: pca64_beta001
 
 inputs:
-  feature_cache_root: sail/artifacts/pathology_embeddings/virchow2
+  feature_cache_root: cvae_rebuild/artifacts/pathology_embeddings/virchow2
   repair_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_preservation_repair_v1
   d1_2_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_decentralized_reliability_weighted_gmm_prior_v1
   source_union_gmm_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_source_union_gmm_prior_v1

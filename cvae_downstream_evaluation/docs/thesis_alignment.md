@@ -36,6 +36,9 @@ Expected evidence:
 Folder responsibility:
 
 - `src/cvae_downstream_evaluation/routing.py`
+- `src/cvae_downstream_evaluation/compatibility/`
+- `src/cvae_downstream_evaluation/features/`
+- `src/cvae_downstream_evaluation/utility_matrix/`
 
 Expected evidence:
 
@@ -43,13 +46,16 @@ Expected evidence:
 - metadata routing remains a serious baseline
 - random and ensemble baselines are retained
 - downstream oracle is diagnostic only
+- learned downstream utility estimators are trained on source-inner folds only
+- direct target identity is not a deployable metadata feature
 
 ## Objective 4: MoErging Generator
 
 Folder responsibility:
 
 - `src/cvae_downstream_evaluation/generation.py`
-- `src/cvae_downstream_evaluation/schemas.py`
+- `src/cvae_downstream_evaluation/schemas/`
+- `src/cvae_downstream_evaluation/artifacts/`
 
 Expected evidence:
 
@@ -57,6 +63,7 @@ Expected evidence:
 - composition/routing is post hoc
 - no parameter sharing or retraining occurs at routing time
 - selected expert generation and all-expert diagnostics are separated
+- `selection_eligible` and `diagnostic_only` candidate rows are schema-enforced
 
 ## Objective 5: Domain-Specific And Generalization Performance
 

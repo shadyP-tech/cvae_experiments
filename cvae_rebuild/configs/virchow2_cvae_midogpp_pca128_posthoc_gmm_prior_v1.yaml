@@ -1,0 +1,82 @@
+experiment:
+  name: virchow2_cvae_midogpp_pca128_posthoc_gmm_prior_v1
+  artifact_root: cvae_rebuild/artifacts/midogpp/virchow2_cvae_midogpp_pca128_posthoc_gmm_prior_v1
+
+inputs:
+  manifest_path: datasets/midogpp/artifacts/midogpp_annotation_patch_v1/manifest.csv
+  feature_cache_path: cvae_rebuild/artifacts/pathology_embeddings/midogpp/virchow2/seed42/embeddings/train.pt
+  signal_split_manifest_path: cvae_rebuild/artifacts/midogpp_virchow2_real_feature_signal_controls/tables/split_manifest.csv
+  preservation_gate_artifact_root: cvae_rebuild/artifacts/midogpp/virchow2_cvae_midogpp_preservation_gate_pca128_v1
+  allow_npz_test_cache: false
+
+positive_label: 1
+
+run:
+  controls:
+    - pooled_tumor_class_balanced_case_split
+    - within_tumor_case_disjoint_control
+  primary_method: gmm_on_posterior_mu_class_conditional_diag
+  gate_required_label: GMM_FEASIBILITY_ALLOWED_NEXT
+  allow_condition_warning: true
+  class_prior_policy: balanced
+  synthetic_budget: match_fit
+  split_seeds: all
+
+primary_variant:
+  variant_id: pca128_beta001
+  pca_dim: 128
+  latent_dim: 32
+  hidden_dim: 512
+  num_hidden_layers: 2
+  train_epochs: 100
+  batch_size: 128
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  beta_final: 0.001
+  kl_warmup_epochs: 25
+
+validity_thresholds:
+  min_fit: 20
+  min_eval: 10
+  min_fit_pos: 10
+  min_fit_neg: 10
+  min_eval_pos: 5
+  min_eval_neg: 5
+  min_fit_cases: 3
+  min_eval_cases: 2
+
+gmm_prior:
+  components: 2
+  covariance_type: diag
+  reg_covar: 0.0001
+  n_init: 1
+  max_iter: 100
+  min_per_class_n: 4
+  min_samples_per_component: 2
+  fallback_to_single_gaussian: true
+  no_rejection: true
+
+downstream:
+  generation_seeds: [13, 29, 47]
+  classifier_seeds: [17, 31, 43]
+  classifier_family: locked_logistic_regression
+  classifier_class_weight: balanced
+  threshold_policy: fixed_0.5
+  calibration: none
+
+bootstrap:
+  reps: 1000
+  seed: 1337
+
+decision_thresholds:
+  real_gate_min_bacc: 0.60
+  ci_low_threshold: 0.50
+
+claim_boundary:
+  allowed: >
+    Fit-only post-hoc latent sampling over pca128 encoder posterior means may
+    recover useful synthetic PCA128 embeddings if held-out downstream metrics
+    pass under the locked firewall.
+  forbidden: >
+    No trained-prior, routing, MoErging, metadata-control, controllable
+    class-conditional generation, or learned-prior-superiority claim.

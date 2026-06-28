@@ -5,27 +5,27 @@ from pathlib import Path
 import pytest
 import yaml
 
-from cvae_rebuild.cli import _load_config_for_validation
-from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
+from cli import _load_config_for_validation
+from experiments.component_union.component_union_tailrisk_anchored_mass_bagged import (
     MIDOGPP_POSITIVE_UNION_TAILRISK_NAME,
     PRIMARY_POSITIVE_UNION_METHOD,
     POSITIVE_UNION_RULE_BETA050,
     _positive_union_rule_selection_manifest_rows,
     parse_source_inner_positive_union_config,
 )
-from cvae_rebuild.domain_regime import (
+from core.domain_regime import (
     MIDOGPP_DOMAIN_REGIME,
     load_midogpp_contract_info,
     validate_runtime_domain_coverage,
 )
-from cvae_rebuild.paired_dense_all4_reliability_confirmation import (
+from experiments.component_union.paired_dense_all4_reliability_confirmation import (
     DENSE_LATE_ALL_SOURCES_MIDOGPP_NAME,
     PRIMARY_DENSE_ALL_SOURCES_METHOD,
     _alias_rows_for_output,
     _artifact_prefix,
     parse_paired_dense_all4_reliability_config,
 )
-from cvae_rebuild.protocol import ProtocolError
+from core.protocol import ProtocolError
 
 
 ELIGIBLE_MIDOGPP_IDS = ("0", "1", "2", "3", "5", "6", "7", "8", "9")
@@ -197,7 +197,7 @@ def test_midogpp_positive_union_config_and_rule_manifest(tmp_path: Path) -> None
 
 
 def _write_midogpp_contract_fixture(tmp_path: Path) -> tuple[Path, Path]:
-    artifact = tmp_path / "datasets/midogpp/artifacts/midogpp_annotation_patch_v1"
+    artifact = tmp_path / "cvae_rebuild/datasets/midogpp/artifacts/midogpp_annotation_patch_v1"
     artifact.mkdir(parents=True)
     axis = "tumor_type|lab_or_origin|scanner_model"
     manifest_rows = []
@@ -244,7 +244,7 @@ def _write_midogpp_contract_fixture(tmp_path: Path) -> tuple[Path, Path]:
     _write_csv(artifact / "manifest.csv", manifest_rows)
     _write_csv(artifact / "domain_feasibility.csv", feasibility_rows)
 
-    cache_report = tmp_path / "sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2/seed42/reports/cache_builder_report.json"
+    cache_report = tmp_path / "cvae_rebuild/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2/seed42/reports/cache_builder_report.json"
     cache_report.parent.mkdir(parents=True, exist_ok=True)
     split_counts = {"train": 20, "val": 20, "test": 20}
     cache_report.write_text(json.dumps({"split_counts": split_counts}), encoding="utf-8")
@@ -259,7 +259,7 @@ def _dense_all_sources_payload(tmp_path: Path, artifact: Path, cache_report: Pat
             "primary_variant": "pca64_beta001",
         },
         "inputs": {
-            "feature_cache_root": str(tmp_path / "sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2"),
+            "feature_cache_root": str(tmp_path / "cvae_rebuild/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2"),
             "repair_artifact_root": str(tmp_path / "repair"),
             "d1_2_artifact_root": None,
             "d1_4_artifact_root": None,
@@ -304,7 +304,7 @@ def _positive_union_payload(tmp_path: Path, artifact: Path, cache_report: Path) 
             "primary_variant": "pca64_beta001",
         },
         "inputs": {
-            "feature_cache_root": str(tmp_path / "sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2"),
+            "feature_cache_root": str(tmp_path / "cvae_rebuild/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2"),
             "repair_artifact_root": str(tmp_path / "repair"),
             "paired_dense_artifact_root": None,
             "mass_bagged_artifact_root": None,

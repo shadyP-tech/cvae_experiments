@@ -128,6 +128,7 @@ artifacts:
     - manifests/expert_provenance.csv
     - tables/support_selection_units.csv
     - tables/all_expert_downstream_matrix.csv
+    - tables/diagnostic_downstream_utility.csv
     - tables/routing_to_downstream_alignment.csv
     - tables/baseline_comparison.csv
     - tables/support_size_stratified_downstream_summary.csv

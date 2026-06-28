@@ -19,7 +19,12 @@ The protocol preserves:
 Query -> Compatibility Estimation -> Routing Decision -> Expert Selection -> Downstream Utility
 ```
 
-For this package, the compatibility estimator is direct support-set NELBO. The downstream utility is balanced accuracy and macro-F1 on held-out target evaluation data after synthetic embedding generation. Distributional fidelity is secondary evidence only.
+For the v1 baseline, the compatibility estimator is direct support-set NELBO.
+For the selection/aggregation extension, the deployable estimator is a learned
+downstream utility predictor trained only on source-inner pseudo-target folds.
+The downstream utility is balanced accuracy and macro-F1 on held-out target
+evaluation data after synthetic embedding generation. Distributional fidelity is
+secondary evidence only.
 
 ## Allowed Query Information
 
@@ -31,6 +36,8 @@ Before expert selection, the router may use:
 - source-trained artifacts
 - unlabeled target support embeddings
 - query metadata available at routing time
+- source-inner validation utility and calibration statistics
+- target-support-only distributional or preservation diagnostics
 
 The primary protocol forbids target support labels.
 
@@ -43,8 +50,15 @@ Before routing, generation settings, and classifier settings are locked, the imp
 - downstream oracle expert labels
 - target test metrics
 - target evaluation distributional metrics
+- direct target identity fields as predictive features
 - target evaluation-tuned generation temperature or synthetic budget
 - target evaluation-tuned classifier architecture or hyperparameters
+
+Direct target identity fields include `target_domain`, `target_domain_id`,
+direct fold identity, excluded-expert identity, oracle labels, and equivalent
+aliases. They may appear in lineage, grouping, manifests, and final reports, but
+not in deployable feature vectors, estimator inputs, normalization/calibration,
+routing decisions, or aggregation weights.
 
 ## Expert Pool
 
@@ -76,6 +90,36 @@ For every target fold, support seed, generation seed, and classifier seed:
 7. Build the downstream oracle from the all-expert downstream matrix.
 8. Compare selected expert utility to metadata, random, source-global, ensemble, and downstream oracle baselines.
 
+## Selection/Aggregation Extension
+
+The extended selection-first path adds the following frozen stages:
+
+1. Build an atomic candidate manifest. A candidate is the tuple of expert
+   checkpoint, source domain, checkpoint seed, generation mode, latent sampling
+   setting, class prior rule, synthetic budget, generation seed, aggregation
+   recipe when applicable, and classifier seed.
+2. Tag every candidate as `selection_eligible` or `diagnostic_only`.
+3. Freeze and hash candidate pool, generation settings, classifier settings,
+   feature definitions, routing choices, metrics, and aggregation parameters
+   before target evaluation metrics are written.
+4. Write all-candidate downstream utility for the selection/aggregation path
+   only to `diagnostic_downstream_utility.*`. Legacy direct-support reports may
+   still read `all_expert_downstream_matrix.csv`, but deployable learned
+   selectors must consume only allowed feature tables.
+5. Train learned downstream utility estimators on source-inner pseudo-target
+   folds only.
+6. Apply top1, top-k uniform, or soft aggregation rules to allowed feature
+   tables only.
+
+The learned target is:
+
+```text
+E[U_downstream(q_inner_eval, e) | allowed_features(q_inner_support, e)]
+```
+
+Real held-out target BACC, macro-F1, downstream oracle ranks, and target-eval
+fidelity metrics are never training labels or deployable feature columns.
+
 ## Primary Metrics
 
 Routing-to-downstream alignment:
@@ -84,6 +128,9 @@ Routing-to-downstream alignment:
 - `spearman_neg_nelbo_vs_bacc`
 - `downstream_oracle_gap_bacc`
 - `downstream_oracle_gap_macro_f1`
+- `top1_downstream_oracle_hit`
+- `pairwise_preference_accuracy`
+- `top_k_recall`
 
 Downstream performance:
 
@@ -98,6 +145,7 @@ Stability:
 - generation seed standard deviation
 - classifier seed standard deviation
 - worst-domain performance
+- bootstrap or fold/seed intervals computed over target/fold or seed-target rows
 
 ## Secondary Diagnostics
 
@@ -110,6 +158,19 @@ Distributional fidelity is secondary evidence:
 - kNN precision, recall, density, coverage
 
 Report correlations between fidelity metrics and downstream utility. Do not treat fidelity as downstream utility.
+
+## Required Implementation Gates
+
+- split overlap test by patient/slide/group/sample
+- target expert exclusion test for deployable candidates and dense baselines
+- feature whitelist and metadata identity tests
+- estimator training rejection for real held-out target labels
+- diagnostic matrix import/read firewall
+- config freeze/hash before target metrics are written
+- schema tests for matrix, feature, selection, candidate, and report artifacts
+- artifact lineage check from every selection row to exactly one feature row and candidate row
+- aggregation budget matching for claimed comparisons
+- source-inner fold parity with the real held-out target protocol
 
 ## Claim Boundary
 

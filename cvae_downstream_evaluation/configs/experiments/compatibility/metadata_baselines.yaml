@@ -1,0 +1,13 @@
+experiment:
+  name: metadata_baselines
+  stage: adoption_eligible_baselines
+
+metadata_identity_guardrail:
+  forbidden_predictive_columns:
+    - target_domain
+    - target_domain_id
+    - heldout_center
+    - direct_fold_identity
+    - excluded_expert_identity
+    - downstream_oracle_expert
+

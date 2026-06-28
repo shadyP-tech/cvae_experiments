@@ -1,25 +1,25 @@
 import math
 from types import SimpleNamespace
 
-from cvae_rebuild.downstream import (
+from evaluation.downstream import (
     PredictionBundle,
     evaluate_probability_predictions,
     geometric_probability_pool,
     weighted_arithmetic_probability_pool,
     weighted_geometric_probability_pool,
 )
-from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import SourceReliability
-from cvae_rebuild.decentralized_support_nelbo_reliability_gmm_prior import _combined_weight_plan, _strongest_control
-from cvae_rebuild.decentralized_support8_top3_tau05_gmm_prior import _topk_existing_plan
-from cvae_rebuild.decentralized_reliability_top3_gmm_prior import _select_topk_reliable
-from cvae_rebuild.decentralized_source_inner_transfer_top3_gmm_prior import (
+from experiments.decentralized.decentralized_reliability_weighted_gmm_prior import SourceReliability
+from experiments.support_selection.decentralized_support_nelbo_reliability_gmm_prior import _combined_weight_plan, _strongest_control
+from experiments.support_selection.decentralized_support8_top3_tau05_gmm_prior import _topk_existing_plan
+from experiments.decentralized.decentralized_reliability_top3_gmm_prior import _select_topk_reliable
+from experiments.decentralized.decentralized_source_inner_transfer_top3_gmm_prior import (
     SubsetScore,
     _best_subset,
     _method_stats,
 )
-from cvae_rebuild.protocol import ProtocolError
-from cvae_rebuild.splits import candidate_experts, random_unlabeled_support_eval_split
-from cvae_rebuild.support_nelbo import (
+from core.protocol import ProtocolError
+from data.splits import build_sail_target_eval_pool, candidate_experts, random_unlabeled_support_eval_split
+from evaluation.support_nelbo import (
     SupportScore,
     annotate_selection_fraction,
     calibration_stats,
@@ -47,6 +47,24 @@ def test_support_sampler_is_unlabeled_and_disjoint() -> None:
     assert split.support_labels_used is False
     assert len(split.support_indices) == 32
     assert set(split.support_sample_ids).isdisjoint(split.eval_sample_ids)
+
+
+def test_sail_target_eval_pool_excludes_configured_support_union_without_labels() -> None:
+    metadata = [
+        {"sample_id": f"c0_{idx}", "domain": "center_0", "label": idx % 2}
+        for idx in range(10)
+    ]
+    pool = build_sail_target_eval_pool(
+        test_metadata=metadata,
+        heldout_center="0",
+        support_sizes=(3, 4),
+        support_seeds=(17,),
+    )
+    assert pool.target_eval_pool_id.startswith("target0_exclude_configured_support_union_")
+    assert set(pool.excluded_support_sample_ids).isdisjoint(
+        metadata[idx]["sample_id"] for idx in pool.eval_indices
+    )
+    assert len(pool.excluded_support_sample_ids) >= 4
 
 
 def test_candidate_experts_are_four_source_centers() -> None:

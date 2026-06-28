@@ -11,33 +11,33 @@ pytest.importorskip("sklearn")
 
 import numpy as np
 
-from cvae_rebuild.config import parse_config
-from cvae_rebuild.covariance_prior import (
+from core.config import parse_config
+from experiments.prior_diagnostics.covariance_prior import (
     PRIMARY_COVARIANCE_METHOD,
     _stabilized_covariance_psd,
     parse_covariance_prior_config,
     run_covariance_prior_confirmation,
 )
-from cvae_rebuild.covariance_shrinkage import (
+from experiments.prior_diagnostics.covariance_shrinkage import (
     PRIMARY_SHRINKAGE_METHOD,
     parse_covariance_shrinkage_config,
     run_covariance_shrinkage_stability,
 )
-from cvae_rebuild.covariance_viability import (
+from experiments.prior_diagnostics.covariance_viability import (
     parse_covariance_viability_config,
     run_covariance_prior_viability_audit,
 )
-from cvae_rebuild.decentralized_k16_gmm_prior import (
+from experiments.decentralized.decentralized_k16_gmm_prior import (
     PRIMARY_DECENTRALIZED_METHOD,
     parse_decentralized_k16_gmm_prior_config,
     run_decentralized_k16_gmm_prior,
 )
-from cvae_rebuild.decentralized_adaptive_gmm_prior import (
+from experiments.decentralized.decentralized_adaptive_gmm_prior import (
     PRIMARY_ADAPTIVE_METHOD,
     parse_decentralized_adaptive_gmm_prior_config,
     run_decentralized_adaptive_gmm_prior,
 )
-from cvae_rebuild.decentralized_component_union_prior import (
+from experiments.decentralized.decentralized_component_union_prior import (
     MATCHED_SHUFFLED_RELIABILITY_PREFIX,
     MATCHED_SHUFFLED_RELIABILITY_SHRINK050_PREFIX,
     PRIMARY_COMPONENT_UNION_METHOD,
@@ -47,14 +47,14 @@ from cvae_rebuild.decentralized_component_union_prior import (
     parse_decentralized_component_union_prior_config,
     run_decentralized_component_union_prior,
 )
-from cvae_rebuild.component_union_mass_bagged import (
+from experiments.component_union.component_union_mass_bagged import (
     PRIMARY_MASS_BAGGED_METHOD,
     ROW_RANDOM_MASS_BAG_CONTROL,
     ROW_SHUFFLED_RELIABILITY_BAG_CONTROL,
     parse_mass_bagged_component_union_config,
     run_mass_bagged_component_union,
 )
-from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
+from experiments.component_union.component_union_tailrisk_anchored_mass_bagged import (
     HARM_GATED_PRIMARY_SELECTABLE_RULES,
     PRIMARY_FIXED_BETA050_POSITIVE_UNION_METHOD,
     PRIMARY_HARM_GATED_POSITIVE_UNION_METHOD,
@@ -83,18 +83,18 @@ from cvae_rebuild.component_union_tailrisk_anchored_mass_bagged import (
     run_source_inner_positive_union,
     run_tailrisk_anchored_component_union,
 )
-from cvae_rebuild.downstream import PredictionBundle
-from cvae_rebuild.dense_reliability_tailshield_random_mass_bag import (
+from evaluation.downstream import PredictionBundle
+from experiments.component_union.dense_reliability_tailshield_random_mass_bag import (
     PRIMARY_DENSE_TAILSHIELD_METHOD,
     parse_dense_tailshield_random_mass_bag_config,
     run_dense_reliability_tailshield_random_mass_bag,
 )
-from cvae_rebuild.source_inner_harmful_source_suppression import (
+from experiments.component_union.source_inner_harmful_source_suppression import (
     PRIMARY_HARMFUL_SUPPRESSION_METHOD,
     parse_harmful_source_suppression_config,
     run_harmful_source_suppression,
 )
-from cvae_rebuild.target_support_regime_risk_gated_component_union import (
+from experiments.support_selection.target_support_regime_risk_gated_component_union import (
     PRIMARY_RISK_GATED_METHOD,
     ROW_ALWAYS_DENSE,
     ROW_ALWAYS_RANDOM_BAG,
@@ -102,7 +102,7 @@ from cvae_rebuild.target_support_regime_risk_gated_component_union import (
     parse_target_support_regime_risk_gate_config,
     run_target_support_regime_risk_gated_component_union,
 )
-from cvae_rebuild.labeled_support_random_vs_dense_policy_calibration import (
+from experiments.policy_calibration.labeled_support_random_vs_dense_policy_calibration import (
     PRIMARY_LABELED_SUPPORT_POLICY_METHOD,
     ROW_OFF_TARGET_SUPPORT_CONTROL,
     ROW_RANDOM_DEFAULT_CONTROL,
@@ -111,39 +111,39 @@ from cvae_rebuild.labeled_support_random_vs_dense_policy_calibration import (
     parse_labeled_support_policy_calibration_config,
     run_labeled_support_policy_calibration,
 )
-from cvae_rebuild.decentralized_pruned_adaptive_equal_all4_prior import (
+from experiments.decentralized.decentralized_pruned_adaptive_equal_all4_prior import (
     PRIMARY_PRUNED_EQUAL_ALL4_METHOD,
     ROW_UNPRUNED_FIXED_K4,
     parse_pruned_adaptive_equal_all4_config,
     run_pruned_adaptive_equal_all4_confirmation,
 )
-from cvae_rebuild.decentralized_reliability_weighted_gmm_prior import (
+from experiments.decentralized.decentralized_reliability_weighted_gmm_prior import (
     PRIMARY_RELIABILITY_METHOD,
     SourceReliability,
     parse_decentralized_reliability_weighted_gmm_prior_config,
     run_decentralized_reliability_weighted_gmm_prior,
 )
-from cvae_rebuild.decentralized_reliability_top3_gmm_prior import (
+from experiments.decentralized.decentralized_reliability_top3_gmm_prior import (
     PRIMARY_RELIABILITY_TOP3_METHOD,
     parse_decentralized_reliability_top3_gmm_prior_config,
     run_decentralized_reliability_top3_gmm_prior,
 )
-from cvae_rebuild.decentralized_source_inner_transfer_top3_gmm_prior import (
+from experiments.decentralized.decentralized_source_inner_transfer_top3_gmm_prior import (
     PRIMARY_SOURCE_INNER_TRANSFER_METHOD,
     parse_decentralized_source_inner_transfer_top3_gmm_prior_config,
     run_decentralized_source_inner_transfer_top3_gmm_prior,
 )
-from cvae_rebuild.decentralized_support_nelbo_reliability_gmm_prior import (
+from experiments.support_selection.decentralized_support_nelbo_reliability_gmm_prior import (
     PRIMARY_SUPPORT_RELIABILITY_METHOD,
     parse_decentralized_support_nelbo_reliability_gmm_prior_config,
     run_decentralized_support_nelbo_reliability_gmm_prior,
 )
-from cvae_rebuild.decentralized_support8_top3_tau05_gmm_prior import (
+from experiments.support_selection.decentralized_support8_top3_tau05_gmm_prior import (
     PRIMARY_SUPPORT8_TOP3_TAU05_METHOD,
     parse_decentralized_support8_top3_tau05_gmm_prior_config,
     run_decentralized_support8_top3_tau05_gmm_prior,
 )
-from cvae_rebuild.support_calibrated_component_union_prior import (
+from experiments.support_selection.support_calibrated_component_union_prior import (
     PRIMARY_SUPPORT_CALIBRATED_COMPONENT_UNION_METHOD,
     ROW_MATCHED_SHUFFLED_SUPPORT_PREFIX,
     ROW_RANDOM_MASS_BAG_CONTROL as ROW_SUPPORT_RANDOM_MASS_BAG_CONTROL,
@@ -152,7 +152,7 @@ from cvae_rebuild.support_calibrated_component_union_prior import (
     parse_support_calibrated_component_union_config,
     run_support_calibrated_component_union_prior,
 )
-from cvae_rebuild.paired_dense_all4_reliability_confirmation import (
+from experiments.component_union.paired_dense_all4_reliability_confirmation import (
     ROW_BUDGET_ONLY,
     ROW_EQUAL_ALL4,
     ROW_INVERSE,
@@ -167,7 +167,7 @@ from cvae_rebuild.paired_dense_all4_reliability_confirmation import (
     parse_paired_dense_all4_reliability_config,
     run_paired_dense_all4_reliability_confirmation,
 )
-from cvae_rebuild.paired_component_coverage_audit import (
+from experiments.component_union.paired_component_coverage_audit import (
     ROW_EQUAL_STRATIFIED128,
     ROW_RELIABILITY_MULTINOMIAL128_REFERENCE,
     ROW_RELIABILITY_MULTINOMIAL256,
@@ -177,7 +177,7 @@ from cvae_rebuild.paired_component_coverage_audit import (
     parse_paired_component_coverage_audit_config,
     run_paired_component_coverage_audit,
 )
-from cvae_rebuild.source_inner_validated_dense_component_hybrid import (
+from experiments.component_union.source_inner_validated_dense_component_hybrid import (
     MATCHED_SHUFFLED_GATE_PREFIX,
     METHOD_COMPONENT,
     METHOD_DENSE,
@@ -187,10 +187,10 @@ from cvae_rebuild.source_inner_validated_dense_component_hybrid import (
     parse_source_inner_validated_hybrid_config,
     run_source_inner_validated_dense_component_hybrid,
 )
-from cvae_rebuild.generation import generate_reference_posterior
-from cvae_rebuild.models import ClassConditionedCVAE
-from cvae_rebuild.pipeline import run_real_cache_backed
-from cvae_rebuild.preservation import (
+from model.generation import generate_reference_posterior
+from model.models import ClassConditionedCVAE
+from pipeline import run_real_cache_backed
+from experiments.preservation.preservation import (
     ROW_DECODE_MU,
     ROW_POSTERIOR,
     ROW_PRIOR,
@@ -199,7 +199,7 @@ from cvae_rebuild.preservation import (
     parse_preservation_config,
     run_preservation_diagnosis,
 )
-from cvae_rebuild.preservation_repair import (
+from experiments.preservation.preservation_repair import (
     PRIMARY_VARIANT,
     _beta_for_epoch,
     _decision,
@@ -207,34 +207,34 @@ from cvae_rebuild.preservation_repair import (
     parse_repair_config,
     run_preservation_repair,
 )
-from cvae_rebuild.preservation_sampling import (
+from experiments.preservation.preservation_sampling import (
     ROW_DECODE_MU as SAMPLING_ROW_DECODE_MU,
     ROW_POSTERIOR as SAMPLING_ROW_POSTERIOR,
     ROW_PRIOR as SAMPLING_ROW_PRIOR,
     parse_sampling_config,
     run_preservation_sampling,
 )
-from cvae_rebuild.prior_calibration import (
+from experiments.prior_diagnostics.prior_calibration import (
     PRIMARY_PRIOR_METHOD,
     parse_prior_calibration_config,
     run_prior_calibration,
 )
-from cvae_rebuild.source_union_gmm_prior import (
+from experiments.source_union.source_union_gmm_prior import (
     PRIMARY_GMM_METHOD,
     parse_source_union_gmm_prior_config,
     run_source_union_gmm_prior,
 )
-from cvae_rebuild.source_union_balanced_gmm_prior import (
+from experiments.source_union.source_union_balanced_gmm_prior import (
     PRIMARY_BALANCED_METHOD,
     parse_source_union_balanced_gmm_prior_config,
     run_source_union_balanced_gmm_prior,
 )
-from cvae_rebuild.source_union_k24_gmm_prior import (
+from experiments.source_union.source_union_k24_gmm_prior import (
     PRIMARY_K24_GMM_METHOD,
     parse_source_union_k24_gmm_prior_config,
     run_source_union_k24_gmm_prior,
 )
-from cvae_rebuild.splits import stratified_source_train_val_split
+from data.splits import stratified_source_train_val_split
 
 
 def test_real_run_tiny_npz_cache_writes_protocol_artifacts(tmp_path: Path) -> None:

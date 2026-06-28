@@ -5,7 +5,7 @@ experiment:
   min_decision_cells: 10
 
 inputs:
-  feature_cache_root: sail/artifacts/pathology_embeddings/virchow2
+  feature_cache_root: cvae_rebuild/artifacts/pathology_embeddings/virchow2
   repair_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_preservation_repair_v1
   backbone: virchow2
 

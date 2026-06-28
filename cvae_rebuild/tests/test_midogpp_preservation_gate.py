@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from cvae_rebuild.midogpp_preservation_gate import (
+from experiments.midogpp.midogpp_preservation_gate import (
     BALANCED_CONTROL,
     CVAE_DECODED_ROW_SHUFFLE,
     DECODE_MU,
@@ -19,7 +19,6 @@ from cvae_rebuild.midogpp_preservation_gate import (
     REAL_FEATURE_ROW_SHUFFLE,
     REAL_LABEL_PERMUTATION,
     REAL_PCA128_REFERENCE,
-    TRUE_TRAIN_TRUE_ENCODE_PERMUTED_DECODE,
     WITHIN_TUMOR_CONTROL,
     MidogPPPreservationGateConfig,
     VariantConfig,
@@ -27,6 +26,7 @@ from cvae_rebuild.midogpp_preservation_gate import (
     _gate_above_chance,
     parse_midogpp_preservation_gate_config,
 )
+from experiments.midogpp.midogpp_condition_audit import TRUE_TRAIN_TRUE_ENCODE_PERMUTED_DECODE
 
 
 def test_config_locks_pca128_primary_and_pca256_diagnostic() -> None:
@@ -241,7 +241,7 @@ variants:
         [
             sys.executable,
             "-m",
-            "cvae_rebuild.cli",
+            "cli",
             "diagnose-midogpp-preservation-gate-pca128",
             "--config",
             str(config),

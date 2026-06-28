@@ -10,6 +10,7 @@ from cvae_downstream_evaluation.downstream import (  # noqa: E402
     CandidateDownstreamRow,
     assert_matrix_schema,
     compute_single_expert_oracles,
+    read_candidate_downstream_matrix,
     validate_candidate_downstream_matrix,
     write_candidate_downstream_matrix,
 )
@@ -45,6 +46,11 @@ from cvae_downstream_evaluation.schemas import (  # noqa: E402
     SUPPORT_NELBO_METHOD,
     NEGATIVE_CONTROL_GENERATION_MODE,
 )
+from cvae_downstream_evaluation.utility_matrix import (  # noqa: E402
+    diagnostic_matrix_path,
+    read_diagnostic_downstream_matrix,
+    write_diagnostic_downstream_matrix,
+)
 
 
 def test_expected_skeleton_files_exist() -> None:
@@ -54,6 +60,7 @@ def test_expected_skeleton_files_exist() -> None:
         ROOT / "docs" / "thesis_alignment.md",
         ROOT / "docs" / "implementation_order.md",
         ROOT / "configs" / "experiments" / "direct_support_nelbo_selected_synthetic_downstream_v1.yaml",
+        ROOT / "configs" / "experiments" / "downstream_compatibility_v1.yaml",
         ROOT / "src" / "cvae_downstream_evaluation" / "protocol.py",
         ROOT / "src" / "cvae_downstream_evaluation" / "routing.py",
         ROOT / "src" / "cvae_downstream_evaluation" / "generation.py",
@@ -63,6 +70,14 @@ def test_expected_skeleton_files_exist() -> None:
         ROOT / "src" / "cvae_downstream_evaluation" / "reporting.py",
         ROOT / "src" / "cvae_downstream_evaluation" / "source_global_gated.py",
         ROOT / "scripts" / "build_source_global_gated_router_report.py",
+        ROOT / "scripts" / "build_learned_utility_selection_report.py",
+        ROOT / "scripts" / "build_allowed_feature_table.py",
+        ROOT / "scripts" / "build_selection_leakage_report.py",
+        ROOT / "scripts" / "train_source_inner_utility_estimator.py",
+        ROOT / "scripts" / "predict_learned_utility_features.py",
+        ROOT / "scripts" / "run_learned_utility_pipeline.py",
+        ROOT / "scripts" / "normalize_c52_legacy_artifacts.py",
+        ROOT / "scripts" / "run_c52_legacy_learned_utility_batch.py",
     ]
     missing = [str(path.relative_to(ROOT)) for path in expected if not path.exists()]
     assert not missing
@@ -185,6 +200,23 @@ def test_matrix_schema_sidecar_is_required_and_validated(tmp_path: Path) -> None
         pass
     else:
         raise AssertionError("stale downstream matrix schema was not rejected")
+
+
+def test_diagnostic_downstream_matrix_uses_same_schema_with_quarantined_name(tmp_path: Path) -> None:
+    path = diagnostic_matrix_path(tmp_path)
+    write_diagnostic_downstream_matrix(path, [_downstream("1", 0.70, "single_expert")])
+    assert path.name == "diagnostic_downstream_utility.csv"
+    assert_matrix_schema(path)
+    assert read_diagnostic_downstream_matrix(path)[0].candidate_expert == "1"
+    assert read_candidate_downstream_matrix(path)[0].candidate_expert == "1"
+
+    bad_path = tmp_path / "tables" / "all_expert_downstream_matrix.csv"
+    try:
+        write_diagnostic_downstream_matrix(bad_path, [_downstream("1", 0.70, "single_expert")])
+    except ProtocolError:
+        pass
+    else:
+        raise AssertionError("diagnostic writer accepted a non-quarantined matrix name")
 
 
 def test_late_ensemble_budget_is_equal_total() -> None:

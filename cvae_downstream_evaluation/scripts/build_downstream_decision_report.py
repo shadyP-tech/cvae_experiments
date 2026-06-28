@@ -34,6 +34,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Output markdown report path. Defaults to reports/decision_summary.md.",
     )
+    parser.add_argument(
+        "--matrix",
+        default=None,
+        help="Matrix CSV path. Defaults to diagnostic_downstream_utility.csv if present, otherwise all_expert_downstream_matrix.csv.",
+    )
     return parser
 
 
@@ -42,7 +47,11 @@ def main() -> None:
     args = parser.parse_args()
     artifacts_root = Path(args.artifacts_root)
     support_path = artifacts_root / "tables" / "support_selection_units.csv"
-    matrix_path = artifacts_root / "tables" / "all_expert_downstream_matrix.csv"
+    if args.matrix:
+        matrix_path = Path(args.matrix)
+    else:
+        diagnostic_path = artifacts_root / "tables" / "diagnostic_downstream_utility.csv"
+        matrix_path = diagnostic_path if diagnostic_path.exists() else artifacts_root / "tables" / "all_expert_downstream_matrix.csv"
     alignment_path = artifacts_root / "tables" / "routing_to_downstream_alignment.csv"
     baseline_path = artifacts_root / "tables" / "baseline_comparison.csv"
     support_size_path = artifacts_root / "tables" / "support_size_stratified_downstream_summary.csv"

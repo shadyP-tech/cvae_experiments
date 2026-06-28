@@ -3,9 +3,9 @@ experiment:
   artifact_root: cvae_rebuild/artifacts/midogpp/virchow2_cvae_midogpp_preservation_condition_audit_v1
 
 inputs:
-  manifest_path: datasets/midogpp/artifacts/midogpp_annotation_patch_v1/manifest.csv
-  feature_cache_path: sail/artifacts/pathology_embeddings/midogpp/virchow2/seed42/embeddings/train.pt
-  signal_split_manifest_path: sail/artifacts/midogpp_virchow2_real_feature_signal_controls/tables/split_manifest.csv
+  manifest_path: cvae_rebuild/datasets/midogpp/artifacts/midogpp_annotation_patch_v1/manifest.csv
+  feature_cache_path: cvae_rebuild/artifacts/pathology_embeddings/midogpp/virchow2/seed42/embeddings/train.pt
+  signal_split_manifest_path: cvae_rebuild/artifacts/midogpp_virchow2_real_feature_signal_controls/tables/split_manifest.csv
   allow_npz_test_cache: false
 
 positive_label: 1
