@@ -1,0 +1,85 @@
+experiment:
+  name: virchow2_cvae_all_candidate_downstream_midogpp_v1
+  stage: diagnostic_downstream_utility_matrix
+  role: diagnostic_only
+
+dataset:
+  dataset: midogpp
+  domain_key: center
+  domain_regime: heldout_center
+  eligible_centers: [0, 1, 2, 3, 5, 6, 7, 8, 9]
+  excluded_centers: [4]
+
+schema:
+  schema_version: midogpp_all_candidate_downstream_matrix_v1
+  context_specific_rows: true
+  primary_key:
+    dataset: required_primary_key
+    domain_regime: required_primary_key
+    heldout_center: required_primary_key
+    candidate_source_center: required_primary_key
+    candidate_id: required_primary_key
+    candidate_method: required_primary_key
+    experiment_seed: required_primary_key
+    replicate_seed: required_primary_key
+    support_size: required_primary_key
+    support_seed: required_primary_key
+    support_set_id: required_primary_key
+    eval_set_id: required_primary_key
+    generation_seed: required_primary_key
+    classifier_seed: required_primary_key
+    synthetic_per_class_total: required_primary_key
+    config_hash: required_primary_key
+    protocol_hash: required_primary_key
+    checkpoint_hash: required_primary_key
+    feature_frame_hash: required_primary_key
+  no_support_sentinel:
+    support_size: 0
+    support_seed: none
+    support_set_id: none
+
+inputs:
+  source_summary_manifest: cvae_rebuild/artifacts/midogpp/virchow2_cvae_dense_late_all_sources_midogpp_v1/tables/exported_source_summary_manifest.csv
+  candidate_inputs: manifest_driven
+  target_expert_exclusion: required_for_selection_eligible
+  domain4_quarantine: required
+
+generation:
+  modeled_distribution: frozen_source_domain_projected_embeddings
+  primary_mode: class_stratified_reference_posterior_resampling
+  class_prior: locked_before_target_eval
+  synthetic_per_class_total: 128
+  budget_tuning_from_target_eval: forbidden
+
+downstream:
+  classifier:
+    family: sklearn_logistic_regression
+    solver: lbfgs
+    C: 1.0
+    max_iter: 2000
+    class_weight: null
+    scaler_fit: synthetic_train_only
+    hyperparameter_tuning: forbidden
+  metrics:
+    primary: [bacc, macro_f1]
+    chosen_before_target_eval: true
+
+protocol:
+  target_support_eval_disjoint: required
+  support_hash_audit: required_if_support_used
+  diagnostic_matrix_quarantine: required
+  features_for_selection: forbidden
+  selections_from_target_metrics: forbidden
+  diagnostic_rows:
+    claim_role: oracle_diagnostic
+    eligibility: diagnostic_only
+    target_eval_labels_used_for_scoring_only: true
+    selection_used_target_labels: false
+    support_labels_used: false
+
+artifacts:
+  output_matrix: tables/diagnostic_downstream_utility.csv
+  frozen_snapshot: configs/frozen_protocol_snapshot.json
+  leakage_report: reports/leakage_report.json
+  candidate_manifest: tables/candidate_manifest.csv
+  allowed_feature_table: not_written_in_phase1
