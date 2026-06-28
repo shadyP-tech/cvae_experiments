@@ -11,7 +11,7 @@ patches:
   patch_dir: datasets/midogpp/artifacts/midogpp_annotation_patch_v1/patches_224
   patch_size: 224
   image_quality: 92
-  bbox_format: coco_xywh
+  bbox_format: xyxy
 
 sampling:
   positive_policy: all_valid_mitotic_annotations
