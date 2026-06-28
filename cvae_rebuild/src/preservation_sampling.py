@@ -12,6 +12,7 @@ from typing import Any, Mapping, Sequence
 
 from downstream import evaluate_probability_predictions, fit_locked_logistic_classifier
 from features import load_feature_cache, select_rows
+from legacy_pickle import install_legacy_cvae_rebuild_pickle_aliases
 from metrics import nanmean
 from preservation import _hash_array
 from preservation_repair import (
@@ -1013,6 +1014,7 @@ def _runtime_source(
         path = local_path
         return RuntimeSource(runtime=runtime, checkpoint_path=path, checkpoint_sha256=_file_sha256(path), checkpoint_reused_from_repair=False)
     with path.open("rb") as f:
+        install_legacy_cvae_rebuild_pickle_aliases()
         runtime = pickle.load(f)
     if len(tuple(getattr(runtime, "source_train_centers", ()))) != len(runtime.source_train_labels):
         runtime.source_train_centers = tuple(str(v) for v in source_data.train_centers)

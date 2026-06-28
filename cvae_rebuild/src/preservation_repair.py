@@ -11,6 +11,7 @@ from typing import Any, Mapping, Sequence
 from downstream import evaluate_probability_predictions, fit_locked_logistic_classifier
 from feature_frame import ExpertFeatureFrame, fit_expert_frame
 from features import FeatureCache, default_cache_path, load_feature_cache, select_rows
+from legacy_pickle import install_legacy_cvae_rebuild_pickle_aliases
 from metrics import nanmean
 from models import ClassConditionedCVAE, loss_for_batch
 from protocol import ProtocolError, assert_candidate_pool, build_leakage_report
@@ -579,6 +580,7 @@ def _runtime_for_variant(
     )
     if checkpoint_path.exists():
         with checkpoint_path.open("rb") as f:
+            install_legacy_cvae_rebuild_pickle_aliases()
             return pickle.load(f)
     runtime = _train_variant_runtime(
         cfg,
