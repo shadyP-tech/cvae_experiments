@@ -236,6 +236,29 @@ def test_phase2_locked_splitter_accepts_scanner_domain_labels() -> None:
     assert {row["domain"] for row in support}.union(row["domain"] for row in evaluation) == {"Hamamatsu XR"}
 
 
+def test_phase2_locked_splitter_keeps_repeated_patient_ids_on_one_side() -> None:
+    rows = [
+        _target_sample("s1", patient_id="p1", slide_id="slide1", label=0) | {"domain": "Hamamatsu XR"},
+        _target_sample("s2", patient_id="p1", slide_id="slide2", label=1) | {"domain": "Hamamatsu XR"},
+        _target_sample("s3", patient_id="p2", slide_id="slide3", label=0) | {"domain": "Hamamatsu XR"},
+        _target_sample("s4", patient_id="p3", slide_id="slide4", label=1) | {"domain": "Hamamatsu XR"},
+        _target_sample("s5", patient_id="p4", slide_id="slide5", label=0) | {"domain": "Hamamatsu XR"},
+    ]
+
+    support, evaluation = build_locked_phase2_support_eval_split(
+        rows,
+        heldout_center="Hamamatsu XR",
+        support_size=2,
+        support_seed=42,
+        center_column="domain",
+    )
+
+    assert_phase2_split_manifests(support_rows=support, eval_rows=evaluation)
+    support_patients = {row["patient_id"] for row in support}
+    eval_patients = {row["patient_id"] for row in evaluation}
+    assert support_patients.isdisjoint(eval_patients)
+
+
 def test_phase2_routing_firewall_blocks_diagnostic_and_phase1_inputs() -> None:
     assert_phase2_routing_firewall(
         input_paths=[Path("tables/support_score_matrix.csv")],

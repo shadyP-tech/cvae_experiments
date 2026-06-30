@@ -447,33 +447,47 @@ def build_locked_phase2_support_eval_split(
         if not row.get(sample_id_column):
             raise ProtocolError(f"Target row {idx} missing required sample_id column {sample_id_column!r}.")
 
-    split_key = _select_split_key(target_rows, sample_id_column=sample_id_column, group_columns=group_columns)
-    ordered_keys = sorted(
-        {str(row[split_key]) for row in target_rows},
-        key=lambda value: stable_hash({"support_seed": int(support_seed), "split_key": value}),
+    components = _identity_components(
+        target_rows,
+        sample_id_column=sample_id_column,
+        group_columns=group_columns,
     )
-    support_keys: set[str] = set()
+    ordered_components = sorted(
+        components,
+        key=lambda component: stable_hash(
+            {
+                "support_seed": int(support_seed),
+                "component_key": sorted(_component_keys(target_rows, component, group_columns=group_columns)),
+            }
+        ),
+    )
+    support_indices: set[int] = set()
     support_count = 0
-    for key in ordered_keys:
-        support_keys.add(key)
-        support_count += sum(1 for row in target_rows if str(row[split_key]) == key)
+    for component in ordered_components:
+        support_indices.update(component)
+        support_count += len(component)
         if support_count >= support_size:
             break
-    if not support_keys:
+    if not support_indices:
         raise ProtocolError("Unable to select non-empty phase-2 support set.")
+    if len(support_indices) == len(target_rows):
+        raise ProtocolError(
+            "Phase-2 support split consumed all heldout rows; reduce support_size or inspect group IDs."
+        )
     support_rows: list[dict[str, object]] = []
     eval_rows: list[dict[str, object]] = []
+    split_key = "identity_component"
     split_id = stable_hash(
         {
             "heldout_center": heldout,
             "support_size": int(support_size),
             "support_seed": int(support_seed),
             "split_key": split_key,
-            "support_keys": sorted(support_keys),
+            "support_sample_ids": sorted(str(target_rows[idx][sample_id_column]) for idx in support_indices),
         }
     )
-    for row in target_rows:
-        if str(row[split_key]) in support_keys:
+    for idx, row in enumerate(target_rows):
+        if idx in support_indices:
             support_rows.append(
                 _support_manifest_row(
                     row,
@@ -587,17 +601,61 @@ def _candidate_score_config(row: Mapping[str, object]) -> dict[str, object]:
     return config
 
 
-def _select_split_key(
+def _identity_components(
     rows: Sequence[Mapping[str, object]],
     *,
     sample_id_column: str,
     group_columns: Sequence[str],
-) -> str:
+) -> list[set[int]]:
+    del sample_id_column
+    parent = list(range(len(rows)))
+
+    def find(idx: int) -> int:
+        while parent[idx] != idx:
+            parent[idx] = parent[parent[idx]]
+            idx = parent[idx]
+        return idx
+
+    def union(left: int, right: int) -> None:
+        root_left = find(left)
+        root_right = find(right)
+        if root_left != root_right:
+            parent[root_right] = root_left
+
     for column in group_columns:
-        values = _present_values(rows, column)
-        if len(values) == len(rows):
-            return column
-    return sample_id_column
+        by_value: dict[str, int] = {}
+        for idx, row in enumerate(rows):
+            raw = row.get(column)
+            if raw in {None, ""}:
+                continue
+            value = str(raw)
+            if value in by_value:
+                union(by_value[value], idx)
+            else:
+                by_value[value] = idx
+
+    components: dict[int, set[int]] = {}
+    for idx in range(len(rows)):
+        components.setdefault(find(idx), set()).add(idx)
+    return list(components.values())
+
+
+def _component_keys(
+    rows: Sequence[Mapping[str, object]],
+    component: set[int],
+    *,
+    group_columns: Sequence[str],
+) -> set[str]:
+    keys: set[str] = set()
+    for idx in component:
+        row = rows[idx]
+        for column in group_columns:
+            raw = row.get(column)
+            if raw not in {None, ""}:
+                keys.add(f"{column}:{raw}")
+    if not keys:
+        keys = {f"row:{idx}" for idx in component}
+    return keys
 
 
 def _support_manifest_row(
