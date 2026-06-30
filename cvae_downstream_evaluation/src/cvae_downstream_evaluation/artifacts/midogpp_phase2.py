@@ -33,6 +33,7 @@ from ..schemas.midogpp_phase2 import (
     build_phase2_routing_decisions,
     build_phase2_selected_sources,
     build_locked_phase2_support_eval_split,
+    build_supplied_phase2_support_eval_split,
 )
 
 
@@ -88,6 +89,8 @@ def materialize_phase2_preflight_freeze(
     source_rows: Sequence[Mapping[str, object]],
     target_rows: Sequence[Mapping[str, object]],
     support_score_inputs: Sequence[Mapping[str, object]],
+    locked_support_rows: Sequence[Mapping[str, object]] | None = None,
+    locked_eval_rows: Sequence[Mapping[str, object]] | None = None,
     heldout_center: str,
     support_size: int,
     support_seed: int,
@@ -105,13 +108,25 @@ def materialize_phase2_preflight_freeze(
     candidate_path = paths["manifests"] / "candidate_sources.csv"
     write_phase2_csv(candidate_path, candidates)
 
-    support_rows, eval_rows = build_locked_phase2_support_eval_split(
-        target_rows,
-        heldout_center=heldout_center,
-        support_size=support_size,
-        support_seed=support_seed,
-        center_column=center_column,
-    )
+    if locked_support_rows is not None or locked_eval_rows is not None:
+        if locked_support_rows is None or locked_eval_rows is None:
+            raise ProtocolError("Phase-2 locked split requires both support_rows and eval_rows.")
+        support_rows, eval_rows = build_supplied_phase2_support_eval_split(
+            support_rows=locked_support_rows,
+            eval_rows=locked_eval_rows,
+            heldout_center=heldout_center,
+            support_size=support_size,
+            support_seed=support_seed,
+            center_column=center_column,
+        )
+    else:
+        support_rows, eval_rows = build_locked_phase2_support_eval_split(
+            target_rows,
+            heldout_center=heldout_center,
+            support_size=support_size,
+            support_seed=support_seed,
+            center_column=center_column,
+        )
     write_phase2_csv(paths["manifests"] / "support_sets.csv", support_rows)
     write_phase2_csv(paths["manifests"] / "eval_sets.csv", eval_rows)
     support_split_ids = sorted({str(row["split_id"]) for row in support_rows})

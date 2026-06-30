@@ -41,6 +41,8 @@ def main() -> None:
         source_rows=_sequence(config, "source_rows"),
         target_rows=_sequence(config, "target_rows"),
         support_score_inputs=_sequence(config, "support_scores"),
+        locked_support_rows=_optional_sequence(config, "support_rows"),
+        locked_eval_rows=_optional_sequence(config, "eval_rows"),
         heldout_center=str(config["heldout_center"]),
         support_size=int(config["support_size"]),
         support_seed=int(config["support_seed"]),
@@ -68,6 +70,12 @@ def _sequence(config: dict[str, object], key: str) -> list[dict[str, object]]:
     if not isinstance(value, list) or not all(isinstance(row, dict) for row in value):
         raise ProtocolError(f"Phase-2 preflight config field {key!r} must be a list of objects.")
     return [dict(row) for row in value]
+
+
+def _optional_sequence(config: dict[str, object], key: str) -> list[dict[str, object]] | None:
+    if key not in config:
+        return None
+    return _sequence(config, key)
 
 
 if __name__ == "__main__":

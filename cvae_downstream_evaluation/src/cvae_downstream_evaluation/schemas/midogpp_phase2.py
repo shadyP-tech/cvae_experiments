@@ -639,6 +639,76 @@ def build_locked_phase2_support_eval_split(
     return support_rows, eval_rows
 
 
+def build_supplied_phase2_support_eval_split(
+    *,
+    support_rows: Sequence[Mapping[str, object]],
+    eval_rows: Sequence[Mapping[str, object]],
+    heldout_center: str,
+    support_size: int,
+    support_seed: int,
+    center_column: str = "center",
+    sample_id_column: str = "sample_id",
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    """Normalize an externally frozen target support/eval split.
+
+    This path is for precomputed support-NELBO routing where scores were
+    already computed on a named support manifest. It refuses to resample.
+    """
+
+    heldout = str(heldout_center)
+    if not heldout:
+        raise ProtocolError("Phase-2 heldout_center/domain must be non-empty.")
+    if support_size <= 0:
+        raise ProtocolError("Phase-2 support_size must be positive.")
+    if len(support_rows) != int(support_size):
+        raise ProtocolError(f"Locked support row count {len(support_rows)} != support_size {support_size}.")
+    if not eval_rows:
+        raise ProtocolError("Locked phase-2 eval rows are empty.")
+
+    for role, rows in (("support", support_rows), ("eval", eval_rows)):
+        for idx, row in enumerate(rows):
+            if str(row.get(center_column, "")) != heldout:
+                raise ProtocolError(f"Locked {role} row {idx} is not in heldout center {heldout!r}.")
+            if not row.get(sample_id_column):
+                raise ProtocolError(f"Locked {role} row {idx} missing required sample_id column {sample_id_column!r}.")
+
+    supplied_split_ids = {
+        str(row.get("split_id", row.get("support_split_id", "")))
+        for row in support_rows
+        if str(row.get("split_id", row.get("support_split_id", "")))
+    }
+    if len(supplied_split_ids) > 1:
+        raise ProtocolError(f"Locked support rows contain multiple split ids: {sorted(supplied_split_ids)}")
+    split_id = next(iter(supplied_split_ids), "")
+    if not split_id:
+        split_id = stable_hash(
+            {
+                "heldout_center": heldout,
+                "support_size": int(support_size),
+                "support_seed": int(support_seed),
+                "split_key": "locked_support_manifest",
+                "support_sample_ids": sorted(str(row[sample_id_column]) for row in support_rows),
+            }
+        )
+
+    support_sample_ids = {str(row[sample_id_column]) for row in support_rows}
+    eval_sample_ids = {str(row[sample_id_column]) for row in eval_rows}
+    overlap = sorted(support_sample_ids.intersection(eval_sample_ids))
+    if overlap:
+        raise ProtocolError(f"Locked support/eval sample overlap: {overlap[:10]}")
+
+    normalized_support = [
+        _support_manifest_row(row, split_id=split_id, support_seed=support_seed, split_key="locked_support_manifest")
+        for row in support_rows
+    ]
+    normalized_eval = [
+        _eval_manifest_row(row, split_id=split_id, support_seed=support_seed, split_key="locked_support_manifest")
+        for row in eval_rows
+    ]
+    assert_phase2_split_manifests(support_rows=normalized_support, eval_rows=normalized_eval)
+    return normalized_support, normalized_eval
+
+
 def assert_phase2_routing_firewall(
     *,
     input_paths: Sequence[Path | str] = (),

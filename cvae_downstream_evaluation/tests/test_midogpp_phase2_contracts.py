@@ -1,4 +1,5 @@
 from pathlib import Path
+import csv
 import json
 import math
 import subprocess
@@ -567,6 +568,62 @@ def test_phase2_preflight_materializer_writes_only_freeze_artifacts(tmp_path: Pa
     assert not (root / "tables" / "diagnostic_downstream_utility.csv").exists()
 
 
+def test_phase2_preflight_materializer_preserves_supplied_locked_split(tmp_path: Path) -> None:
+    root = tmp_path / "midogpp" / PHASE2_ROOT_NAME
+    report = materialize_phase2_preflight_freeze(
+        root=root,
+        source_rows=[_source_row("1"), _source_row("5")],
+        target_rows=[],
+        locked_support_rows=[_target_sample("support-fixed", patient_id="p1", slide_id="slide1", label=1)],
+        locked_eval_rows=[
+            _target_sample("eval-fixed-a", patient_id="p2", slide_id="slide2", label=0),
+            _target_sample("eval-fixed-b", patient_id="p3", slide_id="slide3", label=1),
+        ],
+        support_score_inputs=[
+            {"candidate_id": "source_1", "support_score": 2.0, "support_score_variance_or_se": 0.1},
+            {"candidate_id": "source_5", "support_score": 3.0, "support_score_variance_or_se": 0.2},
+        ],
+        heldout_center="0",
+        support_size=1,
+        support_seed=42,
+        replicate="0",
+        freeze_run_id="freeze-locked",
+        freeze_timestamp="2026-06-30T00:00:00Z",
+        snapshot_fields={"metric_config_hash": "metric", "protocol_hash": "protocol"},
+    )
+
+    assert report["status"] == "PASS"
+    support_rows = _read_csv(root / "manifests" / "support_sets.csv")
+    assert [row["sample_id"] for row in support_rows] == ["support-fixed"]
+    assert {row["support_n"] for row in _read_csv(root / "tables" / "support_score_matrix.csv")} == {"1"}
+
+
+def test_phase2_preflight_materializer_rejects_partial_locked_split(tmp_path: Path) -> None:
+    root = tmp_path / "midogpp" / PHASE2_ROOT_NAME
+    try:
+        materialize_phase2_preflight_freeze(
+            root=root,
+            source_rows=[_source_row("1"), _source_row("5")],
+            target_rows=[],
+            locked_support_rows=[_target_sample("support-fixed", patient_id="p1", slide_id="slide1", label=1)],
+            support_score_inputs=[
+                {"candidate_id": "source_1", "support_score": 2.0, "support_score_variance_or_se": 0.1},
+                {"candidate_id": "source_5", "support_score": 3.0, "support_score_variance_or_se": 0.2},
+            ],
+            heldout_center="0",
+            support_size=1,
+            support_seed=42,
+            replicate="0",
+            freeze_run_id="freeze-locked",
+            freeze_timestamp="2026-06-30T00:00:00Z",
+            snapshot_fields={"metric_config_hash": "metric", "protocol_hash": "protocol"},
+        )
+    except ProtocolError:
+        pass
+    else:
+        raise AssertionError("partial locked support/eval split was accepted")
+
+
 def test_phase2_preflight_cli_rejects_forbidden_downstream_config_key(tmp_path: Path) -> None:
     config_path = tmp_path / "preflight.json"
     config_path.write_text(
@@ -650,6 +707,11 @@ def _target_sample(sample_id: str, *, patient_id: str, slide_id: str, label: int
         "embedding_path": f"emb/{sample_id}.npy",
         "label": label,
     }
+
+
+def _read_csv(path: Path) -> list[dict[str, str]]:
+    with path.open(newline="", encoding="utf-8") as handle:
+        return [dict(row) for row in csv.DictReader(handle)]
 
 
 def _candidate_row(
