@@ -584,8 +584,20 @@ def _assert_csv_rows_match(
 ) -> None:
     observed_canonical = [_canonical_csv_row(row) for row in observed]
     expected_canonical = [_canonical_csv_row(row) for row in expected]
-    if observed_canonical != expected_canonical:
-        raise ProtocolError(f"MIDOG++ {label} contents do not match diagnostic matrix rebuild.")
+    if len(observed_canonical) != len(expected_canonical):
+        raise ProtocolError(f"MIDOG++ {label} row count does not match diagnostic matrix rebuild.")
+    for idx, (observed_row, expected_row) in enumerate(zip(observed_canonical, expected_canonical)):
+        keys = set(observed_row).union(expected_row)
+        mismatched = [
+            key
+            for key in sorted(keys)
+            if not _csv_values_match(observed_row.get(key, ""), expected_row.get(key, ""))
+        ]
+        if mismatched:
+            raise ProtocolError(
+                f"MIDOG++ {label} contents do not match diagnostic matrix rebuild; "
+                f"row={idx}, fields={mismatched[:10]}"
+            )
 
 
 def _canonical_csv_row(row: Mapping[str, object]) -> dict[str, str]:
@@ -603,6 +615,19 @@ def _canonical_csv_value(value: object) -> str:
             return "nan"
         return str(value)
     return str(value)
+
+
+def _csv_values_match(observed: str, expected: str) -> bool:
+    if observed == expected:
+        return True
+    try:
+        observed_float = float(observed)
+        expected_float = float(expected)
+    except (TypeError, ValueError):
+        return False
+    if math.isnan(observed_float) and math.isnan(expected_float):
+        return True
+    return math.isclose(observed_float, expected_float, rel_tol=1e-12, abs_tol=1e-12)
 
 
 def _assert_expected_baseline_methods(
