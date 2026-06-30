@@ -33,8 +33,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Build a MIDOG++ phase-2 preflight config with locked support/eval rows."
     )
-    parser.add_argument("--heldout-center", required=True)
-    parser.add_argument("--support-seed", required=True, type=int)
+    parser.add_argument("--heldout-center")
+    parser.add_argument("--support-seed", type=int)
+    parser.add_argument("--all-contexts", action="store_true")
+    parser.add_argument("--heldout-centers", default="0,1,2,3,5,6,7,8,9")
+    parser.add_argument("--support-seeds", default="17,23,31")
     parser.add_argument("--support-size", default=32, type=int)
     parser.add_argument("--experiment-seed", default=42, type=int)
     parser.add_argument("--replicate", default="0")
@@ -51,8 +54,6 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_parser().parse_args()
-    heldout = str(args.heldout_center)
-    support_seed = str(args.support_seed)
     experiment_seed = str(args.experiment_seed)
     support_size = int(args.support_size)
 
@@ -66,34 +67,41 @@ def main() -> None:
 
     source_rows = _source_rows(
         expert_rows,
-        heldout=heldout,
         experiment_seed=experiment_seed,
         prior=prior,
         prior_hash=prior_hash,
     )
-    locked_support_rows = _locked_support_rows(
-        support_set_rows,
-        heldout=heldout,
-        support_seed=support_seed,
-        support_size=support_size,
-        experiment_seed=experiment_seed,
-    )
-    locked_eval_rows = _eval_rows(target_rows, heldout=heldout, eval_split=str(args.eval_split))
-    support_scores = _support_scores(
-        support_score_rows,
-        heldout=heldout,
-        support_seed=support_seed,
-        experiment_seed=experiment_seed,
-    )
+    if args.all_contexts:
+        heldouts = _csv_values(args.heldout_centers)
+        support_seeds = _csv_values(args.support_seeds)
+    else:
+        if args.heldout_center is None or args.support_seed is None:
+            raise SystemExit("--heldout-center and --support-seed are required unless --all-contexts is set")
+        heldouts = [str(args.heldout_center)]
+        support_seeds = [str(args.support_seed)]
 
-    freeze_run_id = f"midogpp_phase2_preflight_real_center{heldout}_seed{support_seed}"
+    contexts = [
+        _context_payload(
+            support_set_rows=support_set_rows,
+            support_score_rows=support_score_rows,
+            target_rows=target_rows,
+            heldout=heldout,
+            support_seed=support_seed,
+            support_size=support_size,
+            experiment_seed=experiment_seed,
+            eval_split=str(args.eval_split),
+            scoped_candidate_ids=bool(args.all_contexts),
+        )
+        for heldout in heldouts
+        for support_seed in support_seeds
+    ]
+
+    freeze_run_id = "midogpp_phase2_preflight_real_all_contexts" if args.all_contexts else (
+        f"midogpp_phase2_preflight_real_center{heldouts[0]}_seed{support_seeds[0]}"
+    )
     payload = {
         "out_dir": str(args.out_dir),
         "center_column": "center",
-        "heldout_center": heldout,
-        "support_size": support_size,
-        "support_seed": int(support_seed),
-        "replicate": str(args.replicate),
         "freeze_run_id": freeze_run_id,
         "freeze_timestamp": str(args.freeze_timestamp),
         "snapshot_fields": {
@@ -102,11 +110,23 @@ def main() -> None:
             "class_prior_value_hash": prior_hash,
         },
         "source_rows": source_rows,
-        "target_rows": [],
-        "support_rows": locked_support_rows,
-        "eval_rows": locked_eval_rows,
-        "support_scores": support_scores,
+        "contexts": contexts,
     }
+    if not args.all_contexts:
+        context = contexts[0]
+        payload.update(
+            {
+                "heldout_center": context["heldout_center"],
+                "support_size": context["support_size"],
+                "support_seed": context["support_seed"],
+                "replicate": context["replicate"],
+                "target_rows": [],
+                "support_rows": context["support_rows"],
+                "eval_rows": context["eval_rows"],
+                "support_scores": context["support_scores"],
+            }
+        )
+        payload.pop("contexts")
     _validate_counts(payload)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -117,7 +137,6 @@ def main() -> None:
 def _source_rows(
     rows: list[dict[str, str]],
     *,
-    heldout: str,
     experiment_seed: str,
     prior: dict[str, float],
     prior_hash: str,
@@ -125,7 +144,7 @@ def _source_rows(
     out: list[dict[str, object]] = []
     for row in sorted(rows, key=lambda item: str(item.get("expert_id", ""))):
         expert_id = str(row.get("expert_id", ""))
-        if str(row.get("experiment_seed", "")) != experiment_seed or expert_id == heldout:
+        if str(row.get("experiment_seed", "")) != experiment_seed:
             continue
         out.append(
             {
@@ -187,6 +206,41 @@ def _locked_support_rows(
     return selected
 
 
+def _context_payload(
+    *,
+    support_set_rows: list[dict[str, str]],
+    support_score_rows: list[dict[str, str]],
+    target_rows: list[dict[str, str]],
+    heldout: str,
+    support_seed: str,
+    support_size: int,
+    experiment_seed: str,
+    eval_split: str,
+    scoped_candidate_ids: bool,
+) -> dict[str, object]:
+    return {
+        "heldout_center": str(heldout),
+        "support_seed": int(support_seed),
+        "support_size": int(support_size),
+        "replicate": "0",
+        "support_rows": _locked_support_rows(
+            support_set_rows,
+            heldout=str(heldout),
+            support_seed=str(support_seed),
+            support_size=int(support_size),
+            experiment_seed=str(experiment_seed),
+        ),
+        "eval_rows": _eval_rows(target_rows, heldout=str(heldout), eval_split=eval_split),
+        "support_scores": _support_scores(
+            support_score_rows,
+            heldout=str(heldout),
+            support_seed=str(support_seed),
+            experiment_seed=str(experiment_seed),
+            scoped_candidate_ids=scoped_candidate_ids,
+        ),
+    }
+
+
 def _eval_rows(rows: list[dict[str, str]], *, heldout: str, eval_split: str) -> list[dict[str, object]]:
     selected = [
         {
@@ -213,6 +267,7 @@ def _support_scores(
     heldout: str,
     support_seed: str,
     experiment_seed: str,
+    scoped_candidate_ids: bool,
 ) -> list[dict[str, object]]:
     selected = []
     for row in rows:
@@ -221,9 +276,14 @@ def _support_scores(
             and str(row.get("heldout_center", "")) == heldout
             and str(row.get("support_seed", "")) == support_seed
         ):
+            candidate_id = (
+                f"target_{heldout}_source_{row['expert_id']}"
+                if scoped_candidate_ids
+                else f"source_{row['expert_id']}"
+            )
             selected.append(
                 {
-                    "candidate_id": f"source_{row['expert_id']}",
+                    "candidate_id": candidate_id,
                     "support_score": float(row["calibrated_support_nelbo"]),
                     "support_score_variance_or_se": float(row["support_se"]),
                     "support_n": int(float(row["support_n"])),
@@ -234,8 +294,22 @@ def _support_scores(
 
 
 def _validate_counts(payload: dict[str, object]) -> None:
+    if "contexts" in payload:
+        contexts = payload["contexts"]
+        if not isinstance(contexts, list) or not contexts:
+            raise SystemExit("contexts must be a non-empty list")
+        if len(payload["source_rows"]) != 9:  # type: ignore[arg-type]
+            raise SystemExit(f"expected 9 source_rows, got {len(payload['source_rows'])}")  # type: ignore[arg-type]
+        for idx, context in enumerate(contexts):
+            if len(context["support_rows"]) != int(context["support_size"]):  # type: ignore[index,arg-type]
+                raise SystemExit(f"context {idx} support row count does not match support_size")
+            if len(context["support_scores"]) != 8:  # type: ignore[index,arg-type]
+                raise SystemExit(f"context {idx} expected 8 support_scores, got {len(context['support_scores'])}")  # type: ignore[index]
+            if not context["eval_rows"]:  # type: ignore[index]
+                raise SystemExit(f"context {idx} eval_rows must not be empty")
+        return
     checks = {
-        "source_rows": 8,
+        "source_rows": 9,
         "support_rows": int(payload["support_size"]),
         "support_scores": 8,
     }
@@ -248,6 +322,17 @@ def _validate_counts(payload: dict[str, object]) -> None:
 
 
 def _summary(payload: dict[str, object], out: Path) -> dict[str, object]:
+    if "contexts" in payload:
+        contexts = payload["contexts"]
+        assert isinstance(contexts, list)
+        return {
+            "wrote": str(out),
+            "contexts": len(contexts),
+            "source_rows": len(payload["source_rows"]),  # type: ignore[arg-type]
+            "support_rows": sum(len(context["support_rows"]) for context in contexts),
+            "eval_rows": sum(len(context["eval_rows"]) for context in contexts),
+            "support_scores": sum(len(context["support_scores"]) for context in contexts),
+        }
     return {
         "wrote": str(out),
         "heldout_center": payload["heldout_center"],
@@ -262,6 +347,13 @@ def _summary(payload: dict[str, object], out: Path) -> dict[str, object]:
 def _read_csv(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as handle:
         return [dict(row) for row in csv.DictReader(handle)]
+
+
+def _csv_values(value: str) -> list[str]:
+    out = [item.strip() for item in str(value).split(",") if item.strip()]
+    if not out:
+        raise SystemExit("empty comma-separated value list")
+    return out
 
 
 if __name__ == "__main__":

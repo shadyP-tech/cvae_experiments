@@ -13,6 +13,7 @@ from cvae_downstream_evaluation.artifacts.midogpp_phase2 import (  # noqa: E402
     create_phase2_artifact_root,
     default_phase2_artifact_root,
     materialize_phase2_preflight_freeze,
+    materialize_phase2_preflight_freeze_contexts,
     phase2_validation_payload,
     validate_phase2_preflight_freeze,
     write_phase2_csv,
@@ -622,6 +623,52 @@ def test_phase2_preflight_materializer_rejects_partial_locked_split(tmp_path: Pa
         pass
     else:
         raise AssertionError("partial locked support/eval split was accepted")
+
+
+def test_phase2_preflight_materializer_writes_multi_context_freeze(tmp_path: Path) -> None:
+    root = tmp_path / "midogpp" / PHASE2_ROOT_NAME
+    sources = [_source_row("0"), _source_row("1"), _source_row("2")]
+    contexts = [
+        {
+            "heldout_center": "0",
+            "support_seed": 17,
+            "support_size": 1,
+            "replicate": "0",
+            "support_rows": [_target_sample("support-0", patient_id="p0", slide_id="s0", label=1)],
+            "eval_rows": [_target_sample("eval-0", patient_id="p1", slide_id="s1", label=0)],
+            "support_scores": [
+                {"candidate_id": "target_0_source_1", "support_score": 2.0, "support_score_variance_or_se": 0.1},
+                {"candidate_id": "target_0_source_2", "support_score": 3.0, "support_score_variance_or_se": 0.2},
+            ],
+        },
+        {
+            "heldout_center": "1",
+            "support_seed": 23,
+            "support_size": 1,
+            "replicate": "0",
+            "support_rows": [_target_sample("support-1", patient_id="p2", slide_id="s2", label=1) | {"center": "1"}],
+            "eval_rows": [_target_sample("eval-1", patient_id="p3", slide_id="s3", label=0) | {"center": "1"}],
+            "support_scores": [
+                {"candidate_id": "target_1_source_0", "support_score": 4.0, "support_score_variance_or_se": 0.3},
+                {"candidate_id": "target_1_source_2", "support_score": 1.0, "support_score_variance_or_se": 0.4},
+            ],
+        },
+    ]
+
+    report = materialize_phase2_preflight_freeze_contexts(
+        root=root,
+        source_rows=sources,
+        contexts=contexts,
+        freeze_run_id="freeze-multi",
+        freeze_timestamp="2026-06-30T00:00:00Z",
+        snapshot_fields={"metric_config_hash": "metric", "protocol_hash": "protocol"},
+    )
+
+    assert report["status"] == "PASS"
+    assert report["checks"]["candidate_rows"] == 4
+    assert report["checks"]["routing_contexts"] == 2
+    assert len(_read_csv(root / "tables" / "routing_decisions.csv")) == 2
+    assert len(_read_csv(root / "tables" / "selected_sources.csv")) == 2
 
 
 def test_phase2_preflight_cli_rejects_forbidden_downstream_config_key(tmp_path: Path) -> None:

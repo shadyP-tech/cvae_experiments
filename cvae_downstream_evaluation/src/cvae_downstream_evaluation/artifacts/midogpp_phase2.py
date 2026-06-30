@@ -163,6 +163,104 @@ def materialize_phase2_preflight_freeze(
     return read_phase2_json(report_path)
 
 
+def materialize_phase2_preflight_freeze_contexts(
+    *,
+    root: Path,
+    source_rows: Sequence[Mapping[str, object]],
+    contexts: Sequence[Mapping[str, object]],
+    freeze_run_id: str,
+    freeze_timestamp: str,
+    snapshot_fields: Mapping[str, object],
+    center_column: str = "center",
+) -> dict[str, object]:
+    """Write one canonical preflight freeze containing multiple routing contexts."""
+
+    assert_phase2_preflight_config(snapshot_fields)
+    if not contexts:
+        raise ProtocolError("Phase-2 multi-context preflight requires at least one context.")
+    paths = create_phase2_artifact_root(root)
+
+    all_candidates: list[dict[str, object]] = []
+    all_support_rows: list[dict[str, object]] = []
+    all_eval_rows: list[dict[str, object]] = []
+    all_support_score_rows: list[dict[str, object]] = []
+    seen_candidate_ids: set[str] = set()
+
+    for context in contexts:
+        heldout_center = str(context["heldout_center"])
+        support_seed = int(context["support_seed"])
+        support_size = int(context["support_size"])
+        replicate = str(context.get("replicate", "0"))
+        context_sources = _context_source_rows(source_rows, heldout_center=heldout_center)
+        candidates = build_phase2_candidate_manifest(context_sources, heldout_center=heldout_center)
+        for candidate in candidates:
+            candidate_id = str(candidate["candidate_id"])
+            if candidate_id in seen_candidate_ids:
+                raise ProtocolError(f"Duplicate phase-2 multi-context candidate_id: {candidate_id!r}")
+            seen_candidate_ids.add(candidate_id)
+        all_candidates.extend(candidates)
+
+        if "support_rows" in context or "eval_rows" in context:
+            if "support_rows" not in context or "eval_rows" not in context:
+                raise ProtocolError("Each locked phase-2 context requires both support_rows and eval_rows.")
+            support_rows, eval_rows = build_supplied_phase2_support_eval_split(
+                support_rows=_context_sequence(context, "support_rows"),
+                eval_rows=_context_sequence(context, "eval_rows"),
+                heldout_center=heldout_center,
+                support_size=support_size,
+                support_seed=support_seed,
+                center_column=center_column,
+            )
+        else:
+            support_rows, eval_rows = build_locked_phase2_support_eval_split(
+                _context_sequence(context, "target_rows"),
+                heldout_center=heldout_center,
+                support_size=support_size,
+                support_seed=support_seed,
+                center_column=center_column,
+            )
+        all_support_rows.extend(support_rows)
+        all_eval_rows.extend(eval_rows)
+        support_split_ids = sorted({str(row["split_id"]) for row in support_rows})
+        if len(support_split_ids) != 1:
+            raise ProtocolError(f"Expected one support split id for context {heldout_center}/{support_seed}; got {support_split_ids}")
+
+        all_support_score_rows.extend(
+            _phase2_support_score_rows(
+                candidates=candidates,
+                support_score_inputs=_context_sequence(context, "support_scores"),
+                heldout_center=heldout_center,
+                support_seed=support_seed,
+                replicate=replicate,
+                support_split_id=support_split_ids[0],
+                support_n=len(support_rows),
+            )
+        )
+
+    write_phase2_csv(paths["manifests"] / "candidate_sources.csv", all_candidates)
+    write_phase2_csv(paths["manifests"] / "support_sets.csv", all_support_rows)
+    write_phase2_csv(paths["manifests"] / "eval_sets.csv", all_eval_rows)
+    write_phase2_csv(paths["tables"] / "support_score_matrix.csv", all_support_score_rows)
+    decisions = build_phase2_routing_decisions(all_support_score_rows, freeze_run_id=freeze_run_id)
+    write_phase2_csv(paths["tables"] / "routing_decisions.csv", decisions)
+    selected = build_phase2_selected_sources(decisions)
+    write_phase2_csv(paths["tables"] / "selected_sources.csv", selected)
+
+    snapshot = _phase2_preflight_snapshot(
+        root=root,
+        candidates=all_candidates,
+        support_rows=all_support_rows,
+        eval_rows=all_eval_rows,
+        snapshot_fields=snapshot_fields,
+        class_prior_value_hash=_snapshot_prior_hash(all_candidates),
+        freeze_run_id=freeze_run_id,
+        freeze_timestamp=freeze_timestamp,
+    )
+    write_phase2_json(paths["configs"] / "frozen_protocol_snapshot.json", snapshot)
+    report_path = write_phase2_preflight_freeze_report(root)
+    return read_phase2_json(report_path)
+
+
 def read_phase2_csv(path: Path) -> list[dict[str, str]]:
     """Read a phase-2 CSV artifact with path firewall checks."""
 
@@ -211,9 +309,13 @@ def validate_phase2_preflight_freeze(root: Path) -> dict[str, object]:
     snapshot = read_phase2_json(paths["frozen_protocol_snapshot"])
 
     heldouts = sorted({str(row.get("heldout_center", "")) for row in candidate_rows})
-    if len(heldouts) != 1 or not heldouts[0]:
-        raise ProtocolError(f"Phase-2 preflight expects one heldout center per freeze root; got {heldouts}")
-    assert_phase2_candidate_manifest(candidate_rows, heldout_center=heldouts[0])
+    if not heldouts or "" in heldouts:
+        raise ProtocolError(f"Phase-2 preflight candidate rows have invalid heldout centers: {heldouts}")
+    for heldout in heldouts:
+        assert_phase2_candidate_manifest(
+            [row for row in candidate_rows if str(row.get("heldout_center", "")) == heldout],
+            heldout_center=heldout,
+        )
     assert_phase2_split_manifests(support_rows=support_rows, eval_rows=eval_rows)
     assert_phase2_support_score_matrix(support_score_rows)
     assert_phase2_routing_decisions(routing_decision_rows, support_score_rows=support_score_rows)
@@ -233,7 +335,16 @@ def validate_phase2_preflight_freeze(root: Path) -> dict[str, object]:
             "support_score_rows": len(support_score_rows),
             "routing_decision_rows": len(routing_decision_rows),
             "selected_source_rows": len(selected_source_rows),
-            "heldout_center": heldouts[0],
+            "heldout_centers": heldouts,
+            "routing_contexts": len({
+                (
+                    str(row.get("heldout_center", "")),
+                    str(row.get("support_seed", "")),
+                    str(row.get("replicate", "")),
+                    str(row.get("support_split_id", "")),
+                )
+                for row in support_score_rows
+            }),
             "downstream_artifacts_absent": True,
             "claim_boundary": "support-NELBO selected expert routing freeze only",
         },
@@ -369,6 +480,12 @@ def _phase2_support_score_rows(
         if candidate_id not in by_candidate:
             raise ProtocolError(f"Support score references unknown candidate_id: {candidate_id!r}")
         candidate = by_candidate[candidate_id]
+        row_support_n = int(raw.get("support_n", support_n))
+        if row_support_n != int(support_n):
+            raise ProtocolError(
+                f"Support score for {candidate_id!r} has support_n={row_support_n}, "
+                f"but locked support split has {int(support_n)} rows."
+            )
         rows.append(
             {
                 "schema_version": PHASE2_SCHEMA_VERSION,
@@ -382,7 +499,7 @@ def _phase2_support_score_rows(
                 "score_formula_id": PHASE2_SCORE_FUNCTIONAL_ID,
                 "score_direction": "lower_is_better",
                 "support_aggregation": "mean_over_support_samples",
-                "support_n": int(raw.get("support_n", support_n)),
+                "support_n": row_support_n,
                 "support_score": float(raw["support_score"]),
                 "support_score_variance_or_se": float(raw.get("support_score_variance_or_se", 0.0)),
                 "class_order": str(candidate["class_order"]),
@@ -396,6 +513,29 @@ def _phase2_support_score_rows(
         )
     assert_phase2_support_score_matrix(rows)
     return rows
+
+
+def _context_source_rows(
+    source_rows: Sequence[Mapping[str, object]],
+    *,
+    heldout_center: str,
+) -> list[dict[str, object]]:
+    out: list[dict[str, object]] = []
+    for row in source_rows:
+        source = str(row.get("candidate_source_center", row.get("source_center", "")))
+        candidate_id = f"target_{heldout_center}_source_{source}"
+        patched = dict(row)
+        patched["candidate_id"] = candidate_id
+        patched["stable_candidate_id"] = candidate_id
+        out.append(patched)
+    return out
+
+
+def _context_sequence(context: Mapping[str, object], key: str) -> list[dict[str, object]]:
+    value = context.get(key)
+    if not isinstance(value, list) or not all(isinstance(row, dict) for row in value):
+        raise ProtocolError(f"Phase-2 context field {key!r} must be a list of objects.")
+    return [dict(row) for row in value]
 
 
 def _phase2_preflight_snapshot(
