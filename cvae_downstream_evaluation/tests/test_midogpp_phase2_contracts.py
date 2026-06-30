@@ -642,6 +642,18 @@ def test_phase2_preflight_materializer_writes_multi_context_freeze(tmp_path: Pat
             ],
         },
         {
+            "heldout_center": "0",
+            "support_seed": 23,
+            "support_size": 1,
+            "replicate": "0",
+            "support_rows": [_target_sample("support-0b", patient_id="p4", slide_id="s4", label=1)],
+            "eval_rows": [_target_sample("eval-0b", patient_id="p5", slide_id="s5", label=0)],
+            "support_scores": [
+                {"candidate_id": "target_0_source_1", "support_score": 1.5, "support_score_variance_or_se": 0.1},
+                {"candidate_id": "target_0_source_2", "support_score": 2.5, "support_score_variance_or_se": 0.2},
+            ],
+        },
+        {
             "heldout_center": "1",
             "support_seed": 23,
             "support_size": 1,
@@ -666,9 +678,9 @@ def test_phase2_preflight_materializer_writes_multi_context_freeze(tmp_path: Pat
 
     assert report["status"] == "PASS"
     assert report["checks"]["candidate_rows"] == 4
-    assert report["checks"]["routing_contexts"] == 2
-    assert len(_read_csv(root / "tables" / "routing_decisions.csv")) == 2
-    assert len(_read_csv(root / "tables" / "selected_sources.csv")) == 2
+    assert report["checks"]["routing_contexts"] == 3
+    assert len(_read_csv(root / "tables" / "routing_decisions.csv")) == 3
+    assert len(_read_csv(root / "tables" / "selected_sources.csv")) == 3
 
 
 def test_phase2_preflight_cli_rejects_forbidden_downstream_config_key(tmp_path: Path) -> None:

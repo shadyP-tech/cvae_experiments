@@ -185,20 +185,24 @@ def materialize_phase2_preflight_freeze_contexts(
     all_eval_rows: list[dict[str, object]] = []
     all_support_score_rows: list[dict[str, object]] = []
     seen_candidate_ids: set[str] = set()
+    candidates_by_heldout: dict[str, list[dict[str, object]]] = {}
 
     for context in contexts:
         heldout_center = str(context["heldout_center"])
         support_seed = int(context["support_seed"])
         support_size = int(context["support_size"])
         replicate = str(context.get("replicate", "0"))
-        context_sources = _context_source_rows(source_rows, heldout_center=heldout_center)
-        candidates = build_phase2_candidate_manifest(context_sources, heldout_center=heldout_center)
-        for candidate in candidates:
-            candidate_id = str(candidate["candidate_id"])
-            if candidate_id in seen_candidate_ids:
-                raise ProtocolError(f"Duplicate phase-2 multi-context candidate_id: {candidate_id!r}")
-            seen_candidate_ids.add(candidate_id)
-        all_candidates.extend(candidates)
+        candidates = candidates_by_heldout.get(heldout_center)
+        if candidates is None:
+            context_sources = _context_source_rows(source_rows, heldout_center=heldout_center)
+            candidates = build_phase2_candidate_manifest(context_sources, heldout_center=heldout_center)
+            for candidate in candidates:
+                candidate_id = str(candidate["candidate_id"])
+                if candidate_id in seen_candidate_ids:
+                    raise ProtocolError(f"Duplicate phase-2 multi-context candidate_id: {candidate_id!r}")
+                seen_candidate_ids.add(candidate_id)
+            candidates_by_heldout[heldout_center] = candidates
+            all_candidates.extend(candidates)
 
         if "support_rows" in context or "eval_rows" in context:
             if "support_rows" not in context or "eval_rows" not in context:
