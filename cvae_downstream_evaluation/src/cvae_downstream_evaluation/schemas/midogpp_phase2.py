@@ -11,7 +11,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Iterable, Mapping, Sequence
 
 from ..artifacts import stable_hash
 from ..protocol import ProtocolError
@@ -36,6 +36,17 @@ ROW_ROLES = (
 )
 
 PHASE2_REQUIRED_DIRS = ("configs", "manifests", "tables", "reports")
+PHASE2_PREFLIGHT_REPORT_SCHEMA_VERSION = "midogpp_phase2_preflight_freeze_report_v1"
+PHASE2_PREFLIGHT_REQUIRED_FILES = (
+    "configs/frozen_protocol_snapshot.json",
+    "manifests/support_sets.csv",
+    "manifests/eval_sets.csv",
+    "manifests/candidate_sources.csv",
+    "tables/support_score_matrix.csv",
+    "tables/routing_decisions.csv",
+    "tables/selected_sources.csv",
+    "reports/phase2_preflight_freeze_report.json",
+)
 PHASE2_REQUIRED_FILES = (
     "configs/frozen_protocol_snapshot.json",
     "configs/resolved_config.json",
@@ -58,6 +69,27 @@ PHASE2_REQUIRED_FILES = (
     "reports/decision_summary.md",
 )
 PHASE2_OPTIONAL_DIAGNOSTIC_FILES = ("tables/diagnostic_eval_nelbo_matrix.csv",)
+PHASE2_PREFLIGHT_FORBIDDEN_FILES = (
+    "diagnostic_downstream_utility.csv",
+    "diagnostic_eval_nelbo_matrix.csv",
+    "target_support_downstream_matrix.csv",
+    "routing_to_downstream_alignment.csv",
+    "selected_vs_oracle_gap.csv",
+    "baseline_comparison.csv",
+)
+PHASE2_FORBIDDEN_PATH_PARTS = (
+    PHASE1_ROOT_NAME,
+    "quarantined",
+)
+PHASE2_PREFLIGHT_FORBIDDEN_CONFIG_KEYS = (
+    "eval_nelbo_matrix_path",
+    "diagnostic_downstream_utility",
+    "diagnostic_matrix",
+    "downstream_matrix",
+    "oracle_matrix",
+    "target_eval_metrics",
+    "target_eval_labels",
+)
 
 STALE_SCORE_TOKENS = (
     "marginal_unlabeled",
@@ -87,15 +119,80 @@ PHASE2_FORBIDDEN_ROUTING_COLUMNS = (
     "macro_f1",
     "target_eval_bacc",
     "target_eval_macro_f1",
+    "eval_nelbo",
+    "target_eval_nelbo",
     "oracle_rank",
+    "oracle_gap",
     "downstream_oracle_candidate",
     "downstream_oracle_expert",
     "downstream_oracle_gap",
+    "downstream_utility",
+    "target_eval_utility",
     "fidelity",
     "target_eval_fidelity",
     "diagnostic_downstream_utility",
     "diagnostic_eval_nelbo",
     "phase1_oracle",
+)
+
+PHASE2_SUPPORT_SCORE_REQUIRED_COLUMNS = (
+    "schema_version",
+    "heldout_center",
+    "support_seed",
+    "replicate",
+    "support_split_id",
+    "candidate_id",
+    "candidate_source_center",
+    "stable_candidate_id",
+    "score_formula_id",
+    "score_direction",
+    "support_aggregation",
+    "support_n",
+    "support_score",
+    "support_score_variance_or_se",
+    "class_order",
+    "class_prior_value_hash",
+    "checkpoint_hash",
+    "config_hash",
+    "scorer_implementation_hash",
+    "encoder_mode",
+    "tie_or_near_tie",
+)
+PHASE2_ROUTING_DECISION_REQUIRED_COLUMNS = (
+    "schema_version",
+    "heldout_center",
+    "support_seed",
+    "replicate",
+    "support_split_id",
+    "selection_source",
+    "claim_role",
+    "row_role",
+    "support_labels_used",
+    "downstream_metrics_used",
+    "selected_candidate_id",
+    "selected_source_center",
+    "selected_score",
+    "tie_breaker",
+    "freeze_run_id",
+)
+PHASE2_SELECTED_SOURCE_REQUIRED_COLUMNS = (
+    "schema_version",
+    "heldout_center",
+    "support_seed",
+    "replicate",
+    "support_split_id",
+    "selected_candidate_id",
+    "selected_source_center",
+    "freeze_run_id",
+)
+PHASE2_NELBO_COMPARABILITY_FIELDS = (
+    "embedding_representation_hash",
+    "preprocessing_hash",
+    "decoder_likelihood_family",
+    "embedding_dimensionality",
+    "nelbo_reduction",
+    "beta_kl_weight",
+    "checkpoint_objective",
 )
 
 PHASE2_SPLIT_ID_COLUMNS = (
@@ -157,6 +254,7 @@ class Phase2Candidate:
             "heldout_center": self.heldout_center,
             "candidate_source_center": self.candidate_source_center,
             "candidate_id": self.candidate_id,
+            "stable_candidate_id": self.candidate_id,
             "checkpoint_path": self.checkpoint_path,
             "checkpoint_hash": self.checkpoint_hash,
             "checkpoint_provenance_hash": self.checkpoint_provenance_hash,
@@ -311,10 +409,27 @@ def build_phase2_candidate_manifest(
                 "heldout_center": heldout,
                 "candidate_source_center": source,
                 "candidate_id": candidate_id,
+                "stable_candidate_id": str(row.get("stable_candidate_id", candidate_id)),
                 "checkpoint_path": str(row.get("checkpoint_path", "")),
                 "checkpoint_hash": str(row.get("checkpoint_hash", "")),
                 "checkpoint_provenance_hash": str(row.get("checkpoint_provenance_hash", "")),
                 "feature_frame_hash": str(row.get("feature_frame_hash", "")),
+                "feature_provenance": str(row.get("feature_provenance", row.get("feature_provenance_status", ""))),
+                "feature_used_target_eval_labels": _bool(row.get("feature_used_target_eval_labels"), False),
+                "feature_used_downstream_utility": _bool(row.get("feature_used_downstream_utility"), False),
+                "feature_used_fidelity": _bool(row.get("feature_used_fidelity"), False),
+                "feature_used_oracle_gap": _bool(row.get("feature_used_oracle_gap"), False),
+                "feature_used_all_target_eval_statistics": _bool(
+                    row.get("feature_used_all_target_eval_statistics"),
+                    False,
+                ),
+                "embedding_representation_hash": str(row.get("embedding_representation_hash", "")),
+                "preprocessing_hash": str(row.get("preprocessing_hash", "")),
+                "decoder_likelihood_family": str(row.get("decoder_likelihood_family", "")),
+                "embedding_dimensionality": str(row.get("embedding_dimensionality", "")),
+                "nelbo_reduction": str(row.get("nelbo_reduction", "")),
+                "beta_kl_weight": str(row.get("beta_kl_weight", "")),
+                "checkpoint_objective": str(row.get("checkpoint_objective", "")),
                 "checkpoint_seed": int(row.get("checkpoint_seed", row.get("seed", 42))),
                 "generation_mode": str(row.get("generation_mode", "")),
                 "generation_class_prior_policy": str(row.get("generation_class_prior_policy", "locked_separate")),
@@ -356,6 +471,9 @@ def assert_phase2_candidate_manifest(
         candidate_id = str(row.get("candidate_id", ""))
         if not candidate_id:
             raise ProtocolError(f"Candidate row {idx} missing candidate_id.")
+        stable_candidate_id = str(row.get("stable_candidate_id", ""))
+        if not stable_candidate_id:
+            raise ProtocolError(f"Candidate row {candidate_id!r} missing stable_candidate_id.")
         if candidate_id in candidate_ids:
             raise ProtocolError(f"Duplicate phase-2 candidate_id: {candidate_id!r}")
         candidate_ids.add(candidate_id)
@@ -390,6 +508,18 @@ def assert_phase2_split_manifests(
         raise ProtocolError("Phase-2 support manifest is empty.")
     if not eval_rows:
         raise ProtocolError("Phase-2 eval manifest is empty.")
+    for role, rows in (("support", support_rows), ("eval", eval_rows)):
+        for idx, row in enumerate(rows):
+            forbidden = sorted(set(row).intersection(PHASE2_FORBIDDEN_ROUTING_COLUMNS))
+            forbidden = [column for column in forbidden if column != "label_availability"]
+            if forbidden:
+                raise ProtocolError(f"{role.title()} row {idx} exposes forbidden preflight columns: {forbidden}")
+        for idx, row in enumerate(rows):
+            if str(row.get("label_availability", "")) not in {
+                "withheld_from_routing",
+                "final_scoring_only",
+            }:
+                raise ProtocolError(f"{role.title()} row {idx} missing explicit label_availability firewall.")
     for idx, row in enumerate(support_rows):
         forbidden = sorted(set(row).intersection(PHASE2_FORBIDDEN_ROUTING_COLUMNS))
         forbidden = [column for column in forbidden if column != "label_availability"]
@@ -518,9 +648,10 @@ def assert_phase2_routing_firewall(
 
     for path in input_paths:
         normalized = Path(path)
-        if PHASE1_ROOT_NAME in normalized.parts:
-            raise ProtocolError(f"Phase-1 diagnostic artifacts cannot feed phase-2 routing: {path}")
-        if normalized.name in PHASE2_DIAGNOSTIC_INPUT_NAMES:
+        forbidden_parts = sorted(set(normalized.parts).intersection(PHASE2_FORBIDDEN_PATH_PARTS))
+        if forbidden_parts:
+            raise ProtocolError(f"Forbidden phase-2 routing input path component {forbidden_parts}: {path}")
+        if normalized.name in set(PHASE2_DIAGNOSTIC_INPUT_NAMES).union(PHASE2_PREFLIGHT_FORBIDDEN_FILES):
             raise ProtocolError(f"Diagnostic artifact cannot feed phase-2 routing: {path}")
     for idx, row in enumerate(input_rows):
         forbidden = sorted(set(row).intersection(PHASE2_FORBIDDEN_ROUTING_COLUMNS))
@@ -575,6 +706,235 @@ def assert_phase2_snapshot(
         )
 
 
+def assert_phase2_preflight_config(config: Mapping[str, object]) -> None:
+    """Reject preflight configs that expose post-freeze diagnostic/eval paths."""
+
+    forbidden = sorted(
+        key
+        for key in _walk_mapping_keys(config)
+        if key in PHASE2_PREFLIGHT_FORBIDDEN_CONFIG_KEYS
+    )
+    if forbidden:
+        raise ProtocolError(f"Phase-2 preflight config exposes forbidden keys: {forbidden}")
+
+
+def assert_phase2_preflight_snapshot(
+    snapshot: Mapping[str, object],
+    *,
+    candidate_rows: Sequence[Mapping[str, object]],
+) -> None:
+    """Validate the stricter freeze-time snapshot fields."""
+
+    assert_phase2_snapshot(snapshot, candidate_rows=candidate_rows)
+    required = {
+        "support_score_matrix_hash",
+        "routing_decisions_hash",
+        "selected_sources_hash",
+        "candidate_sources_hash",
+        "support_sets_hash",
+        "eval_sets_hash",
+        "freeze_run_id",
+        "freeze_timestamp",
+    }
+    missing = sorted(required.difference(snapshot))
+    if missing:
+        raise ProtocolError(f"Phase-2 preflight snapshot missing fields: {missing}")
+
+
+def assert_phase2_support_score_matrix(rows: Sequence[Mapping[str, object]]) -> None:
+    """Validate support-only score rows before routing decisions are frozen."""
+
+    if not rows:
+        raise ProtocolError("Phase-2 support_score_matrix.csv is empty.")
+    for idx, row in enumerate(rows):
+        _assert_required_columns(row, PHASE2_SUPPORT_SCORE_REQUIRED_COLUMNS, f"support score row {idx}")
+        assert_phase2_routing_firewall(input_rows=[row])
+        if str(row["score_formula_id"]) != PHASE2_SCORE_FUNCTIONAL_ID:
+            raise ProtocolError(f"Unexpected score formula in support score row {idx}.")
+        if str(row["score_direction"]) != "lower_is_better":
+            raise ProtocolError(f"Support score row {idx} must use lower_is_better.")
+        if str(row["support_aggregation"]) != "mean_over_support_samples":
+            raise ProtocolError(f"Support score row {idx} must use mean_over_support_samples.")
+        support_n = int(row["support_n"])
+        if support_n <= 0:
+            raise ProtocolError(f"Support score row {idx} must have positive support_n.")
+        for column in ("support_score", "support_score_variance_or_se"):
+            value = float(row[column])
+            if not math.isfinite(value):
+                raise ProtocolError(f"Support score row {idx} has non-finite {column}: {value!r}")
+        assert_phase2_score_config(_candidate_score_config(row))
+
+
+def build_phase2_routing_decisions(
+    support_score_rows: Sequence[Mapping[str, object]],
+    *,
+    freeze_run_id: str,
+) -> list[dict[str, object]]:
+    """Select one source expert per support context by deterministic argmin."""
+
+    if not freeze_run_id:
+        raise ProtocolError("freeze_run_id is required for routing decisions.")
+    assert_phase2_support_score_matrix(support_score_rows)
+    grouped: dict[tuple[str, str, str, str], list[Mapping[str, object]]] = {}
+    for row in support_score_rows:
+        key = _support_context_key(row)
+        grouped.setdefault(key, []).append(row)
+    decisions: list[dict[str, object]] = []
+    for key, rows in sorted(grouped.items()):
+        ordered = sorted(rows, key=lambda row: (float(row["support_score"]), str(row["stable_candidate_id"])))
+        selected = ordered[0]
+        runner_up = ordered[1] if len(ordered) > 1 else None
+        selected_score = float(selected["support_score"])
+        runner_up_score = float(runner_up["support_score"]) if runner_up is not None else math.nan
+        margin = runner_up_score - selected_score if runner_up is not None else math.nan
+        decisions.append(
+            {
+                "schema_version": PHASE2_SCHEMA_VERSION,
+                "heldout_center": key[0],
+                "support_seed": key[1],
+                "replicate": key[2],
+                "support_split_id": key[3],
+                "selection_source": "support_score_matrix",
+                "claim_role": "routing_preflight",
+                "row_role": "selection_decision",
+                "support_labels_used": False,
+                "downstream_metrics_used": False,
+                "selected_candidate_id": str(selected["candidate_id"]),
+                "selected_source_center": str(selected["candidate_source_center"]),
+                "selected_score": selected_score,
+                "runner_up_candidate_id": "" if runner_up is None else str(runner_up["candidate_id"]),
+                "runner_up_score": "" if runner_up is None else runner_up_score,
+                "score_margin": "" if runner_up is None else margin,
+                "tie_or_near_tie": _bool(selected.get("tie_or_near_tie"), False) or math.isclose(margin, 0.0, abs_tol=1e-12),
+                "tie_breaker": "stable_candidate_id",
+                "freeze_run_id": freeze_run_id,
+            }
+        )
+    return decisions
+
+
+def assert_phase2_routing_decisions(
+    rows: Sequence[Mapping[str, object]],
+    *,
+    support_score_rows: Sequence[Mapping[str, object]],
+) -> None:
+    """Validate routing decisions and prove they are derivable from support scores."""
+
+    if not rows:
+        raise ProtocolError("Phase-2 routing_decisions.csv is empty.")
+    freeze_run_ids = {str(row.get("freeze_run_id", "")) for row in rows}
+    if len(freeze_run_ids) != 1 or "" in freeze_run_ids:
+        raise ProtocolError("Routing decisions must share one non-empty freeze_run_id.")
+    expected = build_phase2_routing_decisions(support_score_rows, freeze_run_id=next(iter(freeze_run_ids)))
+    if len(rows) != len(expected):
+        raise ProtocolError(f"Routing decision row count mismatch: {len(rows)} != {len(expected)}")
+    for idx, (observed, wanted) in enumerate(zip(_sort_decision_rows(rows), expected)):
+        _assert_required_columns(observed, PHASE2_ROUTING_DECISION_REQUIRED_COLUMNS, f"routing decision row {idx}")
+        assert_phase2_routing_firewall(input_rows=[observed])
+        for key, value in wanted.items():
+            _assert_csv_value_equal(
+                observed.get(key, ""),
+                value,
+                label=f"routing_decisions.csv row {idx} column {key}",
+            )
+
+
+def build_phase2_selected_sources(
+    routing_decision_rows: Sequence[Mapping[str, object]],
+) -> list[dict[str, object]]:
+    """Project selected source rows from frozen routing decisions."""
+
+    if not routing_decision_rows:
+        raise ProtocolError("Cannot build selected_sources.csv from empty routing decisions.")
+    selected: list[dict[str, object]] = []
+    for row in _sort_decision_rows(routing_decision_rows):
+        _assert_required_columns(row, PHASE2_ROUTING_DECISION_REQUIRED_COLUMNS, "routing decision row")
+        selected.append(
+            {
+                "schema_version": PHASE2_SCHEMA_VERSION,
+                "heldout_center": str(row["heldout_center"]),
+                "support_seed": str(row["support_seed"]),
+                "replicate": str(row["replicate"]),
+                "support_split_id": str(row["support_split_id"]),
+                "selected_candidate_id": str(row["selected_candidate_id"]),
+                "selected_source_center": str(row["selected_source_center"]),
+                "freeze_run_id": str(row["freeze_run_id"]),
+            }
+        )
+    return selected
+
+
+def assert_phase2_selected_sources(
+    rows: Sequence[Mapping[str, object]],
+    *,
+    routing_decision_rows: Sequence[Mapping[str, object]],
+) -> None:
+    """Validate selected_sources.csv is exactly derivable from routing decisions."""
+
+    expected = build_phase2_selected_sources(routing_decision_rows)
+    if len(rows) != len(expected):
+        raise ProtocolError(f"Selected source row count mismatch: {len(rows)} != {len(expected)}")
+    for idx, (observed, wanted) in enumerate(zip(_sort_selected_rows(rows), expected)):
+        _assert_required_columns(observed, PHASE2_SELECTED_SOURCE_REQUIRED_COLUMNS, f"selected source row {idx}")
+        assert_phase2_routing_firewall(input_rows=[observed])
+        for key, value in wanted.items():
+            _assert_csv_value_equal(
+                observed.get(key, ""),
+                value,
+                label=f"selected_sources.csv row {idx} column {key}",
+            )
+
+
+def assert_phase2_nelbo_comparability(rows: Sequence[Mapping[str, object]]) -> None:
+    """Fail closed unless candidate experts are comparable for support-NELBO ranking."""
+
+    if not rows:
+        raise ProtocolError("Cannot audit NELBO comparability without candidate rows.")
+    reference: dict[str, str] = {}
+    for idx, row in enumerate(rows):
+        candidate = str(row.get("candidate_id", f"row-{idx}"))
+        for field in PHASE2_NELBO_COMPARABILITY_FIELDS:
+            value = str(row.get(field, ""))
+            if not value:
+                raise ProtocolError(f"Candidate {candidate!r} missing NELBO comparability field {field!r}.")
+            if field not in reference:
+                reference[field] = value
+            elif reference[field] != value:
+                raise ProtocolError(
+                    f"Candidate {candidate!r} has incompatible {field}: {value!r} != {reference[field]!r}"
+                )
+
+
+def assert_phase2_feature_provenance(
+    *,
+    candidate_rows: Sequence[Mapping[str, object]],
+    snapshot: Mapping[str, object],
+) -> None:
+    """Require source-only/label-free feature lineage before preflight freeze."""
+
+    if not str(snapshot.get("feature_whitelist_hash", "")):
+        raise ProtocolError("Preflight snapshot missing feature_whitelist_hash.")
+    for idx, row in enumerate(candidate_rows):
+        candidate = str(row.get("candidate_id", f"row-{idx}"))
+        if not str(row.get("feature_frame_hash", "")):
+            raise ProtocolError(f"Candidate {candidate!r} missing feature_frame_hash.")
+        provenance = str(row.get("feature_provenance", row.get("feature_provenance_status", "")))
+        if provenance not in {"predeclared", "source_only_label_free"}:
+            raise ProtocolError(
+                f"Candidate {candidate!r} feature provenance must be predeclared or source_only_label_free."
+            )
+        forbidden_flags = {
+            "feature_used_target_eval_labels": _bool(row.get("feature_used_target_eval_labels"), False),
+            "feature_used_downstream_utility": _bool(row.get("feature_used_downstream_utility"), False),
+            "feature_used_fidelity": _bool(row.get("feature_used_fidelity"), False),
+            "feature_used_oracle_gap": _bool(row.get("feature_used_oracle_gap"), False),
+            "feature_used_all_target_eval_statistics": _bool(row.get("feature_used_all_target_eval_statistics"), False),
+        }
+        leaked = sorted(key for key, value in forbidden_flags.items() if value)
+        if leaked:
+            raise ProtocolError(f"Candidate {candidate!r} feature provenance leaks forbidden inputs: {leaked}")
+
+
 def assert_phase2_artifact_contract(root: Path) -> None:
     """Check the canonical phase-2 root structure and required file names."""
 
@@ -584,6 +944,23 @@ def assert_phase2_artifact_contract(root: Path) -> None:
         raise ProtocolError(f"Phase-2 artifact root missing directories: {missing_dirs}")
     if (Path(root) / "tables" / "target_support_downstream_matrix.csv").exists():
         raise ProtocolError("target_support_downstream_matrix.csv is forbidden for phase-2.")
+
+
+def assert_phase2_preflight_artifact_contract(root: Path) -> None:
+    """Check freeze-time files exist and post-eval artifacts do not."""
+
+    assert_phase2_artifact_contract(root)
+    root = Path(root)
+    missing = [name for name in PHASE2_PREFLIGHT_REQUIRED_FILES[:-1] if not (root / name).exists()]
+    if missing:
+        raise ProtocolError(f"Phase-2 preflight freeze missing required files: {missing}")
+    forbidden = [
+        str(path.relative_to(root))
+        for path in root.rglob("*")
+        if path.is_file() and path.name in PHASE2_PREFLIGHT_FORBIDDEN_FILES
+    ]
+    if forbidden:
+        raise ProtocolError(f"Forbidden post-eval artifacts exist before phase-2 freeze: {sorted(forbidden)}")
 
 
 def _candidate_score_config(row: Mapping[str, object]) -> dict[str, object]:
@@ -596,7 +973,7 @@ def _candidate_score_config(row: Mapping[str, object]) -> dict[str, object]:
         "class_order": class_order,
         "class_prior_value_hash": prior_hash,
     }
-    if "class_prior_values" in row:
+    if isinstance(row.get("class_prior_values"), Mapping):
         config["class_prior_values"] = row["class_prior_values"]
     return config
 
@@ -686,7 +1063,8 @@ def _eval_manifest_row(
     support_seed: int,
     split_key: str,
 ) -> dict[str, object]:
-    out = {str(key): value for key, value in row.items()}
+    forbidden = set(PHASE2_FORBIDDEN_ROUTING_COLUMNS)
+    out = {str(key): value for key, value in row.items() if str(key) not in forbidden}
     out.update(
         {
             "split_role": "eval",
@@ -718,6 +1096,77 @@ def _normalized_prior(prior: Mapping[str, float], *, class_order: Sequence[str])
     return normalized
 
 
+def _walk_mapping_keys(mapping: Mapping[str, object]) -> Iterable[str]:
+    for key, value in mapping.items():
+        yield str(key)
+        if isinstance(value, Mapping):
+            yield from _walk_mapping_keys(value)  # type: ignore[arg-type]
+        elif isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+            for item in value:
+                if isinstance(item, Mapping):
+                    yield from _walk_mapping_keys(item)  # type: ignore[arg-type]
+
+
+def _assert_required_columns(row: Mapping[str, object], required: Sequence[str], label: str) -> None:
+    missing = [column for column in required if column not in row or row.get(column) in {None, ""}]
+    if missing:
+        raise ProtocolError(f"{label} missing required columns: {missing}")
+
+
+def _support_context_key(row: Mapping[str, object]) -> tuple[str, str, str, str]:
+    return (
+        str(row["heldout_center"]),
+        str(row["support_seed"]),
+        str(row["replicate"]),
+        str(row["support_split_id"]),
+    )
+
+
+def _sort_decision_rows(rows: Sequence[Mapping[str, object]]) -> list[Mapping[str, object]]:
+    return sorted(
+        rows,
+        key=lambda row: (
+            str(row.get("heldout_center", "")),
+            str(row.get("support_seed", "")),
+            str(row.get("replicate", "")),
+            str(row.get("support_split_id", "")),
+        ),
+    )
+
+
+def _sort_selected_rows(rows: Sequence[Mapping[str, object]]) -> list[Mapping[str, object]]:
+    return sorted(
+        rows,
+        key=lambda row: (
+            str(row.get("heldout_center", "")),
+            str(row.get("support_seed", "")),
+            str(row.get("replicate", "")),
+            str(row.get("support_split_id", "")),
+            str(row.get("selected_candidate_id", "")),
+        ),
+    )
+
+
+def _assert_csv_value_equal(observed: object, expected: object, *, label: str) -> None:
+    if isinstance(expected, bool):
+        if _bool(observed, default=not expected) != expected:
+            raise ProtocolError(f"{label} mismatch: {observed!r} != {expected!r}")
+        return
+    if isinstance(expected, float):
+        try:
+            observed_float = float(observed)
+        except (TypeError, ValueError) as exc:
+            raise ProtocolError(f"{label} is not numeric: {observed!r}") from exc
+        if math.isnan(expected):
+            if str(observed) not in {"", "nan"}:
+                raise ProtocolError(f"{label} mismatch: {observed!r} != empty/nan")
+        elif not math.isclose(observed_float, expected, rel_tol=1e-9, abs_tol=1e-9):
+            raise ProtocolError(f"{label} mismatch: {observed_float!r} != {expected!r}")
+        return
+    if str(observed) != str(expected):
+        raise ProtocolError(f"{label} mismatch: {observed!r} != {expected!r}")
+
+
 def _uniform_prior(class_order: Sequence[str]) -> dict[str, float]:
     if not class_order:
         raise ProtocolError("Cannot build a uniform prior for an empty class_order.")
@@ -732,7 +1181,7 @@ def _prior_mapping(raw: object) -> dict[str, float]:
 
 
 def _class_order(raw: object) -> tuple[str, ...]:
-    if raw in {None, ""}:
+    if raw is None or raw == "":
         raise ProtocolError("class_order is required.")
     if isinstance(raw, str):
         parts = tuple(part for part in raw.split("|") if part != "")

@@ -1,5 +1,7 @@
 from pathlib import Path
+import json
 import math
+import subprocess
 import sys
 
 
@@ -9,10 +11,15 @@ sys.path.insert(0, str(ROOT / "src"))
 from cvae_downstream_evaluation.artifacts.midogpp_phase2 import (  # noqa: E402
     create_phase2_artifact_root,
     default_phase2_artifact_root,
+    materialize_phase2_preflight_freeze,
     phase2_validation_payload,
+    validate_phase2_preflight_freeze,
     write_phase2_csv,
+    write_phase2_json,
     write_locked_phase2_support_eval_split,
+    write_phase2_preflight_freeze_report,
 )
+from cvae_downstream_evaluation.artifacts import stable_hash  # noqa: E402
 from cvae_downstream_evaluation.protocol import ProtocolError  # noqa: E402
 from cvae_downstream_evaluation.schemas import SELECTION_ELIGIBLE  # noqa: E402
 from cvae_downstream_evaluation.schemas.midogpp_phase2 import (  # noqa: E402
@@ -21,10 +28,18 @@ from cvae_downstream_evaluation.schemas.midogpp_phase2 import (  # noqa: E402
     assert_no_stale_score_semantics,
     assert_phase2_artifact_contract,
     assert_phase2_candidate_manifest,
+    assert_phase2_feature_provenance,
+    assert_phase2_nelbo_comparability,
+    assert_phase2_preflight_config,
     assert_phase2_routing_firewall,
+    assert_phase2_routing_decisions,
     assert_phase2_score_config,
+    assert_phase2_selected_sources,
     assert_phase2_snapshot,
     assert_phase2_split_manifests,
+    assert_phase2_support_score_matrix,
+    build_phase2_routing_decisions,
+    build_phase2_selected_sources,
     build_locked_phase2_support_eval_split,
     build_phase2_candidate_manifest,
     class_prior_hash,
@@ -144,7 +159,7 @@ def test_phase2_split_validation_checks_all_available_id_families() -> None:
             "patient_id": "p2",
             "slide_id": "slide2",
             "center": "0",
-            "class_label": 1,
+            "label_availability": "final_scoring_only",
         }
     ]
 
@@ -193,7 +208,7 @@ def test_phase2_locked_splitter_writes_label_free_support_manifests(tmp_path: Pa
     assert evaluation
     assert all(row["split_role"] == "support" for row in support)
     assert all("label" not in row for row in support)
-    assert any("label" in row for row in evaluation)
+    assert all("label" not in row for row in evaluation)
     assert_phase2_split_manifests(support_rows=support, eval_rows=evaluation)
 
     root = tmp_path / "midogpp" / PHASE2_ROOT_NAME
@@ -211,7 +226,8 @@ def test_phase2_locked_splitter_writes_label_free_support_manifests(tmp_path: Pa
     eval_header = eval_path.read_text(encoding="utf-8").splitlines()[0].split(",")
     assert "label" not in support_header
     assert "label_availability" in support_header
-    assert "label" in eval_header
+    assert "label" not in eval_header
+    assert "label_availability" in eval_header
 
 
 def test_phase2_locked_splitter_accepts_scanner_domain_labels() -> None:
@@ -269,6 +285,7 @@ def test_phase2_routing_firewall_blocks_diagnostic_and_phase1_inputs() -> None:
         Path("tables/diagnostic_downstream_utility.csv"),
         Path("tables/diagnostic_eval_nelbo_matrix.csv"),
         Path("phase1_virchow2_late_import_seed42/tables/anything.csv"),
+        Path("cvae_testing/scripts/quarantined/bad.csv"),
     ]
     for path in forbidden_paths:
         try:
@@ -284,6 +301,13 @@ def test_phase2_routing_firewall_blocks_diagnostic_and_phase1_inputs() -> None:
         pass
     else:
         raise AssertionError("target-eval metric column was not rejected")
+
+    try:
+        assert_phase2_preflight_config({"paths": {"eval_nelbo_matrix_path": "tables/eval.csv"}})
+    except ProtocolError:
+        pass
+    else:
+        raise AssertionError("preflight config accepted eval_nelbo_matrix_path")
 
 
 def test_phase2_snapshot_binds_score_prior_and_routing_decision() -> None:
@@ -346,6 +370,238 @@ def test_phase2_artifact_writer_rejects_forbidden_matrix_name(tmp_path: Path) ->
     assert payload["schema_version"] == "midogpp_phase2_validation_report_v1"
 
 
+def test_phase2_support_score_routing_and_selected_sources_are_derivable() -> None:
+    prior_hash = class_prior_hash({"0": 0.5, "1": 0.5}, class_order=("0", "1"))
+    score_rows = [
+        _support_score_row("c2", "2", support_score=3.0, stable_candidate_id="b", prior_hash=prior_hash),
+        _support_score_row("c1", "1", support_score=3.0, stable_candidate_id="a", prior_hash=prior_hash),
+    ]
+
+    assert_phase2_support_score_matrix(score_rows)
+    decisions = build_phase2_routing_decisions(score_rows, freeze_run_id="freeze-1")
+    assert decisions[0]["selected_candidate_id"] == "c1"
+    assert decisions[0]["tie_or_near_tie"] is True
+    assert_phase2_routing_decisions(decisions, support_score_rows=score_rows)
+
+    selected = build_phase2_selected_sources(decisions)
+    assert selected == [
+        {
+            "schema_version": "midogpp_phase2_target_support_adaptation_v1",
+            "heldout_center": "0",
+            "support_seed": "42",
+            "replicate": "0",
+            "support_split_id": "split-1",
+            "selected_candidate_id": "c1",
+            "selected_source_center": "1",
+            "freeze_run_id": "freeze-1",
+        }
+    ]
+    assert_phase2_selected_sources(selected, routing_decision_rows=decisions)
+
+    try:
+        assert_phase2_support_score_matrix([score_rows[0] | {"bacc": 0.9}])
+    except ProtocolError:
+        pass
+    else:
+        raise AssertionError("support score matrix accepted downstream metric column")
+
+
+def test_phase2_nelbo_comparability_and_feature_provenance_are_blocking() -> None:
+    rows = [_candidate_row(heldout_center="0", source_center="1", candidate_id="c1")]
+    assert_phase2_nelbo_comparability(rows)
+    assert_phase2_feature_provenance(
+        candidate_rows=rows,
+        snapshot={"feature_whitelist_hash": "features"},
+    )
+
+    try:
+        assert_phase2_nelbo_comparability(
+            rows
+            + [
+                _candidate_row(heldout_center="0", source_center="5", candidate_id="c5")
+                | {"decoder_likelihood_family": "bernoulli"}
+            ]
+        )
+    except ProtocolError:
+        pass
+    else:
+        raise AssertionError("NELBO comparability accepted incompatible likelihood family")
+
+    try:
+        assert_phase2_feature_provenance(
+            candidate_rows=[rows[0] | {"feature_used_downstream_utility": True}],
+            snapshot={"feature_whitelist_hash": "features"},
+        )
+    except ProtocolError:
+        pass
+    else:
+        raise AssertionError("feature provenance accepted downstream utility leakage")
+
+
+def test_phase2_preflight_freeze_report_validates_hashes_and_forbidden_artifacts(tmp_path: Path) -> None:
+    root = tmp_path / "midogpp" / PHASE2_ROOT_NAME
+    create_phase2_artifact_root(root)
+    prior_hash = class_prior_hash({"0": 0.5, "1": 0.5}, class_order=("0", "1"))
+    candidate_rows = [
+        _candidate_row(
+            heldout_center="0",
+            source_center="1",
+            candidate_id="c1",
+            class_prior_value_hash=prior_hash,
+        )
+    ]
+    support_rows = [
+        {
+            "center": "0",
+            "sample_id": "s1",
+            "patient_id": "p1",
+            "slide_id": "slide1",
+            "case_id": "case-s1",
+            "group_id": "p1",
+            "split_role": "support",
+            "split_id": "split-1",
+            "support_seed": 42,
+            "split_group_key": "identity_component",
+            "label_availability": "withheld_from_routing",
+        }
+    ]
+    eval_rows = [
+        {
+            "center": "0",
+            "sample_id": "e1",
+            "patient_id": "p2",
+            "slide_id": "slide2",
+            "case_id": "case-e1",
+            "group_id": "p2",
+            "split_role": "eval",
+            "split_id": "split-1",
+            "support_seed": 42,
+            "split_group_key": "identity_component",
+            "label_availability": "final_scoring_only",
+        }
+    ]
+    score_rows = [
+        _support_score_row("c1", "1", support_score=2.0, stable_candidate_id="c1", prior_hash=prior_hash)
+    ]
+    decisions = build_phase2_routing_decisions(score_rows, freeze_run_id="freeze-1")
+    selected = build_phase2_selected_sources(decisions)
+
+    write_phase2_csv(root / "manifests" / "candidate_sources.csv", candidate_rows)
+    write_phase2_csv(root / "manifests" / "support_sets.csv", support_rows)
+    write_phase2_csv(root / "manifests" / "eval_sets.csv", eval_rows)
+    write_phase2_csv(root / "tables" / "support_score_matrix.csv", score_rows)
+    write_phase2_csv(root / "tables" / "routing_decisions.csv", decisions)
+    write_phase2_csv(root / "tables" / "selected_sources.csv", selected)
+    snapshot = {
+        "candidate_pool_hash": "pool",
+        "support_split_hash": "support",
+        "eval_split_hash": "eval",
+        "checkpoint_cache_hash": "ckpt",
+        "generation_config_hash": "gen",
+        "classifier_config_hash": "clf",
+        "metric_config_hash": "metric",
+        "feature_whitelist_hash": "features",
+        "routing_rule": "argmin_support_score",
+        "score_formula_id": PHASE2_SCORE_FUNCTIONAL_ID,
+        "class_prior_value_hash": prior_hash,
+        "score_direction": "lower_is_better",
+        "support_aggregation": "mean_over_support_samples",
+        "tie_breaker": "stable_candidate_id",
+        "freeze_run_id": "freeze-1",
+        "freeze_timestamp": "2026-06-30T00:00:00Z",
+        "protocol_hash": "protocol",
+    } | _artifact_hashes(root)
+    write_phase2_json(root / "configs" / "frozen_protocol_snapshot.json", snapshot)
+
+    payload = validate_phase2_preflight_freeze(root)
+    assert payload["status"] == "PASS"
+    report_path = write_phase2_preflight_freeze_report(root)
+    assert report_path.name == "phase2_preflight_freeze_report.json"
+
+    write_phase2_csv(root / "tables" / "support_score_matrix.csv", [score_rows[0] | {"support_score": 9.0}])
+    try:
+        validate_phase2_preflight_freeze(root)
+    except ProtocolError:
+        pass
+    else:
+        raise AssertionError("preflight freeze accepted support_score_matrix drift")
+
+    try:
+        write_phase2_csv(root / "tables" / "diagnostic_downstream_utility.csv", [{"candidate_id": "c1"}])
+    except ProtocolError:
+        pass
+    else:
+        raise AssertionError("preflight writer accepted diagnostic downstream utility")
+
+
+def test_phase2_preflight_materializer_writes_only_freeze_artifacts(tmp_path: Path) -> None:
+    root = tmp_path / "midogpp" / PHASE2_ROOT_NAME
+    report = materialize_phase2_preflight_freeze(
+        root=root,
+        source_rows=[_source_row("1"), _source_row("5")],
+        target_rows=[
+            _target_sample("s1", patient_id="p1", slide_id="slide1", label=0),
+            _target_sample("s2", patient_id="p2", slide_id="slide2", label=1),
+            _target_sample("s3", patient_id="p3", slide_id="slide3", label=0),
+        ],
+        support_score_inputs=[
+            {"candidate_id": "source_1", "support_score": 2.0, "support_score_variance_or_se": 0.1},
+            {"candidate_id": "source_5", "support_score": 3.0, "support_score_variance_or_se": 0.2},
+        ],
+        heldout_center="0",
+        support_size=1,
+        support_seed=42,
+        replicate="0",
+        freeze_run_id="freeze-smoke",
+        freeze_timestamp="2026-06-30T00:00:00Z",
+        snapshot_fields={"metric_config_hash": "metric", "protocol_hash": "protocol"},
+    )
+
+    assert report["status"] == "PASS"
+    assert (root / "manifests" / "candidate_sources.csv").exists()
+    assert (root / "tables" / "support_score_matrix.csv").exists()
+    assert (root / "tables" / "routing_decisions.csv").exists()
+    assert (root / "tables" / "selected_sources.csv").exists()
+    assert (root / "configs" / "frozen_protocol_snapshot.json").exists()
+    assert (root / "reports" / "phase2_preflight_freeze_report.json").exists()
+    assert not (root / "tables" / "diagnostic_downstream_utility.csv").exists()
+
+
+def test_phase2_preflight_cli_rejects_forbidden_downstream_config_key(tmp_path: Path) -> None:
+    config_path = tmp_path / "preflight.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "out_dir": str(tmp_path / "out"),
+                "heldout_center": "0",
+                "support_size": 1,
+                "support_seed": 42,
+                "freeze_run_id": "freeze-smoke",
+                "freeze_timestamp": "2026-06-30T00:00:00Z",
+                "eval_nelbo_matrix_path": "tables/diagnostic_eval_nelbo_matrix.csv",
+                "source_rows": [],
+                "target_rows": [],
+                "support_scores": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "run_midogpp_phase2_preflight_freeze.py"),
+            "--config",
+            str(config_path),
+            "--dry-run",
+        ],
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "forbidden keys" in result.stderr
+
+
 def _source_row(source_center: str) -> dict[str, object]:
     prior = {"0": 0.5, "1": 0.5}
     return {
@@ -355,6 +611,19 @@ def _source_row(source_center: str) -> dict[str, object]:
         "checkpoint_hash": f"ckpt-{source_center}",
         "checkpoint_provenance_hash": f"prov-{source_center}",
         "feature_frame_hash": f"frame-{source_center}",
+        "feature_provenance": "source_only_label_free",
+        "feature_used_target_eval_labels": False,
+        "feature_used_downstream_utility": False,
+        "feature_used_fidelity": False,
+        "feature_used_oracle_gap": False,
+        "feature_used_all_target_eval_statistics": False,
+        "embedding_representation_hash": "virchow2-pca64",
+        "preprocessing_hash": "preprocess-v1",
+        "decoder_likelihood_family": "gaussian",
+        "embedding_dimensionality": "64",
+        "nelbo_reduction": "mean_per_sample",
+        "beta_kl_weight": "1.0",
+        "checkpoint_objective": "conditional_cvae_elbo",
         "checkpoint_seed": 42,
         "generation_mode": "class_balanced",
         "generation_class_prior_policy": "uniform_generation_policy",
@@ -396,10 +665,24 @@ def _candidate_row(
         "heldout_center": heldout_center,
         "candidate_source_center": source_center,
         "candidate_id": candidate_id,
+        "stable_candidate_id": candidate_id,
         "checkpoint_path": "ckpt.pt",
         "checkpoint_hash": "ckpt",
         "checkpoint_provenance_hash": "prov",
         "feature_frame_hash": "frame",
+        "feature_provenance": "source_only_label_free",
+        "feature_used_target_eval_labels": False,
+        "feature_used_downstream_utility": False,
+        "feature_used_fidelity": False,
+        "feature_used_oracle_gap": False,
+        "feature_used_all_target_eval_statistics": False,
+        "embedding_representation_hash": "virchow2-pca64",
+        "preprocessing_hash": "preprocess-v1",
+        "decoder_likelihood_family": "gaussian",
+        "embedding_dimensionality": "64",
+        "nelbo_reduction": "mean_per_sample",
+        "beta_kl_weight": "1.0",
+        "checkpoint_objective": "conditional_cvae_elbo",
         "checkpoint_seed": 42,
         "generation_mode": "class_balanced",
         "generation_class_prior_policy": "uniform_generation_policy",
@@ -421,3 +704,48 @@ def _candidate_row(
         "eligibility": SELECTION_ELIGIBLE,
         "support_labels_used": False,
     }
+
+
+def _support_score_row(
+    candidate_id: str,
+    source_center: str,
+    *,
+    support_score: float,
+    stable_candidate_id: str,
+    prior_hash: str,
+) -> dict[str, object]:
+    return {
+        "schema_version": "midogpp_phase2_target_support_adaptation_v1",
+        "heldout_center": "0",
+        "support_seed": "42",
+        "replicate": "0",
+        "support_split_id": "split-1",
+        "candidate_id": candidate_id,
+        "candidate_source_center": source_center,
+        "stable_candidate_id": stable_candidate_id,
+        "score_formula_id": PHASE2_SCORE_FUNCTIONAL_ID,
+        "score_direction": "lower_is_better",
+        "support_aggregation": "mean_over_support_samples",
+        "support_n": 2,
+        "support_score": support_score,
+        "support_score_variance_or_se": 0.1,
+        "class_order": "0|1",
+        "class_prior_value_hash": prior_hash,
+        "checkpoint_hash": "ckpt",
+        "config_hash": "config",
+        "scorer_implementation_hash": "score-hash",
+        "encoder_mode": "deterministic",
+        "tie_or_near_tie": False,
+    }
+
+
+def _artifact_hashes(root: Path) -> dict[str, str]:
+    paths = {
+        "candidate_sources_hash": root / "manifests" / "candidate_sources.csv",
+        "support_sets_hash": root / "manifests" / "support_sets.csv",
+        "eval_sets_hash": root / "manifests" / "eval_sets.csv",
+        "support_score_matrix_hash": root / "tables" / "support_score_matrix.csv",
+        "routing_decisions_hash": root / "tables" / "routing_decisions.csv",
+        "selected_sources_hash": root / "tables" / "selected_sources.csv",
+    }
+    return {key: stable_hash(path.read_text(encoding="utf-8")) for key, path in paths.items()}

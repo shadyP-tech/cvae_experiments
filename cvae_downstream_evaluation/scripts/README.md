@@ -16,6 +16,7 @@ Planned entrypoints:
 - `normalize_c52_legacy_artifacts.py`: normalize legacy C5.2 router examples and downstream matrices into the learned-utility pipeline inputs.
 - `run_c52_legacy_learned_utility_batch.py`: run the learned-utility pipeline across filtered legacy target/support contexts and write summary alignment/leakage manifests.
 - `run_midogpp_source_summary_phase1.py`: preflight and run the MIDOG++ diagnostic all-candidate downstream matrix from exported source summaries.
+- `run_midogpp_phase2_preflight_freeze.py`: materialize MIDOG++ phase-2 routing-freeze artifacts before any downstream utility matrix.
 - `import_midogpp_late_aggregation_phase1.py`: import already-scored MIDOG++ upstream late-aggregation single-source rows into the canonical phase-1 diagnostic artifact bundle.
 - `build_midogpp_phase1_artifacts.py`: materialize MIDOG++ phase-1 reports from pre-scored diagnostic rows.
 - `validate_midogpp_phase1_artifacts.py`: validate a materialized MIDOG++ phase-1 artifact directory after workstation execution or sync.
