@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from .classifiers import ClassifierSpec, classifier_grid_hash
 from .downstream import (
     CandidateDownstreamRow,
     balanced_accuracy,
@@ -41,6 +42,12 @@ from .schemas import (
     PRIMARY_GENERATION_MODE,
     SINGLE_EXPERT_HASH,
     SINGLE_EXPERT_ROW_TYPE,
+)
+from .schemas.classifier_tuning import SOURCE_INNER_CLASSIFIER_TUNING_COLUMNS
+from .source_inner_classifier_tuning import (
+    SourceInnerClassifierFold,
+    SourceInnerClassifierSelectionResult,
+    select_classifier_spec_source_inner_lodo,
 )
 from .splits import assert_disjoint_ids
 from .utility_matrix import assert_diagnostic_matrix_path, diagnostic_matrix_path
@@ -198,11 +205,16 @@ def build_all_expert_downstream_matrix(
     limits: MatrixBuildLimits = MatrixBuildLimits(),
     output_path: Path | None = None,
     diagnostic_output: bool = False,
+    source_inner_classifier_specs: Sequence[ClassifierSpec] | None = None,
+    source_inner_classifier_tuning_path: Path | None = None,
 ) -> Path:
     """Build or resume an all-candidate downstream utility matrix."""
 
     if output_path is not None:
         matrix_path = Path(output_path)
+    elif source_inner_classifier_specs is not None:
+        grid_hash = classifier_grid_hash(source_inner_classifier_specs)
+        matrix_path = artifacts_root / "tables" / f"source_inner_classifier_tuned_{grid_hash}_downstream_matrix.csv"
     elif diagnostic_output:
         matrix_path = diagnostic_matrix_path(artifacts_root)
     else:
@@ -220,6 +232,13 @@ def build_all_expert_downstream_matrix(
     selected_classifier_seeds = limits.classifier_seeds or tuple(config.classifier_seeds)
     selected_heldout_centers = limits.heldout_centers or tuple(str(v) for v in config.candidate_domains)
     units_by_seed = _units_by_seed(support_units)
+    tuning_artifact_path = source_inner_classifier_tuning_path or (
+        artifacts_root / "tables" / (
+            f"source_inner_classifier_tuning_{classifier_grid_hash(source_inner_classifier_specs)}.csv"
+            if source_inner_classifier_specs is not None
+            else "source_inner_classifier_tuning.csv"
+        )
+    )
 
     for artifact in artifacts:
         seed_units = units_by_seed.get(int(artifact.experiment_seed), ())
@@ -260,6 +279,24 @@ def build_all_expert_downstream_matrix(
             if label_values != (0, 1):
                 raise ProtocolError(f"Locked v1 expects binary labels 0/1, got {label_values}")
 
+            selected_specs_by_seed: dict[int, ClassifierSpec] = {}
+            if source_inner_classifier_specs is not None:
+                for classifier_seed in selected_classifier_seeds:
+                    selection = _select_source_inner_classifier_spec(
+                        experiment_seed=int(artifact.experiment_seed),
+                        heldout_center=heldout,
+                        classifier_seed=int(classifier_seed),
+                        candidate_specs=source_inner_classifier_specs,
+                        allowed_centers=candidates,
+                        train_cache=train_cache,
+                        test_cache=test_cache,
+                    )
+                    selected_specs_by_seed[int(classifier_seed)] = selection.selected_spec
+                    _append_source_inner_classifier_tuning_rows(
+                        tuning_artifact_path,
+                        selection.to_artifact_rows(),
+                    )
+
             for candidate in candidates:
                 reference_pools = build_class_reference_pools(
                     train_cache=train_cache,
@@ -284,6 +321,7 @@ def build_all_expert_downstream_matrix(
                                 train_cache=train_cache,
                                 test_cache=test_cache,
                                 bank=bank,
+                                classifier_spec=selected_specs_by_seed.get(int(classifier_seed)),
                             )
                             if resume and row.primary_key() in completed:
                                 continue
@@ -304,6 +342,7 @@ def build_all_expert_downstream_matrix(
                         train_cache=train_cache,
                         test_cache=test_cache,
                         bank=bank,
+                        classifier_spec=selected_specs_by_seed.get(int(classifier_seed)),
                     )
                     if resume and row.primary_key() in completed:
                         continue
@@ -468,6 +507,7 @@ def _single_expert_row(
     train_cache: EmbeddingCache,
     test_cache: EmbeddingCache,
     bank: LegacyDomainCvaeExpertBank,
+    classifier_spec: ClassifierSpec | None = None,
 ) -> CandidateDownstreamRow:
     _ = train_cache
     n_synthetic = int(budget_per_class) * len(label_values)
@@ -514,6 +554,7 @@ def _single_expert_row(
             _to_numpy(target_embeddings),
             target_labels,
             classifier_seed=classifier_seed,
+            classifier_spec=classifier_spec,
         )
         return CandidateDownstreamRow(
             **base,
@@ -545,6 +586,7 @@ def _ensemble_row(
     train_cache: EmbeddingCache,
     test_cache: EmbeddingCache,
     bank: LegacyDomainCvaeExpertBank,
+    classifier_spec: ClassifierSpec | None = None,
 ) -> CandidateDownstreamRow:
     candidate_hash = hash_candidate_experts(candidate_experts)
     base = {
@@ -603,6 +645,7 @@ def _ensemble_row(
                 _to_numpy(target_embeddings),
                 target_labels,
                 classifier_seed=classifier_seed,
+                classifier_spec=classifier_spec,
             )
             if tuple(prediction.classes) != tuple(int(v) for v in label_values):
                 raise ProtocolError(
@@ -667,6 +710,114 @@ def _generate_synthetic(
             labels.extend([int(label)] * int(budget_per_class))
         return embeddings, labels
     raise ProtocolError(f"Unknown generation mode: {generation_mode}")
+
+
+def _select_source_inner_classifier_spec(
+    *,
+    experiment_seed: int,
+    heldout_center: str,
+    classifier_seed: int,
+    candidate_specs: Sequence[ClassifierSpec],
+    allowed_centers: Sequence[str],
+    train_cache: EmbeddingCache,
+    test_cache: EmbeddingCache,
+) -> SourceInnerClassifierSelectionResult:
+    seeded_specs = tuple(
+        ClassifierSpec(
+            C=spec.C,
+            penalty=spec.penalty,
+            solver=spec.solver,
+            max_iter=spec.max_iter,
+            class_weight=spec.class_weight,
+            random_state=int(classifier_seed),
+            l1_ratio=spec.l1_ratio,
+            threshold_policy=spec.threshold_policy,
+            scaler_fit=spec.scaler_fit,
+            family=spec.family,
+        )
+        for spec in candidate_specs
+    )
+    folds = _source_inner_classifier_folds(
+        heldout_center=heldout_center,
+        allowed_centers=allowed_centers,
+        train_cache=train_cache,
+        test_cache=test_cache,
+    )
+    return select_classifier_spec_source_inner_lodo(
+        outer_target_center=heldout_center,
+        folds=folds,
+        candidate_specs=seeded_specs,
+        experiment_seed=int(experiment_seed),
+        classifier_seed=int(classifier_seed),
+        selection_metric="bacc",
+    )
+
+
+def _source_inner_classifier_folds(
+    *,
+    heldout_center: str,
+    allowed_centers: Sequence[str],
+    train_cache: EmbeddingCache,
+    test_cache: EmbeddingCache,
+) -> tuple[SourceInnerClassifierFold, ...]:
+    allowed = tuple(str(center) for center in allowed_centers)
+    folds: list[SourceInnerClassifierFold] = []
+    for pseudo_target in allowed:
+        train_indices = [
+            idx
+            for idx, row in enumerate(train_cache.metadata)
+            if _domain(row) in set(allowed) and _domain(row) != str(pseudo_target)
+        ]
+        validation_indices = [
+            idx
+            for idx, row in enumerate(test_cache.metadata)
+            if _domain(row) == str(pseudo_target)
+        ]
+        if not train_indices:
+            raise ProtocolError(
+                f"No source-inner classifier training rows for heldout={heldout_center}, "
+                f"pseudo_target={pseudo_target}."
+            )
+        if not validation_indices:
+            raise ProtocolError(
+                f"No source-inner classifier validation rows for heldout={heldout_center}, "
+                f"pseudo_target={pseudo_target}."
+            )
+        train_labels = [_label(train_cache.metadata[idx]) for idx in train_indices]
+        validation_labels = [_label(test_cache.metadata[idx]) for idx in validation_indices]
+        if sorted(set(train_labels)) != [0, 1]:
+            raise ProtocolError(
+                f"Source-inner classifier training fold lacks binary labels for pseudo_target={pseudo_target}."
+            )
+        if sorted(set(validation_labels)) != [0, 1]:
+            raise ProtocolError(
+                f"Source-inner classifier validation fold lacks binary labels for pseudo_target={pseudo_target}."
+            )
+        folds.append(
+            SourceInnerClassifierFold(
+                pseudo_target_center=str(pseudo_target),
+                train_centers=tuple(center for center in allowed if center != str(pseudo_target)),
+                train_embeddings=_to_numpy(train_cache.embeddings[train_indices]),
+                train_labels=train_labels,
+                validation_embeddings=_to_numpy(test_cache.embeddings[validation_indices]),
+                validation_labels=validation_labels,
+            )
+        )
+    return tuple(folds)
+
+
+def _append_source_inner_classifier_tuning_rows(
+    path: Path,
+    rows: Sequence[Mapping[str, object]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_header = not path.exists() or path.stat().st_size == 0
+    with path.open("a", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(SOURCE_INNER_CLASSIFIER_TUNING_COLUMNS))
+        if write_header:
+            writer.writeheader()
+        for row in rows:
+            writer.writerow({column: row.get(column, "") for column in SOURCE_INNER_CLASSIFIER_TUNING_COLUMNS})
 
 
 def append_matrix_row(path: Path, row: CandidateDownstreamRow) -> None:

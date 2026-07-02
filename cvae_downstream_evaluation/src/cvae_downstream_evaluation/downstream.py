@@ -14,6 +14,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
+from .classifiers import (
+    DEFAULT_LOCKED_CLASSIFIER_SPEC,
+    ClassifierSpec,
+    fit_logistic_classifier,
+)
 from .protocol import ProtocolError
 from .schemas import (
     ALL_EXPERT_DOWNSTREAM_COLUMNS,
@@ -154,6 +159,7 @@ def fit_locked_logistic_classifier(
     target_labels: Sequence[int],
     *,
     classifier_seed: int,
+    classifier_spec: ClassifierSpec | None = None,
 ) -> DownstreamPrediction:
     """Fit the locked synthetic-only classifier and return probabilities.
 
@@ -163,39 +169,37 @@ def fit_locked_logistic_classifier(
 
     try:
         import numpy as np  # type: ignore
-        from sklearn.linear_model import LogisticRegression  # type: ignore
         from sklearn.metrics import average_precision_score, roc_auc_score  # type: ignore
-        from sklearn.preprocessing import StandardScaler  # type: ignore
     except ModuleNotFoundError as exc:
         raise RuntimeError(
             "Synthetic-only downstream evaluation requires numpy and scikit-learn."
         ) from exc
 
-    x_syn = np.asarray(synthetic_embeddings, dtype=float)
     y_syn = np.asarray(synthetic_labels, dtype=int)
-    x_eval = np.asarray(target_embeddings, dtype=float)
     y_eval = np.asarray(target_labels, dtype=int)
-    if x_syn.ndim != 2 or x_eval.ndim != 2:
-        raise ValueError("Embeddings must be 2D arrays.")
-    if x_syn.shape[1] != x_eval.shape[1]:
-        raise ValueError("Synthetic and target embeddings must share the same projection frame.")
-    if sorted(set(int(v) for v in y_syn.tolist())) != [0, 1]:
-        raise ValueError("Locked v1 classifier expects exactly balanced binary synthetic labels.")
-
-    scaler = StandardScaler()
-    x_syn_scaled = scaler.fit_transform(x_syn)
-    x_eval_scaled = scaler.transform(x_eval)
-    clf = LogisticRegression(
-        solver="lbfgs",
-        C=1.0,
-        max_iter=2000,
-        class_weight=None,
-        random_state=int(classifier_seed),
+    spec = classifier_spec or DEFAULT_LOCKED_CLASSIFIER_SPEC
+    if classifier_spec is None and int(spec.random_state) != int(classifier_seed):
+        spec = ClassifierSpec(
+            C=spec.C,
+            penalty=spec.penalty,
+            solver=spec.solver,
+            max_iter=spec.max_iter,
+            class_weight=spec.class_weight,
+            random_state=int(classifier_seed),
+            l1_ratio=spec.l1_ratio,
+            threshold_policy=spec.threshold_policy,
+            scaler_fit=spec.scaler_fit,
+            family=spec.family,
+        )
+    fitted = fit_logistic_classifier(
+        synthetic_embeddings,
+        synthetic_labels,
+        target_embeddings,
+        spec=spec,
     )
-    clf.fit(x_syn_scaled, y_syn)
-    pred = clf.predict(x_eval_scaled)
-    proba = clf.predict_proba(x_eval_scaled)
-    classes = tuple(int(v) for v in clf.classes_.tolist())
+    pred = np.asarray(fitted.predictions, dtype=int)
+    proba = np.asarray(fitted.probabilities, dtype=float)
+    classes = fitted.classes
     secondary: dict[str, float] = {}
     if len(classes) == 2 and proba.shape[1] == 2:
         try:
