@@ -121,6 +121,29 @@ and within-tumor case-disjoint discrimination. Negative controls shuffle fit
 labels or fit feature rows only. It does not make CVAE preservation, routing, or
 metadata-compatibility claims.
 
+Current synced MIDOG++ signal-control status:
+
+- manifest: `datasets/midogpp/artifacts/midogpp_annotation_patch_v1/manifest.csv`
+- real cache: `sail/artifacts/pathology_embeddings/midogpp/virchow2/seed42/embeddings/train.pt`
+- signal-control artifact root:
+  `sail/artifacts/midogpp_virchow2_real_feature_signal_controls/`
+- cache shape: `9886 x 2560`
+- cache/manifest metadata alignment: `9886/9886` train rows, `0` rowwise
+  mismatches across `sample_id`, `label`, `split`, `center`, and
+  `magnification`
+- train labels: `5364` mitotic positive rows, `4522` hard-negative or
+  non-mitotic rows
+- signal-control real-feature summaries: pooled logistic BACC `0.6914`,
+  pooled MLP BACC `0.7146`, tumor-balanced logistic BACC `0.6349`
+- negative controls remain near chance: feature-label row shuffle BACC
+  `0.4939`, label permutation BACC `0.4926`
+
+Interpretation: the earlier near-`0.51` BACC concern was not supported after
+the corrected workstation artifact sync. The verified diagnostic shows real
+Virchow2 class signal under the signal-control protocol, while preserving the
+claim boundary: this is real-feature diagnostic evidence only, not evidence that
+CVAE samples preserve signal or that any routing policy is useful.
+
 The corresponding MIDOG++ pca128 CVAE preservation gate lives outside SAIL:
 
 ```text

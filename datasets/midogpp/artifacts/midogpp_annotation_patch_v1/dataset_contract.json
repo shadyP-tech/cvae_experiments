@@ -1,0 +1,100 @@
+{
+  "artifact_name": "midogpp_annotation_patch_v1",
+  "class_counts": {
+    "hard_negative_or_non_mitotic": 10632,
+    "mitotic": 11937
+  },
+  "class_definition": "mitotic vs hard-negative/non-mitotic",
+  "domain_policy": {
+    "candidate_axes": [
+      "scanner_model",
+      "tumor_type",
+      "tumor_type|lab_or_origin|scanner_model"
+    ],
+    "domain_mapping": {
+      "canine cutaneous mast cell tumor|FU Berlin|Aperio CS2": "0",
+      "canine lung cancer|VMU Vienna|3D Histech": "1",
+      "canine lymphoma|VMU Vienna|3D Histech": "2",
+      "canine soft tissue sarcoma|AMC New York|3D Histech": "3",
+      "canine soft tissue sarcoma|VMU Vienna|3D Histech": "4",
+      "human breast cancer|UMC Utrecht|Aperio CS2": "5",
+      "human breast cancer|UMC Utrecht|Hamamatsu S360": "6",
+      "human breast cancer|UMC Utrecht|Hamamatsu XR": "7",
+      "human melanoma|UMC Utrecht|Hamamatsu XR": "8",
+      "human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR": "9"
+    },
+    "eligible_domain_count": 9,
+    "final_axis_frozen": true,
+    "final_axis_policy": "auto_tumor_lab_scanner",
+    "min_eligible_domains": 6,
+    "selected_domain_axis": "tumor_type|lab_or_origin|scanner_model"
+  },
+  "eligibility_thresholds": {
+    "eval_cases_min": 10,
+    "eval_negatives_min": 20,
+    "eval_positives_min": 20,
+    "total_cases_min": 20,
+    "train_cases_min": 10,
+    "train_negatives_min": 50,
+    "train_positives_min": 50
+  },
+  "extraction_policy": {
+    "bbox_format": "xyxy",
+    "group": "case_id",
+    "patch_size": 224,
+    "positive_policy": "all_valid_mitotic_annotations",
+    "sample": "annotation-centered patch"
+  },
+  "group_definition": "case_id",
+  "hashes": {
+    "annotation_sha256": "8c87ab4276eb11f6b6b5ac0d956b89dad7568a5474e0904b653d54dc68091f47",
+    "metadata_sha256": "e3128b1aeacb11c5a76c5b96ad2b4557c11981d5b5f9eaf2c7fc1d1efe6f8825"
+  },
+  "negative_sampling_policy": {
+    "candidate_negative_count": 14349,
+    "matches_by_scope": {
+      "same_case": 7902,
+      "same_domain_same_split": 2730,
+      "unmatched": 1305
+    },
+    "negative_match_order": [
+      "same_case",
+      "same_pseudo_domain_and_same_split",
+      "unmatched_positive"
+    ],
+    "negative_policy": "matched_1_to_1",
+    "negative_ratio": 1.0,
+    "negative_sampling_seed": 42,
+    "selected_negative_count": 10632,
+    "unmatched_positive_count": 1305
+  },
+  "paths": {
+    "annotations": "cvae_testing/data/MIDOGpp/databases/MIDOG++.json",
+    "artifact_root": "datasets/midogpp/artifacts/midogpp_annotation_patch_v1",
+    "manifest": "datasets/midogpp/artifacts/midogpp_annotation_patch_v1/manifest.csv",
+    "metadata": "cvae_testing/data/MIDOGpp/midogpp_scanner_metadata_full_resplit.csv",
+    "patch_dir": "datasets/midogpp/artifacts/midogpp_annotation_patch_v1/patches_224",
+    "raw_root": "cvae_testing/data/MIDOGpp",
+    "split_manifest": "datasets/midogpp/artifacts/midogpp_annotation_patch_v1/split_manifest.csv"
+  },
+  "row_counts": {
+    "manifest_rows": 22569,
+    "negative_rows": 10632,
+    "positive_rows": 11937,
+    "skipped_source_images": 0
+  },
+  "sample_definition": "annotation-centered patch",
+  "schema_version": "midogpp_annotation_patch_dataset_contract_v1",
+  "split_policy": {
+    "case_disjoint": true,
+    "fractions": {
+      "test": 0.45,
+      "train": 0.45,
+      "val": 0.1
+    },
+    "group": "case_id",
+    "split_order": "assign case-disjoint train/val/test before negative sampling",
+    "split_seed": 42
+  },
+  "status": "pass"
+}

@@ -1,0 +1,81 @@
+{
+  "domain_axis": "tumor_type|lab_or_origin|scanner_model",
+  "domain_name_to_id": {
+    "canine cutaneous mast cell tumor|FU Berlin|Aperio CS2": "0",
+    "canine lung cancer|VMU Vienna|3D Histech": "1",
+    "canine lymphoma|VMU Vienna|3D Histech": "2",
+    "canine soft tissue sarcoma|AMC New York|3D Histech": "3",
+    "canine soft tissue sarcoma|VMU Vienna|3D Histech": "4",
+    "human breast cancer|UMC Utrecht|Aperio CS2": "5",
+    "human breast cancer|UMC Utrecht|Hamamatsu S360": "6",
+    "human breast cancer|UMC Utrecht|Hamamatsu XR": "7",
+    "human melanoma|UMC Utrecht|Hamamatsu XR": "8",
+    "human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR": "9"
+  },
+  "domains": [
+    {
+      "domain_id": "0",
+      "domain_name": "canine cutaneous mast cell tumor|FU Berlin|Aperio CS2",
+      "n_cases": 50,
+      "n_rows": 3693
+    },
+    {
+      "domain_id": "1",
+      "domain_name": "canine lung cancer|VMU Vienna|3D Histech",
+      "n_cases": 44,
+      "n_rows": 1670
+    },
+    {
+      "domain_id": "2",
+      "domain_name": "canine lymphoma|VMU Vienna|3D Histech",
+      "n_cases": 55,
+      "n_rows": 7918
+    },
+    {
+      "domain_id": "3",
+      "domain_name": "canine soft tissue sarcoma|AMC New York|3D Histech",
+      "n_cases": 84,
+      "n_rows": 2194
+    },
+    {
+      "domain_id": "4",
+      "domain_name": "canine soft tissue sarcoma|VMU Vienna|3D Histech",
+      "n_cases": 14,
+      "n_rows": 378
+    },
+    {
+      "domain_id": "5",
+      "domain_name": "human breast cancer|UMC Utrecht|Aperio CS2",
+      "n_cases": 50,
+      "n_rows": 1376
+    },
+    {
+      "domain_id": "6",
+      "domain_name": "human breast cancer|UMC Utrecht|Hamamatsu S360",
+      "n_cases": 46,
+      "n_rows": 1164
+    },
+    {
+      "domain_id": "7",
+      "domain_name": "human breast cancer|UMC Utrecht|Hamamatsu XR",
+      "n_cases": 47,
+      "n_rows": 902
+    },
+    {
+      "domain_id": "8",
+      "domain_name": "human melanoma|UMC Utrecht|Hamamatsu XR",
+      "n_cases": 48,
+      "n_rows": 1996
+    },
+    {
+      "domain_id": "9",
+      "domain_name": "human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR",
+      "n_cases": 54,
+      "n_rows": 1278
+    }
+  ],
+  "eligible_domain_count": 9,
+  "final_axis_frozen": true,
+  "schema_version": "midogpp_domain_mapping_v1",
+  "status": "pass"
+}

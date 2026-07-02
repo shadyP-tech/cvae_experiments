@@ -24,6 +24,13 @@ but only protocol-safe paths are thesis-facing.
   - Protocol: MIDOG++ real Virchow2 train-cache diagnostics.
   - Claim boundary: real-feature learnability and preservation reference only; not CVAE preservation, metadata routing, or expert selection.
   - Required invariant: locked manifest, row-aligned feature cache, case/sample identity disjointness, fixed/fit-only preprocessing, and near-chance negative controls.
+- `midogpp_real_feature_gate/`
+  - Protocol: independent MIDOG++ real-feature discriminative transfer gate with SAIL as reference, not a runtime dependency.
+  - Artifact root: `midogpp_real_feature_gate/artifacts/midogpp_real_feature_gate_v1/`.
+  - Current synced decision: `GO_REAL_FEATURE_GATE_PASSED` with `CLAIM_SCOPE_REAL_FEATURE_TRANSFER_ONLY`.
+  - Evidence summary: 9/9 eligible held-out centers valid; mean source-only BACC `0.668`, macro-F1 `0.662`, AUROC `0.728`, PR-AUC `0.737`; worst eligible center is center `2` with BACC `0.587`, AUROC `0.629`; pooled diagnostic ceiling mean BACC `0.902`.
+  - Claim boundary: supports exploratory CVAE candidate-surface work as a real-feature transfer/headroom gate only; not CVAE preservation, NELBO compatibility, routing quality, synthetic utility, or generative quality.
+  - Current caveat: negative-control and uncertainty/seed-stability artifacts are not present in the synced gate bundle, so use as `USABLE WITH CAVEATS` rather than final confirmatory evidence.
 - `cvae_rebuild/src/midogpp_preservation_gate.py`
   - Protocol: MIDOG++ pca128 Virchow2-CVAE preservation gate under SAIL signal-control splits.
   - Claim boundary: pca128 `decode_mu` preservation mechanics only; not GMM composition, routing, expert selection, or controllable class-conditional generation.
@@ -73,6 +80,10 @@ Thesis-facing compatibility artifacts must satisfy:
   pca128 `decode_mu` synthetic embeddings preserving tumor-balanced
   signal-control utility; latent-prior sampling, GMM composition, and routing
   require separate gates.
+- MIDOG++ real-feature gate claims are limited to source-only held-out-center
+  transfer and pooled diagnostic headroom. The pooled diagnostic ceiling is
+  never adoption-eligible and must not choose CVAE candidates or downstream
+  generation/classifier settings.
 
 ## Current Cleanup Decision
 

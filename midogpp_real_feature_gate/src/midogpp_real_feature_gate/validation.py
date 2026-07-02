@@ -26,19 +26,23 @@ def validate_row_role_flags(row: Mapping[str, object]) -> None:
     selection_used_target_labels = _as_bool(row.get("selection_used_target_labels"))
     scoring_only = _as_bool(row.get("target_eval_labels_used_for_scoring_only"))
 
-    if role == RowRole.SOURCE_ONLY_TRANSFER:
+    if role in {
+        RowRole.SOURCE_ONLY_TRANSFER,
+        RowRole.SOURCE_INNER_WEIGHTED_ENSEMBLE,
+        RowRole.UNIFORM_DENSE_ENSEMBLE,
+    }:
         if str(row.get("schema_version", SCHEMA_VERSION)) != SCHEMA_VERSION:
             raise ValidationError("row schema_version does not match frozen gate schema")
         if str(row.get("heldout_center", "")) in QUARANTINE_CENTERS:
-            raise ValidationError("quarantine centers cannot be source_only_transfer rows")
+            raise ValidationError("quarantine centers cannot be adoption-eligible source-only rows")
         if not adoption_eligible or diagnostic_only:
-            raise ValidationError("source_only_transfer rows must be adoption-eligible transfer baselines.")
+            raise ValidationError("source-only rows must be adoption-eligible and non-diagnostic.")
         if fit_used_target_center:
-            raise ValidationError("source_only_transfer rows must not fit on the held-out target center.")
+            raise ValidationError("source-only rows must not fit on the held-out target center.")
         if selection_used_target_labels:
-            raise ValidationError("source_only_transfer rows must not use target labels for selection.")
+            raise ValidationError("source-only rows must not use target labels for selection.")
         if not scoring_only:
-            raise ValidationError("source_only_transfer rows must mark target labels as scoring-only.")
+            raise ValidationError("source-only rows must mark target labels as scoring-only.")
         return
 
     if role in {RowRole.POOLED_DIAGNOSTIC_CEILING, RowRole.SOURCE_ORACLE_DIAGNOSTIC}:

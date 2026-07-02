@@ -32,13 +32,18 @@ based on the inspected source behavior and artifacts listed below.
 
 ## Inspected Evidence
 
-Primary evidence:
+Original extraction evidence recorded in this manifest:
 
-- `docs/context/thesis_project_context.md`
-- `docs/context/current_experimental_state.md`
-- `docs/context/pivot_statement.md`
-- `docs/wiki/04-current-best-approach/current-synthesis.md`
-- `docs/wiki/04-current-best-approach/virchow2-only-rationale.md`
+- `docs/context/thesis_project_context.md` (referenced by the documentation
+  workflow but absent in the local checkout during the MIDOG++ update)
+- `docs/context/current_experimental_state.md` (referenced by the documentation
+  workflow but absent in the local checkout during the MIDOG++ update)
+- `docs/context/pivot_statement.md` (absent in the local checkout during the
+  MIDOG++ update)
+- `docs/wiki/04-current-best-approach/current-synthesis.md` (absent in the
+  local checkout during the MIDOG++ update)
+- `docs/wiki/04-current-best-approach/virchow2-only-rationale.md` (absent in
+  the local checkout during the MIDOG++ update)
 - `cvae_downstream_evaluation/artifacts/r12b_source_selector_pathology_screen/reports/r12b_decision_report.md`
 - `cvae_downstream_evaluation/artifacts/r12b_source_selector_pathology_screen/reports/r12b_leakage_report.json`
 - `cvae_downstream_evaluation/artifacts/r12b_source_selector_pathology_screen/tables/r12b_backbone_ranking.csv`
@@ -46,6 +51,29 @@ Primary evidence:
 - `cvae_downstream_evaluation/legacy/superseded_by_sail/r12c/configs/r12c_virchow2_dense_config_aggregation.yaml`
 - `cvae_downstream_evaluation/legacy/superseded_by_sail/r12c/src/r12c_dense_config_aggregation.py`
 - `cvae_downstream_evaluation/legacy/superseded_by_sail/r12c/tests/r12c_dense_config_aggregation_legacy_tests.py`
+
+MIDOG++ real-feature signal-control evidence synced and verified after the
+initial extraction:
+
+- `datasets/midogpp/artifacts/midogpp_annotation_patch_v1/manifest.csv`
+- `datasets/midogpp/artifacts/midogpp_annotation_patch_v1/dataset_contract.json`
+- `datasets/midogpp/artifacts/midogpp_annotation_patch_v1/leakage_report.json`
+- `sail/artifacts/pathology_embeddings/midogpp/virchow2/seed42/embeddings/train.pt`
+- `sail/artifacts/pathology_embeddings/midogpp/virchow2/seed42/reports/cache_builder_report.json`
+- `sail/artifacts/midogpp_virchow2_real_feature_signal_controls/tables/control_metrics.csv`
+- `sail/artifacts/midogpp_virchow2_real_feature_signal_controls/tables/negative_control_metrics.csv`
+- `sail/artifacts/midogpp_virchow2_real_feature_signal_controls/tables/split_manifest.csv`
+- `sail/artifacts/midogpp_virchow2_real_feature_signal_controls/tables/predictions.csv`
+- `sail/artifacts/midogpp_virchow2_real_feature_signal_controls/reports/leakage_report.json`
+
+Verification result: the real Virchow2 train cache has shape `9886 x 2560`,
+metadata length `9886`, and `0` rowwise mismatches against the train manifest
+for `sample_id`, `label`, `split`, `center`, and `magnification`. The synced
+signal-control summaries report pooled logistic BACC `0.6914`, pooled MLP BACC
+`0.7146`, and tumor-balanced logistic BACC `0.6349`, while fit-label and
+feature-row-shuffle negative controls remain near chance. This evidence is
+diagnostic only and does not support CVAE preservation, routing, or synthetic
+generation claims.
 
 ## Dependencies Outside `sail/`
 
@@ -63,6 +91,12 @@ scope for that diagnostic.
 The MIDOG++ signal-control diagnostic uses the same input contract and also
 requires `case_id` and `image_path` values for leakage auditing. It never builds
 or realigns feature caches.
+
+The verified MIDOG++ signal-control cache path is:
+
+```text
+sail/artifacts/pathology_embeddings/midogpp/virchow2/seed42/embeddings/train.pt
+```
 
 The default config writes generated outputs under:
 

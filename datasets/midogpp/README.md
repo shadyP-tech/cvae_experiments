@@ -41,6 +41,25 @@ datasets/midogpp/artifacts/midogpp_annotation_patch_v1/
   patches_224/
 ```
 
+Current verified contract snapshot:
+
+- manifest rows: `22569`
+- train rows: `9886`
+- val rows: `2677`
+- test rows: `10006`
+- class counts: `11937` mitotic positives and `10632`
+  hard-negative/non-mitotic rows
+- duplicate `sample_id` values: `0`
+- case overlap across train/val/test splits: `0`
+- leakage report status: `PASS`
+
+The synced Virchow2 train cache at
+`sail/artifacts/pathology_embeddings/midogpp/virchow2/seed42/embeddings/train.pt`
+has `9886 x 2560` features and aligns rowwise to the train split with `0`
+metadata mismatches across `sample_id`, `label`, `split`, `center`, and
+`magnification`. This verifies the dataset/cache contract for real-feature
+diagnostics only; it does not validate CVAE generation or routing claims.
+
 Build from the repository root:
 
 ```bash
@@ -63,7 +82,7 @@ Inspect eligible domains and downstream cache hints:
 PYTHONPATH=datasets/midogpp/src conda run -n thesis python \
   datasets/midogpp/scripts/inspect_cache_and_domains.py \
   --artifact-root datasets/midogpp/artifacts/midogpp_annotation_patch_v1 \
-  --cache-report sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2/seed42/reports/cache_builder_report.json
+  --cache-report sail/artifacts/pathology_embeddings/midogpp/virchow2/seed42/reports/cache_builder_report.json
 ```
 
 Run tests:
@@ -78,7 +97,7 @@ After validation passes, run the SAIL/Virchow2 cache builder in dry-run mode:
 PYTHONPATH=sail/src conda run -n thesis python -m sail.cli build-cache \
   --samples-manifest datasets/midogpp/artifacts/midogpp_annotation_patch_v1/manifest.csv \
   --experiment-seed 42 \
-  --output-root sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1 \
+  --output-root sail/artifacts/pathology_embeddings/midogpp \
   --model-ref hf-hub:paige-ai/Virchow2 \
   --batch-size 16 \
   --device cuda \

@@ -4,7 +4,9 @@ import csv
 import json
 from pathlib import Path
 
-from midogpp_real_feature_gate.runner import RunConfig, run_gate
+import pytest
+
+from midogpp_real_feature_gate.runner import RunConfig, SourceInnerReliabilityConfig, run_gate, run_source_inner_reliability
 from midogpp_real_feature_gate.validation import validate_artifact_bundle
 
 
@@ -66,6 +68,56 @@ def test_quarantine_center_is_diagnostic_only(tmp_path: Path) -> None:
     assert {row["row_role"] for row in center4} == {"pooled_diagnostic_ceiling"}
     assert all(row["claim_role"] == "quarantine_only" for row in center4)
     assert all(row["adoption_eligible"] == "false" for row in center4)
+
+
+def test_run_source_inner_reliability_writes_protocol_artifacts(tmp_path: Path) -> None:
+    manifest, cache = _write_fixture(tmp_path, per_class=4)
+    result = run_source_inner_reliability(
+        SourceInnerReliabilityConfig(
+            manifest_path=manifest,
+            feature_cache_path=cache,
+            artifact_root=tmp_path / "source_inner_artifacts",
+            repo_root=Path(__file__).resolve().parents[2],
+            min_source=4,
+            min_eval=4,
+            allow_npz_test_cache=True,
+        )
+    )
+
+    for key in (
+        "source_inner_reliability",
+        "ensemble_weights",
+        "member_predictions_manifest",
+        "ensemble_results",
+        "ensemble_predictions",
+        "protocol_manifest",
+        "leakage_provenance_report",
+    ):
+        assert result.output_paths[key].exists()
+
+    weights = _read_csv(result.output_paths["ensemble_weights"])
+    assert weights
+    assert all(row["selection_source"] == "source_inner" for row in weights)
+    assert all(row["selection_used_target_labels"] == "false" for row in weights)
+    assert all(row["fit_used_target_center"] == "false" for row in weights)
+    by_target_role: dict[tuple[str, str], float] = {}
+    for row in weights:
+        key = (row["heldout_center"], row["row_role"])
+        by_target_role[key] = by_target_role.get(key, 0.0) + float(row["w_i_utility"])
+        assert row["expert_center"] != row["heldout_center"]
+    assert all(total == pytest.approx(1.0) for total in by_target_role.values())
+
+    reliability = _read_csv(result.output_paths["source_inner_reliability"])
+    excluded = [row for row in reliability if row["pseudo_target_center"] == row["expert_center"]]
+    assert excluded
+    assert all(row["eligible"] == "false" for row in excluded)
+    assert all(row["fallback_reason"] == "pseudo_target_expert_excluded" for row in excluded)
+
+    results = _read_csv(result.output_paths["ensemble_results"])
+    roles = {row["row_role"] for row in results}
+    assert {"source_inner_weighted_ensemble", "uniform_dense_ensemble"}.issubset(roles)
+    assert all(row["selection_used_target_labels"] == "false" for row in results)
+    assert all(row["target_eval_labels_used_for_scoring_only"] == "true" for row in results)
 
 
 def _write_fixture(root: Path, *, per_class: int, include_center4: bool = False) -> tuple[Path, Path]:

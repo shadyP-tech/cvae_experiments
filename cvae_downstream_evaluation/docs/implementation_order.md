@@ -2,6 +2,28 @@
 
 Use this order to keep the next code changes small and auditable.
 
+## 0. MIDOG++ Real-Feature Gate Baseline
+
+Current synced gate:
+
+- artifact root: `midogpp_real_feature_gate/artifacts/midogpp_real_feature_gate_v1/`
+- decision labels: `GO_REAL_FEATURE_GATE_PASSED`,
+  `CLAIM_SCOPE_REAL_FEATURE_TRANSFER_ONLY`
+- valid source-only held-out-center folds: `9/9`
+- mean source-only BACC/AUROC: `0.668` / `0.728`
+- worst eligible center: center `2`, BACC `0.587`, AUROC `0.629`
+- pooled diagnostic ceiling mean BACC/AUROC: `0.902` / `0.964`
+
+Implication:
+
+- CVAE candidate-surface work is justified as exploratory because real features
+  carry nontrivial held-out-center signal and pooled diagnostics show large
+  headroom.
+- Do not use this gate to claim CVAE preservation, NELBO compatibility, routing
+  quality, synthetic utility, or generative quality.
+- Before making stronger thesis-facing claims, add or sync negative-control and
+  uncertainty/seed-stability artifacts for the gate.
+
 ## 1. Contracts And Manifests
 
 Implement:

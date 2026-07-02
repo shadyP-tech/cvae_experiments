@@ -17,6 +17,11 @@ Expected evidence:
 - target expert exclusion
 - seed/fold coverage
 - reproducible config hash or manifest
+- MIDOG++ real-feature gate evidence from
+  `midogpp_real_feature_gate/artifacts/midogpp_real_feature_gate_v1/`:
+  leakage/provenance `PASS`, 9/9 valid eligible source-only held-out-center
+  folds, mean source-only BACC `0.668`, mean AUROC `0.728`, and pooled
+  diagnostic ceiling mean BACC `0.902`.
 
 ## Objective 2: Conditioned Generative Models In Feature Space
 
@@ -79,6 +84,10 @@ Expected evidence:
 - oracle gap and ranking alignment for downstream utility
 - fidelity diagnostics as secondary evidence
 - domain breakdown and seed stability
+- For MIDOG++ candidate-surface work, cite the real-feature gate as the
+  transfer/headroom baseline: source-only real features are above chance across
+  eligible centers, with weakest eligible center `2` at BACC `0.587`; pooled
+  diagnostic rows are non-adoption-eligible and only quantify headroom.
 
 ## Thesis Narrative Placement
 
@@ -93,6 +102,17 @@ Supporting placement:
 - Chapter 8: implications and limitations
 
 Do not use this package to revise the existing negative result unless downstream evidence directly changes the thesis claim boundary.
+
+## MIDOG++ Real-Feature Gate Placement
+
+The MIDOG++ real-feature gate is Chapter 3/6 support evidence for the evaluation
+framework and unseen-domain transfer setup. It can motivate exploratory CVAE
+candidate-surface experiments because the source-only real-feature baseline is
+nontrivial and the pooled diagnostic ceiling leaves substantial headroom.
+
+It cannot support claims about CVAE preservation, compatibility routing,
+synthetic utility, or generative quality. Those require separate generated
+embedding and downstream utility artifacts.
 
 ## Current Downstream Synthesis
 

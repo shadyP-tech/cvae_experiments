@@ -1,0 +1,64 @@
+domain_axis,domain_name,split,case_count,positive_count,negative_count,total_rows
+scanner_model,3D Histech,train,90,2574,2574,5148
+scanner_model,3D Histech,val,19,790,790,1580
+scanner_model,3D Histech,test,88,2736,2696,5432
+scanner_model,Aperio CS2,train,44,1475,937,2412
+scanner_model,Aperio CS2,val,10,297,200,497
+scanner_model,Aperio CS2,test,46,1243,917,2160
+scanner_model,Hamamatsu S360,train,20,183,183,366
+scanner_model,Hamamatsu S360,val,3,28,28,56
+scanner_model,Hamamatsu S360,test,23,371,371,742
+scanner_model,Hamamatsu XR,train,69,1132,828,1960
+scanner_model,Hamamatsu XR,val,14,272,272,544
+scanner_model,Hamamatsu XR,test,66,836,836,1672
+tumor_type,canine cutaneous mast cell tumor,train,22,1162,624,1786
+tumor_type,canine cutaneous mast cell tumor,val,5,236,139,375
+tumor_type,canine cutaneous mast cell tumor,test,23,929,603,1532
+tumor_type,canine lung cancer,train,20,371,371,742
+tumor_type,canine lung cancer,val,4,31,31,62
+tumor_type,canine lung cancer,test,20,453,413,866
+tumor_type,canine lymphoma,train,25,1702,1702,3404
+tumor_type,canine lymphoma,val,6,652,652,1304
+tumor_type,canine lymphoma,test,24,1605,1605,3210
+tumor_type,canine soft tissue sarcoma,train,45,501,501,1002
+tumor_type,canine soft tissue sarcoma,val,9,107,107,214
+tumor_type,canine soft tissue sarcoma,test,44,678,678,1356
+tumor_type,human breast cancer,train,64,745,745,1490
+tumor_type,human breast cancer,val,12,150,150,300
+tumor_type,human breast cancer,test,67,826,826,1652
+tumor_type,human melanoma,train,22,710,406,1116
+tumor_type,human melanoma,val,4,77,77,154
+tumor_type,human melanoma,test,22,363,363,726
+tumor_type,human neuroendocrine tumor,train,25,173,173,346
+tumor_type,human neuroendocrine tumor,val,6,134,134,268
+tumor_type,human neuroendocrine tumor,test,23,332,332,664
+tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2,train,22,1162,624,1786
+tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2,val,5,236,139,375
+tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2,test,23,929,603,1532
+tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech,train,20,371,371,742
+tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech,val,4,31,31,62
+tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech,test,20,453,413,866
+tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech,train,25,1702,1702,3404
+tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech,val,6,652,652,1304
+tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech,test,24,1605,1605,3210
+tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech,train,38,382,382,764
+tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech,val,7,76,76,152
+tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech,test,39,639,639,1278
+tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|VMU Vienna|3D Histech,train,7,119,119,238
+tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|VMU Vienna|3D Histech,val,2,31,31,62
+tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|VMU Vienna|3D Histech,test,5,39,39,78
+tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2,train,22,313,313,626
+tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2,val,5,61,61,122
+tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2,test,23,314,314,628
+tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360,train,20,183,183,366
+tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360,val,3,28,28,56
+tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360,test,23,371,371,742
+tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR,train,22,249,249,498
+tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR,val,4,61,61,122
+tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR,test,21,141,141,282
+tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR,train,22,710,406,1116
+tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR,val,4,77,77,154
+tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR,test,22,363,363,726
+tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR,train,25,173,173,346
+tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR,val,6,134,134,268
+tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR,test,23,332,332,664

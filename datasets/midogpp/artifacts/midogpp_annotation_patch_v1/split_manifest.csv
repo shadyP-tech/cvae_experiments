@@ -1,0 +1,504 @@
+case_id,split,scanner_model,lab_or_origin,tumor_type,species,resolution,preferred_domain_axis,preferred_domain_name
+001,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+002,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+003,val,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+004,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+005,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+006,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+007,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+008,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+009,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+010,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+011,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+012,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+013,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+014,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+015,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+016,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+017,val,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+018,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+019,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+020,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+021,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+022,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+023,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+024,val,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+025,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+026,val,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+027,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+028,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+029,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+030,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+031,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+032,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+033,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+034,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+035,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+036,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+037,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+038,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+039,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+040,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+041,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+042,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+043,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+044,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+045,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+046,val,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+047,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+048,train,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+049,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+050,test,Hamamatsu XR,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu XR
+051,val,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+052,val,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+053,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+054,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+055,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+056,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+057,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+058,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+059,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+060,val,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+061,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+062,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+063,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+064,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+065,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+066,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+067,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+068,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+069,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+070,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+071,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+072,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+073,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+074,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+075,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+076,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+077,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+078,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+079,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+080,val,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+081,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+082,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+083,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+084,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+085,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+086,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+087,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+088,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+089,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+090,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+091,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+092,val,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+093,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+094,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+095,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+096,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+097,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+098,train,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+099,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+100,test,Hamamatsu S360,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Hamamatsu S360
+101,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+102,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+103,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+104,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+105,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+106,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+107,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+108,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+109,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+110,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+111,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+112,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+113,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+114,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+115,val,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+116,val,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+117,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+118,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+119,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+120,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+121,val,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+122,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+123,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+124,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+125,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+126,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+127,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+128,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+129,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+130,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+131,val,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+132,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+133,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+134,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+135,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+136,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+137,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+138,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+139,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+140,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+141,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+142,val,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+143,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+144,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+145,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+146,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+147,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+148,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+149,train,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+150,test,Aperio CS2,UMC Utrecht,human breast cancer,Human,unknown,tumor_type|lab_or_origin|scanner_model,human breast cancer|UMC Utrecht|Aperio CS2
+201,train,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+202,train,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+203,train,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+204,test,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+205,test,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+206,test,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+207,train,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+208,val,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+209,train,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+210,train,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+211,train,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+212,test,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+213,train,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+214,test,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+215,val,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+216,test,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+217,train,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+218,train,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+219,test,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+220,test,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+221,train,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+222,val,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+223,test,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+224,val,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+225,test,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+226,train,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+227,test,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+228,train,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+229,train,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+230,train,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+231,test,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+232,train,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+233,test,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+234,train,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+235,test,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+236,test,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+237,test,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+238,test,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+239,test,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+240,train,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+241,test,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+242,train,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+243,train,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+244,test,3D Histech,VMU Vienna,canine lung cancer,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lung cancer|VMU Vienna|3D Histech
+245,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+246,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+247,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+248,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+249,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+250,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+251,val,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+252,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+253,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+254,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+255,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+256,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+257,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+258,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+259,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+260,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+261,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+262,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+263,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+264,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+265,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+266,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+267,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+268,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+269,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+270,val,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+271,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+272,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+273,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+274,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+275,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+276,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+277,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+278,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+279,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+280,val,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+281,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+282,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+283,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+284,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+285,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+286,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+287,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+288,val,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+289,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+290,val,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+291,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+292,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+293,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+294,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+295,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+296,val,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+297,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+298,test,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+299,train,3D Histech,VMU Vienna,canine lymphoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine lymphoma|VMU Vienna|3D Histech
+300,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+301,val,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+302,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+303,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+304,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+305,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+306,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+307,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+308,val,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+309,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+310,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+311,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+312,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+313,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+314,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+315,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+316,val,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+317,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+318,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+319,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+320,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+321,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+322,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+323,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+324,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+325,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+326,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+327,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+328,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+329,val,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+330,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+331,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+332,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+333,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+334,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+335,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+336,val,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+337,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+338,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+339,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+340,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+341,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+342,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+343,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+344,test,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+345,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+346,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+347,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+348,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+349,train,Aperio CS2,FU Berlin,canine cutaneous mast cell tumor,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine cutaneous mast cell tumor|FU Berlin|Aperio CS2
+350,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+351,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+352,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+353,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+354,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+355,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+356,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+357,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+358,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+359,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+360,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+361,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+362,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+363,val,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+364,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+365,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+366,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+367,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+368,val,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+369,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+370,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+371,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+372,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+373,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+374,val,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+375,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+376,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+377,val,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+378,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+379,val,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+380,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+381,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+382,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+383,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+384,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+385,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+386,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+387,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+388,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+389,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+390,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+391,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+392,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+393,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+394,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+395,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+396,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+397,train,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+398,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+399,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+400,val,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+401,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+402,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+403,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+404,test,Hamamatsu XR,UMC Utrecht,human neuroendocrine tumor,Human,unknown,tumor_type|lab_or_origin|scanner_model,human neuroendocrine tumor|UMC Utrecht|Hamamatsu XR
+405,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+406,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+407,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+408,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+409,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+410,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+411,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+412,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+413,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+414,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+415,val,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+416,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+417,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+418,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+419,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+420,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+421,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+422,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+423,val,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+424,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+425,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+426,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+427,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+428,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+429,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+430,val,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+431,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+432,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+433,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+434,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+435,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+436,val,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+437,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+438,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+439,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+440,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+441,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+442,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+443,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+444,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+445,val,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+446,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+447,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+448,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+449,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+450,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+451,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+452,val,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+453,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+454,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+455,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+456,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+457,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+458,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+459,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+460,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+461,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+462,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+463,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+464,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+465,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+466,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+467,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+468,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+469,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+470,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+471,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+472,val,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+473,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+474,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+475,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+476,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+477,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+478,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+479,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+480,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+481,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+482,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+483,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+484,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+485,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+486,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+487,train,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+488,test,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+489,val,3D Histech,AMC New York,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|AMC New York|3D Histech
+490,test,3D Histech,VMU Vienna,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|VMU Vienna|3D Histech
+491,test,3D Histech,VMU Vienna,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|VMU Vienna|3D Histech
+492,test,3D Histech,VMU Vienna,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|VMU Vienna|3D Histech
+493,train,3D Histech,VMU Vienna,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|VMU Vienna|3D Histech
+494,val,3D Histech,VMU Vienna,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|VMU Vienna|3D Histech
+495,test,3D Histech,VMU Vienna,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|VMU Vienna|3D Histech
+496,train,3D Histech,VMU Vienna,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|VMU Vienna|3D Histech
+497,test,3D Histech,VMU Vienna,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|VMU Vienna|3D Histech
+498,train,3D Histech,VMU Vienna,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|VMU Vienna|3D Histech
+499,train,3D Histech,VMU Vienna,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|VMU Vienna|3D Histech
+500,train,3D Histech,VMU Vienna,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|VMU Vienna|3D Histech
+501,test,3D Histech,VMU Vienna,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|VMU Vienna|3D Histech
+502,train,3D Histech,VMU Vienna,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|VMU Vienna|3D Histech
+503,train,3D Histech,VMU Vienna,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|VMU Vienna|3D Histech
+504,val,3D Histech,VMU Vienna,canine soft tissue sarcoma,Canine,unknown,tumor_type|lab_or_origin|scanner_model,canine soft tissue sarcoma|VMU Vienna|3D Histech
+505,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+506,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+507,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+508,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+509,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+510,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+511,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+512,val,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+513,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+514,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+515,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+516,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+517,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+518,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+519,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+520,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+521,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+522,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+523,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+524,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+525,val,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+526,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+527,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+528,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+529,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+530,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+531,val,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+532,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+533,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+534,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+535,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+536,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+537,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+538,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+539,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+540,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+541,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+542,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+543,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+544,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+545,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+546,val,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+547,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+548,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+549,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+550,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+551,val,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+552,train,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR
+553,test,Hamamatsu XR,UMC Utrecht,human melanoma,Human,unknown,tumor_type|lab_or_origin|scanner_model,human melanoma|UMC Utrecht|Hamamatsu XR

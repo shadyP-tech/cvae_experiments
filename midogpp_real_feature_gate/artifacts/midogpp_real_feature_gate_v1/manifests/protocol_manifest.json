@@ -1,0 +1,41 @@
+{
+  "artifact_root": "/home/stud/spark/cvae_experiments/midogpp_real_feature_gate/artifacts/midogpp_real_feature_gate_v1",
+  "cache_hash": "96afc1b68b001159a37ee5a5ddf8ad104447cc8c88081fe2acb39705f71e1260",
+  "config_hash": "1dc305036049296cfbc38e720e520910628e74319b525f44f640e4ee4d204a06",
+  "dataset": "midogpp",
+  "eligible_centers": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9"
+  ],
+  "feature_cache_path": "/home/stud/spark/cvae_experiments/sail/artifacts/pathology_embeddings/midogpp/virchow2/seed42/embeddings/train.pt",
+  "manifest_hash": "db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869",
+  "manifest_path": "/home/stud/spark/cvae_experiments/datasets/midogpp/artifacts/midogpp_annotation_patch_v1/manifest.csv",
+  "oracle_rows": "diagnostic_only",
+  "pooled_rows": "diagnostic_only",
+  "positive_label": 1,
+  "positive_label_name": "mitotic",
+  "protocol_hash": "ee836275d60b65c25a1099cd700760648720ba63263e2929f675babdd2abb7ea",
+  "quarantine_centers": [
+    "4"
+  ],
+  "sail_reference": {
+    "missing": [],
+    "references": {
+      "multiaxis_config": "/home/stud/spark/cvae_experiments/sail/configs/midogpp_virchow2_real_feature_multiaxis_baseline.yaml",
+      "multiaxis_module": "/home/stud/spark/cvae_experiments/sail/src/sail/midogpp_multiaxis.py",
+      "signal_controls_config": "/home/stud/spark/cvae_experiments/sail/configs/midogpp_virchow2_real_feature_signal_controls.yaml",
+      "signal_controls_module": "/home/stud/spark/cvae_experiments/sail/src/sail/midogpp_signal_controls.py"
+    },
+    "runtime_dependency": false,
+    "status": "PASS"
+  },
+  "schema_version": "midogpp_real_feature_transfer_ceiling_v1",
+  "source_only_target_labels": "scoring_only"
+}

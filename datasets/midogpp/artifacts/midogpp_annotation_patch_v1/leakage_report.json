@@ -1,0 +1,17 @@
+{
+  "case_overlap": {
+    "train_test": [],
+    "train_val": [],
+    "val_test": []
+  },
+  "duplicate_sample_ids": [],
+  "negative_cross_split_violations": [],
+  "schema_version": "midogpp_leakage_report_v1",
+  "split_counts": {
+    "test": 10006,
+    "train": 9886,
+    "val": 2677
+  },
+  "status": "PASS",
+  "unmatched_positive_count": 1305
+}
