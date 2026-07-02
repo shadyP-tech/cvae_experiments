@@ -47,7 +47,9 @@ cvae_testing/results/*
 .github/*
 .cache/
 .agents/
+.codex/
 
 literature/
 outputs
 docs/
+midogpp_real_feature_gate/
