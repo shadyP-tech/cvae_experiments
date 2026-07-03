@@ -433,6 +433,7 @@ def build_midogpp_phase1_run_hashes(
     latent_sample_seed: int,
     classifier_seed: int,
     out_dir: Path,
+    classifier_config_payload: Mapping[str, object] | None = None,
 ) -> MidogppPhase1RunHashes:
     """Build and persist frozen MIDOG++ run hashes before scoring."""
 
@@ -470,8 +471,7 @@ def build_midogpp_phase1_run_hashes(
             "source_summary_file_hashes": source_summary_file_hashes,
         }
     )
-    classifier_config_hash = stable_hash(
-        {
+    classifier_payload = classifier_config_payload or {
             "family": "sklearn_logistic_regression",
             "solver": "lbfgs",
             "C": 1.0,
@@ -480,8 +480,8 @@ def build_midogpp_phase1_run_hashes(
             "scaler_fit": "synthetic_train_only",
             "hyperparameter_tuning": "forbidden",
             "classifier_seed": int(classifier_seed),
-        }
-    )
+    }
+    classifier_config_hash = stable_hash(classifier_payload)
     metric_config_hash = stable_hash({"primary": ("bacc", "macro_f1"), "chosen_before_target_eval": True})
     feature_frame_hash = stable_hash(
         {
