@@ -27,6 +27,7 @@ from cvae_downstream_evaluation.adapters.midogpp_runner import (  # noqa: E402
     run_midogpp_phase1_scoring,
     score_midogpp_baseline,
     score_midogpp_candidate,
+    select_midogpp_source_inner_classifier_spec,
 )
 from cvae_downstream_evaluation.adapters.midogpp_source_summary_backend import (  # noqa: E402
     SourceSummaryMidogppBackend,
@@ -36,6 +37,7 @@ from cvae_downstream_evaluation.adapters.midogpp_source_summary_backend import (
     preflight_midogpp_source_summary_inputs,
 )
 from cvae_downstream_evaluation.protocol import ProtocolError  # noqa: E402
+from cvae_downstream_evaluation.classifiers import ClassifierSpec  # noqa: E402
 from cvae_downstream_evaluation.schemas import DIAGNOSTIC_ONLY, SELECTION_ELIGIBLE  # noqa: E402
 from cvae_downstream_evaluation.schemas.midogpp import (  # noqa: E402
     MIDOGPP_DOWNSTREAM_PRIMARY_KEY,
@@ -712,6 +714,23 @@ def test_midogpp_scoring_runner_scores_candidates_and_writes_artifacts(tmp_path:
     assert all(row.claim_role == "oracle_diagnostic" for row in rows)
     assert all(row.selection_used_target_labels is False for row in rows)
     assert "dense_late_equal_all_sources_geom" in outputs["baseline_comparison"].read_text(encoding="utf-8")
+
+
+def test_midogpp_source_inner_classifier_selection_excludes_outer_target() -> None:
+    backend = _TrackingMidogppBackend()
+    context = _run_context()
+
+    selection = select_midogpp_source_inner_classifier_spec(
+        backend=backend,
+        outer_context=context,
+        candidate_specs=(ClassifierSpec(C=0.1, random_state=23), ClassifierSpec(C=1.0, random_state=23)),
+    )
+
+    assert selection.heldout_center == "0"
+    assert "0" not in backend.target_eval_centers
+    assert "0" not in backend.synthetic_sources
+    for pseudo_target, source in backend.synthetic_pairs:
+        assert source != pseudo_target
 
 
 def test_midogpp_scoring_runner_rejects_missing_requested_baseline(tmp_path: Path) -> None:
@@ -1568,6 +1587,22 @@ class _FakeMidogppBackend:
         if baseline_method == "dense_late_equal_all_sources_geom":
             return MidogppScoringResult(bacc=0.75, macro_f1=0.73)
         return None
+
+
+class _TrackingMidogppBackend(_FakeMidogppBackend):
+    def __init__(self) -> None:
+        self.target_eval_centers: list[str] = []
+        self.synthetic_sources: list[str] = []
+        self.synthetic_pairs: list[tuple[str, str]] = []
+
+    def synthetic_train_batch(self, candidate: MidogppCandidate, *, context: MidogppRunContext):
+        self.synthetic_sources.append(str(candidate.candidate_source_center))
+        self.synthetic_pairs.append((str(context.heldout_center), str(candidate.candidate_source_center)))
+        return super().synthetic_train_batch(candidate, context=context)
+
+    def target_eval_batch(self, *, context: MidogppRunContext):
+        self.target_eval_centers.append(str(context.heldout_center))
+        return super().target_eval_batch(context=context)
 
 
 class _FailingMidogppBackend(_FakeMidogppBackend):

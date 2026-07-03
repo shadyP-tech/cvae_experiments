@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 from pathlib import Path
 import sys
@@ -10,13 +11,18 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from cvae_downstream_evaluation.adapters.midogpp_runner import MidogppRunContext, run_midogpp_phase1_scoring  # noqa: E402
+from cvae_downstream_evaluation.adapters.midogpp_runner import (  # noqa: E402
+    MidogppRunContext,
+    run_midogpp_phase1_scoring,
+    select_midogpp_source_inner_classifier_spec,
+)
 from cvae_downstream_evaluation.adapters.midogpp_source_summary_backend import (  # noqa: E402
     SourceSummaryMidogppBackend,
     build_midogpp_phase1_run_hashes,
     preflight_midogpp_external_baselines,
     preflight_midogpp_source_summary_inputs,
 )
+from cvae_downstream_evaluation.classifiers import ClassifierSpec, classifier_grid_hash  # noqa: E402
 from cvae_downstream_evaluation.protocol import ProtocolError  # noqa: E402
 from cvae_downstream_evaluation.schemas.midogpp import (  # noqa: E402
     MIDOGPP_ELIGIBLE_CENTERS,
@@ -39,6 +45,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--generation-seed", type=int, default=17)
     parser.add_argument("--latent-sample-seed", type=int, default=17)
     parser.add_argument("--classifier-seed", type=int, default=23)
+    parser.add_argument("--source-inner-classifier-tuning", action="store_true")
+    parser.add_argument("--classifier-c-grid", default="0.1,1.0,10.0")
+    parser.add_argument("--classifier-penalties", default="l2")
+    parser.add_argument("--classifier-solvers", default="lbfgs")
+    parser.add_argument("--classifier-class-weights", default="none,balanced")
+    parser.add_argument("--classifier-max-iters", default="2000")
+    parser.add_argument("--classifier-l1-ratios", default="")
     parser.add_argument("--config-hash", default=None)
     parser.add_argument("--protocol-hash", default=None)
     parser.add_argument("--feature-frame-hash", default=None)
@@ -125,6 +138,7 @@ def main() -> None:
         latent_sample_seed=int(args.latent_sample_seed),
         classifier_seed=int(args.classifier_seed),
         out_dir=out_dir,
+        classifier_config_payload=_classifier_config_payload(args),
     )
     _write_report(out_dir / "reports" / "run_hashes_report.json", run_hashes.to_report())
     print(json.dumps(run_hashes.to_report(), indent=2, sort_keys=True))
@@ -162,12 +176,28 @@ def main() -> None:
         context.heldout_center: backend.candidates_for_context(context)
         for context in contexts
     }
+    classifier_specs_by_context = {}
+    if args.source_inner_classifier_tuning:
+        candidate_specs = _classifier_specs_from_args(args)
+        tuning_rows = []
+        for context in contexts:
+            selection = select_midogpp_source_inner_classifier_spec(
+                backend=backend,
+                outer_context=context,
+                candidate_specs=candidate_specs,
+            )
+            classifier_specs_by_context[
+                (int(context.experiment_seed), str(context.heldout_center), int(context.classifier_seed))
+            ] = selection.selected_spec
+            tuning_rows.extend(selection.to_artifact_rows(candidate_specs=candidate_specs))
+        _write_csv(out_dir / "tables" / "source_inner_classifier_tuning.csv", tuning_rows)
     outputs = run_midogpp_phase1_scoring(
         backend=backend,
         contexts=contexts,
         candidates_by_heldout=candidates_by_heldout,
         artifacts_root=out_dir,
         baseline_methods=tuple(args.baseline_method),
+        classifier_specs_by_context=classifier_specs_by_context,
     )
     for label, path in outputs.items():
         print(f"Wrote {label}: {path}")
@@ -180,6 +210,18 @@ def _csv(raw: str) -> tuple[str, ...]:
 def _write_report(path: Path, report: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _write_csv(path: Path, rows: list[dict[str, object]]) -> None:
+    if not rows:
+        raise ProtocolError(f"Refusing to write empty MIDOG++ classifier tuning CSV: {path}")
+    columns = list(rows[0].keys())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({column: row.get(column, "") for column in columns})
 
 
 def _failed_report(*, schema_version: str, error_message: str, **fields: object) -> dict[str, object]:
@@ -207,6 +249,108 @@ def _resolve_hash_arg(name: str, provided: object | None, generated: str) -> str
     if str(provided) != str(generated):
         raise ProtocolError(f"Provided {name}={provided!r} does not match generated frozen value {generated!r}.")
     return str(generated)
+
+
+def _classifier_config_payload(args: argparse.Namespace) -> dict[str, object]:
+    if not args.source_inner_classifier_tuning:
+        return {
+            "family": "sklearn_logistic_regression",
+            "solver": "lbfgs",
+            "C": 1.0,
+            "max_iter": 2000,
+            "class_weight": None,
+            "scaler_fit": "synthetic_train_only",
+            "hyperparameter_tuning": "forbidden",
+            "classifier_seed": int(args.classifier_seed),
+        }
+    specs = _classifier_specs_from_args(args)
+    return {
+        "family": "sklearn_logistic_regression",
+        "hyperparameter_tuning": "source_inner_lodo",
+        "selection_metric": "bacc",
+        "grid_hash": classifier_grid_hash(specs),
+        "grid": [spec.to_payload() for spec in specs],
+        "classifier_seed": int(args.classifier_seed),
+        "outer_target_labels_used": False,
+    }
+
+
+def _classifier_specs_from_args(args: argparse.Namespace) -> tuple[ClassifierSpec, ...]:
+    c_values = _parse_float_list(args.classifier_c_grid, "classifier-c-grid")
+    penalties = _parse_str_list(args.classifier_penalties)
+    solvers = _parse_str_list(args.classifier_solvers)
+    class_weights = tuple(_parse_class_weight(value) for value in _parse_str_list(args.classifier_class_weights))
+    max_iters = _parse_int_list(args.classifier_max_iters, "classifier-max-iters")
+    l1_ratios = _parse_float_list(args.classifier_l1_ratios, "classifier-l1-ratios") if str(args.classifier_l1_ratios).strip() else ()
+    specs: list[ClassifierSpec] = []
+    for c_value in c_values:
+        for penalty in penalties:
+            for solver in solvers:
+                for class_weight in class_weights:
+                    for max_iter in max_iters:
+                        if penalty == "elasticnet":
+                            for l1_ratio in l1_ratios:
+                                specs.append(
+                                    ClassifierSpec(
+                                        C=float(c_value),
+                                        penalty=penalty,
+                                        solver=solver,
+                                        max_iter=int(max_iter),
+                                        class_weight=class_weight,
+                                        l1_ratio=float(l1_ratio),
+                                        random_state=int(args.classifier_seed),
+                                    )
+                                )
+                        else:
+                            specs.append(
+                                ClassifierSpec(
+                                    C=float(c_value),
+                                    penalty=penalty,
+                                    solver=solver,
+                                    max_iter=int(max_iter),
+                                    class_weight=class_weight,
+                                    random_state=int(args.classifier_seed),
+                                )
+                            )
+    if not specs:
+        raise ProtocolError("MIDOG++ source-inner classifier tuning grid is empty.")
+    return tuple(specs)
+
+
+def _parse_str_list(raw: str) -> tuple[str, ...]:
+    values = tuple(part.strip() for part in str(raw).split(",") if part.strip())
+    if not values:
+        raise ProtocolError("Expected at least one comma-separated value.")
+    return values
+
+
+def _parse_int_list(raw: str, label: str) -> tuple[int, ...]:
+    try:
+        values = tuple(int(part.strip()) for part in str(raw).split(",") if part.strip())
+    except ValueError as exc:
+        raise ProtocolError(f"Invalid integer in --{label}: {raw!r}") from exc
+    if not values:
+        raise ProtocolError(f"--{label} must contain at least one value.")
+    return values
+
+
+def _parse_float_list(raw: str, label: str) -> tuple[float, ...]:
+    try:
+        values = tuple(float(part.strip()) for part in str(raw).split(",") if part.strip())
+    except ValueError as exc:
+        raise ProtocolError(f"Invalid float in --{label}: {raw!r}") from exc
+    if not values:
+        raise ProtocolError(f"--{label} must contain at least one value.")
+    return values
+
+
+def _parse_class_weight(raw: str) -> str | None:
+    value = str(raw).strip().lower()
+    if value in {"none", "null", ""}:
+        return None
+    if value == "balanced":
+        return "balanced"
+    raise ProtocolError(f"Unsupported classifier class_weight: {raw!r}")
 
 
 if __name__ == "__main__":
