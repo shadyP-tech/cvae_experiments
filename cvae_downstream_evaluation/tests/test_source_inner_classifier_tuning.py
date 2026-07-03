@@ -121,6 +121,45 @@ def test_source_inner_selected_spec_wins_even_if_target_metric_would_not() -> No
     assert_source_inner_classifier_artifacts(result.to_artifact_rows())
 
 
+def test_source_inner_tie_breaker_is_input_order_invariant() -> None:
+    short_iter = ClassifierSpec(C=1.0, max_iter=2000, random_state=17)
+    long_iter = ClassifierSpec(C=1.0, max_iter=5000, random_state=17)
+    folds = [
+        _fold("A", train_centers=("B", "C")),
+        _fold("B", train_centers=("A", "C")),
+    ]
+
+    first = select_classifier_spec_source_inner_lodo(
+        outer_target_center="T",
+        folds=folds,
+        candidate_specs=[long_iter, short_iter],
+        score_fn=_score_equal,
+    )
+    second = select_classifier_spec_source_inner_lodo(
+        outer_target_center="T",
+        folds=folds,
+        candidate_specs=[short_iter, long_iter],
+        score_fn=_score_equal,
+    )
+
+    assert first.selected_config_hash == short_iter.config_hash
+    assert second.selected_config_hash == short_iter.config_hash
+
+
+def test_source_inner_nonconverged_specs_are_ineligible() -> None:
+    low_c = ClassifierSpec(C=0.1, random_state=17)
+    high_c = ClassifierSpec(C=10.0, random_state=17)
+
+    result = select_classifier_spec_source_inner_lodo(
+        outer_target_center="T",
+        folds=[_fold("A", train_centers=("B", "C"))],
+        candidate_specs=[low_c, high_c],
+        score_fn=_score_low_c_nonconverged,
+    )
+
+    assert result.selected_config_hash == high_c.config_hash
+
+
 def test_source_inner_artifact_check_rejects_target_eval_scoring_flag() -> None:
     result = select_classifier_spec_source_inner_lodo(
         outer_target_center="T",
@@ -153,3 +192,15 @@ def _score_from_c(spec: ClassifierSpec, fold: SourceInnerClassifierFold) -> Clas
     if spec.C == 0.1:
         return ClassifierFoldScore(bacc=0.80, macro_f1=0.75, n_iter=(10,))
     return ClassifierFoldScore(bacc=0.70, macro_f1=0.65, n_iter=(10,))
+
+
+def _score_equal(spec: ClassifierSpec, fold: SourceInnerClassifierFold) -> ClassifierFoldScore:
+    del spec, fold
+    return ClassifierFoldScore(bacc=0.80, macro_f1=0.75, n_iter=(10,))
+
+
+def _score_low_c_nonconverged(spec: ClassifierSpec, fold: SourceInnerClassifierFold) -> ClassifierFoldScore:
+    del fold
+    if spec.C == 0.1:
+        return ClassifierFoldScore(bacc=0.99, macro_f1=0.99, converged=False, n_iter=(2000,))
+    return ClassifierFoldScore(bacc=0.70, macro_f1=0.65, converged=True, n_iter=(10,))

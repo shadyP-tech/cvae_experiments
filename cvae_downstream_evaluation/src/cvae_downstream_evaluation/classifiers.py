@@ -56,7 +56,7 @@ class ClassifierSpec:
             "scaler_fit": self.scaler_fit,
         }
 
-    def tie_break_key(self) -> tuple[int, float, int, int, str]:
+    def tie_break_key(self) -> tuple[int, float, int, int, int, str]:
         penalty_order = {"l2": 0, "elasticnet": 1, "l1": 2}
         solver_order = {
             "lbfgs": 0,
@@ -72,6 +72,7 @@ class ClassifierSpec:
             float(self.C),
             solver_order.get(self.solver, 99),
             class_weight_order.get(self.class_weight, 99),
+            int(self.max_iter),
             self.config_hash,
         )
 
