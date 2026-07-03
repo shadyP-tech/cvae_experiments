@@ -22,6 +22,11 @@ from cvae_downstream_evaluation.adapters.midogpp_source_summary_backend import (
     preflight_midogpp_external_baselines,
     preflight_midogpp_source_summary_inputs,
 )
+from cvae_downstream_evaluation.classifier_grid import (  # noqa: E402
+    add_classifier_grid_arguments,
+    classifier_specs_from_args,
+    csv_values,
+)
 from cvae_downstream_evaluation.classifiers import ClassifierSpec, classifier_grid_hash  # noqa: E402
 from cvae_downstream_evaluation.protocol import ProtocolError  # noqa: E402
 from cvae_downstream_evaluation.schemas.midogpp import (  # noqa: E402
@@ -46,12 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--latent-sample-seed", type=int, default=17)
     parser.add_argument("--classifier-seed", type=int, default=23)
     parser.add_argument("--source-inner-classifier-tuning", action="store_true")
-    parser.add_argument("--classifier-c-grid", default="0.1,1.0,10.0")
-    parser.add_argument("--classifier-penalties", default="l2")
-    parser.add_argument("--classifier-solvers", default="lbfgs")
-    parser.add_argument("--classifier-class-weights", default="none,balanced")
-    parser.add_argument("--classifier-max-iters", default="2000")
-    parser.add_argument("--classifier-l1-ratios", default="")
+    add_classifier_grid_arguments(parser)
     parser.add_argument("--config-hash", default=None)
     parser.add_argument("--protocol-hash", default=None)
     parser.add_argument("--feature-frame-hash", default=None)
@@ -81,7 +81,7 @@ def main() -> None:
     if bool(args.baseline_matrix) != bool(args.baseline_method):
         raise SystemExit("--baseline-matrix and --baseline-method must be provided together.")
     assert_midogpp_frozen_config_file(Path(args.config))
-    heldout_centers = _csv(args.heldout_centers)
+    heldout_centers = csv_values(args.heldout_centers)
     try:
         preflight = preflight_midogpp_source_summary_inputs(
             summary_manifest=Path(args.summary_manifest),
@@ -204,7 +204,7 @@ def main() -> None:
 
 
 def _csv(raw: str) -> tuple[str, ...]:
-    return tuple(part.strip() for part in str(raw).split(",") if part.strip())
+    return csv_values(raw)
 
 
 def _write_report(path: Path, report: dict[str, object]) -> None:
@@ -276,81 +276,7 @@ def _classifier_config_payload(args: argparse.Namespace) -> dict[str, object]:
 
 
 def _classifier_specs_from_args(args: argparse.Namespace) -> tuple[ClassifierSpec, ...]:
-    c_values = _parse_float_list(args.classifier_c_grid, "classifier-c-grid")
-    penalties = _parse_str_list(args.classifier_penalties)
-    solvers = _parse_str_list(args.classifier_solvers)
-    class_weights = tuple(_parse_class_weight(value) for value in _parse_str_list(args.classifier_class_weights))
-    max_iters = _parse_int_list(args.classifier_max_iters, "classifier-max-iters")
-    l1_ratios = _parse_float_list(args.classifier_l1_ratios, "classifier-l1-ratios") if str(args.classifier_l1_ratios).strip() else ()
-    specs: list[ClassifierSpec] = []
-    for c_value in c_values:
-        for penalty in penalties:
-            for solver in solvers:
-                for class_weight in class_weights:
-                    for max_iter in max_iters:
-                        if penalty == "elasticnet":
-                            for l1_ratio in l1_ratios:
-                                specs.append(
-                                    ClassifierSpec(
-                                        C=float(c_value),
-                                        penalty=penalty,
-                                        solver=solver,
-                                        max_iter=int(max_iter),
-                                        class_weight=class_weight,
-                                        l1_ratio=float(l1_ratio),
-                                        random_state=int(args.classifier_seed),
-                                    )
-                                )
-                        else:
-                            specs.append(
-                                ClassifierSpec(
-                                    C=float(c_value),
-                                    penalty=penalty,
-                                    solver=solver,
-                                    max_iter=int(max_iter),
-                                    class_weight=class_weight,
-                                    random_state=int(args.classifier_seed),
-                                )
-                            )
-    if not specs:
-        raise ProtocolError("MIDOG++ source-inner classifier tuning grid is empty.")
-    return tuple(specs)
-
-
-def _parse_str_list(raw: str) -> tuple[str, ...]:
-    values = tuple(part.strip() for part in str(raw).split(",") if part.strip())
-    if not values:
-        raise ProtocolError("Expected at least one comma-separated value.")
-    return values
-
-
-def _parse_int_list(raw: str, label: str) -> tuple[int, ...]:
-    try:
-        values = tuple(int(part.strip()) for part in str(raw).split(",") if part.strip())
-    except ValueError as exc:
-        raise ProtocolError(f"Invalid integer in --{label}: {raw!r}") from exc
-    if not values:
-        raise ProtocolError(f"--{label} must contain at least one value.")
-    return values
-
-
-def _parse_float_list(raw: str, label: str) -> tuple[float, ...]:
-    try:
-        values = tuple(float(part.strip()) for part in str(raw).split(",") if part.strip())
-    except ValueError as exc:
-        raise ProtocolError(f"Invalid float in --{label}: {raw!r}") from exc
-    if not values:
-        raise ProtocolError(f"--{label} must contain at least one value.")
-    return values
-
-
-def _parse_class_weight(raw: str) -> str | None:
-    value = str(raw).strip().lower()
-    if value in {"none", "null", ""}:
-        return None
-    if value == "balanced":
-        return "balanced"
-    raise ProtocolError(f"Unsupported classifier class_weight: {raw!r}")
+    return classifier_specs_from_args(args)
 
 
 if __name__ == "__main__":
