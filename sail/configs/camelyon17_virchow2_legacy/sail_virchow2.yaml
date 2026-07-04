@@ -1,0 +1,90 @@
+experiment:
+  name: virchow2_source_selected_dense_aggregation
+  stage: virchow2_real_feature_source_only_dense_aggregation
+  status: research_pipeline
+  primary_question: >
+    Does Virchow2-only source-selected dense config aggregation improve
+    held-out center balanced accuracy without using target-evaluation labels
+    for selection?
+
+protocol:
+  split_regime: leave_one_center_out
+  primary_backbone: virchow2
+  source_only_selection: true
+  target_eval_labels_used_for_scoring_only: true
+  target_eval_tuned_selection: forbidden
+  target_support_labels_for_selection: false
+  metadata_routing: baseline_only
+  cvae_preservation: later_diagnostic
+  cvae_experts_modified: false
+
+datasets:
+  camelyon17:
+    enabled: true
+    domain_key: center
+    candidate_centers: [0, 1, 2, 3, 4]
+    experiment_seeds: [42, 43, 44]
+    support_sizes: [4, 8, 16, 32]
+    support_seeds: [17, 23, 31]
+    eval_split: test
+
+feature_cache:
+  backbone: virchow2
+  cache_root: sail/artifacts/pathology_embeddings
+  cache_path_template: "{cache_root}/{backbone}/seed{seed}/embeddings/{split}.pt"
+  creation_loader: timm_hf
+  model_ref: hf-hub:paige-ai/Virchow2
+  extraction_uses_labels: false
+  dataset_level_normalization: forbidden
+
+source_inner_lodo:
+  representations: [raw, PCA64, PCA128, PCA256]
+  C_grid: [0.01, 0.1, 1.0, 10.0]
+  class_weight_grid: [none, balanced]
+  pca_fit_scope: classifier_train_rows_only
+  scaler_fit_scope: classifier_train_rows_only
+  classifier:
+    family: sklearn_logistic_regression
+    solver: lbfgs
+    max_iter: 2000
+    random_state: experiment_seed
+    hyperparameter_tuning: forbidden
+  pca_low_sample_warning_multiplier: 3
+
+dense_aggregation:
+  primary_k_values: [3, 5, 10]
+  aggregation_rules: [geometric, arithmetic]
+  primary_calibration_rule: none
+  robust_score:
+    weak_center_threshold: 0.85
+    std_weight: 0.25
+    weak_penalty_weight: 0.50
+
+artifacts:
+  root: sail/artifacts/camelyon17_virchow2_legacy/virchow2_dense_source_selected
+  required_outputs:
+    - tables/source_lodo_selection_matrix.csv
+    - tables/source_k_selection_matrix.csv
+    - tables/dense_aggregation_matrix.csv
+    - tables/member_manifest.csv
+    - tables/center_summary.csv
+    - manifests/protocol_manifest.json
+    - reports/leakage_report.json
+    - reports/decision_report.md
+
+decision_rule:
+  mean_090_threshold: 0.90
+  rebuild_mean_bacc: 0.92
+  rebuild_worst_center_bacc: 0.85
+  seed_std_mean_bacc_max: 0.03
+  seed_worst_center_min: 0.75
+  min_delta_vs_top1: 0.005
+
+claim_boundary:
+  allowed: >
+    The pipeline can support protocol-clean real-feature Virchow2 source-only
+    config/aggregation evidence under leave-one-center-out scoring.
+  forbidden: >
+    Do not claim metadata routing is the primary method, do not claim CVAE
+    preservation is proven, and do not tune selections using target-evaluation
+    labels or metrics.

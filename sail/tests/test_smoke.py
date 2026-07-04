@@ -17,7 +17,7 @@ from sail.pipeline import run_pipeline  # noqa: E402
 
 
 def test_imports_and_config_loading() -> None:
-    config = load_config(ROOT / "configs" / "sail_virchow2.yaml")
+    config = load_config(ROOT / "configs" / "camelyon17_virchow2_legacy" / "sail_virchow2.yaml")
     assert config.primary_backbone == "virchow2"
     assert config.primary_k_values == (3, 5, 10)
     assert config.class_weight_grid == ("none", "balanced")

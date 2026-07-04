@@ -5,7 +5,7 @@ experiment:
 
 inputs:
   feature_cache_root: cvae_rebuild/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2
-  repair_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_preservation_repair_v1
+  repair_artifact_root: cvae_rebuild/artifacts/camelyon17_virchow2_legacy/virchow2_cvae_preservation_repair_v1
   d1_2_artifact_root:
   d1_4_artifact_root:
   dataset_contract_artifact_root: cvae_rebuild/datasets/midogpp/artifacts/midogpp_annotation_patch_v1

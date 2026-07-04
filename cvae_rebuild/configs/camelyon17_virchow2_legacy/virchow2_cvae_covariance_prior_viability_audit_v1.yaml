@@ -1,0 +1,26 @@
+experiment:
+  name: virchow2_cvae_covariance_prior_viability_audit_v1
+  artifact_root: cvae_rebuild/artifacts/camelyon17_virchow2_legacy/virchow2_cvae_covariance_prior_viability_audit_v1
+
+inputs:
+  covariance_confirmation_artifact_root: cvae_rebuild/artifacts/camelyon17_virchow2_legacy/virchow2_cvae_covariance_prior_confirmation_v1
+
+viability_audit:
+  heldout_centers: ["0", "1", "2", "3", "4"]
+  min_viable_cells: 30
+  min_viable_cells_per_center: 3
+  min_viable_seeds_per_center: 2
+  high_real_threshold: 0.80
+  viable_real_threshold: 0.75
+  borderline_real_threshold: 0.65
+  global_center_equal_mean_bacc_min: 0.85
+  mean_clipped_preservation_gap_max: 0.08
+  mean_preservation_ratio_min: 0.92
+  seed_std_max: 0.07
+  delta_bacc_vs_standard_prior_min: 0.05
+  delta_bacc_vs_diag_prior_min: 0.03
+  covariance_beats_diag_cell_fraction_min: 0.70
+  covariance_beats_diag_center_fraction_min: 0.75
+  worst_delta_vs_diag_prior_min: -0.05
+  min_cell_bacc_min: 0.60
+  min_center_mean_bacc_min: 0.75

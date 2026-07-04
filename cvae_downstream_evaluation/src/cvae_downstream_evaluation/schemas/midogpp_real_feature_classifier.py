@@ -27,6 +27,27 @@ REAL_FEATURE_RESULT_COLUMNS = (
     "classifier_grid_hash",
     "selected_classifier_config_hash",
     "selected_classifier_spec",
+    "threshold_policy",
+    "threshold_value",
+    "threshold_policy_group_id",
+    "threshold_grid_hash",
+    "threshold_rule_id",
+    "threshold_selection_source",
+    "threshold_source_score_table_hash",
+    "threshold_tie_breaker",
+    "threshold_decision_config_hash",
+    "threshold_best_value",
+    "threshold_best_mean_bacc",
+    "threshold_selected_mean_bacc",
+    "threshold_se_best",
+    "threshold_valid_pseudo_target_centers",
+    "threshold_missing_row_policy",
+    "n_min",
+    "n_valid_pseudo_targets",
+    "selected_source_inner_score_vector",
+    "fallback_reason",
+    "target_eval_labels_used_for_threshold",
+    "oracle_rows_used_for_threshold",
     "selection_source",
     "source_inner_mean_bacc",
     "source_inner_min_bacc",
@@ -64,6 +85,10 @@ REAL_FEATURE_PREDICTION_COLUMNS = (
     "y_pred",
     "prob_pos",
     "threshold_policy",
+    "threshold_value",
+    "threshold_policy_group_id",
+    "threshold_selection_source",
+    "threshold_decision_config_hash",
     "selected_classifier_config_hash",
     "feature_cache_hash",
     "manifest_hash",
@@ -126,6 +151,10 @@ def _assert_protocol_boundary_flags(row: Mapping[str, object]) -> None:
     for field in expected_false:
         if field in row and str(row[field]).lower() != "false":
             raise ProtocolError(f"{field} must be false in MIDOG++ real-feature artifacts.")
+    if "target_eval_labels_used_for_threshold" in row and str(row["target_eval_labels_used_for_threshold"]).lower() != "false":
+        raise ProtocolError("target_eval_labels_used_for_threshold must be false.")
+    if "oracle_rows_used_for_threshold" in row and str(row["oracle_rows_used_for_threshold"]).lower() != "false":
+        raise ProtocolError("oracle_rows_used_for_threshold must be false.")
     if "claim_scope" in row and str(row["claim_scope"]) != "real_feature_transfer_only":
         raise ProtocolError("claim_scope must be real_feature_transfer_only.")
 

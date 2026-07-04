@@ -1,0 +1,48 @@
+experiment:
+  name: virchow2_cvae_decentralized_support8_top3_tau05_gmm_prior_v1
+  artifact_root: cvae_rebuild/artifacts/camelyon17_virchow2_legacy/virchow2_cvae_decentralized_support8_top3_tau05_gmm_prior_v1
+  primary_variant: pca64_beta001
+
+inputs:
+  feature_cache_root: cvae_rebuild/artifacts/camelyon17_virchow2_legacy/pathology_embeddings/virchow2
+  repair_artifact_root: cvae_rebuild/artifacts/camelyon17_virchow2_legacy/virchow2_cvae_preservation_repair_v1
+  d1_3_artifact_root: cvae_rebuild/artifacts/camelyon17_virchow2_legacy/virchow2_cvae_decentralized_support_nelbo_reliability_gmm_prior_v1
+  backbone: virchow2
+
+run_matrix:
+  experiment_seeds: [42, 43, 44]
+  heldout_centers: ["0", "1", "2", "3", "4"]
+  support_size: 8
+  support_seeds: [17, 23, 31]
+  replicate_seeds: [17, 23, 31]
+  align_support_and_generation_seed: true
+
+generation:
+  synthetic_per_class_total: 128
+  min_per_source_per_class: 8
+
+support8_top3_tau05_gmm_prior:
+  primary_method: decentralized_support8_top3_tau05_support_nelbo_x_reliability_geom
+  candidate_components_per_source_class: [4, 3, 2, 1]
+  min_samples_per_component: 12
+  source_weighting: support_nelbo_x_source_local_reliability_top3
+  gmm_covariance_type: diag
+  gmm_reg_covar: 1.0e-4
+  gmm_n_init: 1
+  gmm_max_iter: 100
+  min_component_weight: 0.001
+  variance_floor: 1.0e-5
+  primary_pooling: weighted_geometric
+  reliability_floor_score: 0.05
+  support_nelbo_tau: 0.5
+  top_k_sources: 3
+  support_alpha: 1.0
+  reliability_alpha: 1.0
+
+classifier:
+  type: sklearn_logistic_regression
+  solver: lbfgs
+  C: 1.0
+  max_iter: 2000
+  class_weight: balanced
+  classifier_seed: null

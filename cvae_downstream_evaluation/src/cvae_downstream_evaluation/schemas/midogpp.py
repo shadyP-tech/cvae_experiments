@@ -45,6 +45,9 @@ MIDOGPP_DOWNSTREAM_PRIMARY_KEY = (
     "generation_seed",
     "classifier_seed",
     "synthetic_per_class_total",
+    "threshold_policy",
+    "threshold_value",
+    "threshold_policy_group_id",
     "config_hash",
     "protocol_hash",
     "checkpoint_hash",
@@ -64,6 +67,9 @@ MIDOGPP_DOWNSTREAM_COLUMNS = (
     "claim_role",
     "target_eval_labels_used_for_scoring_only",
     "selection_used_target_labels",
+    "target_eval_labels_used_for_threshold",
+    "oracle_rows_used_for_threshold",
+    "probabilities_calibrated",
     "support_labels_used",
     "eligibility",
 )
@@ -123,6 +129,8 @@ MIDOGPP_FROZEN_CONFIG_REQUIRED_SNIPPETS = (
     "solver: lbfgs",
     "scaler_fit: synthetic_train_only",
     "hyperparameter_tuning: forbidden",
+    "threshold_policy: fixed_0_5",
+    "threshold_value: 0.5",
 )
 
 MIDOGPP_FROZEN_CONFIG_FORBIDDEN_SNIPPETS = (
@@ -135,6 +143,8 @@ MIDOGPP_FROZEN_CONFIG_FORBIDDEN_SNIPPETS = (
     "selection_used_target_labels: true",
     "support_labels_used: true",
     "domain4_enabled: true",
+    "target_eval_labels_used_for_threshold: true",
+    "oracle_rows_used_for_threshold: true",
 )
 
 
@@ -254,6 +264,9 @@ class MidogppDownstreamRow:
     generation_seed: int
     classifier_seed: int
     synthetic_per_class_total: int
+    threshold_policy: str
+    threshold_value: float
+    threshold_policy_group_id: str
     config_hash: str
     protocol_hash: str
     checkpoint_hash: str
@@ -270,6 +283,9 @@ class MidogppDownstreamRow:
     claim_role: str = "oracle_diagnostic"
     target_eval_labels_used_for_scoring_only: bool = True
     selection_used_target_labels: bool = False
+    target_eval_labels_used_for_threshold: bool = False
+    oracle_rows_used_for_threshold: bool = False
+    probabilities_calibrated: bool = False
     support_labels_used: bool = False
     eligibility: str = DIAGNOSTIC_ONLY
     schema_version: str = MIDOGPP_MATRIX_SCHEMA_VERSION
@@ -295,6 +311,12 @@ class MidogppDownstreamRow:
             raise ProtocolError("MIDOG++ rows must mark target labels as final-scoring only.")
         if self.selection_used_target_labels:
             raise ProtocolError("MIDOG++ diagnostic rows cannot mark selection_used_target_labels=true.")
+        if self.target_eval_labels_used_for_threshold:
+            raise ProtocolError("MIDOG++ threshold selection cannot use target evaluation labels.")
+        if self.oracle_rows_used_for_threshold:
+            raise ProtocolError("MIDOG++ threshold selection cannot use oracle rows.")
+        if self.probabilities_calibrated:
+            raise ProtocolError("MIDOG++ thresholded probabilities are not calibrated probabilities.")
         if self.support_labels_used:
             raise ProtocolError("MIDOG++ support labels cannot be used for downstream candidate selection.")
 
@@ -324,6 +346,9 @@ def midogpp_row_from_mapping(row: Mapping[str, object]) -> MidogppDownstreamRow:
         latent_sample_seed=_optional_int(row.get("latent_sample_seed")),
         classifier_seed=int(row["classifier_seed"]),
         synthetic_per_class_total=int(row["synthetic_per_class_total"]),
+        threshold_policy=str(row.get("threshold_policy") or "fixed_0_5"),
+        threshold_value=float(row.get("threshold_value") or 0.5),
+        threshold_policy_group_id=str(row.get("threshold_policy_group_id") or "fixed_0_5"),
         config_hash=str(row["config_hash"]),
         protocol_hash=str(row["protocol_hash"]),
         checkpoint_hash=str(row["checkpoint_hash"]),
@@ -337,6 +362,9 @@ def midogpp_row_from_mapping(row: Mapping[str, object]) -> MidogppDownstreamRow:
         claim_role=str(row.get("claim_role") or "oracle_diagnostic"),
         target_eval_labels_used_for_scoring_only=_bool(row.get("target_eval_labels_used_for_scoring_only"), True),
         selection_used_target_labels=_bool(row.get("selection_used_target_labels"), False),
+        target_eval_labels_used_for_threshold=_bool(row.get("target_eval_labels_used_for_threshold"), False),
+        oracle_rows_used_for_threshold=_bool(row.get("oracle_rows_used_for_threshold"), False),
+        probabilities_calibrated=_bool(row.get("probabilities_calibrated"), False),
         support_labels_used=_bool(row.get("support_labels_used"), False),
         eligibility=str(row.get("eligibility") or DIAGNOSTIC_ONLY),
     )

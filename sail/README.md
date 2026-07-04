@@ -18,6 +18,11 @@ that CVAE generation preserves Virchow2 utility. For MIDOG++, the downstream
 pca128 CVAE preservation gate is a separate `cvae_rebuild` diagnostic that was
 run after the corrected real-feature gate.
 
+The legacy Camelyon17 Virchow2 instantiation is quarantined under
+`sail/configs/camelyon17_virchow2_legacy/` and
+`sail/artifacts/camelyon17_virchow2_legacy/`. Do not treat those files as
+MIDOG++ Virchow2 configs or artifacts.
+
 ## Why This Is Current Best
 
 Repository evidence in
@@ -49,7 +54,7 @@ The runner expects frozen Virchow2 feature caches with this payload:
 }
 ```
 
-Default cache paths:
+Legacy Camelyon17 cache path pattern referenced by the quarantined config:
 
 ```text
 sail/artifacts/pathology_embeddings/virchow2/seed{seed}/embeddings/{train,test}.pt
@@ -65,14 +70,14 @@ Validate the config:
 
 ```bash
 PYTHONPATH=sail/src conda run -n thesis python -m sail.cli validate-config \
-  --config sail/configs/sail_virchow2.yaml
+  --config sail/configs/camelyon17_virchow2_legacy/sail_virchow2.yaml
 ```
 
 Dry-run Virchow2 cache creation:
 
 ```bash
 PYTHONPATH=sail/src conda run -n thesis python -m sail.cli build-cache \
-  --config sail/configs/sail_virchow2.yaml \
+  --config sail/configs/camelyon17_virchow2_legacy/sail_virchow2.yaml \
   --samples-manifest path/to/samples.csv \
   --experiment-seed 42 \
   --dry-run
@@ -82,7 +87,7 @@ Build Virchow2 caches on a workstation with `torch`, `timm`, and model access:
 
 ```bash
 PYTHONPATH=sail/src conda run -n thesis python -m sail.cli build-cache \
-  --config sail/configs/sail_virchow2.yaml \
+  --config sail/configs/camelyon17_virchow2_legacy/sail_virchow2.yaml \
   --samples-manifest path/to/samples.csv \
   --experiment-seed 42
 ```
@@ -91,7 +96,7 @@ Run the extracted pipeline:
 
 ```bash
 PYTHONPATH=sail/src conda run -n thesis python -m sail.cli run \
-  --config sail/configs/sail_virchow2.yaml
+  --config sail/configs/camelyon17_virchow2_legacy/sail_virchow2.yaml
 ```
 
 Run the MIDOG++ real-feature multi-axis learnability diagnostic:
@@ -162,10 +167,10 @@ conda run -n thesis python -m pytest sail/tests
 
 ## Expected Outputs
 
-The default run writes:
+The quarantined Camelyon17 run writes:
 
 ```text
-sail/artifacts/virchow2_dense_source_selected/
+sail/artifacts/camelyon17_virchow2_legacy/virchow2_dense_source_selected/
   tables/source_lodo_selection_matrix.csv
   tables/source_k_selection_matrix.csv
   tables/dense_aggregation_matrix.csv

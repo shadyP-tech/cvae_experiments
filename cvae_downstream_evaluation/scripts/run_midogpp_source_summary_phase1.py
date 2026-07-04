@@ -33,6 +33,7 @@ from cvae_downstream_evaluation.schemas.midogpp import (  # noqa: E402
     MIDOGPP_ELIGIBLE_CENTERS,
     assert_midogpp_frozen_config_file,
 )
+from cvae_downstream_evaluation.thresholding import fixed_threshold_spec  # noqa: E402
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -51,6 +52,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--latent-sample-seed", type=int, default=17)
     parser.add_argument("--classifier-seed", type=int, default=23)
     parser.add_argument("--source-inner-classifier-tuning", action="store_true")
+    parser.add_argument(
+        "--threshold-policy",
+        choices=("fixed_0_5", "source_inner_selected", "both"),
+        default="fixed_0_5",
+        help="Classifier decision policy for MIDOG++ phase-1 scoring.",
+    )
     add_classifier_grid_arguments(parser)
     parser.add_argument("--config-hash", default=None)
     parser.add_argument("--protocol-hash", default=None)
@@ -80,6 +87,8 @@ def main() -> None:
     out_dir = Path(args.out_dir)
     if bool(args.baseline_matrix) != bool(args.baseline_method):
         raise SystemExit("--baseline-matrix and --baseline-method must be provided together.")
+    if args.threshold_policy in {"source_inner_selected", "both"} and not args.source_inner_classifier_tuning:
+        raise SystemExit("--threshold-policy source_inner_selected/both requires --source-inner-classifier-tuning.")
     assert_midogpp_frozen_config_file(Path(args.config))
     heldout_centers = csv_values(args.heldout_centers)
     try:
@@ -177,6 +186,7 @@ def main() -> None:
         for context in contexts
     }
     classifier_specs_by_context = {}
+    threshold_decisions_by_context = {}
     if args.source_inner_classifier_tuning:
         candidate_specs = _classifier_specs_from_args(args)
         tuning_rows = []
@@ -189,6 +199,17 @@ def main() -> None:
             classifier_specs_by_context[
                 (int(context.experiment_seed), str(context.heldout_center), int(context.classifier_seed))
             ] = selection.selected_spec
+            threshold_key = (int(context.experiment_seed), str(context.heldout_center), int(context.classifier_seed))
+            threshold_decisions = []
+            if args.threshold_policy in {"fixed_0_5", "both"}:
+                threshold_decisions.append(
+                    fixed_threshold_spec(
+                        threshold_policy_group_id=selection.threshold_selection.decision.threshold_policy_group_id
+                    )
+                )
+            if args.threshold_policy in {"source_inner_selected", "both"}:
+                threshold_decisions.append(selection.threshold_selection.decision)
+            threshold_decisions_by_context[threshold_key] = tuple(threshold_decisions)
             tuning_rows.extend(selection.to_artifact_rows(candidate_specs=candidate_specs))
         _write_csv(out_dir / "tables" / "source_inner_classifier_tuning.csv", tuning_rows)
     outputs = run_midogpp_phase1_scoring(
@@ -198,6 +219,7 @@ def main() -> None:
         artifacts_root=out_dir,
         baseline_methods=tuple(args.baseline_method),
         classifier_specs_by_context=classifier_specs_by_context,
+        threshold_decisions_by_context=threshold_decisions_by_context,
     )
     for label, path in outputs.items():
         print(f"Wrote {label}: {path}")
@@ -262,6 +284,8 @@ def _classifier_config_payload(args: argparse.Namespace) -> dict[str, object]:
             "scaler_fit": "synthetic_train_only",
             "hyperparameter_tuning": "forbidden",
             "classifier_seed": int(args.classifier_seed),
+            "threshold_policy": str(args.threshold_policy),
+            "threshold_value": 0.5,
         }
     specs = _classifier_specs_from_args(args)
     return {
@@ -272,6 +296,8 @@ def _classifier_config_payload(args: argparse.Namespace) -> dict[str, object]:
         "grid": [spec.to_payload() for spec in specs],
         "classifier_seed": int(args.classifier_seed),
         "outer_target_labels_used": False,
+        "threshold_policy": str(args.threshold_policy),
+        "threshold_rule": "fixed_0_5" if args.threshold_policy == "fixed_0_5" else "source_inner_lodo",
     }
 
 

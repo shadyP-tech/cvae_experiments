@@ -24,6 +24,28 @@ Implication:
 - Before making stronger thesis-facing claims, add or sync negative-control and
   uncertainty/seed-stability artifacts for the gate.
 
+Completed real-feature classifier-reference follow-up:
+
+- artifact root:
+  `cvae_downstream_evaluation/artifacts/midogpp/real_feature_source_inner_classifier_tuned_virchow2_seed42/`
+- local artifact validator: `PASS`
+- leakage/provenance report: `PASS`
+- evidence label: `WEAK_PASS_REAL_FEATURE_TRANSFER_ONLY`
+- source-inner-tuned mean BACC/macro-F1: `0.740490` / `0.737357`
+- untuned default mean BACC/macro-F1: `0.664684` / `0.660550`
+- tuned-minus-default mean BACC delta: `+0.075806`
+- tuned wins over untuned default on `9/9` eligible held-out centers
+
+Implication:
+
+- Treat this as the current strongest synced MIDOG++ real-feature source-only
+  classifier reference for later candidate-surface comparisons.
+- Do not use it to claim CVAE preservation, NELBO compatibility, routing
+  quality, synthetic utility, or generative quality.
+- Before promoting the claim beyond weak pass, add classifier-seed stability
+  and a formal paired comparison against the active SAIL real-feature
+  aggregation outputs.
+
 ## 1. Contracts And Manifests
 
 Implement:

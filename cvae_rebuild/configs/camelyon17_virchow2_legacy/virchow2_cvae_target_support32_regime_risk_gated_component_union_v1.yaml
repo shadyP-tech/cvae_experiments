@@ -1,0 +1,65 @@
+experiment:
+  name: virchow2_cvae_target_support32_regime_risk_gated_component_union_v1
+  artifact_root: cvae_rebuild/artifacts/camelyon17_virchow2_legacy/virchow2_cvae_target_support32_regime_risk_gated_component_union_v1
+  primary_variant: pca64_beta001
+
+inputs:
+  feature_cache_root: cvae_rebuild/artifacts/camelyon17_virchow2_legacy/pathology_embeddings/virchow2
+  repair_artifact_root: cvae_rebuild/artifacts/camelyon17_virchow2_legacy/virchow2_cvae_preservation_repair_v1
+  source_union_gmm_artifact_root: cvae_rebuild/artifacts/camelyon17_virchow2_legacy/virchow2_cvae_source_union_gmm_prior_v1
+  balanced_gmm_artifact_root: cvae_rebuild/artifacts/camelyon17_virchow2_legacy/virchow2_cvae_source_union_center_balanced_gmm_prior_v1
+  backbone: virchow2
+
+run_matrix:
+  strict_full_run_matrix: true
+  experiment_seeds: [42, 43, 44]
+  heldout_centers: ["0", "1", "2", "3", "4"]
+  support_seeds: [17, 23, 31]
+  support_size: 32
+  support_size_diagnostics: [8, 16]
+  nested_support_max_size: 32
+
+generation:
+  synthetic_per_class_total: 128
+  min_per_source_per_class: 8
+
+target_support_regime_risk_gate:
+  primary_method: target_support32_regime_risk_gated_random_bag_tail_safe_policy_v1
+  candidate_components_per_source_class: [4, 3, 2, 1]
+  min_samples_per_component: 12
+  source_weighting: target_support32_regime_risk_policy_gate
+  gmm_covariance_type: diag
+  gmm_reg_covar: 1.0e-4
+  gmm_n_init: 5
+  gmm_max_iter: 500
+  min_component_weight: 0.02
+  variance_floor: 1.0e-5
+  variance_ceiling_multiplier: 16.0
+  primary_pooling: policy_level_gate
+  reliability_floor_score: 0.05
+  reliability_epsilon: 1.0e-8
+  support_nelbo_tau: 1.0
+  random_mass_bag_size: 11
+  random_mass_bag_alpha: 4.0
+  risk_low_threshold: 0.60
+  risk_high_threshold: 0.75
+  threshold_sensitivity_pairs:
+    - [0.50, 0.70]
+    - [0.60, 0.75]
+    - [0.70, 0.85]
+  min_gate_train_episodes: 8
+  tail_risk_bacc_threshold: 0.80
+  safer_policy_gain_threshold: 0.025
+  gate_c: 0.25
+  reconstruction_probability_tolerance: 1.0e-6
+
+memory:
+  skip_nearest_neighbor_audit: true
+
+classifier:
+  type: sklearn_logistic_regression
+  solver: lbfgs
+  C: 1.0
+  max_iter: 2000
+  class_weight: balanced
+  classifier_seed: null

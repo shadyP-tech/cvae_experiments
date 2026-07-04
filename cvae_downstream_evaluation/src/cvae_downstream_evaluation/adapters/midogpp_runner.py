@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Mapping, Protocol, Sequence
 
 from ..classifiers import ClassifierSpec, classifier_grid_hash
-from ..downstream import fit_locked_logistic_classifier
+from ..downstream import balanced_accuracy, fit_locked_logistic_classifier, macro_f1
 from ..protocol import ProtocolError
 from ..schemas import SELECTION_ELIGIBLE
 from ..schemas.midogpp import (
@@ -27,6 +27,16 @@ from ..schemas.midogpp import (
     canonical_support_context,
 )
 from .midogpp import write_midogpp_phase1_artifacts
+from ..thresholding import (
+    ThresholdDecisionSpec,
+    ThresholdPredictionSet,
+    ThresholdSelectionResult,
+    apply_threshold,
+    artifact_fields_for_decision,
+    fixed_threshold_spec,
+    select_threshold_source_inner_lodo,
+    threshold_source_score_table_hash,
+)
 
 
 @dataclass(frozen=True)
@@ -107,10 +117,13 @@ class MidogppClassifierSelection:
     grid_hash: str
     center_bacc_vector: Mapping[str, float]
     center_macro_f1_vector: Mapping[str, float]
+    threshold_selection: ThresholdSelectionResult
     selection_metric: str = "bacc"
 
     def to_artifact_rows(self, *, candidate_specs: Sequence[ClassifierSpec]) -> list[dict[str, object]]:
         rows: list[dict[str, object]] = []
+        threshold_fields = _json_threshold_fields(self.threshold_selection.to_artifact_fields())
+        empty_threshold_fields = _json_threshold_fields(artifact_fields_for_decision(fixed_threshold_spec()))
         for spec in candidate_specs:
             selected = spec.config_hash == self.selected_spec.config_hash
             rows.append(
@@ -136,6 +149,7 @@ class MidogppClassifierSelection:
                     "selection_metric": self.selection_metric,
                     "selection_source": "midogpp_source_inner_lodo",
                     "selected_by_source_inner_lodo": selected,
+                    **(threshold_fields if selected else empty_threshold_fields),
                     "selection_used_target_labels": False,
                     "fit_used_target_center": False,
                     "target_eval_labels_used_for_scoring": False,
@@ -178,6 +192,7 @@ def score_midogpp_candidate(
     context: MidogppRunContext,
     candidate: MidogppCandidate,
     classifier_spec: ClassifierSpec | None = None,
+    threshold_decision: ThresholdDecisionSpec | None = None,
 ) -> MidogppDownstreamRow:
     """Score one frozen MIDOG++ candidate with the locked classifier."""
 
@@ -192,13 +207,29 @@ def score_midogpp_candidate(
             classifier_seed=int(context.classifier_seed),
             classifier_spec=classifier_spec,
         )
+        decision = threshold_decision or fixed_threshold_spec(
+            threshold_policy_group_id=_midogpp_threshold_group_id(
+                context=context,
+                classifier_spec=classifier_spec,
+                candidate_method=candidate.candidate_method,
+            )
+        )
+        try:
+            import numpy as np  # type: ignore
+        except ModuleNotFoundError as exc:
+            raise RuntimeError("MIDOG++ thresholded scoring requires numpy.") from exc
+        proba = np.asarray(prediction.probabilities, dtype=float)
+        if prediction.classes != (0, 1):
+            raise ProtocolError("MIDOG++ thresholding expects classifier classes (0, 1).")
+        pred = apply_threshold(proba[:, 1].tolist(), decision.threshold_value)
         return _row_from_score(
             context=context,
             candidate=candidate,
             score=MidogppScoringResult(
-                bacc=float(prediction.score.balanced_accuracy),
-                macro_f1=float(prediction.score.macro_f1),
+                bacc=balanced_accuracy(target_labels, pred),
+                macro_f1=macro_f1(target_labels, pred),
             ),
+            threshold_decision=decision,
         )
     except Exception as exc:
         return _row_from_score(
@@ -210,6 +241,7 @@ def score_midogpp_candidate(
                 status=_failure_status(exc),
                 error_message=str(exc),
             ),
+            threshold_decision=threshold_decision or fixed_threshold_spec(),
         )
 
 
@@ -219,6 +251,7 @@ def score_midogpp_baseline(
     context: MidogppRunContext,
     baseline_method: str,
     candidate_sources: Sequence[str],
+    threshold_decision: ThresholdDecisionSpec | None = None,
 ) -> MidogppDownstreamRow | None:
     """Ask the backend for an already-locked method-baseline diagnostic score."""
 
@@ -238,7 +271,12 @@ def score_midogpp_baseline(
         row_type=MIDOGPP_METHOD_BASELINE_ROW_TYPE,
         eligibility="diagnostic_only",
     )
-    return _row_from_score(context=context, candidate=candidate, score=score)
+    return _row_from_score(
+        context=context,
+        candidate=candidate,
+        score=score,
+        threshold_decision=threshold_decision or fixed_threshold_spec(),
+    )
 
 
 def run_midogpp_phase1_scoring(
@@ -249,6 +287,7 @@ def run_midogpp_phase1_scoring(
     artifacts_root: Path,
     baseline_methods: Sequence[str] = (),
     classifier_specs_by_context: Mapping[tuple[int, str, int], ClassifierSpec] | None = None,
+    threshold_decisions_by_context: Mapping[tuple[int, str, int], Sequence[ThresholdDecisionSpec]] | None = None,
 ) -> dict[str, Path]:
     """Score candidates and write phase-1 diagnostic artifacts."""
 
@@ -264,22 +303,40 @@ def run_midogpp_phase1_scoring(
         classifier_spec = (
             classifier_specs_by_context or {}
         ).get((int(context.experiment_seed), str(context.heldout_center), int(context.classifier_seed)))
-        for candidate in candidates:
-            rows.append(
-                score_midogpp_candidate(
-                    backend=backend,
-                    context=context,
-                    candidate=candidate,
-                    classifier_spec=classifier_spec,
-                )
+        threshold_decisions = tuple(
+            (threshold_decisions_by_context or {}).get(
+                (int(context.experiment_seed), str(context.heldout_center), int(context.classifier_seed)),
+                (
+                    fixed_threshold_spec(
+                        threshold_policy_group_id=_midogpp_threshold_group_id(
+                            context=context,
+                            classifier_spec=classifier_spec,
+                            candidate_method="all_candidates",
+                        )
+                    ),
+                ),
             )
+        )
+        for candidate in candidates:
+            for threshold_decision in threshold_decisions:
+                rows.append(
+                    score_midogpp_candidate(
+                        backend=backend,
+                        context=context,
+                        candidate=candidate,
+                        classifier_spec=classifier_spec,
+                        threshold_decision=threshold_decision,
+                    )
+                )
         candidate_sources = tuple(candidate.candidate_source_center for candidate in candidates)
+        baseline_threshold = threshold_decisions[0] if threshold_decisions else fixed_threshold_spec()
         for method in baseline_methods:
             baseline = score_midogpp_baseline(
                 backend=backend,
                 context=context,
                 baseline_method=str(method),
                 candidate_sources=candidate_sources,
+                threshold_decision=baseline_threshold,
             )
             if baseline is None:
                 raise ProtocolError(
@@ -313,6 +370,7 @@ def select_midogpp_source_inner_classifier_spec(
     grid_hash = classifier_grid_hash(candidate_specs)
     per_spec_center_bacc: dict[str, dict[str, float]] = {spec.config_hash: {} for spec in candidate_specs}
     per_spec_center_macro: dict[str, dict[str, float]] = {spec.config_hash: {} for spec in candidate_specs}
+    per_spec_threshold_sets: dict[str, list[ThresholdPredictionSet]] = {spec.config_hash: [] for spec in candidate_specs}
     for pseudo_target in MIDOGPP_ELIGIBLE_CENTERS:
         if str(pseudo_target) == str(outer_context.heldout_center):
             continue
@@ -361,6 +419,21 @@ def select_midogpp_source_inner_classifier_spec(
                 )
                 scores.append(float(prediction.score.balanced_accuracy))
                 macros.append(float(prediction.score.macro_f1))
+                try:
+                    import numpy as np  # type: ignore
+                except ModuleNotFoundError as exc:
+                    raise RuntimeError("MIDOG++ source-inner threshold selection requires numpy.") from exc
+                proba = np.asarray(prediction.probabilities, dtype=float)
+                if prediction.classes != (0, 1):
+                    raise ProtocolError("MIDOG++ source-inner thresholding expects classes (0, 1).")
+                per_spec_threshold_sets[spec.config_hash].append(
+                    ThresholdPredictionSet(
+                        pseudo_target_center=str(pseudo_target),
+                        y_true=tuple(int(value) for value in target_labels),
+                        prob_pos=tuple(float(value) for value in proba[:, 1].tolist()),
+                        scoring_unit_id=f"source_{source}",
+                    )
+                )
             per_spec_center_bacc[spec.config_hash][str(pseudo_target)] = sum(scores) / float(len(scores))
             per_spec_center_macro[spec.config_hash][str(pseudo_target)] = sum(macros) / float(len(macros))
     selected = max(
@@ -370,6 +443,7 @@ def select_midogpp_source_inner_classifier_spec(
             _reverse_tie_breaker(spec.tie_break_key()),
         ),
     )
+    selected_threshold_sets = tuple(per_spec_threshold_sets[selected.config_hash])
     return MidogppClassifierSelection(
         heldout_center=str(outer_context.heldout_center),
         experiment_seed=int(outer_context.experiment_seed),
@@ -378,6 +452,16 @@ def select_midogpp_source_inner_classifier_spec(
         grid_hash=grid_hash,
         center_bacc_vector=per_spec_center_bacc[selected.config_hash],
         center_macro_f1_vector=per_spec_center_macro[selected.config_hash],
+        threshold_selection=select_threshold_source_inner_lodo(
+            outer_target_center=str(outer_context.heldout_center),
+            prediction_sets=selected_threshold_sets,
+            threshold_policy_group_payload=_midogpp_threshold_group_payload(
+                context=outer_context,
+                classifier_spec=selected,
+                candidate_method=candidate_method,
+                source_inner_table_hash=threshold_source_score_table_hash(selected_threshold_sets),
+            ),
+        ),
     )
 
 
@@ -386,6 +470,7 @@ def _row_from_score(
     context: MidogppRunContext,
     candidate: MidogppCandidate,
     score: MidogppScoringResult,
+    threshold_decision: ThresholdDecisionSpec,
 ) -> MidogppDownstreamRow:
     return MidogppDownstreamRow(
         heldout_center=context.heldout_center,
@@ -402,6 +487,9 @@ def _row_from_score(
         latent_sample_seed=context.latent_sample_seed,
         classifier_seed=context.classifier_seed,
         synthetic_per_class_total=context.synthetic_per_class_total,
+        threshold_policy=threshold_decision.threshold_policy,
+        threshold_value=float(threshold_decision.threshold_value),
+        threshold_policy_group_id=threshold_decision.threshold_policy_group_id,
         config_hash=context.config_hash,
         protocol_hash=context.protocol_hash,
         checkpoint_hash=candidate.checkpoint_hash,
@@ -413,6 +501,9 @@ def _row_from_score(
         row_type=candidate.row_type,
         status=score.status,
         error_message=score.error_message,
+        target_eval_labels_used_for_threshold=False,
+        oracle_rows_used_for_threshold=False,
+        probabilities_calibrated=False,
     )
 
 
@@ -422,6 +513,64 @@ def _failure_status(exc: Exception) -> str:
         if "reference" in text:
             return "failed_empty_reference_pool"
     return "failed_metric_invalid"
+
+
+def _midogpp_threshold_group_payload(
+    *,
+    context: MidogppRunContext,
+    classifier_spec: ClassifierSpec | None,
+    candidate_method: str,
+    source_inner_table_hash: str = "",
+) -> dict[str, object]:
+    return {
+        "surface": "midogpp_source_summary_phase1",
+        "dataset": MIDOGPP_DATASET_NAME,
+        "domain_regime": context.domain_regime,
+        "heldout_center": str(context.heldout_center),
+        "experiment_seed": int(context.experiment_seed),
+        "replicate_seed": int(context.replicate_seed),
+        "classifier_seed": int(context.classifier_seed),
+        "classifier_config_hash": classifier_spec.config_hash if classifier_spec else "default_locked_classifier",
+        "classifier_spec": classifier_spec.to_payload() if classifier_spec else "default_locked_classifier",
+        "generation_seed": int(context.generation_seed),
+        "latent_sample_seed": int(context.latent_sample_seed),
+        "synthetic_per_class_total": int(context.synthetic_per_class_total),
+        "candidate_method": str(candidate_method),
+        "config_hash": context.config_hash,
+        "protocol_hash": context.protocol_hash,
+        "feature_frame_hash": context.feature_frame_hash,
+        "source_inner_prediction_table_hash": source_inner_table_hash,
+    }
+
+
+def _midogpp_threshold_group_id(
+    *,
+    context: MidogppRunContext,
+    classifier_spec: ClassifierSpec | None,
+    candidate_method: str,
+) -> str:
+    from ..thresholding import threshold_policy_group_id
+
+    return threshold_policy_group_id(
+        _midogpp_threshold_group_payload(
+            context=context,
+            classifier_spec=classifier_spec,
+            candidate_method=candidate_method,
+        )
+    )
+
+
+def _json_threshold_fields(fields: Mapping[str, object]) -> dict[str, object]:
+    normalized = dict(fields)
+    for key in (
+        "selected_source_inner_score_vector",
+        "threshold_grid",
+        "threshold_objective_by_threshold",
+        "threshold_valid_pseudo_target_centers",
+    ):
+        if key in normalized and not isinstance(normalized[key], str):
+            normalized[key] = json.dumps(normalized[key], sort_keys=True)
+    return normalized
 
 
 def _mean(values: Sequence[float] | object) -> float:

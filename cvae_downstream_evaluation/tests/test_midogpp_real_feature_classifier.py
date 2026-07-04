@@ -56,15 +56,26 @@ def test_midogpp_real_feature_runner_writes_protocol_clean_artifacts(tmp_path: P
         assert "0" not in fold["train_centers"]
         assert pseudo_target not in fold["train_centers"]
     result_rows = _read_csv(paths.results)
-    assert {row["method"] for row in result_rows} == {"source_inner_tuned", "default_untuned"}
+    assert {row["method"] for row in result_rows} == {
+        "source_inner_tuned_fixed_0_5",
+        "source_inner_tuned_source_inner_threshold",
+        "default_untuned_fixed_0_5",
+        "default_untuned_source_inner_threshold",
+    }
     for row in result_rows:
         assert "0" not in json.loads(row["train_centers"])
         assert row["target_eval_labels_used_for_scoring_only"] == "true"
         assert row["selection_used_target_labels"] == "false"
         assert row["fit_used_target_center"] == "false"
         assert row["claim_scope"] == "real_feature_transfer_only"
+        assert row["target_eval_labels_used_for_threshold"] == "False" or row["target_eval_labels_used_for_threshold"] == "false"
+        assert row["oracle_rows_used_for_threshold"] == "False" or row["oracle_rows_used_for_threshold"] == "false"
+        assert row["threshold_value"] != ""
     prediction_rows = _read_csv(paths.predictions)
     assert {row["center"] for row in prediction_rows} == {"0"}
+    for row in prediction_rows:
+        expected = int(float(row["prob_pos"]) >= float(row["threshold_value"]))
+        assert int(row["y_pred"]) == expected
     protocol = json.loads(paths.protocol_manifest.read_text(encoding="utf-8"))
     assert protocol["is_router"] is False
     assert protocol["generated_embeddings_used"] is False
