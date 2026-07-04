@@ -37,7 +37,7 @@ class PipelineConfig:
     pca_low_sample_warning_multiplier: int = 3
     cache_root: str = "sail/artifacts/pathology_embeddings"
     cache_path_template: str = "{cache_root}/{backbone}/seed{seed}/embeddings/{split}.pt"
-    artifacts_root: str = "sail/artifacts/virchow2_dense_source_selected"
+    artifacts_root: str = "sail/artifacts/camelyon17_virchow2_legacy/virchow2_dense_source_selected"
 
 
 @dataclass(frozen=True)

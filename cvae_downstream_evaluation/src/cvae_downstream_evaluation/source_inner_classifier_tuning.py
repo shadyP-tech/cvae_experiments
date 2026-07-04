@@ -19,6 +19,13 @@ from .schemas.classifier_tuning import (
     SOURCE_INNER_CLASSIFIER_TUNING_COLUMNS,
     SOURCE_INNER_CLASSIFIER_TUNING_SCHEMA_VERSION,
 )
+from .thresholding import (
+    ThresholdPredictionSet,
+    ThresholdSelectionResult,
+    artifact_fields_for_decision,
+    fixed_threshold_spec,
+    select_threshold_source_inner_lodo,
+)
 
 
 ScoreFn = Callable[[ClassifierSpec, "SourceInnerClassifierFold"], "ClassifierFoldScore"]
@@ -44,6 +51,8 @@ class ClassifierFoldScore:
     n_iter: tuple[int, ...] = ()
     status: str = "ok"
     error_message: str = ""
+    validation_labels: tuple[int, ...] = ()
+    prob_pos: tuple[float, ...] = ()
 
     def metric(self, name: str) -> float:
         if name == "bacc":
@@ -72,12 +81,14 @@ class ClassifierTuningCandidateRow:
     convergence_by_center: Mapping[str, bool]
     n_iter_by_center: Mapping[str, tuple[int, ...]]
     status_by_center: Mapping[str, str]
+    threshold_artifact_fields: Mapping[str, object] | None = None
 
     @property
     def selected_classifier_config_hash(self) -> str:
         return self.classifier_spec.config_hash
 
     def to_artifact_row(self) -> dict[str, object]:
+        threshold_fields = _csv_threshold_fields(self.threshold_artifact_fields or _empty_threshold_fields())
         return {
             "schema_version": SOURCE_INNER_CLASSIFIER_TUNING_SCHEMA_VERSION,
             "experiment_seed": int(self.experiment_seed),
@@ -105,6 +116,7 @@ class ClassifierTuningCandidateRow:
                 sort_keys=True,
             ),
             "status_by_center": json.dumps(dict(self.status_by_center), sort_keys=True),
+            **threshold_fields,
             "selection_used_target_labels": "false",
             "fit_used_target_center": "false",
             "target_eval_labels_used_for_scoring": "false",
@@ -123,6 +135,7 @@ class SourceInnerClassifierSelectionResult:
     selector_centers: tuple[str, ...]
     inner_lodo_centers: tuple[str, ...]
     rows: tuple[ClassifierTuningCandidateRow, ...]
+    threshold_selection: ThresholdSelectionResult
 
     def to_artifact_rows(self) -> list[dict[str, object]]:
         return [row.to_artifact_row() for row in self.rows]
@@ -138,6 +151,7 @@ def select_classifier_spec_source_inner_lodo(
     selection_metric: str = "bacc",
     score_fn: ScoreFn | None = None,
     reject_non_converged: bool = True,
+    threshold_policy_group_payload: Mapping[str, object] | None = None,
 ) -> SourceInnerClassifierSelectionResult:
     """Select a classifier spec using source-inner LODO folds only.
 
@@ -157,10 +171,12 @@ def select_classifier_spec_source_inner_lodo(
     inner_centers = tuple(fold.pseudo_target_center for fold in folds)
     selector_centers = tuple(sorted({center for fold in folds for center in (*fold.train_centers, fold.pseudo_target_center)}))
     rows: list[ClassifierTuningCandidateRow] = []
+    fold_scores_by_config: dict[str, dict[str, ClassifierFoldScore]] = {}
     for spec in candidate_specs:
         fold_scores: dict[str, ClassifierFoldScore] = {}
         for fold in folds:
             fold_scores[fold.pseudo_target_center] = scorer(spec, fold)
+        fold_scores_by_config[spec.config_hash] = fold_scores
         metric_scores = {
             center: score.metric(selection_metric)
             for center, score in fold_scores.items()
@@ -199,8 +215,20 @@ def select_classifier_spec_source_inner_lodo(
     if not eligible:
         raise ProtocolError("No classifier spec produced valid source-inner LODO scores.")
     selected = max(eligible, key=lambda row: (float(row.aggregate_score), _reverse_tie_breaker(row.tie_breaker)))
+    threshold_selection = _select_threshold_for_spec(
+        outer_target_center=outer_target_center,
+        experiment_seed=int(experiment_seed),
+        classifier_seed=int(classifier_seed),
+        selected_spec=selected.classifier_spec,
+        selected_fold_scores=fold_scores_by_config[selected.classifier_spec.config_hash],
+        threshold_policy_group_payload=threshold_policy_group_payload,
+    )
     selected_rows = tuple(
-        _replace_selected(row, row.classifier_spec.config_hash == selected.classifier_spec.config_hash)
+        _replace_selected(
+            row,
+            row.classifier_spec.config_hash == selected.classifier_spec.config_hash,
+            threshold_selection=threshold_selection,
+        )
         for row in rows
     )
     return SourceInnerClassifierSelectionResult(
@@ -214,6 +242,7 @@ def select_classifier_spec_source_inner_lodo(
         selector_centers=selector_centers,
         inner_lodo_centers=inner_centers,
         rows=selected_rows,
+        threshold_selection=threshold_selection,
     )
 
 
@@ -242,6 +271,10 @@ def assert_source_inner_classifier_artifacts(rows: Sequence[Mapping[str, object]
             raise ProtocolError("Classifier selection fit must not use the target center.")
         if str(row["target_eval_labels_used_for_scoring"]).lower() != "false":
             raise ProtocolError("Source-inner classifier rows must not score target evaluation labels.")
+        if str(row["target_eval_labels_used_for_threshold"]).lower() != "false":
+            raise ProtocolError("Source-inner threshold selection must not use target labels.")
+        if str(row["oracle_rows_used_for_threshold"]).lower() != "false":
+            raise ProtocolError("Source-inner threshold selection must not use oracle rows.")
 
 
 def _validate_selection_inputs(
@@ -280,12 +313,15 @@ def _fit_and_score_fold(spec: ClassifierSpec, fold: SourceInnerClassifierFold) -
             spec=spec,
         )
         predictions = fitted.predictions.tolist()
+        probabilities = fitted.probabilities.tolist()
         return ClassifierFoldScore(
             bacc=balanced_accuracy(fold.validation_labels, predictions),
             macro_f1=macro_f1(fold.validation_labels, predictions),
             converged=fitted.converged,
             n_iter=fitted.n_iter,
             status="ok",
+            validation_labels=tuple(int(value) for value in fold.validation_labels),
+            prob_pos=tuple(float(row[1]) for row in probabilities),
         )
     except Exception as exc:  # pragma: no cover - artifact row preserves workstation failures.
         return ClassifierFoldScore(
@@ -300,6 +336,8 @@ def _fit_and_score_fold(spec: ClassifierSpec, fold: SourceInnerClassifierFold) -
 def _replace_selected(
     row: ClassifierTuningCandidateRow,
     selected: bool,
+    *,
+    threshold_selection: ThresholdSelectionResult,
 ) -> ClassifierTuningCandidateRow:
     return ClassifierTuningCandidateRow(
         outer_target_center=row.outer_target_center,
@@ -319,7 +357,78 @@ def _replace_selected(
         convergence_by_center=row.convergence_by_center,
         n_iter_by_center=row.n_iter_by_center,
         status_by_center=row.status_by_center,
+        threshold_artifact_fields=(
+            threshold_selection.to_artifact_fields()
+            if selected
+            else _empty_threshold_fields()
+        ),
     )
+
+
+def _select_threshold_for_spec(
+    *,
+    outer_target_center: str,
+    experiment_seed: int,
+    classifier_seed: int,
+    selected_spec: ClassifierSpec,
+    selected_fold_scores: Mapping[str, ClassifierFoldScore],
+    threshold_policy_group_payload: Mapping[str, object] | None,
+) -> ThresholdSelectionResult:
+    prediction_sets = []
+    for center, score in selected_fold_scores.items():
+        if score.status != "ok" or not score.converged:
+            continue
+        if not score.validation_labels or not score.prob_pos:
+            continue
+        prediction_sets.append(
+            ThresholdPredictionSet(
+                pseudo_target_center=str(center),
+                y_true=tuple(int(value) for value in score.validation_labels),
+                prob_pos=tuple(float(value) for value in score.prob_pos),
+                scoring_unit_id=selected_spec.config_hash,
+            )
+        )
+    return select_threshold_source_inner_lodo(
+        outer_target_center=str(outer_target_center),
+        prediction_sets=tuple(prediction_sets),
+        threshold_policy_group_payload=threshold_policy_group_payload or {
+            "surface": "source_inner_classifier_tuning",
+            "outer_target_center": str(outer_target_center),
+            "experiment_seed": int(experiment_seed),
+            "classifier_seed": int(classifier_seed),
+            "classifier_config_hash": selected_spec.config_hash,
+            "classifier_spec": selected_spec.to_payload(),
+        },
+    )
+
+
+def _empty_threshold_fields() -> dict[str, object]:
+    decision = fixed_threshold_spec()
+    fields = artifact_fields_for_decision(decision)
+    return {
+        **fields,
+        "threshold_grid": [],
+        "threshold_objective_by_threshold": {},
+        "threshold_best_value": "",
+        "threshold_best_mean_bacc": "",
+        "threshold_selected_mean_bacc": "",
+        "threshold_se_best": "",
+        "threshold_valid_pseudo_target_centers": [],
+        "threshold_missing_row_policy": "",
+    }
+
+
+def _csv_threshold_fields(fields: Mapping[str, object]) -> dict[str, object]:
+    normalized = dict(fields)
+    for key in (
+        "selected_source_inner_score_vector",
+        "threshold_grid",
+        "threshold_objective_by_threshold",
+        "threshold_valid_pseudo_target_centers",
+    ):
+        if key in normalized and not isinstance(normalized[key], str):
+            normalized[key] = json.dumps(normalized[key], sort_keys=True)
+    return normalized
 
 
 def _reverse_tie_breaker(key: tuple[object, ...]) -> tuple[object, ...]:

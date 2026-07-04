@@ -30,6 +30,12 @@ from .source_inner_classifier_tuning import (
     assert_source_inner_classifier_artifacts,
     select_classifier_spec_source_inner_lodo,
 )
+from .thresholding import (
+    ThresholdDecisionSpec,
+    apply_threshold,
+    artifact_fields_for_decision,
+    fixed_threshold_spec,
+)
 
 
 ScoreFnFactory = Callable[[str], ScoreFn | None]
@@ -118,6 +124,7 @@ def run_midogpp_real_feature_source_inner_classifier_tuning(
         "eligible_centers": list(MIDOGPP_ELIGIBLE_CENTERS),
         "excluded_centers": list(MIDOGPP_EXCLUDED_CENTERS),
         "selection_metric": selection_metric,
+        "threshold_variants": ["fixed_0_5", "source_inner_selected"],
     }
     protocol_hash = stable_hash(protocol_hash_payload)
     for heldout in heldouts:
@@ -146,27 +153,69 @@ def run_midogpp_real_feature_source_inner_classifier_tuning(
             frame,
             heldout_center=heldout,
             spec=selection.selected_spec,
-            method="source_inner_tuned",
+            method="source_inner_tuned_fixed_0_5",
             experiment_seed=int(experiment_seed),
             classifier_seed=int(classifier_seed),
             grid_hash=grid_hash,
             source_inner_rows=selection_artifact_rows,
+            threshold_decision=fixed_threshold_spec(
+                threshold_policy_group_id=selection.threshold_selection.decision.threshold_policy_group_id
+            ),
         )
         result_rows.append(tuned_eval["result"])
         prediction_rows.extend(tuned_eval["predictions"])
+        tuned_threshold_eval = fit_and_score_heldout(
+            frame,
+            heldout_center=heldout,
+            spec=selection.selected_spec,
+            method="source_inner_tuned_source_inner_threshold",
+            experiment_seed=int(experiment_seed),
+            classifier_seed=int(classifier_seed),
+            grid_hash=grid_hash,
+            source_inner_rows=selection_artifact_rows,
+            threshold_decision=selection.threshold_selection.decision,
+        )
+        result_rows.append(tuned_threshold_eval["result"])
+        prediction_rows.extend(tuned_threshold_eval["predictions"])
         default_spec = _default_spec_for_seed(classifier_seed)
+        default_threshold_selection = select_classifier_spec_source_inner_lodo(
+            outer_target_center=heldout,
+            folds=folds,
+            candidate_specs=(default_spec,),
+            experiment_seed=int(experiment_seed),
+            classifier_seed=int(classifier_seed),
+            selection_metric=selection_metric,
+            score_fn=score_fn_factory(heldout) if score_fn_factory else None,
+            reject_non_converged=True,
+        )
         default_eval = fit_and_score_heldout(
             frame,
             heldout_center=heldout,
             spec=default_spec,
-            method="default_untuned",
+            method="default_untuned_fixed_0_5",
             experiment_seed=int(experiment_seed),
             classifier_seed=int(classifier_seed),
             grid_hash=grid_hash,
             source_inner_rows=(),
+            threshold_decision=fixed_threshold_spec(
+                threshold_policy_group_id=default_threshold_selection.threshold_selection.decision.threshold_policy_group_id
+            ),
         )
         result_rows.append(default_eval["result"])
         prediction_rows.extend(default_eval["predictions"])
+        default_threshold_eval = fit_and_score_heldout(
+            frame,
+            heldout_center=heldout,
+            spec=default_spec,
+            method="default_untuned_source_inner_threshold",
+            experiment_seed=int(experiment_seed),
+            classifier_seed=int(classifier_seed),
+            grid_hash=grid_hash,
+            source_inner_rows=(),
+            threshold_decision=default_threshold_selection.threshold_selection.decision,
+        )
+        result_rows.append(default_threshold_eval["result"])
+        prediction_rows.extend(default_threshold_eval["predictions"])
         leakage_folds.extend(_outer_and_inner_leakage_rows(frame, heldout_center=heldout, fold_audit=fold_audit))
     paths = _write_real_feature_artifacts(
         out_dir=Path(out_dir),
@@ -308,6 +357,7 @@ def fit_and_score_heldout(
     classifier_seed: int,
     grid_hash: str,
     source_inner_rows: Sequence[Mapping[str, object]],
+    threshold_decision: ThresholdDecisionSpec,
 ) -> dict[str, object]:
     """Fit a frozen classifier on source centers and score the heldout center."""
 
@@ -329,8 +379,8 @@ def fit_and_score_heldout(
         import numpy as np  # type: ignore
     except ModuleNotFoundError as exc:
         raise RuntimeError("MIDOG++ real-feature scoring requires numpy.") from exc
-    predictions = np.asarray(fitted.predictions, dtype=int).tolist()
     probabilities = np.asarray(fitted.probabilities, dtype=float)
+    predictions = apply_threshold(probabilities[:, 1].tolist(), threshold_decision.threshold_value)
     classes = tuple(int(value) for value in fitted.classes)
     if classes != (0, 1):
         raise ProtocolError("MIDOG++ real-feature classifier expects classes (0, 1).")
@@ -346,6 +396,7 @@ def fit_and_score_heldout(
         grid_hash=grid_hash,
         spec=spec,
         source_inner_summary=selected_vectors,
+        threshold_decision=threshold_decision,
         heldout_bacc=balanced_accuracy(eval_labels, predictions),
         heldout_macro_f1=macro_f1(eval_labels, predictions),
         converged=fitted.converged,
@@ -366,6 +417,7 @@ def fit_and_score_heldout(
                 y_pred=int(predictions[local_idx]),
                 prob_pos=float(probabilities[local_idx, 1]),
                 spec=spec,
+                threshold_decision=threshold_decision,
                 feature_cache_hash=frame.feature_cache_hash,
                 manifest_hash=frame.manifest_hash,
             )
@@ -420,6 +472,7 @@ def _write_real_feature_artifacts(
         "fit_used_target_center": False,
         "selections_from_target_metrics": "forbidden",
         "probabilities_calibrated": False,
+        "threshold_selection": "fixed_0_5_and_source_inner_lodo",
         "external_baseline_comparison": "not_imported_requires_matching_cache_manifest_protocol_hashes",
     }
     _write_json(paths.protocol_manifest, protocol_manifest)
@@ -439,6 +492,7 @@ def _write_real_feature_artifacts(
         "is_router": False,
         "claim_scope": "real_feature_transfer_only",
         "probabilities_calibrated": False,
+        "threshold_selection_source": "fixed_0_5_and_source_inner_lodo",
         "overlap_rows": leakage_folds,
     }
     _write_json(paths.leakage_report, leakage_report)
@@ -484,6 +538,7 @@ def _result_row(
     grid_hash: str,
     spec: ClassifierSpec,
     source_inner_summary: Mapping[str, object],
+    threshold_decision: ThresholdDecisionSpec,
     heldout_bacc: float,
     heldout_macro_f1: float,
     converged: bool,
@@ -491,6 +546,7 @@ def _result_row(
     feature_cache_hash: str,
     manifest_hash: str,
 ) -> dict[str, object]:
+    threshold_fields = _json_threshold_fields(artifact_fields_for_decision(threshold_decision))
     return {
         "schema_version": REAL_FEATURE_RESULTS_SCHEMA_VERSION,
         "method": method,
@@ -503,7 +559,8 @@ def _result_row(
         "classifier_grid_hash": grid_hash,
         "selected_classifier_config_hash": spec.config_hash,
         "selected_classifier_spec": json.dumps(spec.to_payload(), sort_keys=True),
-        "selection_source": "source_inner_lodo" if method == "source_inner_tuned" else "default_locked_classifier",
+        **threshold_fields,
+        "selection_source": "source_inner_lodo" if method.startswith("source_inner_tuned") else "default_locked_classifier",
         "source_inner_mean_bacc": source_inner_summary.get("mean_bacc", ""),
         "source_inner_min_bacc": source_inner_summary.get("min_bacc", ""),
         "source_inner_std_bacc": source_inner_summary.get("std_bacc", ""),
@@ -538,6 +595,7 @@ def _prediction_row(
     y_pred: int,
     prob_pos: float,
     spec: ClassifierSpec,
+    threshold_decision: ThresholdDecisionSpec,
     feature_cache_hash: str,
     manifest_hash: str,
 ) -> dict[str, object]:
@@ -553,7 +611,11 @@ def _prediction_row(
         "y_true": int(sample.label),
         "y_pred": int(y_pred),
         "prob_pos": float(prob_pos),
-        "threshold_policy": spec.threshold_policy,
+        "threshold_policy": threshold_decision.threshold_policy,
+        "threshold_value": float(threshold_decision.threshold_value),
+        "threshold_policy_group_id": threshold_decision.threshold_policy_group_id,
+        "threshold_selection_source": threshold_decision.threshold_selection_source,
+        "threshold_decision_config_hash": threshold_decision.decision_config_hash,
         "selected_classifier_config_hash": spec.config_hash,
         "feature_cache_hash": feature_cache_hash,
         "manifest_hash": manifest_hash,
@@ -580,6 +642,19 @@ def _source_inner_summary(rows: Sequence[Mapping[str, object]]) -> dict[str, obj
         "std_bacc": math.sqrt(variance),
         "n_centers": len(values),
     }
+
+
+def _json_threshold_fields(fields: Mapping[str, object]) -> dict[str, object]:
+    normalized = dict(fields)
+    for key in (
+        "selected_source_inner_score_vector",
+        "threshold_grid",
+        "threshold_objective_by_threshold",
+        "threshold_valid_pseudo_target_centers",
+    ):
+        if key in normalized and not isinstance(normalized[key], str):
+            normalized[key] = json.dumps(normalized[key], sort_keys=True)
+    return normalized
 
 
 def _outer_and_inner_leakage_rows(

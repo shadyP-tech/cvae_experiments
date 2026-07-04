@@ -5,7 +5,7 @@ experiment:
 
 inputs:
   feature_cache_root: cvae_rebuild/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2
-  repair_artifact_root: cvae_rebuild/artifacts/virchow2_cvae_preservation_repair_v1
+  repair_artifact_root: cvae_rebuild/artifacts/camelyon17_virchow2_legacy/virchow2_cvae_preservation_repair_v1
   paired_dense_artifact_root: cvae_rebuild/artifacts/midogpp/virchow2_cvae_dense_late_all_sources_midogpp_v1
   mass_bagged_artifact_root:
   shrink050_artifact_root:

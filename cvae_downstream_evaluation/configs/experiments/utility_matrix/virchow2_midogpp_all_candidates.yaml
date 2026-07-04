@@ -33,6 +33,9 @@ schema:
     protocol_hash: required_primary_key
     checkpoint_hash: required_primary_key
     feature_frame_hash: required_primary_key
+    threshold_policy: required_primary_key
+    threshold_value: required_primary_key
+    threshold_policy_group_id: required_primary_key
   no_support_sentinel:
     support_size: 0
     support_seed: none
@@ -60,6 +63,8 @@ downstream:
     class_weight: null
     scaler_fit: synthetic_train_only
     hyperparameter_tuning: forbidden
+    threshold_policy: fixed_0_5
+    threshold_value: 0.5
   metrics:
     primary: [bacc, macro_f1]
     chosen_before_target_eval: true

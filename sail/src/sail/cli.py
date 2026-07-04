@@ -20,7 +20,7 @@ from .pipeline import run_pipeline
 from .protocol import ProtocolError
 
 
-DEFAULT_CONFIG = "sail/configs/sail_virchow2.yaml"
+DEFAULT_CONFIG = "sail/configs/camelyon17_virchow2_legacy/sail_virchow2.yaml"
 DEFAULT_MIDOGPP_MULTIAXIS_CONFIG = "sail/configs/midogpp_virchow2_real_feature_multiaxis_baseline.yaml"
 DEFAULT_MIDOGPP_SIGNAL_CONTROLS_CONFIG = "sail/configs/midogpp_virchow2_real_feature_signal_controls.yaml"
 

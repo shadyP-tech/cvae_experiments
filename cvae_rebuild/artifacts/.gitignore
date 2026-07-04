@@ -1,2 +1,4 @@
 *
 !.gitignore
+!camelyon17_virchow2_legacy/
+!camelyon17_virchow2_legacy/README.md

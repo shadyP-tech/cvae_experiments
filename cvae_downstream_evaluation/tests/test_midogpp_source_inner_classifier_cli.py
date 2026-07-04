@@ -62,3 +62,21 @@ def test_midogpp_runner_rejects_invalid_source_inner_classifier_grid() -> None:
         pass
     else:
         raise AssertionError("MIDOG++ runner accepted invalid elasticnet/lbfgs classifier grid")
+
+
+def test_midogpp_runner_parses_threshold_policy_variants() -> None:
+    args = build_parser().parse_args(
+        [
+            "--summary-manifest",
+            "summary.csv",
+            "--test-cache-path",
+            "test.npz",
+            "--out-dir",
+            "out",
+            "--source-inner-classifier-tuning",
+            "--threshold-policy",
+            "both",
+        ]
+    )
+
+    assert args.threshold_policy == "both"

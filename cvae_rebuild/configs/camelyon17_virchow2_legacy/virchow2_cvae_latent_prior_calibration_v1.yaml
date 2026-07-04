@@ -1,0 +1,39 @@
+experiment:
+  name: virchow2_cvae_latent_prior_calibration_v1
+  artifact_root: cvae_rebuild/artifacts/camelyon17_virchow2_legacy/virchow2_cvae_latent_prior_calibration_v1
+  primary_variant: pca64_beta001
+  min_decision_cells: 9
+
+inputs:
+  feature_cache_root: cvae_rebuild/artifacts/camelyon17_virchow2_legacy/pathology_embeddings/virchow2
+  repair_artifact_root: cvae_rebuild/artifacts/camelyon17_virchow2_legacy/virchow2_cvae_preservation_repair_v1
+  sampling_artifact_root: cvae_rebuild/artifacts/camelyon17_virchow2_legacy/virchow2_cvae_pca64_sampling_continuation_v1
+  backbone: virchow2
+
+run_matrix:
+  experiment_seeds: [42, 43, 44]
+  heldout_centers: ["0", "1", "2", "3", "4"]
+  replicate_seeds: [17, 23, 31]
+
+generation:
+  synthetic_per_class_total: 128
+
+prior_calibration:
+  primary_method: cvae_cc_diag_gaussian_prior_sample
+  min_prior_fit_records_per_class: 8
+  variance_floor: 1.0e-4
+  variance_ddof: 0
+  shrinkage_alphas: [0.25, 0.5]
+  standard_prior_repro_abs_tol_bacc: 1.0e-6
+  full_cov_min_records_per_class: 32
+  full_cov_shrinkage_alpha: 0.1
+  full_cov_eigenvalue_floor: 1.0e-4
+  full_cov_fallback_if_singular: diag
+
+classifier:
+  type: sklearn_logistic_regression
+  solver: lbfgs
+  C: 1.0
+  max_iter: 2000
+  class_weight: balanced
+  classifier_seed: null

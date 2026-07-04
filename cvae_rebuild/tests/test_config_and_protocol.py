@@ -126,25 +126,25 @@ from support_split_rows import labeled_support_split_rows, unlabeled_support_spl
 
 
 def test_locked_config_loads() -> None:
-    cfg = load_config("configs/target_support32_virchow2_cvae_top2_v1.yaml")
+    cfg = load_config("configs/camelyon17_virchow2_legacy/target_support32_virchow2_cvae_top2_v1.yaml")
     assert cfg.primary_method == "support_nelbo_top2_geom"
     assert cfg.support_size == 32
     assert cfg.experiment_seeds == (42, 43, 44)
     assert cfg.heldout_centers == ("0", "1", "2", "3", "4")
-    assert cfg.artifact_root.as_posix().endswith("cvae_rebuild/artifacts/target_support32_virchow2_cvae_top2_v1")
+    assert cfg.artifact_root.as_posix().endswith("cvae_rebuild/artifacts/camelyon17_virchow2_legacy/target_support32_virchow2_cvae_top2_v1")
 
 
 def test_locked_preservation_config_loads() -> None:
-    cfg = load_preservation_config("configs/virchow2_cvae_preservation_diagnosis_v1.yaml")
+    cfg = load_preservation_config("configs/camelyon17_virchow2_legacy/virchow2_cvae_preservation_diagnosis_v1.yaml")
     assert cfg.name == "virchow2_cvae_preservation_diagnosis_v1"
     assert cfg.replicate_seeds == (17, 23, 31)
     assert cfg.classifier_class_weight == "balanced"
     assert cfg.classifier_seed is None
-    assert cfg.artifact_root.as_posix().endswith("cvae_rebuild/artifacts/virchow2_cvae_preservation_diagnosis_v1")
+    assert cfg.artifact_root.as_posix().endswith("cvae_rebuild/artifacts/camelyon17_virchow2_legacy/virchow2_cvae_preservation_diagnosis_v1")
 
 
 def test_locked_preservation_repair_config_loads() -> None:
-    cfg = load_repair_config("configs/virchow2_cvae_preservation_repair_v1.yaml")
+    cfg = load_repair_config("configs/camelyon17_virchow2_legacy/virchow2_cvae_preservation_repair_v1.yaml")
     assert cfg.name == "virchow2_cvae_preservation_repair_v1"
     assert cfg.primary_variant == "pca64_beta001"
     assert cfg.min_decision_rows == 10
@@ -157,12 +157,12 @@ def test_locked_preservation_repair_config_loads() -> None:
         "source_union_pca64_beta001_diagnostic",
         "source_union_pca64_beta001_probe025_diagnostic",
     }
-    assert cfg.artifact_root.as_posix().endswith("cvae_rebuild/artifacts/virchow2_cvae_preservation_repair_v1")
+    assert cfg.artifact_root.as_posix().endswith("cvae_rebuild/artifacts/camelyon17_virchow2_legacy/virchow2_cvae_preservation_repair_v1")
 
 
 def test_locked_decentralized_k16_gmm_prior_config_loads() -> None:
     cfg = load_decentralized_k16_gmm_prior_config(
-        "configs/virchow2_cvae_decentralized_k16_gmm_prior_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_decentralized_k16_gmm_prior_v1.yaml"
     )
     assert cfg.name == "virchow2_cvae_decentralized_k16_gmm_prior_v1"
     assert cfg.backbone == "virchow2"
@@ -177,7 +177,7 @@ def test_locked_decentralized_k16_gmm_prior_config_loads() -> None:
 
 def test_locked_decentralized_adaptive_gmm_prior_config_loads() -> None:
     cfg = load_decentralized_adaptive_gmm_prior_config(
-        "configs/virchow2_cvae_decentralized_adaptive_gmm_prior_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_decentralized_adaptive_gmm_prior_v1.yaml"
     )
     assert cfg.name == "virchow2_cvae_decentralized_adaptive_gmm_prior_v1"
     assert cfg.backbone == "virchow2"
@@ -191,7 +191,7 @@ def test_locked_decentralized_adaptive_gmm_prior_config_loads() -> None:
 
 def test_locked_decentralized_reliability_weighted_gmm_prior_config_loads() -> None:
     cfg = load_decentralized_reliability_weighted_gmm_prior_config(
-        "configs/virchow2_cvae_decentralized_reliability_weighted_gmm_prior_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_decentralized_reliability_weighted_gmm_prior_v1.yaml"
     )
     assert cfg.name == "virchow2_cvae_decentralized_reliability_weighted_gmm_prior_v1"
     assert cfg.backbone == "virchow2"
@@ -206,7 +206,7 @@ def test_locked_decentralized_reliability_weighted_gmm_prior_config_loads() -> N
 
 def test_locked_decentralized_component_union_prior_config_loads() -> None:
     cfg = load_decentralized_component_union_prior_config(
-        "configs/virchow2_cvae_decentralized_component_union_prior_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_decentralized_component_union_prior_v1.yaml"
     )
     assert cfg.name == "virchow2_cvae_decentralized_component_union_prior_v1"
     assert cfg.backbone == "virchow2"
@@ -222,7 +222,7 @@ def test_locked_decentralized_component_union_prior_config_loads() -> None:
 
 def test_locked_decentralized_component_union_shrink025_v2_config_loads() -> None:
     cfg = load_decentralized_component_union_prior_config(
-        "configs/virchow2_cvae_decentralized_component_union_reliability_shrink025_v2.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_decentralized_component_union_reliability_shrink025_v2.yaml"
     )
     assert cfg.name == "virchow2_cvae_decentralized_component_union_reliability_shrink025_v2"
     assert cfg.backbone == "virchow2"
@@ -239,7 +239,7 @@ def test_locked_decentralized_component_union_shrink025_v2_config_loads() -> Non
 
 def test_locked_decentralized_component_union_shrink050_confirmation_config_loads() -> None:
     cfg = load_decentralized_component_union_prior_config(
-        "configs/virchow2_cvae_decentralized_component_union_reliability_shrink050_confirmation_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_decentralized_component_union_reliability_shrink050_confirmation_v1.yaml"
     )
     assert cfg.name == "virchow2_cvae_decentralized_component_union_reliability_shrink050_confirmation_v1"
     assert cfg.backbone == "virchow2"
@@ -258,7 +258,7 @@ def test_locked_decentralized_component_union_shrink050_confirmation_config_load
 
 
 def test_locked_decentralized_component_union_shrink050_rejects_changed_lambda() -> None:
-    path = Path("configs/virchow2_cvae_decentralized_component_union_reliability_shrink050_confirmation_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_decentralized_component_union_reliability_shrink050_confirmation_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["component_union_prior"]["primary_shrink_lambda"] = 0.25
 
@@ -267,7 +267,7 @@ def test_locked_decentralized_component_union_shrink050_rejects_changed_lambda()
 
 
 def test_locked_decentralized_component_union_shrink050_rejects_changed_fresh_seed_grid() -> None:
-    path = Path("configs/virchow2_cvae_decentralized_component_union_reliability_shrink050_confirmation_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_decentralized_component_union_reliability_shrink050_confirmation_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["run_matrix"]["fresh_replicate_seeds"] = [101]
 
@@ -276,7 +276,7 @@ def test_locked_decentralized_component_union_shrink050_rejects_changed_fresh_se
 
 
 def test_locked_decentralized_component_union_shrink025_v2_rejects_changed_seed_grid() -> None:
-    path = Path("configs/virchow2_cvae_decentralized_component_union_reliability_shrink025_v2.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_decentralized_component_union_reliability_shrink025_v2.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["run_matrix"]["experiment_seeds"] = [42]
 
@@ -286,7 +286,7 @@ def test_locked_decentralized_component_union_shrink025_v2_rejects_changed_seed_
 
 def test_locked_mass_bagged_component_union_config_loads() -> None:
     cfg = load_mass_bagged_component_union_config(
-        "configs/virchow2_cvae_decentralized_component_union_mass_bagged_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_decentralized_component_union_mass_bagged_v1.yaml"
     )
     assert cfg.name == "virchow2_cvae_decentralized_component_union_mass_bagged_v1"
     assert cfg.backbone == "virchow2"
@@ -304,7 +304,7 @@ def test_locked_mass_bagged_component_union_config_loads() -> None:
 
 
 def test_mass_bagged_component_union_rejects_shuffled_primary_member() -> None:
-    path = Path("configs/virchow2_cvae_decentralized_component_union_mass_bagged_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_decentralized_component_union_mass_bagged_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["mass_bagged_component_union"]["primary_bag_members"][0] = "shuffled_reliability_shrink025_perm000"
 
@@ -314,7 +314,7 @@ def test_mass_bagged_component_union_rejects_shuffled_primary_member() -> None:
 
 def test_locked_tailrisk_anchored_component_union_config_loads() -> None:
     cfg = load_tailrisk_anchored_component_union_config(
-        "configs/virchow2_cvae_component_union_tailrisk_anchored_mass_bagged_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_component_union_tailrisk_anchored_mass_bagged_v1.yaml"
     )
     assert cfg.name == "virchow2_cvae_component_union_tailrisk_anchored_mass_bagged_v1"
     assert cfg.backbone == "virchow2"
@@ -334,7 +334,7 @@ def test_locked_tailrisk_anchored_component_union_config_loads() -> None:
 
 
 def test_tailrisk_anchored_component_union_rejects_changed_blend_alpha() -> None:
-    path = Path("configs/virchow2_cvae_component_union_tailrisk_anchored_mass_bagged_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_component_union_tailrisk_anchored_mass_bagged_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["tailrisk_anchored_component_union"]["blend_alpha"] = 0.25
 
@@ -343,7 +343,7 @@ def test_tailrisk_anchored_component_union_rejects_changed_blend_alpha() -> None
 
 
 def test_tailrisk_anchored_component_union_rejects_changed_random_bag_size() -> None:
-    path = Path("configs/virchow2_cvae_component_union_tailrisk_anchored_mass_bagged_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_component_union_tailrisk_anchored_mass_bagged_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["tailrisk_anchored_component_union"]["random_mass_bag_size"] = 3
 
@@ -353,7 +353,7 @@ def test_tailrisk_anchored_component_union_rejects_changed_random_bag_size() -> 
 
 def test_locked_multipanel_tailrisk_component_union_config_loads() -> None:
     cfg = load_multipanel_tailrisk_component_union_config(
-        "configs/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1.yaml"
     )
     assert cfg.name == MULTIPANEL_TAILRISK_NAME
     assert cfg.backbone == "virchow2"
@@ -374,7 +374,7 @@ def test_locked_multipanel_tailrisk_component_union_config_loads() -> None:
 
 
 def test_multipanel_tailrisk_rejects_changed_blend_alpha() -> None:
-    path = Path("configs/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["tailrisk_multipanel_component_union"]["blend_alpha"] = 0.25
 
@@ -383,7 +383,7 @@ def test_multipanel_tailrisk_rejects_changed_blend_alpha() -> None:
 
 
 def test_multipanel_tailrisk_rejects_undeclared_panel_seed() -> None:
-    path = Path("configs/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["tailrisk_multipanel_component_union"]["panel_seed_groups"]["fresh_b"][-1] = 131
     payload["run_matrix"]["fresh_replicate_seeds"][-1] = 131
@@ -393,7 +393,7 @@ def test_multipanel_tailrisk_rejects_undeclared_panel_seed() -> None:
 
 
 def test_multipanel_tailrisk_rejects_target_support_field() -> None:
-    path = Path("configs/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["inputs"]["support_calibrated_artifact_root"] = "cvae_rebuild/artifacts/not_allowed"
 
@@ -403,7 +403,7 @@ def test_multipanel_tailrisk_rejects_target_support_field() -> None:
 
 def test_locked_source_inner_positive_union_config_loads() -> None:
     cfg = load_source_inner_positive_union_config(
-        "configs/virchow2_cvae_source_inner_class_conditional_positive_union_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_source_inner_class_conditional_positive_union_v1.yaml"
     )
     assert cfg.name == POSITIVE_UNION_TAILRISK_NAME
     assert cfg.backbone == "virchow2"
@@ -428,7 +428,7 @@ def test_locked_source_inner_positive_union_config_loads() -> None:
 
 
 def test_source_inner_positive_union_rejects_changed_beta_grid() -> None:
-    path = Path("configs/virchow2_cvae_source_inner_class_conditional_positive_union_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_source_inner_class_conditional_positive_union_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["source_inner_class_conditional_positive_union"]["candidate_pooling_rules"][-1] = "positive_union_beta075"
 
@@ -437,7 +437,7 @@ def test_source_inner_positive_union_rejects_changed_beta_grid() -> None:
 
 
 def test_source_inner_positive_union_rejects_changed_min_positive_count() -> None:
-    path = Path("configs/virchow2_cvae_source_inner_class_conditional_positive_union_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_source_inner_class_conditional_positive_union_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["source_inner_class_conditional_positive_union"]["min_source_inner_positive_count"] = 3
 
@@ -456,7 +456,7 @@ def test_source_inner_positive_union_rejects_changed_min_positive_count() -> Non
     ],
 )
 def test_source_inner_positive_union_rejects_changed_locked_fields(section: str, key: str, value: object, message: str) -> None:
-    path = Path("configs/virchow2_cvae_source_inner_class_conditional_positive_union_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_source_inner_class_conditional_positive_union_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload[section][key] = value
 
@@ -465,7 +465,7 @@ def test_source_inner_positive_union_rejects_changed_locked_fields(section: str,
 
 
 def test_source_inner_positive_union_rejects_undeclared_panel_seed_and_bag_size_in_strict_run() -> None:
-    path = Path("configs/virchow2_cvae_source_inner_class_conditional_positive_union_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_source_inner_class_conditional_positive_union_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["source_inner_class_conditional_positive_union"]["panel_seed_groups"]["fresh_b"][-1] = 131
     payload["run_matrix"]["fresh_replicate_seeds"][-1] = 131
@@ -479,7 +479,7 @@ def test_source_inner_positive_union_rejects_undeclared_panel_seed_and_bag_size_
 
 
 def test_source_inner_positive_union_rejects_target_support_and_target_selection() -> None:
-    path = Path("configs/virchow2_cvae_source_inner_class_conditional_positive_union_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_source_inner_class_conditional_positive_union_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["inputs"]["support_calibrated_artifact_root"] = "cvae_rebuild/artifacts/not_allowed"
 
@@ -494,7 +494,7 @@ def test_source_inner_positive_union_rejects_target_support_and_target_selection
 
 def test_locked_fixed_beta050_positive_union_config_loads() -> None:
     cfg = load_fixed_beta050_positive_union_config(
-        "configs/virchow2_cvae_fixed_beta050_positive_union_confirmation_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_fixed_beta050_positive_union_confirmation_v1.yaml"
     )
     assert cfg.name == FIXED_BETA050_POSITIVE_UNION_NAME
     assert cfg.primary_method == PRIMARY_FIXED_BETA050_POSITIVE_UNION_METHOD
@@ -518,7 +518,7 @@ def test_locked_fixed_beta050_positive_union_config_loads() -> None:
 
 
 def test_fixed_beta050_positive_union_rejects_changed_beta_and_seed_overlap() -> None:
-    path = Path("configs/virchow2_cvae_fixed_beta050_positive_union_confirmation_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_fixed_beta050_positive_union_confirmation_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["fixed_beta050_positive_union_confirmation"]["fixed_beta"] = 0.25
     with pytest.raises(Exception, match="fixed_beta"):
@@ -543,7 +543,7 @@ def test_fixed_beta050_positive_union_rejects_changed_beta_and_seed_overlap() ->
     ],
 )
 def test_fixed_beta050_positive_union_rejects_changed_locked_fields(key: str, value: object, message: str) -> None:
-    path = Path("configs/virchow2_cvae_fixed_beta050_positive_union_confirmation_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_fixed_beta050_positive_union_confirmation_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["fixed_beta050_positive_union_confirmation"][key] = value
     with pytest.raises(Exception, match=message):
@@ -551,7 +551,7 @@ def test_fixed_beta050_positive_union_rejects_changed_locked_fields(key: str, va
 
 
 def test_fixed_beta050_positive_union_rejects_target_support_and_target_selection() -> None:
-    path = Path("configs/virchow2_cvae_fixed_beta050_positive_union_confirmation_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_fixed_beta050_positive_union_confirmation_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["inputs"]["support_calibrated_artifact_root"] = "cvae_rebuild/artifacts/not_allowed"
     with pytest.raises(Exception, match="support_calibrated_artifact_root"):
@@ -565,7 +565,7 @@ def test_fixed_beta050_positive_union_rejects_target_support_and_target_selectio
 
 def test_locked_harm_gated_positive_union_config_loads() -> None:
     cfg = load_harm_gated_positive_union_config(
-        "configs/virchow2_cvae_source_inner_harm_gated_positive_union_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_source_inner_harm_gated_positive_union_v1.yaml"
     )
     assert cfg.name == HARM_GATED_POSITIVE_UNION_NAME
     assert cfg.primary_method == PRIMARY_HARM_GATED_POSITIVE_UNION_METHOD
@@ -608,7 +608,7 @@ def test_locked_harm_gated_positive_union_config_loads() -> None:
     ],
 )
 def test_harm_gated_positive_union_rejects_changed_locked_fields(key: str, value: object, message: str) -> None:
-    path = Path("configs/virchow2_cvae_source_inner_harm_gated_positive_union_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_source_inner_harm_gated_positive_union_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["source_inner_harm_gated_positive_union"][key] = value
     with pytest.raises(Exception, match=message):
@@ -616,7 +616,7 @@ def test_harm_gated_positive_union_rejects_changed_locked_fields(key: str, value
 
 
 def test_harm_gated_positive_union_rejects_beta100_primary_target_support_and_seed_overlap() -> None:
-    path = Path("configs/virchow2_cvae_source_inner_harm_gated_positive_union_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_source_inner_harm_gated_positive_union_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["source_inner_harm_gated_positive_union"]["beta100_primary_selectable"] = True
     with pytest.raises(Exception, match="beta100_primary_selectable"):
@@ -656,7 +656,7 @@ def test_harm_gated_positive_union_rejects_beta100_primary_target_support_and_se
 
 def test_locked_dense_tailshield_random_mass_bag_config_loads() -> None:
     cfg = load_dense_tailshield_random_mass_bag_config(
-        "configs/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1.yaml"
     )
     assert cfg.name == "virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1"
     assert cfg.backbone == "virchow2"
@@ -677,7 +677,7 @@ def test_locked_dense_tailshield_random_mass_bag_config_loads() -> None:
 
 
 def test_dense_tailshield_random_mass_bag_rejects_changed_dense_alpha() -> None:
-    path = Path("configs/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["dense_tailshield_random_mass_bag"]["dense_blend_alpha"] = 0.5
 
@@ -686,7 +686,7 @@ def test_dense_tailshield_random_mass_bag_rejects_changed_dense_alpha() -> None:
 
 
 def test_dense_tailshield_random_mass_bag_rejects_changed_alpha_curve() -> None:
-    path = Path("configs/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_dense_reliability_tailshield_random_mass_bag_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["dense_tailshield_random_mass_bag"]["alpha_curve_dense_values"] = [0.0, 0.25, 1.0]
 
@@ -696,7 +696,7 @@ def test_dense_tailshield_random_mass_bag_rejects_changed_alpha_curve() -> None:
 
 def test_locked_harmful_source_suppression_config_loads() -> None:
     cfg = load_harmful_source_suppression_config(
-        "configs/virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1.yaml"
     )
     assert cfg.name == "virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1"
     assert cfg.backbone == "virchow2"
@@ -716,7 +716,7 @@ def test_locked_harmful_source_suppression_config_loads() -> None:
 
 
 def test_harmful_source_suppression_rejects_changed_bag_size() -> None:
-    path = Path("configs/virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["harmful_source_suppression"]["random_mass_bag_size"] = 3
 
@@ -725,7 +725,7 @@ def test_harmful_source_suppression_rejects_changed_bag_size() -> None:
 
 
 def test_harmful_source_suppression_rejects_target_support_config() -> None:
-    path = Path("configs/virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_source_inner_harmful_source_suppression_random_mass_bag_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["run_matrix"]["support_size"] = 8
 
@@ -735,7 +735,7 @@ def test_harmful_source_suppression_rejects_target_support_config() -> None:
 
 def test_locked_target_support_regime_risk_gate_config_loads() -> None:
     cfg = load_target_support_regime_risk_gate_config(
-        "configs/virchow2_cvae_target_support32_regime_risk_gated_component_union_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_target_support32_regime_risk_gated_component_union_v1.yaml"
     )
     assert cfg.name == "virchow2_cvae_target_support32_regime_risk_gated_component_union_v1"
     assert cfg.backbone == "virchow2"
@@ -756,7 +756,7 @@ def test_locked_target_support_regime_risk_gate_config_loads() -> None:
 
 
 def test_target_support_regime_risk_gate_rejects_changed_support_size() -> None:
-    path = Path("configs/virchow2_cvae_target_support32_regime_risk_gated_component_union_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_target_support32_regime_risk_gated_component_union_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["run_matrix"]["support_size"] = 16
 
@@ -765,7 +765,7 @@ def test_target_support_regime_risk_gate_rejects_changed_support_size() -> None:
 
 
 def test_target_support_regime_risk_gate_rejects_changed_thresholds() -> None:
-    path = Path("configs/virchow2_cvae_target_support32_regime_risk_gated_component_union_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_target_support32_regime_risk_gated_component_union_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["target_support_regime_risk_gate"]["risk_low_threshold"] = 0.5
 
@@ -774,7 +774,7 @@ def test_target_support_regime_risk_gate_rejects_changed_thresholds() -> None:
 
 
 def test_target_support_regime_risk_gate_rejects_enabled_nn_audit() -> None:
-    path = Path("configs/virchow2_cvae_target_support32_regime_risk_gated_component_union_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_target_support32_regime_risk_gated_component_union_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["memory"]["skip_nearest_neighbor_audit"] = False
 
@@ -784,7 +784,7 @@ def test_target_support_regime_risk_gate_rejects_enabled_nn_audit() -> None:
 
 def test_locked_labeled_support_policy_calibration_config_loads() -> None:
     cfg = load_labeled_support_policy_calibration_config(
-        "configs/virchow2_cvae_labeled_support16_random_vs_dense_policy_calibration_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_labeled_support16_random_vs_dense_policy_calibration_v1.yaml"
     )
     assert cfg.name == "virchow2_cvae_labeled_support16_random_vs_dense_policy_calibration_v1"
     assert cfg.backbone == "virchow2"
@@ -804,7 +804,7 @@ def test_locked_labeled_support_policy_calibration_config_loads() -> None:
 
 
 def test_labeled_support_policy_calibration_rejects_changed_switch_quantum() -> None:
-    path = Path("configs/virchow2_cvae_labeled_support16_random_vs_dense_policy_calibration_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_labeled_support16_random_vs_dense_policy_calibration_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["labeled_support_policy_calibration"]["primary_switch_quantum"] = 0.025
 
@@ -849,7 +849,7 @@ def test_nested_labeled_support_splits_are_class_balanced_and_disjoint() -> None
 
 def test_locked_source_inner_validated_dense_component_hybrid_config_loads() -> None:
     cfg = load_source_inner_validated_hybrid_config(
-        "configs/virchow2_cvae_source_inner_validated_dense_component_hybrid_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_source_inner_validated_dense_component_hybrid_v1.yaml"
     )
     assert cfg.name == "virchow2_cvae_source_inner_validated_dense_component_hybrid_v1"
     assert cfg.backbone == "virchow2"
@@ -865,7 +865,7 @@ def test_locked_source_inner_validated_dense_component_hybrid_config_loads() -> 
 
 
 def test_source_inner_validated_dense_component_hybrid_rejects_changed_lambda() -> None:
-    path = Path("configs/virchow2_cvae_source_inner_validated_dense_component_hybrid_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_source_inner_validated_dense_component_hybrid_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["source_inner_validated_dense_component_hybrid"]["component_shrink_lambda"] = 0.5
 
@@ -875,7 +875,7 @@ def test_source_inner_validated_dense_component_hybrid_rejects_changed_lambda() 
 
 def test_locked_pruned_adaptive_equal_all4_config_loads() -> None:
     cfg = load_pruned_adaptive_equal_all4_config(
-        "configs/virchow2_cvae_decentralized_pruned_adaptive_equal_all4_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_decentralized_pruned_adaptive_equal_all4_v1.yaml"
     )
     assert cfg.name == "virchow2_cvae_decentralized_pruned_adaptive_equal_all4_v1"
     assert cfg.backbone == "virchow2"
@@ -891,7 +891,7 @@ def test_locked_pruned_adaptive_equal_all4_config_loads() -> None:
 
 def test_locked_decentralized_reliability_top3_gmm_prior_config_loads() -> None:
     cfg = load_decentralized_reliability_top3_gmm_prior_config(
-        "configs/virchow2_cvae_decentralized_reliability_top3_gmm_prior_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_decentralized_reliability_top3_gmm_prior_v1.yaml"
     )
     assert cfg.name == "virchow2_cvae_decentralized_reliability_top3_gmm_prior_v1"
     assert cfg.backbone == "virchow2"
@@ -905,7 +905,7 @@ def test_locked_decentralized_reliability_top3_gmm_prior_config_loads() -> None:
 
 def test_locked_decentralized_source_inner_transfer_top3_gmm_prior_config_loads() -> None:
     cfg = load_decentralized_source_inner_transfer_top3_gmm_prior_config(
-        "configs/virchow2_cvae_decentralized_source_inner_transfer_top3_gmm_prior_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_decentralized_source_inner_transfer_top3_gmm_prior_v1.yaml"
     )
     assert cfg.name == "virchow2_cvae_decentralized_source_inner_transfer_top3_gmm_prior_v1"
     assert cfg.backbone == "virchow2"
@@ -919,7 +919,7 @@ def test_locked_decentralized_source_inner_transfer_top3_gmm_prior_config_loads(
 
 def test_locked_decentralized_support_nelbo_reliability_gmm_prior_config_loads() -> None:
     cfg = load_decentralized_support_nelbo_reliability_gmm_prior_config(
-        "configs/virchow2_cvae_decentralized_support_nelbo_reliability_gmm_prior_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_decentralized_support_nelbo_reliability_gmm_prior_v1.yaml"
     )
     assert cfg.name == "virchow2_cvae_decentralized_support_nelbo_reliability_gmm_prior_v1"
     assert cfg.backbone == "virchow2"
@@ -935,7 +935,7 @@ def test_locked_decentralized_support_nelbo_reliability_gmm_prior_config_loads()
 
 def test_locked_decentralized_support8_top3_tau05_gmm_prior_config_loads() -> None:
     cfg = load_decentralized_support8_top3_tau05_gmm_prior_config(
-        "configs/virchow2_cvae_decentralized_support8_top3_tau05_gmm_prior_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_decentralized_support8_top3_tau05_gmm_prior_v1.yaml"
     )
     assert cfg.name == "virchow2_cvae_decentralized_support8_top3_tau05_gmm_prior_v1"
     assert cfg.backbone == "virchow2"
@@ -950,7 +950,7 @@ def test_locked_decentralized_support8_top3_tau05_gmm_prior_config_loads() -> No
 
 def test_locked_support_calibrated_component_union_config_loads() -> None:
     cfg = load_support_calibrated_component_union_config(
-        "configs/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml"
     )
     assert cfg.name == "virchow2_cvae_support8_calibrated_component_union_prior_v1"
     assert cfg.backbone == "virchow2"
@@ -968,7 +968,7 @@ def test_locked_support_calibrated_component_union_config_loads() -> None:
 
 
 def test_support_calibrated_component_union_rejects_changed_support_size() -> None:
-    path = Path("configs/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["run_matrix"]["support_size"] = 32
 
@@ -977,7 +977,7 @@ def test_support_calibrated_component_union_rejects_changed_support_size() -> No
 
 
 def test_support_calibrated_component_union_rejects_strict_changed_null_count() -> None:
-    path = Path("configs/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["support_calibrated_component_union_prior"]["matched_shuffled_support_null_permutations"] = 2
 
@@ -986,7 +986,7 @@ def test_support_calibrated_component_union_rejects_strict_changed_null_count() 
 
 
 def test_support_calibrated_component_union_rejects_strict_changed_random_bag_size() -> None:
-    path = Path("configs/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["support_calibrated_component_union_prior"]["random_mass_bag_control_size"] = 3
 
@@ -995,7 +995,7 @@ def test_support_calibrated_component_union_rejects_strict_changed_random_bag_si
 
 
 def test_support_calibrated_component_union_rejects_strict_changed_budget() -> None:
-    path = Path("configs/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml")
+    path = Path("configs/camelyon17_virchow2_legacy/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml")
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     payload["generation"]["synthetic_per_class_total"] = 64
 
@@ -1044,7 +1044,7 @@ def test_nested_support_sets_are_ordered_and_eval_disjoint() -> None:
 
 def test_support_shrink_plan_preserves_mass_rule_and_floor_nonbinding() -> None:
     cfg = load_support_calibrated_component_union_config(
-        "configs/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml"
     )
     scores = [
         SupportScore(42, "0", 17, 8, "1", 10.0, 0.0),
@@ -1063,7 +1063,7 @@ def test_support_shrink_plan_preserves_mass_rule_and_floor_nonbinding() -> None:
 
 def test_support_shuffled_null_preserves_score_multiset() -> None:
     cfg = load_support_calibrated_component_union_config(
-        "configs/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_support8_calibrated_component_union_prior_v1.yaml"
     )
     scores = [
         SupportScore(42, "0", 17, 8, "1", 10.0, 0.0),
@@ -1100,7 +1100,7 @@ def test_constrained_budget_floor_binding_is_reported() -> None:
 
 def test_locked_paired_dense_all4_reliability_config_loads() -> None:
     cfg = load_paired_dense_all4_reliability_config(
-        "configs/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_paired_dense_all4_reliability_confirmation_v1.yaml"
     )
     assert cfg.name == "virchow2_cvae_paired_dense_all4_reliability_confirmation_v1"
     assert cfg.backbone == "virchow2"
@@ -1118,7 +1118,7 @@ def test_locked_paired_dense_all4_reliability_config_loads() -> None:
 
 def test_locked_paired_component_coverage_audit_config_loads() -> None:
     cfg = load_paired_component_coverage_audit_config(
-        "configs/virchow2_cvae_paired_component_coverage_audit_v1.yaml"
+        "configs/camelyon17_virchow2_legacy/virchow2_cvae_paired_component_coverage_audit_v1.yaml"
     )
     assert cfg.name == "virchow2_cvae_paired_component_coverage_audit_v1"
     assert cfg.backbone == "virchow2"
@@ -1191,7 +1191,7 @@ def test_oracle_rows_must_be_diagnostic_only_for_prior_method_schema() -> None:
 
 
 def test_reporting_finalizer_writes_exact_default_protocol_payloads(tmp_path: Path) -> None:
-    cfg = load_config("configs/target_support32_virchow2_cvae_top2_v1.yaml")
+    cfg = load_config("configs/camelyon17_virchow2_legacy/target_support32_virchow2_cvae_top2_v1.yaml")
     report = build_leakage_report(
         target_support_labels_for_selection=False,
         target_eval_labels_for_scoring_only=True,
@@ -1236,7 +1236,7 @@ def test_reporting_finalizer_writes_exact_default_protocol_payloads(tmp_path: Pa
 
 
 def test_reporting_finalizer_preserves_explicit_leakage_report_payload(tmp_path: Path) -> None:
-    cfg = load_config("configs/target_support32_virchow2_cvae_top2_v1.yaml")
+    cfg = load_config("configs/camelyon17_virchow2_legacy/target_support32_virchow2_cvae_top2_v1.yaml")
     report = build_leakage_report(
         target_support_labels_for_selection=True,
         target_eval_labels_for_scoring_only=False,
@@ -1336,7 +1336,7 @@ def test_write_json_uses_sorted_keys_and_trailing_newline(tmp_path: Path) -> Non
 
 
 def test_smoke_artifacts_write_contract(tmp_path: Path) -> None:
-    cfg = load_config("configs/target_support32_virchow2_cvae_top2_v1.yaml")
+    cfg = load_config("configs/camelyon17_virchow2_legacy/target_support32_virchow2_cvae_top2_v1.yaml")
     root = run_artifact_contract_smoke(cfg, artifact_root=tmp_path / "artifacts")
     missing = [rel for rel in REQUIRED_OUTPUTS if not (root / rel).exists()]
     assert not missing
@@ -1346,7 +1346,7 @@ def test_synthetic_smoke_runs_mini_cvae_and_writes_nonempty_tables(tmp_path: Pat
     pytest.importorskip("torch")
     pytest.importorskip("numpy")
     pytest.importorskip("sklearn")
-    cfg = load_config("configs/target_support32_virchow2_cvae_top2_v1.yaml")
+    cfg = load_config("configs/camelyon17_virchow2_legacy/target_support32_virchow2_cvae_top2_v1.yaml")
     root = run_synthetic_smoke(cfg, artifact_root=tmp_path / "synthetic_smoke")
     assert (root / "tables" / "support_nelbo_routing_scores.csv").read_text(encoding="utf-8").count("\n") > 1
     assert "support_nelbo_top2_geom" in (root / "tables" / "all_expert_downstream_matrix.csv").read_text(
