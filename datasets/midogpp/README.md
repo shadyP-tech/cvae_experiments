@@ -20,11 +20,27 @@ Tracked layout:
 ```text
 datasets/midogpp/
   configs/annotation_patch_v1.yaml
+  configs/deprecated/
   schemas/dataset_contract.schema.json
   src/midogpp_contract/
   scripts/
   tests/
   artifacts/.gitignore
+```
+
+The active annotation-patch config uses `bbox_format: xyxy`. The old
+`coco_xywh` config has been moved to:
+
+```text
+datasets/midogpp/configs/deprecated/annotation_patch_v1_coco_xywh_stale.yaml
+```
+
+That deprecated config is provenance only. Do not use it for thesis-facing
+cache builds or downstream experiments. It is associated with the stale
+full-split cache lineage:
+
+```text
+sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2/
 ```
 
 The expected frozen artifact is:
@@ -59,6 +75,17 @@ has `9886 x 2560` features and aligns rowwise to the train split with `0`
 metadata mismatches across `sample_id`, `label`, `split`, `center`, and
 `magnification`. This verifies the dataset/cache contract for real-feature
 diagnostics only; it does not validate CVAE generation or routing claims.
+
+For future full train/val/test Virchow2 cache builds, use a cache root that
+names the corrected annotation geometry:
+
+```text
+sail/artifacts/pathology_embeddings_midogpp_annotation_patch_xyxy/virchow2/
+```
+
+Do not reuse `sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/`
+for new thesis-facing real-feature experiments unless it has been explicitly
+rebuilt from the active `xyxy` config and revalidated against the manifest.
 
 Build from the repository root:
 
@@ -97,7 +124,7 @@ After validation passes, run the SAIL/Virchow2 cache builder in dry-run mode:
 PYTHONPATH=sail/src conda run -n thesis python -m sail.cli build-cache \
   --samples-manifest datasets/midogpp/artifacts/midogpp_annotation_patch_v1/manifest.csv \
   --experiment-seed 42 \
-  --output-root sail/artifacts/pathology_embeddings/midogpp \
+  --output-root sail/artifacts/pathology_embeddings_midogpp_annotation_patch_xyxy \
   --model-ref hf-hub:paige-ai/Virchow2 \
   --batch-size 16 \
   --device cuda \

@@ -27,19 +27,24 @@ Implication:
 Completed real-feature classifier-reference follow-up:
 
 - artifact root:
-  `cvae_downstream_evaluation/artifacts/midogpp/real_feature_source_inner_classifier_tuned_virchow2_seed42/`
-- local artifact validator: `PASS`
+  `cvae_downstream_evaluation/artifacts/midogpp/real_feature_threshold_both_annotation_patch_xyxy_virchow2_seed42/`
+- workstation leakage/protocol inspection: `PASS`
 - leakage/provenance report: `PASS`
 - evidence label: `WEAK_PASS_REAL_FEATURE_TRANSFER_ONLY`
-- source-inner-tuned mean BACC/macro-F1: `0.740490` / `0.737357`
-- untuned default mean BACC/macro-F1: `0.664684` / `0.660550`
-- tuned-minus-default mean BACC delta: `+0.075806`
+- source-inner-tuned fixed-0.5 mean BACC/macro-F1: `0.740312` / `0.737205`
+- untuned default fixed-0.5 mean BACC/macro-F1: `0.665812` / `0.661730`
+- tuned-minus-default mean BACC delta at fixed `0.5`: `+0.074500`
 - tuned wins over untuned default on `9/9` eligible held-out centers
+- source-inner threshold selection chose `0.5` for every held-out center and
+  added `+0.000000` mean BACC over fixed `0.5`
 
 Implication:
 
 - Treat this as the current strongest synced MIDOG++ real-feature source-only
   classifier reference for later candidate-surface comparisons.
+- Treat threshold tuning as protocol-clean but empirically inert for this
+  corrected `xyxy` cache; do not prioritize another threshold run unless the
+  threshold rule changes for a predeclared reason.
 - Do not use it to claim CVAE preservation, NELBO compatibility, routing
   quality, synthetic utility, or generative quality.
 - Before promoting the claim beyond weak pass, add classifier-seed stability

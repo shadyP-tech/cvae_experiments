@@ -75,6 +75,21 @@ feature-row-shuffle negative controls remain near chance. This evidence is
 diagnostic only and does not support CVAE preservation, routing, or synthetic
 generation claims.
 
+Annotation-patch cache provenance update:
+
+- active config: `datasets/midogpp/configs/annotation_patch_v1.yaml`
+- active bbox interpretation: `xyxy`
+- deprecated config:
+  `datasets/midogpp/configs/deprecated/annotation_patch_v1_coco_xywh_stale.yaml`
+- rejected stale full-split cache lineage:
+  `sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2/`
+- intended corrected rebuild root:
+  `sail/artifacts/pathology_embeddings_midogpp_annotation_patch_xyxy/virchow2/`
+
+The deprecated `coco_xywh` lineage must not be used for new thesis-facing
+real-feature, threshold, or CVAE preservation experiments. It is retained only
+to explain stale cache provenance.
+
 ## Dependencies Outside `sail/`
 
 Runtime code does not import modules outside `sail/`.
@@ -96,6 +111,12 @@ The verified MIDOG++ signal-control cache path is:
 
 ```text
 sail/artifacts/pathology_embeddings/midogpp/virchow2/seed42/embeddings/train.pt
+```
+
+For new full train/val/test MIDOG++ Virchow2 cache builds, prefer:
+
+```text
+sail/artifacts/pathology_embeddings_midogpp_annotation_patch_xyxy/virchow2/seed42/embeddings/
 ```
 
 The default config writes generated outputs under:

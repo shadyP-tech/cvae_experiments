@@ -23,10 +23,12 @@ Expected evidence:
   folds, mean source-only BACC `0.668`, mean AUROC `0.728`, and pooled
   diagnostic ceiling mean BACC `0.902`.
 - MIDOG++ real-feature source-inner classifier reference from
-  `cvae_downstream_evaluation/artifacts/midogpp/real_feature_source_inner_classifier_tuned_virchow2_seed42/`:
-  artifact validator `PASS`, leakage/provenance `PASS`, target labels used for
-  scoring only, and source-inner-only classifier selection over real Virchow2
-  features.
+  `cvae_downstream_evaluation/artifacts/midogpp/real_feature_threshold_both_annotation_patch_xyxy_virchow2_seed42/`:
+  workstation leakage/protocol inspection `PASS`, leakage/provenance `PASS`,
+  target labels used for scoring only, and source-inner-only classifier
+  selection over real Virchow2 features. The paired threshold rows are
+  protocol-clean but selected `0.5` for every held-out center, so threshold
+  tuning did not change downstream predictions or BACC.
 
 ## Objective 2: Conditioned Generative Models In Feature Space
 
@@ -95,9 +97,11 @@ Expected evidence:
   diagnostic rows are non-adoption-eligible and only quantify headroom.
 - For MIDOG++ real-feature classifier-reference work, cite the source-inner
   tuned reference as the strongest currently synced source-only classifier
-  surface: mean held-out-center BACC `0.740490`, mean macro-F1 `0.737357`,
-  tuned-minus-default mean BACC delta `+0.075806`, and tuned wins on `9/9`
-  eligible centers. This is real-feature transfer evidence only.
+  surface: mean held-out-center BACC `0.740312`, mean macro-F1 `0.737205`,
+  tuned-minus-default mean BACC delta `+0.074500`, and tuned wins on `9/9`
+  eligible centers. The source-inner threshold variant selected fixed `0.5`
+  everywhere and added `+0.000000` mean BACC over fixed `0.5`. This is
+  real-feature transfer evidence only.
 
 ## Thesis Narrative Placement
 

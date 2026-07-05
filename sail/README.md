@@ -23,6 +23,12 @@ The legacy Camelyon17 Virchow2 instantiation is quarantined under
 `sail/artifacts/camelyon17_virchow2_legacy/`. Do not treat those files as
 MIDOG++ Virchow2 configs or artifacts.
 
+For MIDOG++ annotation-patch work, the active dataset config uses
+`bbox_format: xyxy`. The old `coco_xywh` config is quarantined under
+`datasets/midogpp/configs/deprecated/` and the stale full-split cache lineage
+`sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2/`
+must not be used for new thesis-facing experiments.
+
 ## Why This Is Current Best
 
 Repository evidence in
@@ -130,6 +136,8 @@ Current synced MIDOG++ signal-control status:
 
 - manifest: `datasets/midogpp/artifacts/midogpp_annotation_patch_v1/manifest.csv`
 - real cache: `sail/artifacts/pathology_embeddings/midogpp/virchow2/seed42/embeddings/train.pt`
+- corrected full-split cache rebuild target:
+  `sail/artifacts/pathology_embeddings_midogpp_annotation_patch_xyxy/virchow2/`
 - signal-control artifact root:
   `sail/artifacts/midogpp_virchow2_real_feature_signal_controls/`
 - cache shape: `9886 x 2560`
@@ -148,6 +156,11 @@ the corrected workstation artifact sync. The verified diagnostic shows real
 Virchow2 class signal under the signal-control protocol, while preserving the
 claim boundary: this is real-feature diagnostic evidence only, not evidence that
 CVAE samples preserve signal or that any routing policy is useful.
+
+Do not interpret runs produced from
+`sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2/` as
+current real-feature evidence unless that root has been explicitly rebuilt from
+the active `xyxy` annotation-patch config and revalidated against the manifest.
 
 The corresponding MIDOG++ pca128 CVAE preservation gate lives outside SAIL:
 
