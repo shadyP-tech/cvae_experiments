@@ -53,3 +53,5 @@ literature/
 outputs
 docs/
 midogpp_real_feature_gate/
+run_log.md
+cvae_rebuild/datasets
