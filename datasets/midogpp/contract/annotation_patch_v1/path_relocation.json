@@ -1,0 +1,11 @@
+{
+  "schema_version": "midogpp_contract_path_relocation_v1",
+  "reason": "repository_ownership_refactor_preserving_frozen_manifest_hash",
+  "manifest_rewritten": false,
+  "relocations": [
+    {
+      "from": "datasets/midogpp/artifacts/midogpp_annotation_patch_v1",
+      "to": "datasets/midogpp/contract/annotation_patch_v1"
+    }
+  ]
+}

@@ -1,0 +1,399 @@
+schema_version: 2
+catalog_kind: midogpp_artifact_catalog
+last_reviewed: 2026-07-12
+path_base: repository_root
+
+catalog_policy:
+  historical_entries_preserve_original_manifests_and_bytes: true
+  canonical_output_entries_are_run_destinations: true
+  active_resolution_uses_canonical_roots_only: true
+  moved_artifacts_require_pre_post_hash_equality: true
+  preserve_original_manifests_and_hashes: true
+  semantic_identities_are_not_treated_as_file_hashes: true
+  expected_file_hashes_are_verified_during_prepare: true
+  provenance_files_receive_computed_sha256_during_prepare: true
+  evidence_authority: pointed_protocol_manifests_and_reports
+  new_outputs_belong_under: artifacts/midogpp
+
+artifacts:
+  - artifact_id: midogpp_dataset_contract_annotation_patch_v1
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: AUDIT_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      contract_identity: midogpp_annotation_patch_v1
+    authoritative_files:
+      - dataset_contract.json
+      - manifest.csv
+      - split_manifest.csv
+      - leakage_report.json
+      - path_relocation.json
+    expected_file_hashes:
+      dataset_contract.json:
+        algorithm: sha256
+        digest: 2c36620fc318d4790b09951eaa13105c829bc47aa18bb285a9e86e31252873c8
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      split_manifest.csv:
+        algorithm: sha256
+        digest: 2f1e992bcc18518b2744461d659cade6cd41b0ae0bf3f099eb5adc78d4637c68
+      leakage_report.json:
+        algorithm: sha256
+        digest: 734de602385d5fe5878da355ec0202324bb7ad55c201c41765fe0daee9e4bc24
+      path_relocation.json:
+        algorithm: sha256
+        digest: 6ac700494a5e20f8ce209c87148311bb1410d9fb3bd6a07e2ff16b474b8a842c
+    notes:
+      - Frozen manifest paths retain their original repository prefix for hash stability.
+      - path_relocation.json maps only that audited prefix to the canonical contract tree.
+      - The complete 22569-patch payload is present locally and on the workstation at the canonical path.
+
+  - artifact_id: midogpp_virchow2_xyxy_feature_cache_seed42
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/annotation_patch_xyxy/seed42
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: AUDIT_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      feature_cache_hash: f6608e513fb2d06671e3ec117b093a85d58530b77b1fae44a3be1680d9feabd2
+    required_files:
+      - embeddings/train.pt
+    expected_file_hashes:
+      embeddings/train.pt:
+        algorithm: sha256
+        digest: f6608e513fb2d06671e3ec117b093a85d58530b77b1fae44a3be1680d9feabd2
+    notes:
+      - Active corrected xyxy cache lineage for current experiments.
+      - Local and workstation copies were moved to this canonical path and hash-verified.
+      - The historical train-only cache is not an acceptable fallback.
+
+  - artifact_id: midogpp_virchow2_historical_train_only_cache_seed42
+    stage: derived_features
+    physical_path: datasets/midogpp/derived/features/virchow2/historical_train_only/seed42
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: DIAGNOSTIC ONLY
+    claim_scope: historical_train_cache
+    required_files:
+      - embeddings/train.pt
+      - reports/cache_builder_report.json
+    expected_file_hashes:
+      embeddings/train.pt:
+        algorithm: sha256
+        digest: 96afc1b68b001159a37ee5a5ddf8ad104447cc8c88081fe2acb39705f71e1260
+      reports/cache_builder_report.json:
+        algorithm: sha256
+        digest: b8cd9a6df60055b2173d3cc48d876a4f9adeb134927517489344378fb018758b
+    notes:
+      - Historical train-only cache; do not silently substitute for a full-split cache.
+      - Its train tensor hash differs from the active corrected xyxy cache.
+
+  - artifact_id: midogpp_virchow2_stale_coco_xywh_cache
+    stage: derived_features
+    physical_path: datasets/midogpp/derived/features/quarantine/coco_xywh/virchow2
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: REJECTED
+    claim_scope: none
+    notes:
+      - Stale coco_xywh lineage retained only for provenance diagnosis.
+
+  - artifact_id: midogpp_virchow2_cache_integrity_audit
+    stage: 90_oracles_and_diagnostics
+    physical_path: artifacts/midogpp/90_oracles_and_diagnostics/cache_integrity/midogpp_virchow2_cache_integrity_audit
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: AUDIT_ONLY
+    claim_scope: cache_integrity
+
+  - artifact_id: midogpp_repository_migration_20260712_xai_master
+    stage: 90_oracles_and_diagnostics
+    physical_path: artifacts/midogpp/90_oracles_and_diagnostics/repository_migration/2026-07-12_xai_master
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: AUDIT_ONLY
+    claim_scope: repository_migration_provenance
+    authoritative_files:
+      - cache.pre.sha256
+      - cache.post.sha256
+      - reference.pre.sha256
+      - reference.post.sha256
+      - preservation.pre.sha256
+      - preservation.post.sha256
+      - contract.pre.sha256
+      - contract.post.sha256
+      - raw.pre.metadata
+      - raw.post.metadata
+      - raw.critical.pre.sha256
+      - raw.critical.post.sha256
+      - source_roots.pre.stat
+    expected_file_hashes:
+      cache.pre.sha256:
+        algorithm: sha256
+        digest: b5bae1e20e3dcfe527378e67a6b553475ce76cd262aad6b354be6c412a2c9f7d
+      cache.post.sha256:
+        algorithm: sha256
+        digest: b5bae1e20e3dcfe527378e67a6b553475ce76cd262aad6b354be6c412a2c9f7d
+      reference.pre.sha256:
+        algorithm: sha256
+        digest: 4f324925f595ca119ac483bc6fe5cd307798797fb2b0ceae3ef10d4ae694d270
+      reference.post.sha256:
+        algorithm: sha256
+        digest: 4f324925f595ca119ac483bc6fe5cd307798797fb2b0ceae3ef10d4ae694d270
+      preservation.pre.sha256:
+        algorithm: sha256
+        digest: 0c18a6a5250f60c12b316d7f8d2fa0971ab981898aad3d9d2d32ebaef7e3dee5
+      preservation.post.sha256:
+        algorithm: sha256
+        digest: 0c18a6a5250f60c12b316d7f8d2fa0971ab981898aad3d9d2d32ebaef7e3dee5
+      contract.pre.sha256:
+        algorithm: sha256
+        digest: 0d7a2b1c6bc83b5fac422b3e1112d9d2661cce41ef7c1321572342c95f193f07
+      contract.post.sha256:
+        algorithm: sha256
+        digest: 0d7a2b1c6bc83b5fac422b3e1112d9d2661cce41ef7c1321572342c95f193f07
+      raw.pre.metadata:
+        algorithm: sha256
+        digest: edf9056da9da210dbcac001aa759cb9fbd28a32edf1090e3fbd5776187e394c6
+      raw.post.metadata:
+        algorithm: sha256
+        digest: edf9056da9da210dbcac001aa759cb9fbd28a32edf1090e3fbd5776187e394c6
+      raw.critical.pre.sha256:
+        algorithm: sha256
+        digest: 875a0d0d5f5f9272267151fb4375c589c334ab86cc927c23d2051cbc8aacf16d
+      raw.critical.post.sha256:
+        algorithm: sha256
+        digest: 875a0d0d5f5f9272267151fb4375c589c334ab86cc927c23d2051cbc8aacf16d
+      source_roots.pre.stat:
+        algorithm: sha256
+        digest: da0478f31374ce26be30ac4818275dd99e73220239d17f081ddc18cce28ed1e3
+    notes:
+      - Pre/post manifests are byte-identical for the corrected cache, tuned reference, preservation bundle, and complete contract.
+      - Raw-data verification uses stable relative path, byte size, and inode identity plus hashes of six critical metadata/annotation files.
+
+  - artifact_id: midogpp_virchow2_real_feature_signal_controls
+    stage: 10_real_feature_reference
+    physical_path: artifacts/midogpp/10_real_feature_reference/historical/midogpp_virchow2_real_feature_signal_controls_train_only_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: DIAGNOSTIC ONLY
+    claim_scope: real_feature_signal_controls
+
+  - artifact_id: midogpp_virchow2_real_feature_multiaxis_baseline
+    stage: 10_real_feature_reference
+    physical_path: artifacts/midogpp/10_real_feature_reference/midogpp_virchow2_real_feature_multiaxis_baseline
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: DIAGNOSTIC ONLY
+    claim_scope: real_feature_transfer_only
+
+  - artifact_id: midogpp_real_feature_gate_v1
+    stage: 10_real_feature_reference
+    canonical_path: artifacts/midogpp/10_real_feature_reference/midogpp_real_feature_gate_v1
+    availability: referenced_but_not_in_local_checkout
+    migration: pending_hash_verified_move
+    evidence_label: WEAK PASS
+    claim_scope: real_feature_transfer_only
+
+  - artifact_id: midogpp_source_inner_reliability_v1
+    stage: 10_real_feature_reference
+    physical_path: artifacts/midogpp/10_real_feature_reference/midogpp_source_inner_reliability_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: NEGATIVE_RESULT
+    claim_scope: real_feature_transfer_only
+    authoritative_files:
+      - manifests/protocol_manifest.json
+      - reports/leakage_provenance_report.json
+      - tables/source_inner_reliability.csv
+
+  - artifact_id: midogpp_real_feature_source_inner_classifier_tuned_seed42
+    stage: 10_real_feature_reference
+    physical_path: artifacts/midogpp/10_real_feature_reference/historical/real_feature_source_inner_classifier_tuned_virchow2_seed42
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: TODO_VERIFY_ARTIFACT
+    claim_scope: real_feature_transfer_only
+
+  - artifact_id: midogpp_real_feature_threshold_both_xyxy_seed42
+    stage: 10_real_feature_reference
+    canonical_path: artifacts/midogpp/10_real_feature_reference/real_feature_threshold_both_annotation_patch_xyxy_virchow2_seed42
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: WEAK PASS
+    claim_scope: real_feature_transfer_only
+    semantic_identities:
+      protocol_hash: 78c1d254019a2cc0
+      manifest_hash: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      feature_cache_hash: f6608e513fb2d06671e3ec117b093a85d58530b77b1fae44a3be1680d9feabd2
+    authoritative_files:
+      - manifests/protocol_manifest.json
+      - reports/leakage_provenance_report.json
+      - tables/classifier_tuned_source_results.csv
+    expected_file_hashes:
+      manifests/protocol_manifest.json:
+        algorithm: sha256
+        digest: a45fd34169660fd82aebe9afb6e048ec76b9fc0c2dd0da11de025ad7554ea710
+      reports/leakage_provenance_report.json:
+        algorithm: sha256
+        digest: 00dd2d7174e46ce1bee5e3912053ebda35d8a87d614e87a17d5d4ce5be75fe84
+      tables/classifier_tuned_source_results.csv:
+        algorithm: sha256
+        digest: 5ed15fdc8fb0b8b82bb79055ae3f447b869addedd8721b4a189c85e626e8013b
+
+  - artifact_id: midogpp_cvae_tuned_classifier_preservation_v1
+    stage: 20_cvae_preservation
+    canonical_path: artifacts/midogpp/20_cvae_preservation/virchow2_cvae_midogpp_tuned_classifier_preservation_v1/seed42
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: PASS
+    validation_verdict: THESIS-FACING
+    claim_scope: cvae_preservation_only
+    semantic_identities:
+      imported_real_reference_protocol_hash: 78c1d254019a2cc0
+    authoritative_files:
+      - manifests/protocol_manifest.json
+      - reports/leakage_report.json
+      - reports/decision_report.md
+      - tables/tuned_preservation_metrics.csv
+    expected_file_hashes:
+      manifests/protocol_manifest.json:
+        algorithm: sha256
+        digest: cd1a36e71b7a7d3bea380797547d45a9f2282d73ca6a3fd978433c013447cc9e
+      reports/leakage_report.json:
+        algorithm: sha256
+        digest: 4c56757a8613d7d0f3a7358ad5db5d42a05c53d652c133515fc8a9147198a29b
+      reports/decision_report.md:
+        algorithm: sha256
+        digest: 34c01d229f6caa4c8913fa98c51915efdc3e45d1c4c61f7a2e75034c4002bfff
+      tables/tuned_preservation_metrics.csv:
+        algorithm: sha256
+        digest: 496b52a6165ef408d9b37c4a3a6d49bc1ad20825d2d532e31e4b57faf6b28966
+    forbidden_reuse:
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_deployable_selection: false
+
+  - artifact_id: midogpp_dense_late_all_sources_v1
+    stage: 90_oracles_and_diagnostics
+    physical_path: artifacts/midogpp/90_oracles_and_diagnostics/rejected/virchow2_cvae_dense_late_all_sources_midogpp_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: REJECTED
+    claim_scope: none
+    notes:
+      - Original protocol stage was 30_expert_bank.
+      - Retained for audit; checkpoint and cache lineage is not eligible for current MIDOG++ claims.
+
+  - artifact_id: midogpp_source_inner_class_conditional_positive_union_v1
+    stage: 90_oracles_and_diagnostics
+    physical_path: artifacts/midogpp/90_oracles_and_diagnostics/rejected/virchow2_cvae_source_inner_class_conditional_positive_union_midogpp_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: REJECTED
+    claim_scope: none
+    may_feed_deployable_selection: false
+    forbidden_reuse:
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - synthetic_downstream_utility_evidence
+    notes:
+      - Original protocol stage was 40_prior_and_generation.
+      - The registered config consumes the Camelyon17 legacy repair artifact.
+      - It also consumes the stale annotation_patch_v1 MIDOG++ cache lineage and the rejected dense-late bank.
+      - Retained only to diagnose historical lineage; do not use it as a current MIDOG++ stage-40 input.
+
+  - artifact_id: midogpp_phase1_virchow2_late_import_seed42
+    stage: 50_all_candidate_utility_matrix
+    physical_path: artifacts/midogpp/50_all_candidate_utility_matrix/phase1_virchow2_late_import_seed42
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: DIAGNOSTIC ONLY
+    claim_scope: diagnostic_only
+    may_feed_deployable_selection: false
+
+  - artifact_id: midogpp_phase2_target_support_adaptation_seed42
+    stage: 90_oracles_and_diagnostics
+    physical_path: artifacts/midogpp/90_oracles_and_diagnostics/rejected/phase2_target_support_adaptation_virchow2_seed42
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: REJECTED
+    claim_scope: none
+    notes:
+      - Original protocol stage was 60_routing_and_composition.
+      - Retained for protocol audit and must not be used as current routing evidence.
+
+  # Canonical output locations below are run destinations, not historical
+  # evidence. They become claim-eligible only after their own manifests and
+  # leakage reports have been validated.
+  - artifact_id: midogpp_output_real_feature_tuned_classifier_seed42
+    stage: 10_real_feature_reference
+    canonical_path: artifacts/midogpp/10_real_feature_reference/midogpp_real_feature_tuned_classifier/seed42
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: TODO_VERIFY_ARTIFACT
+    claim_scope: real_feature_transfer_only
+
+  - artifact_id: midogpp_output_real_feature_signal_controls_v1
+    stage: 10_real_feature_reference
+    canonical_path: artifacts/midogpp/10_real_feature_reference/midogpp_virchow2_real_feature_signal_controls/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: TODO_VERIFY_ARTIFACT
+    claim_scope: real_feature_signal_controls
+
+  - artifact_id: midogpp_output_real_feature_multiaxis_v1
+    stage: 10_real_feature_reference
+    canonical_path: artifacts/midogpp/10_real_feature_reference/midogpp_virchow2_real_feature_multiaxis_baseline/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: TODO_VERIFY_ARTIFACT
+    claim_scope: real_feature_transfer_only
+
+  - artifact_id: midogpp_output_cvae_tuned_classifier_preservation_v1
+    stage: 20_cvae_preservation
+    canonical_path: artifacts/midogpp/20_cvae_preservation/virchow2_cvae_midogpp_tuned_classifier_preservation_v1/seed42
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: TODO_VERIFY_ARTIFACT
+    claim_scope: cvae_preservation_only
+
+  - artifact_id: midogpp_output_cvae_preservation_sanity_v1
+    stage: 20_cvae_preservation
+    canonical_path: artifacts/midogpp/20_cvae_preservation/virchow2_cvae_midogpp_preservation_sanity_v1/seed42
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: TODO_VERIFY_ARTIFACT
+    claim_scope: cvae_preservation_only
+
+  - artifact_id: midogpp_output_cvae_preservation_gate_pca128_v1
+    stage: 20_cvae_preservation
+    canonical_path: artifacts/midogpp/20_cvae_preservation/virchow2_cvae_midogpp_preservation_gate_pca128_v1/seed42
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: TODO_VERIFY_ARTIFACT
+    claim_scope: cvae_preservation_only
+
+  - artifact_id: midogpp_output_cvae_condition_audit_v1
+    stage: 20_cvae_preservation
+    canonical_path: artifacts/midogpp/20_cvae_preservation/virchow2_cvae_midogpp_preservation_condition_audit_v1/seed42
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: TODO_VERIFY_ARTIFACT
+    claim_scope: diagnostic_only
+
+  - artifact_id: midogpp_output_provenance_clean_expert_bank_v1
+    stage: 30_expert_bank
+    canonical_path: artifacts/midogpp/30_expert_bank/provenance_clean_source_local_experts/v1
+    availability: planned
+    migration: canonical_output
+    evidence_label: TODO_VERIFY_ARTIFACT
+    claim_scope: expert_bank_construction_only

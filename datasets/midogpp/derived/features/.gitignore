@@ -1,0 +1,4 @@
+# Feature tensors and cache reports are generated artifacts.
+*
+!.gitignore
+!README.md

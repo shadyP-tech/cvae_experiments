@@ -1,134 +1,55 @@
-# MIDOG++ Dataset Contracts
+# MIDOG++ Dataset Ownership
 
-This directory owns MIDOG++ dataset-contract artifacts before any routing,
-SAIL, Virchow2 cache, or C6.3 experiment consumes the dataset.
-
-The v1 contract defines:
-
-- sample: annotation-centered patch
-- group: case/specimen/slide id (`case_id`)
-- class: mitotic vs hard-negative/non-mitotic
-- domain candidates: `scanner_model`, `tumor_type`,
-  `tumor_type|lab_or_origin|scanner_model`
-
-Generated patch images and feature caches are local artifacts and must not be
-committed. The small CSV/JSON contract artifacts are intended to be tracked so
-the dataset definition is auditable.
-
-Tracked layout:
+This subtree owns all MIDOG++ data locations before an experiment consumes
+them:
 
 ```text
-datasets/midogpp/
-  configs/annotation_patch_v1.yaml
-  configs/deprecated/
-  schemas/dataset_contract.schema.json
-  src/midogpp_contract/
-  scripts/
-  tests/
-  artifacts/.gitignore
+raw/MIDOGpp/                         local source data, ignored by Git
+configs/annotation_patch_v1.yaml     active xyxy contract build
+configs/quarantine/                  rejected geometry/config provenance
+contract/annotation_patch_v1/        frozen CSV/JSON contract and local patches
+derived/features/                    Virchow2 feature caches
 ```
 
-The active annotation-patch config uses `bbox_format: xyxy`. The old
-`coco_xywh` config has been moved to:
+The frozen annotation-patch contract contains 22,569 rows, uses case-disjoint
+train/validation/test splits, and has a `PASS` leakage report. Its hashed
+manifest retains the original repository-relative patch prefix. The audited
+`path_relocation.json` sidecar maps only that prefix to the canonical contract
+tree; the manifest itself is not rewritten.
 
-```text
-datasets/midogpp/configs/deprecated/annotation_patch_v1_coco_xywh_stale.yaml
-```
+All 22,569 referenced patch images are present locally and on the workstation
+at the canonical contract path. Local `dataset-validate` passes with 22,569
+rows and nine eligible domains. The approximately 65 GB unmodified raw source
+tree remains workstation-only at `raw/MIDOGpp/` and is intentionally not synced
+to the Mac.
 
-That deprecated config is provenance only. Do not use it for thesis-facing
-cache builds or downstream experiments. It is associated with the stale
-full-split cache lineage:
+The active annotation geometry is `xyxy`. The quarantined `coco_xywh` config
+documents a stale cache lineage and must not feed current experiments.
 
-```text
-sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2/
-```
+Two feature-cache lineages are deliberately separate:
 
-The expected frozen artifact is:
+- `derived/features/virchow2/annotation_patch_xyxy/seed42` is the active,
+  corrected cache, present locally and on the workstation with train tensor
+  SHA-256
+  `f6608e513fb2d06671e3ec117b093a85d58530b77b1fae44a3be1680d9feabd2`.
+- `derived/features/virchow2/historical_train_only/seed42` is diagnostic-only;
+  its train tensor has a different SHA-256 and cannot be used as a fallback.
 
-```text
-datasets/midogpp/artifacts/midogpp_annotation_patch_v1/
-  manifest.csv
-  domain_mapping.json
-  split_manifest.csv
-  domain_feasibility.csv
-  class_balance_by_domain.csv
-  leakage_report.json
-  dataset_contract.json
-  patches_224/
-```
-
-Current verified contract snapshot:
-
-- manifest rows: `22569`
-- train rows: `9886`
-- val rows: `2677`
-- test rows: `10006`
-- class counts: `11937` mitotic positives and `10632`
-  hard-negative/non-mitotic rows
-- duplicate `sample_id` values: `0`
-- case overlap across train/val/test splits: `0`
-- leakage report status: `PASS`
-
-The synced Virchow2 train cache at
-`sail/artifacts/pathology_embeddings/midogpp/virchow2/seed42/embeddings/train.pt`
-has `9886 x 2560` features and aligns rowwise to the train split with `0`
-metadata mismatches across `sample_id`, `label`, `split`, `center`, and
-`magnification`. This verifies the dataset/cache contract for real-feature
-diagnostics only; it does not validate CVAE generation or routing claims.
-
-For future full train/val/test Virchow2 cache builds, use a cache root that
-names the corrected annotation geometry:
-
-```text
-sail/artifacts/pathology_embeddings_midogpp_annotation_patch_xyxy/virchow2/
-```
-
-Do not reuse `sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/`
-for new thesis-facing real-feature experiments unless it has been explicitly
-rebuilt from the active `xyxy` config and revalidated against the manifest.
-
-Build from the repository root:
+Canonical commands from the repository root after installing the package with
+`conda run -n thesis python -m pip install -e .`:
 
 ```bash
-PYTHONPATH=datasets/midogpp/src conda run -n thesis python \
-  datasets/midogpp/scripts/build_annotation_patch_contract.py \
+conda run -n thesis python -m midogpp_thesis dataset-build \
   --config datasets/midogpp/configs/annotation_patch_v1.yaml
+
+conda run -n thesis python -m midogpp_thesis dataset-validate \
+  --artifact-root datasets/midogpp/contract/annotation_patch_v1
+
+conda run -n thesis python -m midogpp_thesis dataset-inspect \
+  --artifact-root datasets/midogpp/contract/annotation_patch_v1
 ```
 
-Validate:
-
-```bash
-PYTHONPATH=datasets/midogpp/src conda run -n thesis python \
-  datasets/midogpp/scripts/validate_contract.py \
-  --artifact-root datasets/midogpp/artifacts/midogpp_annotation_patch_v1
-```
-
-Inspect eligible domains and downstream cache hints:
-
-```bash
-PYTHONPATH=datasets/midogpp/src conda run -n thesis python \
-  datasets/midogpp/scripts/inspect_cache_and_domains.py \
-  --artifact-root datasets/midogpp/artifacts/midogpp_annotation_patch_v1 \
-  --cache-report sail/artifacts/pathology_embeddings/midogpp/virchow2/seed42/reports/cache_builder_report.json
-```
-
-Run tests:
-
-```bash
-PYTHONPATH=datasets/midogpp/src pytest datasets/midogpp/tests
-```
-
-After validation passes, run the SAIL/Virchow2 cache builder in dry-run mode:
-
-```bash
-PYTHONPATH=sail/src conda run -n thesis python -m sail.cli build-cache \
-  --samples-manifest datasets/midogpp/artifacts/midogpp_annotation_patch_v1/manifest.csv \
-  --experiment-seed 42 \
-  --output-root sail/artifacts/pathology_embeddings_midogpp_annotation_patch_xyxy \
-  --model-ref hf-hub:paige-ai/Virchow2 \
-  --batch-size 16 \
-  --device cuda \
-  --dry-run
-```
-
-Only build the actual feature cache after the dry-run passes.
+Raw data stays on the workstation. Patch pixels and feature tensors are present
+locally and on the workstation but remain ignored by Git. Small contract
+tables, schemas, configs, relocation metadata, and lineage documentation are
+tracked.

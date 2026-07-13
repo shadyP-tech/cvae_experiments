@@ -1,1 +1,0 @@
-"""Reusable artifact schema identifiers."""

@@ -1,0 +1,7 @@
+# Keep the stage documentation, ignore all generated run contents.
+*
+!.gitignore
+!README.md
+!*/
+!*/README.md
+!**/provenance/*.historical.md

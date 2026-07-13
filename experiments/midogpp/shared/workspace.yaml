@@ -1,0 +1,47 @@
+schema_version: 1
+workspace_kind: midogpp_repository_paths
+path_mode: repository_relative
+dataset_id: midogpp
+
+roots:
+  dataset: datasets/midogpp
+  dataset_contract_artifact: datasets/midogpp/contract/annotation_patch_v1
+  derived_features: datasets/midogpp/derived/features
+  experiments: experiments/midogpp
+  canonical_artifacts: artifacts/midogpp
+  documentation: docs
+
+metadata:
+  registry: experiments/midogpp/registry.yaml
+  historical_artifact_catalog: experiments/midogpp/artifact_catalog.yaml
+  protocol_defaults: experiments/midogpp/shared/protocol_defaults.yaml
+
+output_policy:
+  new_midogpp_runs: canonical_artifact_root_only
+  historical_runs: canonical_archive_or_stage90_with_original_provenance
+  move_or_copy_historical_runs: hash_verified_move_only
+  absolute_paths_in_new_configs: forbidden
+  resolved_config_snapshot_required: true
+  input_hash_manifest_required: true
+
+run_layout:
+  pattern: artifacts/midogpp/<stage>/<experiment_id>/<run_id>
+  required_directories:
+    - manifests
+    - provenance
+    - reports
+    - tables
+  optional_directories:
+    - checkpoints
+    - configs
+    - diagnostics
+    - predictions
+    - summaries
+
+required_run_files:
+  resolved_config: config.resolved.yaml
+  protocol_manifest: manifests/protocol_manifest.json
+  input_artifacts: provenance/input_artifacts.json
+  leakage_report_candidates:
+    - reports/leakage_report.json
+    - reports/leakage_provenance_report.json

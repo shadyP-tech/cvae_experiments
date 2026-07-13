@@ -1,1 +1,0 @@
-"""Gaussian latent prior helpers."""

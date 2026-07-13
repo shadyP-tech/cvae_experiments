@@ -27,21 +27,15 @@ dist/
 .DS_Store
 .vscode/settings.json
 
-# Project-generated outputs and tracking files
-cvae_testing/outputs/
-cvae_testing/wandb/
+# Canonical generated artifacts. Selected historical text tables already
+# tracked by Git remain tracked; new large archive contents stay local.
+artifacts/cross_dataset_archive/**
+!artifacts/cross_dataset_archive/README.md
 
-# Local datasets (do not commit raw data)
-cvae_testing/data/
-
-# Local results (default ignore; allow select findings)
-cvae_testing/quarantine/*
-cvae_testing/results/*
-!cvae_testing/results/comparison_tables/
-!cvae_testing/results/comparison_tables/learned_utility*_decision*.md
-!cvae_testing/results/comparison_tables/learned_utility*_decision*.csv
-!cvae_testing/results/comparison_tables/learned_utility_decision_summary_v2*.md
-!cvae_testing/results/comparison_tables/learned_utility_decision_summary_v2*.csv
+# Local MIDOG++ source images and generated patch images.
+datasets/midogpp/raw/**
+!datasets/midogpp/raw/README.md
+datasets/midogpp/contract/**/patches_*/
 
 # github agents
 .github/*
@@ -50,8 +44,4 @@ cvae_testing/results/*
 .codex/
 
 literature/
-outputs
-docs/
-midogpp_real_feature_gate/
 run_log.md
-cvae_rebuild/datasets

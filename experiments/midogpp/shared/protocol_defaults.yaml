@@ -1,0 +1,92 @@
+schema_version: 1
+protocol_kind: midogpp_experiment_defaults
+
+scope:
+  artifact_dataset: MIDOG++
+  claim_dataset: MIDOG++
+  default_backbone: virchow2
+  feature_frame: annotation_patch_xyxy_v1
+  domain_axis: center
+  eligible_centers: [0, 1, 2, 3, 5, 6, 7, 8, 9]
+  quarantined_centers: [4]
+
+evaluation:
+  regime: leave_one_domain_out
+  target_support_labels: forbidden
+  target_support_target_evaluation_overlap: forbidden
+  target_evaluation_labels: scoring_only
+  target_identity_as_deployable_feature: forbidden
+  target_expert_in_deployable_candidate_pool: forbidden
+  update_expert_checkpoints_during_routing: forbidden
+
+allowed_pre_evaluation_data:
+  - source_expert_checkpoints
+  - source_expert_provenance
+  - source_domain_metadata
+  - source_trained_artifacts
+  - source_inner_validation_statistics
+  - unlabeled_disjoint_target_support_embeddings
+  - query_metadata_available_at_routing_time
+
+forbidden_pre_evaluation_data:
+  - target_evaluation_labels
+  - target_evaluation_metrics
+  - target_evaluation_nelbo
+  - downstream_oracle_expert
+  - stage_50_target_utility
+  - stage_90_oracle_identity
+  - target_tuned_generation_settings
+  - target_tuned_classifier_settings
+  - target_tuned_thresholds_or_weights
+
+evidence_order:
+  - real_feature_reference
+  - cvae_preservation
+  - expert_bank
+  - prior_and_generation
+  - all_candidate_utility_matrix_diagnostic
+  - routing_and_composition
+  - frozen_policy_downstream_utility
+
+claim_boundaries:
+  real_feature_reference:
+    does_not_establish:
+      - cvae_preservation
+      - routing_quality
+      - synthetic_downstream_utility
+  cvae_preservation:
+    does_not_establish:
+      - prior_quality
+      - routing_quality
+      - synthetic_downstream_utility
+  support_nelbo_or_fidelity:
+    role: proxy_until_validated_against_heldout_utility
+  all_candidate_utility_matrix:
+    role: diagnostic_only
+    usable_for_deployable_selection: false
+  downstream_oracle:
+    role: diagnostic_upper_bound
+    deployable: false
+
+required_provenance:
+  - dataset_contract_hash
+  - feature_cache_hash
+  - parent_artifact_ids_and_hashes
+  - backbone_and_feature_frame
+  - claim_scope
+  - repository_revision
+  - experiment_seed
+  - model_seed
+  - generation_seed
+  - classifier_seed
+  - heldout_center
+  - candidate_pool
+
+required_audits:
+  - sample_identity_overlap
+  - case_identity_overlap
+  - image_path_overlap
+  - feature_row_alignment
+  - target_expert_exclusion
+  - target_label_usage
+  - dataset_and_checkpoint_lineage

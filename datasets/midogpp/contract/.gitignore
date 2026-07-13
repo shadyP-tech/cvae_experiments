@@ -1,0 +1,2 @@
+# Generated patch pixels stay local; the small contract tables remain tracked.
+**/patches_*/

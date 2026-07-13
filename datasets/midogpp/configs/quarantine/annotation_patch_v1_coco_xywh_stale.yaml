@@ -1,3 +1,17 @@
+deprecated:
+  status: rejected_for_current_midogpp_cache_builds
+  reason: >
+    MIDOG++ annotation boxes are interpreted as xyxy in the corrected
+    annotation-patch contract. This historical config treated them as coco_xywh,
+    which shifts patch centers and produces stale Virchow2 caches that can match
+    sample_id order while disagreeing on bbox geometry.
+  replacement_config: datasets/midogpp/configs/annotation_patch_v1.yaml
+  stale_cache_root: datasets/midogpp/derived/features/quarantine/coco_xywh/virchow2
+  rebuilt_cache_root: datasets/midogpp/derived/features/virchow2/annotation_patch_xyxy/seed42
+  original_stale_cache_root: sail/artifacts/pathology_embeddings_midogpp_annotation_patch_v1/virchow2
+  original_rebuilt_cache_root: sail/artifacts/pathology_embeddings_midogpp_annotation_patch_xyxy/virchow2
+  original_input_root: cvae_testing/data/MIDOGpp
+
 artifact:
   name: midogpp_annotation_patch_v1
   root: datasets/midogpp/contract/annotation_patch_v1
@@ -11,7 +25,7 @@ patches:
   patch_dir: datasets/midogpp/contract/annotation_patch_v1/patches_224
   patch_size: 224
   image_quality: 92
-  bbox_format: xyxy
+  bbox_format: coco_xywh
 
 sampling:
   positive_policy: all_valid_mitotic_annotations

@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "midogpp-thesis-experiments"
+version = "0.1.0"
+description = "Protocol-safe MIDOG++ real-feature and CVAE thesis experiments."
+requires-python = ">=3.10"
+dependencies = [
+  "numpy",
+  "Pillow",
+  "PyYAML",
+  "scikit-learn",
+  "torch",
+]
+
+[project.optional-dependencies]
+cache = ["timm"]
+dataset-full = ["openslide-python", "tifffile"]
+test = ["pytest"]
+
+[project.scripts]
+midogpp-thesis = "midogpp_thesis.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["midogpp_thesis", "midogpp_thesis.*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

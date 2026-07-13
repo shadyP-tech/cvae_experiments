@@ -1,5 +1,9 @@
 # Multipanel Tail-Risk And Center3 Audit
 
+Status after repository migration: historical Camelyon17 evidence outside the
+active MIDOG++ registry. This page preserves the original interpretation; it is
+not a current MIDOG++ runbook, baseline, or routing result.
+
 ## Purpose
 
 Document the `virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1`
@@ -29,7 +33,7 @@ claim random mass-bagging discovers target-compatible experts.
 Verified artifact root:
 
 ```text
-cvae_rebuild/artifacts/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/
+artifacts/cross_dataset_archive/cvae/camelyon17_virchow2_legacy/virchow2_cvae_component_union_tailrisk_multipanel_mass_bagged_v1/
 ```
 
 Primary files:

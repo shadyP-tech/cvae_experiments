@@ -1,0 +1,84 @@
+experiment:
+  name: virchow2_cvae_midogpp_preservation_condition_audit_v1
+  artifact_root: output://midogpp_output_cvae_condition_audit_v1
+
+inputs:
+  manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  feature_cache_path: artifact://midogpp_virchow2_xyxy_feature_cache_seed42/embeddings/train.pt
+  signal_split_manifest_path: artifact://midogpp_virchow2_real_feature_signal_controls/tables/split_manifest.csv
+  allow_npz_test_cache: false
+
+positive_label: 1
+
+run:
+  controls:
+    - pooled_case_disjoint_control
+    - pooled_tumor_class_balanced_case_split
+    - within_tumor_case_disjoint_control
+  split_seeds: all
+
+validity_thresholds:
+  min_fit: 20
+  min_eval: 10
+  min_fit_pos: 10
+  min_fit_neg: 10
+  min_eval_pos: 5
+  min_eval_neg: 5
+  min_fit_cases: 3
+  min_eval_cases: 2
+
+bootstrap:
+  reps: 1000
+  seed: 1337
+
+decision_thresholds:
+  real_gate_min_bacc: 0.60
+  ci_low_threshold: 0.50
+  close_bacc_delta: 0.03
+  close_ratio_threshold: 0.90
+  weak_conditioning_ratio_threshold: 0.25
+
+variants:
+  - variant_id: pca64_beta001
+    pca_dim: 64
+    latent_dim: 16
+    hidden_dim: 512
+    num_hidden_layers: 2
+    train_epochs: 100
+    batch_size: 128
+    learning_rate: 0.001
+    weight_decay: 0.0001
+    beta_final: 0.001
+    kl_warmup_epochs: 25
+
+  - variant_id: pca128_beta001
+    pca_dim: 128
+    latent_dim: 32
+    hidden_dim: 512
+    num_hidden_layers: 2
+    train_epochs: 100
+    batch_size: 128
+    learning_rate: 0.001
+    weight_decay: 0.0001
+    beta_final: 0.001
+    kl_warmup_epochs: 25
+
+  - variant_id: pca256_beta001
+    pca_dim: 256
+    latent_dim: 64
+    hidden_dim: 512
+    num_hidden_layers: 2
+    train_epochs: 100
+    batch_size: 128
+    learning_rate: 0.001
+    weight_decay: 0.0001
+    beta_final: 0.001
+    kl_warmup_epochs: 25
+
+claim_boundary:
+  allowed: >
+    Diagnostic-only PCA capacity and CVAE label-conditioning evidence under
+    corrected MIDOG++ Virchow2 signal-control splits.
+  forbidden: >
+    Do not emit a CVAE preservation PASS, promote pca128/pca256, or claim
+    routing, expert selection, metadata compatibility, or composition success.

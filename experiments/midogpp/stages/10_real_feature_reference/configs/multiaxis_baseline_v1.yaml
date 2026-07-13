@@ -1,0 +1,46 @@
+experiment:
+  name: midogpp_virchow2_real_feature_multiaxis_baseline
+  stage: virchow2_real_feature_multiaxis_lodo_learnability
+  status: diagnostic
+
+inputs:
+  manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  feature_cache_path: artifact://midogpp_virchow2_xyxy_feature_cache_seed42/embeddings/train.pt
+  allow_npz_test_cache: false
+
+positive_label: 1
+label_mapping:
+  "0": non_mitotic
+  "1": mitotic
+
+validity_thresholds:
+  min_source: 20
+  min_eval: 10
+  min_source_pos: 10
+  min_source_neg: 10
+  min_eval_pos: 5
+  min_eval_neg: 5
+  min_valid_domains: 2
+  min_valid_fold_fraction: 0.70
+
+mlp_sensitivity:
+  min_source: 100
+  min_source_pos: 20
+  min_source_neg: 20
+  seeds: [42, 43, 44]
+
+bootstrap:
+  reps: 1000
+  seed: 1337
+
+output:
+  artifacts_root: output://midogpp_output_real_feature_multiaxis_v1
+
+claim_boundary:
+  allowed: >
+    Real Virchow2 feature transfer is strong or weak per decision-valid MIDOG++
+    axis under train-only leave-one-domain-out scoring.
+  forbidden: >
+    Do not treat metadata similarity as compatibility, do not use composite
+    stress-test failure as global Virchow2 failure, and do not claim CVAE/C6.3
+    preservation from this real-feature diagnostic.

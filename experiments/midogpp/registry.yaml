@@ -1,0 +1,384 @@
+schema_version: 1
+registry_kind: midogpp_experiment_stage_registry
+dataset_id: midogpp
+workspace_root: experiments/midogpp
+canonical_artifact_root: artifacts/midogpp
+
+ownership:
+  dataset_contract: datasets/midogpp
+  derived_features: datasets/midogpp/derived/features
+  experiment_composition: experiments/midogpp
+  generated_outputs: artifacts/midogpp
+  interpretation: docs
+  capability_packages:
+    canonical_python_package: src/midogpp_thesis
+    real_feature_methods: src/midogpp_thesis/real_features
+    cvae_models: src/midogpp_thesis/cvae
+    support_routing: planned
+    downstream_evaluation: src/midogpp_thesis/real_features/classifier_reference
+
+stages:
+  - order: 10
+    id: real_feature_reference
+    directory: stages/10_real_feature_reference
+    artifact_prefix: 10_real_feature_reference
+    evidence_surface: real_feature_reference
+    allowed_claim_scopes:
+      - real_feature_transfer_only
+      - real_feature_signal_controls
+    allowed_input_claim_scopes:
+      - dataset_contract_and_split_provenance
+      - feature_cache_provenance
+      - cache_integrity
+    input_reuse_purposes:
+      - real_feature_reference_evidence
+    required_upstream:
+      - midogpp_dataset_contract
+      - validated_real_feature_cache
+    forbidden_claims:
+      - cvae_preservation
+      - routing_quality
+      - synthetic_downstream_utility
+
+  - order: 20
+    id: cvae_preservation
+    directory: stages/20_cvae_preservation
+    artifact_prefix: 20_cvae_preservation
+    evidence_surface: cvae_preservation
+    allowed_claim_scopes:
+      - cvae_preservation_only
+      - diagnostic_only
+    allowed_input_claim_scopes:
+      - dataset_contract_and_split_provenance
+      - feature_cache_provenance
+      - real_feature_transfer_only
+      - real_feature_signal_controls
+    input_reuse_purposes:
+      - cvae_preservation_evidence
+    required_upstream:
+      - validated_real_feature_reference
+      - validated_real_feature_cache
+    forbidden_claims:
+      - routing_quality
+      - controllable_generation
+      - synthetic_downstream_utility
+
+  - order: 30
+    id: expert_bank
+    directory: stages/30_expert_bank
+    artifact_prefix: 30_expert_bank
+    evidence_surface: independently_trained_source_experts
+    allowed_claim_scopes:
+      - expert_bank_construction_only
+    allowed_input_claim_scopes:
+      - dataset_contract_and_split_provenance
+      - feature_cache_provenance
+      - cvae_preservation_only
+    input_reuse_purposes:
+      - expert_bank_evidence
+    required_upstream:
+      - validated_cvae_variant
+      - source_domain_train_splits
+    hard_requirements:
+      - independently_trained_source_experts
+      - target_expert_excluded_from_each_deployable_fold
+      - checkpoint_provenance_verified
+
+  - order: 40
+    id: prior_and_generation
+    directory: stages/40_prior_and_generation
+    artifact_prefix: 40_prior_and_generation
+    evidence_surface: generation_and_prior_diagnostics
+    allowed_claim_scopes:
+      - generation_diagnostics_only
+    allowed_input_claim_scopes:
+      - dataset_contract_and_split_provenance
+      - feature_cache_provenance
+      - expert_bank_construction_only
+    input_reuse_purposes:
+      - generation_evidence
+    required_upstream:
+      - validated_expert_bank
+    forbidden_claims:
+      - routing_quality_from_fidelity_alone
+      - downstream_utility_without_stage_70_evaluation
+
+  - order: 50
+    id: all_candidate_utility_matrix
+    directory: stages/50_all_candidate_utility_matrix
+    artifact_prefix: 50_all_candidate_utility_matrix
+    evidence_surface: posthoc_all_candidate_diagnostic
+    allowed_claim_scopes:
+      - diagnostic_only
+    allowed_input_claim_scopes:
+      - dataset_contract_and_split_provenance
+      - feature_cache_provenance
+      - expert_bank_construction_only
+      - generation_diagnostics_only
+    input_reuse_purposes:
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+    required_upstream:
+      - validated_expert_bank
+      - frozen_generation_and_classifier_settings
+    hard_requirements:
+      - never_use_target_utility_as_router_input
+      - mark_oracle_rows_non_deployable
+    may_feed_deployable_selection: false
+
+  - order: 60
+    id: routing_and_composition
+    directory: stages/60_routing_and_composition
+    artifact_prefix: 60_routing_and_composition
+    evidence_surface: pre_evaluation_routing
+    allowed_claim_scopes:
+      - routing_and_composition
+    allowed_input_claim_scopes:
+      - dataset_contract_and_split_provenance
+      - feature_cache_provenance
+      - expert_bank_construction_only
+      - routing_compatibility_only
+      - routing_and_composition
+    input_reuse_purposes:
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    performs_deployable_selection: true
+    required_upstream:
+      - validated_expert_bank
+      - source_inner_or_unlabeled_support_compatibility
+    hard_requirements:
+      - target_support_disjoint_from_target_evaluation
+      - target_labels_not_used_for_selection
+      - target_expert_excluded
+      - routing_policy_frozen_before_stage_70
+    forbidden_upstream:
+      - 50_all_candidate_utility_matrix
+      - 90_oracles_and_diagnostics
+
+  - order: 70
+    id: frozen_policy_downstream
+    directory: stages/70_frozen_policy_downstream
+    artifact_prefix: 70_frozen_policy_downstream
+    evidence_surface: heldout_downstream_utility
+    allowed_claim_scopes:
+      - synthetic_downstream_utility
+    allowed_input_claim_scopes:
+      - dataset_contract_and_split_provenance
+      - feature_cache_provenance
+      - expert_bank_construction_only
+      - generation_diagnostics_only
+      - routing_and_composition
+    input_reuse_purposes:
+      - synthetic_downstream_utility_evidence
+    required_upstream:
+      - frozen_stage_60_policy
+      - frozen_generation_settings
+      - frozen_classifier_settings
+    hard_requirements:
+      - target_evaluation_labels_used_for_scoring_only
+      - matched_candidate_eligibility_and_budget
+      - leakage_and_identity_overlap_audits
+
+  - order: 90
+    id: oracles_and_diagnostics
+    directory: stages/90_oracles_and_diagnostics
+    artifact_prefix: 90_oracles_and_diagnostics
+    evidence_surface: posthoc_oracle_and_fidelity_diagnostics
+    allowed_claim_scopes:
+      - diagnostic_only
+    allowed_input_claim_scopes:
+      - dataset_contract_and_split_provenance
+      - feature_cache_provenance
+      - real_feature_transfer_only
+      - real_feature_signal_controls
+      - cvae_preservation_only
+      - expert_bank_construction_only
+      - generation_diagnostics_only
+      - diagnostic_only
+      - routing_and_composition
+      - synthetic_downstream_utility
+    input_reuse_purposes:
+      - oracle_and_diagnostic_evidence
+    hard_requirements:
+      - mark_all_oracle_rows_non_deployable
+      - keep_fidelity_separate_from_utility
+    may_feed_deployable_selection: false
+
+experiments:
+  - experiment_id: midogpp.real_feature.tuned_classifier.seed42
+    stage: 10_real_feature_reference
+    status: active
+    claim_scope: real_feature_transfer_only
+    output_artifact_id: midogpp_output_real_feature_tuned_classifier_seed42
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_xyxy_feature_cache_seed42
+    runner:
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - real-feature-classifier
+        - --manifest
+        - artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+        - --feature-cache
+        - artifact://midogpp_virchow2_xyxy_feature_cache_seed42/embeddings/train.pt
+        - --out-dir
+        - output://midogpp_output_real_feature_tuned_classifier_seed42
+        - --classifier-c-grid
+        - 0.01,0.1,1.0,10.0,100.0
+        - --classifier-penalties
+        - l2
+        - --classifier-solvers
+        - lbfgs
+        - --classifier-class-weights
+        - none,balanced
+        - --classifier-max-iters
+        - 2000,5000
+        - --classifier-seed
+        - "23"
+        - --experiment-seed
+        - "42"
+
+  - experiment_id: midogpp.real_feature.signal_controls.v1
+    stage: 10_real_feature_reference
+    status: diagnostic
+    claim_scope: real_feature_signal_controls
+    config_path: experiments/midogpp/stages/10_real_feature_reference/configs/virchow2_signal_controls_v1.yaml
+    output_artifact_id: midogpp_output_real_feature_signal_controls_v1
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_xyxy_feature_cache_seed42
+    runner:
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - real-features
+        - run-midogpp-signal-controls
+        - --config
+        - "{resolved_config}"
+
+  - experiment_id: midogpp.real_feature.multiaxis.v1
+    stage: 10_real_feature_reference
+    status: diagnostic
+    claim_scope: real_feature_transfer_only
+    config_path: experiments/midogpp/stages/10_real_feature_reference/configs/multiaxis_baseline_v1.yaml
+    output_artifact_id: midogpp_output_real_feature_multiaxis_v1
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_xyxy_feature_cache_seed42
+    runner:
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - real-features
+        - run-midogpp-multiaxis
+        - --config
+        - "{resolved_config}"
+
+  - experiment_id: midogpp.cvae.tuned_classifier_preservation.v1
+    stage: 20_cvae_preservation
+    status: active
+    claim_scope: cvae_preservation_only
+    config_path: experiments/midogpp/stages/20_cvae_preservation/configs/tuned_classifier_preservation_v1.yaml
+    output_artifact_id: midogpp_output_cvae_tuned_classifier_preservation_v1
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_xyxy_feature_cache_seed42
+      - midogpp_real_feature_threshold_both_xyxy_seed42
+    runner:
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-preservation
+        - tuned-classifier
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_cvae_tuned_classifier_preservation_v1
+
+  - experiment_id: midogpp.cvae.preservation_sanity.v1
+    stage: 20_cvae_preservation
+    status: diagnostic
+    claim_scope: cvae_preservation_only
+    config_path: experiments/midogpp/stages/20_cvae_preservation/configs/preservation_sanity_v1.yaml
+    output_artifact_id: midogpp_output_cvae_preservation_sanity_v1
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_xyxy_feature_cache_seed42
+      - midogpp_virchow2_real_feature_signal_controls
+    runner:
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-preservation
+        - sanity
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_cvae_preservation_sanity_v1
+
+  - experiment_id: midogpp.cvae.preservation_gate_pca128.v1
+    stage: 20_cvae_preservation
+    status: diagnostic
+    claim_scope: cvae_preservation_only
+    config_path: experiments/midogpp/stages/20_cvae_preservation/configs/preservation_gate_pca128_v1.yaml
+    output_artifact_id: midogpp_output_cvae_preservation_gate_pca128_v1
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_xyxy_feature_cache_seed42
+      - midogpp_virchow2_real_feature_signal_controls
+    runner:
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-preservation
+        - gate
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_cvae_preservation_gate_pca128_v1
+
+  - experiment_id: midogpp.cvae.preservation_condition_audit.v1
+    stage: 20_cvae_preservation
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/20_cvae_preservation/configs/preservation_condition_audit_v1.yaml
+    output_artifact_id: midogpp_output_cvae_condition_audit_v1
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_xyxy_feature_cache_seed42
+      - midogpp_virchow2_real_feature_signal_controls
+    runner:
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-preservation
+        - condition-audit
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_cvae_condition_audit_v1
+
+  - experiment_id: midogpp.expert_bank.provenance_clean.v1
+    stage: 30_expert_bank
+    status: planned
+    claim_scope: expert_bank_construction_only
+    output_artifact_id: midogpp_output_provenance_clean_expert_bank_v1
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_xyxy_feature_cache_seed42
+    runner:
+      argv:
+        - "{python}"
+        - -c
+        - "raise SystemExit('PLANNED: provenance-clean expert-bank runner is not registered yet')"
+    notes:
+      - This replaces the rejected dense-late legacy bank; it is not runnable until its protocol-reviewed runner exists.
