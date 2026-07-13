@@ -1,4 +1,4 @@
-"""CLI for the four MIDOG++ CVAE preservation-only surfaces."""
+"""CLI for MIDOG++ CVAE preservation-only surfaces."""
 
 from __future__ import annotations
 
@@ -19,6 +19,8 @@ def build_parser() -> argparse.ArgumentParser:
         ("gate", "Run the PCA128 preservation gate."),
         ("condition-audit", "Run the condition-capacity audit."),
         ("tuned-classifier", "Run tuned-classifier preservation."),
+        ("source-inner-prior-recovery", "Fit source-inner sampler and objective RecipeLocks."),
+        ("prior-recovery-outer", "Run the locked outer A/B/C/D preservation matrix."),
     ):
         command = sub.add_parser(name, help=help_text)
         command.add_argument("--config", required=True)
@@ -67,6 +69,22 @@ def _surface_handler(surface: str) -> tuple[Loader, Runner]:
         return (
             load_midogpp_tuned_classifier_preservation_config,
             run_midogpp_tuned_classifier_preservation,
+        )
+    if surface == "source-inner-prior-recovery":
+        from .prior_recovery import run_source_inner_prior_recovery
+        from .prior_recovery_config import load_prior_recovery_config
+
+        return (
+            lambda path: load_prior_recovery_config(path, expected_mode="source_inner"),
+            run_source_inner_prior_recovery,
+        )
+    if surface == "prior-recovery-outer":
+        from .prior_recovery import run_outer_prior_recovery
+        from .prior_recovery_config import load_prior_recovery_config
+
+        return (
+            lambda path: load_prior_recovery_config(path, expected_mode="outer"),
+            run_outer_prior_recovery,
         )
     raise AssertionError(f"Unknown preservation surface: {surface}")
 

@@ -1,6 +1,6 @@
 # Current Experimental State
 
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 This page records verified evidence and canonical availability after the
 completed MIDOG++ repository migration. Active inputs and the two tuned
@@ -28,6 +28,9 @@ with cataloged hash verification.
 - Stages 30 through 70 have no active expert-bank, generation, routing, or
   frozen-policy downstream implementation. Their directories and protocol
   contracts are planning scaffolds, not experimental evidence.
+- New Stage-10 matched-reference v2 and Stage-20 prior-recovery/Task-Fisher
+  runners are implemented in the current working tree, but all three canonical
+  output roots are absent. They are implementation readiness, not results.
 
 ## MIDOG++ Real-Feature Gate
 
@@ -195,6 +198,47 @@ Next preservation-specific evidence:
 - seed or variant stability for the same predeclared preservation protocol
 - separate expert-bank, generation, routing, and held-out downstream stages
   before making any broader thesis claim
+
+## Prior-Recovery And Task-Fisher Implementation Status
+
+Status: `IMPLEMENTED, NOT RUN`, with catalog evidence label
+`TODO_VERIFY_ARTIFACT` for every new output.
+
+The implementation adds three registered experiments:
+
+| Stage | Experiment | Canonical output | Current evidence |
+| --- | --- | --- | --- |
+| 10 | `midogpp.real_feature.eligible_tuned_predict_reference.v2` | `artifacts/midogpp/10_real_feature_reference/eligible_tuned_real_reference_v2/seed42/` | absent; no matched-v2 result |
+| 20 | `midogpp.cvae.prior_recovery_source_inner.v1` | `artifacts/midogpp/20_cvae_preservation/prior_recovery_source_inner_v1/seed42/` | absent; no gate or `RecipeLock` result |
+| 20 | `midogpp.cvae.prior_recovery_outer.v1` | `artifacts/midogpp/20_cvae_preservation/prior_recovery_outer_v1/seeds17_42_101/` | absent; no outer preservation result |
+
+The Stage-10 v2 artifact is an eligible-nine-center, full-Virchow2,
+predict-policy real-feature reference. It remains separate from the validated
+fixed-0.5 v1 result above and has no reported metric yet.
+
+The source-inner Stage-20 run removes each real outer center before any
+training or selection, treats each remaining center as an inner pseudo-target,
+and selects ex-post aggregate-posterior sampler and Task-Fisher recipe choices
+only from nested source evidence. Its output claim scope is
+`cvae_recipe_lock_only`. A complete validated set of source-inner `RecipeLock`
+files may feed the planned Stage-30 expert recipe, but cannot establish
+preservation, routing, compatibility, or downstream utility.
+
+The outer Stage-20 run is conditional. It must fail closed unless all nine
+source-inner locks are valid and conditional (`C` or `D`) and the source-inner
+gate records `factorial_triggered=true`. If unlocked, it evaluates the frozen
+2x2 A/B/C/D objective-by-sampler factorial over training seeds `17,42,101` and
+generation seeds `17,42,101` against the matched Stage-10 v2 denominator.
+Outer target labels are scoring-only. Outer preservation metrics may never feed
+model, sampler, expert, generation-policy, routing, or composition selection.
+
+A complete valid outer factorial retains
+`claim_scope=cvae_preservation_only`: it reports `POSITIVE_PRESERVATION` when
+the positive gate passes and `NEGATIVE_PRESERVATION` otherwise.
+`diagnostic_only` is reserved for incomplete or invalid execution. The outer
+bundle also requires a validated `tables/sampler_realizations.csv`. Stage 40
+remains planned post-expert-bank generation validation and is not replaced by
+this pooled Stage-20 prior-recovery surface.
 
 ## Quarantine And Planned Work
 

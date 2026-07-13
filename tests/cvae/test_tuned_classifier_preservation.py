@@ -16,6 +16,7 @@ from midogpp_thesis.cvae.preservation.tuned_classifier import (
 from midogpp_thesis.cvae.preservation.tuned_reference import (
     load_tuned_classifier_reference,
 )
+from midogpp_thesis.real_features.classifier_reference.artifacts import stable_hash
 
 
 def test_reference_import_rejects_missing_root(tmp_path: Path) -> None:
@@ -162,7 +163,7 @@ reference_validation:
         "posterior_sample_fit_to_real_eval",
         "prior_sample_fit_to_real_eval",
     }
-    assert {row["selected_classifier_config_hash"] for row in metrics} == {"spec-0", "spec-1"}
+    assert len({row["selected_classifier_config_hash"] for row in metrics}) == 2
 
 
 def _write_manifest(path: Path) -> None:
@@ -236,7 +237,7 @@ def _write_reference_artifact(
                 "n_train": 16,
                 "n_eval": 16,
                 "classifier_grid_hash": "grid",
-                "selected_classifier_config_hash": f"spec-{center}",
+                "selected_classifier_config_hash": stable_hash(row_spec),
                 "selected_classifier_spec": json.dumps(row_spec, sort_keys=True),
                 "selection_source": "source_inner_lodo",
                 "source_inner_mean_bacc": 0.7,

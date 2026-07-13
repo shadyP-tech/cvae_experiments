@@ -1,0 +1,27 @@
+experiment:
+  name: eligible_tuned_real_reference_v2
+  artifact_root: output://midogpp_output_eligible_tuned_real_reference_v2
+
+inputs:
+  manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  feature_cache_path: artifact://midogpp_virchow2_xyxy_feature_cache_seed42/embeddings/train.pt
+
+run:
+  experiment_seed: 42
+  classifier_seed: 23
+  heldout_centers: all
+  expected_feature_dim: 2560
+
+classifier_grid:
+  expected_candidate_count: 20
+  expected_grid_hash: 16a7a1183ea3f65b
+  c_grid: [0.01, 0.1, 1.0, 10.0, 100.0]
+  penalty: l2
+  solver: lbfgs
+  class_weight: [none, balanced]
+  max_iter: [2000, 5000]
+  threshold_policy: predict
+
+claim_boundary:
+  allowed: eligible-only full-Virchow2 real-feature transfer reference
+  forbidden: CVAE preservation, prior quality, routing, or downstream utility

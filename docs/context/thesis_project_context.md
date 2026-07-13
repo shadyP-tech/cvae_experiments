@@ -1,6 +1,6 @@
 # Thesis Project Context
 
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 This file is the stable context anchor for the thesis project. It should define
 the durable protocol vocabulary, evidence categories, and claim boundaries.
@@ -98,6 +98,13 @@ reference. Routing and composition must not update source expert checkpoints.
 For real-feature source-only experiments, classifier selection and aggregation
 recipes must be selected inside source-inner pseudo-target folds, then frozen
 before held-out target-center scoring.
+
+For CVAE recipe selection, fully nested source-inner pseudo-target evidence may
+freeze a `RecipeLock` for later source-expert training. Real held-out outer
+preservation metrics are evaluation-only: they may never revise the objective,
+sampler family, expert recipe, generation policy, router, or composition rule.
+Stage-20 recipe selection and pooled preservation do not replace the later
+post-expert-bank Stage-40 generation-validation boundary.
 
 ## Evidence Labels
 

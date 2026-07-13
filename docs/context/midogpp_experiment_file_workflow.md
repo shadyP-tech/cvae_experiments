@@ -1,6 +1,6 @@
 # MIDOG++ Experiment File Workflow
 
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 This is the operational path and command reference for the active MIDOG++
 checkout. Result interpretation belongs in
@@ -51,8 +51,9 @@ The module groups are:
 
 - `dataset-build`, `dataset-validate`, and `dataset-inspect`;
 - `real-features` for cache building and real-feature diagnostics;
-- `real-feature-classifier` for the tuned source-inner reference;
-- `cvae-preservation` for the four preservation surfaces;
+- `real-feature-classifier` for the tuned and eligible matched references;
+- `cvae-preservation` for preservation, source-inner recipe locking, and the
+  conditional outer factorial;
 - `workspace` for registry validation, artifact resolution, preparation, and
   registered runs.
 
@@ -151,7 +152,7 @@ Neither may substitute for the corrected `xyxy` cache.
 
 ## Registered Real-Feature Workflow
 
-The active classifier experiment is:
+The retained tuned-classifier experiment is:
 
 ```text
 midogpp.real_feature.tuned_classifier.seed42
@@ -184,9 +185,38 @@ artifacts/midogpp/10_real_feature_reference/real_feature_threshold_both_annotati
 Its claim scope is `real_feature_transfer_only`. It is a frozen comparator for
 CVAE preservation, not routing or generated-embedding evidence.
 
+### Eligible-only matched reference v2
+
+The prior-recovery surface requires a separate full-Virchow2, eligible-only,
+predict-policy reference:
+
+```text
+midogpp.real_feature.eligible_tuned_predict_reference.v2
+experiments/midogpp/stages/10_real_feature_reference/configs/eligible_tuned_real_reference_v2.yaml
+artifacts/midogpp/10_real_feature_reference/eligible_tuned_real_reference_v2/seed42/
+```
+
+Run it with:
+
+```bash
+conda run -n thesis python -m midogpp_thesis workspace prepare \
+  midogpp.real_feature.eligible_tuned_predict_reference.v2
+conda run -n thesis python -m midogpp_thesis workspace run \
+  midogpp.real_feature.eligible_tuned_predict_reference.v2
+```
+
+The expected bundle contains `config.resolved.yaml`,
+`provenance/input_artifacts.json`, protocol and leakage/provenance JSON, the
+source-inner tuning table, held-out result table, and prediction table. Current
+status is `TODO_VERIFY_ARTIFACT`: the root is absent and no v2 result exists.
+Validation binds the three table contents through `reference_bundle_hash`, then
+binds that content identity to the protocol, resolved config, registered
+dataset/cache inputs, and their SHA-256 values. The Stage-20 outer run imports
+that bound reference identity; it does not accept an unverified table copy.
+
 ## Registered CVAE Preservation Workflow
 
-The active preservation experiment is:
+The validated tuned-classifier preservation experiment is:
 
 ```text
 midogpp.cvae.tuned_classifier_preservation.v1
@@ -226,6 +256,89 @@ The validated workstation result supports only
 `claim_scope=cvae_preservation_only`. Decode and posterior preservation do not
 establish prior quality, routing, expert selection, NELBO compatibility,
 controllable generation, GMM composition, or held-out synthetic utility.
+
+## Registered Prior-Recovery Workflow
+
+The implementation separates source-inner recipe selection from held-out outer
+evaluation.
+
+Source-inner experiment and output:
+
+```text
+midogpp.cvae.prior_recovery_source_inner.v1
+experiments/midogpp/stages/20_cvae_preservation/configs/prior_recovery_source_inner_v1.yaml
+artifacts/midogpp/20_cvae_preservation/prior_recovery_source_inner_v1/seed42/
+```
+
+Run it with:
+
+```bash
+conda run -n thesis python -m midogpp_thesis workspace prepare \
+  midogpp.cvae.prior_recovery_source_inner.v1
+conda run -n thesis python -m midogpp_thesis workspace run \
+  midogpp.cvae.prior_recovery_source_inner.v1
+```
+
+This run uses only the dataset contract and corrected cache. For every outer
+center it removes that center completely, builds inner pseudo-target folds from
+the remaining eligible centers, and records nested real denominators,
+source-inner preservation metrics, sampler realizations, identity audits,
+checkpoint and Task-Fisher indexes, hashed `RecipeLock` files, a leakage
+report, `tables/checkpoint_reuse_audit.csv`, and
+`reports/gate_decision.json`. The audit requires `A/C` checkpoint reuse and,
+when Task-Fisher is triggered, `B/D` reuse plus paired `A/B` initialization and
+stochastic streams. Source-inner metric validation also requires equal
+per-class generation budgets across compared arms.
+
+The outer experiment and output are:
+
+```text
+midogpp.cvae.prior_recovery_outer.v1
+experiments/midogpp/stages/20_cvae_preservation/configs/prior_recovery_outer_v1.yaml
+artifacts/midogpp/20_cvae_preservation/prior_recovery_outer_v1/seeds17_42_101/
+```
+
+It depends on the matched Stage-10 v2 bundle and the source-inner lock bundle.
+Before running, verify that the source-inner bundle validates and that its gate
+has `factorial_triggered=true`. Then run:
+
+```bash
+conda run -n thesis python -m midogpp_thesis workspace prepare \
+  midogpp.cvae.prior_recovery_outer.v1
+conda run -n thesis python -m midogpp_thesis workspace run \
+  midogpp.cvae.prior_recovery_outer.v1
+```
+
+The runner fails closed if the matched reference is not schema v2/predict
+policy, the lock bundle is incomplete or tampered, any lock is not conditional,
+identity overlap exists, a requested conditional sampler falls back, or full
+factorial coverage is missing. Its bundle contains preservation metrics,
+sampler realizations, paired deltas, equal-center aggregation, checkpoint-reuse
+and identity audits, coverage/protocol/provenance manifests, decision/leakage
+reports, content-addressed checkpoints, and Task-Fisher states.
+`tables/sampler_realizations.csv` is required and validated against the outer
+metric rows and recorded sampler states.
+
+Both source-inner and outer metrics use the same frozen classifier
+specification/predict policy within each fold and the chance-corrected ratio
+`(BACC_generated - 0.5) / (BACC_real - 0.5)`. Outer validation requires equal
+per-class generation budgets across A/B/C/D and binds every metric row to the
+validated source `RecipeLock`, its shared selection-bundle identity, and the
+source protocol/selection-evidence file hashes.
+
+A complete valid factorial keeps `claim_scope=cvae_preservation_only` whether
+the decision is `POSITIVE_PRESERVATION` or `NEGATIVE_PRESERVATION`.
+`claim_scope=diagnostic_only` and status
+`INCOMPLETE_OR_INVALID_DIAGNOSTIC` are reserved for incomplete or invalid
+executions.
+
+Only validated source-inner `RecipeLock` files may feed the planned Stage-30
+expert recipe. Outer target labels and metrics are evaluation-only and may
+never feed model or routing selection. Stage 40 remains the later
+post-expert-bank generation-validation stage.
+
+Current status: both Stage-20 output roots are absent, so there is no new
+prior-recovery, Task-Fisher, gate, or outer-preservation result.
 
 ## Fail-Closed Preparation
 

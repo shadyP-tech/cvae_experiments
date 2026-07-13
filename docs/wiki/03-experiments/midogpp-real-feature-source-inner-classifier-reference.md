@@ -2,6 +2,21 @@
 
 RESULT INTERPRETATION:
 
+## Relationship To Matched Reference v2
+
+This page reports the validated v1 fixed-0.5/source-inner-threshold artifact
+below. A separate eligible-only, full-Virchow2, sklearn-`predict` matched
+reference v2 is implemented for the new Stage-20 prior-recovery denominator:
+
+```text
+midogpp.real_feature.eligible_tuned_predict_reference.v2
+artifacts/midogpp/10_real_feature_reference/eligible_tuned_real_reference_v2/seed42/
+```
+
+The v2 output root is currently absent and remains
+`TODO_VERIFY_ARTIFACT`. Do not copy the v1 metrics on this page into the v2
+surface or claim that a matched-v2 result exists.
+
 ## Evidence Source
 
 Canonical artifact target:

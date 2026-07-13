@@ -1,0 +1,56 @@
+experiment:
+  name: virchow2_cvae_midogpp_prior_recovery_outer_v1
+  mode: outer
+  artifact_root: output://midogpp_output_cvae_prior_recovery_outer_v1
+  code_version: prior_recovery_v1
+
+inputs:
+  manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  feature_cache_path: artifact://midogpp_virchow2_xyxy_feature_cache_seed42/embeddings/train.pt
+  reference_artifact_root: artifact://midogpp_output_eligible_tuned_real_reference_v2
+  recipe_lock_artifact_root: artifact://midogpp_output_cvae_prior_recovery_source_inner_v1
+
+run:
+  heldout_centers: all
+  expected_feature_dim: 2560
+  selection_training_seed: 42
+  training_seeds: [17, 42, 101]
+  generation_seeds: [17, 42, 101]
+  device: cuda:0
+
+model:
+  pca_dim: 128
+  latent_dim: 32
+  hidden_dim: 512
+  num_hidden_layers: 2
+  train_epochs: 100
+  batch_size: 128
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  beta_final: 0.001
+  kl_warmup_epochs: 25
+  task_fisher_alpha: 1.0
+
+sampler:
+  min_class_count: 64
+  max_condition_number: 1000000
+  families:
+    - standard_normal
+    - class_conditional_diagonal_total_moment
+    - class_conditional_shrinkage_full_total_moment
+  fallback: full_to_diagonal_to_standard_per_class
+  viability: require_requested_family_both_classes
+
+decisions:
+  gate_min_ratio_improvement: 0.05
+  gate_min_inner_wins: 6
+  sampler_tie_margin: 0.01
+  task_increment_min_ratio: 0.01
+  safety_max_bacc_regression: 0.01
+  minimum_real_bacc: 0.55
+  positive_claim_min_ratio: 0.80
+  positive_claim_min_center_wins: 7
+
+claim_boundary:
+  allowed: locked A/B/C/D CVAE preservation against the eligible tuned-real reference
+  forbidden: Stage-30 expert evidence, routing, composition, or downstream utility

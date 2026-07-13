@@ -6,6 +6,7 @@ import subprocess
 import sys
 
 from midogpp_thesis.cli import COMMANDS, command_help, main
+from midogpp_thesis.cvae.preservation.cli import build_parser as build_preservation_parser
 
 
 def test_root_cli_lists_only_canonical_command_groups(capsys) -> None:
@@ -41,3 +42,13 @@ def test_root_cli_import_is_lazy_in_fresh_interpreter() -> None:
         check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_preservation_cli_exposes_separate_lock_and_outer_commands() -> None:
+    parser = build_preservation_parser()
+
+    source_inner = parser.parse_args(["source-inner-prior-recovery", "--config", "source.yaml"])
+    outer = parser.parse_args(["prior-recovery-outer", "--config", "outer.yaml"])
+
+    assert source_inner.surface == "source-inner-prior-recovery"
+    assert outer.surface == "prior-recovery-outer"

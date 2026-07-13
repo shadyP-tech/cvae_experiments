@@ -342,6 +342,23 @@ artifacts:
     evidence_label: TODO_VERIFY_ARTIFACT
     claim_scope: real_feature_transfer_only
 
+  - artifact_id: midogpp_output_eligible_tuned_real_reference_v2
+    stage: 10_real_feature_reference
+    canonical_path: artifacts/midogpp/10_real_feature_reference/eligible_tuned_real_reference_v2/seed42
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: TODO_VERIFY_ARTIFACT
+    claim_scope: real_feature_transfer_only
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/protocol_manifest.json
+      - reports/leakage_provenance_report.json
+      - tables/source_inner_classifier_tuning.csv
+      - tables/classifier_tuned_source_results.csv
+      - tables/classifier_tuned_predictions.csv
+    may_feed_deployable_selection: false
+
   - artifact_id: midogpp_output_real_feature_signal_controls_v1
     stage: 10_real_feature_reference
     canonical_path: artifacts/midogpp/10_real_feature_reference/midogpp_virchow2_real_feature_signal_controls/v1
@@ -365,6 +382,73 @@ artifacts:
     migration: canonical_output
     evidence_label: TODO_VERIFY_ARTIFACT
     claim_scope: cvae_preservation_only
+
+  - artifact_id: midogpp_output_cvae_prior_recovery_source_inner_v1
+    stage: 20_cvae_preservation
+    canonical_path: artifacts/midogpp/20_cvae_preservation/prior_recovery_source_inner_v1/seed42
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: TODO_VERIFY_ARTIFACT
+    claim_scope: cvae_recipe_lock_only
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/protocol_manifest.json
+      - manifests/selection_evidence_manifest.json
+      - manifests/checkpoint_index.json
+      - manifests/task_fisher_index.json
+      - manifests/recipe_locks/0.json
+      - manifests/recipe_locks/1.json
+      - manifests/recipe_locks/2.json
+      - manifests/recipe_locks/3.json
+      - manifests/recipe_locks/5.json
+      - manifests/recipe_locks/6.json
+      - manifests/recipe_locks/7.json
+      - manifests/recipe_locks/8.json
+      - manifests/recipe_locks/9.json
+      - reports/gate_decision.json
+      - reports/leakage_report.json
+      - tables/source_inner_metrics.csv
+      - tables/nested_real_references.csv
+      - tables/sampler_realizations.csv
+      - tables/checkpoint_reuse_audit.csv
+      - tables/identity_overlap_audit.csv
+    forbidden_reuse:
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_deployable_selection: false
+
+  - artifact_id: midogpp_output_cvae_prior_recovery_outer_v1
+    stage: 20_cvae_preservation
+    canonical_path: artifacts/midogpp/20_cvae_preservation/prior_recovery_outer_v1/seeds17_42_101
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: TODO_VERIFY_ARTIFACT
+    claim_scope: cvae_preservation_only
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/protocol_manifest.json
+      - manifests/coverage_manifest.json
+      - manifests/checkpoint_index.json
+      - manifests/task_fisher_index.json
+      - reports/decision_report.json
+      - reports/leakage_report.json
+      - tables/preservation_metrics.csv
+      - tables/sampler_realizations.csv
+      - tables/paired_deltas.csv
+      - tables/aggregation_summary.csv
+      - tables/checkpoint_reuse_audit.csv
+      - tables/identity_overlap_audit.csv
+    forbidden_reuse:
+      - expert_bank_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_deployable_selection: false
 
   - artifact_id: midogpp_output_cvae_preservation_sanity_v1
     stage: 20_cvae_preservation

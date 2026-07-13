@@ -139,3 +139,17 @@ GMM-composition, or downstream synthetic-utility claim.
   generation and held-out downstream evidence.
 - Build the provenance-clean independently trained source-expert bank before
   starting routing or composition claims.
+
+## Relationship To The Unrun Prior-Recovery Surface
+
+The new `midogpp.cvae.prior_recovery_source_inner.v1` and
+`midogpp.cvae.prior_recovery_outer.v1` experiments are separate from this
+validated v1 artifact. They use a new eligible-only Stage-10 matched reference,
+fully nested source-inner `RecipeLock` selection, and a conditionally unlocked
+A/B/C/D outer factorial. Their output roots are currently absent, so this
+page's preservation metrics must not be presented as prior-recovery or
+Task-Fisher results.
+
+Validated source-inner locks may later feed a Stage-30 expert recipe. Outer
+preservation metrics may never feed model or routing selection, and Stage 40
+remains post-expert-bank generation validation.

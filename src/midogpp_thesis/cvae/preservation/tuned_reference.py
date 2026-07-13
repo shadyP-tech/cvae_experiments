@@ -7,13 +7,22 @@ from pathlib import Path
 from typing import Mapping, Sequence
 
 from ..protocol import ProtocolError
+from ...real_features.classifier_reference.classifiers import ClassifierSpec
+from ...real_features.classifier_reference.schemas.matched_reference import (
+    assert_matched_reference_artifacts,
+)
 
 
 REFERENCE_SCHEMA_VERSION = "midogpp_real_feature_source_only_classifier_reference_v1"
 RESULT_SCHEMA_VERSION = "midogpp_real_feature_classifier_results_v1"
+MATCHED_REFERENCE_SCHEMA_VERSION = "midogpp_eligible_tuned_real_reference_v2"
+MATCHED_RESULT_SCHEMA_VERSION = "midogpp_eligible_tuned_real_result_v2"
 REFERENCE_METHOD = "source_inner_tuned"
 REFERENCE_METHOD_FIXED_0_5 = "source_inner_tuned_fixed_0_5"
-ACCEPTED_REFERENCE_METHODS = frozenset({REFERENCE_METHOD, REFERENCE_METHOD_FIXED_0_5})
+REFERENCE_METHOD_PREDICT = "source_inner_tuned_predict"
+ACCEPTED_REFERENCE_METHODS = frozenset(
+    {REFERENCE_METHOD, REFERENCE_METHOD_FIXED_0_5, REFERENCE_METHOD_PREDICT}
+)
 
 REQUIRED_REFERENCE_FILES = (
     "tables/classifier_tuned_source_results.csv",
@@ -77,6 +86,8 @@ def load_tuned_classifier_reference(
     protocol = _read_json(root / "manifests" / "protocol_manifest.json")
     leakage = _read_json(root / "reports" / "leakage_provenance_report.json")
     _validate_protocol(protocol, leakage)
+    if protocol.get("schema_version") == MATCHED_REFERENCE_SCHEMA_VERSION:
+        assert_matched_reference_artifacts(root)
     if expected_manifest_hash and str(protocol.get("manifest_hash", "")) != str(expected_manifest_hash):
         raise ProtocolError(
             "Tuned reference manifest_hash mismatch: "
@@ -90,6 +101,11 @@ def load_tuned_classifier_reference(
 
     rows = _read_csv(root / "tables" / "classifier_tuned_source_results.csv")
     rows_by_center = _parse_reference_rows(rows)
+    for center, row in rows_by_center.items():
+        if row.manifest_hash and row.manifest_hash != str(protocol.get("manifest_hash", "")):
+            raise ProtocolError(f"Tuned reference row manifest_hash mismatch for center {center}.")
+        if row.feature_cache_hash and row.feature_cache_hash != str(protocol.get("feature_cache_hash", "")):
+            raise ProtocolError(f"Tuned reference row feature_cache_hash mismatch for center {center}.")
     required = set(str(center) for center in (required_centers or protocol.get("heldout_centers", ())))
     if required:
         missing_centers = sorted(required.difference(rows_by_center), key=_center_sort_key)
@@ -99,7 +115,7 @@ def load_tuned_classifier_reference(
 
 
 def _validate_protocol(protocol: Mapping[str, object], leakage: Mapping[str, object]) -> None:
-    if protocol.get("schema_version") != REFERENCE_SCHEMA_VERSION:
+    if protocol.get("schema_version") not in {REFERENCE_SCHEMA_VERSION, MATCHED_REFERENCE_SCHEMA_VERSION}:
         raise ProtocolError(f"Unexpected tuned reference schema_version: {protocol.get('schema_version')!r}")
     if leakage.get("status") != "PASS":
         raise ProtocolError(f"Tuned reference leakage report must be PASS, got {leakage.get('status')!r}")
@@ -118,7 +134,7 @@ def _validate_protocol(protocol: Mapping[str, object], leakage: Mapping[str, obj
 def _parse_reference_rows(rows: Sequence[Mapping[str, str]]) -> dict[str, TunedReferenceRow]:
     out: dict[str, TunedReferenceRow] = {}
     for row in rows:
-        if str(row.get("schema_version", "")) != RESULT_SCHEMA_VERSION:
+        if str(row.get("schema_version", "")) not in {RESULT_SCHEMA_VERSION, MATCHED_RESULT_SCHEMA_VERSION}:
             raise ProtocolError(f"Unexpected tuned reference result schema_version: {row.get('schema_version')!r}")
         method = str(row.get("method", ""))
         if method not in ACCEPTED_REFERENCE_METHODS:
@@ -156,6 +172,20 @@ def _parse_reference_rows(rows: Sequence[Mapping[str, str]]) -> dict[str, TunedR
             config_hash=config_hash,
             payload=spec_payload,
         )
+        canonical_spec = ClassifierSpec(
+            C=spec.C,
+            penalty=spec.penalty,
+            solver=spec.solver,
+            max_iter=spec.max_iter,
+            class_weight=spec.class_weight,
+            random_state=spec.random_state,
+            l1_ratio=spec.l1_ratio,
+            threshold_policy=spec.threshold_policy,
+            scaler_fit=str(spec_payload.get("scaler_fit", "synthetic_train_only")),
+            family=str(spec_payload.get("family", "sklearn_logistic_regression")),
+        )
+        if canonical_spec.config_hash != config_hash:
+            raise ProtocolError(f"Tuned reference classifier-spec hash mismatch for center {center}.")
         if spec.threshold_policy not in {"predict", "fixed_0_5"}:
             raise ProtocolError(f"Unsupported tuned reference threshold_policy: {spec.threshold_policy!r}")
         out[center] = TunedReferenceRow(

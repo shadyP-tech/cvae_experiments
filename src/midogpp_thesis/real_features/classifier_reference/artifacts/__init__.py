@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import csv
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -43,6 +44,35 @@ def stable_hash(payload: object) -> str:
 
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()[:16]
+
+
+def prepare_artifact_dirs(root: str | Path) -> Path:
+    artifact_root = Path(root)
+    for relative in ("tables", "manifests", "reports"):
+        (artifact_root / relative).mkdir(parents=True, exist_ok=True)
+    return artifact_root
+
+
+def write_csv_rows(
+    path: str | Path,
+    rows: Sequence[Mapping[str, object]],
+    columns: Sequence[str] | None = None,
+) -> None:
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    if columns is None:
+        columns = tuple(dict.fromkeys(str(key) for row in rows for key in row))
+    with output.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(columns))
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({key: row.get(key, "") for key in columns})
+
+
+def write_json(path: str | Path, payload: Mapping[str, object]) -> None:
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def write_frozen_snapshot(path: Path, snapshot: FrozenProtocolSnapshot) -> None:

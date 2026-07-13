@@ -47,12 +47,14 @@ stages:
     evidence_surface: cvae_preservation
     allowed_claim_scopes:
       - cvae_preservation_only
+      - cvae_recipe_lock_only
       - diagnostic_only
     allowed_input_claim_scopes:
       - dataset_contract_and_split_provenance
       - feature_cache_provenance
       - real_feature_transfer_only
       - real_feature_signal_controls
+      - cvae_recipe_lock_only
     input_reuse_purposes:
       - cvae_preservation_evidence
     required_upstream:
@@ -73,7 +75,7 @@ stages:
     allowed_input_claim_scopes:
       - dataset_contract_and_split_provenance
       - feature_cache_provenance
-      - cvae_preservation_only
+      - cvae_recipe_lock_only
     input_reuse_purposes:
       - expert_bank_evidence
     required_upstream:
@@ -220,6 +222,7 @@ experiments:
         - -m
         - midogpp_thesis
         - real-feature-classifier
+        - tune
         - --manifest
         - artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
         - --feature-cache
@@ -240,6 +243,27 @@ experiments:
         - "23"
         - --experiment-seed
         - "42"
+
+  - experiment_id: midogpp.real_feature.eligible_tuned_predict_reference.v2
+    stage: 10_real_feature_reference
+    status: active
+    claim_scope: real_feature_transfer_only
+    config_path: experiments/midogpp/stages/10_real_feature_reference/configs/eligible_tuned_real_reference_v2.yaml
+    output_artifact_id: midogpp_output_eligible_tuned_real_reference_v2
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_xyxy_feature_cache_seed42
+    runner:
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - real-feature-classifier
+        - matched-reference
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_eligible_tuned_real_reference_v2
 
   - experiment_id: midogpp.real_feature.signal_controls.v1
     stage: 10_real_feature_reference
@@ -300,6 +324,50 @@ experiments:
         - "{resolved_config}"
         - --artifact-root
         - output://midogpp_output_cvae_tuned_classifier_preservation_v1
+
+  - experiment_id: midogpp.cvae.prior_recovery_source_inner.v1
+    stage: 20_cvae_preservation
+    status: active
+    claim_scope: cvae_recipe_lock_only
+    config_path: experiments/midogpp/stages/20_cvae_preservation/configs/prior_recovery_source_inner_v1.yaml
+    output_artifact_id: midogpp_output_cvae_prior_recovery_source_inner_v1
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_xyxy_feature_cache_seed42
+    runner:
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-preservation
+        - source-inner-prior-recovery
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_cvae_prior_recovery_source_inner_v1
+
+  - experiment_id: midogpp.cvae.prior_recovery_outer.v1
+    stage: 20_cvae_preservation
+    status: active
+    claim_scope: cvae_preservation_only
+    config_path: experiments/midogpp/stages/20_cvae_preservation/configs/prior_recovery_outer_v1.yaml
+    output_artifact_id: midogpp_output_cvae_prior_recovery_outer_v1
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_xyxy_feature_cache_seed42
+      - midogpp_output_eligible_tuned_real_reference_v2
+      - midogpp_output_cvae_prior_recovery_source_inner_v1
+    runner:
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-preservation
+        - prior-recovery-outer
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_cvae_prior_recovery_outer_v1
 
   - experiment_id: midogpp.cvae.preservation_sanity.v1
     stage: 20_cvae_preservation
@@ -375,6 +443,7 @@ experiments:
     input_artifact_ids:
       - midogpp_dataset_contract_annotation_patch_v1
       - midogpp_virchow2_xyxy_feature_cache_seed42
+      - midogpp_output_cvae_prior_recovery_source_inner_v1
     runner:
       argv:
         - "{python}"

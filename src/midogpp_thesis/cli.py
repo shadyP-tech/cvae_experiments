@@ -33,7 +33,7 @@ COMMANDS: dict[str, tuple[str, str]] = {
     ),
     "cvae-preservation": (
         "midogpp_thesis.cvae.preservation.cli:main",
-        "Run one of the four CVAE preservation surfaces.",
+        "Run a CVAE preservation surface.",
     ),
     "workspace": (
         "midogpp_thesis.workspace.cli:main",

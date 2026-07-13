@@ -139,9 +139,10 @@ def test_midogpp_real_feature_folds_require_both_classes(tmp_path: Path) -> None
 
 def test_midogpp_real_feature_cli_excludes_forbidden_backend_inputs() -> None:
     parser = build_parser()
+    tune_parser = parser._subparsers._group_actions[0].choices["tune"]
     option_strings = {
         option
-        for action in parser._actions
+        for action in tune_parser._actions
         for option in action.option_strings
     }
 
@@ -152,6 +153,12 @@ def test_midogpp_real_feature_cli_excludes_forbidden_backend_inputs() -> None:
     assert "--latent-sample-seed" not in option_strings
     assert "--synthetic-per-class-total" not in option_strings
     assert "--checkpoint" not in option_strings
+
+
+def test_real_feature_cli_help_exposes_matched_reference() -> None:
+    parser = build_parser()
+    choices = parser._subparsers._group_actions[0].choices
+    assert set(choices) == {"tune", "matched-reference"}
 
 
 def _write_midogpp_real_feature_fixture(

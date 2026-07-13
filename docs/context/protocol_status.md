@@ -1,6 +1,6 @@
 # Protocol Status
 
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 ## Active MIDOG++ surfaces
 
@@ -16,6 +16,17 @@ Last updated: 2026-07-12
 The active regime is MIDOG++ with Virchow2 embeddings, corrected `xyxy` patch
 geometry, case-disjoint splits, and center held-out evaluation over eligible
 centers `0,1,2,3,5,6,7,8,9`. Target-evaluation labels are scoring-only.
+
+The working tree now contains active but unrun implementations for:
+
+- the eligible-only, predict-policy Stage-10 matched reference v2;
+- fully nested Stage-20 source-inner ex-post-prior and Task-Fisher
+  `RecipeLock` selection;
+- a conditionally unlocked Stage-20 outer A/B/C/D preservation factorial.
+
+Their catalog entries remain `TODO_VERIFY_ARTIFACT`, and their canonical output
+roots are absent. Therefore they provide no new metric, decision, or thesis
+result yet.
 
 ## Current thesis-facing evidence
 
@@ -40,6 +51,12 @@ Legacy source trees were retired rather than exposed as fallbacks. Any new
 implementation must use only the canonical dataset/cache lineage and must pass
 target-leakage, expert-isolation, candidate-exclusion, and proxy-versus-utility
 checks before activation.
+
+Validated source-inner `RecipeLock` files may later feed the Stage-30 expert
+recipe. Outer preservation metrics and decisions may never feed model, sampler,
+expert, routing, or composition selection. Stage 40 remains a post-expert-bank
+generation-validation stage; the new Stage-20 prior-recovery surface does not
+activate it.
 
 ## Quarantine and historical evidence
 
