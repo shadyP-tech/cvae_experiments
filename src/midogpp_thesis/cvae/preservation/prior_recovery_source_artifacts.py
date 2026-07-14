@@ -35,8 +35,14 @@ from .prior_recovery_common import (
     mean,
     selection_evidence_hash,
 )
+from .prior_recovery_classifier import (
+    SOURCE_INNER_CLASSIFIER_GRID_HASH,
+    source_inner_classifier_specs,
+)
 from .prior_recovery_config import PriorRecoveryConfig, recipe_contract_hash
 from .prior_recovery_provenance import validate_provenance_indices
+from .prior_recovery_runtime_cache import validate_feature_frame_index
+from .prior_recovery_timing import validate_runtime_reports, write_run_state
 from .prior_recovery_schema import (
     NESTED_REAL_REFERENCE_SCHEMA,
     SOURCE_CHECKPOINT_AUDIT_COLUMNS,
@@ -57,6 +63,7 @@ def write_source_inner_bundle(
     *,
     metric_rows: Sequence[Mapping[str, object]],
     nested_reference_rows: Sequence[Mapping[str, object]],
+    nested_tuning_rows: Sequence[Mapping[str, object]],
     sampler_rows: Sequence[Mapping[str, object]],
     identity_audit_rows: Sequence[Mapping[str, object]],
     locks: Sequence[RecipeLock],
@@ -75,6 +82,7 @@ def write_source_inner_bundle(
         SOURCE_INNER_METRIC_COLUMNS,
     )
     write_csv_rows(root / "tables/nested_real_references.csv", nested_reference_rows)
+    write_csv_rows(root / "tables/nested_classifier_tuning.csv", nested_tuning_rows)
     write_csv_rows(root / "tables/sampler_realizations.csv", sampler_rows)
     write_csv_rows(root / "tables/identity_overlap_audit.csv", identity_audit_rows)
     write_csv_rows(
@@ -136,7 +144,22 @@ def write_source_inner_bundle(
     }
     write_json(root / "reports/gate_decision.json", gate)
     write_json(root / "reports/leakage_report.json", leakage)
-    validate_source_inner_bundle(root)
+    write_run_state(
+        root,
+        protocol_hash=str(protocol_manifest["protocol_hash"]),
+        mode="source_inner",
+        status="COMPLETE",
+    )
+    try:
+        validate_source_inner_bundle(root)
+    except Exception:
+        write_run_state(
+            root,
+            protocol_hash=str(protocol_manifest["protocol_hash"]),
+            mode="source_inner",
+            status="FAILED",
+        )
+        raise
     return root
 
 
@@ -150,6 +173,7 @@ def validate_source_inner_bundle(
     required = (
         "tables/source_inner_metrics.csv",
         "tables/nested_real_references.csv",
+        "tables/nested_classifier_tuning.csv",
         "tables/sampler_realizations.csv",
         "tables/identity_overlap_audit.csv",
         "tables/checkpoint_reuse_audit.csv",
@@ -157,8 +181,12 @@ def validate_source_inner_bundle(
         "manifests/selection_evidence_manifest.json",
         "manifests/checkpoint_index.json",
         "manifests/task_fisher_index.json",
+        "manifests/feature_frame_index.json",
         "reports/gate_decision.json",
         "reports/leakage_report.json",
+        "tables/runtime_timings.csv",
+        "reports/runtime_summary.json",
+        "reports/run_state.json",
     )
     _require_files(root, required)
     protocol = _read_json(root / "manifests/protocol_manifest.json")
@@ -169,9 +197,14 @@ def validate_source_inner_bundle(
     checkpoint_index, fisher_index = validate_provenance_indices(root)
     rows = _read_csv(root / "tables/source_inner_metrics.csv")
     nested_rows = _read_csv(root / "tables/nested_real_references.csv")
+    nested_tuning_rows = _read_csv(root / "tables/nested_classifier_tuning.csv")
     sampler_rows = _read_csv(root / "tables/sampler_realizations.csv")
     identity_rows = _read_csv(root / "tables/identity_overlap_audit.csv")
     checkpoint_audits = _read_csv(root / "tables/checkpoint_reuse_audit.csv")
+    frame_index = validate_feature_frame_index(
+        root,
+        expected_frame_hashes={str(row.get("frame_hash", "")) for row in rows},
+    )
     _assert_columns(rows, SOURCE_INNER_METRIC_COLUMNS, "source_inner_metrics.csv")
     _assert_columns(
         checkpoint_audits,
@@ -179,16 +212,25 @@ def validate_source_inner_bundle(
         "checkpoint_reuse_audit.csv",
     )
     _validate_source_protocol(protocol, expected_config=expected_config)
+    validate_runtime_reports(
+        root,
+        protocol_hash=str(protocol["protocol_hash"]),
+        mode="source_inner",
+        checkpoint_index=checkpoint_index,
+        frame_index=frame_index,
+    )
     heldouts = tuple(str(value) for value in protocol["heldout_centers"])
     eligible = tuple(str(value) for value in protocol["eligible_centers"])
     bundle_hash = selection_evidence_hash(
         metric_rows=rows,
         nested_reference_rows=nested_rows,
+        nested_tuning_rows=nested_tuning_rows,
         sampler_rows=sampler_rows,
         identity_rows=identity_rows,
         protocol_manifest=protocol,
         checkpoint_index=checkpoint_index,
         task_fisher_index=fisher_index,
+        feature_frame_index=frame_index,
     )
     if evidence.get("selection_bundle_hash") != bundle_hash:
         raise ProtocolError("Source-inner selection evidence bundle hash mismatch.")
@@ -209,6 +251,13 @@ def validate_source_inner_bundle(
     _validate_nested_reference_rows(
         nested_rows,
         metric_rows=rows,
+        heldouts=heldouts,
+        eligible=eligible,
+        protocol=protocol,
+    )
+    _validate_nested_tuning_rows(
+        nested_tuning_rows,
+        nested_reference_rows=nested_rows,
         heldouts=heldouts,
         eligible=eligible,
         protocol=protocol,
@@ -331,6 +380,13 @@ def _validate_source_protocol(
         or stable_hash(contract) != protocol.get("recipe_contract_hash")
     ):
         raise ProtocolError("Source-inner recipe contract hash mismatch.")
+    expected_specs = source_inner_classifier_specs(classifier_seed=23)
+    if (
+        contract.get("classifier_grid_hash") != SOURCE_INNER_CLASSIFIER_GRID_HASH
+        or protocol.get("classifier_grid_hash") != SOURCE_INNER_CLASSIFIER_GRID_HASH
+        or protocol.get("classifier_grid") != [spec.to_payload() for spec in expected_specs]
+    ):
+        raise ProtocolError("Source-inner protocol and recipe contract do not share the frozen Stage-20 grid.")
     if (
         expected_config is not None
         and recipe_contract_hash(expected_config)
@@ -639,6 +695,91 @@ def _single_fold_value(
     return next(iter(values))
 
 
+def _validate_nested_tuning_rows(
+    rows: Sequence[Mapping[str, str]],
+    *,
+    nested_reference_rows: Sequence[Mapping[str, str]],
+    heldouts: Sequence[str],
+    eligible: Sequence[str],
+    protocol: Mapping[str, object],
+) -> None:
+    specs = source_inner_classifier_specs(classifier_seed=23)
+    specs_by_hash = {spec.config_hash: spec for spec in specs}
+    nested_by_fold = {
+        (row["outer_target_center"], row["inner_pseudo_target_center"]): row
+        for row in nested_reference_rows
+    }
+    expected_folds = {
+        (outer, inner)
+        for outer in heldouts
+        for inner in eligible
+        if inner != outer
+    }
+    grouped: dict[tuple[str, str], list[Mapping[str, str]]] = {}
+    for row in rows:
+        fold = (row.get("outer_target_center", ""), row.get("inner_pseudo_target_center", ""))
+        grouped.setdefault(fold, []).append(row)
+    if set(grouped) != expected_folds or any(len(group) != len(specs) for group in grouped.values()):
+        raise ProtocolError("Nested classifier tuning coverage mismatch.")
+    for (outer, inner), group in grouped.items():
+        validation_centers = tuple(center for center in eligible if center not in {outer, inner})
+        by_hash: dict[str, tuple[Mapping[str, str], float]] = {}
+        for row in group:
+            try:
+                spec_payload = json.loads(row["classifier_spec"])
+                vector = json.loads(row["center_bacc_vector"])
+                convergence = json.loads(row["convergence_by_center"])
+            except (KeyError, json.JSONDecodeError) as exc:
+                raise ProtocolError("Malformed nested classifier tuning row.") from exc
+            config_hash = row.get("classifier_config_hash", "")
+            expected_spec = specs_by_hash.get(config_hash)
+            if (
+                row.get("schema_version") != "midogpp_eligible_predict_spec_selection_v2"
+                or expected_spec is None
+                or spec_payload != expected_spec.to_payload()
+                or row.get("classifier_grid_hash") != SOURCE_INNER_CLASSIFIER_GRID_HASH
+                or tuple(json.loads(row["deeper_validation_centers"])) != validation_centers
+                or tuple(json.loads(row["excluded_centers"])) != (outer, inner)
+                or set(vector) != set(validation_centers)
+                or set(convergence) != set(validation_centers)
+                or not all(bool(value) for value in convergence.values())
+            ):
+                raise ProtocolError("Nested classifier tuning identity or fold coverage mismatch.")
+            values = [float(vector[center]) for center in validation_centers]
+            aggregate = sum(values) / float(len(values))
+            if (
+                not all(math.isfinite(value) and 0.0 <= value <= 1.0 for value in values)
+                or not math.isclose(float(row["aggregate_bacc"]), aggregate, abs_tol=1e-12)
+                or any(
+                    row.get(field) != "false"
+                    for field in (
+                        "selection_used_target_labels",
+                        "fit_used_outer_target_center",
+                        "fit_used_inner_pseudo_target_center",
+                    )
+                )
+                or row.get("selection_source") != "nested_source_inner_predict"
+            ):
+                raise ProtocolError("Nested classifier tuning scores or leakage fields are invalid.")
+            by_hash[config_hash] = (row, aggregate)
+        if set(by_hash) != set(specs_by_hash):
+            raise ProtocolError("Nested classifier tuning grid membership mismatch.")
+        best_score = max(aggregate for _, aggregate in by_hash.values())
+        winners = [
+            specs_by_hash[config_hash]
+            for config_hash, (_, aggregate) in by_hash.items()
+            if aggregate == best_score
+        ]
+        selected_spec = min(winners, key=lambda spec: spec.tie_break_key())
+        selected_rows = [row for row, _ in by_hash.values() if row.get("selected") == "true"]
+        if (
+            len(selected_rows) != 1
+            or selected_rows[0].get("classifier_config_hash") != selected_spec.config_hash
+            or nested_by_fold[(outer, inner)].get("selected_classifier_spec_hash") != selected_spec.config_hash
+        ):
+            raise ProtocolError("Nested classifier selection does not recompute from its tuning rows.")
+
+
 def _validate_nested_reference_rows(
     rows: Sequence[Mapping[str, str]],
     *,
@@ -647,6 +788,13 @@ def _validate_nested_reference_rows(
     eligible: Sequence[str],
     protocol: Mapping[str, object],
 ) -> None:
+    expected_specs = source_inner_classifier_specs(classifier_seed=23)
+    expected_payloads = {stable_hash(spec.to_payload()) for spec in expected_specs}
+    if (
+        protocol.get("classifier_grid_hash") != SOURCE_INNER_CLASSIFIER_GRID_HASH
+        or protocol.get("classifier_grid") != [spec.to_payload() for spec in expected_specs]
+    ):
+        raise ProtocolError("Source-inner protocol classifier grid is not the frozen Stage-20 grid.")
     expected = {
         (outer, inner)
         for outer in heldouts
@@ -687,6 +835,8 @@ def _validate_nested_reference_rows(
             or stable_hash(spec) != row["selected_classifier_spec_hash"]
         ):
             raise ProtocolError("Nested classifier specification hash mismatch.")
+        if stable_hash(spec) not in expected_payloads:
+            raise ProtocolError("Nested classifier specification is not a member of the frozen Stage-20 grid.")
         expected_reference_hash = stable_hash(
             {
                 "outer": outer,

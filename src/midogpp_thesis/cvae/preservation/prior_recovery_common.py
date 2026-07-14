@@ -32,6 +32,7 @@ from .prior_recovery_config import (
     outer_decision_contract_hash,
     recipe_contract_hash,
 )
+from .prior_recovery_provenance import ProvenanceRecorder
 from .representations import encode_posterior
 from .runtime import EvaluationKey, GenerationKey, SamplerFitKey
 from .scoring import chance_normalized_preservation
@@ -96,7 +97,12 @@ def train_runtime(
     manifest_hash: str,
     task_metric: object | None,
     objective_context_hash: str,
+    recorder: ProvenanceRecorder,
+    task_fisher_state_hash: str,
+    classifier_spec_hash: str,
 ) -> TrainedCVAERuntime:
+    import numpy as np
+
     pairing_hash = stable_hash(
         {
             "fit_centers": list(fit_centers),
@@ -126,14 +132,30 @@ def train_runtime(
         stochastic_pairing_hash=pairing_hash,
         objective_context_hash=objective_context_hash,
     )
-    return train_cvae(
-        x_fit,
-        y_fit,
-        variant=variant,
+    input_dim = int(np.asarray(x_fit).shape[1])
+    runtime = recorder.load_runtime(
         training_key=key,
-        task_metric=task_metric,
+        variant=variant,
+        input_dim=input_dim,
+        task_fisher_state_hash=task_fisher_state_hash,
+        classifier_spec_hash=classifier_spec_hash,
         device=config.device,
     )
+    if runtime is None:
+        runtime = train_cvae(
+            x_fit,
+            y_fit,
+            variant=variant,
+            training_key=key,
+            task_metric=task_metric,
+            device=config.device,
+        )
+    recorder.record_runtime(
+        runtime,
+        task_fisher_state_hash=task_fisher_state_hash,
+        classifier_spec_hash=classifier_spec_hash,
+    )
+    return runtime
 
 
 def fit_samplers(
@@ -277,11 +299,13 @@ def selection_evidence_hash(
     *,
     metric_rows: Sequence[Mapping[str, object]],
     nested_reference_rows: Sequence[Mapping[str, object]],
+    nested_tuning_rows: Sequence[Mapping[str, object]],
     sampler_rows: Sequence[Mapping[str, object]],
     identity_rows: Sequence[Mapping[str, object]],
     protocol_manifest: Mapping[str, object],
     checkpoint_index: Mapping[str, object],
     task_fisher_index: Mapping[str, object],
+    feature_frame_index: Mapping[str, object],
 ) -> str:
     metrics = []
     for row in metric_rows:
@@ -292,11 +316,13 @@ def selection_evidence_hash(
         {
             "metric_rows": _tabular_rows(metrics),
             "nested_reference_rows": _tabular_rows(nested_reference_rows),
+            "nested_tuning_rows": _tabular_rows(nested_tuning_rows),
             "sampler_rows": _tabular_rows(sampler_rows),
             "identity_rows": _tabular_rows(identity_rows),
             "protocol_manifest": dict(protocol_manifest),
             "checkpoint_index": dict(checkpoint_index),
             "task_fisher_index": dict(task_fisher_index),
+            "feature_frame_index": dict(feature_frame_index),
         }
     )
 

@@ -5,10 +5,11 @@
 This page documents the implemented, unrun prior-recovery protocol. It does not
 report a result.
 
-Current status: `IMPLEMENTED, NOT RUN`. The three canonical output roots are
-absent and their catalog labels remain `TODO_VERIFY_ARTIFACT`. No preservation
-metric, gate outcome, Task-Fisher benefit, or thesis-facing decision exists
-until the bundles are produced and validated.
+Current status: `IMPLEMENTED, NO VALIDATED RESULT`. Invalid or terminated
+partial workstation roots are non-evidence, and catalog labels remain
+`TODO_VERIFY_ARTIFACT`. No preservation metric, gate outcome, Task-Fisher
+benefit, or thesis-facing decision exists until the bundles are completed and
+validated.
 
 ## Evidence Sequence
 
@@ -36,8 +37,11 @@ experiments/midogpp/stages/10_real_feature_reference/configs/eligible_tuned_real
 
 The reference uses the corrected full 2560-dimensional Virchow2 cache, the
 nine eligible centers `0,1,2,3,5,6,7,8,9`, classifier seed `23`, experiment
-seed `42`, and the frozen 20-spec grid identified by
-`16a7a1183ea3f65b`. Center `4` is excluded. For each outer target, classifier
+seed `42`, and the frozen 10-spec grid identified by
+`5abd0897d02bdcaa`. The grid retains `C in {0.01,0.1,1,10,100}` and
+`class_weight in {none,balanced}` while fixing `max_iter=5000` so numerical
+under-budget candidates cannot invalidate an otherwise complete bundle.
+Center `4` is excluded. For each outer target, classifier
 selection uses only source-inner folds and the target center is absent from
 fit/selection. Final target labels are scoring-only. The threshold policy is
 sklearn `predict`, so this is a separate matched denominator rather than a new
@@ -86,10 +90,25 @@ experiments/midogpp/stages/20_cvae_preservation/configs/prior_recovery_source_in
 ```
 
 For every outer center `H`, the runner removes all rows from `H`. Each remaining
-eligible center becomes an inner pseudo-target `I`; the real classifier,
-source-fit PCA128 frame, CVAE training, Task-Fisher probe, and sampler fitting
-use only the deeper source centers excluding both `H` and `I`. Inner labels may
-select the recipe. The real outer rows and labels are never passed to this run.
+eligible center becomes an inner pseudo-target `I`. The fixed `C=0.01` is an
+evidence-informed, predeclared design constant inherited from the earlier
+Stage-10 source-inner result; that artifact is not a runtime dependency and
+Stage 20 does not resweep `C`. Its distinct two-spec grid, hash
+`59b9fa2a008dedc5`, varies only
+`class_weight in {none, balanced}`. That choice is selected on the deeper
+centers excluding `H` and `I`. Every final real-classifier fit, fixed source-fit
+PCA128 frame, CVAE training, Task-Fisher probe, and sampler fit also excludes
+both `H` and `I`. Inner labels may select the sampler/objective recipe. The
+real outer rows and labels are never passed to this run.
+
+PCA128 is one locked preprocessing dimension, not a PCA sweep. Each fold frame
+is fitted once and stored under a key binding the fold/rows, dataset and feature
+cache, PCA policy, runtime protocol, code version, and numerical-library
+versions. Each CVAE checkpoint is written incrementally with an exact
+training-key sidecar. Reissuing the same workspace command resumes exact hits;
+identity drift is a miss and matching corruption is a hard protocol error. The
+terminated pre-v2 partial checkpoints lack this identity and are not reusable
+under `prior_recovery_v2_resume`.
 
 The initial sampler gate uses the exact configured families
 `standard_normal`, `class_conditional_diagonal_total_moment`, and
@@ -131,16 +150,23 @@ artifacts/midogpp/20_cvae_preservation/prior_recovery_source_inner_v1/seed42/
 ```
 
 The bundle must include resolved config/input provenance, protocol and
-selection-evidence manifests, checkpoint and Task-Fisher indexes, nine hashed
-`manifests/recipe_locks/<center>.json` files, gate/leakage reports,
-source-inner metrics, nested real references, sampler realizations, identity
-audits, persisted Task-Fisher states, and content-addressed checkpoints.
+selection-evidence manifests, checkpoint, Task-Fisher, and feature-frame
+indexes, nine hashed `manifests/recipe_locks/<center>.json` files,
+gate/leakage/runtime-summary/run-state reports, source-inner metrics, nested
+classifier-tuning rows, nested real references, sampler realizations, runtime
+timings, identity audits, persisted Task-Fisher states, and content-addressed
+checkpoints.
 `tables/checkpoint_reuse_audit.csv` is required: it enforces `A/C` checkpoint
 identity in every source-inner fold and, when the Task-Fisher cells are
 triggered, `B/D` checkpoint identity plus paired `A/B` initialization and
 stochastic streams. The source-inner validator also requires equal per-class
 generation counts across the compared arms for each outer/inner fold, training
 seed, generation seed, and representation role.
+
+`tables/runtime_timings.csv` and `reports/runtime_summary.json` report phase
+costs and cache hits with `claim_scope=diagnostic_only` and
+`used_for_selection=false`. They are deliberately excluded from the
+selection-evidence hash and cannot alter a lock.
 
 The nested real denominator and every generated arm are evaluated with the
 same frozen classifier specification and sklearn `predict` policy for that
@@ -218,8 +244,10 @@ artifacts/midogpp/20_cvae_preservation/prior_recovery_outer_v1/seeds17_42_101/
 Expected tables and reports include `tables/preservation_metrics.csv`,
 `tables/sampler_realizations.csv`, `tables/paired_deltas.csv`,
 `tables/aggregation_summary.csv`, `tables/checkpoint_reuse_audit.csv`,
-`tables/identity_overlap_audit.csv`, protocol/coverage/checkpoint/Task-Fisher
-manifests, and decision/leakage reports, plus persisted states and checkpoints.
+`tables/identity_overlap_audit.csv`, `tables/runtime_timings.csv`,
+protocol/coverage/checkpoint/Task-Fisher/feature-frame manifests, and
+decision/leakage/runtime-summary/run-state reports, plus persisted states and
+checkpoints.
 The outer validator requires the sampler-realization table and binds its
 requested/realized families, fallback metadata, and state hashes to the metric
 rows.

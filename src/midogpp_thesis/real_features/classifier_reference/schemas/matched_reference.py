@@ -299,7 +299,7 @@ def _validate_protocol(protocol: Mapping[str, object], leakage: Mapping[str, obj
     elif protocol.get("coverage_mode") != "partial_test":
         raise ProtocolError("Unknown matched-reference coverage mode.")
     grid = tuple(_spec(payload) for payload in protocol.get("classifier_grid", ()))
-    if len(grid) != 20 or classifier_grid_hash(grid) != str(protocol.get("classifier_grid_hash")):
+    if len(grid) != 10 or classifier_grid_hash(grid) != str(protocol.get("classifier_grid_hash")):
         raise ProtocolError("Matched-reference classifier grid payload/hash mismatch.")
     if protocol.get("method") != MATCHED_REFERENCE_METHOD or protocol.get("threshold_policy") != "predict":
         raise ProtocolError("Matched-reference method/threshold policy drifted.")
@@ -360,7 +360,7 @@ def _validate_workspace_provenance(root: Path, protocol: Mapping[str, object]) -
         or int(run.get("experiment_seed", -1)) != int(protocol.get("experiment_seed", -2))
         or int(run.get("classifier_seed", -1)) != int(protocol.get("classifier_seed", -2))
         or str(run.get("heldout_centers", "")).lower() != "all"
-        or int(grid.get("expected_candidate_count", -1)) != 20
+        or int(grid.get("expected_candidate_count", -1)) != 10
         or grid.get("expected_grid_hash") != protocol.get("classifier_grid_hash")
         or grid.get("threshold_policy") != "predict"
     ):

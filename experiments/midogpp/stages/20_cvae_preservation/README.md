@@ -34,9 +34,13 @@ Prior recovery is split into two independent bundles so held-out outer metrics
 cannot change the recipe.
 
 1. `midogpp.cvae.prior_recovery_source_inner.v1` removes each outer center
-   completely, uses each remaining center as an inner pseudo-target, and fits
-   the classifier/CVAE/PCA/sampler choices only on the still-deeper source
-   centers. It produces per-outer `RecipeLock` files with
+   completely and uses each remaining center as an inner pseudo-target.
+   `C=0.01` is an evidence-informed, predeclared design constant inherited
+   from the earlier Stage-10 source-inner result; it is not a runtime input or
+   a Stage-20 sweep. Within each `H/I` fold, only
+   `class_weight in {none, balanced}` is selected on still-deeper centers.
+   Every classifier fit, fixed PCA128 fit, CVAE/Task-Fisher fit, and sampler fit
+   excludes both `H` and `I`. It produces per-outer `RecipeLock` files with
    `claim_scope=cvae_recipe_lock_only`.
 2. `midogpp.cvae.prior_recovery_outer.v1` may run only when all nine source-inner
    locks are valid, all select a conditional arm (`C` or `D`), the leakage
@@ -65,6 +69,15 @@ gate and must add value over `C` without violating decode/posterior safety.
 Failure to pass the conditional gate is a completed negative source-inner
 result and blocks the outer factorial; it is not permission to inspect outer
 metrics and revise the recipe.
+
+PCA128 is one fixed, source-fit preprocessing step per fold, not another
+hyperparameter sweep. Exact protocol keys cache each fitted frame. CVAE
+checkpoints are persisted incrementally under exact training-key sidecars, so
+rerunning the same command resumes completed fits. Changed rows, cache hashes,
+folds, classifier specifications, recipe/protocol hashes, code versions, or
+library identities do not count as a cache hit. A matching corrupt entry fails
+closed. Timing and cache-hit reports are diagnostic-only and cannot influence
+the gate or any `RecipeLock`.
 
 ## Exact Run Sequence
 
@@ -106,14 +119,17 @@ artifacts/midogpp/20_cvae_preservation/prior_recovery_outer_v1/seeds17_42_101/
 ```
 
 The source-inner bundle contains the resolved config and input provenance,
-protocol/selection/checkpoint/Task-Fisher manifests, nine hashed `RecipeLock`
-files, gate and leakage reports, nested real references, source-inner metrics,
-sampler realizations, identity audits, persisted Task-Fisher states, and
-content-addressed checkpoints. The outer bundle contains the resolved config
-and input provenance, protocol/coverage/checkpoint/Task-Fisher manifests,
-decision and leakage reports, preservation metrics, sampler realizations,
-paired deltas, aggregation summary, checkpoint-reuse and identity audits,
-persisted Task-Fisher states, and content-addressed checkpoints. The outer
+protocol/selection/checkpoint/Task-Fisher/feature-frame manifests, nine hashed
+`RecipeLock` files, gate, leakage, runtime-summary, and run-state reports,
+nested classifier-tuning evidence, nested real references, source-inner
+metrics, sampler realizations, runtime timings, identity audits, persisted
+Task-Fisher states, and content-addressed checkpoints. The outer bundle
+contains the resolved config and input provenance,
+protocol/coverage/checkpoint/Task-Fisher/feature-frame manifests, decision,
+leakage, runtime-summary, and run-state reports, preservation metrics, runtime
+timings, sampler realizations, paired deltas, aggregation summary,
+checkpoint-reuse and identity audits, persisted Task-Fisher states, and
+content-addressed checkpoints. The outer
 validator requires `tables/sampler_realizations.csv` and cross-checks its
 sampler identities against the preservation metric rows.
 
@@ -134,6 +150,9 @@ sampler identities against the preservation metric rows.
 - Stage 40 remains the post-expert-bank validation of frozen expert generation.
   Stage-20 aggregate-posterior prior recovery does not activate or replace it.
 
-Status: `IMPLEMENTED, NOT RUN`. Both new output artifacts remain
-`TODO_VERIFY_ARTIFACT`; no prior-recovery or Task-Fisher result exists until
-the required bundles are run and validated.
+Status: `IMPLEMENTED, NO VALIDATED RESULT`. Both new output artifacts remain
+`TODO_VERIFY_ARTIFACT`. A terminated pre-resume source-inner partial root is
+non-evidence and its old checkpoints are incompatible with
+`prior_recovery_v2_resume`; only checkpoints written with exact v2 sidecars are
+resumable. No prior-recovery or Task-Fisher result exists until the required
+bundles are completed and validated.

@@ -117,6 +117,7 @@ class TrainedCVAERuntime:
     initialization_hash: str
     stochastic_stream_hash: str
     reproducibility_policy: str
+    resumed_from_checkpoint: bool = False
 
 
 def train_cvae(
@@ -243,6 +244,67 @@ def train_cvae(
         initialization_hash=initialization_hash,
         stochastic_stream_hash=stochastic_stream_hash,
         reproducibility_policy="torch_deterministic_algorithms_v1",
+        resumed_from_checkpoint=False,
+    )
+
+
+def runtime_from_checkpoint_payload(
+    payload: Mapping[str, object],
+    *,
+    expected_variant: TrainingVariant,
+    expected_training_key: TrainingKey,
+    expected_input_dim: int,
+    device: str,
+) -> TrainedCVAERuntime:
+    """Restore an exactly matched runtime after its provenance was validated."""
+
+    if payload.get("schema_version") != "midogpp_prior_recovery_checkpoint_v2":
+        raise ValueError("Unsupported resumable checkpoint schema.")
+    if payload.get("training_key") != expected_training_key.to_payload():
+        raise ValueError("Checkpoint training key differs from the requested key.")
+    if payload.get("training_key_hash") != expected_training_key.hash:
+        raise ValueError("Checkpoint training-key hash differs from the requested key.")
+    if payload.get("variant") != expected_variant.to_payload():
+        raise ValueError("Checkpoint training variant differs from the requested variant.")
+    if (
+        len(str(payload.get("initialization_hash", ""))) != 64
+        or any(character not in "0123456789abcdef" for character in str(payload["initialization_hash"]))
+        or len(str(payload.get("stochastic_stream_hash", ""))) != 16
+        or any(character not in "0123456789abcdef" for character in str(payload["stochastic_stream_hash"]))
+        or payload.get("reproducibility_policy") != "torch_deterministic_algorithms_v1"
+    ):
+        raise ValueError("Checkpoint reproducibility metadata is malformed.")
+    state_dict = payload.get("state_dict")
+    if not isinstance(state_dict, Mapping):
+        raise ValueError("Checkpoint lacks a state dictionary.")
+    resolved_device = _resolve_device(device)
+    model = ClassConditionedCVAE(
+        input_dim=int(expected_input_dim),
+        hidden_dim=int(expected_variant.hidden_dim),
+        latent_dim=int(expected_variant.latent_dim),
+        num_hidden_layers=int(expected_variant.num_hidden_layers),
+    ).to(resolved_device)
+    model.load_state_dict(state_dict, strict=True)
+    model.eval()
+    observed_checkpoint_hash = checkpoint_hash(model)
+    if observed_checkpoint_hash != str(payload.get("checkpoint_hash", "")):
+        raise ValueError("Checkpoint state dictionary hash mismatch.")
+    diagnostics = payload.get("diagnostics", ())
+    if not isinstance(diagnostics, (list, tuple)) or not all(
+        isinstance(row, Mapping) for row in diagnostics
+    ):
+        raise ValueError("Checkpoint diagnostics are malformed.")
+    return TrainedCVAERuntime(
+        model=model,
+        variant=expected_variant,
+        training_key=expected_training_key,
+        checkpoint_hash=observed_checkpoint_hash,
+        diagnostics=tuple(dict(row) for row in diagnostics),
+        device=resolved_device,
+        initialization_hash=str(payload.get("initialization_hash", "")),
+        stochastic_stream_hash=str(payload.get("stochastic_stream_hash", "")),
+        reproducibility_policy=str(payload.get("reproducibility_policy", "")),
+        resumed_from_checkpoint=True,
     )
 
 

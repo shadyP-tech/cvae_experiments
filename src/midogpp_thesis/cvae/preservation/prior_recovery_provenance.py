@@ -6,7 +6,9 @@ from dataclasses import dataclass, field
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
+import string
 from typing import Mapping
 
 import torch
@@ -14,7 +16,13 @@ import torch
 from ...real_features.classifier_reference.artifacts import stable_hash
 from ...real_features.classifier_reference.protocol import ProtocolError
 from ..task_fisher import TaskFisherMetric
-from ..training import TrainedCVAERuntime, checkpoint_hash
+from ..training import (
+    TrainedCVAERuntime,
+    TrainingKey,
+    TrainingVariant,
+    checkpoint_hash,
+    runtime_from_checkpoint_payload,
+)
 from ..reporting import write_json
 
 
@@ -23,6 +31,74 @@ class ProvenanceRecorder:
     root: Path
     checkpoint_records: dict[str, dict[str, object]] = field(default_factory=dict)
     fisher_records: dict[str, dict[str, object]] = field(default_factory=dict)
+
+    def load_runtime(
+        self,
+        *,
+        training_key: TrainingKey,
+        variant: TrainingVariant,
+        input_dim: int,
+        task_fisher_state_hash: str,
+        classifier_spec_hash: str,
+        device: str,
+    ) -> TrainedCVAERuntime | None:
+        sidecar_path = self.root / f"checkpoints/by_training_key/{training_key.hash}.json"
+        if not sidecar_path.is_file():
+            return None
+        record = _read_json(sidecar_path)
+        if (
+            record.get("training_key_hash") != training_key.hash
+            or record.get("training_key") != training_key.to_payload()
+            or record.get("variant") != variant.to_payload()
+            or record.get("variant_hash") != training_key.variant_hash
+            or record.get("task_fisher_state_hash") != task_fisher_state_hash
+            or record.get("classifier_spec_hash") != classifier_spec_hash
+        ):
+            raise ProtocolError("Matching checkpoint sidecar differs from the requested runtime identity.")
+        checkpoint_id = str(record.get("checkpoint_hash", ""))
+        expected_relative_path = f"checkpoints/{checkpoint_id}.pt"
+        if not _is_hex(checkpoint_id, length=64) or record.get("relative_path") != expected_relative_path:
+            raise ProtocolError("Matching checkpoint sidecar has a noncanonical checkpoint path.")
+        _validate_reproducibility_record(record)
+        path = self.root / expected_relative_path
+        if not path.is_file() or _file_sha256(path) != str(record.get("file_sha256", "")):
+            raise ProtocolError("Matching checkpoint cache file is missing or corrupt.")
+        try:
+            state_payload = torch.load(path, map_location="cpu", weights_only=True)
+        except Exception as exc:
+            raise ProtocolError("Matching checkpoint cache payload is malformed.") from exc
+        if (
+            not isinstance(state_payload, Mapping)
+            or state_payload.get("schema_version") != "midogpp_prior_recovery_checkpoint_state_v1"
+            or state_payload.get("checkpoint_hash") != checkpoint_id
+            or not isinstance(state_payload.get("state_dict"), Mapping)
+            or _state_dict_hash(state_payload["state_dict"]) != checkpoint_id
+        ):
+            raise ProtocolError("Matching checkpoint cache payload is not a mapping.")
+        payload = {
+            "schema_version": "midogpp_prior_recovery_checkpoint_v2",
+            "state_dict": state_payload["state_dict"],
+            "training_key": record["training_key"],
+            "training_key_hash": record["training_key_hash"],
+            "variant": record["variant"],
+            "checkpoint_hash": checkpoint_id,
+            "initialization_hash": record["initialization_hash"],
+            "stochastic_stream_hash": record["stochastic_stream_hash"],
+            "reproducibility_policy": record["reproducibility_policy"],
+            "diagnostics": [],
+        }
+        try:
+            runtime = runtime_from_checkpoint_payload(
+                payload,
+                expected_variant=variant,
+                expected_training_key=training_key,
+                expected_input_dim=int(input_dim),
+                device=device,
+            )
+        except (RuntimeError, ValueError) as exc:
+            raise ProtocolError("Matching checkpoint cannot be restored safely.") from exc
+        self._record_checkpoint(record)
+        return runtime
 
     def record_fisher(self, fisher: TaskFisherMetric) -> str:
         state_hash = fisher.state_hash
@@ -56,24 +132,28 @@ class ProvenanceRecorder:
         path.parent.mkdir(parents=True, exist_ok=True)
         if checkpoint_hash(runtime.model) != runtime.checkpoint_hash:
             raise ProtocolError("Runtime checkpoint hash drifted before persistence.")
+        payload = {
+            "schema_version": "midogpp_prior_recovery_checkpoint_state_v1",
+            "state_dict": {
+                key: value.detach().cpu() for key, value in runtime.model.state_dict().items()
+            },
+            "checkpoint_hash": runtime.checkpoint_hash,
+        }
         if not path.exists():
-            torch.save(
-                {
-                    "state_dict": {
-                        key: value.detach().cpu() for key, value in runtime.model.state_dict().items()
-                    },
-                    "training_key": runtime.training_key.to_payload(),
-                    "training_key_hash": runtime.training_key.hash,
-                    "variant": runtime.variant.to_payload(),
-                    "checkpoint_hash": runtime.checkpoint_hash,
-                    "task_fisher_state_hash": task_fisher_state_hash,
-                    "classifier_spec_hash": classifier_spec_hash,
-                    "initialization_hash": runtime.initialization_hash,
-                    "stochastic_stream_hash": runtime.stochastic_stream_hash,
-                    "reproducibility_policy": runtime.reproducibility_policy,
-                },
-                path,
-            )
+            _atomic_torch_save(path, payload)
+        else:
+            try:
+                existing_payload = torch.load(path, map_location="cpu", weights_only=True)
+            except Exception as exc:
+                raise ProtocolError("Existing content-addressed checkpoint is malformed.") from exc
+            if (
+                not isinstance(existing_payload, Mapping)
+                or existing_payload.get("schema_version") != payload["schema_version"]
+                or existing_payload.get("checkpoint_hash") != runtime.checkpoint_hash
+                or not isinstance(existing_payload.get("state_dict"), Mapping)
+                or _state_dict_hash(existing_payload["state_dict"]) != runtime.checkpoint_hash
+            ):
+                raise ProtocolError("Checkpoint hash collision with a different persisted payload.")
         record = {
             "checkpoint_hash": runtime.checkpoint_hash,
             "relative_path": path.relative_to(self.root).as_posix(),
@@ -90,10 +170,22 @@ class ProvenanceRecorder:
             "stochastic_pairing_hash": runtime.training_key.stochastic_pairing_hash,
             "reproducibility_policy": runtime.reproducibility_policy,
         }
-        existing = self.checkpoint_records.get(runtime.checkpoint_hash)
-        if existing is not None and existing != record:
+        _validate_reproducibility_record(record)
+        sidecar_path = self.root / f"checkpoints/by_training_key/{runtime.training_key.hash}.json"
+        if sidecar_path.is_file():
+            if _read_json(sidecar_path) != record:
+                raise ProtocolError("Training-key checkpoint sidecar collision.")
+        else:
+            _atomic_json(sidecar_path, record)
+        self._record_checkpoint(record)
+
+    def _record_checkpoint(self, record: Mapping[str, object]) -> None:
+        checkpoint_id = str(record.get("checkpoint_hash", ""))
+        normalized = dict(record)
+        existing = self.checkpoint_records.get(checkpoint_id)
+        if not checkpoint_id or (existing is not None and existing != normalized):
             raise ProtocolError("Checkpoint hash collision with different provenance metadata.")
-        self.checkpoint_records[runtime.checkpoint_hash] = record
+        self.checkpoint_records[checkpoint_id] = normalized
 
     def write_indices(self) -> None:
         write_json(
@@ -129,50 +221,46 @@ def validate_provenance_indices(root: Path) -> tuple[Mapping[str, object], Mappi
         raise ProtocolError("Checkpoint index count mismatch.")
     if int(fisher_index.get("n_unique_states", -1)) != len(fisher_records):
         raise ProtocolError("Task-Fisher index count mismatch.")
-    for record in (*checkpoint_records, *fisher_records):
-        if not isinstance(record, Mapping):
-            raise ProtocolError("Malformed provenance index record.")
-        path = Path(root) / str(record.get("relative_path", ""))
-        if not path.is_file() or _file_sha256(path) != str(record.get("file_sha256", "")):
-            raise ProtocolError(f"Persisted provenance file hash mismatch: {path}")
-    checkpoint_hashes: set[str] = set()
+    if not all(isinstance(record, Mapping) for record in (*checkpoint_records, *fisher_records)):
+        raise ProtocolError("Malformed provenance index record.")
+    training_key_hashes: set[str] = set()
     for record in checkpoint_records:
         assert isinstance(record, Mapping)
         checkpoint_id = str(record.get("checkpoint_hash", ""))
-        if not checkpoint_id or checkpoint_id in checkpoint_hashes:
-            raise ProtocolError("Checkpoint index contains a missing or duplicate identity.")
-        checkpoint_hashes.add(checkpoint_id)
+        training_key_hash = str(record.get("training_key_hash", ""))
+        if (
+            not _is_hex(checkpoint_id, length=64)
+            or not _is_hex(training_key_hash, length=16)
+            or training_key_hash in training_key_hashes
+        ):
+            raise ProtocolError("Checkpoint index contains a missing or duplicate training identity.")
+        training_key_hashes.add(training_key_hash)
         expected_path = f"checkpoints/{checkpoint_id}.pt"
         if record.get("relative_path") != expected_path:
             raise ProtocolError("Checkpoint path is not bound to its checkpoint hash.")
         path = Path(root) / expected_path
+        if not path.is_file() or _file_sha256(path) != str(record.get("file_sha256", "")):
+            raise ProtocolError(f"Persisted provenance file hash mismatch: {path}")
         try:
-            payload = torch.load(path, map_location="cpu", weights_only=False)
+            payload = torch.load(path, map_location="cpu", weights_only=True)
         except Exception as exc:
             raise ProtocolError(f"Malformed persisted checkpoint: {path}") from exc
         if not isinstance(payload, Mapping) or not isinstance(payload.get("state_dict"), Mapping):
             raise ProtocolError(f"Malformed persisted checkpoint payload: {path}")
-        expected_fields = (
-            "checkpoint_hash",
-            "training_key_hash",
-            "task_fisher_state_hash",
-            "classifier_spec_hash",
-            "initialization_hash",
-            "stochastic_stream_hash",
-            "reproducibility_policy",
-        )
-        if any(str(payload.get(field, "")) != str(record.get(field, "")) for field in expected_fields):
-            raise ProtocolError("Checkpoint index metadata differs from the persisted payload.")
-        if stable_hash(payload.get("training_key")) != record.get("training_key_hash"):
+        if payload.get("schema_version") != "midogpp_prior_recovery_checkpoint_state_v1":
+            raise ProtocolError("Unexpected persisted checkpoint schema.")
+        if payload.get("checkpoint_hash") != checkpoint_id:
+            raise ProtocolError("Persisted checkpoint identity mismatch.")
+        if stable_hash(record.get("training_key")) != training_key_hash:
             raise ProtocolError("Persisted training key hash mismatch.")
-        if stable_hash(payload.get("variant")) != record.get("variant_hash"):
+        if stable_hash(record.get("variant")) != record.get("variant_hash"):
             raise ProtocolError("Persisted training variant hash mismatch.")
-        if payload.get("training_key") != record.get("training_key"):
-            raise ProtocolError("Checkpoint index training key differs from the persisted payload.")
-        if payload.get("variant") != record.get("variant"):
-            raise ProtocolError("Checkpoint index variant differs from the persisted payload.")
         if _state_dict_hash(payload["state_dict"]) != checkpoint_id:
             raise ProtocolError("Persisted checkpoint state hash mismatch.")
+        _validate_reproducibility_record(record)
+        sidecar_path = Path(root) / f"checkpoints/by_training_key/{record['training_key_hash']}.json"
+        if _read_json(sidecar_path) != dict(record):
+            raise ProtocolError("Checkpoint index differs from its durable training-key sidecar.")
     fisher_hashes: set[str] = set()
     for record in fisher_records:
         assert isinstance(record, Mapping)
@@ -183,7 +271,10 @@ def validate_provenance_indices(root: Path) -> tuple[Mapping[str, object], Mappi
         expected_path = f"manifests/task_fisher/{fisher_id}.json"
         if record.get("relative_path") != expected_path:
             raise ProtocolError("Task-Fisher path is not bound to its state hash.")
-        payload = _read_json(Path(root) / expected_path)
+        path = Path(root) / expected_path
+        if not path.is_file() or _file_sha256(path) != str(record.get("file_sha256", "")):
+            raise ProtocolError(f"Persisted provenance file hash mismatch: {path}")
+        payload = _read_json(path)
         embedded_hash = payload.pop("task_fisher_state_hash", None)
         if embedded_hash != fisher_id or stable_hash(payload) != fisher_id:
             raise ProtocolError("Persisted Task-Fisher state hash mismatch.")
@@ -211,6 +302,39 @@ def _file_sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _is_hex(value: str, *, length: int) -> bool:
+    return len(value) == length and all(character in string.hexdigits for character in value)
+
+
+def _validate_reproducibility_record(record: Mapping[str, object]) -> None:
+    if (
+        not _is_hex(str(record.get("initialization_hash", "")), length=64)
+        or not _is_hex(str(record.get("stochastic_stream_hash", "")), length=16)
+        or record.get("reproducibility_policy") != "torch_deterministic_algorithms_v1"
+    ):
+        raise ProtocolError("Checkpoint reproducibility metadata is malformed.")
+
+
+def _atomic_torch_save(path: Path, payload: Mapping[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        torch.save(dict(payload), temporary)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _atomic_json(path: Path, payload: Mapping[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _read_json(path: Path) -> dict[str, object]:

@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
+from time import perf_counter
 from typing import Sequence
 
 from ...real_features.classifier_reference.artifacts import stable_hash
@@ -14,7 +15,7 @@ from ...real_features.classifier_reference.schemas.midogpp import (
     MIDOGPP_ELIGIBLE_CENTERS,
     MIDOGPP_EXCLUDED_CENTERS,
 )
-from ..feature_frame import ExpertFeatureFrame, fit_expert_frame
+from ..feature_frame import ExpertFeatureFrame
 from ..generation_samplers import AggregatePosteriorSampler, STANDARD_SAMPLER
 from ..objectives import ISOTROPIC_OBJECTIVE, TASK_FISHER_OBJECTIVE
 from ..reporting import prepare_artifact_dirs
@@ -44,6 +45,8 @@ from .prior_recovery_config import (
 )
 from .prior_recovery_decision import aggregate_outer
 from .prior_recovery_provenance import ProvenanceRecorder
+from .prior_recovery_runtime_cache import FeatureFrameCache
+from .prior_recovery_timing import RuntimeTimingRecorder, mark_run_failed, write_run_state
 from .prior_recovery_schema import OUTER_METRIC_SCHEMA, SAMPLER_REALIZATION_SCHEMA
 from .representations import decode_means, posterior_samples, sampler_decodes, source_budget_labels
 from .scoring import RepresentationScore, score_representation
@@ -71,7 +74,20 @@ def run_outer_prior_recovery(
     if not isinstance(config, OuterPriorRecoveryConfig):
         raise ProtocolError("Outer runner requires OuterPriorRecoveryConfig.")
     root = prepare_artifact_dirs(Path(artifact_root or config.artifact_root))
+    try:
+        return _run_outer_prior_recovery(config, root=root)
+    except Exception:
+        mark_run_failed(root, mode="outer")
+        raise
+
+
+def _run_outer_prior_recovery(
+    config: OuterPriorRecoveryConfig,
+    *,
+    root: Path,
+) -> Path:
     recorder = ProvenanceRecorder(root)
+    frame_cache = FeatureFrameCache(root)
     frame = load_frame(config)
     reference = load_tuned_classifier_reference(
         config.reference_artifact_root,
@@ -124,6 +140,8 @@ def run_outer_prior_recovery(
         source_inner_protocol_hash=source_inner_protocol_hash,
         frozen_reference_identity_hash=frozen_reference_identity_hash,
     )
+    timings = RuntimeTimingRecorder(root, protocol_hash=runtime_protocol_hash, mode="outer")
+    write_run_state(root, protocol_hash=runtime_protocol_hash, mode="outer", status="RUNNING")
     metric_rows: list[dict[str, object]] = []
     sampler_rows: list[dict[str, object]] = []
     checkpoint_rows: list[dict[str, object]] = []
@@ -150,14 +168,39 @@ def run_outer_prior_recovery(
         identity_rows.append(audit)
         x_fit_full, y_fit, source_ids = frame_arrays(frame, fit_idx)
         x_eval_full, y_eval, eval_ids = frame_arrays(frame, eval_idx)
-        feature_frame = fit_expert_frame(
+        started = perf_counter()
+        feature_frame, frame_cache_hit = frame_cache.fit_or_load(
             expert_id=f"outer_H{outer}",
             source_train_embeddings=x_fit_full,
+            fit_centers=split.fit_centers,
+            fit_row_hash=row_hash(source_ids),
             requested_dim=config.pca_dim,
+            manifest_hash=frame.manifest_hash,
+            feature_cache_hash=frame.feature_cache_hash,
+            protocol_hash=runtime_protocol_hash,
+            code_version=config.code_version,
+        )
+        timings.record(
+            phase="pca_frame",
+            elapsed_seconds=perf_counter() - started,
+            outer_target_center=outer,
+            cache_status="hit" if frame_cache_hit else "miss",
         )
         x_fit = feature_frame.transform(x_fit_full)
         x_eval = feature_frame.transform(x_eval_full)
+        started = perf_counter()
+        fisher = fit_task_fisher_metric(x_fit, y_fit, spec=spec, alpha=1.0)
+        fisher_hash = recorder.record_fisher(fisher)
+        timings.record(
+            phase="task_fisher_fit",
+            elapsed_seconds=perf_counter() - started,
+            outer_target_center=outer,
+            objective_id=TASK_FISHER_OBJECTIVE,
+        )
+        if not fisher.valid:
+            raise ProtocolError(f"Outer Task-Fisher state invalid for center {outer}: {fisher.reason}")
         for training_seed in config.training_seeds:
+            started = perf_counter()
             runtime_a = train_runtime(
                 config,
                 variant=config.isotropic_variant,
@@ -172,16 +215,19 @@ def run_outer_prior_recovery(
                 manifest_hash=frame.manifest_hash,
                 task_metric=None,
                 objective_context_hash=NO_TASK_FISHER_STATE,
-            )
-            recorder.record_runtime(
-                runtime_a,
+                recorder=recorder,
                 task_fisher_state_hash=NO_TASK_FISHER_STATE,
                 classifier_spec_hash=spec.config_hash,
             )
-            fisher = fit_task_fisher_metric(x_fit, y_fit, spec=spec, alpha=1.0)
-            fisher_hash = recorder.record_fisher(fisher)
-            if not fisher.valid:
-                raise ProtocolError(f"Outer Task-Fisher state invalid for center {outer}: {fisher.reason}")
+            timings.record(
+                phase="cvae_training",
+                elapsed_seconds=perf_counter() - started,
+                outer_target_center=outer,
+                objective_id=runtime_a.variant.objective_id,
+                training_key_hash=runtime_a.training_key.hash,
+                cache_status="hit" if runtime_a.resumed_from_checkpoint else "miss",
+            )
+            started = perf_counter()
             runtime_b = train_runtime(
                 config,
                 variant=config.task_fisher_variant,
@@ -196,12 +242,19 @@ def run_outer_prior_recovery(
                 manifest_hash=frame.manifest_hash,
                 task_metric=fisher.metric,
                 objective_context_hash=fisher_hash,
-            )
-            recorder.record_runtime(
-                runtime_b,
+                recorder=recorder,
                 task_fisher_state_hash=fisher_hash,
                 classifier_spec_hash=spec.config_hash,
             )
+            timings.record(
+                phase="cvae_training",
+                elapsed_seconds=perf_counter() - started,
+                outer_target_center=outer,
+                objective_id=runtime_b.variant.objective_id,
+                training_key_hash=runtime_b.training_key.hash,
+                cache_status="hit" if runtime_b.resumed_from_checkpoint else "miss",
+            )
+            evaluation_started = perf_counter()
             metric_rows.extend(
                 _objective_rows(
                     config,
@@ -271,7 +324,18 @@ def run_outer_prior_recovery(
                     "status": "PASS",
                 }
             )
+            timings.record(
+                phase="sampling_and_scoring",
+                elapsed_seconds=perf_counter() - evaluation_started,
+                outer_target_center=outer,
+                objective_id="paired_isotropic_task_fisher",
+                training_key_hash=stable_hash(
+                    [runtime_a.training_key.hash, runtime_b.training_key.hash]
+                ),
+            )
     recorder.write_indices()
+    frame_cache.write_index()
+    timings.finalize()
     aggregation_rows, paired_rows, decision, coverage = aggregate_outer(config, metric_rows, locks)
     protocol_manifest = {
         "schema_version": "midogpp_prior_recovery_outer_protocol_v1",

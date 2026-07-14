@@ -27,7 +27,7 @@ Current canonical definitions:
 denominator for the Stage-20 prior-recovery experiment. It uses the complete
 Virchow2 feature frame for the nine eligible centers
 `0,1,2,3,5,6,7,8,9`, excludes quarantined center `4`, freezes the exact
-20-spec classifier grid with hash `16a7a1183ea3f65b`, and uses sklearn
+10-spec classifier grid with hash `5abd0897d02bdcaa`, and uses sklearn
 `predict` rather than a separately tuned threshold policy.
 
 For each held-out center, classifier selection is source-inner and the outer

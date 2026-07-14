@@ -13,13 +13,13 @@ run:
   expected_feature_dim: 2560
 
 classifier_grid:
-  expected_candidate_count: 20
-  expected_grid_hash: 16a7a1183ea3f65b
+  expected_candidate_count: 10
+  expected_grid_hash: 5abd0897d02bdcaa
   c_grid: [0.01, 0.1, 1.0, 10.0, 100.0]
   penalty: l2
   solver: lbfgs
   class_weight: [none, balanced]
-  max_iter: [2000, 5000]
+  max_iter: [5000]
   threshold_policy: predict
 
 claim_boundary:

@@ -38,6 +38,8 @@ from .prior_recovery_config import (
 )
 from .prior_recovery_decision import aggregate_outer, outer_coverage
 from .prior_recovery_provenance import validate_provenance_indices
+from .prior_recovery_runtime_cache import validate_feature_frame_index
+from .prior_recovery_timing import validate_runtime_reports, write_run_state
 from .prior_recovery_schema import OUTER_METRIC_COLUMNS, OUTER_METRIC_SCHEMA
 from .runtime import EvaluationKey, GenerationKey
 from .source_inner_selection import recipe_lock_from_payload
@@ -75,7 +77,22 @@ def write_outer_bundle(
     write_json(root / "manifests/coverage_manifest.json", dict(coverage_manifest))
     write_json(root / "reports/decision_report.json", dict(decision_report))
     write_json(root / "reports/leakage_report.json", dict(leakage_report))
-    validate_outer_bundle(root)
+    write_run_state(
+        root,
+        protocol_hash=str(protocol_manifest["protocol_hash"]),
+        mode="outer",
+        status="COMPLETE",
+    )
+    try:
+        validate_outer_bundle(root)
+    except Exception:
+        write_run_state(
+            root,
+            protocol_hash=str(protocol_manifest["protocol_hash"]),
+            mode="outer",
+            status="FAILED",
+        )
+        raise
     return root
 
 
@@ -96,8 +113,12 @@ def validate_outer_bundle(
         "manifests/coverage_manifest.json",
         "manifests/checkpoint_index.json",
         "manifests/task_fisher_index.json",
+        "manifests/feature_frame_index.json",
         "reports/decision_report.json",
         "reports/leakage_report.json",
+        "tables/runtime_timings.csv",
+        "reports/runtime_summary.json",
+        "reports/run_state.json",
     )
     _require_files(root, required)
     protocol = _read_json(root / "manifests/protocol_manifest.json")
@@ -107,6 +128,10 @@ def validate_outer_bundle(
     leakage = _read_json(root / "reports/leakage_report.json")
     checkpoint_index, fisher_index = validate_provenance_indices(root)
     rows = _read_csv(root / "tables/preservation_metrics.csv")
+    frame_index = validate_feature_frame_index(
+        root,
+        expected_frame_hashes={str(row.get("frame_hash", "")) for row in rows},
+    )
     sampler_rows = _read_csv(root / "tables/sampler_realizations.csv")
     paired_rows = _read_csv(root / "tables/paired_deltas.csv")
     aggregation_rows = _read_csv(root / "tables/aggregation_summary.csv")
@@ -114,6 +139,13 @@ def validate_outer_bundle(
     identity_rows = _read_csv(root / "tables/identity_overlap_audit.csv")
     _assert_columns(rows, OUTER_METRIC_COLUMNS, "preservation_metrics.csv")
     _validate_outer_protocol(protocol, expected_config=expected_config)
+    validate_runtime_reports(
+        root,
+        protocol_hash=str(protocol["protocol_hash"]),
+        mode="outer",
+        checkpoint_index=checkpoint_index,
+        frame_index=frame_index,
+    )
     _validate_outer_rows(rows, protocol=protocol)
     _validate_sampler_rows(sampler_rows, metric_rows=rows)
     _validate_metric_provenance(

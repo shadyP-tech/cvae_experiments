@@ -35,7 +35,8 @@ from .schemas.matched_reference import (
 from .schemas.midogpp import MIDOGPP_ELIGIBLE_CENTERS, MIDOGPP_EXCLUDED_CENTERS
 
 
-CANONICAL_GRID_HASH = "16a7a1183ea3f65b"
+CANONICAL_GRID_HASH = "5abd0897d02bdcaa"
+CANONICAL_GRID_SIZE = 10
 
 
 @dataclass(frozen=True)
@@ -68,7 +69,7 @@ def canonical_matched_reference_specs(*, classifier_seed: int = 23) -> tuple[Cla
         penalties="l2",
         solvers="lbfgs",
         class_weights="none,balanced",
-        max_iters="2000,5000",
+        max_iters="5000",
         classifier_seed=int(classifier_seed),
     )
     grid_hash = classifier_grid_hash(specs)
@@ -155,8 +156,8 @@ def run_matched_reference(config: MatchedReferenceConfig, *, artifact_root: Path
         expected_feature_dim=config.expected_feature_dim,
     )
     specs = config.classifier_specs or canonical_matched_reference_specs(classifier_seed=config.classifier_seed)
-    if len(specs) != 20 or classifier_grid_hash(specs) != CANONICAL_GRID_HASH:
-        raise ProtocolError("Matched reference requires the exact canonical 20-spec classifier grid.")
+    if len(specs) != CANONICAL_GRID_SIZE or classifier_grid_hash(specs) != CANONICAL_GRID_HASH:
+        raise ProtocolError("Matched reference requires the exact canonical 10-spec classifier grid.")
     heldouts = tuple(_eligible_present(frame, center) for center in config.heldout_centers)
     coverage_mode = "partial_test" if config.allow_partial_test_coverage else "complete"
     if not config.allow_partial_test_coverage:

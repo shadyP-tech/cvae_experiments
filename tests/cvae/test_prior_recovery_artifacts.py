@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import csv
 from dataclasses import replace
-import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -81,6 +80,23 @@ def test_artifacts_are_separate_and_tamper_evident(tmp_path: Path) -> None:
     _rebind_source_evidence(changed_source_selection, source_selection_rows)
     with pytest.raises(ProtocolError, match="selection identity"):
         validate_source_inner_bundle(changed_source_selection)
+
+    changed_classifier_grid = _copy_bundle(
+        source_root,
+        tmp_path / "changed-classifier-grid",
+    )
+    tuning_path = changed_classifier_grid / "tables/nested_classifier_tuning.csv"
+    tuning_rows = _read_csv(tuning_path)
+    forged_spec = json.loads(tuning_rows[0]["classifier_spec"])
+    forged_spec["C"] = 10.0
+    tuning_rows[0]["classifier_spec"] = json.dumps(forged_spec, sort_keys=True)
+    _write_csv(tuning_path, tuning_rows)
+    _rebind_source_evidence(
+        changed_classifier_grid,
+        _read_csv(changed_classifier_grid / "tables/source_inner_metrics.csv"),
+    )
+    with pytest.raises(ProtocolError, match="tuning identity or fold coverage"):
+        validate_source_inner_bundle(changed_classifier_grid)
 
     changed_source_generation = _copy_bundle(
         source_root,
@@ -170,16 +186,18 @@ def test_artifacts_are_separate_and_tamper_evident(tmp_path: Path) -> None:
         for record in checkpoint_index["records"]
         if record["objective_id"] == TASK_FISHER_OBJECTIVE
     )
-    checkpoint_path = changed_source_pairing / task_record["relative_path"]
-    import torch
-
-    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-    checkpoint["initialization_hash"] = "forged"
-    torch.save(checkpoint, checkpoint_path)
-    task_record["initialization_hash"] = "forged"
-    task_record["file_sha256"] = hashlib.sha256(checkpoint_path.read_bytes()).hexdigest()
+    task_record["initialization_hash"] = "0" * 64
     checkpoint_index_path.write_text(
         json.dumps(checkpoint_index, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    sidecar_path = (
+        changed_source_pairing
+        / "checkpoints/by_training_key"
+        / f"{task_record['training_key_hash']}.json"
+    )
+    sidecar_path.write_text(
+        json.dumps(task_record, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     _rebind_source_evidence(
@@ -188,6 +206,14 @@ def test_artifacts_are_separate_and_tamper_evident(tmp_path: Path) -> None:
     )
     with pytest.raises(ProtocolError, match="initialization pairing failed"):
         validate_source_inner_bundle(changed_source_pairing)
+
+    changed_timing = _copy_bundle(source_root, tmp_path / "changed-timing")
+    timing_path = changed_timing / "tables/runtime_timings.csv"
+    timing_rows = _read_csv(timing_path)
+    timing_rows[0]["elapsed_seconds"] = "-1"
+    _write_csv(timing_path, timing_rows)
+    with pytest.raises(ProtocolError, match="finite and nonnegative"):
+        validate_source_inner_bundle(changed_timing)
 
     changed_lock = _copy_bundle(source_root, tmp_path / "changed-lock")
     lock_path = changed_lock / "manifests/recipe_locks/0.json"
@@ -422,6 +448,7 @@ def _rebind_source_evidence(root: Path, rows: list[dict[str, str]]) -> None:
     bundle_hash = selection_evidence_hash(
         metric_rows=rows,
         nested_reference_rows=_read_csv(root / "tables/nested_real_references.csv"),
+        nested_tuning_rows=_read_csv(root / "tables/nested_classifier_tuning.csv"),
         sampler_rows=_read_csv(root / "tables/sampler_realizations.csv"),
         identity_rows=_read_csv(root / "tables/identity_overlap_audit.csv"),
         protocol_manifest=json.loads(
@@ -432,6 +459,9 @@ def _rebind_source_evidence(root: Path, rows: list[dict[str, str]]) -> None:
         ),
         task_fisher_index=json.loads(
             (root / "manifests/task_fisher_index.json").read_text(encoding="utf-8")
+        ),
+        feature_frame_index=json.loads(
+            (root / "manifests/feature_frame_index.json").read_text(encoding="utf-8")
         ),
     )
     for row in rows:

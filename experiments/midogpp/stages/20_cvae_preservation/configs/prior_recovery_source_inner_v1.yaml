@@ -2,7 +2,7 @@ experiment:
   name: virchow2_cvae_midogpp_prior_recovery_source_inner_v1
   mode: source_inner
   artifact_root: output://midogpp_output_cvae_prior_recovery_source_inner_v1
-  code_version: prior_recovery_v1
+  code_version: prior_recovery_v2_resume
 
 inputs:
   manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv

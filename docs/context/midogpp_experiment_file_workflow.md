@@ -281,14 +281,24 @@ conda run -n thesis python -m midogpp_thesis workspace run \
 
 This run uses only the dataset contract and corrected cache. For every outer
 center it removes that center completely, builds inner pseudo-target folds from
-the remaining eligible centers, and records nested real denominators,
-source-inner preservation metrics, sampler realizations, identity audits,
-checkpoint and Task-Fisher indexes, hashed `RecipeLock` files, a leakage
-report, `tables/checkpoint_reuse_audit.csv`, and
-`reports/gate_decision.json`. The audit requires `A/C` checkpoint reuse and,
+the remaining eligible centers, and records the distinct two-spec Stage-20
+classifier grid (`C=0.01`, class weight none/balanced), nested classifier
+tuning, nested real denominators, source-inner preservation metrics, sampler
+realizations, identity audits, checkpoint, Task-Fisher, and feature-frame
+indexes, hashed `RecipeLock` files, leakage/gate/run-state/runtime-summary
+reports, `tables/runtime_timings.csv`, and
+`tables/checkpoint_reuse_audit.csv`. `C` and PCA128 are fixed design choices,
+not sweeps; only class weight is selected inside each deeper fold. The audit
+requires `A/C` checkpoint reuse and,
 when Task-Fisher is triggered, `B/D` reuse plus paired `A/B` initialization and
 stochastic streams. Source-inner metric validation also requires equal
 per-class generation budgets across compared arms.
+
+The runner writes checkpoint and PCA cache entries incrementally. Reissuing the
+same command resumes exact `prior_recovery_v2_resume` keys and overwrites only
+diagnostic timing/cache-status rows. Protocol, row, recipe, classifier, cache,
+code, or library drift produces a miss; a matching corrupt entry fails closed.
+Pre-v2 partial checkpoints are not eligible for resume.
 
 The outer experiment and output are:
 
@@ -317,7 +327,8 @@ sampler realizations, paired deltas, equal-center aggregation, checkpoint-reuse
 and identity audits, coverage/protocol/provenance manifests, decision/leakage
 reports, content-addressed checkpoints, and Task-Fisher states.
 `tables/sampler_realizations.csv` is required and validated against the outer
-metric rows and recorded sampler states.
+metric rows and recorded sampler states. The outer bundle also requires the
+feature-frame index, runtime timings/summary, and run-state report.
 
 Both source-inner and outer metrics use the same frozen classifier
 specification/predict policy within each fold and the chance-corrected ratio

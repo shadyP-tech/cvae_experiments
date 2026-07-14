@@ -397,6 +397,7 @@ artifacts:
       - manifests/selection_evidence_manifest.json
       - manifests/checkpoint_index.json
       - manifests/task_fisher_index.json
+      - manifests/feature_frame_index.json
       - manifests/recipe_locks/0.json
       - manifests/recipe_locks/1.json
       - manifests/recipe_locks/2.json
@@ -408,11 +409,15 @@ artifacts:
       - manifests/recipe_locks/9.json
       - reports/gate_decision.json
       - reports/leakage_report.json
+      - reports/runtime_summary.json
+      - reports/run_state.json
       - tables/source_inner_metrics.csv
       - tables/nested_real_references.csv
+      - tables/nested_classifier_tuning.csv
       - tables/sampler_realizations.csv
       - tables/checkpoint_reuse_audit.csv
       - tables/identity_overlap_audit.csv
+      - tables/runtime_timings.csv
     forbidden_reuse:
       - routing_evidence
       - expert_selection_evidence
@@ -434,14 +439,18 @@ artifacts:
       - manifests/coverage_manifest.json
       - manifests/checkpoint_index.json
       - manifests/task_fisher_index.json
+      - manifests/feature_frame_index.json
       - reports/decision_report.json
       - reports/leakage_report.json
+      - reports/runtime_summary.json
+      - reports/run_state.json
       - tables/preservation_metrics.csv
       - tables/sampler_realizations.csv
       - tables/paired_deltas.csv
       - tables/aggregation_summary.csv
       - tables/checkpoint_reuse_audit.csv
       - tables/identity_overlap_audit.csv
+      - tables/runtime_timings.csv
     forbidden_reuse:
       - expert_bank_evidence
       - routing_evidence

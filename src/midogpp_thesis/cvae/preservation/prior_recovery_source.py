@@ -6,14 +6,13 @@ from dataclasses import dataclass
 import json
 import math
 from pathlib import Path
+from time import perf_counter
 from typing import Mapping, Sequence
 
 from ...real_features.classifier_reference.artifacts import stable_hash
 from ...real_features.classifier_reference.classifiers import ClassifierSpec
 from ...real_features.classifier_reference.matched_reference import (
-    CANONICAL_GRID_HASH,
     PredictOnlySelection,
-    canonical_matched_reference_specs,
     select_nested_predict_spec_source_only,
 )
 from ...real_features.classifier_reference.midogpp_real_feature_classifier import RealFeatureFrame
@@ -22,7 +21,7 @@ from ...real_features.classifier_reference.schemas.midogpp import (
     MIDOGPP_ELIGIBLE_CENTERS,
     MIDOGPP_EXCLUDED_CENTERS,
 )
-from ..feature_frame import ExpertFeatureFrame, fit_expert_frame
+from ..feature_frame import ExpertFeatureFrame
 from ..generation_samplers import (
     AggregatePosteriorSampler,
     DIAGONAL_SAMPLER,
@@ -52,7 +51,13 @@ from .prior_recovery_config import (
     recipe_contract_hash,
     recipe_contract_payload,
 )
+from .prior_recovery_classifier import (
+    SOURCE_INNER_CLASSIFIER_GRID_HASH,
+    source_inner_classifier_specs,
+)
 from .prior_recovery_provenance import ProvenanceRecorder
+from .prior_recovery_runtime_cache import FeatureFrameCache
+from .prior_recovery_timing import RuntimeTimingRecorder, mark_run_failed, write_run_state
 from .prior_recovery_schema import (
     NESTED_REAL_REFERENCE_SCHEMA,
     SAMPLER_REALIZATION_SCHEMA,
@@ -106,13 +111,29 @@ def run_source_inner_prior_recovery(
     if not isinstance(config, SourceInnerPriorRecoveryConfig):
         raise ProtocolError("Source-inner runner requires SourceInnerPriorRecoveryConfig.")
     root = prepare_artifact_dirs(Path(artifact_root or config.artifact_root))
+    try:
+        return _run_source_inner_prior_recovery(config, root=root)
+    except Exception:
+        mark_run_failed(root, mode="source_inner")
+        raise
+
+
+def _run_source_inner_prior_recovery(
+    config: SourceInnerPriorRecoveryConfig,
+    *,
+    root: Path,
+) -> Path:
     recorder = ProvenanceRecorder(root)
+    frame_cache = FeatureFrameCache(root)
     frame = load_frame(config)
-    specs = canonical_matched_reference_specs(classifier_seed=23)
+    specs = source_inner_classifier_specs(classifier_seed=23)
     runtime_protocol_hash = protocol_hash(config, frame)
+    timings = RuntimeTimingRecorder(root, protocol_hash=runtime_protocol_hash, mode="source_inner")
+    write_run_state(root, protocol_hash=runtime_protocol_hash, mode="source_inner", status="RUNNING")
     contract_hash = recipe_contract_hash(config)
     detail_rows: list[dict[str, object]] = []
     nested_reference_rows: list[dict[str, object]] = []
+    nested_tuning_rows: list[dict[str, object]] = []
     sampler_rows: list[dict[str, object]] = []
     identity_rows: list[dict[str, object]] = []
     summaries_by_outer: dict[str, list[InnerCenterMetric]] = {}
@@ -133,10 +154,13 @@ def run_source_inner_prior_recovery(
                 candidate_specs=specs,
                 runtime_protocol_hash=runtime_protocol_hash,
                 recorder=recorder,
+                frame_cache=frame_cache,
+                timings=timings,
             )
             contexts.append(context)
             detail_rows.extend(rows)
             nested_reference_rows.append(nested_row)
+            nested_tuning_rows.extend(dict(row) for row in context.selection.candidate_rows)
             sampler_rows.extend(sampler_detail)
             summaries.extend(center_summaries)
             identity_rows.append(audit_row)
@@ -162,14 +186,18 @@ def run_source_inner_prior_recovery(
                     selected_family=preliminary.sampler_family,
                     runtime_protocol_hash=runtime_protocol_hash,
                     recorder=recorder,
+                    timings=timings,
                 )
                 detail_rows.extend(rows)
                 sampler_rows.extend(sampler_detail)
                 summaries.extend(task_summaries)
         summaries_by_outer[outer] = summaries
     recorder.write_indices()
+    frame_cache.write_index()
+    timings.finalize()
     checkpoint_index = json.loads((root / "manifests/checkpoint_index.json").read_text(encoding="utf-8"))
     fisher_index = json.loads((root / "manifests/task_fisher_index.json").read_text(encoding="utf-8"))
+    frame_index = json.loads((root / "manifests/feature_frame_index.json").read_text(encoding="utf-8"))
     manifest = {
         "schema_version": "midogpp_prior_recovery_source_inner_protocol_v1",
         "experiment_name": config.name,
@@ -184,7 +212,8 @@ def run_source_inner_prior_recovery(
             else "partial_test"
         ),
         "excluded_centers": list(MIDOGPP_EXCLUDED_CENTERS),
-        "classifier_grid_hash": CANONICAL_GRID_HASH,
+        "classifier_grid_hash": SOURCE_INNER_CLASSIFIER_GRID_HASH,
+        "classifier_grid": [spec.to_payload() for spec in specs],
         "manifest_hash": frame.manifest_hash,
         "feature_cache_hash": frame.feature_cache_hash,
         "protocol_hash": runtime_protocol_hash,
@@ -205,11 +234,13 @@ def run_source_inner_prior_recovery(
     bundle_hash = selection_evidence_hash(
         metric_rows=detail_rows,
         nested_reference_rows=nested_reference_rows,
+        nested_tuning_rows=nested_tuning_rows,
         sampler_rows=sampler_rows,
         identity_rows=identity_rows,
         protocol_manifest=manifest,
         checkpoint_index=checkpoint_index,
         task_fisher_index=fisher_index,
+        feature_frame_index=frame_index,
     )
     for row in detail_rows:
         row["selection_bundle_hash"] = bundle_hash
@@ -234,6 +265,7 @@ def run_source_inner_prior_recovery(
         root,
         metric_rows=detail_rows,
         nested_reference_rows=nested_reference_rows,
+        nested_tuning_rows=nested_tuning_rows,
         sampler_rows=sampler_rows,
         identity_audit_rows=identity_rows,
         locks=locks,
@@ -251,6 +283,8 @@ def _run_isotropic_fold(
     candidate_specs: Sequence[ClassifierSpec],
     runtime_protocol_hash: str,
     recorder: ProvenanceRecorder,
+    frame_cache: FeatureFrameCache,
+    timings: RuntimeTimingRecorder,
 ) -> tuple[
     _InnerFoldContext,
     list[dict[str, object]],
@@ -260,11 +294,18 @@ def _run_isotropic_fold(
     dict[str, object],
 ]:
     split = inner_split(outer, inner, centers=frame.eligible_centers)
+    started = perf_counter()
     selection = select_nested_predict_spec_source_only(
         frame,
         outer_target_center=outer,
         inner_pseudo_target_center=inner,
         candidate_specs=candidate_specs,
+    )
+    timings.record(
+        phase="nested_classifier_selection",
+        elapsed_seconds=perf_counter() - started,
+        outer_target_center=outer,
+        inner_pseudo_target_center=inner,
     )
     fit_idx = indices_for_centers(frame, split.fit_centers)
     eval_idx = indices_for_centers(frame, (inner,))
@@ -281,13 +322,28 @@ def _run_isotropic_fold(
     real_score = score_representation(x_fit_full, y_fit, x_eval_full, y_eval, spec=selection.selected_spec)
     if not real_score.converged:
         raise ProtocolError(f"Nested real reference did not converge for H={outer}, I={inner}.")
-    feature_frame = fit_expert_frame(
+    started = perf_counter()
+    feature_frame, frame_cache_hit = frame_cache.fit_or_load(
         expert_id=f"source_inner_H{outer}_I{inner}",
         source_train_embeddings=x_fit_full,
+        fit_centers=split.fit_centers,
+        fit_row_hash=row_hash(source_ids),
         requested_dim=config.pca_dim,
+        manifest_hash=frame.manifest_hash,
+        feature_cache_hash=frame.feature_cache_hash,
+        protocol_hash=runtime_protocol_hash,
+        code_version=config.code_version,
+    )
+    timings.record(
+        phase="pca_frame",
+        elapsed_seconds=perf_counter() - started,
+        outer_target_center=outer,
+        inner_pseudo_target_center=inner,
+        cache_status="hit" if frame_cache_hit else "miss",
     )
     x_fit = feature_frame.transform(x_fit_full)
     x_eval = feature_frame.transform(x_eval_full)
+    started = perf_counter()
     runtime = train_runtime(
         config,
         variant=config.isotropic_variant,
@@ -302,12 +358,20 @@ def _run_isotropic_fold(
         manifest_hash=frame.manifest_hash,
         task_metric=None,
         objective_context_hash=NO_TASK_FISHER_STATE,
-    )
-    recorder.record_runtime(
-        runtime,
+        recorder=recorder,
         task_fisher_state_hash=NO_TASK_FISHER_STATE,
         classifier_spec_hash=selection.selected_spec.config_hash,
     )
+    timings.record(
+        phase="cvae_training",
+        elapsed_seconds=perf_counter() - started,
+        outer_target_center=outer,
+        inner_pseudo_target_center=inner,
+        objective_id=runtime.variant.objective_id,
+        training_key_hash=runtime.training_key.hash,
+        cache_status="hit" if runtime.resumed_from_checkpoint else "miss",
+    )
+    evaluation_started = perf_counter()
     samplers = fit_samplers(
         config,
         runtime=runtime,
@@ -496,6 +560,14 @@ def _run_isotropic_fold(
         decode_a=decode_score,
         posterior_a=posterior_scores,
     )
+    timings.record(
+        phase="sampling_and_scoring",
+        elapsed_seconds=perf_counter() - evaluation_started,
+        outer_target_center=outer,
+        inner_pseudo_target_center=inner,
+        objective_id=runtime.variant.objective_id,
+        training_key_hash=runtime.training_key.hash,
+    )
     return context, rows, nested_row, sampler_rows, summaries, audit
 
 
@@ -506,9 +578,18 @@ def _run_task_fold(
     selected_family: str,
     runtime_protocol_hash: str,
     recorder: ProvenanceRecorder,
+    timings: RuntimeTimingRecorder,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]], list[InnerCenterMetric]]:
+    started = perf_counter()
     fisher = fit_task_fisher_metric(context.x_fit, context.y_fit, spec=context.spec, alpha=1.0)
     fisher_hash = recorder.record_fisher(fisher)
+    timings.record(
+        phase="task_fisher_fit",
+        elapsed_seconds=perf_counter() - started,
+        outer_target_center=context.outer,
+        inner_pseudo_target_center=context.inner,
+        objective_id=TASK_FISHER_OBJECTIVE,
+    )
     if not fisher.valid:
         return [], [], [
             InnerCenterMetric(
@@ -527,6 +608,7 @@ def _run_task_fold(
             )
             for arm, family in (("B", STANDARD_SAMPLER), ("D", selected_family))
         ]
+    started = perf_counter()
     runtime = train_runtime(
         config,
         variant=config.task_fisher_variant,
@@ -541,12 +623,20 @@ def _run_task_fold(
         manifest_hash=context.runtime_a.training_key.dataset_contract_hash,
         task_metric=fisher.metric,
         objective_context_hash=fisher_hash,
-    )
-    recorder.record_runtime(
-        runtime,
+        recorder=recorder,
         task_fisher_state_hash=fisher_hash,
         classifier_spec_hash=context.spec.config_hash,
     )
+    timings.record(
+        phase="cvae_training",
+        elapsed_seconds=perf_counter() - started,
+        outer_target_center=context.outer,
+        inner_pseudo_target_center=context.inner,
+        objective_id=runtime.variant.objective_id,
+        training_key_hash=runtime.training_key.hash,
+        cache_status="hit" if runtime.resumed_from_checkpoint else "miss",
+    )
+    evaluation_started = perf_counter()
     samplers = fit_samplers(
         config,
         runtime=runtime,
@@ -683,6 +773,14 @@ def _run_task_fold(
             task_fisher_state_hash=fisher_hash,
             task_fisher_valid=True,
         )
+    )
+    timings.record(
+        phase="sampling_and_scoring",
+        elapsed_seconds=perf_counter() - evaluation_started,
+        outer_target_center=context.outer,
+        inner_pseudo_target_center=context.inner,
+        objective_id=runtime.variant.objective_id,
+        training_key_hash=runtime.training_key.hash,
     )
     return rows, sampler_rows, summaries
 
@@ -825,7 +923,7 @@ def _select_lock(
         expected_inner_centers=expected_inner,
         generation_seeds=config.generation_seeds,
         beta_final=config.isotropic_variant.beta_final,
-        classifier_grid_hash=CANONICAL_GRID_HASH,
+        classifier_grid_hash=SOURCE_INNER_CLASSIFIER_GRID_HASH,
         protocol_hash=runtime_protocol_hash,
         fit_center_sets_hash=fit_sets_hash,
         recipe_contract_hash=recipe_contract_hash(config),

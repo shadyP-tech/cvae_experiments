@@ -12,11 +12,11 @@ from ...real_features.classifier_reference.schemas.midogpp import MIDOGPP_ELIGIB
 from ..generation_samplers import DIAGONAL_SAMPLER, FULL_SAMPLER, STANDARD_SAMPLER
 from ..objectives import ISOTROPIC_OBJECTIVE, TASK_FISHER_OBJECTIVE
 from ..training import TrainingVariant
+from .prior_recovery_classifier import SOURCE_INNER_CLASSIFIER_GRID_HASH
 
 
 SOURCE_INNER_EXPERIMENT = "virchow2_cvae_midogpp_prior_recovery_source_inner_v1"
 OUTER_EXPERIMENT = "virchow2_cvae_midogpp_prior_recovery_outer_v1"
-CANONICAL_CLASSIFIER_GRID_HASH = "16a7a1183ea3f65b"
 SAMPLER_FALLBACK_POLICY = "full_to_diagonal_to_standard_per_class"
 SAMPLER_VIABILITY_POLICY = "require_requested_family_both_classes"
 
@@ -97,7 +97,18 @@ def recipe_contract_payload(config: PriorRecoveryConfig) -> dict[str, object]:
         "task_increment_min_ratio": config.task_increment_min_ratio,
         "safety_max_bacc_regression": config.safety_max_bacc_regression,
         "minimum_real_bacc": config.minimum_real_bacc,
-        "classifier_grid_hash": CANONICAL_CLASSIFIER_GRID_HASH,
+        "classifier_grid_hash": SOURCE_INNER_CLASSIFIER_GRID_HASH,
+        "classifier_policy": {
+            "C": 0.01,
+            "penalty": "l2",
+            "solver": "lbfgs",
+            "max_iter": 5000,
+            "class_weight_candidates": [None, "balanced"],
+            "threshold_policy": "predict",
+            "classifier_seed": 23,
+            "freeze_source": "stage10_source_inner_all_outer_centers_selected_C_0_01",
+            "selection_used_stage20_outer_or_inner_metrics": False,
+        },
         "code_version": config.code_version,
     }
 
@@ -190,7 +201,7 @@ def load_prior_recovery_config(
         "task_increment_min_ratio": float(decisions.get("task_increment_min_ratio", 0.01)),
         "safety_max_bacc_regression": float(decisions.get("safety_max_bacc_regression", 0.01)),
         "minimum_real_bacc": float(decisions.get("minimum_real_bacc", 0.55)),
-        "code_version": str(experiment.get("code_version", "prior_recovery_v1")),
+        "code_version": str(experiment.get("code_version", "prior_recovery_v2_resume")),
     }
     if mode == "source_inner":
         config: SourceInnerPriorRecoveryConfig | OuterPriorRecoveryConfig = SourceInnerPriorRecoveryConfig(**common)
@@ -214,8 +225,10 @@ def _validate(config: PriorRecoveryConfig) -> None:
         raise ProtocolError("Prior recovery requires nonempty generation seeds.")
     if isinstance(config, OuterPriorRecoveryConfig) and not config.training_seeds:
         raise ProtocolError("Outer prior recovery requires nonempty training seeds.")
-    if config.sampler_min_class_count <= 0 or config.pca_dim <= 0:
-        raise ProtocolError("Sampler class count and PCA dimension must be positive.")
+    if config.sampler_min_class_count <= 0:
+        raise ProtocolError("Sampler class count must be positive.")
+    if config.pca_dim != 128:
+        raise ProtocolError("Production prior recovery fixes PCA to 128 dimensions; it is not a sweep.")
     if config.gate_min_inner_wins < 1:
         raise ProtocolError("gate_min_inner_wins must be positive.")
     if config.task_fisher_variant.alpha != 1.0:

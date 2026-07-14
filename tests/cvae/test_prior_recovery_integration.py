@@ -24,7 +24,10 @@ from tests.cvae.prior_recovery_test_support import (
 )
 
 
-def test_source_inner_and_outer_commands_write_separate_complete_bundles(tmp_path: Path) -> None:
+def test_source_inner_and_outer_commands_write_separate_complete_bundles(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     manifest, cache = write_prior_recovery_fixture(tmp_path / "midogpp_prior_recovery")
     source_config = prior_recovery_config(
         mode="source_inner",
@@ -69,6 +72,39 @@ def test_source_inner_and_outer_commands_write_separate_complete_bundles(tmp_pat
     assert {row["arm"] for row in rows if row["representation_role"] == "prior"} == {"A", "B", "C", "D"}
     assert all(row["may_feed_model_recipe"] == "false" for row in rows)
     assert not (outer_root / "manifests/recipe_locks/0.json").exists()
+
+    from midogpp_thesis.cvae.preservation import prior_recovery_common
+
+    scientific_before = {
+        relative: (outer_root / relative).read_bytes()
+        for relative in (
+            "manifests/checkpoint_index.json",
+            "manifests/feature_frame_index.json",
+            "tables/preservation_metrics.csv",
+            "tables/paired_deltas.csv",
+            "tables/aggregation_summary.csv",
+            "reports/decision_report.json",
+        )
+    }
+
+    def unexpected_training(*args: object, **kwargs: object) -> object:
+        raise AssertionError("an exact-key outer rerun must not retrain a CVAE")
+
+    monkeypatch.setattr(prior_recovery_common, "train_cvae", unexpected_training)
+    assert run_outer_prior_recovery(outer_config) == outer_root
+    assert {
+        relative: (outer_root / relative).read_bytes()
+        for relative in scientific_before
+    } == scientific_before
+    timing_rows = list(
+        csv.DictReader((outer_root / "tables/runtime_timings.csv").open())
+    )
+    assert all(
+        row["cache_status"] == "hit"
+        for row in timing_rows
+        if row["phase"] in {"pca_frame", "cvae_training"}
+    )
+    assert len([row for row in timing_rows if row["phase"] == "task_fisher_fit"]) == 1
     with pytest.raises(ProtocolError, match="decision contract differs"):
         validate_outer_bundle(
             outer_root,

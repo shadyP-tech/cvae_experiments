@@ -35,7 +35,8 @@ from midogpp_thesis.real_features.classifier_reference.schemas.matched_reference
 
 def test_canonical_matched_reference_grid_is_frozen() -> None:
     specs = canonical_matched_reference_specs()
-    assert len(specs) == 20
+    assert len(specs) == 10
+    assert {spec.max_iter for spec in specs} == {5000}
     from midogpp_thesis.real_features.classifier_reference.classifiers import classifier_grid_hash
 
     assert classifier_grid_hash(specs) == CANONICAL_GRID_HASH
@@ -148,7 +149,7 @@ def test_complete_matched_reference_binds_workspace_inputs(tmp_path: Path) -> No
             "heldout_centers": "all",
         },
         "classifier_grid": {
-            "expected_candidate_count": 20,
+            "expected_candidate_count": 10,
             "expected_grid_hash": CANONICAL_GRID_HASH,
             "threshold_policy": "predict",
         },

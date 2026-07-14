@@ -1,6 +1,6 @@
 # Current Experimental State
 
-Last updated: 2026-07-13
+Last updated: 2026-07-14
 
 This page records verified evidence and canonical availability after the
 completed MIDOG++ repository migration. Active inputs and the two tuned
@@ -29,8 +29,9 @@ with cataloged hash verification.
   frozen-policy downstream implementation. Their directories and protocol
   contracts are planning scaffolds, not experimental evidence.
 - New Stage-10 matched-reference v2 and Stage-20 prior-recovery/Task-Fisher
-  runners are implemented in the current working tree, but all three canonical
-  output roots are absent. They are implementation readiness, not results.
+  runners are implemented in the current working tree, but no valid new bundle
+  exists. Invalid and terminated partial workstation roots are implementation
+  state, not results.
 
 ## MIDOG++ Real-Feature Gate
 
@@ -201,28 +202,44 @@ Next preservation-specific evidence:
 
 ## Prior-Recovery And Task-Fisher Implementation Status
 
-Status: `IMPLEMENTED, NOT RUN`, with catalog evidence label
+Status: `IMPLEMENTED, NO VALIDATED RESULT`, with catalog evidence label
 `TODO_VERIFY_ARTIFACT` for every new output.
 
 The implementation adds three registered experiments:
 
 | Stage | Experiment | Canonical output | Current evidence |
 | --- | --- | --- | --- |
-| 10 | `midogpp.real_feature.eligible_tuned_predict_reference.v2` | `artifacts/midogpp/10_real_feature_reference/eligible_tuned_real_reference_v2/seed42/` | absent; no matched-v2 result |
-| 20 | `midogpp.cvae.prior_recovery_source_inner.v1` | `artifacts/midogpp/20_cvae_preservation/prior_recovery_source_inner_v1/seed42/` | absent; no gate or `RecipeLock` result |
+| 10 | `midogpp.real_feature.eligible_tuned_predict_reference.v2` | `artifacts/midogpp/10_real_feature_reference/eligible_tuned_real_reference_v2/seed42/` | invalid failed root only; no matched-v2 result |
+| 20 | `midogpp.cvae.prior_recovery_source_inner.v1` | `artifacts/midogpp/20_cvae_preservation/prior_recovery_source_inner_v1/seed42/` | terminated partial root only; no gate or `RecipeLock` result |
 | 20 | `midogpp.cvae.prior_recovery_outer.v1` | `artifacts/midogpp/20_cvae_preservation/prior_recovery_outer_v1/seeds17_42_101/` | absent; no outer preservation result |
 
 The Stage-10 v2 artifact is an eligible-nine-center, full-Virchow2,
 predict-policy real-feature reference. It remains separate from the validated
 fixed-0.5 v1 result above and has no reported metric yet.
 
+The first workstation attempt wrote tables but failed its final artifact
+assertion because 16 unselected `C=100, max_iter=2000` candidate rows contained
+nonconverged source-inner fits. All selected `C=0.01` models and all nine final
+fits converged, but the fail-closed schema correctly rejected a bundle with any
+nonconverged grid member. The repaired predeclared grid fixes `max_iter=5000`,
+contains 10 candidates, and is frozen by hash `5abd0897d02bdcaa`. The failed
+workstation root remains invalid and does not constitute a v2 result.
+
 The source-inner Stage-20 run removes each real outer center before any
 training or selection, treats each remaining center as an inner pseudo-target,
-and selects ex-post aggregate-posterior sampler and Task-Fisher recipe choices
-only from nested source evidence. Its output claim scope is
+prelocks the evidence-informed `C=0.01`, selects only
+`class_weight in {none, balanced}` on the deeper centers, and selects ex-post
+aggregate-posterior sampler and Task-Fisher recipe choices only from nested
+source evidence. PCA128 is fixed rather than swept. Its output claim scope is
 `cvae_recipe_lock_only`. A complete validated set of source-inner `RecipeLock`
 files may feed the planned Stage-30 expert recipe, but cannot establish
 preservation, routing, compatibility, or downstream utility.
+
+The repaired `prior_recovery_v2_resume` runtime writes exact training-key
+checkpoint sidecars, exact fold/row-keyed PCA-frame caches, diagnostic phase
+timings, and `RUNNING`/`COMPLETE`/`FAILED` state. Reissuing the same command
+resumes only exact v2 identities. The terminated earlier partial checkpoints
+do not have the repaired identity contract and must not be reused.
 
 The outer Stage-20 run is conditional. It must fail closed unless all nine
 source-inner locks are valid and conditional (`C` or `D`) and the source-inner
