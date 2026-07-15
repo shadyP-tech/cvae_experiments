@@ -19,14 +19,17 @@ Canonical configs are:
 - `configs/preservation_condition_audit_v1.yaml`
 - `configs/tuned_classifier_preservation_v1.yaml`
 - `configs/prior_recovery_source_inner_v1.yaml`
+- `configs/prior_recovery_source_inner_training_seed_stability_v1.yaml`
 - `configs/prior_recovery_outer_v1.yaml`
 
 They use logical artifact IDs for the dataset contract, corrected `xyxy`
 cache, and their declared real-feature inputs, and write only to stage-20
-canonical artifact roots. The tuned-classifier result is the only currently
-validated thesis-facing artifact. The two prior-recovery configs are active
-implementation surfaces but have no result yet; the other three are diagnostic
-surfaces.
+canonical artifact roots. The scalar source-inner prior-recovery result is
+complete and validated on `xai-master`; its outer factorial is blocked by the
+predeclared gate. The training-seed stability surface is implemented and
+registered but has not been production-run and has no result. The other
+preservation configs retain their documented thesis-facing or diagnostic
+status.
 
 ## Prior-Recovery Selection And Evaluation Firewall
 
@@ -42,7 +45,17 @@ cannot change the recipe.
    Every classifier fit, fixed PCA128 fit, CVAE/Task-Fisher fit, and sampler fit
    excludes both `H` and `I`. It produces per-outer `RecipeLock` files with
    `claim_scope=cvae_recipe_lock_only`.
-2. `midogpp.cvae.prior_recovery_outer.v1` may run only when all nine source-inner
+2. `midogpp.cvae.prior_recovery_source_inner_training_seed_stability.v1`
+   repeats the exact source-inner computation over training seeds
+   `17,42,101`, fully crossed with generation seeds `17,42,101`. It writes 27
+   wrapped seed locks and nine predeclared consensus locks. Those consensus
+   locks, not the scalar seed-42 locks, are the registered Stage-30 recipe
+   input. Deterministic preparation and Task-Fisher state are shared per
+   outer/inner fold `(H,I)`; training RNG identities remain distinct by
+   training seed, while posterior/prior noise is paired by generation seed and
+   recorded in `tables/rng_pairing_audit.csv`.
+3. `midogpp.cvae.prior_recovery_outer.v1` remains unchanged and may run only
+   when all nine scalar source-inner
    locks are valid, all select a conditional arm (`C` or `D`), the leakage
    report passes, and `reports/gate_decision.json` records
    `factorial_triggered=true`. The outer run imports the eligible-only Stage-10
@@ -102,7 +115,24 @@ Inspect the source-inner gate at:
 artifacts/midogpp/20_cvae_preservation/prior_recovery_source_inner_v1/seed42/reports/gate_decision.json
 ```
 
-Only when it validates with `factorial_triggered=true` run:
+Run the bounded stability panel once with:
+
+```bash
+conda run -n thesis python -m midogpp_thesis workspace prepare \
+  midogpp.cvae.prior_recovery_source_inner_training_seed_stability.v1
+conda run -n thesis python -m midogpp_thesis workspace run \
+  midogpp.cvae.prior_recovery_source_inner_training_seed_stability.v1
+```
+
+This command has no completed production artifact yet. A successful run must
+validate all 27 seed locks, all nine consensus locks, the seed-free preparation,
+shared Task-Fisher states, distinct training identities, paired
+generation-seed policy, and leakage reports. It must then publish
+`reports/publication_state.json` as `PUBLISHED`; `PENDING` and `FAILED` are not
+consumable by Stage 30.
+
+Independently of the stability run, only when the scalar source-inner bundle
+validates with `factorial_triggered=true` run:
 
 ```bash
 conda run -n thesis python -m midogpp_thesis workspace prepare \
@@ -115,6 +145,7 @@ Canonical outputs are:
 
 ```text
 artifacts/midogpp/20_cvae_preservation/prior_recovery_source_inner_v1/seed42/
+artifacts/midogpp/20_cvae_preservation/prior_recovery_source_inner_training_seed_stability_v1/seeds17_42_101/
 artifacts/midogpp/20_cvae_preservation/prior_recovery_outer_v1/seeds17_42_101/
 ```
 
@@ -123,7 +154,10 @@ protocol/selection/checkpoint/Task-Fisher/feature-frame manifests, nine hashed
 `RecipeLock` files, gate, leakage, runtime-summary, and run-state reports,
 nested classifier-tuning evidence, nested real references, source-inner
 metrics, sampler realizations, runtime timings, identity audits, persisted
-Task-Fisher states, and content-addressed checkpoints. The outer bundle
+Task-Fisher states, and content-addressed checkpoints. The stability bundle
+adds per-training-seed and consensus locks,
+`reports/stability_decision.json`, `reports/publication_state.json`, and
+`tables/rng_pairing_audit.csv`. The outer bundle
 contains the resolved config and input provenance,
 protocol/coverage/checkpoint/Task-Fisher/feature-frame manifests, decision,
 leakage, runtime-summary, and run-state reports, preservation metrics, runtime
@@ -135,9 +169,13 @@ sampler identities against the preservation metric rows.
 
 ## Claim Boundaries
 
-- Validated source-inner `RecipeLock` files may feed the planned Stage-30
-  expert-bank recipe. They are not preservation results, routing evidence, or
-  deployable selections.
+- Validated scalar source-inner `RecipeLock` files are evidence for one
+  training seed. Only validated fold-level consensus locks from the bounded
+  stability bundle may feed the registered planned Stage-30 expert-bank
+  recipe. Stage 30 accepts them only when publication state is `PUBLISHED` and
+  every consensus lock in the bundle is valid/export-ready, then loads fold
+  `H`'s lock for fold `H`. Neither artifact is a preservation result, routing
+  evidence, or a deployable selection.
 - Outer target labels are scoring-only. Outer preservation metrics, arm wins,
   decision reports, and checkpoints may never select or revise a model recipe,
   sampler, expert, generation policy, router, or composition rule.
@@ -150,9 +188,10 @@ sampler identities against the preservation metric rows.
 - Stage 40 remains the post-expert-bank validation of frozen expert generation.
   Stage-20 aggregate-posterior prior recovery does not activate or replace it.
 
-Status: `IMPLEMENTED, NO VALIDATED RESULT`. Both new output artifacts remain
+Status: scalar source-inner `COMPLETE/PASS` on `xai-master`; stability
+`IMPLEMENTED AND REGISTERED, NOT YET PRODUCTION-RUN`; outer `BLOCKED BY VALID
+SOURCE-INNER GATE`. The new stability and outer destinations remain
 `TODO_VERIFY_ARTIFACT`. A terminated pre-resume source-inner partial root is
 non-evidence and its old checkpoints are incompatible with
 `prior_recovery_v2_resume`; only checkpoints written with exact v2 sidecars are
-resumable. No prior-recovery or Task-Fisher result exists until the required
-bundles are completed and validated.
+resumable.

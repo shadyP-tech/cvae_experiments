@@ -1,6 +1,12 @@
 """Artifact schemas for prior-recovery selection and outer preservation."""
 
 SOURCE_INNER_METRIC_SCHEMA = "midogpp_prior_recovery_source_inner_metric_v1"
+STABILITY_PROTOCOL_SCHEMA = (
+    "midogpp_prior_recovery_source_inner_training_seed_stability_protocol_v1"
+)
+STABILITY_EVIDENCE_SCHEMA = (
+    "midogpp_prior_recovery_training_seed_stability_evidence_v1"
+)
 NESTED_REAL_REFERENCE_SCHEMA = "midogpp_nested_real_reference_v1"
 SAMPLER_REALIZATION_SCHEMA = "midogpp_prior_recovery_sampler_realization_v1"
 OUTER_METRIC_SCHEMA = "midogpp_prior_recovery_outer_metric_v1"

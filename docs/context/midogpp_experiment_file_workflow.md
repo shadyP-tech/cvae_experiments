@@ -1,6 +1,6 @@
 # MIDOG++ Experiment File Workflow
 
-Last updated: 2026-07-13
+Last updated: 2026-07-15
 
 This is the operational path and command reference for the active MIDOG++
 checkout. Result interpretation belongs in
@@ -205,10 +205,16 @@ conda run -n thesis python -m midogpp_thesis workspace run \
   midogpp.real_feature.eligible_tuned_predict_reference.v2
 ```
 
-The expected bundle contains `config.resolved.yaml`,
+The completed workstation bundle contains `config.resolved.yaml`,
 `provenance/input_artifacts.json`, protocol and leakage/provenance JSON, the
-source-inner tuning table, held-out result table, and prediction table. Current
-status is `TODO_VERIFY_ARTIFACT`: the root is absent and no v2 result exists.
+source-inner tuning table, held-out result table, and prediction table. It
+validates `PASS` on `xai-master`, with protocol hash `786589b799d61b14` and
+reference-bundle hash `995aa193c82ee7ec`. The matched reference reports mean
+BACC `0.740312`, mean macro-F1 `0.737205`, worst-center BACC `0.679245` at
+center `1`, and best-center BACC `0.792350` at center `6`. The bundle has not
+yet been synced into the local checkout, and its catalog destination still
+retains the lifecycle label `TODO_VERIFY_ARTIFACT`. The earlier failed root
+remains non-evidence; `PASS` refers only to the repaired completed bundle.
 Validation binds the three table contents through `reference_bundle_hash`, then
 binds that content identity to the protocol, resolved config, registered
 dataset/cache inputs, and their SHA-256 values. The Stage-20 outer run imports
@@ -300,6 +306,14 @@ diagnostic timing/cache-status rows. Protocol, row, recipe, classifier, cache,
 code, or library drift produces a miss; a matching corrupt entry fails closed.
 Pre-v2 partial checkpoints are not eligible for resume.
 
+The completed seed-42 source-inner bundle on `xai-master` is `COMPLETE` and its
+full validator passes. All nine recipe locks are valid, seven select a
+conditional sampler, and centers `5` and `9` retain the standard-normal `A`
+fallback. The gate status is `NEGATIVE_GATE_COMPLETE` with
+`factorial_triggered=false`; its selection-bundle hash is
+`1e929d05ff987ad9` and protocol hash is `dd7ca955d79fade4`. This is a valid
+recipe-lock result and a complete negative gate, not an execution failure.
+
 The outer experiment and output are:
 
 ```text
@@ -309,8 +323,10 @@ artifacts/midogpp/20_cvae_preservation/prior_recovery_outer_v1/seeds17_42_101/
 ```
 
 It depends on the matched Stage-10 v2 bundle and the source-inner lock bundle.
-Before running, verify that the source-inner bundle validates and that its gate
-has `factorial_triggered=true`. Then run:
+The current source-inner bundle has `factorial_triggered=false` and two `A`
+locks, so the registered outer v1 is blocked and must not be run. If a future
+predeclared source-inner experiment validates with all conditional locks and
+`factorial_triggered=true`, the outer command is:
 
 ```bash
 conda run -n thesis python -m midogpp_thesis workspace prepare \
@@ -343,13 +359,70 @@ the decision is `POSITIVE_PRESERVATION` or `NEGATIVE_PRESERVATION`.
 `INCOMPLETE_OR_INVALID_DIAGNOSTIC` are reserved for incomplete or invalid
 executions.
 
-Only validated source-inner `RecipeLock` files may feed the planned Stage-30
-expert recipe. Outer target labels and metrics are evaluation-only and may
-never feed model or routing selection. Stage 40 remains the later
-post-expert-bank generation-validation stage.
+Only validated fold-level consensus locks from the bounded training-seed
+stability bundle may feed the registered planned Stage-30 expert recipe. The
+Stage-30 loader requires `reports/publication_state.json` to be `PUBLISHED`,
+validates the complete bundle, requires all consensus locks bundle-wide to be
+valid and export-ready, and only then consumes lock `H` for fold `H`. A
+`PENDING` or `FAILED` publication state blocks consumption. Scalar seed-42
+locks remain source-inner evidence, while outer target labels and metrics are
+evaluation-only and may never feed model or routing selection. The outer
+experiment continues to consume the scalar source-inner bundle; the stability
+bundle neither changes nor unlocks that evidence boundary. Stage 40 remains
+the later post-expert-bank generation-validation stage.
 
-Current status: both Stage-20 output roots are absent, so there is no new
-prior-recovery, Task-Fisher, gate, or outer-preservation result.
+Current status: the source-inner seed-42 result is complete and validated on
+`xai-master`; the outer output is absent because its fail-closed prerequisite
+is not satisfied. There is no outer-preservation result.
+
+### Bounded training-seed stability check
+
+The next Stage-20 check is limited to training seeds `17,42,101` with the
+existing generation seeds `17,42,101`. It is registered as:
+
+```text
+midogpp.cvae.prior_recovery_source_inner_training_seed_stability.v1
+experiments/midogpp/stages/20_cvae_preservation/configs/prior_recovery_source_inner_training_seed_stability_v1.yaml
+artifacts/midogpp/20_cvae_preservation/prior_recovery_source_inner_training_seed_stability_v1/seeds17_42_101/
+```
+
+Run exactly the registered panel:
+
+```bash
+conda run -n thesis python -m midogpp_thesis workspace prepare \
+  midogpp.cvae.prior_recovery_source_inner_training_seed_stability.v1
+conda run -n thesis python -m midogpp_thesis workspace run \
+  midogpp.cvae.prior_recovery_source_inner_training_seed_stability.v1
+```
+
+The runner performs seed-free deterministic preparation once per outer/inner
+fold `(H,I)`: nested classifier selection, real reference, identity audit, and
+PCA frame are shared across training seeds. It also fits at most one shared
+Task-Fisher state per `(H,I)`. CVAE training retains distinct initialization
+and stochastic-stream identities for training seeds `17,42,101`, while
+posterior and prior-generation noise is paired by generation seed across those
+training arms. These recomputable identities are persisted in
+`tables/rng_pairing_audit.csv`. The runner preserves the source class-count
+budget without rebalancing and writes one wrapped lock per
+`(training seed, outer center)` plus one consensus lock per outer center.
+The frozen consensus rule exports unanimous `A`; exports `D` only when all
+seeds select `D` with one conditional sampler family; falls back to `C` for a
+shared conditional family with any `C`; and conservatively exports `A` for
+cross-seed arm or conditional-family disagreement. Any invalid child disables
+export. Structural bundle validity and Stage-30 recipe readiness are reported
+separately.
+
+Bundle writing begins with `reports/publication_state.json` set to `PENDING`.
+Only after the complete bundle validates is it rewritten as `PUBLISHED`; a
+validation error writes `FAILED`. The normal validator and the Stage-30 loader
+accept only `PUBLISHED`. Stage 30 then requires all nine consensus locks to be
+valid and `recipe_export_ready=true` before returning fold `H`'s lock to fold
+`H`.
+
+Status: `IMPLEMENTED AND REGISTERED, NOT YET PRODUCTION-RUN`. No stability
+result may be interpreted until the canonical bundle validates and publishes.
+After this bounded check, proceed to Stage 30 rather than continuing Stage-20
+tuning.
 
 ## Fail-Closed Preparation
 

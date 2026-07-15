@@ -18,9 +18,11 @@ from ..objectives import ISOTROPIC_OBJECTIVE
 from .prior_recovery_common import PRIOR_RECOVERY_METHOD, safe_ratio
 from .prior_recovery_config import (
     OuterPriorRecoveryConfig,
+    SourceInnerStabilityConfig,
     load_prior_recovery_config,
     outer_decision_contract_hash,
     recipe_contract_hash,
+    stability_contract_hash,
 )
 from .prior_recovery_schema import SAMPLER_REALIZATION_SCHEMA
 
@@ -185,7 +187,7 @@ def _validate_metric_provenance(
     ):
         raise ProtocolError("Malformed provenance indices.")
     checkpoints = {
-        str(record["checkpoint_hash"]): record
+        str(record["training_key_hash"]): record
         for record in checkpoint_records
         if isinstance(record, Mapping)
     }
@@ -194,13 +196,16 @@ def _validate_metric_provenance(
         for record in fisher_records
         if isinstance(record, Mapping)
     }
-    referenced_checkpoints: set[str] = set()
+    referenced_training_keys: set[str] = set()
     for row in rows:
         checkpoint_id = row["checkpoint_hash"]
-        record = checkpoints.get(checkpoint_id)
+        training_key_id = row["training_key_hash"]
+        record = checkpoints.get(training_key_id)
         if not isinstance(record, Mapping):
             raise ProtocolError("Metric row references an unpersisted checkpoint.")
-        referenced_checkpoints.add(checkpoint_id)
+        if str(record.get("checkpoint_hash", "")) != checkpoint_id:
+            raise ProtocolError("Metric training identity points to another checkpoint.")
+        referenced_training_keys.add(training_key_id)
         training_key = record.get("training_key")
         if not isinstance(training_key, Mapping):
             raise ProtocolError("Checkpoint index lacks its full training key.")
@@ -260,7 +265,7 @@ def _validate_metric_provenance(
                 raise ProtocolError(
                     "Task-Fisher state is invalid or bound to another classifier."
                 )
-    if referenced_checkpoints != set(checkpoints):
+    if referenced_training_keys != set(checkpoints):
         raise ProtocolError("Checkpoint index contains unreferenced training state.")
 
 
@@ -444,7 +449,16 @@ def _validate_workspace_provenance(
         root / "config.resolved.yaml",
         expected_mode=mode,
     )
-    if recipe_contract_hash(resolved) != protocol.get("recipe_contract_hash"):
+    if mode == "source_inner_training_seed_stability":
+        if (
+            not isinstance(resolved, SourceInnerStabilityConfig)
+            or stability_contract_hash(resolved)
+            != protocol.get("stability_contract_hash")
+        ):
+            raise ProtocolError(
+                "Resolved stability contract differs from the artifact protocol."
+            )
+    elif recipe_contract_hash(resolved) != protocol.get("recipe_contract_hash"):
         raise ProtocolError(
             "Resolved config recipe contract differs from the artifact protocol."
         )
@@ -460,14 +474,16 @@ def _validate_workspace_provenance(
                 "Resolved config outer decision contract differs from the artifact."
             )
     manifest = _read_json(root / "provenance/input_artifacts.json")
-    expected_experiment = (
-        "midogpp.cvae.prior_recovery_source_inner.v1"
-        if mode == "source_inner"
-        else "midogpp.cvae.prior_recovery_outer.v1"
-    )
+    expected_experiment = {
+        "source_inner": "midogpp.cvae.prior_recovery_source_inner.v1",
+        "source_inner_training_seed_stability": (
+            "midogpp.cvae.prior_recovery_source_inner_training_seed_stability.v1"
+        ),
+        "outer": "midogpp.cvae.prior_recovery_outer.v1",
+    }[mode]
     expected_scope = (
         "cvae_recipe_lock_only"
-        if mode == "source_inner"
+        if mode in {"source_inner", "source_inner_training_seed_stability"}
         else "cvae_preservation_only"
     )
     if (

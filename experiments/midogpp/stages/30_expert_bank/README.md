@@ -12,12 +12,17 @@ Status: `PLANNED`. No active expert-bank runner was carried forward from the
 rejected legacy stack. A new implementation must live under
 `src/midogpp_thesis/cvae/` and pass protocol review before activation.
 
-The registered planning entry may consume validated Stage-20 source-inner
-`RecipeLock` artifacts from
-`midogpp.cvae.prior_recovery_source_inner.v1`. Those locks may freeze a
-source-only CVAE objective and prior-sampler recipe for independent expert
-training. They do not make Stage 30 active and do not themselves prove expert
-quality.
+The registered planning entry consumes the validated Stage-20 training-seed
+consensus artifact from
+`midogpp.cvae.prior_recovery_source_inner_training_seed_stability.v1`. The
+fail-closed loader requires `reports/publication_state.json` status
+`PUBLISHED`, validates the complete stability bundle, requires every consensus
+lock bundle-wide to be valid and export-ready, and only then returns consensus
+lock `H` for Stage-30 fold `H`. `PENDING`, `FAILED`, missing, invalid, or
+non-exportable state blocks consumption. These locks may freeze a source-only
+CVAE objective and prior-sampler recipe for independent expert training. They
+do not make Stage 30 active and do not themselves prove expert quality. The
+scalar seed-42 source-inner bundle is not the registered Stage-30 input.
 
 Outer held-out-center preservation metrics from
 `midogpp.cvae.prior_recovery_outer.v1` must never feed Stage-30 model or recipe

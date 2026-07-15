@@ -140,15 +140,17 @@ GMM-composition, or downstream synthetic-utility claim.
 - Build the provenance-clean independently trained source-expert bank before
   starting routing or composition claims.
 
-## Relationship To The Unrun Prior-Recovery Surface
+## Relationship To The Prior-Recovery Surface
 
 The new `midogpp.cvae.prior_recovery_source_inner.v1` and
 `midogpp.cvae.prior_recovery_outer.v1` experiments are separate from this
 validated v1 artifact. They use a new eligible-only Stage-10 matched reference,
 fully nested source-inner `RecipeLock` selection, and a conditionally unlocked
-A/B/C/D outer factorial. Their output roots are currently absent, so this
-page's preservation metrics must not be presented as prior-recovery or
-Task-Fisher results.
+A/B/C/D outer factorial. The Stage-10 reference and source-inner result are now
+complete and validated on `xai-master`; the source-inner gate is
+`NEGATIVE_GATE_COMPLETE` with two standard-normal fallback locks, so the outer
+experiment remains blocked. This page's preservation metrics must not be
+presented as prior-recovery or Task-Fisher results.
 
 Validated source-inner locks may later feed a Stage-30 expert recipe. Outer
 preservation metrics may never feed model or routing selection, and Stage 40

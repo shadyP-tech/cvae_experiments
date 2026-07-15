@@ -425,6 +425,80 @@ artifacts:
       - synthetic_downstream_utility_evidence
     may_feed_deployable_selection: false
 
+  - artifact_id: midogpp_output_cvae_prior_recovery_source_inner_training_seed_stability_v1
+    stage: 20_cvae_preservation
+    canonical_path: artifacts/midogpp/20_cvae_preservation/prior_recovery_source_inner_training_seed_stability_v1/seeds17_42_101
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: TODO_VERIFY_ARTIFACT
+    claim_scope: cvae_recipe_lock_only
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/protocol_manifest.json
+      - manifests/selection_evidence_manifest.json
+      - manifests/checkpoint_index.json
+      - manifests/task_fisher_index.json
+      - manifests/feature_frame_index.json
+      - manifests/child_protocols/seed17.json
+      - manifests/child_protocols/seed42.json
+      - manifests/child_protocols/seed101.json
+      - manifests/training_seed_recipe_locks/seed17/0.json
+      - manifests/training_seed_recipe_locks/seed17/1.json
+      - manifests/training_seed_recipe_locks/seed17/2.json
+      - manifests/training_seed_recipe_locks/seed17/3.json
+      - manifests/training_seed_recipe_locks/seed17/5.json
+      - manifests/training_seed_recipe_locks/seed17/6.json
+      - manifests/training_seed_recipe_locks/seed17/7.json
+      - manifests/training_seed_recipe_locks/seed17/8.json
+      - manifests/training_seed_recipe_locks/seed17/9.json
+      - manifests/training_seed_recipe_locks/seed42/0.json
+      - manifests/training_seed_recipe_locks/seed42/1.json
+      - manifests/training_seed_recipe_locks/seed42/2.json
+      - manifests/training_seed_recipe_locks/seed42/3.json
+      - manifests/training_seed_recipe_locks/seed42/5.json
+      - manifests/training_seed_recipe_locks/seed42/6.json
+      - manifests/training_seed_recipe_locks/seed42/7.json
+      - manifests/training_seed_recipe_locks/seed42/8.json
+      - manifests/training_seed_recipe_locks/seed42/9.json
+      - manifests/training_seed_recipe_locks/seed101/0.json
+      - manifests/training_seed_recipe_locks/seed101/1.json
+      - manifests/training_seed_recipe_locks/seed101/2.json
+      - manifests/training_seed_recipe_locks/seed101/3.json
+      - manifests/training_seed_recipe_locks/seed101/5.json
+      - manifests/training_seed_recipe_locks/seed101/6.json
+      - manifests/training_seed_recipe_locks/seed101/7.json
+      - manifests/training_seed_recipe_locks/seed101/8.json
+      - manifests/training_seed_recipe_locks/seed101/9.json
+      - manifests/consensus_recipe_locks/0.json
+      - manifests/consensus_recipe_locks/1.json
+      - manifests/consensus_recipe_locks/2.json
+      - manifests/consensus_recipe_locks/3.json
+      - manifests/consensus_recipe_locks/5.json
+      - manifests/consensus_recipe_locks/6.json
+      - manifests/consensus_recipe_locks/7.json
+      - manifests/consensus_recipe_locks/8.json
+      - manifests/consensus_recipe_locks/9.json
+      - reports/stability_decision.json
+      - reports/leakage_report.json
+      - reports/runtime_summary.json
+      - reports/run_state.json
+      - reports/publication_state.json
+      - tables/source_inner_metrics.csv
+      - tables/nested_real_references.csv
+      - tables/nested_classifier_tuning.csv
+      - tables/sampler_realizations.csv
+      - tables/checkpoint_reuse_audit.csv
+      - tables/rng_pairing_audit.csv
+      - tables/identity_overlap_audit.csv
+      - tables/runtime_timings.csv
+    forbidden_reuse:
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_deployable_selection: false
+
   - artifact_id: midogpp_output_cvae_prior_recovery_outer_v1
     stage: 20_cvae_preservation
     canonical_path: artifacts/midogpp/20_cvae_preservation/prior_recovery_outer_v1/seeds17_42_101

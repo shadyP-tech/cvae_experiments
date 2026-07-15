@@ -1,6 +1,6 @@
 # Current Experimental State
 
-Last updated: 2026-07-14
+Last updated: 2026-07-15
 
 This page records verified evidence and canonical availability after the
 completed MIDOG++ repository migration. Active inputs and the two tuned
@@ -28,10 +28,11 @@ with cataloged hash verification.
 - Stages 30 through 70 have no active expert-bank, generation, routing, or
   frozen-policy downstream implementation. Their directories and protocol
   contracts are planning scaffolds, not experimental evidence.
-- New Stage-10 matched-reference v2 and Stage-20 prior-recovery/Task-Fisher
-  runners are implemented in the current working tree, but no valid new bundle
-  exists. Invalid and terminated partial workstation roots are implementation
-  state, not results.
+- The Stage-10 matched-reference v2 and Stage-20 source-inner
+  prior-recovery/Task-Fisher runs are complete on `xai-master` and validate
+  `PASS`. These new workstation bundles have not yet been synced into this
+  local checkout. The registered Stage-20 outer run remains blocked by the
+  completed source-inner gate.
 
 ## MIDOG++ Real-Feature Gate
 
@@ -200,62 +201,75 @@ Next preservation-specific evidence:
 - separate expert-bank, generation, routing, and held-out downstream stages
   before making any broader thesis claim
 
-## Prior-Recovery And Task-Fisher Implementation Status
+## Prior-Recovery And Task-Fisher Result
 
-Status: `IMPLEMENTED, NO VALIDATED RESULT`, with catalog evidence label
-`TODO_VERIFY_ARTIFACT` for every new output.
-
-The implementation adds three registered experiments:
+Status: the Stage-10 matched reference and Stage-20 source-inner bundle are
+complete and directly validated on `xai-master`. The catalog still labels these
+canonical output destinations `TODO_VERIFY_ARTIFACT`; catalog promotion and a
+local artifact sync remain separate follow-up work.
 
 | Stage | Experiment | Canonical output | Current evidence |
 | --- | --- | --- | --- |
-| 10 | `midogpp.real_feature.eligible_tuned_predict_reference.v2` | `artifacts/midogpp/10_real_feature_reference/eligible_tuned_real_reference_v2/seed42/` | invalid failed root only; no matched-v2 result |
-| 20 | `midogpp.cvae.prior_recovery_source_inner.v1` | `artifacts/midogpp/20_cvae_preservation/prior_recovery_source_inner_v1/seed42/` | terminated partial root only; no gate or `RecipeLock` result |
-| 20 | `midogpp.cvae.prior_recovery_outer.v1` | `artifacts/midogpp/20_cvae_preservation/prior_recovery_outer_v1/seeds17_42_101/` | absent; no outer preservation result |
+| 10 | `midogpp.real_feature.eligible_tuned_predict_reference.v2` | `artifacts/midogpp/10_real_feature_reference/eligible_tuned_real_reference_v2/seed42/` | validator `PASS` |
+| 20 | `midogpp.cvae.prior_recovery_source_inner.v1` | `artifacts/midogpp/20_cvae_preservation/prior_recovery_source_inner_v1/seed42/` | `COMPLETE`; full validator `PASS`; `NEGATIVE_GATE_COMPLETE` |
+| 20 | `midogpp.cvae.prior_recovery_source_inner_training_seed_stability.v1` | `artifacts/midogpp/20_cvae_preservation/prior_recovery_source_inner_training_seed_stability_v1/seeds17_42_101/` | `IMPLEMENTED AND REGISTERED`; not yet production-run; `TODO_VERIFY_ARTIFACT` |
+| 20 | `midogpp.cvae.prior_recovery_outer.v1` | `artifacts/midogpp/20_cvae_preservation/prior_recovery_outer_v1/seeds17_42_101/` | blocked by the source-inner gate; no outer result |
 
-The Stage-10 v2 artifact is an eligible-nine-center, full-Virchow2,
-predict-policy real-feature reference. It remains separate from the validated
-fixed-0.5 v1 result above and has no reported metric yet.
+The matched Stage-10 v2 reference uses the eligible nine centers, full
+Virchow2 features, and sklearn `predict`. Its mean BACC is `0.740312` and mean
+macro-F1 is `0.737205`; center `1` is worst at `0.679245` BACC and center `6`
+is best at `0.792350`. Its protocol hash is `786589b799d61b14` and its bound
+reference-bundle hash is `995aa193c82ee7ec`. This confirms the matched
+denominator only; it remains a `real_feature_transfer_only` result.
 
-The first workstation attempt wrote tables but failed its final artifact
-assertion because 16 unselected `C=100, max_iter=2000` candidate rows contained
-nonconverged source-inner fits. All selected `C=0.01` models and all nine final
-fits converged, but the fail-closed schema correctly rejected a bundle with any
-nonconverged grid member. The repaired predeclared grid fixes `max_iter=5000`,
-contains 10 candidates, and is frozen by hash `5abd0897d02bdcaa`. The failed
-workstation root remains invalid and does not constitute a v2 result.
+The source-inner Stage-20 bundle contains nine valid `RecipeLock` files. Seven
+locks select a conditional sampler: centers `0,6,7,8` select Task-Fisher plus
+the full conditional sampler (`D`), centers `1,2` select isotropic plus full
+conditional sampling (`C`), and center `3` selects isotropic plus diagonal
+conditional sampling (`C`). Centers `5` and `9` retain isotropic standard-normal
+sampling (`A`). The selection bundle hash is `1e929d05ff987ad9`; the protocol
+hash is `dd7ca955d79fade4`.
 
-The source-inner Stage-20 run removes each real outer center before any
-training or selection, treats each remaining center as an inner pseudo-target,
-prelocks the evidence-informed `C=0.01`, selects only
-`class_weight in {none, balanced}` on the deeper centers, and selects ex-post
-aggregate-posterior sampler and Task-Fisher recipe choices only from nested
-source evidence. PCA128 is fixed rather than swept. Its output claim scope is
-`cvae_recipe_lock_only`. A complete validated set of source-inner `RecipeLock`
-files may feed the planned Stage-30 expert recipe, but cannot establish
-preservation, routing, compatibility, or downstream utility.
+The gate outcome is `NEGATIVE_GATE_COMPLETE` with
+`factorial_triggered=false`. This is a protocol-complete negative gate, not a
+numerical, leakage, identity, checkpoint, or sampler-realization failure.
+Center `5` is borderline and generation-seed-sensitive: its best diagonal
+sampler has mean
+preservation-ratio delta `+0.109849` over `A` but wins only `5/8` strict inner
+comparisons. Center `9` is less consistent: its best full sampler has mean
+delta `+0.087841` but wins only `4/8`. Both miss the predeclared six-win gate.
 
-The repaired `prior_recovery_v2_resume` runtime writes exact training-key
-checkpoint sidecars, exact fold/row-keyed PCA-frame caches, diagnostic phase
-timings, and `RUNNING`/`COMPLETE`/`FAILED` state. Reissuing the same command
-resumes only exact v2 identities. The terminated earlier partial checkpoints
-do not have the repaired identity contract and must not be reused.
+The registered outer v1 requires all nine locks to select `C` or `D` and
+requires `factorial_triggered=true`; it therefore must not be run against this
+bundle. No outer preservation, routing, compatibility, or downstream-utility
+claim follows from the source-inner result.
 
-The outer Stage-20 run is conditional. It must fail closed unless all nine
-source-inner locks are valid and conditional (`C` or `D`) and the source-inner
-gate records `factorial_triggered=true`. If unlocked, it evaluates the frozen
-2x2 A/B/C/D objective-by-sampler factorial over training seeds `17,42,101` and
-generation seeds `17,42,101` against the matched Stage-10 v2 denominator.
-Outer target labels are scoring-only. Outer preservation metrics may never feed
-model, sampler, expert, generation-policy, routing, or composition selection.
+The bounded next Stage-20 check is training-seed stability with training seeds
+`17,42,101` and the existing generation seeds `17,42,101`. This check is
+`IMPLEMENTED AND REGISTERED, NOT YET PRODUCTION-RUN`. Its canonical experiment
+ID is `midogpp.cvae.prior_recovery_source_inner_training_seed_stability.v1`,
+and its output destination is
+`artifacts/midogpp/20_cvae_preservation/prior_recovery_source_inner_training_seed_stability_v1/seeds17_42_101/`.
+The fully crossed panel writes 27 training-seed locks and nine fold-level
+consensus locks. Preparation is seed-free and shared per outer/inner fold
+`(H,I)`, including one Task-Fisher state per `(H,I)` when needed. CVAE training
+has distinct RNG identities for each training seed, while posterior and prior
+generation noise is paired by generation seed; the recomputable identities are
+persisted in `tables/rng_pairing_audit.csv`.
 
-A complete valid outer factorial retains
-`claim_scope=cvae_preservation_only`: it reports `POSITIVE_PRESERVATION` when
-the positive gate passes and `NEGATIVE_PRESERVATION` otherwise.
-`diagnostic_only` is reserved for incomplete or invalid execution. The outer
-bundle also requires a validated `tables/sampler_realizations.csv`. Stage 40
-remains planned post-expert-bank generation validation and is not replaced by
-this pooled Stage-20 prior-recovery surface.
+The predeclared rule keeps a unanimous conditional sampler
+family, falls back from mixed `C/D` objectives to isotropic `C`, and uses the
+conservative standard-normal `A` recipe when seeds or conditional sampler
+families disagree. Any invalid child lock disables export. No stability
+artifact or cross-seed result exists yet, so the catalog remains
+`TODO_VERIFY_ARTIFACT`. `reports/publication_state.json` is the fail-closed
+Stage-30 publication gate: only `PUBLISHED` is consumable. Stage 30 first
+requires every consensus lock in the bundle to be valid and export-ready, then
+loads lock `H` only for fold `H`. The scalar seed-42 source-inner result and the
+blocked outer-v1 evidence boundary are unchanged; the stability bundle does not
+retroactively unlock or replace the outer gate. After this one bounded check,
+stop Stage-20 optimization and proceed to the planned Stage-30
+provenance-clean expert bank.
 
 ## Quarantine And Planned Work
 
@@ -282,7 +296,7 @@ absent.
   target utility and oracle rows cannot train or select a deployable router.
 - BreakHis, Camelyon17, and generic historical material is outside the active
   registry under `artifacts/cross_dataset_archive/`.
-- The immediate experimental bottlenecks are preservation seed or variant
-  stability and a new provenance-clean independently trained MIDOG++
-  source-expert bank. Routing is premature until that bank and a fresh
-  protocol-clean utility surface exist.
+- The immediate experimental sequence is one bounded source-inner
+  training-seed stability check, followed by the new provenance-clean
+  independently trained MIDOG++ source-expert bank. Routing remains premature
+  until that bank and a fresh protocol-clean utility surface exist.

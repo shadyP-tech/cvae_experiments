@@ -216,11 +216,13 @@ def validate_runtime_reports(
         or len(pca_rows) != len(frame_records)
     ):
         raise ProtocolError("Runtime timing coverage differs from checkpoint or PCA provenance.")
-    if mode == "source_inner":
+    if mode in {"source_inner", "source_inner_training_seed_stability"}:
         nested_rows = [row for row in rows if row["phase"] == "nested_classifier_selection"]
+        expected_nested = len(frame_records)
+        expected_sampling = len(expected_training_keys)
         if (
-            len(nested_rows) != len(frame_records)
-            or len(sampling_rows) != len(expected_training_keys)
+            len(nested_rows) != expected_nested
+            or len(sampling_rows) != expected_sampling
             or {row["training_key_hash"] for row in sampling_rows} != expected_training_keys
         ):
             raise ProtocolError("Source-inner runtime timing fold coverage is incomplete.")

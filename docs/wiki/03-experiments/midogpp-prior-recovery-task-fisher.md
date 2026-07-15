@@ -2,29 +2,38 @@
 
 ## Purpose And Status
 
-This page documents the implemented, unrun prior-recovery protocol. It does not
-report a result.
+This page documents the implemented prior-recovery protocol and the completed
+Stage-10 matched-reference and Stage-20 source-inner results. It does not report
+an outer-preservation result.
 
-Current status: `IMPLEMENTED, NO VALIDATED RESULT`. Invalid or terminated
-partial workstation roots are non-evidence, and catalog labels remain
-`TODO_VERIFY_ARTIFACT`. No preservation metric, gate outcome, Task-Fisher
-benefit, or thesis-facing decision exists until the bundles are completed and
-validated.
+Current status: the matched Stage-10 v2 bundle validates `PASS`; the Stage-20
+source-inner bundle is `COMPLETE`, passes its full validator, and reports
+`NEGATIVE_GATE_COMPLETE`. Seven of nine locks are conditional, while centers
+`5` and `9` retain the standard-normal fallback. Because
+`factorial_triggered=false`, the registered outer v1 is blocked by design.
+These workstation bundles are not yet synced locally, and their catalog
+destinations still carry `TODO_VERIFY_ARTIFACT` lifecycle labels. Earlier
+invalid or terminated partial roots remain non-evidence.
+
+The separate training-seed stability experiment is implemented and registered
+but has not been production-run. It has no result on this page.
 
 ## Evidence Sequence
 
 ```text
 eligible-only Stage-10 matched reference v2
   -> fully nested Stage-20 source-inner RecipeLocks
-  -> conditional Stage-20 outer A/B/C/D preservation
-  -> planned Stage-30 independent expert bank
-  -> planned Stage-40 frozen-expert generation validation
+       -> bounded training-seed consensus RecipeLocks
+            -> planned Stage-30 independent expert bank
+                 -> planned Stage-40 frozen-expert generation validation
+       -> conditional Stage-20 outer A/B/C/D preservation (scoring only)
 ```
 
-The sequence contains two firewalls. Source-inner `RecipeLock` files may freeze
-a recipe for Stage 30. Outer preservation metrics are scoring-only and may
-never flow backward into model or routing selection. Stage 40 remains a later
-post-expert-bank generation-validation stage.
+The sequence contains two firewalls. Only validated fold-level consensus locks
+from the bounded stability bundle may freeze a recipe for Stage 30. Scalar
+seed-42 locks remain one-seed source-inner evidence. Outer preservation metrics
+are scoring-only and may never flow backward into model or routing selection.
+Stage 40 remains a later post-expert-bank generation-validation stage.
 
 ## Stage-10 Matched Reference v2
 
@@ -79,6 +88,14 @@ hash and real BACC, and the SHA-256 of the reference protocol manifest.
 Claim boundary: `real_feature_transfer_only`. This artifact can be the matched
 real denominator for Stage 20; it cannot establish CVAE preservation, prior
 quality, expert quality, routing, generation, or downstream utility.
+
+### Validated result
+
+The full bundle validator passes on `xai-master`. Across the nine eligible
+held-out centers, mean BACC is `0.740312` and mean macro-F1 is `0.737205`.
+Center `1` is worst at `0.679245` BACC and center `6` is best at `0.792350`.
+The protocol hash is `786589b799d61b14`, and the content-bound reference
+bundle hash is `995aa193c82ee7ec`.
 
 ## Fully Nested Source-Inner Gate
 
@@ -181,9 +198,42 @@ preservation_ratio = (BACC_generated - 0.5) / (BACC_real - 0.5)
 The denominator must meet the predeclared real-BACC floor `0.55`; otherwise the
 ratio is invalid rather than evidence for or against a sampler.
 
-Claim boundary: `cvae_recipe_lock_only`. A validated lock bundle may feed the
-planned Stage-30 model recipe. It is not outer preservation, routing,
-compatibility, expert-selection, or downstream-utility evidence.
+Claim boundary: `cvae_recipe_lock_only`. This scalar lock bundle supplies the
+per-seed computation but is not the registered Stage-30 input; validated
+cross-seed consensus locks may feed the planned Stage-30 model recipe. It is
+not outer preservation, routing, compatibility, expert-selection, or
+downstream-utility evidence.
+
+### Validated source-inner result
+
+The seed-42 source-inner bundle is `COMPLETE` and passes the full validator.
+All nine recipe locks validate:
+
+| Outer center | Locked arm | Objective | Sampler |
+| --- | --- | --- | --- |
+| `0,6,7,8` | `D` | Task-Fisher | full conditional |
+| `1,2` | `C` | isotropic | full conditional |
+| `3` | `C` | isotropic | diagonal conditional |
+| `5,9` | `A` | isotropic | standard normal |
+
+The gate records `n_locks=9`, `n_valid_locks=9`,
+`n_conditional_locks=7`, `factorial_triggered=false`, and
+`status=NEGATIVE_GATE_COMPLETE`. The selection-bundle hash is
+`1e929d05ff987ad9`; the protocol hash is `dd7ca955d79fade4`.
+
+The negative gate is substantive rather than numerical or procedural. Center
+`5` is borderline and generation-seed-sensitive: its best diagonal sampler
+improves mean preservation ratio over `A` by `+0.109849`, but wins only `5/8`
+strict inner comparisons. Center `9` is inconsistent: its best full sampler
+improves the mean by `+0.087841`, but wins only `4/8`. Both therefore miss the
+predeclared six-win requirement despite clearing the mean-delta threshold. The
+full bundle has valid locks, sampler realizations, checkpoint audits, identity
+audits, and zero recorded overlap. Training-seed stability has not yet been
+measured because this run fixed the training seed at `42`.
+
+Implication: the result supports seven conditional source-inner recipe locks
+and two standard-normal fallbacks, not a universal conditional-prior or
+Task-Fisher claim. It also does not authorize changing the gate post hoc.
 
 ## Conditional Outer 2x2 Factorial
 
@@ -197,6 +247,11 @@ experiments/midogpp/stages/20_cvae_preservation/configs/prior_recovery_outer_v1.
 The runner imports the matched Stage-10 v2 reference and validates/recomputes
 the source-inner lock bundle. It runs only if all nine locks are valid and each
 selects conditional arm `C` or `D` with `factorial_triggered=true`.
+
+Current status: `BLOCKED BY VALID SOURCE-INNER GATE`. Centers `5` and `9` lock
+arm `A`, and the source-inner report records `factorial_triggered=false`.
+Running the registered outer v1 against this bundle must fail closed; no outer
+preservation decision exists.
 
 | Arm | Objective | Sampler |
 | --- | --- | --- |
@@ -259,10 +314,12 @@ outer metrics have `may_feed_model_recipe=false` and
 objective, prior sampler, expert, generation setting, router, or composition
 policy.
 
-## Exact Workspace Commands
+## Existing Workspace Commands
 
 Run from the repository root after installing the checkout into the `thesis`
-environment. The outer pair is conditional on the validated source-inner gate.
+environment. The first commands reproduce or resume the registered seed-42
+reference and source-inner experiments. The final pair runs the separate
+bounded training-seed stability experiment.
 
 ```bash
 conda run -n thesis python -m midogpp_thesis workspace validate
@@ -278,17 +335,55 @@ conda run -n thesis python -m midogpp_thesis workspace run \
   midogpp.cvae.prior_recovery_source_inner.v1
 
 conda run -n thesis python -m midogpp_thesis workspace prepare \
-  midogpp.cvae.prior_recovery_outer.v1
+  midogpp.cvae.prior_recovery_source_inner_training_seed_stability.v1
 conda run -n thesis python -m midogpp_thesis workspace run \
-  midogpp.cvae.prior_recovery_outer.v1
+  midogpp.cvae.prior_recovery_source_inner_training_seed_stability.v1
 ```
+
+Do not run `midogpp.cvae.prior_recovery_outer.v1` with the current lock bundle.
+
+## Registered Training-Seed Stability Check
+
+Run one bounded source-inner stability check with training seeds `17,42,101`
+and the existing generation seeds `17,42,101`, then stop Stage-20 optimization
+and proceed to the planned Stage-30 provenance-clean expert bank.
+
+Status: `IMPLEMENTED AND REGISTERED, NOT YET PRODUCTION-RUN`. The experiment
+`midogpp.cvae.prior_recovery_source_inner_training_seed_stability.v1` fully
+crosses training and generation seeds `17,42,101`. It shares deterministic
+nested-classifier, real-reference, identity-audit, and PCA preparation once per
+outer/inner fold `(H,I)`. When Task-Fisher is needed, one fitted Task-Fisher
+state is shared across training seeds for that `(H,I)`. Each training seed has
+distinct initialization and stochastic-stream identities; posterior and prior
+generation noise is paired by generation seed across training arms. The
+recomputable contract is persisted in `tables/rng_pairing_audit.csv`. Source
+class-count budgets remain fixed. The bundle writes 27 training-seed wrappers
+and nine consensus locks.
+
+The frozen consensus rule exports `D` only for unanimous `D` with one sampler
+family; exports `C` when all seeds share one conditional family and any seed
+selects `C`; and conservatively exports standard-normal `A` when arm or sampler
+family choices disagree. Any invalid child lock disables export. Structural
+bundle validity and Stage-30 readiness remain separate fields.
+`reports/publication_state.json` starts as `PENDING`, becomes `PUBLISHED` only
+after the complete bundle validates, and becomes `FAILED` if publication
+validation fails. Only `PUBLISHED` is consumable. The Stage-30 loader then
+requires every consensus lock in the bundle to be valid and export-ready before
+returning consensus lock `H` for expert-bank fold `H`.
+
+This stability input changes neither neighboring evidence boundary: outer v1
+continues to consume the scalar source-inner locks and remains blocked by its
+original gate, while scalar seed-42 evidence remains a one-training-seed result.
+No scientific stability result exists until the canonical production artifact
+is run, validated, and published.
 
 ## Validation Before Interpretation
 
-Do not add metrics to this page until each claimed bundle has its required
+The metrics above are limited to the two workstation bundles that passed their
+full validators. Before catalog promotion or thesis-facing reuse, preserve the
 resolved config, input provenance, protocol manifest, accepted leakage report,
 complete tables, identity checks, and tamper-evident checkpoint/Task-Fisher
-indexes. The outer artifact additionally needs
+indexes during local sync. Any future outer artifact additionally needs
 `manifests/coverage_manifest.json` with `status=PASS` and a decision report
 that recomputes from the metric rows, plus a validated
 `tables/sampler_realizations.csv` bound to those rows.

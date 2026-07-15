@@ -16,9 +16,16 @@ from .prior_recovery_classifier import SOURCE_INNER_CLASSIFIER_GRID_HASH
 
 
 SOURCE_INNER_EXPERIMENT = "virchow2_cvae_midogpp_prior_recovery_source_inner_v1"
+SOURCE_INNER_STABILITY_EXPERIMENT = (
+    "virchow2_cvae_midogpp_prior_recovery_source_inner_training_seed_stability_v1"
+)
 OUTER_EXPERIMENT = "virchow2_cvae_midogpp_prior_recovery_outer_v1"
 SAMPLER_FALLBACK_POLICY = "full_to_diagonal_to_standard_per_class"
 SAMPLER_VIABILITY_POLICY = "require_requested_family_both_classes"
+STABILITY_TRAINING_SEEDS = (17, 42, 101)
+STABILITY_CONSENSUS_RULE = (
+    "unanimous_conditional_family_d_only_if_all_d_else_c_v1"
+)
 
 
 @dataclass(frozen=True)
@@ -58,6 +65,17 @@ class SourceInnerPriorRecoveryConfig(PriorRecoveryConfig):
     @property
     def mode(self) -> str:
         return "source_inner"
+
+
+@dataclass(frozen=True)
+class SourceInnerStabilityConfig(PriorRecoveryConfig):
+    training_seeds: tuple[int, ...]
+    consensus_rule_id: str
+    child_code_version: str
+
+    @property
+    def mode(self) -> str:
+        return "source_inner_training_seed_stability"
 
 
 @dataclass(frozen=True)
@@ -117,6 +135,93 @@ def recipe_contract_hash(config: PriorRecoveryConfig) -> str:
     return stable_hash(recipe_contract_payload(config))
 
 
+def scalar_source_inner_config(
+    config: SourceInnerStabilityConfig,
+    *,
+    training_seed: int,
+) -> SourceInnerPriorRecoveryConfig:
+    """Derive the exact scalar-v1 computational contract for one seed."""
+
+    seed = int(training_seed)
+    if seed not in config.training_seeds:
+        raise ProtocolError(f"Training seed {seed} is not in the stability panel.")
+    return SourceInnerPriorRecoveryConfig(
+        name=SOURCE_INNER_EXPERIMENT,
+        artifact_root=config.artifact_root,
+        manifest_path=config.manifest_path,
+        feature_cache_path=config.feature_cache_path,
+        heldout_centers=config.heldout_centers,
+        expected_feature_dim=config.expected_feature_dim,
+        pca_dim=config.pca_dim,
+        selection_training_seed=seed,
+        generation_seeds=config.generation_seeds,
+        device=config.device,
+        isotropic_variant=config.isotropic_variant,
+        task_fisher_variant=config.task_fisher_variant,
+        sampler_min_class_count=config.sampler_min_class_count,
+        sampler_max_condition_number=config.sampler_max_condition_number,
+        sampler_families=config.sampler_families,
+        sampler_fallback_policy=config.sampler_fallback_policy,
+        sampler_viability_policy=config.sampler_viability_policy,
+        gate_min_ratio_improvement=config.gate_min_ratio_improvement,
+        gate_min_inner_wins=config.gate_min_inner_wins,
+        sampler_tie_margin=config.sampler_tie_margin,
+        task_increment_min_ratio=config.task_increment_min_ratio,
+        safety_max_bacc_regression=config.safety_max_bacc_regression,
+        minimum_real_bacc=config.minimum_real_bacc,
+        code_version=config.child_code_version,
+    )
+
+
+def common_source_inner_design_payload(
+    config: SourceInnerStabilityConfig,
+) -> dict[str, object]:
+    """Return frozen scientific choices, excluding only the varied training seed."""
+
+    scalar = scalar_source_inner_config(
+        config,
+        training_seed=config.training_seeds[0],
+    )
+    payload = recipe_contract_payload(scalar)
+    payload.pop("selection_training_seed")
+    return {
+        "schema_version": "midogpp_prior_recovery_common_source_inner_design_v1",
+        **payload,
+    }
+
+
+def common_source_inner_design_hash(config: SourceInnerStabilityConfig) -> str:
+    return stable_hash(common_source_inner_design_payload(config))
+
+
+def stability_contract_payload(
+    config: SourceInnerStabilityConfig,
+) -> dict[str, object]:
+    child_hashes = {
+        str(seed): recipe_contract_hash(
+            scalar_source_inner_config(config, training_seed=seed)
+        )
+        for seed in config.training_seeds
+    }
+    return {
+        "schema_version": "midogpp_prior_recovery_training_seed_stability_contract_v1",
+        "heldout_centers": list(config.heldout_centers),
+        "training_seeds": list(config.training_seeds),
+        "selection_training_seed": config.selection_training_seed,
+        "generation_seeds": list(config.generation_seeds),
+        "consensus_rule_id": config.consensus_rule_id,
+        "common_design": common_source_inner_design_payload(config),
+        "common_design_hash": common_source_inner_design_hash(config),
+        "child_recipe_contract_hashes": child_hashes,
+        "parent_code_version": config.code_version,
+        "child_code_version": config.child_code_version,
+    }
+
+
+def stability_contract_hash(config: SourceInnerStabilityConfig) -> str:
+    return stable_hash(stability_contract_payload(config))
+
+
 def outer_decision_contract_payload(config: OuterPriorRecoveryConfig) -> dict[str, object]:
     return {
         "positive_claim_min_ratio": config.positive_claim_min_ratio,
@@ -133,7 +238,7 @@ def load_prior_recovery_config(
     path: str | Path,
     *,
     expected_mode: str | None = None,
-) -> SourceInnerPriorRecoveryConfig | OuterPriorRecoveryConfig:
+) -> SourceInnerPriorRecoveryConfig | SourceInnerStabilityConfig | OuterPriorRecoveryConfig:
     try:
         import yaml
     except ModuleNotFoundError as exc:
@@ -149,8 +254,17 @@ def load_prior_recovery_config(
     sampler = _mapping(payload.get("sampler", {}), "sampler")
     decisions = _mapping(payload.get("decisions", {}), "decisions")
     name = str(experiment.get("name", ""))
-    mode = str(experiment.get("mode") or ("source_inner" if name == SOURCE_INNER_EXPERIMENT else "outer"))
-    if mode not in {"source_inner", "outer"}:
+    default_mode = (
+        "source_inner"
+        if name == SOURCE_INNER_EXPERIMENT
+        else (
+            "source_inner_training_seed_stability"
+            if name == SOURCE_INNER_STABILITY_EXPERIMENT
+            else "outer"
+        )
+    )
+    mode = str(experiment.get("mode") or default_mode)
+    if mode not in {"source_inner", "source_inner_training_seed_stability", "outer"}:
         raise ProtocolError(f"Unsupported prior-recovery mode: {mode!r}")
     if expected_mode and mode != expected_mode:
         raise ProtocolError(f"Expected prior-recovery mode {expected_mode!r}, got {mode!r}")
@@ -204,7 +318,18 @@ def load_prior_recovery_config(
         "code_version": str(experiment.get("code_version", "prior_recovery_v2_resume")),
     }
     if mode == "source_inner":
-        config: SourceInnerPriorRecoveryConfig | OuterPriorRecoveryConfig = SourceInnerPriorRecoveryConfig(**common)
+        config: SourceInnerPriorRecoveryConfig | SourceInnerStabilityConfig | OuterPriorRecoveryConfig = SourceInnerPriorRecoveryConfig(**common)
+    elif mode == "source_inner_training_seed_stability":
+        config = SourceInnerStabilityConfig(
+            **common,
+            training_seeds=_int_tuple(run.get("training_seeds", STABILITY_TRAINING_SEEDS)),
+            consensus_rule_id=str(
+                decisions.get("training_seed_consensus_rule", STABILITY_CONSENSUS_RULE)
+            ),
+            child_code_version=str(
+                experiment.get("child_code_version", "prior_recovery_v2_resume")
+            ),
+        )
     else:
         config = OuterPriorRecoveryConfig(
             **common,
@@ -225,6 +350,23 @@ def _validate(config: PriorRecoveryConfig) -> None:
         raise ProtocolError("Prior recovery requires nonempty generation seeds.")
     if isinstance(config, OuterPriorRecoveryConfig) and not config.training_seeds:
         raise ProtocolError("Outer prior recovery requires nonempty training seeds.")
+    if isinstance(config, SourceInnerStabilityConfig):
+        if config.training_seeds != STABILITY_TRAINING_SEEDS:
+            raise ProtocolError(
+                "Training-seed stability requires ordered seeds (17, 42, 101)."
+            )
+        if config.generation_seeds != STABILITY_TRAINING_SEEDS:
+            raise ProtocolError(
+                "Training-seed stability requires ordered generation seeds (17, 42, 101)."
+            )
+        if config.selection_training_seed != config.training_seeds[0]:
+            raise ProtocolError(
+                "Stability selection_training_seed must equal the first panel seed."
+            )
+        if config.consensus_rule_id != STABILITY_CONSENSUS_RULE:
+            raise ProtocolError("Training-seed stability consensus rule drifted.")
+        if config.child_code_version != "prior_recovery_v2_resume":
+            raise ProtocolError("Training-seed stability child code version drifted from v1.")
     if config.sampler_min_class_count <= 0:
         raise ProtocolError("Sampler class count must be positive.")
     if config.pca_dim != 128:

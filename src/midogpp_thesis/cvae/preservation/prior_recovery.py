@@ -2,5 +2,10 @@
 
 from .prior_recovery_outer import run_outer_prior_recovery
 from .prior_recovery_source import run_source_inner_prior_recovery
+from .prior_recovery_stability import run_source_inner_training_seed_stability
 
-__all__ = ["run_outer_prior_recovery", "run_source_inner_prior_recovery"]
+__all__ = [
+    "run_outer_prior_recovery",
+    "run_source_inner_prior_recovery",
+    "run_source_inner_training_seed_stability",
+]

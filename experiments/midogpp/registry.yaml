@@ -346,6 +346,27 @@ experiments:
         - --artifact-root
         - output://midogpp_output_cvae_prior_recovery_source_inner_v1
 
+  - experiment_id: midogpp.cvae.prior_recovery_source_inner_training_seed_stability.v1
+    stage: 20_cvae_preservation
+    status: active
+    claim_scope: cvae_recipe_lock_only
+    config_path: experiments/midogpp/stages/20_cvae_preservation/configs/prior_recovery_source_inner_training_seed_stability_v1.yaml
+    output_artifact_id: midogpp_output_cvae_prior_recovery_source_inner_training_seed_stability_v1
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_xyxy_feature_cache_seed42
+    runner:
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-preservation
+        - source-inner-prior-recovery-training-seed-stability
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_cvae_prior_recovery_source_inner_training_seed_stability_v1
+
   - experiment_id: midogpp.cvae.prior_recovery_outer.v1
     stage: 20_cvae_preservation
     status: active
@@ -443,7 +464,7 @@ experiments:
     input_artifact_ids:
       - midogpp_dataset_contract_annotation_patch_v1
       - midogpp_virchow2_xyxy_feature_cache_seed42
-      - midogpp_output_cvae_prior_recovery_source_inner_v1
+      - midogpp_output_cvae_prior_recovery_source_inner_training_seed_stability_v1
     runner:
       argv:
         - "{python}"

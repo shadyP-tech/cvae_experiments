@@ -29,6 +29,7 @@ from ..reporting import write_json
 @dataclass
 class ProvenanceRecorder:
     root: Path
+    allow_shared_checkpoint_hashes: bool = False
     checkpoint_records: dict[str, dict[str, object]] = field(default_factory=dict)
     fisher_records: dict[str, dict[str, object]] = field(default_factory=dict)
 
@@ -181,20 +182,42 @@ class ProvenanceRecorder:
 
     def _record_checkpoint(self, record: Mapping[str, object]) -> None:
         checkpoint_id = str(record.get("checkpoint_hash", ""))
+        training_key_id = str(record.get("training_key_hash", ""))
         normalized = dict(record)
-        existing = self.checkpoint_records.get(checkpoint_id)
-        if not checkpoint_id or (existing is not None and existing != normalized):
+        record_id = training_key_id if self.allow_shared_checkpoint_hashes else checkpoint_id
+        existing = self.checkpoint_records.get(record_id)
+        if (
+            not checkpoint_id
+            or not record_id
+            or (existing is not None and existing != normalized)
+        ):
             raise ProtocolError("Checkpoint hash collision with different provenance metadata.")
-        self.checkpoint_records[checkpoint_id] = normalized
+        self.checkpoint_records[record_id] = normalized
 
     def write_indices(self) -> None:
+        checkpoint_records = [
+            self.checkpoint_records[key] for key in sorted(self.checkpoint_records)
+        ]
+        checkpoint_index: dict[str, object] = {
+            "schema_version": "midogpp_prior_recovery_checkpoint_index_v1",
+            "n_unique_checkpoints": len(checkpoint_records),
+            "records": checkpoint_records,
+        }
+        if self.allow_shared_checkpoint_hashes:
+            checkpoint_index.update(
+                {
+                    "n_unique_checkpoint_contents": len(
+                        {
+                            str(record["checkpoint_hash"])
+                            for record in checkpoint_records
+                        }
+                    ),
+                    "record_identity": "training_key_hash",
+                }
+            )
         write_json(
             self.root / "manifests/checkpoint_index.json",
-            {
-                "schema_version": "midogpp_prior_recovery_checkpoint_index_v1",
-                "n_unique_checkpoints": len(self.checkpoint_records),
-                "records": [self.checkpoint_records[key] for key in sorted(self.checkpoint_records)],
-            },
+            checkpoint_index,
         )
         write_json(
             self.root / "manifests/task_fisher_index.json",
@@ -219,6 +242,21 @@ def validate_provenance_indices(root: Path) -> tuple[Mapping[str, object], Mappi
         raise ProtocolError("Malformed checkpoint or Task-Fisher index.")
     if int(checkpoint_index.get("n_unique_checkpoints", -1)) != len(checkpoint_records):
         raise ProtocolError("Checkpoint index count mismatch.")
+    if "n_unique_checkpoint_contents" in checkpoint_index and int(
+        checkpoint_index.get("n_unique_checkpoint_contents", -1)
+    ) != len(
+        {
+            str(record.get("checkpoint_hash", ""))
+            for record in checkpoint_records
+            if isinstance(record, Mapping)
+        }
+    ):
+        raise ProtocolError("Checkpoint content-identity count mismatch.")
+    if checkpoint_index.get("record_identity", "checkpoint_hash") not in {
+        "checkpoint_hash",
+        "training_key_hash",
+    }:
+        raise ProtocolError("Checkpoint index record-identity policy is malformed.")
     if int(fisher_index.get("n_unique_states", -1)) != len(fisher_records):
         raise ProtocolError("Task-Fisher index count mismatch.")
     if not all(isinstance(record, Mapping) for record in (*checkpoint_records, *fisher_records)):

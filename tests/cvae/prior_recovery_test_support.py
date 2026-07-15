@@ -14,9 +14,11 @@ from midogpp_thesis.cvae.generation_samplers import (
 from midogpp_thesis.cvae.preservation.prior_recovery_config import (
     SAMPLER_FALLBACK_POLICY,
     SAMPLER_VIABILITY_POLICY,
+    STABILITY_CONSENSUS_RULE,
     OuterPriorRecoveryConfig,
     PriorRecoveryConfig,
     SourceInnerPriorRecoveryConfig,
+    SourceInnerStabilityConfig,
 )
 from midogpp_thesis.cvae.training import TrainingVariant
 
@@ -70,6 +72,21 @@ def prior_recovery_config(
     )
     if mode == "source_inner":
         return SourceInnerPriorRecoveryConfig(**common)
+    if mode == "stability":
+        return SourceInnerStabilityConfig(
+            **(
+                common
+                | {
+                    "name": "test_source_inner_training_seed_stability",
+                    "selection_training_seed": 17,
+                    "generation_seeds": (17, 42),
+                    "code_version": "test_stability",
+                }
+            ),
+            training_seeds=(17, 42),
+            consensus_rule_id=STABILITY_CONSENSUS_RULE,
+            child_code_version="test",
+        )
     if mode != "outer" or reference is None or locks is None:
         raise ValueError("Outer test config requires reference and lock roots.")
     return OuterPriorRecoveryConfig(

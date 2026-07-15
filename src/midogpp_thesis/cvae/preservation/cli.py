@@ -20,6 +20,10 @@ def build_parser() -> argparse.ArgumentParser:
         ("condition-audit", "Run the condition-capacity audit."),
         ("tuned-classifier", "Run tuned-classifier preservation."),
         ("source-inner-prior-recovery", "Fit source-inner sampler and objective RecipeLocks."),
+        (
+            "source-inner-prior-recovery-training-seed-stability",
+            "Run the bounded source-inner training-seed stability panel.",
+        ),
         ("prior-recovery-outer", "Run the locked outer A/B/C/D preservation matrix."),
     ):
         command = sub.add_parser(name, help=help_text)
@@ -72,18 +76,35 @@ def _surface_handler(surface: str) -> tuple[Loader, Runner]:
         )
     if surface == "source-inner-prior-recovery":
         from .prior_recovery import run_source_inner_prior_recovery
-        from .prior_recovery_config import load_prior_recovery_config
+        from .prior_recovery_config import (
+            load_prior_recovery_config as load_source_inner_config,
+        )
 
         return (
-            lambda path: load_prior_recovery_config(path, expected_mode="source_inner"),
+            lambda path: load_source_inner_config(path, expected_mode="source_inner"),
             run_source_inner_prior_recovery,
+        )
+    if surface == "source-inner-prior-recovery-training-seed-stability":
+        from .prior_recovery import run_source_inner_training_seed_stability
+        from .prior_recovery_config import (
+            load_prior_recovery_config as load_stability_config,
+        )
+
+        return (
+            lambda path: load_stability_config(
+                path,
+                expected_mode="source_inner_training_seed_stability",
+            ),
+            run_source_inner_training_seed_stability,
         )
     if surface == "prior-recovery-outer":
         from .prior_recovery import run_outer_prior_recovery
-        from .prior_recovery_config import load_prior_recovery_config
+        from .prior_recovery_config import (
+            load_prior_recovery_config as load_outer_config,
+        )
 
         return (
-            lambda path: load_prior_recovery_config(path, expected_mode="outer"),
+            lambda path: load_outer_config(path, expected_mode="outer"),
             run_outer_prior_recovery,
         )
     raise AssertionError(f"Unknown preservation surface: {surface}")
