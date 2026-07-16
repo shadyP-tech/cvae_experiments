@@ -44,11 +44,19 @@ def test_root_cli_import_is_lazy_in_fresh_interpreter() -> None:
     assert result.returncode == 0, result.stderr
 
 
-def test_preservation_cli_exposes_separate_lock_and_outer_commands() -> None:
+def test_preservation_cli_exposes_separate_lock_study_and_outer_commands() -> None:
     parser = build_preservation_parser()
 
     source_inner = parser.parse_args(["source-inner-prior-recovery", "--config", "source.yaml"])
+    prior_study = parser.parse_args(
+        ["source-inner-learned-conditional-prior-study", "--config", "prior-v2.yaml"]
+    )
+    fisher_study = parser.parse_args(
+        ["source-inner-task-fisher-shrinkage-study", "--config", "fisher-v2.yaml"]
+    )
     outer = parser.parse_args(["prior-recovery-outer", "--config", "outer.yaml"])
 
     assert source_inner.surface == "source-inner-prior-recovery"
+    assert prior_study.surface == "source-inner-learned-conditional-prior-study"
+    assert fisher_study.surface == "source-inner-task-fisher-shrinkage-study"
     assert outer.surface == "prior-recovery-outer"

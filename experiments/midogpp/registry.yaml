@@ -48,6 +48,7 @@ stages:
     allowed_claim_scopes:
       - cvae_preservation_only
       - cvae_recipe_lock_only
+      - cvae_source_inner_study_only
       - diagnostic_only
     allowed_input_claim_scopes:
       - dataset_contract_and_split_provenance
@@ -366,6 +367,48 @@ experiments:
         - "{resolved_config}"
         - --artifact-root
         - output://midogpp_output_cvae_prior_recovery_source_inner_training_seed_stability_v1
+
+  - experiment_id: midogpp.cvae.learned_conditional_prior_source_inner.v2
+    stage: 20_cvae_preservation
+    status: active
+    claim_scope: cvae_source_inner_study_only
+    config_path: experiments/midogpp/stages/20_cvae_preservation/configs/learned_conditional_prior_source_inner_v2.yaml
+    output_artifact_id: midogpp_output_cvae_learned_conditional_prior_source_inner_v2
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_xyxy_feature_cache_seed42
+    runner:
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-preservation
+        - source-inner-learned-conditional-prior-study
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_cvae_learned_conditional_prior_source_inner_v2
+
+  - experiment_id: midogpp.cvae.task_fisher_shrinkage_source_inner.v2
+    stage: 20_cvae_preservation
+    status: active
+    claim_scope: cvae_source_inner_study_only
+    config_path: experiments/midogpp/stages/20_cvae_preservation/configs/task_fisher_shrinkage_source_inner_v2.yaml
+    output_artifact_id: midogpp_output_cvae_task_fisher_shrinkage_source_inner_v2
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_xyxy_feature_cache_seed42
+    runner:
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-preservation
+        - source-inner-task-fisher-shrinkage-study
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_cvae_task_fisher_shrinkage_source_inner_v2
 
   - experiment_id: midogpp.cvae.prior_recovery_outer.v1
     stage: 20_cvae_preservation

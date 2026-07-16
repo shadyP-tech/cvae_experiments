@@ -6,16 +6,21 @@ RESULT INTERPRETATION:
 
 This page reports the validated v1 fixed-0.5/source-inner-threshold artifact
 below. A separate eligible-only, full-Virchow2, sklearn-`predict` matched
-reference v2 is implemented for the new Stage-20 prior-recovery denominator:
+reference v2 supplies the Stage-20 prior-recovery denominator:
 
 ```text
 midogpp.real_feature.eligible_tuned_predict_reference.v2
 artifacts/midogpp/10_real_feature_reference/eligible_tuned_real_reference_v2/seed42/
 ```
 
-The v2 output root is currently absent and remains
-`TODO_VERIFY_ARTIFACT`. Do not copy the v1 metrics on this page into the v2
-surface or claim that a matched-v2 result exists.
+The v2 workstation bundle is complete and passes its full validator on
+`xai-master`. It reports mean BACC `0.740312`, mean macro-F1 `0.737205`,
+protocol hash `786589b799d61b14`, and reference-bundle hash
+`995aa193c82ee7ec`. It has not yet been synced locally, and its catalog entry
+still carries the stale lifecycle label `TODO_VERIFY_ARTIFACT` pending catalog
+promotion. The v1 and v2 metrics happen to agree, but their prediction policies
+and content-bound artifact identities remain separate; do not substitute one
+bundle for the other.
 
 ## Evidence Source
 

@@ -20,6 +20,8 @@ Canonical configs are:
 - `configs/tuned_classifier_preservation_v1.yaml`
 - `configs/prior_recovery_source_inner_v1.yaml`
 - `configs/prior_recovery_source_inner_training_seed_stability_v1.yaml`
+- `configs/learned_conditional_prior_source_inner_v2.yaml`
+- `configs/task_fisher_shrinkage_source_inner_v2.yaml`
 - `configs/prior_recovery_outer_v1.yaml`
 
 They use logical artifact IDs for the dataset contract, corrected `xyxy`
@@ -27,9 +29,11 @@ cache, and their declared real-feature inputs, and write only to stage-20
 canonical artifact roots. The scalar source-inner prior-recovery result is
 complete and validated on `xai-master`; its outer factorial is blocked by the
 predeclared gate. The training-seed stability surface is implemented and
-registered but has not been production-run and has no result. The other
-preservation configs retain their documented thesis-facing or diagnostic
-status.
+registered; its validated workstation status is documented separately in the
+current-state pages. Two additive v2 source-inner mechanism studies are now
+implemented and registered but have not been production-run. They cannot
+publish or replace a `RecipeLock`. The other preservation configs retain their
+documented thesis-facing or diagnostic status.
 
 ## Prior-Recovery Selection And Evaluation Firewall
 
@@ -83,6 +87,56 @@ Failure to pass the conditional gate is a completed negative source-inner
 result and blocks the outer factorial; it is not permission to inspect outer
 metrics and revise the recipe.
 
+## Separate V2 Mechanism Studies
+
+The v2 studies answer two new source-inner questions without reopening the v1
+recipe decision. Both use the corrected `xyxy` Virchow2 cache, source-fit
+PCA128, all eligible outer/inner folds, and the fully crossed training and
+generation seeds `17,42,101`.
+
+| Experiment | Fixed axis | Compared axis | Purpose |
+| --- | --- | --- | --- |
+| `midogpp.cvae.learned_conditional_prior_source_inner.v2` | stochastic isotropic objective | `A` standard normal, `C-diag` ex-post conditional diagonal, `E` jointly learned class-conditional diagonal Gaussian | test whether learning `p(z|y)` through the KL reduces the training/sampling mismatch |
+| `midogpp.cvae.task_fisher_shrinkage_source_inner.v2` | standard-normal prior | `alpha in {0,0.05,0.10,0.25}` | test whether shrinking the source-only rank-one Task-Fisher metric improves preservation stability |
+
+Arm `E` uses
+`p(z|y)=Normal(mu_y, diag(sigma_y^2))`, with two learned class rows for
+`mu_y` and `rho_y`, bounded log variance
+`6*tanh(rho_y/6)`, an analytic latent-dimension-normalized KL, zero prior
+weight decay, and separate gradient clipping. Its base encoder/decoder
+initialization and stochastic training stream are paired with arm `A` for each
+`(H,I,training seed)`. `C-diag` reuses the corresponding `A` checkpoint and
+fits its total-moment diagonal sampler from source-fit posterior state only.
+
+The Fisher study fits one raw source-only Fisher state per `(H,I)` and derives
+all nonzero metrics from that same state:
+
+```text
+M_alpha = (I + alpha * F_tilde) / (1 + alpha)
+```
+
+`alpha=0` is the literal isotropic `metric=None` training path. All alpha arms
+share initialization and stochastic streams within a training seed. Evaluation
+epsilon is paired across arms and training seeds by `(H,I,generation seed,
+class,row,stream)` in both studies, and generation budgets reproduce the source
+`y_fit` class counts.
+
+The studies write v2-owned checkpoints, state indexes, exact grid/coverage
+manifests, RNG and initialization audits, paired deltas, child decisions, and
+per-outer consensus decisions. Invalid A/E state invalidates the learned-prior
+decision; an unavailable `C-diag` disables only the secondary E-vs-C
+comparison; a finite but mechanism-ineligible E remains valid negative
+evidence. Invalid raw Fisher state preserves the literal alpha-zero baseline
+but makes the complete Fisher decision invalid rather than silently inventing
+a nonzero metric.
+
+Both outputs have `claim_scope=cvae_source_inner_study_only` and hard-code
+`may_feed_model_recipe=false` and `may_feed_deployable_selection=false`. They
+emit no publication state and are forbidden as Stage-30, Stage-40, routing,
+compatibility, generation, or downstream-utility inputs. Running either study
+does not alter the scalar v1 gate, the published training-seed consensus locks,
+outer v1, or the existing Stage-30 input edge.
+
 PCA128 is one fixed, source-fit preprocessing step per fold, not another
 hyperparameter sweep. Exact protocol keys cache each fitted frame. CVAE
 checkpoints are persisted incrementally under exact training-key sidecars, so
@@ -124,12 +178,36 @@ conda run -n thesis python -m midogpp_thesis workspace run \
   midogpp.cvae.prior_recovery_source_inner_training_seed_stability.v1
 ```
 
-This command has no completed production artifact yet. A successful run must
-validate all 27 seed locks, all nine consensus locks, the seed-free preparation,
-shared Task-Fisher states, distinct training identities, paired
-generation-seed policy, and leakage reports. It must then publish
-`reports/publication_state.json` as `PUBLISHED`; `PENDING` and `FAILED` are not
-consumable by Stage 30.
+The canonical workstation stability artifact is complete and published as
+recorded in the current-state documentation. A reproduction must validate all
+27 seed locks, all nine consensus locks, the seed-free preparation, shared
+Task-Fisher states, distinct training identities, paired generation-seed
+policy, and leakage reports. It publishes
+`reports/publication_state.json` only after validation; `PENDING` and `FAILED`
+are not consumable by Stage 30.
+
+Run the two independent, non-adoptive v2 studies only through their registered
+workspace entries:
+
+```bash
+conda run -n thesis python -m midogpp_thesis workspace run \
+  midogpp.cvae.learned_conditional_prior_source_inner.v2
+
+conda run -n thesis python -m midogpp_thesis workspace run \
+  midogpp.cvae.task_fisher_shrinkage_source_inner.v2
+```
+
+Their canonical destinations are:
+
+```text
+artifacts/midogpp/20_cvae_preservation/learned_conditional_prior_source_inner_v2/seeds17_42_101/
+artifacts/midogpp/20_cvae_preservation/task_fisher_shrinkage_source_inner_v2/seeds17_42_101/
+```
+
+Status: `IMPLEMENTED AND REGISTERED, NOT YET PRODUCTION-RUN`. Do not infer a
+mechanism result until a complete canonical bundle passes its own validator.
+Neither run is a prerequisite for proceeding with the already frozen Stage-30
+consensus locks.
 
 Independently of the stability run, only when the scalar source-inner bundle
 validates with `factorial_triggered=true` run:
@@ -189,9 +267,9 @@ sampler identities against the preservation metric rows.
   Stage-20 aggregate-posterior prior recovery does not activate or replace it.
 
 Status: scalar source-inner `COMPLETE/PASS` on `xai-master`; stability
-`IMPLEMENTED AND REGISTERED, NOT YET PRODUCTION-RUN`; outer `BLOCKED BY VALID
-SOURCE-INNER GATE`. The new stability and outer destinations remain
-`TODO_VERIFY_ARTIFACT`. A terminated pre-resume source-inner partial root is
-non-evidence and its old checkpoints are incompatible with
-`prior_recovery_v2_resume`; only checkpoints written with exact v2 sidecars are
-resumable.
+`COMPLETE/PUBLISHED`; the two additive v2 mechanism studies `IMPLEMENTED AND
+REGISTERED, NOT YET PRODUCTION-RUN`; outer `BLOCKED BY VALID SOURCE-INNER
+GATE`. The new v2 destinations remain `TODO_VERIFY_ARTIFACT`. A terminated
+pre-resume source-inner partial root is non-evidence and its old checkpoints
+are incompatible with `prior_recovery_v2_resume`; only checkpoints written
+with exact sidecars are resumable.

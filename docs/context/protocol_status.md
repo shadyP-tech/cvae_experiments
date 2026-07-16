@@ -1,6 +1,6 @@
 # Protocol Status
 
-Last updated: 2026-07-15
+Last updated: 2026-07-16
 
 ## Active MIDOG++ surfaces
 
@@ -24,16 +24,30 @@ The working tree contains active implementations for:
   `RecipeLock` selection;
 - the bounded Stage-20 training-seed stability panel and fold-level consensus
   `RecipeLock` export;
+- the separate non-adoptive learned class-conditional diagonal-prior
+  source-inner v2 study;
+- the separate non-adoptive Task-Fisher shrinkage source-inner v2 study;
 - a conditionally unlocked Stage-20 outer A/B/C/D preservation factorial.
 
-The first two runs are complete on `xai-master` and pass their full validators.
-The Stage-10 v2 result is a matched `real_feature_transfer_only` denominator.
-The Stage-20 source-inner result is a valid `cvae_recipe_lock_only` bundle with
-seven conditional locks and standard-normal fallbacks for centers `5` and `9`.
-Its gate is `NEGATIVE_GATE_COMPLETE` with `factorial_triggered=false`, so the
-registered outer factorial is blocked and provides no outer-preservation
-result. The new bundles have not yet been synced locally, and their catalog
-output entries still carry `TODO_VERIFY_ARTIFACT` lifecycle labels.
+The first three runs are complete on `xai-master` and pass their full
+validators. The Stage-10 v2 result is a matched
+`real_feature_transfer_only` denominator. The scalar Stage-20 source-inner
+result is a valid `cvae_recipe_lock_only` bundle with seven conditional locks
+and standard-normal fallbacks for centers `5` and `9`. Its gate is
+`NEGATIVE_GATE_COMPLETE` with `factorial_triggered=false`, so the registered
+outer factorial is blocked and provides no outer-preservation result. The
+bounded training-seed stability bundle is `COMPLETE` and `PUBLISHED`, with
+`27/27` valid child locks, `9/9` export-ready consensus locks, and
+`stage30_recipe_ready=true`. These workstation bundles have not yet been
+synced locally, and their catalog output entries still carry stale
+`TODO_VERIFY_ARTIFACT` lifecycle labels pending catalog promotion.
+
+The two v2 mechanism studies are active implementations but remain unrun. They
+fully cross training and generation seeds `17,42,101` over the nested nine-by-
+eight center structure. Their only allowed claim scope is
+`cvae_source_inner_study_only`: study decisions have recipe and deployable
+consumption fixed false. They cannot change the scalar v1 gate, the published
+stability consensus, outer v1, or the registered Stage-30 input.
 
 ## Current thesis-facing evidence
 
@@ -43,6 +57,14 @@ the frozen PCA128 real-feature classifier surface. It does not support routing,
 expert selection, NELBO compatibility, prior generation, controllable
 generation, or downstream synthetic utility. Prior sampling remains materially
 weaker and is a separate bottleneck.
+
+The training-seed panel is thesis-facing only for the narrow
+`cvae_recipe_lock_only` stability claim. Exactly unanimous recipe selection is
+limited to centers `6` and `7`; centers `0,1,2,3,5,8,9` are unstable under the
+predeclared consensus rule. This is a `NEGATIVE_RESULT` for broad recipe
+stability and an operational `PASS` for publishing a conservative complete
+recipe bank. It is not outer-preservation, routing, generation, or downstream
+utility evidence.
 
 ## Planned surfaces
 
@@ -59,29 +81,30 @@ implementation must use only the canonical dataset/cache lineage and must pass
 target-leakage, expert-isolation, candidate-exclusion, and proxy-versus-utility
 checks before activation.
 
-Validated training-seed consensus `RecipeLock` files may later feed the
-fold-matched Stage-30 expert recipe. Scalar seed-42 locks remain evidence for
-the completed source-inner result but are no longer the registered Stage-30
-input. Stage-30 consumption is fail-closed: the stability bundle must have
-`reports/publication_state.json` status `PUBLISHED`, and every consensus lock
+The published training-seed consensus `RecipeLock` files are now eligible to
+feed the fold-matched Stage-30 expert recipe. Consensus is `A` for centers
+`0,1,2,3,5,9`, `D` with the full conditional sampler for centers `6,7`, and
+`C` with the full conditional sampler for center `8`. The bundle's protocol
+hash is `bbde3e5c5a1e3374`, and its selection-bundle hash is
+`79cb9b614779c23b`. Full bundle, leakage, identity-overlap, and RNG validation
+passes, and the Stage-30 loader accepts the publication.
+
+Scalar seed-42 locks remain evidence for the completed source-inner result but
+are no longer the registered Stage-30 input. Stage-30 consumption remains
+fail-closed: the stability bundle must be `PUBLISHED`, and every consensus lock
 must be valid and export-ready before the loader returns lock `H` for fold `H`.
-Outer v1 still consumes the scalar source-inner bundle and retains its original
+The Stage-30 registry entry is still planned and has no runnable expert-bank
+runner, so the eligible input does not activate Stage 30. Outer v1 still
+consumes the scalar source-inner bundle and retains its original
 all-conditional/factorial gate. Outer preservation metrics and decisions may
 never feed model, sampler, expert, routing, or composition selection. Stage 40
-remains a post-expert-bank generation-validation stage; the new Stage-20
-prior-recovery surface does not activate it.
+remains a post-expert-bank generation-validation stage.
 
-Before Stage 30, run at most one bounded source-inner training-seed stability
-check over training seeds `17,42,101` and generation seeds `17,42,101`. This
-check is implemented and registered as
-`midogpp.cvae.prior_recovery_source_inner_training_seed_stability.v1`, but it
-has not yet produced a production artifact. Its fully crossed training and
-generation seeds, seed-free `(H,I)` preparation, shared Task-Fisher state,
-distinct training RNG identities, generation-seed-paired posterior/prior noise,
-and cross-seed rule are frozen in the config and validator. The RNG identities
-are persisted in `tables/rng_pairing_audit.csv`; the catalog destination
-remains `TODO_VERIFY_ARTIFACT` until the full bundle is run, validated, and
-published.
+The v2 mechanism studies may run independently while Stage-30 implementation
+proceeds; they are not prerequisites for it. A fully executed v2 bundle may
+still report `INVALID_INCOMPLETE`, for example when a raw Fisher state is
+invalid. In that case `run_state=COMPLETE` means execution and mechanical
+bundle validation finished, not that a scientific mechanism decision passed.
 
 ## Quarantine and historical evidence
 

@@ -1,6 +1,6 @@
 # MIDOG++ Experiment File Workflow
 
-Last updated: 2026-07-15
+Last updated: 2026-07-16
 
 This is the operational path and command reference for the active MIDOG++
 checkout. Result interpretation belongs in
@@ -371,13 +371,15 @@ experiment continues to consume the scalar source-inner bundle; the stability
 bundle neither changes nor unlocks that evidence boundary. Stage 40 remains
 the later post-expert-bank generation-validation stage.
 
-Current status: the source-inner seed-42 result is complete and validated on
-`xai-master`; the outer output is absent because its fail-closed prerequisite
-is not satisfied. There is no outer-preservation result.
+Current status: the scalar source-inner seed-42 result and bounded
+training-seed stability result are complete and validated on `xai-master`.
+The stability publication is an eligible Stage-30 recipe input. The outer
+output is absent because its separate fail-closed prerequisite is not
+satisfied. There is no outer-preservation result.
 
-### Bounded training-seed stability check
+### Completed bounded training-seed stability check
 
-The next Stage-20 check is limited to training seeds `17,42,101` with the
+The bounded Stage-20 panel is limited to training seeds `17,42,101` with the
 existing generation seeds `17,42,101`. It is registered as:
 
 ```text
@@ -386,7 +388,7 @@ experiments/midogpp/stages/20_cvae_preservation/configs/prior_recovery_source_in
 artifacts/midogpp/20_cvae_preservation/prior_recovery_source_inner_training_seed_stability_v1/seeds17_42_101/
 ```
 
-Run exactly the registered panel:
+Reproduce or resume exactly the registered panel with:
 
 ```bash
 conda run -n thesis python -m midogpp_thesis workspace prepare \
@@ -419,10 +421,80 @@ accept only `PUBLISHED`. Stage 30 then requires all nine consensus locks to be
 valid and `recipe_export_ready=true` before returning fold `H`'s lock to fold
 `H`.
 
-Status: `IMPLEMENTED AND REGISTERED, NOT YET PRODUCTION-RUN`. No stability
-result may be interpreted until the canonical bundle validates and publishes.
-After this bounded check, proceed to Stage 30 rather than continuing Stage-20
-tuning.
+The canonical workstation bundle is now `COMPLETE` and `PUBLISHED`. Full
+bundle, leakage, identity-overlap, and RNG validation passes; all `27/27`
+training-seed child locks validate, all `9/9` consensus locks are export-ready,
+and `stage30_recipe_ready=true`. The Stage-30 loader accepts the bundle. Its
+protocol hash is `bbde3e5c5a1e3374`, and its selection-bundle hash is
+`79cb9b614779c23b`. The artifact has not yet been synced locally, and the
+catalog entry still has the stale lifecycle label `TODO_VERIFY_ARTIFACT`
+pending catalog promotion.
+
+The published fold recipes are:
+
+| Outer center | Consensus recipe | Stability outcome |
+| --- | --- | --- |
+| `0,1,2,3,5,9` | `A`: isotropic objective, standard-normal sampler | cross-seed arm or conditional-family disagreement |
+| `6,7` | `D`: Task-Fisher objective, full conditional sampler | exactly unanimous |
+| `8` | `C`: isotropic objective, full conditional sampler | sampler family stable, objective unstable |
+
+Thus centers `0,1,2,3,5,8,9` are unstable and only centers `6,7` are exactly
+unanimous. This is a protocol-valid `NEGATIVE_RESULT` for broad training-seed
+stability of source-inner recipe selection and an operational `PASS` for the
+predeclared conservative publication gate. It remains
+`claim_scope=cvae_recipe_lock_only`: no outer-preservation, routing,
+generation-quality, or downstream-utility claim follows.
+
+Stop Stage-20 tuning. Stage 30 now has an eligible consensus-lock input, but
+its registry entry remains a planned placeholder without a runnable expert-bank
+implementation. Implement and protocol-review that runner before attempting
+Stage 30. The stability bundle does not change or unlock outer v1, which still
+consumes the scalar seed-42 lock bundle.
+
+### Non-adoptive v2 source-inner mechanism studies
+
+Two additional Stage-20 studies are registered independently of the current
+recipe locks:
+
+| Experiment ID | Config | Canonical output |
+| --- | --- | --- |
+| `midogpp.cvae.learned_conditional_prior_source_inner.v2` | `experiments/midogpp/stages/20_cvae_preservation/configs/learned_conditional_prior_source_inner_v2.yaml` | `artifacts/midogpp/20_cvae_preservation/learned_conditional_prior_source_inner_v2/seeds17_42_101/` |
+| `midogpp.cvae.task_fisher_shrinkage_source_inner.v2` | `experiments/midogpp/stages/20_cvae_preservation/configs/task_fisher_shrinkage_source_inner_v2.yaml` | `artifacts/midogpp/20_cvae_preservation/task_fisher_shrinkage_source_inner_v2/seeds17_42_101/` |
+
+Prepare and run them separately:
+
+```bash
+conda run -n thesis python -m midogpp_thesis workspace prepare \
+  midogpp.cvae.learned_conditional_prior_source_inner.v2
+conda run -n thesis python -m midogpp_thesis workspace run \
+  midogpp.cvae.learned_conditional_prior_source_inner.v2
+
+conda run -n thesis python -m midogpp_thesis workspace prepare \
+  midogpp.cvae.task_fisher_shrinkage_source_inner.v2
+conda run -n thesis python -m midogpp_thesis workspace run \
+  midogpp.cvae.task_fisher_shrinkage_source_inner.v2
+```
+
+The underlying preservation CLI surfaces are
+`source-inner-learned-conditional-prior-study` and
+`source-inner-task-fisher-shrinkage-study`. The registered workspace commands
+should be preferred because they resolve and record the exact dataset/cache
+inputs and canonical output root.
+
+Both runners use all nine outer centers, all eight remaining inner
+pseudo-targets, training seeds `17,42,101`, and generation seeds
+`17,42,101`. They persist exact-key checkpoints and final learned-prior or raw
+Fisher state, pair initialization/training/evaluation RNG where declared, and
+validate their complete bundle before marking `reports/run_state.json` as
+`COMPLETE`. A matching interrupted run resumes from exact sidecars; changed
+protocol, data, frame, objective, prior family, or code identity is a cache
+miss.
+
+Status: `IMPLEMENTED AND REGISTERED, NOT YET PRODUCTION-RUN`. Their output
+scope is `cvae_source_inner_study_only`; the catalog forbids reuse as expert
+bank, generation, routing, NELBO-compatibility, or downstream-utility evidence.
+They have no publication state, no `RecipeLock`, and no Stage-30 consumption
+edge. The current consensus locks and outer-v1 gate remain unchanged.
 
 ## Fail-Closed Preparation
 

@@ -1,0 +1,57 @@
+experiment:
+  name: virchow2_cvae_midogpp_task_fisher_shrinkage_source_inner_v2
+  mode: task_fisher_shrinkage_source_inner_study
+  study_version: v2
+  artifact_root: output://midogpp_output_cvae_task_fisher_shrinkage_source_inner_v2
+  code_version: task_fisher_shrinkage_source_inner_v2
+
+inputs:
+  manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  feature_cache_path: artifact://midogpp_virchow2_xyxy_feature_cache_seed42/embeddings/train.pt
+
+run:
+  heldout_centers: all
+  expected_feature_dim: 2560
+  training_seeds: [17, 42, 101]
+  generation_seeds: [17, 42, 101]
+  device: cuda:0
+
+model:
+  pca_dim: 128
+  latent_dim: 32
+  hidden_dim: 512
+  num_hidden_layers: 2
+  train_epochs: 100
+  batch_size: 128
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  gradient_clip_norm: 5.0
+  beta_final: 0.001
+  kl_warmup_epochs: 25
+
+prior:
+  family: standard_normal
+  fixed_across_alphas: true
+
+objective:
+  alphas: [0.0, 0.05, 0.10, 0.25]
+  raw_fisher_fit_scope: shared_per_outer_inner
+  alpha_zero_policy: literal_isotropic_metric_none
+
+generation:
+  budget_policy: source_empirical_class_counts_from_y_fit
+
+decisions:
+  fisher_min_mean_delta: 0.01
+  min_inner_wins: 6
+  tie_margin: 0.01
+  safety_max_bacc_regression: 0.01
+  minimum_real_bacc: 0.55
+
+claim_boundary:
+  allowed: fully nested source-inner Task-Fisher shrinkage study evidence only
+  forbidden: recipe adoption, outer-target preservation, expert-bank input, generation evidence, routing, expert selection, NELBO compatibility, or downstream utility
+  target_evaluation_data_used: false
+  may_change_existing_consensus_locks: false
+  may_feed_recipe_selection: false
+  may_feed_deployable_selection: false

@@ -52,6 +52,7 @@ class ArtifactEntry:
     authoritative_files: tuple[str, ...]
     expected_file_hashes: Mapping[str, FileHashExpectation]
     forbidden_reuse: tuple[str, ...]
+    may_feed_recipe_selection: bool | None
     may_feed_deployable_selection: bool | None
 
     @property
@@ -685,6 +686,13 @@ class MidogppWorkspace:
                 raise WorkspaceError(
                     f"{artifact_id}: may_feed_deployable_selection must be a boolean or null"
                 )
+            may_feed_recipe_selection = raw.get("may_feed_recipe_selection")
+            if may_feed_recipe_selection is not None and not isinstance(
+                may_feed_recipe_selection, bool
+            ):
+                raise WorkspaceError(
+                    f"{artifact_id}: may_feed_recipe_selection must be a boolean or null"
+                )
             parsed[artifact_id] = ArtifactEntry(
                 artifact_id=artifact_id,
                 stage=str(raw.get("stage", "")),
@@ -699,6 +707,7 @@ class MidogppWorkspace:
                 authoritative_files=authoritative_files,
                 expected_file_hashes=expected_file_hashes,
                 forbidden_reuse=forbidden_reuse,
+                may_feed_recipe_selection=may_feed_recipe_selection,
                 may_feed_deployable_selection=may_feed_selection,
             )
         return parsed

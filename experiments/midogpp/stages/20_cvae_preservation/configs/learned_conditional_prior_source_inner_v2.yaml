@@ -1,0 +1,64 @@
+experiment:
+  name: virchow2_cvae_midogpp_learned_conditional_prior_source_inner_v2
+  mode: learned_conditional_prior_source_inner_study
+  study_version: v2
+  artifact_root: output://midogpp_output_cvae_learned_conditional_prior_source_inner_v2
+  code_version: learned_conditional_prior_source_inner_v2
+
+inputs:
+  manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  feature_cache_path: artifact://midogpp_virchow2_xyxy_feature_cache_seed42/embeddings/train.pt
+
+run:
+  heldout_centers: all
+  expected_feature_dim: 2560
+  training_seeds: [17, 42, 101]
+  generation_seeds: [17, 42, 101]
+  device: cuda:0
+
+model:
+  pca_dim: 128
+  latent_dim: 32
+  hidden_dim: 512
+  num_hidden_layers: 2
+  train_epochs: 100
+  batch_size: 128
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  gradient_clip_norm: 5.0
+  beta_final: 0.001
+  kl_warmup_epochs: 25
+
+objective:
+  family: stochastic_isotropic_v1
+  fixed_across_arms: true
+
+prior:
+  arms: [A, C-diag, E]
+  standard_family: standard_normal
+  ex_post_family: class_conditional_diagonal_total_moment
+  learned_family: learned_class_conditional_diagonal_gaussian
+  logvar_parameterization: bounded_tanh
+  logvar_bound: 6.0
+  initialization: exact_standard_normal
+  optimizer_learning_rate_multiplier: 1.0
+  optimizer_weight_decay: 0.0
+  prior_gradient_clip_norm: 5.0
+
+generation:
+  budget_policy: source_empirical_class_counts_from_y_fit
+
+decisions:
+  e_vs_a_min_mean_delta: 0.05
+  e_vs_c_min_mean_delta: 0.01
+  min_inner_wins: 6
+  safety_max_bacc_regression: 0.01
+  minimum_real_bacc: 0.55
+
+claim_boundary:
+  allowed: fully nested source-inner learned-prior study evidence only
+  forbidden: recipe adoption, outer-target preservation, expert-bank input, generation evidence, routing, expert selection, NELBO compatibility, or downstream utility
+  target_evaluation_data_used: false
+  may_change_existing_consensus_locks: false
+  may_feed_recipe_selection: false
+  may_feed_deployable_selection: false

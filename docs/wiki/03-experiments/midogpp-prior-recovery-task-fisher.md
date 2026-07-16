@@ -3,20 +3,19 @@
 ## Purpose And Status
 
 This page documents the implemented prior-recovery protocol and the completed
-Stage-10 matched-reference and Stage-20 source-inner results. It does not report
-an outer-preservation result.
+Stage-10 matched-reference, scalar Stage-20 source-inner, and bounded Stage-20
+training-seed stability results. It does not report an outer-preservation
+result.
 
-Current status: the matched Stage-10 v2 bundle validates `PASS`; the Stage-20
-source-inner bundle is `COMPLETE`, passes its full validator, and reports
-`NEGATIVE_GATE_COMPLETE`. Seven of nine locks are conditional, while centers
-`5` and `9` retain the standard-normal fallback. Because
-`factorial_triggered=false`, the registered outer v1 is blocked by design.
-These workstation bundles are not yet synced locally, and their catalog
-destinations still carry `TODO_VERIFY_ARTIFACT` lifecycle labels. Earlier
+Current status: the matched Stage-10 v2 bundle validates `PASS`; the scalar
+Stage-20 source-inner bundle is `COMPLETE`, passes its full validator, and
+reports `NEGATIVE_GATE_COMPLETE`; and the training-seed stability bundle is
+`COMPLETE`, `PUBLISHED`, and accepted by the Stage-30 recipe loader. Because the
+scalar source-inner bundle has `factorial_triggered=false`, registered outer v1
+remains blocked by design. These workstation bundles are not yet synced
+locally, and their catalog destinations still carry stale
+`TODO_VERIFY_ARTIFACT` lifecycle labels pending catalog promotion. Earlier
 invalid or terminated partial roots remain non-evidence.
-
-The separate training-seed stability experiment is implemented and registered
-but has not been production-run. It has no result on this page.
 
 ## Evidence Sequence
 
@@ -228,8 +227,9 @@ strict inner comparisons. Center `9` is inconsistent: its best full sampler
 improves the mean by `+0.087841`, but wins only `4/8`. Both therefore miss the
 predeclared six-win requirement despite clearing the mean-delta threshold. The
 full bundle has valid locks, sampler realizations, checkpoint audits, identity
-audits, and zero recorded overlap. Training-seed stability has not yet been
-measured because this run fixed the training seed at `42`.
+audits, and zero recorded overlap. This scalar bundle fixes the training seed
+at `42`; its stability is evaluated separately by the completed bounded panel
+below.
 
 Implication: the result supports seven conditional source-inner recipe locks
 and two standard-normal fallbacks, not a universal conditional-prior or
@@ -342,13 +342,16 @@ conda run -n thesis python -m midogpp_thesis workspace run \
 
 Do not run `midogpp.cvae.prior_recovery_outer.v1` with the current lock bundle.
 
-## Registered Training-Seed Stability Check
+## Validated Training-Seed Stability Result
 
-Run one bounded source-inner stability check with training seeds `17,42,101`
-and the existing generation seeds `17,42,101`, then stop Stage-20 optimization
-and proceed to the planned Stage-30 provenance-clean expert bank.
+The bounded source-inner stability panel uses training seeds `17,42,101` and
+generation seeds `17,42,101`. Its canonical artifact is:
 
-Status: `IMPLEMENTED AND REGISTERED, NOT YET PRODUCTION-RUN`. The experiment
+```text
+artifacts/midogpp/20_cvae_preservation/prior_recovery_source_inner_training_seed_stability_v1/seeds17_42_101/
+```
+
+The experiment
 `midogpp.cvae.prior_recovery_source_inner_training_seed_stability.v1` fully
 crosses training and generation seeds `17,42,101`. It shares deterministic
 nested-classifier, real-reference, identity-audit, and PCA preparation once per
@@ -371,19 +374,93 @@ validation fails. Only `PUBLISHED` is consumable. The Stage-30 loader then
 requires every consensus lock in the bundle to be valid and export-ready before
 returning consensus lock `H` for expert-bank fold `H`.
 
-This stability input changes neither neighboring evidence boundary: outer v1
-continues to consume the scalar source-inner locks and remains blocked by its
-original gate, while scalar seed-42 evidence remains a one-training-seed result.
-No scientific stability result exists until the canonical production artifact
-is run, validated, and published.
+### Validation
+
+The canonical workstation bundle is `COMPLETE` and `PUBLISHED`. The full
+validator and leakage, identity-overlap, and RNG checks pass. All `27/27` child
+locks validate, all `9/9` consensus locks are export-ready, and
+`stage30_recipe_ready=true`. The Stage-30 loader accepts the bundle. The
+protocol hash is `bbde3e5c5a1e3374`, and the selection-bundle hash is
+`79cb9b614779c23b`.
+
+### Cross-seed result
+
+| Outer center | Consensus arm | Objective | Sampler | Interpretation |
+| --- | --- | --- | --- | --- |
+| `0,1,2,3,5,9` | `A` | isotropic | standard normal | cross-seed arm or conditional-family disagreement; conservative fallback |
+| `6,7` | `D` | Task-Fisher | full conditional | exactly unanimous across training seeds |
+| `8` | `C` | isotropic | full conditional | sampler family stable, objective unstable |
+
+Only centers `6` and `7` are exactly unanimous. Centers
+`0,1,2,3,5,8,9` are unstable under the predeclared rule. In particular, center
+`8` does not count as exactly stable: all seeds retain the full conditional
+sampler, but the objective choice diverges and the rule falls back to isotropic
+`C`.
+
+Claim classification: thesis-facing `NEGATIVE_RESULT` for broad training-seed
+stability of source-inner recipe selection, paired with an operational `PASS`
+for the predeclared conservative consensus publication gate. The nine locks are
+export-ready because the fallback contract produced a complete valid recipe
+bank; this does not imply conditional recipe stability across all folds.
+
+Claim boundary: `cvae_recipe_lock_only`. This result does not establish outer
+preservation, routing, compatibility, generation quality, or downstream
+utility. Outer v1 continues to consume the scalar source-inner locks and
+remains blocked by its original gate. The stability publication is an eligible
+Stage-30 input, but Stage 30 still has only a planned placeholder and no
+runnable expert-bank implementation. Stop Stage-20 tuning and implement the
+provenance-clean Stage-30 runner next.
+
+## Separate V2 Prior And Objective Studies
+
+Two additive Stage-20 studies are implemented and registered as non-adoptive
+source-inner evidence surfaces:
+
+- `midogpp.cvae.learned_conditional_prior_source_inner.v2` compares matched
+  standard normal `A`, ex-post diagonal `C-diag`, and jointly learned
+  class-conditional diagonal Gaussian `E` under the fixed isotropic objective;
+- `midogpp.cvae.task_fisher_shrinkage_source_inner.v2` fixes the
+  standard-normal prior and compares
+  `alpha in {0,0.05,0.10,0.25}` in
+  `M_alpha=(I+alpha*F_tilde)/(1+alpha)`.
+
+Both use all eligible outer/inner folds and the fully crossed training and
+generation seeds `17,42,101`. The learned-prior implementation uses bounded
+`6*tanh(rho/6)` log variance, analytic normalized KL, a zero-weight-decay prior
+optimizer group, separate clipping, final source-posterior sufficient
+statistics, per-class/per-dimension KL audits, and per-epoch prior range and
+saturation diagnostics. The Fisher implementation fits one source-only raw
+rank-one state per `(H,I)`, derives every nonzero alpha from it, and keeps
+`alpha=0` as literal isotropic `metric=None`. Initialization, stochastic
+training streams, and evaluation epsilon are paired across the intended study
+axes and persisted for recomputation.
+
+Status: `IMPLEMENTED AND REGISTERED, NOT YET PRODUCTION-RUN`. No v2 mechanism
+result exists yet. Their artifact roots are:
+
+```text
+artifacts/midogpp/20_cvae_preservation/learned_conditional_prior_source_inner_v2/seeds17_42_101/
+artifacts/midogpp/20_cvae_preservation/task_fisher_shrinkage_source_inner_v2/seeds17_42_101/
+```
+
+Their scope is `cvae_source_inner_study_only`. Neither emits a `RecipeLock` or
+publication state, neither is consumable by Stage 30 or later stages, and
+neither may revise the current consensus locks. An unavailable `C-diag`
+invalidates only the secondary E-vs-C comparison; a finite but
+mechanism-ineligible E is valid negative evidence. An invalid raw Fisher state
+produces a mechanically complete, validated-invalid attempt with
+`reports/study_decision.json` marked `INVALID_INCOMPLETE`, not a selected
+alpha. Stage 30 may proceed using its current published locks independently of
+these studies.
 
 ## Validation Before Interpretation
 
-The metrics above are limited to the two workstation bundles that passed their
-full validators. Before catalog promotion or thesis-facing reuse, preserve the
-resolved config, input provenance, protocol manifest, accepted leakage report,
-complete tables, identity checks, and tamper-evident checkpoint/Task-Fisher
-indexes during local sync. Any future outer artifact additionally needs
+The results above are limited to the three workstation bundles that passed
+their full validators. During local sync, preserve the resolved configs, input
+provenance, protocol manifests, accepted leakage reports, complete tables,
+identity checks, RNG audit, publication state, consensus locks, and
+tamper-evident checkpoint/Task-Fisher indexes. Catalog lifecycle promotion
+remains a separate repository update. Any future outer artifact additionally needs
 `manifests/coverage_manifest.json` with `status=PASS` and a decision report
 that recomputes from the metric rows, plus a validated
 `tables/sampler_realizations.csv` bound to those rows.

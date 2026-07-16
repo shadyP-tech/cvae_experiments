@@ -24,6 +24,14 @@ def build_parser() -> argparse.ArgumentParser:
             "source-inner-prior-recovery-training-seed-stability",
             "Run the bounded source-inner training-seed stability panel.",
         ),
+        (
+            "source-inner-learned-conditional-prior-study",
+            "Run the non-adoptive learned conditional-prior source-inner study.",
+        ),
+        (
+            "source-inner-task-fisher-shrinkage-study",
+            "Run the non-adoptive Task-Fisher shrinkage source-inner study.",
+        ),
         ("prior-recovery-outer", "Run the locked outer A/B/C/D preservation matrix."),
     ):
         command = sub.add_parser(name, help=help_text)
@@ -96,6 +104,38 @@ def _surface_handler(surface: str) -> tuple[Loader, Runner]:
                 expected_mode="source_inner_training_seed_stability",
             ),
             run_source_inner_training_seed_stability,
+        )
+    if surface == "source-inner-learned-conditional-prior-study":
+        from .source_inner_studies.config import (
+            LEARNED_PRIOR_MODE,
+            load_source_inner_study_config,
+        )
+        from .source_inner_studies.prior_runner import (
+            run_learned_conditional_prior_source_inner_study,
+        )
+
+        return (
+            lambda path: load_source_inner_study_config(
+                path,
+                expected_mode=LEARNED_PRIOR_MODE,
+            ),
+            run_learned_conditional_prior_source_inner_study,
+        )
+    if surface == "source-inner-task-fisher-shrinkage-study":
+        from .source_inner_studies.config import (
+            FISHER_SHRINKAGE_MODE,
+            load_source_inner_study_config,
+        )
+        from .source_inner_studies.fisher_runner import (
+            run_task_fisher_shrinkage_source_inner_study,
+        )
+
+        return (
+            lambda path: load_source_inner_study_config(
+                path,
+                expected_mode=FISHER_SHRINKAGE_MODE,
+            ),
+            run_task_fisher_shrinkage_source_inner_study,
         )
     if surface == "prior-recovery-outer":
         from .prior_recovery import run_outer_prior_recovery
