@@ -7,7 +7,7 @@ from typing import Mapping, Sequence
 
 from ...real_features.classifier_reference.artifacts import stable_hash
 from ...real_features.classifier_reference.classifiers import ClassifierSpec
-from ...real_features.classifier_reference.midogpp_real_feature_classifier import (
+from ...real_features.classifier_reference.real_feature_frame import (
     RealFeatureFrame,
     load_midogpp_real_feature_frame,
 )

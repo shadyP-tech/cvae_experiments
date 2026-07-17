@@ -29,7 +29,7 @@ COMMANDS: dict[str, tuple[str, str]] = {
     ),
     "real-feature-classifier": (
         "midogpp_thesis.real_features.classifier_reference.cli:main",
-        "Run source-inner real-feature classifier tuning.",
+        "Run real-feature classifier references and diagnostics.",
     ),
     "cvae-preservation": (
         "midogpp_thesis.cvae.preservation.cli:main",

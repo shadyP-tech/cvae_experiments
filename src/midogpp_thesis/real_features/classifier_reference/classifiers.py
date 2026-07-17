@@ -98,6 +98,7 @@ class FittedClassifierResult:
     n_iter: tuple[int, ...]
     converged: bool
     classifier_config_hash: str
+    scaler_state_hash: str
 
 
 def validate_classifier_spec(spec: ClassifierSpec) -> None:
@@ -161,6 +162,7 @@ def fit_logistic_classifier(
     eval_embeddings: Sequence[Sequence[float]],
     *,
     spec: ClassifierSpec,
+    sample_weight: Sequence[float] | None = None,
 ) -> FittedClassifierResult:
     """Fit a validated logistic classifier with scaler fit only on training data."""
 
@@ -182,15 +184,52 @@ def fit_logistic_classifier(
         raise ValueError("Training and evaluation embeddings must share the same projection frame.")
     if sorted(set(int(v) for v in y_train.tolist())) != [0, 1]:
         raise ValueError("Downstream logistic classifier expects binary training labels 0/1.")
+    validated_sample_weight = None
+    if sample_weight is not None:
+        validated_sample_weight = np.asarray(sample_weight, dtype=float)
+        if validated_sample_weight.ndim != 1:
+            raise ValueError("sample_weight must be a 1D array.")
+        if (
+            validated_sample_weight.shape[0] != x_train.shape[0]
+            or validated_sample_weight.shape[0] != y_train.shape[0]
+        ):
+            raise ValueError("sample_weight must align with the training rows and labels.")
+        if not np.all(np.isfinite(validated_sample_weight)):
+            raise ValueError("sample_weight must contain only finite values.")
+        if np.any(validated_sample_weight < 0.0):
+            raise ValueError("sample_weight must be nonnegative.")
+        if float(np.sum(validated_sample_weight)) <= 0.0:
+            raise ValueError("sample_weight must have positive total mass.")
+        for label in (0, 1):
+            if float(np.sum(validated_sample_weight[y_train == label])) <= 0.0:
+                raise ValueError(
+                    "sample_weight must have positive effective mass for both classes."
+                )
 
     scaler = StandardScaler()
     x_train_scaled = scaler.fit_transform(x_train)
     x_eval_scaled = scaler.transform(x_eval)
+    scaler_state_hash = stable_hash(
+        {
+            "mean_": np.asarray(scaler.mean_, dtype=float).tolist(),
+            "var_": np.asarray(scaler.var_, dtype=float).tolist(),
+            "scale_": np.asarray(scaler.scale_, dtype=float).tolist(),
+            "n_features_in_": int(scaler.n_features_in_),
+            "n_samples_seen_": np.asarray(scaler.n_samples_seen_).tolist(),
+        }
+    )
     clf = LogisticRegression(**spec.to_sklearn_kwargs())
     convergence_warnings = []
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        clf.fit(x_train_scaled, y_train)
+        if validated_sample_weight is None:
+            clf.fit(x_train_scaled, y_train)
+        else:
+            clf.fit(
+                x_train_scaled,
+                y_train,
+                sample_weight=validated_sample_weight,
+            )
         convergence_warnings = [
             item for item in caught if issubclass(item.category, ConvergenceWarning)
         ]
@@ -211,4 +250,5 @@ def fit_logistic_classifier(
         n_iter=n_iter,
         converged=bool(converged),
         classifier_config_hash=spec.config_hash,
+        scaler_state_hash=scaler_state_hash,
     )

@@ -8,10 +8,10 @@ from pathlib import Path
 
 from .classifier_grid import add_classifier_grid_arguments, classifier_specs_from_args, csv_values
 from .midogpp_real_feature_classifier import (
-    load_midogpp_real_feature_frame,
     run_midogpp_real_feature_source_inner_classifier_tuning,
 )
 from .protocol import ProtocolError
+from .real_feature_frame import load_midogpp_real_feature_frame
 from .schemas.midogpp import MIDOGPP_ELIGIBLE_CENTERS
 
 
@@ -26,6 +26,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     matched.add_argument("--config", required=True)
     matched.add_argument("--artifact-root", default=None)
+    fixed_risk = subparsers.add_parser(
+        "fixed-c-risk-diagnostic",
+        help="Run the fixed-C four-arm risk-weighting diagnostic.",
+    )
+    fixed_risk.add_argument("--config", required=True)
+    fixed_risk.add_argument("--artifact-root", default=None)
     return parser
 
 
@@ -36,6 +42,19 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_matched_reference_config(args.config)
         output = run_matched_reference(
+            config,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(output)
+        return 0
+    if args.surface == "fixed-c-risk-diagnostic":
+        from .fixed_c_risk_diagnostic import (
+            load_fixed_c_risk_config,
+            run_fixed_c_risk_diagnostic,
+        )
+
+        config = load_fixed_c_risk_config(args.config)
+        output = run_fixed_c_risk_diagnostic(
             config,
             artifact_root=Path(args.artifact_root) if args.artifact_root else None,
         )

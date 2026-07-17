@@ -13,7 +13,7 @@ from ...real_features.classifier_reference.matched_reference import (
     PredictOnlySelection,
     select_nested_predict_spec_source_only,
 )
-from ...real_features.classifier_reference.midogpp_real_feature_classifier import (
+from ...real_features.classifier_reference.real_feature_frame import (
     RealFeatureFrame,
 )
 from ...real_features.classifier_reference.protocol import ProtocolError

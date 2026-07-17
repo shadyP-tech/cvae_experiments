@@ -22,7 +22,7 @@ from midogpp_thesis.real_features.classifier_reference.matched_reference import 
     select_nested_predict_spec,
     select_nested_predict_spec_source_only,
 )
-from midogpp_thesis.real_features.classifier_reference.midogpp_real_feature_classifier import (
+from midogpp_thesis.real_features.classifier_reference.real_feature_frame import (
     load_midogpp_real_feature_frame,
 )
 from midogpp_thesis.real_features.classifier_reference.protocol import ProtocolError

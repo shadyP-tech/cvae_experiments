@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Mapping, Sequence
 
 from ...real_features.classifier_reference.artifacts import stable_hash
-from ...real_features.classifier_reference.midogpp_real_feature_classifier import (
+from ...real_features.classifier_reference.real_feature_frame import (
     RealFeatureFrame,
 )
 from ...real_features.classifier_reference.protocol import ProtocolError

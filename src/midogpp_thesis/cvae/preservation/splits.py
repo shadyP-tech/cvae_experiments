@@ -6,7 +6,7 @@ from dataclasses import dataclass, replace
 import hashlib
 from typing import Mapping, Sequence
 
-from ...real_features.classifier_reference.midogpp_real_feature_classifier import RealFeatureFrame
+from ...real_features.classifier_reference.real_feature_frame import RealFeatureFrame
 from ...real_features.classifier_reference.schemas.midogpp import (
     MIDOGPP_ELIGIBLE_CENTERS,
     MIDOGPP_EXCLUDED_CENTERS,

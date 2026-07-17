@@ -10,7 +10,7 @@ from midogpp_thesis.cvae.preservation.splits import (
     outer_split,
     source_only_frame,
 )
-from midogpp_thesis.real_features.classifier_reference.midogpp_real_feature_classifier import (
+from midogpp_thesis.real_features.classifier_reference.real_feature_frame import (
     RealFeatureFrame,
     RealFeatureRow,
 )

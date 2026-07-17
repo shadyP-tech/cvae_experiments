@@ -359,6 +359,41 @@ artifacts:
       - tables/classifier_tuned_predictions.csv
     may_feed_deployable_selection: false
 
+  - artifact_id: midogpp_output_real_feature_fixed_c_risk_diagnostic_v1
+    stage: 10_real_feature_reference
+    canonical_path: artifacts/midogpp/10_real_feature_reference/fixed_c_risk_diagnostic_v1/seed42
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: TODO_VERIFY_ARTIFACT
+    claim_scope: real_feature_transfer_only
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/frozen_protocol_snapshot.json
+      - manifests/protocol_manifest.json
+      - reports/leakage_provenance_report.json
+      - reports/diagnostic_summary.json
+      - reports/diagnostic_report.md
+      - reports/runtime_summary.json
+      - tables/fixed_c_risk_results.csv
+      - tables/fixed_c_risk_predictions.csv
+      - tables/fixed_c_risk_weight_audit.csv
+      - tables/fixed_c_risk_paired_comparison.csv
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Non-adoptive fixed-C weighting diagnostic; only Stage-90 oracle and diagnostic evidence may consume it.
+
   - artifact_id: midogpp_output_real_feature_signal_controls_v1
     stage: 10_real_feature_reference
     canonical_path: artifacts/midogpp/10_real_feature_reference/midogpp_virchow2_real_feature_signal_controls/v1

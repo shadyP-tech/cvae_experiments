@@ -13,7 +13,7 @@ from .artifacts import prepare_artifact_dirs, stable_hash, write_csv_rows, write
 from .classifier_grid import build_classifier_specs
 from .classifiers import ClassifierSpec, classifier_grid_hash, fit_logistic_classifier
 from .downstream import balanced_accuracy, macro_f1
-from .midogpp_real_feature_classifier import (
+from .real_feature_frame import (
     RealFeatureFrame,
     load_midogpp_real_feature_frame,
 )

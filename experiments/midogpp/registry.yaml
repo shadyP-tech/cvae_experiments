@@ -266,6 +266,30 @@ experiments:
         - --artifact-root
         - output://midogpp_output_eligible_tuned_real_reference_v2
 
+  - experiment_id: midogpp.real_feature.fixed_c_risk_diagnostic.v1
+    stage: 10_real_feature_reference
+    status: diagnostic
+    claim_scope: real_feature_transfer_only
+    config_path: experiments/midogpp/stages/10_real_feature_reference/configs/fixed_c_risk_diagnostic_v1.yaml
+    output_artifact_id: midogpp_output_real_feature_fixed_c_risk_diagnostic_v1
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_xyxy_feature_cache_seed42
+    runner:
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - real-feature-classifier
+        - fixed-c-risk-diagnostic
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_real_feature_fixed_c_risk_diagnostic_v1
+    notes:
+      - Four predeclared source-fit weighting arms are evaluated under one fixed classifier.
+      - The diagnostic cannot select or adopt a classifier, weighting rule, recipe, or deployable policy.
+
   - experiment_id: midogpp.real_feature.signal_controls.v1
     stage: 10_real_feature_reference
     status: diagnostic

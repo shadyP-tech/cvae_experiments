@@ -233,6 +233,7 @@ def study_implementation_lineage(mode: str) -> dict[str, object]:
         preservation / "representations.py",
         preservation / "splits.py",
         cvae.parent / "real_features/classifier_reference/classifiers.py",
+        cvae.parent / "real_features/classifier_reference/real_feature_frame.py",
         cvae.parent
         / "real_features/classifier_reference/midogpp_real_feature_classifier.py",
     )

@@ -1,0 +1,69 @@
+experiment:
+  name: fixed_c_risk_diagnostic_v1
+  mode: fixed_c_risk_diagnostic
+  artifact_root: output://midogpp_output_real_feature_fixed_c_risk_diagnostic_v1
+  code_version: fixed_c_risk_diagnostic_v1
+
+inputs:
+  manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  feature_cache_path: artifact://midogpp_virchow2_xyxy_feature_cache_seed42/embeddings/train.pt
+
+run:
+  experiment_seed: 42
+  heldout_centers: all
+  expected_feature_dim: 2560
+  expected_outer_fold_count: 9
+  expected_arm_count: 4
+  expected_fit_count: 36
+
+classifier:
+  C: 0.01
+  penalty: l2
+  solver: lbfgs
+  max_iter: 5000
+  class_weight: none
+  random_state: 23
+  threshold_policy: predict
+  expected_config_hash: 86378e6ceb12136e
+
+weighting:
+  arms:
+    - pooled
+    - global_class
+    - domain
+    - domain_class
+  formulas:
+    pooled: "1"
+    global_class: "N/(2*n_y)"
+    domain: "N/(D*n_d)"
+    domain_class: "N/(2*D*n_dy)"
+  normalization: sum_to_n_fit
+  zero_cell_policy: fail_closed
+  require_finite_positive_weights: true
+
+comparison:
+  primary_contrast: domain_class_minus_pooled
+  paired_by: heldout_center
+  selection_rule: none
+  adoption_enabled: false
+
+claim_boundary:
+  claim_scope: real_feature_transfer_only
+  diagnostic_only: true
+  non_adoptive: true
+  target_evaluation_labels_used_for_fit: false
+  target_evaluation_labels_used_for_selection: false
+  target_evaluation_labels_used_for_scoring_only: true
+  uses_cvae_checkpoint: false
+  uses_generated_embeddings: false
+  uses_prior: false
+  uses_router: false
+  may_feed_recipe_selection: false
+  may_feed_deployable_selection: false
+  allowed: >
+    Diagnostic comparison of four predeclared source-fit weighting formulas
+    under one fixed real-feature logistic-regression configuration.
+  forbidden: >
+    No classifier, weighting, recipe, router, expert, generation, or
+    downstream-policy selection or adoption; no CVAE preservation, prior,
+    routing, or synthetic-utility claim.

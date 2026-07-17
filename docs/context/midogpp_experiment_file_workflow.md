@@ -1,6 +1,6 @@
 # MIDOG++ Experiment File Workflow
 
-Last updated: 2026-07-16
+Last updated: 2026-07-17
 
 This is the operational path and command reference for the active MIDOG++
 checkout. Result interpretation belongs in
@@ -219,6 +219,45 @@ Validation binds the three table contents through `reference_bundle_hash`, then
 binds that content identity to the protocol, resolved config, registered
 dataset/cache inputs, and their SHA-256 values. The Stage-20 outer run imports
 that bound reference identity; it does not accept an unverified table copy.
+
+### Fixed-C risk-weighting diagnostic v1
+
+The registered non-adoptive weighting diagnostic is:
+
+```text
+midogpp.real_feature.fixed_c_risk_diagnostic.v1
+experiments/midogpp/stages/10_real_feature_reference/configs/fixed_c_risk_diagnostic_v1.yaml
+artifacts/midogpp/10_real_feature_reference/fixed_c_risk_diagnostic_v1/seed42/
+```
+
+It consumes only the frozen MIDOG++ contract and corrected Virchow2 `xyxy`
+feature cache. Across the nine eligible held-out centers it runs the four
+predeclared `pooled`, `global_class`, `domain`, and `domain_class` source-fit
+weighting arms under the same fixed logistic-regression configuration. Raw
+weights use `1`, `N/(2*n_y)`, `N/(D*n_d)`, and `N/(2*D*n_dy)`,
+respectively, and each arm is normalized to sum to its source-fit row count.
+This is a fixed `9 x 4 = 36` diagnostic; it performs no model, arm, recipe, or
+policy selection.
+
+Prepare and run it through the workspace:
+
+```bash
+conda run -n thesis python -m midogpp_thesis workspace prepare \
+  midogpp.real_feature.fixed_c_risk_diagnostic.v1
+conda run -n thesis python -m midogpp_thesis workspace run \
+  midogpp.real_feature.fixed_c_risk_diagnostic.v1
+```
+
+Its maximum claim scope is `real_feature_transfer_only`, with held-out labels
+used for scoring only. Catalog policy fixes
+`may_feed_recipe_selection=false` and
+`may_feed_deployable_selection=false`, and forbids consumption by every
+current workspace purpose except Stage-90
+`oracle_and_diagnostic_evidence`. It is not a Stage-20 input, a routing
+signal, a deployable weighting rule, or evidence for CVAE preservation,
+generation, prior quality, or synthetic downstream utility. The catalog
+defines the required 12-file destination bundle, but this workflow page
+records no result or metric for an unvalidated run.
 
 ## Registered CVAE Preservation Workflow
 

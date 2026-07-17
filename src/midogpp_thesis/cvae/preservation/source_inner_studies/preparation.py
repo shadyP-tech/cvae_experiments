@@ -13,7 +13,7 @@ import hashlib
 from pathlib import Path
 from typing import Mapping
 
-from ....real_features.classifier_reference.midogpp_real_feature_classifier import (
+from ....real_features.classifier_reference.real_feature_frame import (
     RealFeatureFrame,
     load_midogpp_real_feature_frame,
 )

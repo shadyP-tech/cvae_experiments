@@ -15,8 +15,10 @@ from midogpp_thesis.real_features.classifier_reference.source_inner_classifier_t
 )
 from midogpp_thesis.real_features.classifier_reference.midogpp_real_feature_classifier import (
     build_source_inner_folds,
-    load_midogpp_real_feature_frame,
     run_midogpp_real_feature_source_inner_classifier_tuning,
+)
+from midogpp_thesis.real_features.classifier_reference.real_feature_frame import (
+    load_midogpp_real_feature_frame,
 )
 from midogpp_thesis.real_features.classifier_reference.cli import build_parser
 
@@ -158,7 +160,11 @@ def test_midogpp_real_feature_cli_excludes_forbidden_backend_inputs() -> None:
 def test_real_feature_cli_help_exposes_matched_reference() -> None:
     parser = build_parser()
     choices = parser._subparsers._group_actions[0].choices
-    assert set(choices) == {"tune", "matched-reference"}
+    assert set(choices) == {
+        "tune",
+        "matched-reference",
+        "fixed-c-risk-diagnostic",
+    }
 
 
 def _write_midogpp_real_feature_fixture(
