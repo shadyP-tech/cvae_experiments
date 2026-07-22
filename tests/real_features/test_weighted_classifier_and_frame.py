@@ -14,7 +14,9 @@ from midogpp_thesis.real_features.classifier_reference.artifacts import stable_h
 from midogpp_thesis.real_features.classifier_reference.classifiers import (
     DEFAULT_LOCKED_CLASSIFIER_SPEC,
     ClassifierSpec,
+    _fit_standardized_logistic_classifier,
     fit_logistic_classifier,
+    standardize_fit_eval,
 )
 from midogpp_thesis.real_features.classifier_reference.real_feature_frame import (
     RealFeatureFrame,
@@ -165,3 +167,23 @@ def test_classifier_and_scaler_hash_snapshots_remain_stable() -> None:
         spec=DEFAULT_LOCKED_CLASSIFIER_SPEC,
     )
     assert result.scaler_state_hash == "099c2df0f2908b88"
+
+
+def test_shared_standardized_fit_preserves_public_wrapper_and_exposes_private_state() -> None:
+    spec = ClassifierSpec(C=0.01, max_iter=5000, random_state=23)
+    standardized = standardize_fit_eval(X_TRAIN, X_EVAL)
+    private = _fit_standardized_logistic_classifier(
+        standardized,
+        Y_TRAIN,
+        spec=spec,
+    )
+    public = fit_logistic_classifier(X_TRAIN, Y_TRAIN, X_EVAL, spec=spec)
+
+    np.testing.assert_array_equal(private.predictions, public.predictions)
+    np.testing.assert_array_equal(private.probabilities, public.probabilities)
+    assert private.classes == public.classes
+    assert private.n_iter == public.n_iter
+    assert private.converged is public.converged
+    assert private.scaler_state_hash == public.scaler_state_hash
+    assert np.asarray(private.coefficients).shape == (1, X_TRAIN.shape[1])
+    assert np.asarray(private.intercept).shape == (1,)

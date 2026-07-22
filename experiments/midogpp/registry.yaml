@@ -290,6 +290,33 @@ experiments:
       - Four predeclared source-fit weighting arms are evaluated under one fixed classifier.
       - The diagnostic cannot select or adopt a classifier, weighting rule, recipe, or deployable policy.
 
+  - experiment_id: midogpp.real_feature.conditional_logit_alignment.v1
+    stage: 10_real_feature_reference
+    status: diagnostic
+    claim_scope: real_feature_transfer_only
+    config_path: experiments/midogpp/stages/10_real_feature_reference/configs/conditional_logit_alignment_v1.yaml
+    output_artifact_id: midogpp_output_real_feature_conditional_logit_alignment_v1
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_xyxy_feature_cache_seed42
+    runner:
+      environment:
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - real-feature-classifier
+        - conditional-logit-alignment
+        - --config
+        - "{resolved_config}"
+    notes:
+      - Gamma is selected separately per outer center using source-inner center LODO only.
+      - The output is a standalone non-adoptive real-feature diagnostic and cannot feed Stage 20 or later selection.
+
   - experiment_id: midogpp.real_feature.signal_controls.v1
     stage: 10_real_feature_reference
     status: diagnostic

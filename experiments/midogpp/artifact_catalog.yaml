@@ -394,6 +394,45 @@ artifacts:
     notes:
       - Non-adoptive fixed-C weighting diagnostic; only Stage-90 oracle and diagnostic evidence may consume it.
 
+  - artifact_id: midogpp_output_real_feature_conditional_logit_alignment_v1
+    stage: 10_real_feature_reference
+    canonical_path: artifacts/midogpp/10_real_feature_reference/conditional_logit_alignment_v1/seed42
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: TODO_VERIFY_ARTIFACT
+    claim_scope: real_feature_transfer_only
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/frozen_protocol_snapshot.json
+      - manifests/protocol_manifest.json
+      - manifests/content_index.json
+      - reports/leakage_provenance_report.json
+      - reports/decision_summary.json
+      - reports/decision_report.md
+      - reports/runtime_summary.json
+      - tables/source_inner_fold_scores.csv
+      - tables/source_inner_gamma_summary.csv
+      - tables/outer_results.csv
+      - tables/outer_predictions.csv
+      - tables/conditional_frame_audit.csv
+      - tables/solver_audit.csv
+      - tables/outer_comparison.csv
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Standalone non-adoptive conditional-logit regularization diagnostic; only Stage-90 oracle and diagnostic evidence may consume it.
+
   - artifact_id: midogpp_output_real_feature_signal_controls_v1
     stage: 10_real_feature_reference
     canonical_path: artifacts/midogpp/10_real_feature_reference/midogpp_virchow2_real_feature_signal_controls/v1

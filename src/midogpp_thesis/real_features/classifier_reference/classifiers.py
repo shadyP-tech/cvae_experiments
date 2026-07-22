@@ -101,6 +101,30 @@ class FittedClassifierResult:
     scaler_state_hash: str
 
 
+@dataclass(frozen=True)
+class StandardizedFitEval:
+    """One fit-only standardization frame shared by classifier implementations."""
+
+    fit_embeddings: object
+    eval_embeddings: object
+    scaler_state_hash: str
+
+
+@dataclass(frozen=True)
+class _StandardizedLogisticFit:
+    """Private fitted state used by extensions that need coefficients."""
+
+    predictions: object
+    probabilities: object
+    coefficients: object
+    intercept: object
+    classes: tuple[int, ...]
+    n_iter: tuple[int, ...]
+    converged: bool
+    classifier_config_hash: str
+    scaler_state_hash: str
+
+
 def validate_classifier_spec(spec: ClassifierSpec) -> None:
     if spec.family != "sklearn_logistic_regression":
         raise ProtocolError(f"Unsupported classifier family: {spec.family!r}")
@@ -166,22 +190,90 @@ def fit_logistic_classifier(
 ) -> FittedClassifierResult:
     """Fit a validated logistic classifier with scaler fit only on training data."""
 
+    standardized = standardize_fit_eval(train_embeddings, eval_embeddings)
+    fitted = _fit_standardized_logistic_classifier(
+        standardized,
+        train_labels,
+        spec=spec,
+        sample_weight=sample_weight,
+    )
+    return FittedClassifierResult(
+        predictions=fitted.predictions,
+        probabilities=fitted.probabilities,
+        classes=fitted.classes,
+        n_iter=fitted.n_iter,
+        converged=fitted.converged,
+        classifier_config_hash=fitted.classifier_config_hash,
+        scaler_state_hash=fitted.scaler_state_hash,
+    )
+
+
+def standardize_fit_eval(
+    fit_embeddings: Sequence[Sequence[float]],
+    eval_embeddings: Sequence[Sequence[float]],
+) -> StandardizedFitEval:
+    """Fit ``StandardScaler`` on fit rows and transform fit/evaluation rows."""
+
+    try:
+        import numpy as np  # type: ignore
+        from sklearn.preprocessing import StandardScaler  # type: ignore
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("Feature standardization requires numpy and scikit-learn.") from exc
+
+    x_fit = np.asarray(fit_embeddings, dtype=float)
+    x_eval = np.asarray(eval_embeddings, dtype=float)
+    if x_fit.ndim != 2 or x_eval.ndim != 2:
+        raise ValueError("Embeddings must be 2D arrays.")
+    if x_fit.shape[0] == 0 or x_eval.shape[0] == 0:
+        raise ValueError("Fit and evaluation embeddings must be nonempty.")
+    if x_fit.shape[1] != x_eval.shape[1]:
+        raise ValueError("Training and evaluation embeddings must share the same projection frame.")
+    if not np.all(np.isfinite(x_fit)) or not np.all(np.isfinite(x_eval)):
+        raise ValueError("Embeddings must contain only finite values.")
+
+    scaler = StandardScaler()
+    x_fit_scaled = scaler.fit_transform(x_fit)
+    x_eval_scaled = scaler.transform(x_eval)
+    scaler_state_hash = stable_hash(
+        {
+            "mean_": np.asarray(scaler.mean_, dtype=float).tolist(),
+            "var_": np.asarray(scaler.var_, dtype=float).tolist(),
+            "scale_": np.asarray(scaler.scale_, dtype=float).tolist(),
+            "n_features_in_": int(scaler.n_features_in_),
+            "n_samples_seen_": np.asarray(scaler.n_samples_seen_).tolist(),
+        }
+    )
+    return StandardizedFitEval(
+        fit_embeddings=x_fit_scaled,
+        eval_embeddings=x_eval_scaled,
+        scaler_state_hash=scaler_state_hash,
+    )
+
+
+def _fit_standardized_logistic_classifier(
+    standardized: StandardizedFitEval,
+    fit_labels: Sequence[int],
+    *,
+    spec: ClassifierSpec,
+    sample_weight: Sequence[float] | None = None,
+) -> _StandardizedLogisticFit:
+    """Fit sklearn logistic regression on an already standardized frame."""
+
     try:
         import numpy as np  # type: ignore
         from sklearn.exceptions import ConvergenceWarning  # type: ignore
         from sklearn.linear_model import LogisticRegression  # type: ignore
-        from sklearn.preprocessing import StandardScaler  # type: ignore
     except ModuleNotFoundError as exc:
         raise RuntimeError("Downstream classifier fitting requires numpy and scikit-learn.") from exc
 
     validate_classifier_spec(spec)
-    x_train = np.asarray(train_embeddings, dtype=float)
-    y_train = np.asarray(train_labels, dtype=int)
-    x_eval = np.asarray(eval_embeddings, dtype=float)
-    if x_train.ndim != 2 or x_eval.ndim != 2:
-        raise ValueError("Embeddings must be 2D arrays.")
-    if x_train.shape[1] != x_eval.shape[1]:
-        raise ValueError("Training and evaluation embeddings must share the same projection frame.")
+    x_fit_scaled = np.asarray(standardized.fit_embeddings, dtype=float)
+    x_eval_scaled = np.asarray(standardized.eval_embeddings, dtype=float)
+    y_train = np.asarray(fit_labels, dtype=int)
+    if x_fit_scaled.ndim != 2 or x_eval_scaled.ndim != 2:
+        raise ValueError("Standardized embeddings must be 2D arrays.")
+    if x_fit_scaled.shape[0] != y_train.shape[0]:
+        raise ValueError("Training embeddings and labels must align.")
     if sorted(set(int(v) for v in y_train.tolist())) != [0, 1]:
         raise ValueError("Downstream logistic classifier expects binary training labels 0/1.")
     validated_sample_weight = None
@@ -190,7 +282,7 @@ def fit_logistic_classifier(
         if validated_sample_weight.ndim != 1:
             raise ValueError("sample_weight must be a 1D array.")
         if (
-            validated_sample_weight.shape[0] != x_train.shape[0]
+            validated_sample_weight.shape[0] != x_fit_scaled.shape[0]
             or validated_sample_weight.shape[0] != y_train.shape[0]
         ):
             raise ValueError("sample_weight must align with the training rows and labels.")
@@ -206,27 +298,15 @@ def fit_logistic_classifier(
                     "sample_weight must have positive effective mass for both classes."
                 )
 
-    scaler = StandardScaler()
-    x_train_scaled = scaler.fit_transform(x_train)
-    x_eval_scaled = scaler.transform(x_eval)
-    scaler_state_hash = stable_hash(
-        {
-            "mean_": np.asarray(scaler.mean_, dtype=float).tolist(),
-            "var_": np.asarray(scaler.var_, dtype=float).tolist(),
-            "scale_": np.asarray(scaler.scale_, dtype=float).tolist(),
-            "n_features_in_": int(scaler.n_features_in_),
-            "n_samples_seen_": np.asarray(scaler.n_samples_seen_).tolist(),
-        }
-    )
     clf = LogisticRegression(**spec.to_sklearn_kwargs())
     convergence_warnings = []
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         if validated_sample_weight is None:
-            clf.fit(x_train_scaled, y_train)
+            clf.fit(x_fit_scaled, y_train)
         else:
             clf.fit(
-                x_train_scaled,
+                x_fit_scaled,
                 y_train,
                 sample_weight=validated_sample_weight,
             )
@@ -243,12 +323,14 @@ def fit_logistic_classifier(
         pred = clf.predict(x_eval_scaled)
     n_iter = tuple(int(v) for v in getattr(clf, "n_iter_", ()))
     converged = not convergence_warnings and all(value < int(spec.max_iter) for value in n_iter)
-    return FittedClassifierResult(
+    return _StandardizedLogisticFit(
         predictions=pred,
         probabilities=proba,
+        coefficients=np.asarray(clf.coef_, dtype=float).copy(),
+        intercept=np.asarray(clf.intercept_, dtype=float).copy(),
         classes=classes,
         n_iter=n_iter,
         converged=bool(converged),
         classifier_config_hash=spec.config_hash,
-        scaler_state_hash=scaler_state_hash,
+        scaler_state_hash=standardized.scaler_state_hash,
     )

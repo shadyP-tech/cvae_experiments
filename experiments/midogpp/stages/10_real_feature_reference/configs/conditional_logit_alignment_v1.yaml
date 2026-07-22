@@ -1,0 +1,136 @@
+experiment:
+  name: conditional_logit_alignment_v1
+  mode: conditional_logit_alignment
+  artifact_root: output://midogpp_output_real_feature_conditional_logit_alignment_v1
+  code_version: conditional_logit_alignment_v1
+
+inputs:
+  manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  feature_cache_path: artifact://midogpp_virchow2_xyxy_feature_cache_seed42/embeddings/train.pt
+  split: train
+
+run:
+  experiment_seed: 42
+  heldout_centers: all
+  expected_feature_dim: 2560
+  expected_outer_fold_count: 9
+  expected_inner_folds_per_outer: 8
+  expected_gamma_count: 7
+  expected_inner_score_count: 504
+  expected_gamma_summary_count: 63
+  expected_outer_result_count: 18
+  expected_outer_comparison_count: 9
+  expected_frame_audit_count: 81
+
+classifier:
+  C: 0.01
+  penalty: l2
+  solver: lbfgs
+  max_iter: 5000
+  class_weight: none
+  sample_weight: none
+  random_state: 23
+  threshold_policy: predict
+  fit_intercept: true
+  intercept_penalized: false
+  dtype: float64
+  scaler_fit: fit_rows_only
+
+alignment:
+  gamma_grid:
+    - 0.0
+    - 0.0001
+    - 0.001
+    - 0.01
+    - 0.1
+    - 1.0
+    - 10.0
+  centroid_weighting: equal_domain_class_cells
+  class_centering: equal_domain_mean_within_class
+  construction_frame: standardized_fit_rows
+  factor_representation: rectangular_contrast_factor
+  normalization: unit_trace
+  trace_atol: 1.0e-12
+  trace_rtol: 0.0
+  missing_cell_policy: fail_closed
+  nonfinite_policy: fail_closed
+  dense_matrix_materialized: false
+
+selection:
+  outer_protocol: eligible_center_lodo
+  inner_protocol: source_inner_center_lodo
+  metric: bacc
+  aggregation: equal_center_arithmetic_mean
+  tie_atol: 1.0e-12
+  tie_rtol: 0.0
+  tie_break: smallest_gamma
+  outer_score_roles:
+    - selected
+    - gamma0
+  outer_all_gamma_scoring: false
+  outer_oracle_gamma_computed: false
+
+optimizer:
+  pooled_backend: sklearn_lbfgs
+  aligned_backend: scipy_lbfgsb
+  warm_start: pooled_gamma0_solution
+  tol: 1.0e-4
+  gradient_inf_norm_max: 1.0e-4
+  ftol_float64_eps_multiplier: 64
+  max_line_search_steps: 50
+  max_iter: 5000
+  expected_versions:
+    numpy: 1.26.4
+    scipy: 1.17.1
+    scikit_learn: 1.8.0
+  require_single_thread: true
+  parity:
+    objective_atol: 1.0e-10
+    coefficient_atol: 1.0e-6
+    coefficient_rtol: 1.0e-6
+    probability_atol: 1.0e-8
+    probability_rtol: 1.0e-7
+    predictions_exact: true
+
+decision:
+  primary_contrast: selected_minus_gamma0
+  primary_metric: equal_center_mean_bacc
+  numerical_epsilon: 1.0e-12
+  pass_requires_positive_mean_delta: true
+  pass_requires_nonworse_minimum_center: true
+  pass_min_nonnegative_center_deltas: 5
+  macro_f1_role: secondary_descriptive
+  invalid_bundle_decision: REJECTED
+
+claim_boundary:
+  claim_scope: real_feature_transfer_only
+  diagnostic_only: true
+  non_adoptive: true
+  target_evaluation_labels_used_for_fit: false
+  target_evaluation_labels_used_for_selection: false
+  target_evaluation_labels_used_for_scoring_only: true
+  source_inner_labels_used_for_selection: true
+  support_labels_used: false
+  uses_generated_embeddings: false
+  uses_cvae_checkpoint: false
+  uses_encoder_posterior: false
+  uses_decoder_likelihood: false
+  uses_prior: false
+  uses_nelbo: false
+  uses_latent_representation: false
+  models_embedding_distribution: false
+  uses_expert_bank: false
+  uses_router: false
+  performs_expert_selection: false
+  performs_expert_weighting: false
+  performs_aggregation: false
+  compatibility_signal: none
+  may_feed_recipe_selection: false
+  may_feed_deployable_selection: false
+  allowed: >
+    Nested source-inner selection of a class-conditional centroid-contrast
+    regularizer for one pooled real-feature logistic classifier.
+  forbidden: >
+    No claim of causal domain-shift removal, representation alignment, CVAE
+    preservation, prior quality, expert compatibility, routing, composition,
+    generation, or synthetic downstream utility; no Stage-20+ consumption.

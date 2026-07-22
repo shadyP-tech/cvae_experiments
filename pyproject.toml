@@ -12,6 +12,7 @@ dependencies = [
   "Pillow",
   "PyYAML",
   "scikit-learn",
+  "scipy",
   "torch",
 ]
 

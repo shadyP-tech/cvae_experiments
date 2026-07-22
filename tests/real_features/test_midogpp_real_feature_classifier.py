@@ -157,13 +157,14 @@ def test_midogpp_real_feature_cli_excludes_forbidden_backend_inputs() -> None:
     assert "--checkpoint" not in option_strings
 
 
-def test_real_feature_cli_help_exposes_matched_reference() -> None:
+def test_real_feature_cli_help_exposes_registered_diagnostics() -> None:
     parser = build_parser()
     choices = parser._subparsers._group_actions[0].choices
     assert set(choices) == {
         "tune",
         "matched-reference",
         "fixed-c-risk-diagnostic",
+        "conditional-logit-alignment",
     }
 
 

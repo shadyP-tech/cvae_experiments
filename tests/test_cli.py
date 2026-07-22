@@ -7,6 +7,9 @@ import sys
 
 from midogpp_thesis.cli import COMMANDS, command_help, main
 from midogpp_thesis.cvae.preservation.cli import build_parser as build_preservation_parser
+from midogpp_thesis.real_features.classifier_reference.cli import (
+    build_parser as build_classifier_parser,
+)
 
 
 def test_root_cli_lists_only_canonical_command_groups(capsys) -> None:
@@ -60,3 +63,17 @@ def test_preservation_cli_exposes_separate_lock_study_and_outer_commands() -> No
     assert prior_study.surface == "source-inner-learned-conditional-prior-study"
     assert fisher_study.surface == "source-inner-task-fisher-shrinkage-study"
     assert outer.surface == "prior-recovery-outer"
+
+
+def test_classifier_cli_exposes_conditional_logit_alignment_command() -> None:
+    args = build_classifier_parser().parse_args(
+        [
+            "conditional-logit-alignment",
+            "--config",
+            "cla.yaml",
+        ]
+    )
+
+    assert args.surface == "conditional-logit-alignment"
+    assert args.config == "cla.yaml"
+    assert not hasattr(args, "artifact_root")

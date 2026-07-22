@@ -17,9 +17,11 @@ Current canonical definitions:
 - `configs/virchow2_signal_controls_v1.yaml`
 - `configs/eligible_tuned_real_reference_v2.yaml`
 - `configs/fixed_c_risk_diagnostic_v1.yaml`
+- `configs/conditional_logit_alignment_v1.yaml`
 - registry entry `midogpp.real_feature.tuned_classifier.seed42`
 - registry entry `midogpp.real_feature.eligible_tuned_predict_reference.v2`
 - registry entry `midogpp.real_feature.fixed_c_risk_diagnostic.v1`
+- registry entry `midogpp.real_feature.conditional_logit_alignment.v1`
 - registry entry `midogpp.real_feature.signal_controls.v1`
 - registry entry `midogpp.real_feature.multiaxis.v1`
 
@@ -131,3 +133,50 @@ downstream policy. The output is catalog-blocked from every current reuse
 purpose except Stage-90 oracle and diagnostic evidence, and it cannot support
 CVAE preservation, prior, routing, or synthetic-utility claims. No metric or
 result is claimed until a produced bundle passes its validator.
+
+## Conditional Logit Alignment Diagnostic v1
+
+`conditional_logit_alignment_v1.yaml` defines a standalone, non-adoptive
+source-only regularization diagnostic. It retains the pooled logistic
+classifier at `C=0.01`, fits preprocessing only on the current source-fit
+rows, and selects one alignment strength per outer center through source-inner
+center LODO. The fixed grid is
+`0, 0.0001, 0.001, 0.01, 0.1, 1, 10`, with equal-center mean BACC and a
+deterministic smallest-gamma tie break.
+
+For an outer center `H` and inner pseudo-target `I`, both centers are absent
+from scaler fitting, class-conditional centroid construction, normalization,
+and classifier fitting. After selection, the scaler and penalty frame are
+rebuilt from all eight outer-source centers. Only the selected gamma and the
+matched `gamma=0` classifier are evaluated on `H`; an outer all-gamma or oracle
+table is forbidden.
+
+The penalty uses a rectangular, unit-trace low-rank contrast factor rather
+than materializing a `2560 x 2560` matrix. The run fails closed on missing
+center-class cells, degenerate scatter, non-finite values, non-convergence,
+identity overlap, incomplete folds, or artifact-integrity failure.
+
+Canonical output root:
+
+```text
+artifacts/midogpp/10_real_feature_reference/conditional_logit_alignment_v1/seed42/
+```
+
+The implementation, focused/full tests, partial end-to-end bundle validation,
+blocking protocol review, and workspace-definition validation are complete.
+The registry entry is now a runnable `diagnostic`. Execute the canonical
+production run through the workspace:
+
+```bash
+conda run -n thesis python -m midogpp_thesis workspace prepare \
+  midogpp.real_feature.conditional_logit_alignment.v1
+conda run -n thesis python -m midogpp_thesis workspace run \
+  midogpp.real_feature.conditional_logit_alignment.v1
+```
+
+Claim boundary: even a positive result supports only the matched comparison
+of this source-inner-selected pooled real-feature regularizer against its
+`gamma=0` extension. The catalog blocks it from Stage 20 through 70 and from
+replacing the canonical matched denominator. It establishes no CVAE,
+generation, expert-compatibility, routing, composition, or synthetic-utility
+claim. No metric or result exists until the complete bundle validates.

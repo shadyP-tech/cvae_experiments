@@ -32,6 +32,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     fixed_risk.add_argument("--config", required=True)
     fixed_risk.add_argument("--artifact-root", default=None)
+    alignment = subparsers.add_parser(
+        "conditional-logit-alignment",
+        help="Run the nested conditional-logit alignment diagnostic.",
+    )
+    alignment.add_argument("--config", required=True)
     return parser
 
 
@@ -58,6 +63,16 @@ def main(argv: list[str] | None = None) -> int:
             config,
             artifact_root=Path(args.artifact_root) if args.artifact_root else None,
         )
+        print(output)
+        return 0
+    if args.surface == "conditional-logit-alignment":
+        from .conditional_logit_alignment import (
+            load_conditional_logit_alignment_config,
+            run_conditional_logit_alignment,
+        )
+
+        config = load_conditional_logit_alignment_config(args.config)
+        output = run_conditional_logit_alignment(config)
         print(output)
         return 0
     if args.preflight_only:

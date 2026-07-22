@@ -259,6 +259,43 @@ generation, prior quality, or synthetic downstream utility. The catalog
 defines the required 12-file destination bundle, but this workflow page
 records no result or metric for an unvalidated run.
 
+### Conditional logit alignment diagnostic v1
+
+The implemented source-inner regularization diagnostic is:
+
+```text
+midogpp.real_feature.conditional_logit_alignment.v1
+experiments/midogpp/stages/10_real_feature_reference/configs/conditional_logit_alignment_v1.yaml
+artifacts/midogpp/10_real_feature_reference/conditional_logit_alignment_v1/seed42/
+```
+
+It consumes only the frozen MIDOG++ contract and corrected Virchow2 `xyxy`
+train cache. For each outer center it selects one gamma from
+`0, 0.0001, 0.001, 0.01, 0.1, 1, 10` through eight source-inner center-LODO
+folds. The outer center is absent from all preprocessing and selection; each
+inner pseudo-target is absent from its fold's scaler, conditional-centroid
+factor, and classifier fit. Only the selected gamma and matched `gamma=0`
+baseline are scored on the outer center.
+
+The code, focused/full tests, partial end-to-end bundle validation, blocking
+protocol review, and workspace-definition validation are complete. The
+registry status is `diagnostic`, so the canonical production run is enabled
+through the workspace command surface:
+
+```bash
+conda run -n thesis python -m midogpp_thesis workspace prepare \
+  midogpp.real_feature.conditional_logit_alignment.v1
+conda run -n thesis python -m midogpp_thesis workspace run \
+  midogpp.real_feature.conditional_logit_alignment.v1
+```
+
+The catalog fixes `may_feed_recipe_selection=false` and
+`may_feed_deployable_selection=false` and permits only Stage-90 diagnostic
+consumption. This experiment cannot replace the matched Stage-10 denominator
+or feed CVAE preservation, expert-bank, generation, routing, or downstream
+selection. No result or metric is recorded until the canonical run produces
+and independently validates all 16 required files.
+
 ## Registered CVAE Preservation Workflow
 
 The validated tuned-classifier preservation experiment is:

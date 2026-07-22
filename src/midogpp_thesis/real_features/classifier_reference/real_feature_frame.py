@@ -21,6 +21,7 @@ class RealFeatureRow:
     center: str
     label: int
     split: str
+    image_path: str = ""
 
 
 @dataclass(frozen=True)
@@ -94,6 +95,9 @@ def load_midogpp_real_feature_frame(
                 center=center,
                 label=label,
                 split="train",
+                image_path=str(
+                    manifest_row.get("image_path", meta.get("image_path", ""))
+                ),
             )
         )
     missing_cache = sorted(set(manifest_by_id).difference(seen_cache_ids))
