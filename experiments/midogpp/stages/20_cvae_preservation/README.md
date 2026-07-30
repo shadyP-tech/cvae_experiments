@@ -238,6 +238,14 @@ conda run -n thesis python -m midogpp_thesis workspace run \
   midogpp.cvae.uniform_b_geco_task_geometry_source_inner.v1
 ```
 
+The registered runner uses two device-bound training processes
+(`cuda:0,cuda:1`) for independent source/seed panels and eight bounded CPU
+scoring workers. These are execution-only controls: canonical task/result
+order, config hashes, RNG pairing, classifier specifications, candidate pools,
+and all protocol gates remain unchanged. Diversity diagnostics use exact
+sample-Gram eigenspectra and pairwise Gram distances, avoiding the former
+high-dimensional SVD and three-dimensional difference tensor.
+
 The canonical destination is:
 
 ```text

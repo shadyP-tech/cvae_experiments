@@ -611,6 +611,8 @@ experiments:
         MKL_NUM_THREADS: "1"
         OPENBLAS_NUM_THREADS: "1"
         NUMEXPR_NUM_THREADS: "1"
+        MIDOGPP_UNIFORM_B_SCORING_WORKERS: "8"
+        MIDOGPP_UNIFORM_B_TRAINING_DEVICES: "cuda:0,cuda:1"
       argv:
         - "{python}"
         - -m
