@@ -162,6 +162,21 @@ class TaskGeometryCheckpointStore:
         )
         return path
 
+    def register_record(
+        self,
+        record: Mapping[str, object],
+    ) -> None:
+        """Register a worker-written record after full content validation."""
+
+        self._validate_record(record)
+        key = str(record.get("training_key_hash", ""))
+        existing = self.records.get(key)
+        if existing is not None and existing != dict(record):
+            raise ProtocolError(
+                "Uniform-B checkpoint key maps to conflicting records."
+            )
+        self.records[key] = dict(record)
+
     def _validate_record(self, record: Mapping[str, object]) -> None:
         key = str(record.get("training_key_hash", ""))
         expected = (

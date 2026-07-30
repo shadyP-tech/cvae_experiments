@@ -30,7 +30,7 @@ from .contracts import (
     SINGLE_BUDGET_MATCHED,
 )
 from .decisions import paired_deltas, prior_posterior_gaps, study_decision
-from .evaluation import evaluate_tstr_diagnostic
+from .execution import resolve_runtime_plan
 from .frame import fit_source_block_frame
 from .generation import (
     GeneratedBlock,
@@ -38,8 +38,8 @@ from .generation import (
     generate_prior_block,
 )
 from .protocol import candidate_pool_manifest, protocol_manifest
-from .task_geometry import fit_task_geometry
-from .training import SourcePanelRuntime, train_source_panel
+from .scoring_runtime import DeterministicScoringPool
+from .training_runtime import train_panel_grid
 from .validation import validate_uniform_b_task_geometry_bundle
 
 
@@ -94,6 +94,7 @@ def _run(config: UniformBTaskGeometryConfig, root: Path) -> None:
     )
     if frame.eligible_centers != config.heldout_centers:
         raise ProtocolError("Uniform-B study requires exact eligible-center coverage.")
+    runtime_plan = resolve_runtime_plan(config)
     protocol = protocol_manifest(
         config,
         manifest_hash=frame.manifest_hash,
@@ -115,99 +116,40 @@ def _run(config: UniformBTaskGeometryConfig, root: Path) -> None:
         for center, source in sources.items()
     }
     checkpoint_store = TaskGeometryCheckpointStore(root, config)
-    panels: dict[tuple[str, int], SourcePanelRuntime] = {}
     geometries: dict[tuple[str, int], object] = {}
+    training_keys: dict[tuple[str, int, str], str] = {}
     geometry_rows: list[dict[str, object]] = []
     rng_rows: list[dict[str, object]] = []
     timing_rows: list[dict[str, object]] = []
-    for center in centers:
-        source = sources[center]
-        for training_seed in config.training_seeds:
-            fit_started = perf_counter()
-            geometry = fit_task_geometry(
-                projected[center],
-                source.labels,
-                source.case_ids,
-                source.sample_ids,
-                source_center=center,
-                source_row_hash=source.row_hash,
-                frame_hash=source_frames[center].state_hash,
-                config=config,
-                seed=training_seed,
+    training_results = train_panel_grid(
+        root=root,
+        config=config,
+        sources=sources,
+        projected=projected,
+        frame_hashes={
+            center: source_frames[center].state_hash for center in centers
+        },
+        runtime_plan=runtime_plan,
+    )
+    for result in training_results:
+        geometries[result.key] = result.geometry
+        geometry_rows.extend(result.geometry_rows)
+        rng_rows.extend(result.rng_rows)
+        timing_rows.append(
+            {
+                "phase": "source_panel_training",
+                "source_center": result.source_center,
+                "training_seed": result.training_seed,
+                "runtime_device": result.runtime_device,
+                "elapsed_seconds": result.elapsed_seconds,
+            }
+        )
+        for record in result.checkpoint_records:
+            checkpoint_store.register_record(record)
+            arm = str(record["arm"])
+            training_keys[(result.source_center, result.training_seed, arm)] = (
+                str(record["training_key_hash"])
             )
-            geometries[(center, training_seed)] = geometry
-            panel = train_source_panel(
-                projected[center],
-                source.labels,
-                source.case_ids,
-                source.sample_ids,
-                geometry=geometry,
-                config=config,
-                source_center=center,
-                training_seed=training_seed,
-                source_identity_hash=source.identity_hash,
-                frame_hash=source_frames[center].state_hash,
-            )
-            panels[(center, training_seed)] = panel
-            timing_rows.append(
-                {
-                    "phase": "source_panel_training",
-                    "source_center": center,
-                    "training_seed": training_seed,
-                    "elapsed_seconds": perf_counter() - fit_started,
-                }
-            )
-            for fold in geometry.folds:
-                geometry_rows.append(
-                    {
-                        "schema_version": "midogpp_task_geometry_diagnostic_v1",
-                        "source_center": center,
-                        "training_seed": training_seed,
-                        "fold": fold.fold,
-                        "geometry_hash": geometry.state_hash,
-                        "fit_row_hash": fold.fit_row_hash,
-                        "reference_row_hash": fold.reference_row_hash,
-                        "reference_per_class": fold.reference_per_class,
-                        "hessian_min_eigenvalue": float(
-                            fold.hessian_eigenvalues.min()
-                        ),
-                        "hessian_max_eigenvalue": float(
-                            fold.hessian_eigenvalues.max()
-                        ),
-                        "hessian_condition_number": float(
-                            fold.hessian_eigenvalues.max()
-                            / fold.hessian_eigenvalues.min()
-                        ),
-                        "outer_or_inner_rows_used": False,
-                    }
-                )
-            for arm in ARMS:
-                runtime = panel.arms[arm]
-                checkpoint_store.save(
-                    runtime,
-                    source_center=center,
-                    training_seed=training_seed,
-                    frame_hash=source_frames[center].state_hash,
-                    geometry_hash=geometry.state_hash,
-                )
-                rng_rows.append(
-                    {
-                        "schema_version": "midogpp_uniform_b_rng_pairing_v1",
-                        "source_center": center,
-                        "training_seed": training_seed,
-                        "arm": arm,
-                        "schedule_hash": panel.schedule_hash,
-                        "initialization_hash": panel.shared_initialization_hash,
-                        "warmup_state_hash": panel.warmup_state_hash,
-                        "task_branch_state_hash": (
-                            panel.task_branch_state_hash
-                            if arm in {"BG", "BM", "BT"}
-                            else ""
-                        ),
-                        "final_stream_hash": runtime.final_stream_hash,
-                        "outer_or_inner_identity_present": False,
-                    }
-                )
     checkpoint_store.write_index()
 
     generation_rows: list[dict[str, object]] = []
@@ -284,17 +226,29 @@ def _run(config: UniformBTaskGeometryConfig, root: Path) -> None:
     # Generate one source panel at a time and release it after all H/I cells.
     # Peak generated-array memory is therefore O(number of sources), not
     # O(sources x arms x training seeds x generation seeds).
+    scoring_pool = DeterministicScoringPool(runtime_plan.scoring_workers)
     for training_seed in config.training_seeds:
         for arm in ARMS:
+            arm_states = {}
+            for center in centers:
+                state = checkpoint_store.load(
+                    training_keys[(center, training_seed, arm)],
+                    device=config.device,
+                )
+                if state is None:
+                    raise ProtocolError(
+                        "Uniform-B panel checkpoint disappeared before generation."
+                    )
+                arm_states[center] = state
             for generation_seed in config.generation_seeds:
                 for generation_kind in ("prior", "posterior"):
                     blocks_all: dict[str, GeneratedBlock] = {}
                     for center in centers:
-                        runtime = panels[(center, training_seed)].arms[arm]
-                        checkpoint_hash = model_state_hash(runtime.state.model)
+                        state = arm_states[center]
+                        checkpoint_hash = model_state_hash(state.model)
                         if generation_kind == "prior":
                             block = generate_prior_block(
-                                runtime.state.model,
+                                state.model,
                                 source_frames[center],
                                 source_center=center,
                                 arm=arm,
@@ -302,11 +256,11 @@ def _run(config: UniformBTaskGeometryConfig, root: Path) -> None:
                                 generation_seed=generation_seed,
                                 per_class=maximum_per_class,
                                 checkpoint_hash=checkpoint_hash,
-                                device=runtime.state.device,
+                                device=state.device,
                             )
                         else:
                             block = generate_posterior_block(
-                                runtime.state.model,
+                                state.model,
                                 source_frames[center],
                                 projected[center],
                                 np.asarray(
@@ -319,7 +273,7 @@ def _run(config: UniformBTaskGeometryConfig, root: Path) -> None:
                                 generation_seed=generation_seed,
                                 per_class=maximum_per_class,
                                 checkpoint_hash=checkpoint_hash,
-                                device=runtime.state.device,
+                                device=state.device,
                             )
                         blocks_all[center] = block
                         record = {
@@ -401,13 +355,17 @@ def _run(config: UniformBTaskGeometryConfig, root: Path) -> None:
                                         }
                                     )
                             x_eval, y_eval = eval_data[(outer, inner)]
-                            for mode, selected, synthetic in sealed:
-                                result = evaluate_tstr_diagnostic(
-                                    synthetic,
-                                    x_eval,
-                                    y_eval,
-                                    classifier_spec=classifier_spec,
-                                )
+                            scored = scoring_pool.score(
+                                sealed,
+                                x_eval,
+                                y_eval,
+                                classifier_spec=classifier_spec,
+                            )
+                            for item in scored:
+                                mode = item.mode
+                                selected = item.selected_source
+                                synthetic = item.synthetic
+                                result = item.diagnostic
                                 for key, value in result.diversity.items():
                                     if "effective_rank_ratio" in key:
                                         diversity_pass &= (
@@ -455,6 +413,8 @@ def _run(config: UniformBTaskGeometryConfig, root: Path) -> None:
                                         **result.diversity,
                                     }
                                 )
+            del arm_states
+    scoring_pool.close()
     delta_rows = paired_deltas(metric_rows)
     delta_rows.extend(prior_posterior_gaps(metric_rows))
     decision = study_decision(
@@ -530,6 +490,7 @@ def _run(config: UniformBTaskGeometryConfig, root: Path) -> None:
         rng_rows=rng_rows,
         timing_rows=timing_rows,
         decision=decision,
+        runtime_plan=runtime_plan.to_payload(),
     )
 
 

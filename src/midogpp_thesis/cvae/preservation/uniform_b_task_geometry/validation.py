@@ -59,6 +59,7 @@ def validate_uniform_b_task_geometry_bundle(root: Path) -> Mapping[str, object]:
     geometries = _json(root / "manifests/task_geometry_state_index.json")
     generation = _json(root / "manifests/generation_budget_manifest.json")
     compositions = _json(root / "manifests/composition_manifest.json")
+    runtime = _json(root / "reports/runtime_summary.json")
     if (
         protocol.get("expected_feature_dim") != 3840
         or protocol.get("arms") != list(ARMS)
@@ -86,6 +87,17 @@ def validate_uniform_b_task_geometry_bundle(root: Path) -> Mapping[str, object]:
         or publication.get("separate_promotion_artifact_required") is not True
     ):
         raise ProtocolError("Uniform-B publication boundary is consumable.")
+    runtime_plan = runtime.get("runtime_plan")
+    if (
+        not isinstance(runtime_plan, Mapping)
+        or runtime_plan.get("scientific_contract_unchanged") is not True
+        or runtime_plan.get("deterministic_result_order") is not True
+        or runtime_plan.get("mixed_precision") is not False
+        or runtime_plan.get("tf32") is not False
+        or int(runtime_plan.get("scoring_workers", 0)) < 1
+        or not runtime_plan.get("training_devices")
+    ):
+        raise ProtocolError("Uniform-B runtime plan violates equivalence controls.")
     if (
         leakage.get("status") != "PASS"
         or int(leakage.get("identity_audit_failures", -1)) != 0

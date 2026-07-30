@@ -70,6 +70,7 @@ def train_source_panel(
     training_seed: int,
     source_identity_hash: str,
     frame_hash: str,
+    device: str | None = None,
 ) -> SourcePanelRuntime:
     """Train the exact paired panel; source centers remain independent."""
 
@@ -108,7 +109,7 @@ def train_source_panel(
         input_dim=128,
         spec=spec,
         pairing_key=pairing_key,
-        device=config.device,
+        device=str(device or config.device),
     )
     shared_initialization_hash = warm.initialization_hash
     run_keyed_steps(

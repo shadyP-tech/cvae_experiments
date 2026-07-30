@@ -27,6 +27,12 @@ def test_uniform_b_task_geometry_workspace_contract_is_non_consumable() -> None:
         "midogpp_virchow2_uniform_b_canonical_train_cache_seed42",
     ]
     assert experiment["output_artifact_id"] == OUTPUT_ID
+    assert experiment["runner"]["environment"][
+        "MIDOGPP_UNIFORM_B_SCORING_WORKERS"
+    ] == "8"
+    assert experiment["runner"]["environment"][
+        "MIDOGPP_UNIFORM_B_TRAINING_DEVICES"
+    ] == "cuda:0,cuda:1"
     consumers = [
         row["experiment_id"]
         for row in registry["experiments"]

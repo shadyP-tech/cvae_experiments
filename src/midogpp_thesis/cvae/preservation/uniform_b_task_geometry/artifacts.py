@@ -54,6 +54,7 @@ def write_final_artifacts(
     rng_rows: Sequence[Mapping[str, object]],
     timing_rows: Sequence[Mapping[str, object]],
     decision: Mapping[str, object],
+    runtime_plan: Mapping[str, object],
 ) -> None:
     write_json(root / "provenance/input_artifacts.json", provenance)
     write_json(root / "manifests/protocol_manifest.json", protocol)
@@ -146,6 +147,7 @@ def write_final_artifacts(
             "checkpoint_records": int(coverage["checkpoint_records"]),
             "generation_blocks": len(generation_manifest),
             "composition_cells": len(composition_manifest),
+            "runtime_plan": dict(runtime_plan),
         },
     )
 

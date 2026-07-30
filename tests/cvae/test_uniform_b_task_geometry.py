@@ -27,6 +27,18 @@ from midogpp_thesis.cvae.preservation.uniform_b_task_geometry.contracts import (
 from midogpp_thesis.cvae.preservation.uniform_b_task_geometry.generation import (
     GeneratedBlock,
 )
+from midogpp_thesis.cvae.preservation.uniform_b_task_geometry.evaluation import (
+    _distance_quantiles,
+    _effective_rank,
+)
+from midogpp_thesis.cvae.preservation.uniform_b_task_geometry.execution import (
+    SCORING_WORKERS_ENV,
+    partition_panel_tasks,
+    resolve_runtime_plan,
+)
+from midogpp_thesis.cvae.preservation.uniform_b_task_geometry.scoring_runtime import (
+    DeterministicScoringPool,
+)
 from midogpp_thesis.cvae.preservation.uniform_b_task_geometry.protocol import (
     candidate_pool_manifest,
     validate_candidate_pool,
@@ -123,6 +135,129 @@ def test_all_composition_modes_have_exact_budget_controls() -> None:
     assert sum(counts[0] for counts in equal.source_counts.values()) == base
 
 
+def test_gram_diversity_kernels_match_reference_definitions() -> None:
+    rng = np.random.default_rng(211)
+    values = rng.normal(size=(48, 96)).astype(np.float32)
+    centered = values - values.mean(axis=0, keepdims=True)
+    singular = np.linalg.svd(
+        centered,
+        compute_uv=False,
+        full_matrices=False,
+    )
+    energy = singular**2
+    probabilities = energy / energy.sum()
+    expected_rank = float(
+        np.exp(
+            -np.sum(
+                probabilities[probabilities > 0]
+                * np.log(probabilities[probabilities > 0])
+            )
+        )
+    )
+    differences = values[:, None, :] - values[None, :, :]
+    distances = np.sqrt(np.sum(differences * differences, axis=2))
+    upper = distances[np.triu_indices(len(values), k=1)]
+    expected_quantiles = np.quantile(upper, (0.1, 0.5, 0.9))
+
+    assert _effective_rank(values) == pytest.approx(
+        expected_rank,
+        rel=2e-6,
+        abs=2e-6,
+    )
+    np.testing.assert_allclose(
+        _distance_quantiles(values),
+        expected_quantiles,
+        rtol=2e-6,
+        atol=2e-6,
+    )
+
+
+def test_panel_partition_is_stable_and_complete() -> None:
+    tasks = tuple(
+        (center, seed)
+        for center in ("0", "1", "2")
+        for seed in (17, 42, 101)
+    )
+    partitions = partition_panel_tasks(tasks, ("cuda:0", "cuda:1"))
+    assert partitions == {
+        "cuda:0": tasks[0::2],
+        "cuda:1": tasks[1::2],
+    }
+
+
+def test_runtime_worker_count_does_not_change_scientific_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = _small_config()
+    contract_hash = config.contract_hash
+    monkeypatch.setenv(SCORING_WORKERS_ENV, "3")
+    runtime = resolve_runtime_plan(config)
+    assert runtime.scoring_workers == 3
+    assert runtime.training_devices == ("cpu",)
+    assert runtime.to_payload()["scientific_contract_unchanged"] is True
+    assert config.contract_hash == contract_hash
+
+
+def test_parallel_scoring_preserves_submission_order_and_metrics() -> None:
+    rng = np.random.default_rng(223)
+    eval_embeddings = rng.normal(size=(40, 3840)).astype(np.float32)
+    eval_labels = np.asarray([0] * 20 + [1] * 20, dtype=np.int64)
+    sealed = tuple(
+        (
+            "single_base",
+            source,
+            _block(source, per_class=8),
+        )
+        for source in ("2", "3")
+    )
+    composed = tuple(
+        (
+            mode,
+            selected,
+            compose_generated_blocks(
+                {selected: block},
+                mode=mode,
+                base_per_class=8,
+                shuffle_seed=17,
+                selected_source=selected,
+            ),
+        )
+        for mode, selected, block in sealed
+    )
+    config = _small_config()
+    from midogpp_thesis.real_features.classifier_reference.classifiers import (
+        ClassifierSpec,
+    )
+
+    spec = ClassifierSpec(C=config.classifier_c, random_state=config.classifier_seed)
+    with DeterministicScoringPool(1) as serial:
+        expected = serial.score(
+            composed,
+            eval_embeddings,
+            eval_labels,
+            classifier_spec=spec,
+        )
+    with DeterministicScoringPool(2) as parallel:
+        observed = parallel.score(
+            composed,
+            eval_embeddings,
+            eval_labels,
+            classifier_spec=spec,
+        )
+    assert [
+        (item.mode, item.selected_source) for item in observed
+    ] == [
+        (item.mode, item.selected_source) for item in expected
+    ]
+    assert [
+        (item.diagnostic.bacc, item.diagnostic.macro_f1)
+        for item in observed
+    ] == [
+        (item.diagnostic.bacc, item.diagnostic.macro_f1)
+        for item in expected
+    ]
+
+
 def test_task_geometry_is_cross_fitted_and_task_loss_has_gradients() -> None:
     config = _small_config()
     x, y, cases, samples = _source_arrays()
@@ -207,7 +342,9 @@ def test_small_panel_has_exact_bg_branch_and_equal_steps(
 
 def test_tiny_runner_writes_and_validates_non_consumable_bundle(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setenv(SCORING_WORKERS_ENV, "2")
     manifest, cache, cache_hash = _tiny_uniform_b_cache(tmp_path)
     config = replace(
         _small_config(),
@@ -220,6 +357,10 @@ def test_tiny_runner_writes_and_validates_non_consumable_bundle(
     root = run_uniform_b_task_geometry_source_inner_study(config)
     report = validate_uniform_b_task_geometry_bundle(root)
     assert report["status"] == "PASS"
+    runtime = json.loads(
+        (root / "reports/runtime_summary.json").read_text(encoding="utf-8")
+    )
+    assert runtime["runtime_plan"]["scoring_workers"] == 2
     publication = (root / "reports/publication_state.json").read_text(
         encoding="utf-8"
     )

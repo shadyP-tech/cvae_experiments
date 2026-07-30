@@ -387,7 +387,10 @@ def training_state_hash(state: KeyedTrainingState) -> str:
                 key: value.detach().cpu()
                 for key, value in state.model.state_dict().items()
             },
-            "optimizer": state.optimizer.state_dict(),
+            # Optimizer tensors are normalized to CPU so the same numerical
+            # state has one identity when moved between CUDA devices for
+            # checkpointing or generation.
+            "optimizer": _cpu_tree(state.optimizer.state_dict()),
             "controller": (
                 None
                 if state.controller is None
@@ -400,6 +403,21 @@ def training_state_hash(state: KeyedTrainingState) -> str:
         buffer,
     )
     return hashlib.sha256(buffer.getvalue()).hexdigest()
+
+
+def _cpu_tree(value: object) -> object:
+    if isinstance(value, torch.Tensor):
+        return value.detach().cpu()
+    if isinstance(value, dict):
+        return {
+            key: _cpu_tree(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_cpu_tree(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_cpu_tree(item) for item in value)
+    return value
 
 
 def model_state_hash(model: ClassConditionedCVAE) -> str:

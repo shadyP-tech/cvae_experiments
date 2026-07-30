@@ -92,13 +92,17 @@ def diversity_diagnostics(
 
 
 def _effective_rank(values: np.ndarray) -> float:
-    centered = values - values.mean(axis=0, keepdims=True)
-    singular = np.linalg.svd(
-        centered[: min(len(centered), 512)],
-        compute_uv=False,
-        full_matrices=False,
+    subset = np.asarray(
+        values[: min(len(values), 512)],
+        dtype=np.float64,
     )
-    energy = singular**2
+    centered = subset - subset.mean(axis=0, keepdims=True)
+    # The non-zero eigenvalues of X X^T are exactly the squared singular
+    # values of X.  Working in the row-space avoids an expensive SVD of the
+    # 512 x 3840 matrix while preserving the effective-rank definition.
+    gram = centered @ centered.T
+    gram = 0.5 * (gram + gram.T)
+    energy = np.maximum(np.linalg.eigvalsh(gram), 0.0)
     probabilities = energy / max(float(energy.sum()), 1e-12)
     entropy = -float(
         np.sum(probabilities[probabilities > 0] * np.log(probabilities[probabilities > 0]))
@@ -107,11 +111,19 @@ def _effective_rank(values: np.ndarray) -> float:
 
 
 def _distance_quantiles(values: np.ndarray) -> tuple[float, float, float]:
-    subset = values[: min(len(values), 512)]
+    subset = np.asarray(
+        values[: min(len(values), 512)],
+        dtype=np.float64,
+    )
     if len(subset) < 2:
         return (0.0, 0.0, 0.0)
-    differences = subset[:, None, :] - subset[None, :, :]
-    distances = np.sqrt(np.sum(differences * differences, axis=2))
+    squared_norms = np.einsum("ij,ij->i", subset, subset)
+    squared_distances = (
+        squared_norms[:, None]
+        + squared_norms[None, :]
+        - 2.0 * (subset @ subset.T)
+    )
+    distances = np.sqrt(np.maximum(squared_distances, 0.0))
     upper = distances[np.triu_indices(len(subset), k=1)]
     return tuple(float(value) for value in np.quantile(upper, (0.1, 0.5, 0.9)))
 
