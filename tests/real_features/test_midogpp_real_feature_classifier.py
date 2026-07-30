@@ -175,6 +175,8 @@ def test_real_feature_cli_help_exposes_registered_diagnostics() -> None:
         "uniform-b-nystroem-nonlinear-probe",
         "uniform-b-robust-interaction-probe",
         "uniform-b-sens-spec-constrained-nystroem-probe",
+        "build-uniform-b-spatial-cache",
+        "uniform-b-spatial-probe",
     }
 
 

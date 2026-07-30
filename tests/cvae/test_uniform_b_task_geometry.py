@@ -346,6 +346,16 @@ def _tiny_uniform_b_cache(tmp_path: Path) -> tuple[Path, Path, str]:
                     }
                 )
                 row_index += 1
+    rows.append(
+        {
+            "sample_id": "excluded-center-4-manifest-only",
+            "case_id": "excluded-center-4-case",
+            "center": "4",
+            "label": 0,
+            "split": "train",
+            "image_path": "/midogpp/4/excluded.png",
+        }
+    )
     with manifest.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
         writer.writeheader()

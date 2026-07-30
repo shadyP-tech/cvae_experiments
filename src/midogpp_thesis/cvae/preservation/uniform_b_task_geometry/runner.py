@@ -90,6 +90,7 @@ def _run(config: UniformBTaskGeometryConfig, root: Path) -> None:
         manifest_path=Path(config.manifest_path),
         feature_cache_path=Path(config.feature_cache_path),
         expected_feature_dim=3840,
+        allow_excluded_center_omission=True,
     )
     if frame.eligible_centers != config.heldout_centers:
         raise ProtocolError("Uniform-B study requires exact eligible-center coverage.")
