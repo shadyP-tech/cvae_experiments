@@ -32,6 +32,10 @@ def build_parser() -> argparse.ArgumentParser:
             "source-inner-task-fisher-shrinkage-study",
             "Run the non-adoptive Task-Fisher shrinkage source-inner study.",
         ),
+        (
+            "source-inner-aggregate-posterior-mixture-geco",
+            "Run the independent-source K=2 aggregate-prior plus GECO study.",
+        ),
         ("prior-recovery-outer", "Run the locked outer A/B/C/D preservation matrix."),
     ):
         command = sub.add_parser(name, help=help_text)
@@ -136,6 +140,18 @@ def _surface_handler(surface: str) -> tuple[Loader, Runner]:
                 expected_mode=FISHER_SHRINKAGE_MODE,
             ),
             run_task_fisher_shrinkage_source_inner_study,
+        )
+    if surface == "source-inner-aggregate-posterior-mixture-geco":
+        from .aggregate_prior_study.config import (
+            load_aggregate_prior_study_config,
+        )
+        from .aggregate_prior_study.runner import (
+            run_aggregate_prior_source_inner_study,
+        )
+
+        return (
+            load_aggregate_prior_study_config,
+            run_aggregate_prior_source_inner_study,
         )
     if surface == "prior-recovery-outer":
         from .prior_recovery import run_outer_prior_recovery

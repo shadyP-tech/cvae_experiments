@@ -1,0 +1,27 @@
+{
+  "center_identity_used_for_geometry": false,
+  "claim_firewall": {
+    "feature_extraction_stochastic": false,
+    "geometry_uses_center_identity": false,
+    "geometry_uses_labels": false,
+    "may_feed_deployable_selection": false,
+    "may_feed_recipe_selection": false,
+    "performs_expert_aggregation": false,
+    "uses_experts": false,
+    "uses_generative_sampling": false,
+    "uses_latent_prior": false,
+    "uses_likelihood": false,
+    "uses_mixture_model": false,
+    "uses_nelbo": false,
+    "uses_posterior": false
+  },
+  "geometry_driven_row_exclusion": false,
+  "label_stratified_geometry_summary_is_audit_only": true,
+  "mechanical_pass_criteria_are_label_blind": true,
+  "post_label_row_exclusion": false,
+  "schema_version": "midogpp_physical_multiscale_leakage_v3",
+  "split": "train",
+  "status": "PASS",
+  "target_labels_used_for_geometry": false,
+  "target_metrics_used_for_geometry": false
+}

@@ -33,6 +33,9 @@ from midogpp_thesis.cvae.preservation.source_inner_studies.prior_runner import (
     _learned_prior_record,
     _learned_prior_sampler_rows,
 )
+from midogpp_thesis.cvae.preservation.source_inner_studies.prior_validation import (
+    _validate_prior_state_record,
+)
 
 
 def _variant(*, learned: bool) -> StudyTrainingVariant:
@@ -166,6 +169,16 @@ def test_a_and_e_pair_shared_initialization_and_training_stream() -> None:
     assert len(sampler_rows) == 2
     assert {row["class_label"] for row in sampler_rows} == {0, 1}
     assert all(row["sampler_state_hash"] == record["state_hash"] for row in sampler_rows)
+
+    # The derived log-variance can differ by a few float32 ulps between CPU
+    # and GPU tanh kernels. It remains audit data, but must not alter the
+    # canonical parameter-partition identity shared with the checkpoint.
+    record["state"]["effective_logvar"][0][0] += 5e-9
+    _validate_prior_state_record(
+        record,
+        latent_dim=learned_variant.latent_dim,
+        train_epochs=learned_variant.train_epochs,
+    )
 
 
 def test_learned_prior_checkpoint_round_trip_is_strict_and_content_addressed(

@@ -37,6 +37,66 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run the nested conditional-logit alignment diagnostic.",
     )
     alignment.add_argument("--config", required=True)
+    physical_multiscale = subparsers.add_parser(
+        "physical-multiscale-center-pooling-pilot",
+        help="Run the locked non-adoptive physical-multiscale representation pilot.",
+    )
+    physical_multiscale.add_argument("--config", required=True)
+    annotation_local = subparsers.add_parser(
+        "physical-multiscale-annotation-local-pooling-pilot",
+        help="Run a locked versioned annotation-local representation pilot.",
+    )
+    annotation_local.add_argument("--config", required=True)
+    uniform_b_replay = subparsers.add_parser(
+        "uniform-b-v3-replay",
+        help="Run the non-adoptive Stage-90 retrospective uniform-B replay.",
+    )
+    uniform_b_replay.add_argument("--config", required=True)
+    uniform_b_cache = subparsers.add_parser(
+        "build-uniform-b-v3-test-cache",
+        help="Build the immutable B cache for prospective test confirmation.",
+    )
+    uniform_b_cache.add_argument("--config", required=True)
+    uniform_b_confirmation = subparsers.add_parser(
+        "uniform-b-v3-confirmation",
+        help="Run prospective within-center confirmation of uniform B.",
+    )
+    uniform_b_confirmation.add_argument("--config", required=True)
+    uniform_b_canonical_cache = subparsers.add_parser(
+        "build-uniform-b-canonical-train-cache",
+        help="Standardize the reviewed B train shards as a canonical cache.",
+    )
+    uniform_b_canonical_cache.add_argument("--config", required=True)
+    uniform_b_canonical_reference = subparsers.add_parser(
+        "uniform-b-canonical-reference",
+        help="Run the separately reviewed Stage-10 Uniform-B reference.",
+    )
+    uniform_b_canonical_reference.add_argument("--config", required=True)
+    uniform_b_nonlinear = subparsers.add_parser(
+        "uniform-b-nystroem-nonlinear-probe",
+        help="Run the bounded Stage-90 nonlinear-boundary probe on canonical B.",
+    )
+    uniform_b_nonlinear.add_argument("--config", required=True)
+    uniform_b_robust = subparsers.add_parser(
+        "uniform-b-robust-interaction-probe",
+        help="Run the Stage-90 robust-Nyström versus bilinear B+ probe.",
+    )
+    uniform_b_robust.add_argument("--config", required=True)
+    uniform_b_constrained = subparsers.add_parser(
+        "uniform-b-sens-spec-constrained-nystroem-probe",
+        help="Run the fixed-threshold constrained nonlinear-capacity B+ probe.",
+    )
+    uniform_b_constrained.add_argument("--config", required=True)
+    uniform_b_spatial_cache = subparsers.add_parser(
+        "build-uniform-b-spatial-cache",
+        help="Build the immutable dual-GPU central-token and B-spatial cache.",
+    )
+    uniform_b_spatial_cache.add_argument("--config", required=True)
+    uniform_b_spatial = subparsers.add_parser(
+        "uniform-b-spatial-probe",
+        help="Run the frozen-capacity Stage-90 B-spatial representation diagnostic.",
+    )
+    uniform_b_spatial.add_argument("--config", required=True)
     return parser
 
 
@@ -73,6 +133,124 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_conditional_logit_alignment_config(args.config)
         output = run_conditional_logit_alignment(config)
+        print(output)
+        return 0
+    if args.surface in {
+        "physical-multiscale-center-pooling-pilot",
+        "physical-multiscale-annotation-local-pooling-pilot",
+    }:
+        from .physical_multiscale_center_pooling import (
+            load_physical_multiscale_pilot_config,
+            run_physical_multiscale_center_pooling_pilot,
+        )
+
+        config = load_physical_multiscale_pilot_config(args.config)
+        output = run_physical_multiscale_center_pooling_pilot(config)
+        print(output)
+        return 0
+    if args.surface == "uniform-b-v3-replay":
+        from .uniform_b_replay import (
+            load_uniform_b_replay_config,
+            run_uniform_b_replay,
+        )
+
+        config = load_uniform_b_replay_config(args.config)
+        output = run_uniform_b_replay(config)
+        print(output)
+        return 0
+    if args.surface == "build-uniform-b-v3-test-cache":
+        from .uniform_b_confirmation import (
+            build_uniform_b_test_cache,
+            load_uniform_b_test_cache_config,
+        )
+
+        output = build_uniform_b_test_cache(
+            load_uniform_b_test_cache_config(args.config)
+        )
+        print(output)
+        return 0
+    if args.surface == "uniform-b-v3-confirmation":
+        from .uniform_b_confirmation import (
+            load_uniform_b_confirmation_config,
+            run_uniform_b_confirmation,
+        )
+
+        output = run_uniform_b_confirmation(
+            load_uniform_b_confirmation_config(args.config)
+        )
+        print(output)
+        return 0
+    if args.surface == "build-uniform-b-canonical-train-cache":
+        from .uniform_b_reference import (
+            build_uniform_b_canonical_train_cache,
+            load_uniform_b_canonical_cache_config,
+        )
+
+        output = build_uniform_b_canonical_train_cache(
+            load_uniform_b_canonical_cache_config(args.config)
+        )
+        print(output)
+        return 0
+    if args.surface == "uniform-b-canonical-reference":
+        from .uniform_b_reference import (
+            load_uniform_b_canonical_reference_config,
+            run_uniform_b_canonical_reference,
+        )
+
+        output = run_uniform_b_canonical_reference(
+            load_uniform_b_canonical_reference_config(args.config)
+        )
+        print(output)
+        return 0
+    if args.surface == "uniform-b-nystroem-nonlinear-probe":
+        from .uniform_b_nonlinear_probe import (
+            load_nonlinear_probe_config,
+            run_nonlinear_probe,
+        )
+
+        output = run_nonlinear_probe(load_nonlinear_probe_config(args.config))
+        print(output)
+        return 0
+    if args.surface == "uniform-b-robust-interaction-probe":
+        from .uniform_b_robust_interaction_probe import (
+            load_robust_interaction_config,
+            run_robust_interaction_probe,
+        )
+
+        output = run_robust_interaction_probe(
+            load_robust_interaction_config(args.config)
+        )
+        print(output)
+        return 0
+    if args.surface == "uniform-b-sens-spec-constrained-nystroem-probe":
+        from .uniform_b_sens_spec_constrained_nystroem_probe import (
+            load_constrained_nystroem_config,
+            run_constrained_nystroem_probe,
+        )
+
+        output = run_constrained_nystroem_probe(
+            load_constrained_nystroem_config(args.config)
+        )
+        print(output)
+        return 0
+    if args.surface == "build-uniform-b-spatial-cache":
+        from .uniform_b_spatial_probe import (
+            build_uniform_b_spatial_cache,
+            load_spatial_cache_config,
+        )
+
+        output = build_uniform_b_spatial_cache(
+            load_spatial_cache_config(args.config)
+        )
+        print(output)
+        return 0
+    if args.surface == "uniform-b-spatial-probe":
+        from .uniform_b_spatial_probe import (
+            load_spatial_probe_config,
+            run_spatial_probe,
+        )
+
+        output = run_spatial_probe(load_spatial_probe_config(args.config))
         print(output)
         return 0
     if args.preflight_only:

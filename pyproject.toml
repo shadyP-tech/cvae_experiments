@@ -11,14 +11,20 @@ dependencies = [
   "numpy",
   "Pillow",
   "PyYAML",
+  "jsonschema",
   "scikit-learn",
   "scipy",
   "torch",
 ]
 
 [project.optional-dependencies]
-cache = ["timm"]
-dataset-full = ["openslide-python", "tifffile"]
+cache = ["huggingface_hub", "timm"]
+dataset-full = [
+  "openslide-python",
+  "tifffile",
+  "pyvips==3.1.1",
+  "pyvips-binary==8.18.4",
+]
 test = ["pytest"]
 
 [project.scripts]

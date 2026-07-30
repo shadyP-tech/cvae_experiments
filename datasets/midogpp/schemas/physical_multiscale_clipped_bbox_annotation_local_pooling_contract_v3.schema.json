@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MIDOG++ Physical Multiscale Clipped-Bbox Annotation-Local Contract v3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "profile_id",
+    "contract_hash",
+    "artifact_dataset",
+    "claim_dataset",
+    "split",
+    "eligible_centers",
+    "excluded_centers",
+    "canonical_cache_sha256",
+    "row_count",
+    "slide_count",
+    "fov_um",
+    "geometry_policy",
+    "identity_hashes",
+    "target_labels_used_for_extraction",
+    "claim_firewall"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "midogpp_physical_multiscale_clipped_bbox_annotation_local_contract_v3"
+    },
+    "status": {"const": "PASS"},
+    "profile_id": {
+      "const": "physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3"
+    },
+    "contract_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$"
+    },
+    "artifact_dataset": {"const": "MIDOG++"},
+    "claim_dataset": {"const": "MIDOG++"},
+    "split": {"const": "train"},
+    "eligible_centers": {
+      "const": ["0", "1", "2", "3", "5", "6", "7", "8", "9"]
+    },
+    "excluded_centers": {"const": ["4"]},
+    "canonical_cache_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "row_count": {"const": 9648},
+    "slide_count": {"const": 216},
+    "fov_um": {"const": [28.0, 56.0, 112.0]},
+    "geometry_policy": {
+      "const": {
+        "crop_policy": "deterministic_axiswise_in_bounds_translation",
+        "annotation_anchor": "clipped_axis_aligned_bbox_continuous_centroid",
+        "annotation_anchor_policy_id": "continuous_half_open_bbox_image_intersection_centroid_v1",
+        "bbox_convention": "continuous_half_open_xyxy",
+        "image_intersection": "[max(0,x0),min(W,x1)) x [max(0,y0),min(H,y1))",
+        "minimum_clipped_bbox_area_fraction": 0.25,
+        "anchor_delta_definition": "clipped_bbox_centroid_minus_original_bbox_centroid",
+        "coordinate_origin": "level_0_top_left_pixel_edge",
+        "pixel_rounding": "round_half_up",
+        "out_of_bounds_padding_used": false,
+        "realized_padding_pixel_count": 0,
+        "crop_size_changed": false,
+        "resize_interpolation": "bicubic",
+        "resize_antialias": true,
+        "output_size_px": 224,
+        "token_window_start": "axis_start=clamp(floor(16*p_axis-2),0,12)",
+        "token_window_shape": [4, 4],
+        "geometry_uses_labels": false,
+        "geometry_uses_center_identity": false
+      }
+    },
+    "identity_hashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_id_order",
+        "case_id_order",
+        "slide_id_order",
+        "center_order",
+        "label_order",
+        "partition_identity"
+      ],
+      "properties": {
+        "sample_id_order": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
+        "case_id_order": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
+        "slide_id_order": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
+        "center_order": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
+        "label_order": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
+        "partition_identity": {"type": "string", "pattern": "^[0-9a-f]{16}$"}
+      }
+    },
+    "target_labels_used_for_extraction": {"const": false},
+    "claim_firewall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "feature_extraction_stochastic",
+        "geometry_uses_labels",
+        "geometry_uses_center_identity",
+        "may_feed_recipe_selection",
+        "may_feed_deployable_selection",
+        "uses_likelihood",
+        "uses_nelbo",
+        "uses_latent_prior",
+        "uses_posterior",
+        "uses_mixture_model",
+        "uses_experts",
+        "performs_expert_aggregation",
+        "uses_generative_sampling"
+      ],
+      "properties": {
+        "feature_extraction_stochastic": {"const": false},
+        "geometry_uses_labels": {"const": false},
+        "geometry_uses_center_identity": {"const": false},
+        "may_feed_recipe_selection": {"const": false},
+        "may_feed_deployable_selection": {"const": false},
+        "uses_likelihood": {"const": false},
+        "uses_nelbo": {"const": false},
+        "uses_latent_prior": {"const": false},
+        "uses_posterior": {"const": false},
+        "uses_mixture_model": {"const": false},
+        "uses_experts": {"const": false},
+        "performs_expert_aggregation": {"const": false},
+        "uses_generative_sampling": {"const": false}
+      }
+    }
+  }
+}

@@ -1,0 +1,121 @@
+experiment:
+  schema_version: midogpp_uniform_b_block_tail_average_stability_probe_v1
+  name: uniform_b_block_tail_average_stability_probe_v1
+  artifact_root: output://midogpp_output_uniform_b_block_tail_average_stability_probe_v1
+  code_version: uniform_b_block_tail_average_stability_probe_v1
+
+inputs:
+  predecessor_root: artifact://midogpp_output_uniform_b_source_expert_adaptation_pilot_v2
+
+run:
+  centers: ["2", "5", "6", "9"]
+  training_seeds: [17, 42, 101]
+  devices: [cuda:0, cuda:1]
+  cpu_threads_per_worker: 1
+
+frozen_replay:
+  arm: b_block_pca96_32
+  predecessor_protocol_hash: 4a65f62dfeae9914
+  representation_dim: 128
+  block_pca_dims: [96, 32]
+  pca_solver: randomized
+  pca_random_state: 0
+  pca_n_oversamples: 10
+  pca_iterated_power: 4
+  whiten: false
+  post_fit_reweighting: false
+  case_split_fraction: 0.20
+  case_split_seed: 2718
+  batch_policy: class_to_case_to_row_balanced_with_replacement_v1
+  optimizer_steps: 1000
+  batch_size: 128
+  hidden_dim: 512
+  latent_dim: 32
+  num_hidden_layers: 2
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  beta_final: 0.001
+  kl_warmup_steps: 250
+  gradient_clip_norm: 5.0
+
+tail_averaging:
+  method: uniform_fp32_online_parameter_mean_v1
+  update_timing: after_optimizer_step
+  start_step: 751
+  end_step: 1000
+  stride: 1
+  expected_state_count: 250
+  accumulator_dtype: float32
+  average_optimizer_state: false
+  heldout_selection: false
+
+evaluation:
+  classifier_family: standard_scaler_l2_logistic
+  classifier_c: 0.01
+  classifier_class_weight: balanced
+  classifier_threshold: 0.5
+  minimum_real_bacc: 0.60
+  roles: [terminal_step_1000, tail_average_steps_751_1000]
+  decode_uses_heldout_true_class: true
+  heldout_labels_used_for_classifier_fit: false
+  heldout_labels_used_for_cvae_fit: false
+  heldout_labels_used_for_scoring: true
+  heldout_labels_used_for_diagnostic_progression_decision: true
+  heldout_labels_used_for_confirmation: false
+  prior_or_generation_evaluated: false
+
+decision:
+  mean_preservation_min: 0.80
+  mean_minus_a_preservation_min: -0.02
+  worst_center_minus_a_preservation_min: -0.05
+  mean_minus_a_bacc_min: -0.01
+  mean_minus_a_recall_min: -0.05
+  mean_minus_a_specificity_min: -0.05
+  minimum_seed_mean_preservation: 0.75
+  maximum_seed_mean_preservation_range: 0.05
+  mean_center_minus_joint_preservation_min: 0.01
+  minimum_strict_center_wins_over_joint: 3.0
+  mean_bacc_delta_vs_terminal_min: -0.01
+  mean_preservation_delta_vs_terminal_min: -0.02
+  worst_center_preservation_delta_vs_terminal_min: -0.05
+  mean_recall_delta_vs_terminal_min: -0.03
+  mean_specificity_delta_vs_terminal_min: -0.03
+  center_5_mean_recall_delta_vs_terminal_min: -0.05
+  center_5_mean_specificity_delta_vs_terminal_min: -0.05
+  center_9_mean_recall_delta_vs_terminal_min: -0.05
+  center_9_mean_specificity_delta_vs_terminal_min: -0.05
+  maximum_within_center_class_direction_seed_range: 0.15
+
+lineage:
+  predecessor_experiment: midogpp.oracle.uniform_b_source_expert_adaptation_pilot.v2
+  predecessor_artifact: midogpp_output_uniform_b_source_expert_adaptation_pilot_v2
+  predecessor_status: COMPLETE
+  predecessor_validation: PASS
+  predecessor_decision: B_ADAPTATION_NOT_FEASIBLE
+  predecessor_protocol_hash: 4a65f62dfeae9914
+  predecessor_hashes:
+    manifests/frozen_protocol.json: fb9372a318f5362f56509c40c60401b014e8e937e696c82be7433682e7b8a50c
+    manifests/content_index.json: cd971e94f72eb232d5b8759533ab2ce1ac41963b0e8448809826c34128c73ae1
+    reports/pilot_decision.json: abb2dcb0ae71cbd035ef1b3efcb9fc2cf4fb52d36c09305fad97259bd0b80344
+    reports/validation_report.json: ab624a458f2f7bb14aab256aadf07c7aa7886cbb26523277957a316dd0ec8fb7
+    reports/run_state.json: 43c9734c4a381fae6266de406c12f15f3b18aa07b685278833cc6a40418d2e70
+    tables/job_inventory.csv: cef52ffc64c6d7e3e213d3b9692b757c360e85fb46aa0afad13ec3dcab871ed2
+    tables/pilot_metrics.csv: b9fa980d0b30cc4f8096dd369c4aab56ce44a7b50a0c02e75243c2819faf898f
+    tables/heldout_predictions.csv: 8504512bcec15482a01698310cc8921648d40e3201030924221241588f7a77cd
+    tables/case_class_sampling_audit.csv: 8c48fdd84a74a792bfe025eed5a2bf7f71cd74666e62ef702001e7976a1b2398
+  observed_seed_mean_preservation_range: 0.06949044912501856
+  observed_macro_recall_range: 0.07884013071895424
+  observed_macro_specificity_range: 0.08568367346938777
+  v2_outcomes_inspected_before_intervention: true
+  confirmation_eligible: false
+  rehabilitates_v2: false
+  sole_intervention: uniform_parameter_average_steps_751_through_1000
+
+claim_boundary:
+  claim_scope: diagnostic_only
+  may_export_recipe_lock: false
+  may_feed_expert_bank: false
+  may_feed_generation: false
+  may_feed_routing: false
+  may_use_validation_or_test: false
+  next_step_if_pass: separately_reviewed_b_block_prior_only_replay

@@ -1,0 +1,30 @@
+cache:
+  name: uniform_b_v3_prospective_test_cache_v1
+  root: datasets/midogpp/derived/features/virchow2/uniform_b_v3_prospective_test_confirmation_v1/seed42
+
+inputs:
+  repo_root: .
+  manifest_path: datasets/midogpp/contract/annotation_patch_v1/manifest.csv
+  canonical_train_cache_path: datasets/midogpp/derived/features/virchow2/annotation_patch_xyxy/seed42/embeddings/train.pt
+  canonical_test_cache_path: datasets/midogpp/derived/features/virchow2/annotation_patch_xyxy/seed42/embeddings/test.pt
+  source_train_b_cache_root: datasets/midogpp/derived/features/virchow2/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3/seed42/b_3840
+
+model:
+  model_ref: hf-hub:paige-ai/Virchow2
+  model_revision: 3158645804b69e3f3bc4439d4116edddf0840a72
+  expected_model_config_sha256: 7db445b996bb165e88fe70e826c2ebb530539a2b1d136aa16eeb847df5f1e3db
+  expected_checkpoint_file_sha256: 8d6cea947eb2418c3b0dff48cfb9b238e47744ab0dfca21b2b0637b140769b4b
+  expected_state_dict_sha256: 91084959869cb53bf76e5038e5dc8a8ddc1ef8359a886fa22c19b4e8c62e112a
+  expected_preprocessing_config_hash: 4fb7d9ab76d1da72
+
+runtime_identity:
+  timm: 1.0.27
+  torch: 2.6.0+cu124
+  pillow: 12.0.0
+
+run:
+  eligible_centers: ["0", "1", "2", "3", "5", "6", "7", "8", "9"]
+  experiment_seed: 42
+  device: cuda
+  batch_size: 32
+  expected_test_rows: 9928

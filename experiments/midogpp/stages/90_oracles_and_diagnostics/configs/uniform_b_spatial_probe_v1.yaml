@@ -1,0 +1,53 @@
+experiment:
+  name: uniform_b_spatial_probe_v1
+  artifact_root: output://midogpp_output_uniform_b_spatial_probe_v1
+
+inputs:
+  manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  canonical_b_cache_path: artifact://midogpp_virchow2_uniform_b_canonical_train_cache_seed42/embeddings/train.pt
+  spatial_cache_root: artifact://midogpp_virchow2_uniform_b_spatial_token_cache_seed42
+  spatial_cache_config_path: datasets/midogpp/configs/uniform_b_spatial_token_cache_v1.yaml
+  spatial_feature_cache_path: artifact://midogpp_virchow2_uniform_b_spatial_token_cache_seed42/embeddings/train.pt
+  canonical_reference_root: artifact://midogpp_output_uniform_b_canonical_reference_v1
+  nonlinear_reference_root: artifact://midogpp_output_uniform_b_nystroem_nonlinear_probe_v1
+
+run:
+  heldout_centers: all
+  expected_rows: 9648
+  expected_feature_dim: 7680
+
+classifiers:
+  linear_lock: canonical_b_per_outer_selected_spec
+  nystroem_lock: canonical_bplus_per_outer_selected_capacity
+  primary_landmark_seed: 42
+  stability_landmark_seeds: [17, 101]
+  gamma_sample_seed: 42017
+  gamma_sample_cap: 512
+  threshold_policy: predict
+
+progression_gate:
+  mean_bacc_delta_min: 0.005
+  strict_center_wins_min: 6
+  worst_center_bacc_delta_min: -0.01
+  worst_center_class_direction_delta_min: -0.05
+  hard_core_net_rescue_min_exclusive: 0
+  stability_mean_delta_min_exclusive: 0.0
+  stability_primary_deviation_max: 0.01
+  stability_worst_center_delta_min: -0.01
+  bootstrap_replicates: 2000
+  bootstrap_seed: 42
+
+runtime:
+  outer_jobs: 4
+  threads_per_job: 3
+  use_gpu_for_classifiers: false
+
+claim_boundary:
+  claim_scope: diagnostic_only
+  diagnostic_surface_previously_inspected: true
+  representation_change_isolated: true
+  may_replace_canonical_reference: false
+  may_feed_recipe_selection: false
+  may_feed_deployable_selection: false
+  validation_features_generated: false
+  test_features_generated: false

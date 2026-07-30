@@ -1,0 +1,70 @@
+schema_version: midogpp_b_paired_reparameterization_audit_config_v1
+name: uniform_b_paired_reparameterization_audit_v1
+code_version: uniform_b_paired_reparameterization_audit_v1
+snapshot_artifact_id: midogpp_stage90_uniform_b_paired_reparameterization_snapshot_v1
+snapshot_root: artifact://midogpp_stage90_uniform_b_paired_reparameterization_snapshot_v1
+stage: 90_oracles_and_diagnostics
+evidence_label: AUDIT_ONLY
+claim_scope: diagnostic_only
+
+centers: ["2", "5", "6", "9"]
+initialization_seeds: [17, 42, 101]
+candidates:
+  - legacy_v2_seed_specific_one_epsilon
+  - fold_fixed_one_epsilon
+  - fold_fixed_antithetic
+
+recipe:
+  schema_version: midogpp_b_paired_audit_frozen_recipe_v1
+  expected_b_dim: 3840
+  global_dim: 2560
+  local_dim: 1280
+  block_global_pca_dim: 96
+  block_local_pca_dim: 32
+  output_dim: 128
+  pca_fit_scope: source_fit_only
+  pca_svd_solver: randomized
+  pca_random_state: 0
+  pca_n_oversamples: 10
+  pca_iterated_power: 4
+  pca_whiten: false
+  post_fit_reweighting: false
+  validation_fraction: 0.20
+  case_split_seed: 2718
+  optimizer_steps: 1000
+  batch_size: 128
+  hidden_dim: 512
+  latent_dim: 32
+  num_hidden_layers: 2
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  beta_final: 0.001
+  kl_warmup_steps: 250
+  gradient_clip_norm: 5.0
+  objective: stochastic_isotropic_beta_objective_step_normalized_v1
+  optimizer: AdamW
+  batch_policy: class_then_case_then_row_balanced_with_replacement
+  batch_class_quota: exact_half_per_binary_class
+  batch_case_sampling: uniform_with_replacement
+  batch_row_sampling: uniform_with_replacement_within_case
+  batch_permutation: deterministic_per_step
+
+decision_thresholds:
+  mean_preservation_min: 0.80
+  minimum_seed_mean_preservation: 0.75
+  maximum_seed_mean_preservation_range: 0.05
+  maximum_within_center_class_direction_seed_range: 0.15
+  mean_bacc_delta_vs_fixed_min: -0.01
+  mean_preservation_delta_vs_fixed_min: -0.02
+
+claim_firewall:
+  may_export_recipe_lock: false
+  may_feed_stage20: false
+  may_feed_expert_bank: false
+  may_feed_generation: false
+  may_feed_routing: false
+  may_feed_composition: false
+  may_feed_downstream: false
+  may_feed_deployable_selection: false
+  may_tune_or_select: false
+  may_support_thesis_claim: false

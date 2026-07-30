@@ -1,0 +1,43 @@
+experiment:
+  name: uniform_b_robust_interaction_probe_v1
+  artifact_root: output://midogpp_output_uniform_b_robust_interaction_probe_v1
+
+inputs:
+  manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  feature_cache_path: artifact://midogpp_virchow2_uniform_b_canonical_train_cache_seed42/embeddings/train.pt
+  canonical_reference_root: artifact://midogpp_output_uniform_b_canonical_reference_v1
+  nonlinear_probe_root: artifact://midogpp_output_uniform_b_nystroem_nonlinear_probe_v1
+  multiscale_probe_root: artifact://midogpp_output_real_feature_physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3
+
+run:
+  heldout_centers: all
+  primary_seed: 42
+  stability_seeds: [17, 101]
+
+robust_nystroem:
+  objectives: [equal_group, group_dro_eta_0.1, group_dro_eta_0.5]
+  dro_iterations: 8
+
+bilinear:
+  ranks: [4, 8, 16]
+  global_dim: 2560
+  local_dim: 1280
+  epochs: 1
+  learning_rate: 0.001
+  weight_decay: 0.001
+  batch_size: 1024
+  initialization: equal_center_class_linear_c0.01
+  linear_term_frozen_during_interaction_fit: true
+
+runtime:
+  cpu_pair_jobs: 4
+  cpu_threads_per_job: 3
+  gpu_devices: [0, 1]
+
+claim_boundary:
+  claim_scope: diagnostic_only
+  already_inspected_train_surface: true
+  validation_scored: false
+  test_scored: false
+  may_replace_canonical_reference: false
+  may_feed_deployable_selection: false

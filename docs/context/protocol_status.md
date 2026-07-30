@@ -1,6 +1,6 @@
 # Protocol Status
 
-Last updated: 2026-07-16
+Last updated: 2026-07-25
 
 ## Active MIDOG++ surfaces
 
@@ -20,6 +20,12 @@ centers `0,1,2,3,5,6,7,8,9`. Target-evaluation labels are scoring-only.
 The working tree contains active implementations for:
 
 - the eligible-only, predict-policy Stage-10 matched reference v2;
+- the audit-blocked v1/v2 physical-multiscale histories and the pre-activation,
+  non-adoptive v3 clipped-bbox annotation-local Stage-10 pilot;
+- the Stage-90 fixed-B v3 retrospective replay, isolated from downstream
+  consumption;
+- the Stage-90 prospective fixed-B confirmation on case-disjoint test rows,
+  also isolated from downstream consumption;
 - fully nested Stage-20 source-inner ex-post-prior and Task-Fisher
   `RecipeLock` selection;
 - the bounded Stage-20 training-seed stability panel and fold-level consensus
@@ -67,6 +73,38 @@ recipe bank. It is not outer-preservation, routing, generation, or downstream
 utility evidence.
 
 ## Planned surfaces
+
+Physical-multiscale v1 and v2 remain `planned` only as non-runnable
+failed-audit histories. V3 is registered as `diagnostic`; its label-blind
+`xai-master` source audit passes all 9,648 eligible rows and 216 TIFFs with 84
+clipped bboxes, no row exclusion, and no synthesized pixels. Its immutable
+contract and atomic B/C feature bundle are independently validated and have
+complete required-file SHA-256 coverage. The Stage-10 run is complete and
+validates: the nested adaptive policy selected B for six centers, C for two,
+and A for one and improved mean BACC by `+0.044091` over A. All three lineages
+remain forbidden from Stage 20 through Stage 70.
+
+The Stage-90 uniform-B replay is also complete and validates. It imports the
+nine frozen source-v3 classifier locks and applies B to every previously scored
+outer center, producing mean BACC `0.792087` and a paired `+0.051775` over A,
+with eight of nine strict wins. Because the decision to test B uniformly was
+informed by these same outer results, its status is `POSTHOC_DISCOVERY`, its
+catalog label is `DIAGNOSTIC ONLY`, and `independent_confirmation=false`.
+Neither its conditional bootstrap nor its deterministic replay covers
+representation-choice or new-center uncertainty.
+
+Phase B freezes the hypothesis before test-B extraction and evaluates 9,928
+case-disjoint test rows from the same nine centers. The result is
+`CONFIRMED_WITHIN_CENTER`: B reaches mean BACC `0.799159` versus `0.735733` for
+A (`+0.063426`), wins all nine centers, and has a positive worst-center delta
+of `+0.010638`. The 95% conditional paired case interval is
+`[+0.050709, +0.073650]`; all four predeclared confirmation checks pass.
+
+This resolves representation-choice uncertainty for new cases sampled from
+the observed centers more convincingly than the retrospective replay. It does
+not resolve center-sampling uncertainty, external-dataset transfer, or
+deployment utility. Phase B therefore remains `DIAGNOSTIC ONLY` in Stage 90
+and is forbidden from revising the matched denominator or feeding later stages.
 
 Stages 30 through 70 are not active implementations:
 
@@ -133,3 +171,15 @@ is:
 ```bash
 conda run -n thesis python -m midogpp_thesis workspace validate
 ```
+
+## Constrained Uniform-B classifier status
+
+`uniform_b_sens_spec_constrained_nystroem_probe_v1` is complete, validated,
+and diagnostic only. It keeps the global threshold fixed at `0.5`, selects
+capacity using source-inner folds only, and records that the study design was
+informed by previously inspected outer outcomes.
+
+The decision is `NO_CONSTRAINED_BPLUS_CANDIDATE_PASSES`; it does not authorize
+canonical-reference replacement, validation scoring, test scoring, recipe
+selection, or deployable selection. Seven centers use the exact-linear
+fallback and only two retain nonlinear capacity.

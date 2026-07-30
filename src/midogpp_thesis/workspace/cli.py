@@ -84,11 +84,23 @@ def main(argv: list[str] | None = None) -> int:
         print(f"command={shlex.join(prepared.argv)}")
         return 0
     if args.command == "run":
-        extra = tuple(args.extra_args)
-        if extra and extra[0] == "--":
-            extra = extra[1:]
-        return workspace.run(args.experiment_id, force=bool(args.force), extra_args=extra)
+        extra, force = _normalize_run_arguments(args.extra_args, force=bool(args.force))
+        return workspace.run(args.experiment_id, force=force, extra_args=extra)
     raise AssertionError(f"Unhandled command: {args.command}")
+
+
+def _normalize_run_arguments(
+    raw_extra: list[str],
+    *,
+    force: bool,
+) -> tuple[tuple[str, ...], bool]:
+    extra = list(raw_extra)
+    if extra and extra[0] == "--":
+        return tuple(extra[1:]), force
+    while "--force" in extra:
+        extra.remove("--force")
+        force = True
+    return tuple(extra), force
 
 
 if __name__ == "__main__":  # pragma: no cover

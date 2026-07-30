@@ -165,6 +165,16 @@ def test_real_feature_cli_help_exposes_registered_diagnostics() -> None:
         "matched-reference",
         "fixed-c-risk-diagnostic",
         "conditional-logit-alignment",
+        "physical-multiscale-center-pooling-pilot",
+        "physical-multiscale-annotation-local-pooling-pilot",
+        "uniform-b-v3-replay",
+        "build-uniform-b-v3-test-cache",
+        "uniform-b-v3-confirmation",
+        "build-uniform-b-canonical-train-cache",
+        "uniform-b-canonical-reference",
+        "uniform-b-nystroem-nonlinear-probe",
+        "uniform-b-robust-interaction-probe",
+        "uniform-b-sens-spec-constrained-nystroem-probe",
     }
 
 

@@ -9,6 +9,10 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from midogpp_thesis.data.contract.paths import resolve_contract_path
+from midogpp_thesis.data.features.virchow2 import (
+    pool_virchow2_tokens,
+    resolve_tensor,
+)
 
 from .protocol import ProtocolError
 from .splits import sample_id
@@ -245,32 +249,11 @@ def _load_virchow2_extractor(request: CacheBuildRequest) -> _Virchow2Extractor:
 
 
 def _virchow2_embedding_from_tokens(outputs: Any) -> Any:
-    tokens = _resolve_tensor(outputs)
-    if getattr(tokens, "ndim", 0) != 3 or int(tokens.shape[1]) <= 5:
-        raise RuntimeError(f"Virchow2 expected class/register/patch tokens, got shape={getattr(tokens, 'shape', None)}")
-    return _torch_cat((tokens[:, 0], tokens[:, 5:].mean(dim=1)), dim=-1)
+    return pool_virchow2_tokens(outputs, include_center=False)
 
 
 def _resolve_tensor(value: Any, *, depth: int = 0) -> Any:
-    if depth > 8:
-        raise RuntimeError(f"Could not resolve tensor from output type {type(value)}")
-    if getattr(value, "ndim", None) is not None:
-        return value
-    if isinstance(value, Mapping):
-        for candidate in value.values():
-            try:
-                return _resolve_tensor(candidate, depth=depth + 1)
-            except RuntimeError:
-                continue
-    if hasattr(value, "to_tuple"):
-        return _resolve_tensor(value.to_tuple(), depth=depth + 1)
-    if isinstance(value, (tuple, list)):
-        for candidate in value:
-            try:
-                return _resolve_tensor(candidate, depth=depth + 1)
-            except RuntimeError:
-                continue
-    raise RuntimeError(f"Could not resolve tensor from output type {type(value)}")
+    return resolve_tensor(value, depth=depth)
 
 
 def _resolve_device(torch: Any, raw: str) -> Any:
@@ -280,12 +263,6 @@ def _resolve_device(torch: Any, raw: str) -> Any:
     if requested == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA requested but unavailable")
     return torch.device(requested)
-
-
-def _torch_cat(values: Sequence[Any], *, dim: int) -> Any:
-    import torch  # type: ignore
-
-    return torch.cat(tuple(values), dim=int(dim))
 
 
 def _torch_save(payload: Mapping[str, Any], path: Path) -> None:

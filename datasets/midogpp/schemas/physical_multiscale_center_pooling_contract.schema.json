@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MIDOG++ Physical Multiscale Center-Pooling Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "contract_hash",
+    "artifact_dataset",
+    "claim_dataset",
+    "split",
+    "eligible_centers",
+    "excluded_centers",
+    "canonical_cache_sha256",
+    "row_count",
+    "slide_count",
+    "fov_um",
+    "geometry_policy",
+    "target_labels_used_for_extraction"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "midogpp_physical_multiscale_contract_v1"
+    },
+    "status": {
+      "const": "PASS"
+    },
+    "contract_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$"
+    },
+    "artifact_dataset": {
+      "const": "MIDOG++"
+    },
+    "claim_dataset": {
+      "const": "MIDOG++"
+    },
+    "split": {
+      "const": "train"
+    },
+    "eligible_centers": {
+      "const": ["0", "1", "2", "3", "5", "6", "7", "8", "9"]
+    },
+    "excluded_centers": {
+      "const": ["4"]
+    },
+    "canonical_cache_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "row_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "slide_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "fov_um": {
+      "const": [28.0, 56.0, 112.0]
+    },
+    "geometry_policy": {
+      "const": {
+        "padding_fraction_max": 0.1,
+        "padding_rgb": [255, 255, 255],
+        "resize_interpolation": "bicubic",
+        "resize_antialias": true,
+        "coordinate_origin": "level_0_top_left",
+        "pixel_rounding": "round_half_up"
+      }
+    },
+    "target_labels_used_for_extraction": {
+      "const": false
+    }
+  }
+}

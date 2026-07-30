@@ -1,0 +1,114 @@
+{
+  "all_orientations_top_left": true,
+  "all_required_tiff_headers_validated": true,
+  "anchor_delta_x_summary_px": {
+    "count": 84,
+    "maximum": 13.5,
+    "mean": 0.041666666666666664,
+    "median": 0.0,
+    "minimum": -11.0,
+    "p25": 0.0,
+    "p75": 0.0
+  },
+  "anchor_delta_y_summary_px": {
+    "count": 84,
+    "maximum": 15.0,
+    "mean": 0.13690476190476192,
+    "median": 0.0,
+    "minimum": -10.5,
+    "p25": -1.5,
+    "p75": 3.0
+  },
+  "center_and_label_stratified_counts_are_audit_only": true,
+  "clipped_bbox_area_fraction_summary": {
+    "count": 84,
+    "maximum": 0.98,
+    "mean": 0.8,
+    "median": 0.81,
+    "minimum": 0.4,
+    "p25": 0.76,
+    "p75": 0.86
+  },
+  "clipped_bbox_count": 84,
+  "clipped_bbox_counts_by_center": {
+    "0": 18,
+    "1": 8,
+    "2": 23,
+    "3": 4,
+    "5": 6,
+    "6": 5,
+    "7": 5,
+    "8": 8,
+    "9": 7
+  },
+  "clipped_bbox_counts_by_label": {
+    "0": 40,
+    "1": 44
+  },
+  "expected_clipped_bbox_count": 84,
+  "expected_row_count": 9648,
+  "expected_slide_count": 216,
+  "failure_examples": [],
+  "geometry_driven_row_exclusion": false,
+  "maximum_absolute_anchor_delta_px": 15.0,
+  "maximum_axis_shift_fraction": 0.47737556561085975,
+  "maximum_axis_shift_px": 230,
+  "maximum_mpp": 0.2533008895448562,
+  "mechanical_pass_criteria_are_label_blind": true,
+  "minimum_mpp": 0.22629275923275685,
+  "minimum_required_clipped_bbox_area_fraction": 0.25,
+  "original_bbox_centroid_out_of_bounds_count": 2,
+  "original_bbox_centroid_out_of_bounds_examples": [
+    {
+      "anchor_x": 11.5,
+      "anchor_y": 2416.0,
+      "clipped_area_fraction": 0.46,
+      "original_centroid_x": -2.0,
+      "original_centroid_y": 2416.0,
+      "sample_id": "305__305__ann15363__y1"
+    },
+    {
+      "anchor_x": 4211.0,
+      "anchor_y": 10.0,
+      "clipped_area_fraction": 0.4,
+      "original_centroid_x": 4211.0,
+      "original_centroid_y": -5.0,
+      "sample_id": "309__309__ann15728__y0"
+    }
+  ],
+  "out_of_bounds_pixels_synthesized": false,
+  "profile_id": "physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3",
+  "realized_padding_pixel_count": 0,
+  "row_count": 9648,
+  "schema_version": "midogpp_physical_multiscale_source_audit_v3",
+  "shift_direction_counts": {
+    "down": 693,
+    "left": 435,
+    "right": 454,
+    "up": 620
+  },
+  "shifted_crop_counts_by_fov": {
+    "112um": 1286,
+    "28um": 282,
+    "56um": 580
+  },
+  "shifted_sample_count": 1286,
+  "shifted_sample_counts_by_center": {
+    "0": 258,
+    "1": 88,
+    "2": 447,
+    "3": 92,
+    "5": 84,
+    "6": 47,
+    "7": 63,
+    "8": 158,
+    "9": 49
+  },
+  "shifted_sample_counts_by_label": {
+    "0": 567,
+    "1": 719
+  },
+  "shifted_sample_fraction": 0.13329187396351574,
+  "slide_count": 216,
+  "status": "PASS"
+}

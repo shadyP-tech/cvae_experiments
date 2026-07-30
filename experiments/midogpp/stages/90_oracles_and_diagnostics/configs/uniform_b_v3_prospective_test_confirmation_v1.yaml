@@ -1,0 +1,46 @@
+experiment:
+  name: uniform_b_v3_prospective_test_confirmation_v1
+  artifact_root: output://midogpp_output_uniform_b_v3_prospective_test_confirmation_v1
+
+inputs:
+  manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  canonical_train_cache_path: artifact://midogpp_virchow2_xyxy_feature_cache_seed42/embeddings/train.pt
+  canonical_test_cache_path: artifact://midogpp_virchow2_xyxy_feature_cache_seed42/embeddings/test.pt
+  source_train_b_cache_root: artifact://midogpp_virchow2_annotation_jpeg_fixed_center_pooling_3840_v3_seed42
+  test_b_cache_root: artifact://midogpp_virchow2_uniform_b_v3_prospective_test_cache_seed42
+  source_v3_root: artifact://midogpp_output_real_feature_physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3
+  retrospective_root: artifact://midogpp_output_uniform_b_v3_retrospective_replay_v1
+
+run:
+  heldout_centers: ["0", "1", "2", "3", "5", "6", "7", "8", "9"]
+  allow_partial_test_coverage: false
+
+bootstrap:
+  seed: 42
+  valid_replicates: 2000
+  max_attempts: 20000
+
+confirmation_rule:
+  minimum_mean_bacc_delta: 0.02
+  minimum_strict_center_wins: 6
+  minimum_worst_center_delta: -0.01
+  require_bootstrap_lower_bound_above_zero: true
+
+prospective_provenance:
+  representation_locked_before_test_b_extraction: true
+  test_b_outcomes_previously_observed: false
+  test_split_used_for_selection: false
+  validation_split_used: false
+  train_test_case_overlap: 0
+  independent_confirmation_within_observed_centers: true
+  external_dataset_confirmation: false
+
+claim_boundary:
+  claim_scope: diagnostic_only
+  may_replace_canonical_reference: false
+  may_feed_recipe_selection: false
+  may_feed_deployable_selection: false
+  covers_new_case_uncertainty_within_centers: true
+  covers_new_center_uncertainty: false
+  uses_cvae: false
+  uses_router: false

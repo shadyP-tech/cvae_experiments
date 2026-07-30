@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import hashlib
 import csv
 import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Sequence
+
+from midogpp_thesis.common.hashing import stable_hash
 
 from ..protocol import ProtocolError
 from ..schemas import ArtifactLineageKey, REQUIRED_LINEAGE_COLUMNS
@@ -37,13 +38,6 @@ class FrozenProtocolSnapshot:
             "feature_config_hash": self.feature_config_hash,
             "routing_config_hash": self.routing_config_hash,
         }
-
-
-def stable_hash(payload: object) -> str:
-    """Return a deterministic short hash for JSON-serializable protocol payloads."""
-
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()[:16]
 
 
 def prepare_artifact_dirs(root: str | Path) -> Path:

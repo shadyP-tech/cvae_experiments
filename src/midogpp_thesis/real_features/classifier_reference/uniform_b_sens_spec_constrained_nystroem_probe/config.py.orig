@@ -1,0 +1,243 @@
+"""Frozen protocol for the sensitivity/specificity-constrained B+ probe."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Mapping
+
+import yaml
+
+from ..protocol import ProtocolError
+from ..schemas.midogpp import MIDOGPP_ELIGIBLE_CENTERS
+
+
+EXPERIMENT_NAME = "uniform_b_sens_spec_constrained_nystroem_probe_v1"
+EXPERIMENT_ID = "midogpp.oracle.uniform_b_sens_spec_constrained_nystroem_probe.v1"
+OUTPUT_ID = "midogpp_output_uniform_b_sens_spec_constrained_nystroem_probe_v1"
+BOUNDED_SHRINKAGE_EXPERIMENT_NAME = "uniform_b_bounded_shrinkage_probe_v1"
+BOUNDED_SHRINKAGE_EXPERIMENT_ID = (
+    "midogpp.oracle.uniform_b_bounded_shrinkage_probe.v1"
+)
+BOUNDED_SHRINKAGE_OUTPUT_ID = (
+    "midogpp_output_uniform_b_bounded_shrinkage_probe_v1"
+)
+SOURCE_INNER_REPLAY_ID = (
+    "midogpp_output_uniform_b_sens_spec_constrained_nystroem_probe_v1"
+)
+DATASET_ID = "midogpp_dataset_contract_annotation_patch_v1"
+CACHE_ID = "midogpp_virchow2_uniform_b_canonical_train_cache_seed42"
+CANONICAL_ID = "midogpp_output_uniform_b_canonical_reference_v1"
+NONLINEAR_ID = "midogpp_output_uniform_b_nystroem_nonlinear_probe_v1"
+ROBUST_ID = "midogpp_output_uniform_b_robust_interaction_probe_v1"
+OBJECTIVES = (
+    "canonical_class_weight",
+    "equal_group",
+    "group_dro_eta_0.1",
+    "group_dro_eta_0.5",
+)
+ALPHAS = (0.25, 0.5, 0.75, 1.0)
+BOUNDED_SHRINKAGE_ALPHAS = tuple(
+    round(value / 100.0, 2) for value in range(2, 41, 2)
+)
+
+
+@dataclass(frozen=True)
+class ConstraintSpec:
+    per_inner_recall_delta_min: float
+    per_inner_specificity_delta_min: float
+    per_inner_bacc_delta_min: float
+    mean_recall_delta_exclusive: float
+    mean_specificity_delta_min: float
+    mean_bacc_delta_exclusive: float
+
+
+@dataclass(frozen=True)
+class ProgressionGate:
+    nonlinear_outer_locks_min: int
+    mean_bacc_delta_min: float
+    strict_center_wins_min: int
+    worst_center_bacc_delta_min: float
+    every_center_recall_delta_min: float
+    every_center_specificity_delta_min: float
+    mean_recall_delta_exclusive: float
+    mean_specificity_delta_min: float
+    stability_mean_bacc_delta_exclusive: float
+    stability_worst_center_bacc_delta_min: float
+    stability_every_direction_delta_min: float
+
+
+@dataclass(frozen=True)
+class ConstrainedNystroemConfig:
+    name: str
+    artifact_root: Path
+    manifest_path: Path
+    feature_cache_path: Path
+    canonical_root: Path
+    nonlinear_root: Path
+    robust_lineage_root: Path
+    source_inner_replay_root: Path | None
+    heldout_centers: tuple[str, ...]
+    expected_rows: int
+    expected_dim: int
+    primary_seed: int
+    stability_seeds: tuple[int, ...]
+    gamma_sample_seed: int
+    gamma_sample_cap: int
+    objectives: tuple[str, ...]
+    alphas: tuple[float, ...]
+    dro_iterations: int
+    threshold: float
+    fallback_alpha: float
+    fallback_role: str
+    constraints: ConstraintSpec
+    gate: ProgressionGate
+    pair_jobs: int
+    threads_per_job: int
+    claim_boundary: Mapping[str, object]
+
+
+def load_constrained_nystroem_config(
+    path: str | Path,
+) -> ConstrainedNystroemConfig:
+    payload = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    if not isinstance(payload, Mapping):
+        raise ProtocolError("Constrained-Nyström config must be a mapping.")
+    experiment = _mapping(payload, "experiment")
+    inputs = _mapping(payload, "inputs")
+    run = _mapping(payload, "run")
+    capacity = _mapping(payload, "capacity_path")
+    raw_constraints = _mapping(payload, "source_inner_constraints")
+    raw_gate = _mapping(payload, "progression_gate")
+    runtime = _mapping(payload, "runtime")
+    claim = _mapping(payload, "claim_boundary")
+    heldouts = (
+        MIDOGPP_ELIGIBLE_CENTERS
+        if str(run["heldout_centers"]).lower() == "all"
+        else tuple(str(value) for value in run["heldout_centers"])
+    )
+    constraints = ConstraintSpec(
+        per_inner_recall_delta_min=float(
+            raw_constraints["per_inner_recall_delta_min"]
+        ),
+        per_inner_specificity_delta_min=float(
+            raw_constraints["per_inner_specificity_delta_min"]
+        ),
+        per_inner_bacc_delta_min=float(raw_constraints["per_inner_bacc_delta_min"]),
+        mean_recall_delta_exclusive=float(
+            raw_constraints["mean_recall_delta_exclusive"]
+        ),
+        mean_specificity_delta_min=float(
+            raw_constraints["mean_specificity_delta_min"]
+        ),
+        mean_bacc_delta_exclusive=float(
+            raw_constraints["mean_bacc_delta_exclusive"]
+        ),
+    )
+    gate = ProgressionGate(
+        nonlinear_outer_locks_min=int(raw_gate["nonlinear_outer_locks_min"]),
+        mean_bacc_delta_min=float(raw_gate["mean_bacc_delta_min"]),
+        strict_center_wins_min=int(raw_gate["strict_center_wins_min"]),
+        worst_center_bacc_delta_min=float(
+            raw_gate["worst_center_bacc_delta_min"]
+        ),
+        every_center_recall_delta_min=float(
+            raw_gate["every_center_recall_delta_min"]
+        ),
+        every_center_specificity_delta_min=float(
+            raw_gate["every_center_specificity_delta_min"]
+        ),
+        mean_recall_delta_exclusive=float(
+            raw_gate["mean_recall_delta_exclusive"]
+        ),
+        mean_specificity_delta_min=float(
+            raw_gate["mean_specificity_delta_min"]
+        ),
+        stability_mean_bacc_delta_exclusive=float(
+            raw_gate["stability_mean_bacc_delta_exclusive"]
+        ),
+        stability_worst_center_bacc_delta_min=float(
+            raw_gate["stability_worst_center_bacc_delta_min"]
+        ),
+        stability_every_direction_delta_min=float(
+            raw_gate["stability_every_direction_delta_min"]
+        ),
+    )
+    config = ConstrainedNystroemConfig(
+        name=str(experiment["name"]),
+        artifact_root=Path(str(experiment["artifact_root"])),
+        manifest_path=Path(str(inputs["manifest_path"])),
+        feature_cache_path=Path(str(inputs["feature_cache_path"])),
+        canonical_root=Path(str(inputs["canonical_reference_root"])),
+        nonlinear_root=Path(str(inputs["nonlinear_probe_root"])),
+        robust_lineage_root=Path(str(inputs["robust_interaction_lineage_root"])),
+        source_inner_replay_root=(
+            Path(str(inputs["source_inner_replay_root"]))
+            if inputs.get("source_inner_replay_root") is not None
+            else None
+        ),
+        heldout_centers=tuple(heldouts),
+        expected_rows=int(run["expected_rows"]),
+        expected_dim=int(run["expected_dim"]),
+        primary_seed=int(run["primary_seed"]),
+        stability_seeds=tuple(int(value) for value in run["stability_seeds"]),
+        gamma_sample_seed=int(run["gamma_sample_seed"]),
+        gamma_sample_cap=int(run["gamma_sample_cap"]),
+        objectives=tuple(str(value) for value in capacity["objectives"]),
+        alphas=tuple(float(value) for value in capacity["alphas"]),
+        dro_iterations=int(capacity["dro_iterations"]),
+        threshold=float(capacity["threshold"]),
+        fallback_alpha=float(capacity["fallback_alpha"]),
+        fallback_role=str(capacity["fallback_role"]),
+        constraints=constraints,
+        gate=gate,
+        pair_jobs=int(runtime["pair_jobs"]),
+        threads_per_job=int(runtime["threads_per_job"]),
+        claim_boundary=dict(claim),
+    )
+    _validate(config)
+    return config
+
+
+def _validate(config: ConstrainedNystroemConfig) -> None:
+    required_claim = {
+        "claim_scope": "diagnostic_only",
+        "already_inspected_train_surface": True,
+        "study_design_informed_by_prior_outer_scores": True,
+        "independent_outer_confirmation": False,
+        "validation_scored": False,
+        "test_scored": False,
+        "may_replace_canonical_reference": False,
+        "may_feed_deployable_selection": False,
+    }
+    expected_constraints = ConstraintSpec(-0.02, -0.02, -0.01, 0.0, -0.01, 0.0)
+    expected_gate = ProgressionGate(6, 0.01, 6, -0.01, -0.02, -0.02, 0.0, -0.01, 0.0, -0.01, -0.03)
+    if (
+        config.name != EXPERIMENT_NAME
+        or config.heldout_centers != MIDOGPP_ELIGIBLE_CENTERS
+        or config.expected_rows != 9648
+        or config.expected_dim != 3840
+        or config.primary_seed != 42
+        or config.stability_seeds != (17, 101)
+        or config.gamma_sample_seed != 42017
+        or config.gamma_sample_cap != 512
+        or config.objectives != OBJECTIVES
+        or config.alphas != ALPHAS
+        or config.dro_iterations != 8
+        or config.threshold != 0.5
+        or config.fallback_alpha != 0.0
+        or config.fallback_role != "exact_linear_b"
+        or config.constraints != expected_constraints
+        or config.gate != expected_gate
+        or config.pair_jobs != 4
+        or config.threads_per_job != 3
+        or any(config.claim_boundary.get(key) != value for key, value in required_claim.items())
+    ):
+        raise ProtocolError("Constrained-Nyström protocol drifted.")
+
+
+def _mapping(payload: Mapping[str, object], key: str) -> Mapping[str, object]:
+    value = payload.get(key)
+    if not isinstance(value, Mapping):
+        raise ProtocolError(f"Constrained-Nyström section {key!r} must be a mapping.")
+    return value

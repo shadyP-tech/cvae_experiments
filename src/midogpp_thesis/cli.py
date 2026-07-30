@@ -23,6 +23,10 @@ COMMANDS: dict[str, tuple[str, str]] = {
         "midogpp_thesis.data.contract.commands.inspect:main",
         "Inspect contract/cache domain alignment.",
     ),
+    "dataset-physical-multiscale": (
+        "midogpp_thesis.data.physical_multiscale.cli:main",
+        "Audit and build physical-multiscale dataset contracts and caches.",
+    ),
     "real-features": (
         "midogpp_thesis.real_features.sail.cli:main",
         "Build Virchow2 caches or run real-feature controls.",
@@ -34,6 +38,10 @@ COMMANDS: dict[str, tuple[str, str]] = {
     "cvae-preservation": (
         "midogpp_thesis.cvae.preservation.cli:main",
         "Run a CVAE preservation surface.",
+    ),
+    "cvae-expert-bank": (
+        "midogpp_thesis.cvae.expert_bank.cli:main",
+        "Run CVAE source-expert adaptation pilots or expert-bank construction.",
     ),
     "workspace": (
         "midogpp_thesis.workspace.cli:main",

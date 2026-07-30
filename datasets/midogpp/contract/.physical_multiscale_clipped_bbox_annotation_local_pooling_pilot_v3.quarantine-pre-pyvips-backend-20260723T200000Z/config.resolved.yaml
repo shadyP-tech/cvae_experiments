@@ -1,0 +1,79 @@
+artifact:
+  name: physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3
+source_config_path: /home/stud/spark/cvae_experiments/datasets/midogpp/configs/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3.yaml
+inputs:
+  raw_root: /home/stud/spark/cvae_experiments/datasets/midogpp/raw/MIDOGpp
+  raw_metadata_path: /home/stud/spark/cvae_experiments/datasets/midogpp/raw/MIDOGpp/midogpp_scanner_metadata_full_resplit.csv
+  base_manifest_path: /home/stud/spark/cvae_experiments/datasets/midogpp/contract/annotation_patch_v1/manifest.csv
+  canonical_cache_path: /home/stud/spark/cvae_experiments/datasets/midogpp/derived/features/virchow2/annotation_patch_xyxy/seed42/embeddings/train.pt
+  canonical_reference_root: /home/stud/spark/cvae_experiments/artifacts/midogpp/10_real_feature_reference/eligible_tuned_real_reference_v2/seed42
+outputs:
+  contract_root: /home/stud/spark/cvae_experiments/datasets/midogpp/contract/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3
+  cache_bundle_root: /home/stud/spark/cvae_experiments/datasets/midogpp/derived/features/virchow2/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3/seed42
+  b_cache_root: /home/stud/spark/cvae_experiments/datasets/midogpp/derived/features/virchow2/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3/seed42/b_3840
+  c_cache_root: /home/stud/spark/cvae_experiments/datasets/midogpp/derived/features/virchow2/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3/seed42/c_11520
+physical_scale:
+  fov_um:
+  - 28.0
+  - 56.0
+  - 112.0
+  mpp_min: 0.15
+  mpp_max: 0.4
+  anisotropy_relative_max: 0.01
+  dual_source_relative_max: 0.01
+geometry:
+  crop_policy: deterministic_axiswise_in_bounds_translation
+  annotation_anchor: clipped_axis_aligned_bbox_continuous_centroid
+  annotation_anchor_policy_id: continuous_half_open_bbox_image_intersection_centroid_v1
+  bbox_convention: continuous_half_open_xyxy
+  image_intersection: '[max(0,x0),min(W,x1)) x [max(0,y0),min(H,y1))'
+  minimum_clipped_bbox_area_fraction: 0.25
+  anchor_delta_definition: clipped_bbox_centroid_minus_original_bbox_centroid
+  coordinate_origin: level_0_top_left_pixel_edge
+  pixel_rounding: round_half_up
+  out_of_bounds_padding_used: false
+  realized_padding_pixel_count: 0
+  crop_size_changed: false
+  resize_interpolation: bicubic
+  resize_antialias: true
+  output_size_px: 224
+  token_window_start: axis_start=clamp(floor(16*p_axis-2),0,12)
+  token_window_shape:
+  - 4
+  - 4
+  geometry_uses_labels: false
+  geometry_uses_center_identity: false
+bridge:
+  minimum_cosine: 0.99999
+  maximum_relative_l2: 0.001
+  minimum_prediction_agreement: 0.999
+  maximum_absolute_equal_center_bacc_delta: 0.001
+model:
+  model_ref: hf-hub:paige-ai/Virchow2
+  model_revision: 3158645804b69e3f3bc4439d4116edddf0840a72
+  expected_model_config_sha256: 7db445b996bb165e88fe70e826c2ebb530539a2b1d136aa16eeb847df5f1e3db
+  expected_checkpoint_file_sha256: 8d6cea947eb2418c3b0dff48cfb9b238e47744ab0dfca21b2b0637b140769b4b
+  expected_state_dict_sha256: 91084959869cb53bf76e5038e5dc8a8ddc1ef8359a886fa22c19b4e8c62e112a
+  expected_preprocessing_config_hash: 4fb7d9ab76d1da72
+runtime_identity:
+  timm: 1.0.27
+  torch: 2.6.0+cu124
+  pillow: 12.0.0
+run:
+  eligible_centers:
+  - '0'
+  - '1'
+  - '2'
+  - '3'
+  - '5'
+  - '6'
+  - '7'
+  - '8'
+  - '9'
+  experiment_seed: 42
+  device: cuda
+  batch_size: 32
+  require_tiled_reader: true
+  expected_row_count: 9648
+  expected_slide_count: 216
+  expected_clipped_bbox_count: 84

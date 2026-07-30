@@ -1,13 +1,14 @@
 # Current Experimental State
 
-Last updated: 2026-07-16
+Last updated: 2026-07-25
 
 This page records verified evidence and canonical availability after the
 completed MIDOG++ repository migration. Active inputs and the two tuned
 evidence bundles are present locally and on the workstation at canonical paths
-with cataloged hash verification. The matched Stage-10 reference, scalar
-Stage-20 source-inner result, and bounded training-seed stability bundle are
-validated on `xai-master` but have not yet been synced locally.
+with cataloged hash verification. The matched Stage-10 reference, Stage-10
+conditional-logit alignment diagnostic, scalar Stage-20 source-inner result,
+and bounded training-seed stability bundle are validated on `xai-master` but
+have not yet been synced locally.
 
 ## Local Readiness Snapshot
 
@@ -27,13 +28,23 @@ validated on `xai-master` but have not yet been synced locally.
   stage-20 paths and validate `PASS`.
 - The approximately 65 GB raw source tree is workstation-only at
   `datasets/midogpp/raw/MIDOGpp/` and intentionally not synced to the Mac.
+- Physical-multiscale v1 and v2 are immutable failed-audit lineages. The clean
+  v3 clipped-bbox annotation-local implementation is registered as
+  `diagnostic`; its 9,648-row/216-TIFF `xai-master` source audit passes with 84
+  deterministic bbox clips, no row exclusion, and no synthesized pixels. Its
+  immutable contract and atomic B/C cache are workstation-built, independently
+  validated, and fully hash-promoted. The Stage-10 diagnostic and Stage-90
+  fixed-B retrospective replay are complete, independently validated, and
+  fully hash-promoted. Phase-B case-disjoint test confirmation is also
+  complete, validates, and passes its predeclared within-center gate.
 - Stages 30 through 70 have no active expert-bank, generation, routing, or
   frozen-policy downstream implementation. Their directories and protocol
   contracts are planning scaffolds, not experimental evidence.
-- The Stage-10 matched-reference v2, Stage-20 scalar source-inner
-  prior-recovery/Task-Fisher run, and bounded Stage-20 training-seed stability
-  run are complete on `xai-master` and pass their full validators. These three
-  workstation bundles have not yet been synced into this local checkout.
+- The Stage-10 matched-reference v2, Stage-10 conditional-logit alignment
+  diagnostic, Stage-20 scalar source-inner prior-recovery/Task-Fisher run, and
+  bounded Stage-20 training-seed stability run are complete on `xai-master`
+  and protocol-clean. These four workstation bundles have not yet been synced
+  into this local checkout.
 - The stability bundle is a valid, published Stage-30 recipe input. Stage 30
   remains planned and has no runnable expert-bank implementation. The
   registered Stage-20 outer run remains blocked by the scalar source-inner
@@ -154,6 +165,175 @@ Missing evidence:
 - classifier-seed stability beyond seed `23`
 - formal paired comparison against another active real-feature aggregation
   baseline on hash-matched inputs
+
+## MIDOG++ Conditional-Logit Alignment Diagnostic
+
+Canonical target:
+
+```text
+artifacts/midogpp/10_real_feature_reference/conditional_logit_alignment_v1/seed42/
+```
+
+Availability: `workstation_only`; the complete 16-file bundle was inspected
+directly at the canonical path on `xai-master` and has not been synced locally.
+The registry status remains `diagnostic`. The artifact catalog still carries
+`TODO_VERIFY_ARTIFACT`; updating that lifecycle metadata after sync is an
+explicit TODO, not a reason to weaken the directly verified result.
+
+Validation status:
+
+- runtime status: `COMPLETE`
+- leakage/provenance report: `PASS`
+- evidence labels: `NEGATIVE_RESULT` and `DIAGNOSTIC_ONLY`
+- claim scope: `real_feature_transfer_only`
+- target evaluation labels used for fit or gamma selection: `false`
+- target evaluation labels used for scoring only: `true`
+- generated embeddings, CVAE checkpoint, expert bank, NELBO, and router used:
+  `false`
+- protocol hash: `3806cca63f914a09`
+- table-bundle hash: `4b19d9052da239f6`
+
+Primary result against the matched `gamma=0` classifier:
+
+| Quantity | Selected CLA | `gamma=0` | Selected minus `gamma=0` |
+| --- | ---: | ---: | ---: |
+| mean BACC | `0.7434042753` | `0.7434898099` | `-0.0000855346` |
+| mean macro-F1 | `0.7414722419` | `0.7414225940` | `+0.0000496479` |
+| worst-center BACC | `0.6913746631` | `0.6913746631` | `0.0000000000` |
+
+Source-inner selection chose a positive gamma in every outer fold (`gamma=10`
+for seven centers and `gamma=1` for two), but outer BACC produced only two
+wins, four ties, and three losses. Only `22/9,648` predictions changed: nine
+changes corrected the `gamma=0` prediction and thirteen introduced an error.
+The post-run source-inner-versus-outer delta Spearman correlation was `0.052`.
+These descriptive audits cannot override the predeclared BACC decision.
+
+Interpretation: the regularizer was mechanism-active but utility-inert. The
+outer conditional operator occupies a rank-14 subspace of the 2,560-dimensional
+feature frame; the artifact-backed causal audit attributes the weak response to
+low overlap with the fitted discriminative direction and to decision-threshold
+plateaus. This audit interpretation comes from the supplied artifact-backed
+synthesis; it is not a claim of causal domain-shift removal. No post-hoc
+probability metric is adoption evidence.
+
+Stop recommendation: do not adopt CLA and do not expand the gamma sweep. Any
+future CLA work should be optional, predeclared, and restricted to a mechanism
+diagnostic. This result cannot replace the Stage-10 matched denominator or
+support CVAE preservation, routing, composition, generation, or downstream
+utility claims. See
+`docs/wiki/03-experiments/midogpp-conditional-logit-alignment-diagnostic.md`.
+
+## MIDOG++ Physical Multiscale Clipped-Bbox Annotation-Local Pilot v3
+
+Canonical target:
+
+```text
+artifacts/midogpp/10_real_feature_reference/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3/seed42/
+```
+
+Availability: `COMPLETE; VALIDATED`. The code, configs, registry/catalog
+entries, dataset ownership split, command surfaces, independent validators,
+and centralized tests are implemented. The workstation source audit passes
+for 9,648 rows and 216 slides. It repairs 84 partially outside bboxes using
+their clipped continuous centroid; the retained-area fraction ranges from
+`0.40` to `0.98`, the maximum anchor correction is `15` pixels, and the two
+formerly invalid centers become `(11.5, 2416)` and `(4211, 10)`. No row is
+excluded and no pixel is padded or synthesized. This audit remains Stage-90
+provenance only.
+
+The workstation-only immutable v3 contract and atomic 3,840-dimensional B /
+11,520-dimensional C cache bundle now exist and independently validate. The
+contract covers 9,648 rows, 216 TIFFs, and 28,944 scale-level pooling records;
+its contract hash is `4d6c3088e8b72073`. The numeric canonical-A bridge passes
+with minimum cosine `0.9999994039535522` and maximum relative L2
+`2.322336695215199e-05`. The frozen task bridge agrees on 9,647/9,648
+predictions. All 37 required files across the contract, atomic parent, B child,
+and C child have cataloged SHA-256 values. Registry status is `diagnostic`.
+
+The predeclared selector compares canonical A, v3 canonical-JPEG fixed-center
+B, and the complete v3 clipped-bbox-anchor, shifted-in-bounds, multiscale
+annotation-local C under the same ten-spec classifier grid.
+Each outer center is absent from 240 source-inner cells, all nine decisions are
+locked before any outer shard is opened, and the gate requires mean BACC delta
+at least `+0.02`, six of eight strict wins, and worst delta at least `-0.01`.
+Failure falls back exactly to canonical A.
+
+Claim boundary: at most the diagnostic performance of the complete nested
+adaptive pipeline. The boundary handling changes the anchor for 84 rows, so no
+future result may isolate pooling, scale, crop-shift, or anchor effects. No
+individual component effect is identified. The locked policy selected B for
+six centers, C for two, and A for one. Its mean BACC is `0.784403` versus
+`0.740312` for A, a paired delta of `+0.044091`; the conditional bootstrap 95%
+percentile interval is `[+0.031537, +0.054889]`. The pilot cannot establish CVAE preservation,
+calibration, probabilistic or NELBO validity, routing, deployment, new-center
+generalization, or any Stage-20 through Stage-70 decision. V1 and v2 remain
+non-runnable failed-audit lineages and are not fallbacks.
+
+## MIDOG++ Uniform-B v3 Retrospective Replay v1
+
+Canonical target:
+
+```text
+artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v3_retrospective_replay_v1/seed42/
+```
+
+Availability: `COMPLETE; VALIDATED; DIAGNOSTIC ONLY`. The replay imports all
+nine source-v3 classifier locks, fixes B globally, refits A and B without each
+held-out center, and exactly replays the canonical A and source-v3 result rows.
+The B-only store never loads C. The validator passes with 9 source locks, 18
+outer result rows, 19,296 prediction rows, and 9 paired center comparisons.
+
+Result summary:
+
+- uniform-B equal-center mean BACC: `0.792087`;
+- canonical-A equal-center mean BACC: `0.740312`;
+- paired mean delta: `+0.051775`;
+- strict wins: `8/9` centers;
+- worst-center delta: `-0.002890` at center `9`;
+- conditional paired case-bootstrap 95% percentile interval:
+  `[+0.038962, +0.063599]` from 2,000 valid replicates.
+
+Interpretation: this confirms exact reproducibility of the fixed-B result on
+the same nine centers and indicates that the adaptive selector left useful B
+performance on the table. It does not confirm B prospectively: the choice to
+replay B uniformly was informed by the already-observed target scores. The
+bootstrap conditions on this choice, the observed centers, fixed fits, and
+imported classifier locks and does not cover representation-choice or
+new-center uncertainty. The result is non-adoptive and cannot replace the
+canonical Stage-10 representation or feed any downstream stage.
+
+## MIDOG++ Uniform-B v3 Prospective Test Confirmation v1
+
+Canonical target:
+
+```text
+artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v3_prospective_test_confirmation_v1/seed42/
+```
+
+Availability: `COMPLETE; VALIDATED; DIAGNOSTIC ONLY`. Before test-B extraction,
+the protocol froze B, the source-only per-center classifier locks, the
+equal-center test BACC estimand, and four confirmation checks. The evaluation
+uses 9,928 eligible test rows with zero sample or case overlap against the
+9,648 discovery/train rows. The validation split is unused and target-test
+labels are scoring-only.
+
+Result summary:
+
+- decision: `CONFIRMED_WITHIN_CENTER`;
+- uniform-B equal-center test mean BACC: `0.799159`;
+- canonical-A equal-center test mean BACC: `0.735733`;
+- paired mean delta: `+0.063426`;
+- strict wins: `9/9` centers;
+- worst-center delta: `+0.010638` at center `7`;
+- conditional paired case-bootstrap 95% percentile interval:
+  `[+0.050709, +0.073650]` from 2,000 valid replicates.
+
+All predeclared checks pass: mean delta at least `+0.02`, at least six wins,
+worst delta at least `-0.01`, and a positive bootstrap lower bound. This is
+independent confirmation for new cases within the same nine centers. It is not
+external-dataset evidence and does not quantify new-center uncertainty. The
+Stage-90 placement preserves the existing firewall: the result cannot
+automatically replace the canonical reference or feed Stage 20 through 70.
 
 ## MIDOG++ Tuned-Classifier CVAE Preservation
 
@@ -331,3 +511,96 @@ absent.
   trained MIDOG++ Stage-30 source-expert bank using the published consensus
   locks. Routing remains premature until that bank and a fresh protocol-clean
   utility surface exist.
+
+## Latest Uniform-B Nonlinear-Boundary Diagnostic
+
+Canonical target:
+
+```text
+artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_nystroem_nonlinear_probe_v1/seed42/
+```
+
+Availability: `COMPLETE; VALIDATED; HASH-PROMOTED; DIAGNOSTIC ONLY`. This
+bounded experiment retains canonical B and tests only a nonlinear
+`StandardScaler -> Nyström RBF -> L2 logistic` boundary under exact nested
+source-inner LODO. The validator reconstructs all 2,592 selector cells, 324
+primary kernel transforms, baseline identity, outer metrics, bootstrap,
+progression decision, and split isolation.
+
+Result summary:
+
+- decision: `NONLINEAR_B_DIAGNOSTIC_GATE_PASS`;
+- linear-B equal-center BACC: `0.792087`;
+- nonlinear-B equal-center BACC: `0.815278`;
+- paired mean delta: `+0.023192`;
+- strict wins: `9/9`;
+- worst-center delta: `+0.002008`;
+- equal-center positive-recall delta: `+0.018308`;
+- equal-center specificity delta: `+0.028075`;
+- supportive bootstrap interval: `[+0.011774, +0.032390]`.
+
+The nonlinear boundary rescues 751 linear errors and introduces 550, for a
+net 201-row rescue. It resolves 613 of 1,025 baseline errors for which the
+source-only class centroid was already closer to the true class. This supports
+a nonlinear-separability limitation rather than an immediate need to replace
+B with C or B-spatial.
+
+The result remains post-hoc diagnostic evidence on an already inspected train
+surface. It does not prove that B is sufficient or authorize automatic B+
+adoption. Center 2 loses `0.123972` specificity while gaining substantial
+positive recall, and 1,318 rows remain wrong under both boundaries. These are
+the priority follow-up analyses.
+
+The validation split remains unfeaturized and unscored. Its 2,615 eligible
+rows comprise only 44 cases and 3–7 cases per center, below the frozen
+ten-case-per-center confirmation minimum. Formal confirmation requires a
+larger untouched, external, or genuinely new-center surface.
+
+## Latest Uniform-B Robust Interaction Diagnostic
+
+Canonical target:
+
+```text
+artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_robust_interaction_probe_v1/seed42/
+```
+
+Availability: `COMPLETE; VALIDATED; HASH-PROMOTED; DIAGNOSTIC ONLY`. The
+paired audit covers 751 rescues, 550 regressions, and 1,318 shared hard-core
+errors. Of the regressions, 246 are near-boundary and only two are confidently
+wrong. Center 2 contains 257 false-positive regressions.
+
+Robust Nyström retains `+0.020437` equal-center BACC over linear B and loses
+only `−0.002755` versus standard Nyström. It improves the center-2
+specificity exchange, but center-9 recall is `−0.127168` versus linear B,
+violating the frozen `−0.05` class-direction floor. The minimal bilinear model
+is `−0.006267` below linear B and wins only two centers.
+
+Decision: `NO_FAMILY_PASSES_ROBUST_BPLUS_GATE`. No final B+ protocol is
+frozen. Generic group weighting moves the limiting error from center 2
+specificity to center 9 recall, while the low-rank bilinear interaction does
+not explain the Nyström gain.
+
+Validation and test remain untouched. The next justified work is a bounded
+source-inner constrained-sensitivity/specificity objective or deeper review
+of the 1,318-case hard core—not B-spatial by default.
+
+## Latest constrained nonlinear-B diagnostic
+
+The source-inner sensitivity/specificity-constrained Nyström successor is
+complete and independently validated at:
+
+```text
+artifacts/midogpp/90_oracles_and_diagnostics/
+  uniform_b_sens_spec_constrained_nystroem_probe_v1/seed42/
+```
+
+Decision: `NO_CONSTRAINED_BPLUS_CANDIDATE_PASSES`. Seven of nine outer recipes
+had no feasible nonlinear source-inner candidate and fell back to exact linear
+B. Only centers 6 and 9 selected `alpha=0.25`. The equal-center mean BACC gain
+is `+0.00282`, with only `2/9` strict wins and a `−0.03468` worst recall delta.
+
+This means the original nonlinear gain cannot presently be retained under the
+frozen uniform class-direction constraints. No final B+ protocol is promoted.
+The result is post-hoc and diagnostic; validation and test remain untouched.
+The next work should examine why feasibility collapses across seven centers,
+rather than relaxing the constraint or changing the global threshold.

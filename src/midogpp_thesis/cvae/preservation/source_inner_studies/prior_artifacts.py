@@ -4,12 +4,45 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Mapping, Sequence
+import torch
+
+from ....real_features.classifier_reference.artifacts import stable_hash
+from ....real_features.classifier_reference.protocol import ProtocolError
 
 from ...reporting import write_json
 from .validation_common import write_common_artifacts
 
 
 PRIOR_STATE_INDEX_SCHEMA = "midogpp_learned_conditional_prior_state_index_v2"
+
+
+def learned_prior_partition_hash(prior_mu: object, prior_rho: object) -> str:
+    """Hash learned-prior parameters with a canonical CPU derivation."""
+
+    try:
+        canonical_mu = torch.as_tensor(
+            prior_mu, dtype=torch.float32, device="cpu"
+        ).detach()
+        canonical_rho = torch.as_tensor(
+            prior_rho, dtype=torch.float32, device="cpu"
+        ).detach()
+    except (TypeError, ValueError, RuntimeError) as exc:
+        raise ProtocolError("Cannot canonicalize learned-prior parameters.") from exc
+    if (
+        canonical_mu.shape != canonical_rho.shape
+        or canonical_mu.ndim != 2
+        or not torch.isfinite(canonical_mu).all()
+        or not torch.isfinite(canonical_rho).all()
+    ):
+        raise ProtocolError("Learned-prior parameters are malformed.")
+    effective_logvar = 6.0 * torch.tanh(canonical_rho / 6.0)
+    return stable_hash(
+        {
+            "prior_mu": canonical_mu.tolist(),
+            "prior_rho": canonical_rho.tolist(),
+            "effective_logvar": effective_logvar.tolist(),
+        }
+    )
 
 
 def write_prior_study_bundle(

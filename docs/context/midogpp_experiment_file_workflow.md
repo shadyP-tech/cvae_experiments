@@ -1,6 +1,6 @@
 # MIDOG++ Experiment File Workflow
 
-Last updated: 2026-07-17
+Last updated: 2026-07-23
 
 This is the operational path and command reference for the active MIDOG++
 checkout. Result interpretation belongs in
@@ -36,7 +36,7 @@ audit. Retired workstation source locations are absent.
 Install the package in the thesis environment once from the repository root:
 
 ```bash
-conda run -n thesis python -m pip install -e .
+conda run -n thesis python -m pip install -e '.[cache,dataset-full]'
 ```
 
 All operational commands then use the package entry point:
@@ -49,7 +49,8 @@ conda run -n thesis python -m midogpp_thesis workspace list
 
 The module groups are:
 
-- `dataset-build`, `dataset-validate`, and `dataset-inspect`;
+- `dataset-build`, `dataset-validate`, `dataset-inspect`, and
+  `dataset-physical-multiscale`;
 - `real-features` for cache building and real-feature diagnostics;
 - `real-feature-classifier` for the tuned and eligible matched references;
 - `cvae-preservation` for preservation, source-inner recipe locking, and the
@@ -149,6 +150,34 @@ Two other local lineages are deliberately non-active:
   `REJECTED`.
 
 Neither may substitute for the corrected `xyxy` cache.
+
+### Validated physical-multiscale cache lineage
+
+V1 and v2 are immutable failed-audit lineages. The current v3 implementation
+has a passing source audit and a hash-promoted workstation-only contract/cache
+lineage:
+
+```text
+datasets/midogpp/configs/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3.yaml
+datasets/midogpp/contract/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3/
+datasets/midogpp/derived/features/virchow2/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3/seed42/
+```
+
+The contract and caches are reusable dataset inputs, so they remain under
+`datasets/midogpp`; the Stage-10 evidence bundle remains under
+`artifacts/midogpp`. Build order is `audit-v3`, `build-contract-v3`,
+`build-cache-v3`, then `validate-v3` through the
+`dataset-physical-multiscale` command. Raw TIFFs, tiled reading, and the exact
+Virchow2 commit/checkpoint/runtime identity make these workstation-only
+operations.
+
+The 2026-07-23 `xai-master` `audit-v3` pass covers 9,648 rows and 216 TIFFs,
+including 84 clipped bboxes, with no row exclusion, padding, or synthesized
+pixels. The subsequent contract and atomic B/C build independently passes
+`validate-v3`, including 28,944 pooling records, the canonical-A numeric
+bridge, frozen task bridge, decoder/runtime identity, and content-index checks.
+All required files are hash-promoted in the catalog. Do not run a later build
+command against v1 or v2, and do not treat their failed audits as fallbacks.
 
 ## Registered Real-Feature Workflow
 
@@ -277,9 +306,7 @@ inner pseudo-target is absent from its fold's scaler, conditional-centroid
 factor, and classifier fit. Only the selected gamma and matched `gamma=0`
 baseline are scored on the outer center.
 
-The code, focused/full tests, partial end-to-end bundle validation, blocking
-protocol review, and workspace-definition validation are complete. The
-registry status is `diagnostic`, so the canonical production run is enabled
+The registry status is `diagnostic`. Prepare or reproduce the canonical run
 through the workspace command surface:
 
 ```bash
@@ -293,8 +320,48 @@ The catalog fixes `may_feed_recipe_selection=false` and
 `may_feed_deployable_selection=false` and permits only Stage-90 diagnostic
 consumption. This experiment cannot replace the matched Stage-10 denominator
 or feed CVAE preservation, expert-bank, generation, routing, or downstream
-selection. No result or metric is recorded until the canonical run produces
-and independently validates all 16 required files.
+selection.
+
+The canonical workstation run is complete and protocol-clean. All 16 required
+files are present on `xai-master`, the leakage/provenance report is `PASS`, and
+the runtime, protocol, and content identities agree. The selected method has
+mean BACC `0.7434042753` versus `0.7434898099` for matched `gamma=0`, a delta of
+`-0.0000855346`; macro-F1 changes by `+0.0000496479`, and worst-center BACC is
+unchanged at `0.6913746631`. Source-inner selection chooses positive gamma in
+all nine folds (`gamma=10` seven times, `gamma=1` twice), but held-out BACC has
+only two wins, four ties, and three losses. The result is therefore a
+protocol-valid `NEGATIVE_RESULT` and remains `DIAGNOSTIC_ONLY`.
+
+The bundle is currently workstation-only. Its catalog lifecycle label remains
+`TODO_VERIFY_ARTIFACT` pending local sync and metadata promotion; do not edit or
+reinterpret that catalog field by inference. Do not expand the gamma sweep or
+adopt CLA. Any later study must be predeclared and mechanism-diagnostic only.
+Post-hoc probability metrics cannot overturn the predeclared BACC decision.
+Detailed artifact paths, causal audit interpretation, limitations, and the
+stop recommendation are recorded in
+`docs/wiki/03-experiments/midogpp-conditional-logit-alignment-diagnostic.md`.
+
+### Physical multiscale clipped-bbox annotation-local pilot v3
+
+The current registered pilot is:
+
+```text
+midogpp.real_feature.physical_multiscale_clipped_bbox_annotation_local_pooling_pilot.v3
+experiments/midogpp/stages/10_real_feature_reference/configs/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3.yaml
+artifacts/midogpp/10_real_feature_reference/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3/seed42/
+```
+
+Its status is `diagnostic`. The v3 contract and atomic B/C bundle exist on
+`xai-master`, independently pass `validate-v3`, and have complete cataloged
+expected hashes. `workspace run` is therefore authorized, but no Stage-10
+output exists yet. The pilot freezes the 30-candidate hash
+`2f651b2f8bd53c1a`, produces exactly 2,160 source-inner cells, writes all nine
+per-center locks before outer evaluation, and requires exact A replay. Posthoc
+target-scored candidates are non-adoptive and excluded from all lock hashes.
+The catalog blocks the output from Stage 20 through Stage 70.
+
+V1 and v2 stay registered only as audit-blocked historical plans; neither may
+be activated, resumed, or repointed to the v3 artifacts.
 
 ## Registered CVAE Preservation Workflow
 

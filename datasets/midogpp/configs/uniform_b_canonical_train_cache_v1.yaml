@@ -1,0 +1,19 @@
+cache:
+  name: uniform_b_canonical_train_cache_v1
+  root: datasets/midogpp/derived/features/virchow2/uniform_b_canonical_reference_v1/seed42
+
+inputs:
+  manifest_path: datasets/midogpp/contract/annotation_patch_v1/manifest.csv
+  source_b_cache_root: datasets/midogpp/derived/features/virchow2/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3/seed42/b_3840
+
+run:
+  eligible_centers: ["0", "1", "2", "3", "5", "6", "7", "8", "9"]
+  expected_train_rows: 9648
+  expected_feature_dim: 3840
+
+claim_boundary:
+  role: canonical_feature_cache_provenance
+  transformation: lossless_center_shard_concatenation_in_manifest_order
+  labels_used_for_feature_construction: false
+  contains_test_rows: false
+  contains_validation_rows: false

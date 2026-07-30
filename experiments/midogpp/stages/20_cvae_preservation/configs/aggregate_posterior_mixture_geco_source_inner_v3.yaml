@@ -1,0 +1,88 @@
+experiment:
+  name: virchow2_cvae_midogpp_aggregate_posterior_mixture_geco_source_inner_v3
+  mode: aggregate_posterior_mixture_geco_source_inner_study
+  study_version: v3
+  artifact_root: output://midogpp_output_cvae_aggregate_posterior_mixture_geco_source_inner_v3
+  code_version: aggregate_posterior_mixture_geco_source_inner_v3
+
+inputs:
+  manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  feature_cache_path: artifact://midogpp_virchow2_xyxy_feature_cache_seed42/embeddings/train.pt
+
+run:
+  heldout_centers: all
+  expected_feature_dim: 2560
+  training_seeds: [17, 42, 101]
+  generation_seeds: [17, 42, 101]
+  device: cuda:0
+
+model:
+  pca_dim: 128
+  latent_dim: 32
+  hidden_dim: 512
+  num_hidden_layers: 2
+  warmup_epochs: 25
+  continuation_epochs: 75
+  batch_size: 128
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  gradient_clip_norm: 5.0
+  beta_final: 0.001
+  kl_warmup_epochs: 25
+
+prior:
+  arms: [SF, KF, SG, KG]
+  n_components: 2
+  rank: 2
+  weight_floor: 0.05
+  variance_floor: 0.0001
+  covariance_shrinkage: 0.10
+  refit_interval_epochs: 5
+  final_stabilization_epochs: 5
+  minimum_component_rows: 8
+  minimum_component_cases: 2
+  maximum_condition_number: 1000000.0
+  fitting: deterministic_source_aggregate_coordinate_updates
+  optimizer_updates_prior_parameters: false
+  rate_semantics: mixture_KL_upper_bound_not_exact_NELBO
+
+geco:
+  target_policy: source_warmup_mean_mse_times_slack
+  target_slack: 1.05
+  ema_decay: 0.99
+  dual_step_size: 0.001
+  initial_multiplier: 1.0
+  minimum_multiplier: 0.000001
+  maximum_multiplier: 1000000.0
+  target_uses_inner_or_outer_data: false
+
+generation:
+  policy: fixed_balanced_per_source
+  per_source_per_class: 256
+  same_budget_and_rng_across_arms: true
+  source_or_target_prevalence_used: false
+  inverse_transform_to_common_virchow2_frame: true
+
+decisions:
+  primary_arm: KG
+  min_mean_bacc_delta_vs_sf: 0.02
+  min_inner_wins: 6
+  max_worst_inner_regression: -0.01
+  max_training_seed_range: 0.05
+  max_posterior_bacc_regression: -0.01
+  min_prior_posterior_gap_reduction: 0.01
+  require_positive_delta_vs_kf: true
+  require_positive_delta_vs_sg: true
+  equal_weight_sources_then_inner_centers: true
+
+claim_boundary:
+  claim_scope: cvae_source_inner_study_only
+  allowed: fully nested independent-source prior-mismatch study evidence only
+  forbidden: recipe adoption, outer-target preservation, expert-bank input, generation evidence, routing, expert selection, NELBO compatibility, or downstream utility
+  outer_target_rows_used: false
+  inner_rows_used_for_fit: false
+  inner_labels_used_for_scoring_only: true
+  independent_source_experts_required: true
+  may_feed_recipe_selection: false
+  may_feed_deployable_selection: false
+  separate_promotion_artifact_required: true

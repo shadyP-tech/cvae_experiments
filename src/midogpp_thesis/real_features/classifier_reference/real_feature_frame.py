@@ -46,10 +46,17 @@ def load_midogpp_real_feature_frame(
     manifest_path: Path,
     feature_cache_path: Path,
     expected_feature_dim: int = 2560,
+    allow_excluded_center_omission: bool = False,
 ) -> RealFeatureFrame:
     """Load and align a MIDOG++ real-feature cache to the train manifest rows."""
 
     manifest_rows = _read_manifest_train_rows(Path(manifest_path))
+    if allow_excluded_center_omission:
+        manifest_rows = tuple(
+            row
+            for row in manifest_rows
+            if _center_value(row) not in MIDOGPP_EXCLUDED_CENTERS
+        )
     embeddings, metadata, feature_extractor = _load_feature_cache_payload(Path(feature_cache_path))
     _assert_feature_array(embeddings, expected_feature_dim=expected_feature_dim)
     if int(getattr(embeddings, "shape", (0,))[0]) != len(metadata):

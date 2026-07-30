@@ -25,7 +25,7 @@ from .config import (
 )
 from .contracts import LEARNED_PRIOR_MODEL_FAMILY, PriorStudyMetricV2
 from .preparation import embedded_v1_preparation_lineage
-from .prior_artifacts import PRIOR_STATE_INDEX_SCHEMA
+from .prior_artifacts import PRIOR_STATE_INDEX_SCHEMA, learned_prior_partition_hash
 from .prior_runner import EXPERIMENT_ID, _decisions, _study_summary
 from .validation_common import (
     COVERAGE_SCHEMA,
@@ -461,12 +461,9 @@ def _validate_prior_state_record(
         or set(gaps) != {"0", "1"}
     ):
         raise ProtocolError("Learned-prior mechanism eligibility is inconsistent.")
-    expected_partition_hash = stable_hash(
-        {
-            "prior_mu": state["prior_mu"],
-            "prior_rho": state["prior_rho"],
-            "effective_logvar": state["effective_logvar"],
-        }
+    expected_partition_hash = learned_prior_partition_hash(
+        state["prior_mu"],
+        state["prior_rho"],
     )
     if record.get("final_prior_partition_hash") != expected_partition_hash:
         raise ProtocolError("Final learned-prior partition hash mismatch.")

@@ -1,0 +1,79 @@
+{
+  "artifact_dataset": "MIDOG++",
+  "canonical_cache_sha256": "f6608e513fb2d06671e3ec117b093a85d58530b77b1fae44a3be1680d9feabd2",
+  "claim_dataset": "MIDOG++",
+  "claim_firewall": {
+    "feature_extraction_stochastic": false,
+    "geometry_uses_center_identity": false,
+    "geometry_uses_labels": false,
+    "may_feed_deployable_selection": false,
+    "may_feed_recipe_selection": false,
+    "performs_expert_aggregation": false,
+    "uses_experts": false,
+    "uses_generative_sampling": false,
+    "uses_latent_prior": false,
+    "uses_likelihood": false,
+    "uses_mixture_model": false,
+    "uses_nelbo": false,
+    "uses_posterior": false
+  },
+  "contract_hash": "4d6c3088e8b72073",
+  "eligible_centers": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9"
+  ],
+  "excluded_centers": [
+    "4"
+  ],
+  "fov_um": [
+    28.0,
+    56.0,
+    112.0
+  ],
+  "geometry_policy": {
+    "anchor_delta_definition": "clipped_bbox_centroid_minus_original_bbox_centroid",
+    "annotation_anchor": "clipped_axis_aligned_bbox_continuous_centroid",
+    "annotation_anchor_policy_id": "continuous_half_open_bbox_image_intersection_centroid_v1",
+    "bbox_convention": "continuous_half_open_xyxy",
+    "coordinate_origin": "level_0_top_left_pixel_edge",
+    "crop_policy": "deterministic_axiswise_in_bounds_translation",
+    "crop_size_changed": false,
+    "geometry_uses_center_identity": false,
+    "geometry_uses_labels": false,
+    "image_intersection": "[max(0,x0),min(W,x1)) x [max(0,y0),min(H,y1))",
+    "minimum_clipped_bbox_area_fraction": 0.25,
+    "out_of_bounds_padding_used": false,
+    "output_size_px": 224,
+    "pixel_rounding": "round_half_up",
+    "realized_padding_pixel_count": 0,
+    "resize_antialias": true,
+    "resize_interpolation": "bicubic",
+    "token_window_shape": [
+      4,
+      4
+    ],
+    "token_window_start": "axis_start=clamp(floor(16*p_axis-2),0,12)"
+  },
+  "identity_hashes": {
+    "case_id_order": "b51e086b9c7f9791",
+    "center_order": "fb7d76ac741de30b",
+    "label_order": "0bd3342c4fc0906e",
+    "partition_identity": "b10c243d74598a87",
+    "sample_id_order": "b2490407ff53bf40",
+    "slide_id_order": "8506d4ffe98eefc3"
+  },
+  "profile_id": "physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3",
+  "row_count": 9648,
+  "schema_version": "midogpp_physical_multiscale_clipped_bbox_annotation_local_contract_v3",
+  "slide_count": 216,
+  "split": "train",
+  "status": "PASS",
+  "target_labels_used_for_extraction": false
+}

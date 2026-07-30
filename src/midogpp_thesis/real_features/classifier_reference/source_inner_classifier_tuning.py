@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from joblib import Parallel, delayed
 import json
 import math
+import os
 from dataclasses import dataclass
 from typing import Callable, Mapping, Sequence
 
@@ -168,14 +170,37 @@ def select_classifier_spec_source_inner_lodo(
     )
     scorer = score_fn or _fit_and_score_fold
     grid_hash = classifier_grid_hash(candidate_specs)
+    parallel_jobs = int(os.environ.get("MIDOGPP_CLASSIFIER_SELECTION_JOBS", "1"))
+    if parallel_jobs < 1:
+        raise ProtocolError("MIDOGPP_CLASSIFIER_SELECTION_JOBS must be positive.")
+    precomputed: dict[tuple[int, int], ClassifierFoldScore] = {}
+    if parallel_jobs > 1:
+        pairs = [
+            (spec_index, fold_index, spec, fold)
+            for spec_index, spec in enumerate(candidate_specs)
+            for fold_index, fold in enumerate(folds)
+        ]
+        scores = Parallel(
+            n_jobs=parallel_jobs,
+            backend="loky",
+            max_nbytes="10M",
+        )(delayed(scorer)(spec, fold) for _, _, spec, fold in pairs)
+        precomputed = {
+            (spec_index, fold_index): score
+            for (spec_index, fold_index, _, _), score in zip(pairs, scores, strict=True)
+        }
     inner_centers = tuple(fold.pseudo_target_center for fold in folds)
     selector_centers = tuple(sorted({center for fold in folds for center in (*fold.train_centers, fold.pseudo_target_center)}))
     rows: list[ClassifierTuningCandidateRow] = []
     fold_scores_by_config: dict[str, dict[str, ClassifierFoldScore]] = {}
-    for spec in candidate_specs:
+    for spec_index, spec in enumerate(candidate_specs):
         fold_scores: dict[str, ClassifierFoldScore] = {}
-        for fold in folds:
-            fold_scores[fold.pseudo_target_center] = scorer(spec, fold)
+        for fold_index, fold in enumerate(folds):
+            fold_scores[fold.pseudo_target_center] = (
+                precomputed[(spec_index, fold_index)]
+                if precomputed
+                else scorer(spec, fold)
+            )
         fold_scores_by_config[spec.config_hash] = fold_scores
         metric_scores = {
             center: score.metric(selection_metric)

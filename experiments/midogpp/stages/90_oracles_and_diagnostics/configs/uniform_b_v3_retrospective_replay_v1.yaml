@@ -1,0 +1,45 @@
+experiment:
+  name: uniform_b_v3_retrospective_replay_v1
+  artifact_root: output://midogpp_output_uniform_b_v3_retrospective_replay_v1
+
+inputs:
+  source_v3_root: artifact://midogpp_output_real_feature_physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3
+  b_cache_root: artifact://midogpp_virchow2_annotation_jpeg_fixed_center_pooling_3840_v3_seed42
+  canonical_reference_root: artifact://midogpp_output_eligible_tuned_real_reference_v2
+  source_profile_id: physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3
+  source_protocol_hash: 002518c99a174e2d
+  source_bundle_lock_hash: dff84c385584e568
+  source_content_hash: 735260abdcac65aa
+
+representations:
+  canonical_a:
+    feature_dim: 2560
+  annotation_jpeg_fixed_center_b_v3:
+    feature_dim: 3840
+
+run:
+  heldout_centers: ["0", "1", "2", "3", "5", "6", "7", "8", "9"]
+  allow_partial_test_coverage: false
+
+bootstrap:
+  seed: 42
+  valid_replicates: 2000
+  max_attempts: 20000
+
+retrospective_provenance:
+  study_design_informed_by_prior_target_scores: true
+  same_outer_centers_previously_scored: true
+  uniform_representation_choice_pre_original_outer_scoring: false
+  per_fold_classifier_selection_used_target_labels: false
+  selection_performed_this_run: false
+  independent_confirmation: false
+
+claim_boundary:
+  claim_scope: diagnostic_only
+  non_adoptive: true
+  adoption_eligible: false
+  may_feed_recipe_selection: false
+  may_feed_deployable_selection: false
+  uses_cvae: false
+  uses_router: false
+  covers_new_center_uncertainty: false

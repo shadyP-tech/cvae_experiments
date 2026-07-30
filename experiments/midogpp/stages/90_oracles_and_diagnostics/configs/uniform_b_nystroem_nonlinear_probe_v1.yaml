@@ -1,0 +1,52 @@
+experiment:
+  name: uniform_b_nystroem_nonlinear_probe_v1
+  artifact_root: output://midogpp_output_uniform_b_nystroem_nonlinear_probe_v1
+
+inputs:
+  manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  feature_cache_path: artifact://midogpp_virchow2_uniform_b_canonical_train_cache_seed42/embeddings/train.pt
+  canonical_reference_root: artifact://midogpp_output_uniform_b_canonical_reference_v1
+
+run:
+  heldout_centers: all
+  expected_feature_dim: 3840
+  expected_train_rows: 9648
+
+nonlinear_grid:
+  expected_candidate_count: 36
+  width_multipliers: [0.5, 1.0, 2.0]
+  nystroem_components: [256, 512, 1024]
+  logistic_c: [0.01, 0.1, 1.0, 10.0]
+  primary_landmark_seed: 42
+  stability_landmark_seeds: [17, 101]
+  gamma_sample_seed: 42017
+  gamma_sample_cap: 512
+  classifier_max_iter: 5000
+  threshold_policy: predict
+
+progression_gate:
+  mean_bacc_delta_min: 0.01
+  strict_center_wins_min: 6
+  worst_center_delta_min: -0.01
+  mean_positive_recall_delta_min_exclusive: 0.0
+  mean_specificity_delta_min: -0.01
+  supplemental_mean_delta_min_exclusive: 0.0
+  supplemental_primary_deviation_max: 0.01
+  supplemental_worst_center_delta_min: -0.01
+  bootstrap_replicates: 2000
+  bootstrap_seed: 42
+
+runtime:
+  pair_jobs: 4
+  threads_per_job: 3
+  use_gpu: false
+
+claim_boundary:
+  claim_scope: diagnostic_only
+  diagnostic_surface_previously_inspected: true
+  may_replace_canonical_reference: false
+  may_feed_recipe_selection: false
+  may_feed_deployable_selection: false
+  new_center_generalization_claimed: false
+  validation_features_generated: false
+  validation_predictions_generated: false

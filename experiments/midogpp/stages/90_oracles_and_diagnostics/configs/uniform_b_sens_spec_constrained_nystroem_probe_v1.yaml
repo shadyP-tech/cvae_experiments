@@ -1,0 +1,63 @@
+experiment:
+  name: uniform_b_sens_spec_constrained_nystroem_probe_v1
+  artifact_root: output://midogpp_output_uniform_b_sens_spec_constrained_nystroem_probe_v1
+
+inputs:
+  manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  feature_cache_path: artifact://midogpp_virchow2_uniform_b_canonical_train_cache_seed42/embeddings/train.pt
+  canonical_reference_root: artifact://midogpp_output_uniform_b_canonical_reference_v1
+  nonlinear_probe_root: artifact://midogpp_output_uniform_b_nystroem_nonlinear_probe_v1
+  robust_interaction_lineage_root: artifact://midogpp_output_uniform_b_robust_interaction_probe_v1
+
+run:
+  heldout_centers: all
+  expected_rows: 9648
+  expected_dim: 3840
+  primary_seed: 42
+  stability_seeds: [17, 101]
+  gamma_sample_seed: 42017
+  gamma_sample_cap: 512
+
+capacity_path:
+  objectives:
+    [canonical_class_weight, equal_group, group_dro_eta_0.1, group_dro_eta_0.5]
+  alphas: [0.25, 0.5, 0.75, 1.0]
+  dro_iterations: 8
+  threshold: 0.5
+  fallback_alpha: 0.0
+  fallback_role: exact_linear_b
+
+source_inner_constraints:
+  per_inner_recall_delta_min: -0.02
+  per_inner_specificity_delta_min: -0.02
+  per_inner_bacc_delta_min: -0.01
+  mean_recall_delta_exclusive: 0.0
+  mean_specificity_delta_min: -0.01
+  mean_bacc_delta_exclusive: 0.0
+
+progression_gate:
+  nonlinear_outer_locks_min: 6
+  mean_bacc_delta_min: 0.01
+  strict_center_wins_min: 6
+  worst_center_bacc_delta_min: -0.01
+  every_center_recall_delta_min: -0.02
+  every_center_specificity_delta_min: -0.02
+  mean_recall_delta_exclusive: 0.0
+  mean_specificity_delta_min: -0.01
+  stability_mean_bacc_delta_exclusive: 0.0
+  stability_worst_center_bacc_delta_min: -0.01
+  stability_every_direction_delta_min: -0.03
+
+runtime:
+  pair_jobs: 4
+  threads_per_job: 3
+
+claim_boundary:
+  claim_scope: diagnostic_only
+  already_inspected_train_surface: true
+  study_design_informed_by_prior_outer_scores: true
+  independent_outer_confirmation: false
+  validation_scored: false
+  test_scored: false
+  may_replace_canonical_reference: false
+  may_feed_deployable_selection: false

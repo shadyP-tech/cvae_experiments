@@ -1,0 +1,36 @@
+cache:
+  name: uniform_b_spatial_token_cache_v1
+  root: datasets/midogpp/derived/features/virchow2/uniform_b_spatial_token_cache_v1/seed42
+
+inputs:
+  repo_root: .
+  manifest_path: datasets/midogpp/contract/annotation_patch_v1/manifest.csv
+  canonical_b_cache_path: datasets/midogpp/derived/features/virchow2/uniform_b_canonical_reference_v1/seed42/embeddings/train.pt
+
+model:
+  model_ref: hf-hub:paige-ai/Virchow2
+  model_revision: 3158645804b69e3f3bc4439d4116edddf0840a72
+  expected_model_config_sha256: 7db445b996bb165e88fe70e826c2ebb530539a2b1d136aa16eeb847df5f1e3db
+  expected_checkpoint_file_sha256: 8d6cea947eb2418c3b0dff48cfb9b238e47744ab0dfca21b2b0637b140769b4b
+  expected_state_dict_sha256: 91084959869cb53bf76e5038e5dc8a8ddc1ef8359a886fa22c19b4e8c62e112a
+  expected_preprocessing_config_hash: 4fb7d9ab76d1da72
+  hf_hub_cache_path: /home/stud/spark/.cache/huggingface/hub
+  hf_hub_local_files_only: true
+
+run:
+  eligible_centers: ["0", "1", "2", "3", "5", "6", "7", "8", "9"]
+  expected_rows: 9648
+  experiment_seed: 42
+  devices: ["cuda:0", "cuda:1"]
+  workers_per_device: 1
+  batch_size_per_device: 32
+  extraction_precision: float32
+  token_storage_dtype: float16
+
+claim_boundary:
+  role: diagnostic_feature_cache_provenance
+  labels_used_for_feature_construction: false
+  contains_validation_rows: false
+  contains_test_rows: false
+  may_feed_recipe_selection: false
+  may_feed_deployable_selection: false

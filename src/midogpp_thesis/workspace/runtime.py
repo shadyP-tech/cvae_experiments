@@ -130,9 +130,35 @@ class MidogppWorkspace:
 
     def validate(self) -> None:
         errors: list[str] = []
-        expected_root = str(self.workspace_payload.get("roots", {}).get("canonical_artifacts", ""))
+        workspace_roots = self.workspace_payload.get("roots", {})
+        expected_root = str(workspace_roots.get("canonical_artifacts", ""))
         if expected_root != "artifacts/midogpp":
             errors.append("workspace canonical_artifacts must remain artifacts/midogpp")
+        expected_derived_root = str(workspace_roots.get("derived_features", ""))
+        if expected_derived_root != "datasets/midogpp/derived/features":
+            errors.append(
+                "workspace derived_features must remain datasets/midogpp/derived/features"
+            )
+
+        catalog_policy = self.catalog_payload.get("catalog_policy", {})
+        if not isinstance(catalog_policy, Mapping):
+            errors.append("artifact catalog policy must be a mapping")
+            catalog_policy = {}
+        expected_catalog_roots = {
+            "new_run_outputs_belong_under": "artifacts/midogpp",
+            "new_dataset_contracts_belong_under": "datasets/midogpp/contract",
+            "new_derived_feature_caches_belong_under": "datasets/midogpp/derived/features",
+        }
+        if "new_outputs_belong_under" in catalog_policy:
+            errors.append(
+                "artifact catalog policy must distinguish run outputs from reusable inputs"
+            )
+        for policy_key, required_root in expected_catalog_roots.items():
+            actual_root = str(catalog_policy.get(policy_key, ""))
+            if actual_root != required_root:
+                errors.append(
+                    f"artifact catalog {policy_key} must remain {required_root}"
+                )
         if not self.stages:
             errors.append("registry must define stages")
         if not self.experiments:
@@ -164,14 +190,48 @@ class MidogppWorkspace:
                 )
 
         for artifact in self.artifacts.values():
+            resolved_canonical = (
+                None
+                if artifact.canonical_path is None
+                else self._repo_path(artifact.canonical_path).resolve()
+            )
             if artifact.migration == "canonical_output":
                 if not artifact.canonical_path:
                     errors.append(f"{artifact.artifact_id}: canonical output lacks canonical_path")
                 else:
-                    canonical_root = (self.repo_root / "artifacts" / "midogpp").resolve()
-                    resolved_output = self._repo_path(artifact.canonical_path).resolve()
-                    if resolved_output == canonical_root or not resolved_output.is_relative_to(canonical_root):
-                        errors.append(f"{artifact.artifact_id}: canonical output escapes artifacts/midogpp")
+                    canonical_root = (
+                        self.repo_root / expected_catalog_roots["new_run_outputs_belong_under"]
+                    ).resolve()
+                    if (
+                        resolved_canonical == canonical_root
+                        or not resolved_canonical.is_relative_to(canonical_root)
+                    ):
+                        errors.append(
+                            f"{artifact.artifact_id}: canonical output escapes artifacts/midogpp"
+                        )
+            if artifact.stage == "dataset_contract" and resolved_canonical is not None:
+                contract_root = (
+                    self.repo_root / expected_catalog_roots["new_dataset_contracts_belong_under"]
+                ).resolve()
+                if resolved_canonical == contract_root or not resolved_canonical.is_relative_to(
+                    contract_root
+                ):
+                    errors.append(
+                        f"{artifact.artifact_id}: canonical dataset contract escapes "
+                        "datasets/midogpp/contract"
+                    )
+            if artifact.stage == "derived_features" and resolved_canonical is not None:
+                derived_root = (
+                    self.repo_root
+                    / expected_catalog_roots["new_derived_feature_caches_belong_under"]
+                ).resolve()
+                if resolved_canonical == derived_root or not resolved_canonical.is_relative_to(
+                    derived_root
+                ):
+                    errors.append(
+                        f"{artifact.artifact_id}: canonical derived feature escapes "
+                        "datasets/midogpp/derived/features"
+                    )
             if artifact.evidence_label in BLOCKED_EVIDENCE_LABELS and artifact.may_feed_deployable_selection:
                 errors.append(f"{artifact.artifact_id}: rejected artifact may not feed selection")
             for relative in artifact.provenance_files:

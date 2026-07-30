@@ -375,11 +375,32 @@ def _validate_workspace_provenance(root: Path, protocol: Mapping[str, object]) -
     ):
         raise ProtocolError("Resolved matched-reference input files differ from the runtime protocol.")
 
+    is_uniform_b_reference = (
+        protocol.get("experiment_name")
+        == "uniform_b_canonical_real_feature_reference_v1"
+    )
+    expected_experiment_id = (
+        "midogpp.real_feature.uniform_b_canonical_reference.v1"
+        if is_uniform_b_reference
+        else "midogpp.real_feature.eligible_tuned_predict_reference.v2"
+    )
+    expected_cache_id = (
+        "midogpp_virchow2_uniform_b_canonical_train_cache_seed42"
+        if is_uniform_b_reference
+        else "midogpp_virchow2_xyxy_feature_cache_seed42"
+    )
+    expected_ids = {
+        "midogpp_dataset_contract_annotation_patch_v1",
+        expected_cache_id,
+    }
+    if is_uniform_b_reference:
+        expected_ids.add("midogpp_output_uniform_b_v3_prospective_test_confirmation_v1")
+
     provenance = _read_json(provenance_path)
     if (
         provenance.get("schema_version") != "midogpp_input_artifacts_v2"
         or provenance.get("dataset_id") != "midogpp"
-        or provenance.get("experiment_id") != "midogpp.real_feature.eligible_tuned_predict_reference.v2"
+        or provenance.get("experiment_id") != expected_experiment_id
         or provenance.get("stage") != "10_real_feature_reference"
         or provenance.get("claim_scope") != "real_feature_transfer_only"
         or provenance.get("selection_used_target_eval_artifacts") is not False
@@ -389,10 +410,6 @@ def _validate_workspace_provenance(root: Path, protocol: Mapping[str, object]) -
     if not isinstance(rows, list) or not all(isinstance(row, Mapping) for row in rows):
         raise ProtocolError("Malformed matched-reference input-artifact records.")
     by_id = {str(row["artifact_id"]): row for row in rows}
-    expected_ids = {
-        "midogpp_dataset_contract_annotation_patch_v1",
-        "midogpp_virchow2_xyxy_feature_cache_seed42",
-    }
     if set(by_id) != expected_ids or len(by_id) != len(rows):
         raise ProtocolError("Matched-reference input artifact IDs differ from the registry contract.")
     for artifact_id, row in by_id.items():
@@ -419,7 +436,7 @@ def _validate_workspace_provenance(root: Path, protocol: Mapping[str, object]) -
         _recorded_file_hash(by_id["midogpp_dataset_contract_annotation_patch_v1"], "manifest.csv")
         != protocol.get("manifest_hash")
         or _recorded_file_hash(
-            by_id["midogpp_virchow2_xyxy_feature_cache_seed42"],
+            by_id[expected_cache_id],
             "embeddings/train.pt",
         )
         != protocol.get("feature_cache_hash")

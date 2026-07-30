@@ -51,6 +51,7 @@ class MatchedReferenceConfig:
     expected_feature_dim: int = 2560
     classifier_specs: tuple[ClassifierSpec, ...] = ()
     allow_partial_test_coverage: bool = False
+    allow_excluded_center_omission: bool = False
 
 
 @dataclass(frozen=True)
@@ -154,6 +155,7 @@ def run_matched_reference(config: MatchedReferenceConfig, *, artifact_root: Path
         manifest_path=config.manifest_path,
         feature_cache_path=config.feature_cache_path,
         expected_feature_dim=config.expected_feature_dim,
+        allow_excluded_center_omission=config.allow_excluded_center_omission,
     )
     specs = config.classifier_specs or canonical_matched_reference_specs(classifier_seed=config.classifier_seed)
     if len(specs) != CANONICAL_GRID_SIZE or classifier_grid_hash(specs) != CANONICAL_GRID_HASH:

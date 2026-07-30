@@ -1,0 +1,330 @@
+schema_version: midogpp_b_paired_reparameterization_snapshot_build_v1
+name: uniform_b_paired_reparameterization_snapshot_v1
+code_version: uniform_b_paired_reparameterization_snapshot_v1
+artifact_root: output://midogpp_stage90_uniform_b_paired_reparameterization_snapshot_v1
+
+inputs:
+  manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  b_feature_cache_path: artifact://midogpp_virchow2_uniform_b_canonical_train_cache_seed42/embeddings/train.pt
+
+run:
+  centers: ["2", "5", "6", "9"]
+  initialization_seeds: [17, 42, 101]
+  devices: [cuda:0, cuda:1]
+  cpu_threads_per_worker: 1
+
+recipe:
+  schema_version: midogpp_b_paired_audit_frozen_recipe_v1
+  expected_b_dim: 3840
+  global_dim: 2560
+  local_dim: 1280
+  block_global_pca_dim: 96
+  block_local_pca_dim: 32
+  output_dim: 128
+  pca_fit_scope: source_fit_only
+  pca_svd_solver: randomized
+  pca_random_state: 0
+  pca_n_oversamples: 10
+  pca_iterated_power: 4
+  pca_whiten: false
+  post_fit_reweighting: false
+  validation_fraction: 0.20
+  case_split_seed: 2718
+  optimizer_steps: 1000
+  batch_size: 128
+  hidden_dim: 512
+  latent_dim: 32
+  num_hidden_layers: 2
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  beta_final: 0.001
+  kl_warmup_steps: 250
+  gradient_clip_norm: 5.0
+  objective: stochastic_isotropic_beta_objective_step_normalized_v1
+  optimizer: AdamW
+  batch_policy: class_then_case_then_row_balanced_with_replacement
+  batch_class_quota: exact_half_per_binary_class
+  batch_case_sampling: uniform_with_replacement
+  batch_row_sampling: uniform_with_replacement_within_case
+  batch_permutation: deterministic_per_step
+
+historical_lineage:
+  predecessor_experiment: midogpp.oracle.uniform_b_source_expert_adaptation_pilot.v2
+  predecessor_protocol_hash: 4a65f62dfeae9914
+  predecessor_root_provenance_only: /home/stud/spark/cvae_experiments/artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_source_expert_adaptation_pilot_v2
+  historical_paths_read: false
+  predecessor_bundle_hashes:
+    manifests/frozen_protocol.json: fb9372a318f5362f56509c40c60401b014e8e937e696c82be7433682e7b8a50c
+    manifests/content_index.json: cd971e94f72eb232d5b8759533ab2ce1ac41963b0e8448809826c34128c73ae1
+    reports/pilot_decision.json: abb2dcb0ae71cbd035ef1b3efcb9fc2cf4fb52d36c09305fad97259bd0b80344
+    reports/validation_report.json: ab624a458f2f7bb14aab256aadf07c7aa7886cbb26523277957a316dd0ec8fb7
+    reports/run_state.json: 43c9734c4a381fae6266de406c12f15f3b18aa07b685278833cc6a40418d2e70
+    tables/job_inventory.csv: cef52ffc64c6d7e3e213d3b9692b757c360e85fb46aa0afad13ec3dcab871ed2
+    tables/pilot_metrics.csv: b9fa980d0b30cc4f8096dd369c4aab56ce44a7b50a0c02e75243c2819faf898f
+    tables/heldout_predictions.csv: 8504512bcec15482a01698310cc8921648d40e3201030924221241588f7a77cd
+    tables/case_class_sampling_audit.csv: 8c48fdd84a74a792bfe025eed5a2bf7f71cd74666e62ef702001e7976a1b2398
+
+legacy_expectations:
+  - center: "2"
+    training_seed: 17
+    device: cuda:1
+    training_key_hash: 5f8f8fa0422811f3
+    checkpoint_hash: 0fc735e5809866dfb334aa4e0e5f78356542a709aa3d35203c4759635bcdfcd4
+    initialization_hash: 25fa9822f74125e5eb020a12221f9439a87b19e105687ac302bd7a495819a405
+    schedule_hash: 76d74c92b4c0f79d
+    posterior_stream_hash: 24658253eb8f2a76
+    fit_row_hash: 80dcd86f7efc4561
+    eval_row_hash: 0de7d9e98533991a
+    frame_hash: 9673b01303da857a
+    expected_decode_prediction_sha256: fccbfb1a091c9a07e1acda57e28fadf9d3bc6666ffa80eb0816eaf126ed981b9
+    expected_decode_metric:
+      bacc: 0.754975369458128
+      positive_recall: 0.7413793103448276
+      specificity: 0.7685714285714286
+      fn: 60
+      fp: 81
+      tn: 269
+      tp: 172
+
+  - center: "2"
+    training_seed: 42
+    device: cuda:0
+    training_key_hash: 51c5f2fd990e851d
+    checkpoint_hash: b70ba8b4c0f6a453a43ff3971f6473f84c7b28f81636570dcccd2d0322a38f30
+    initialization_hash: 5ff8bf5ac9a3f5c818cc9a618641c389af04fdef4d29f21b686a4461eabab5bb
+    schedule_hash: 62744cc5af757d31
+    posterior_stream_hash: 0757af1c9eb3016e
+    fit_row_hash: 80dcd86f7efc4561
+    eval_row_hash: 0de7d9e98533991a
+    frame_hash: 9673b01303da857a
+    expected_decode_prediction_sha256: 507f25429a184bb7992717fc4c2750c9e2233122d9c297c6585f4f0afee992f0
+    expected_decode_metric:
+      bacc: 0.7534975369458128
+      positive_recall: 0.7241379310344828
+      specificity: 0.7828571428571428
+      fn: 64
+      fp: 76
+      tn: 274
+      tp: 168
+
+  - center: "2"
+    training_seed: 101
+    device: cuda:1
+    training_key_hash: 2bc09b5eb53e571d
+    checkpoint_hash: bb75bc0ae8f206bcda2d9ee32f6406e643d52c97821b038165193f22de7631e0
+    initialization_hash: 57f498733584dcd715ac6abd3dca1aaaf6eea6950a0420ffd78463a384091c82
+    schedule_hash: 843b7107a83453b6
+    posterior_stream_hash: c17035985417518e
+    fit_row_hash: 80dcd86f7efc4561
+    eval_row_hash: 0de7d9e98533991a
+    frame_hash: 9673b01303da857a
+    expected_decode_prediction_sha256: d6617e44ce634d73d5c2846b75f097ae094845c21743f30fbfb63c9591de0107
+    expected_decode_metric:
+      bacc: 0.7720689655172414
+      positive_recall: 0.7241379310344828
+      specificity: 0.82
+      fn: 64
+      fp: 63
+      tn: 287
+      tp: 168
+
+  - center: "5"
+    training_seed: 17
+    device: cuda:0
+    training_key_hash: 50c24ef6a3ea1b71
+    checkpoint_hash: c6a150ca038c3d089c059b350052310155b785357eb5803878367ea215bca583
+    initialization_hash: 277109a8184c6b242b73fb6353b41e7017bea5c44a9ebfc804da008445502bc3
+    schedule_hash: 0f5e65d2e2b61065
+    posterior_stream_hash: f1625b5feee68872
+    fit_row_hash: 915f32125116cb96
+    eval_row_hash: e6a5e2e781bd4575
+    frame_hash: 0ab2f2c2cb4c5f42
+    expected_decode_prediction_sha256: c76dd8d19a29c2618fb0f5f5e77f7aa082b13fa0ff67c282f402ed4e17fa2220
+    expected_decode_metric:
+      bacc: 0.7369791666666667
+      positive_recall: 0.7083333333333334
+      specificity: 0.765625
+      fn: 14
+      fp: 15
+      tn: 49
+      tp: 34
+
+  - center: "5"
+    training_seed: 42
+    device: cuda:1
+    training_key_hash: 263bd145a77e0573
+    checkpoint_hash: fc1fed8c68874b4ef410402628b15023356c06f375dd837bb94b5cd9f4724c09
+    initialization_hash: 9c719a49da1dcf2abfb00e6c2a4aab5710ba43f8db16fe6d436bd34b5777f7a9
+    schedule_hash: 523814d47ce53073
+    posterior_stream_hash: 7a62af273a70a089
+    fit_row_hash: 915f32125116cb96
+    eval_row_hash: e6a5e2e781bd4575
+    frame_hash: 0ab2f2c2cb4c5f42
+    expected_decode_prediction_sha256: 9cd9a43ce0239e8f530081dc925e7cc3f65691c90d6f224ba78e82344fb96da7
+    expected_decode_metric:
+      bacc: 0.6692708333333333
+      positive_recall: 0.5416666666666666
+      specificity: 0.796875
+      fn: 22
+      fp: 13
+      tn: 51
+      tp: 26
+
+  - center: "5"
+    training_seed: 101
+    device: cuda:0
+    training_key_hash: 806a40377e3ac31d
+    checkpoint_hash: ce1b843c53963182bc0766202eb1eabe6ff285aa70c428a72fcba51cebdcf9fb
+    initialization_hash: df137921879900f634d0c6599dc424aa92c76021ae12f7d6cff0770b2c6d8c78
+    schedule_hash: 8e7d59cddf6361ed
+    posterior_stream_hash: fb2f0ca266ce271a
+    fit_row_hash: 915f32125116cb96
+    eval_row_hash: e6a5e2e781bd4575
+    frame_hash: 0ab2f2c2cb4c5f42
+    expected_decode_prediction_sha256: 0d6587abf890b371627336b4895027bc9b665c9f6a0d364943797ac7d6c2d0dd
+    expected_decode_metric:
+      bacc: 0.6614583333333334
+      positive_recall: 0.4791666666666667
+      specificity: 0.84375
+      fn: 25
+      fp: 10
+      tn: 54
+      tp: 23
+
+  - center: "6"
+    training_seed: 17
+    device: cuda:1
+    training_key_hash: 84fb363e7d7ffa51
+    checkpoint_hash: f20fb671a508f1c45d07cce72825d239f17b3a35b2bfed82c0135da6ce0147fc
+    initialization_hash: 58caee51d4f7336bb1903980872fd1391eab3c96356c8cd986fd24c105328f07
+    schedule_hash: 8590bec76c0b0eec
+    posterior_stream_hash: 23e9cf7d8a09ff94
+    fit_row_hash: 7857727e7a847f66
+    eval_row_hash: 55c9eb55040c7f27
+    frame_hash: 12f6fa17432ef329
+    expected_decode_prediction_sha256: cb554b5308fdd6c9433aabdb3d2057223f174430cb0ee1d87ec21d5b31b9ce4d
+    expected_decode_metric:
+      bacc: 0.8517006802721089
+      positive_recall: 0.8666666666666667
+      specificity: 0.8367346938775511
+      fn: 6
+      fp: 8
+      tn: 41
+      tp: 39
+
+  - center: "6"
+    training_seed: 42
+    device: cuda:0
+    training_key_hash: 81db769eb50b3168
+    checkpoint_hash: 2051a776ca4f7b5940ab68cae508f3f1307534e2449387c323adb0387abbf7b4
+    initialization_hash: 4303974b3178ba22cc1b0072dd80e2d7322fc393731a675ee752a90a4b76e749
+    schedule_hash: 037c0f749e8111d5
+    posterior_stream_hash: 326252795b57c43a
+    fit_row_hash: 7857727e7a847f66
+    eval_row_hash: 55c9eb55040c7f27
+    frame_hash: 12f6fa17432ef329
+    expected_decode_prediction_sha256: a2d607b592a1d633f7d722d2a5446961c4db59247c7f150d5ae0298c650d42d1
+    expected_decode_metric:
+      bacc: 0.86281179138322
+      positive_recall: 0.8888888888888888
+      specificity: 0.8367346938775511
+      fn: 5
+      fp: 8
+      tn: 41
+      tp: 40
+
+  - center: "6"
+    training_seed: 101
+    device: cuda:1
+    training_key_hash: 00d617e9489df36c
+    checkpoint_hash: 786afb0707bb0032ea2116c0b1561de6ebe5c98a84d81b9ed74178d022e1309c
+    initialization_hash: 3596baffb4192c806843c262b4e89d0c288ce31c41b29e67768b441decc58003
+    schedule_hash: cafbfb2fb5d2eb00
+    posterior_stream_hash: cc3af0a185518e91
+    fit_row_hash: 7857727e7a847f66
+    eval_row_hash: 55c9eb55040c7f27
+    frame_hash: 12f6fa17432ef329
+    expected_decode_prediction_sha256: f7ccbd19d43c12f0f1cb4b61ab2dccf7caf38da897c064493c8be780e0450804
+    expected_decode_metric:
+      bacc: 0.8507936507936508
+      positive_recall: 0.8444444444444444
+      specificity: 0.8571428571428571
+      fn: 7
+      fp: 7
+      tn: 42
+      tp: 38
+
+  - center: "9"
+    training_seed: 17
+    device: cuda:0
+    training_key_hash: 87d0735e192188b2
+    checkpoint_hash: 28259ac742d29d144db8f03b6d3f6b9e0de02de627fc82e18961c84a7df2ab04
+    initialization_hash: 63b4faad0e6b68381d46ccc465f59922e32b61be895ec831b7a3d00391547a87
+    schedule_hash: 183eb008821359ce
+    posterior_stream_hash: 860d5ca64b138673
+    fit_row_hash: 7272e6ed7cb26baf
+    eval_row_hash: bf6abdafa29c01ff
+    frame_hash: 318aff64bd3a2179
+    expected_decode_prediction_sha256: 2a6c5ab20745f0fe49ec899c1ffcb6112b58ea955b95ea7093a0fe6ba0e9650b
+    expected_decode_metric:
+      bacc: 0.6364148181511091
+      positive_recall: 0.5981308411214953
+      specificity: 0.6746987951807228
+      fn: 43
+      fp: 27
+      tn: 56
+      tp: 64
+
+  - center: "9"
+    training_seed: 42
+    device: cuda:1
+    training_key_hash: c7e244250b50ea34
+    checkpoint_hash: 14958dc7e3a705c59031d26a80a150cd1850871f762ac8063b9592254f6910bd
+    initialization_hash: ef3ba6bb2cd6dc933432068e30d0435a977698c66e0f4c318276e5a26cf364f3
+    schedule_hash: 1b42ab3acfa9fccd
+    posterior_stream_hash: 65e08e91fd78f613
+    fit_row_hash: 7272e6ed7cb26baf
+    eval_row_hash: bf6abdafa29c01ff
+    frame_hash: 318aff64bd3a2179
+    expected_decode_prediction_sha256: 4ea2bb4a8384986f788e4f7d57e9f8d7856dbc9091e045e0bdca83b1f3697c89
+    expected_decode_metric:
+      bacc: 0.6819051908568854
+      positive_recall: 0.616822429906542
+      specificity: 0.7469879518072289
+      fn: 41
+      fp: 21
+      tn: 62
+      tp: 66
+
+  - center: "9"
+    training_seed: 101
+    device: cuda:0
+    training_key_hash: d6b9afcbb7061d56
+    checkpoint_hash: a2cc24d472f2223ad67350418e9813fd27fab699ee8dc564a628d6b112aa6162
+    initialization_hash: 885747b98dbe06dc42036d58c5da29d3899eb27ef20df9e344a1bd9e4f4053ba
+    schedule_hash: 20b9e0a5b0848257
+    posterior_stream_hash: 2febb2617da4f7c1
+    fit_row_hash: 7272e6ed7cb26baf
+    eval_row_hash: bf6abdafa29c01ff
+    frame_hash: 318aff64bd3a2179
+    expected_decode_prediction_sha256: 7e95df227c6ceafa4427d7dc2b115cb27e084ac2826ead59e87a2fc5470bd53d
+    expected_decode_metric:
+      bacc: 0.7094358743384754
+      positive_recall: 0.5514018691588785
+      specificity: 0.8674698795180723
+      fn: 48
+      fp: 11
+      tn: 72
+      tp: 59
+
+claim_firewall:
+  may_export_recipe_lock: false
+  may_feed_stage20: false
+  may_feed_expert_bank: false
+  may_feed_generation: false
+  may_feed_routing: false
+  may_feed_composition: false
+  may_feed_downstream: false
+  may_feed_deployable_selection: false
+  may_tune_or_select: false
+  may_support_thesis_claim: false

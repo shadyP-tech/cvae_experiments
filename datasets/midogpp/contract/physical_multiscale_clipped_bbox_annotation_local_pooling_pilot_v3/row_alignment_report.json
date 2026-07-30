@@ -1,0 +1,18 @@
+{
+  "canonical_order_exact": true,
+  "center_4_present": false,
+  "geometry_driven_row_exclusion": false,
+  "identity_hashes": {
+    "case_id_order": "b51e086b9c7f9791",
+    "center_order": "fb7d76ac741de30b",
+    "label_order": "0bd3342c4fc0906e",
+    "partition_identity": "b10c243d74598a87",
+    "sample_id_order": "b2490407ff53bf40",
+    "slide_id_order": "8506d4ffe98eefc3"
+  },
+  "profile_id": "physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3",
+  "row_count": 9648,
+  "sample_id_order_hash": "b2490407ff53bf40",
+  "schema_version": "midogpp_physical_multiscale_row_alignment_v3",
+  "status": "PASS"
+}

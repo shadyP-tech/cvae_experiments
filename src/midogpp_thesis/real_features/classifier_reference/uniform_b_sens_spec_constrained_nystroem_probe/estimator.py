@@ -1,0 +1,674 @@
+"""Source-inner constrained selection and locked outer evaluation."""
+
+from __future__ import annotations
+
+import csv
+import hashlib
+from itertools import combinations
+import json
+from pathlib import Path
+from typing import Mapping, Sequence
+
+from joblib import Parallel, delayed
+import numpy as np
+from scipy.special import expit
+from sklearn.kernel_approximation import Nystroem
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+from threadpoolctl import threadpool_limits
+
+from ..protocol import ProtocolError
+from ..uniform_b_nonlinear_probe.config import Candidate
+from ..uniform_b_nonlinear_probe.estimator import (
+    effective_gamma,
+    fit_logistic,
+    median_distance_fit,
+)
+from ..uniform_b_nonlinear_probe.statistics import binary_metrics
+from ..uniform_b_robust_interaction_probe.estimator import (
+    load_selected_nystroem_candidates,
+)
+from ..uniform_b_robust_interaction_probe.models import fit_weighted_logistic
+from ..schemas.midogpp import MIDOGPP_ELIGIBLE_CENTERS
+from .config import ConstrainedNystroemConfig
+
+
+def load_canonical_specs(root: Path) -> dict[str, dict[str, object]]:
+    import csv
+
+    path = root / "tables/classifier_tuned_source_results.csv"
+    with path.open(newline="", encoding="utf-8") as handle:
+        rows = [dict(row) for row in csv.DictReader(handle)]
+    output: dict[str, dict[str, object]] = {}
+    for row in rows:
+        spec = json.loads(row["selected_classifier_spec"])
+        if (
+            spec.get("family") != "sklearn_logistic_regression"
+            or spec.get("solver") != "lbfgs"
+            or spec.get("penalty") != "l2"
+            or spec.get("threshold_policy") != "predict"
+            or spec.get("class_weight") not in {None, "balanced"}
+        ):
+            raise ProtocolError("Canonical linear-B classifier specification drifted.")
+        center = str(row["heldout_center"])
+        if center in output:
+            raise ProtocolError("Duplicate canonical linear-B center lock.")
+        output[center] = {
+            "C": float(spec["C"]),
+            "class_weight": spec["class_weight"],
+            "max_iter": int(spec["max_iter"]),
+            "random_state": int(spec["random_state"]),
+            "source_inner_bacc_vector": json.loads(
+                row["source_inner_center_bacc_vector"]
+            ),
+        }
+    if set(output) != set(MIDOGPP_ELIGIBLE_CENTERS):
+        raise ProtocolError("Canonical linear-B center-lock coverage drifted.")
+    return output
+
+
+def run_source_inner_capacity_path(
+    x: np.ndarray,
+    y: np.ndarray,
+    centers: np.ndarray,
+    sample_ids: np.ndarray,
+    *,
+    config: ConstrainedNystroemConfig,
+    kernels: Mapping[str, Candidate],
+    linear_specs: Mapping[str, Mapping[str, object]],
+) -> tuple[list[dict[str, object]], list[dict[str, object]], list[dict[str, object]]]:
+    pairs = tuple(combinations(config.heldout_centers, 2))
+    outputs = Parallel(
+        n_jobs=config.pair_jobs,
+        backend="loky",
+        max_nbytes="10M",
+        mmap_mode="r",
+    )(
+        delayed(_score_pair)(
+            pair,
+            x,
+            y,
+            centers,
+            sample_ids,
+            config,
+            kernels,
+            linear_specs,
+        )
+        for pair in pairs
+    )
+    baseline = [row for output in outputs for row in output[0]]
+    cells = [row for output in outputs for row in output[1]]
+    scores = [row for output in outputs for row in output[2]]
+    baseline.sort(key=lambda row: (row["outer_center"], row["inner_center"]))
+    cells.sort(
+        key=lambda row: (
+            row["outer_center"],
+            row["inner_center"],
+            row["objective"],
+            float(row["alpha"]),
+        )
+    )
+    scores.sort(
+        key=lambda row: (
+            row["outer_center"],
+            row["inner_center"],
+            row["sample_id"],
+        )
+    )
+    return baseline, cells, scores
+
+
+def replay_source_inner_capacity_path(
+    replay_root: Path,
+    *,
+    config: ConstrainedNystroemConfig,
+) -> tuple[list[dict[str, object]], list[dict[str, object]], list[dict[str, object]]]:
+    """Reconstruct the bounded alpha path from hash-locked base logits."""
+    def read_table(path: Path) -> list[dict[str, object]]:
+        with path.open(newline="", encoding="utf-8") as handle:
+            return [dict(row) for row in csv.DictReader(handle)]
+
+    baseline = read_table(
+        replay_root / "tables/source_inner_linear_baseline_cells.csv"
+    )
+    prior_cells = read_table(replay_root / "tables/source_inner_blend_cells.csv")
+    scores = read_table(replay_root / "tables/source_inner_base_scores.csv")
+    baseline_index = {
+        (str(row["outer_center"]), str(row["inner_center"])): row
+        for row in baseline
+    }
+    templates: dict[tuple[str, str, str], dict[str, object]] = {}
+    for row in prior_cells:
+        templates.setdefault(
+            (
+                str(row["outer_center"]),
+                str(row["inner_center"]),
+                str(row["objective"]),
+            ),
+            row,
+        )
+    score_groups: dict[tuple[str, str], list[dict[str, object]]] = {}
+    for row in scores:
+        score_groups.setdefault(
+            (str(row["outer_center"]), str(row["inner_center"])), []
+        ).append(row)
+    cells: list[dict[str, object]] = []
+    for outer in config.heldout_centers:
+        for inner in config.heldout_centers:
+            if inner == outer:
+                continue
+            key = (outer, inner)
+            rows = score_groups.get(key, [])
+            base = baseline_index.get(key)
+            if not rows or base is None:
+                raise ProtocolError(
+                    "Bounded-shrinkage replay coverage is incomplete."
+                )
+            truth = np.asarray([int(row["y_true"]) for row in rows], dtype=np.int8)
+            linear = np.asarray([float(row["linear_logit"]) for row in rows])
+            for objective in config.objectives:
+                template = templates.get((outer, inner, objective))
+                if template is None:
+                    raise ProtocolError(
+                        "Bounded-shrinkage replay template is missing."
+                    )
+                nonlinear = np.asarray(
+                    [float(row[f"{objective}_logit"]) for row in rows]
+                )
+                for alpha in config.alphas:
+                    mixed = linear + alpha * (nonlinear - linear)
+                    metrics = binary_metrics(
+                        truth, (mixed >= 0.0).astype(np.int8)
+                    )
+                    cell = dict(template)
+                    cell.update(
+                        {
+                            "alpha": alpha,
+                            "candidate_id": f"{objective}__alpha_{alpha:g}",
+                            **metrics,
+                            "delta_bacc": metrics["bacc"] - float(base["bacc"]),
+                            "delta_recall": metrics["positive_recall"]
+                            - float(base["positive_recall"]),
+                            "delta_specificity": metrics["specificity"]
+                            - float(base["specificity"]),
+                        }
+                    )
+                    cells.append(cell)
+    return baseline, cells, scores
+
+
+def _score_pair(
+    pair: tuple[str, str],
+    x: np.ndarray,
+    y: np.ndarray,
+    centers: np.ndarray,
+    sample_ids: np.ndarray,
+    config: ConstrainedNystroemConfig,
+    kernels: Mapping[str, Candidate],
+    linear_specs: Mapping[str, Mapping[str, object]],
+) -> tuple[list[dict[str, object]], list[dict[str, object]], list[dict[str, object]]]:
+    with threadpool_limits(limits=config.threads_per_job):
+        train_mask = ~np.isin(centers, pair)
+        scaler = StandardScaler()
+        train_x = scaler.fit_transform(x[train_mask]).astype(np.float32, copy=False)
+        eval_x = {
+            center: scaler.transform(x[centers == center]).astype(np.float32, copy=False)
+            for center in pair
+        }
+        linear_scaler = StandardScaler()
+        linear_train_x = linear_scaler.fit_transform(
+            np.asarray(x[train_mask], dtype=float)
+        )
+        linear_eval_x = {
+            center: linear_scaler.transform(
+                np.asarray(x[centers == center], dtype=float)
+            )
+            for center in pair
+        }
+        median = median_distance_fit(
+            train_x,
+            sample_ids[train_mask],
+            seed=config.gamma_sample_seed,
+            cap=config.gamma_sample_cap,
+            fit_key="pair:" + ",".join(pair),
+        )
+        transform_cache: dict[str, tuple[np.ndarray, dict[str, np.ndarray]]] = {}
+        linear_cache: dict[tuple[object, ...], LogisticRegression] = {}
+        nonlinear_cache: dict[tuple[object, ...], LogisticRegression] = {}
+        baseline_rows: list[dict[str, object]] = []
+        cell_rows: list[dict[str, object]] = []
+        score_rows: list[dict[str, object]] = []
+        train_centers = [
+            center for center in config.heldout_centers if center not in pair
+        ]
+        for outer, inner in (pair, pair[::-1]):
+            train_y = y[train_mask]
+            train_center = centers[train_mask]
+            eval_mask = centers == inner
+            truth = y[eval_mask]
+            spec = linear_specs[outer]
+            linear_key = (
+                spec["C"],
+                _weight_name(spec["class_weight"]),
+                spec["max_iter"],
+                spec["random_state"],
+            )
+            linear = linear_cache.get(linear_key)
+            if linear is None:
+                linear = _fit_linear(linear_train_x, train_y, spec)
+                linear_cache[linear_key] = linear
+            linear_logit = linear.decision_function(linear_eval_x[inner])
+            linear_metrics = binary_metrics(truth, (linear_logit >= 0.0).astype(np.int8))
+            fit_row_hash = _hash_strings(sample_ids[train_mask])
+            eval_row_hash = _hash_strings(sample_ids[eval_mask])
+            baseline_rows.append(
+                {
+                    "schema_version": "midogpp_constrained_linear_cell_v1",
+                    "outer_center": outer,
+                    "inner_center": inner,
+                    "train_centers": json.dumps(train_centers),
+                    "fit_row_hash": fit_row_hash,
+                    "eval_row_hash": eval_row_hash,
+                    "linear_c": spec["C"],
+                    "linear_class_weight": _weight_name(spec["class_weight"]),
+                    **linear_metrics,
+                    "selection_used_outer_labels": False,
+                    "fit_used_outer_or_inner_center": False,
+                }
+            )
+            kernel = kernels[outer]
+            if kernel.candidate_id not in transform_cache:
+                transformer = Nystroem(
+                    kernel="rbf",
+                    gamma=effective_gamma(
+                        kernel.width_multiplier, float(median["median_distance"])
+                    ),
+                    n_components=kernel.n_components,
+                    random_state=config.primary_seed,
+                    n_jobs=1,
+                )
+                transform_cache[kernel.candidate_id] = (
+                    transformer.fit_transform(train_x),
+                    {
+                        center: transformer.transform(values)
+                        for center, values in eval_x.items()
+                    },
+                )
+            train_z, eval_z = transform_cache[kernel.candidate_id]
+            objective_logits: dict[str, np.ndarray] = {}
+            for objective in config.objectives:
+                model_key = (
+                    kernel.candidate_id,
+                    objective,
+                    _weight_name(spec["class_weight"])
+                    if objective == "canonical_class_weight"
+                    else "group_shared",
+                )
+                nonlinear = nonlinear_cache.get(model_key)
+                if nonlinear is None:
+                    nonlinear = _fit_nonlinear(
+                        train_z,
+                        train_y,
+                        train_center,
+                        kernel,
+                        spec,
+                        objective,
+                        config,
+                    )
+                    nonlinear_cache[model_key] = nonlinear
+                nonlinear_logit = nonlinear.decision_function(eval_z[inner])
+                objective_logits[objective] = nonlinear_logit
+                for alpha in config.alphas:
+                    mixed = linear_logit + alpha * (nonlinear_logit - linear_logit)
+                    metrics = binary_metrics(truth, (mixed >= 0.0).astype(np.int8))
+                    cell_rows.append(
+                        {
+                            "schema_version": "midogpp_constrained_blend_cell_v1",
+                            "outer_center": outer,
+                            "inner_center": inner,
+                            "train_centers": json.dumps(train_centers),
+                            "fit_row_hash": fit_row_hash,
+                            "eval_row_hash": eval_row_hash,
+                            "objective": objective,
+                            "alpha": alpha,
+                            "candidate_id": f"{objective}__alpha_{alpha:g}",
+                            "kernel_candidate_id": kernel.candidate_id,
+                            "width_multiplier": kernel.width_multiplier,
+                            "n_components": kernel.n_components,
+                            "logistic_c": kernel.logistic_c,
+                            **metrics,
+                            "delta_bacc": metrics["bacc"] - linear_metrics["bacc"],
+                            "delta_recall": metrics["positive_recall"]
+                            - linear_metrics["positive_recall"],
+                            "delta_specificity": metrics["specificity"]
+                            - linear_metrics["specificity"],
+                            "threshold": config.threshold,
+                            "selection_used_outer_labels": False,
+                            "fit_used_outer_or_inner_center": False,
+                        }
+                    )
+            for index, sample_id in enumerate(sample_ids[eval_mask]):
+                row: dict[str, object] = {
+                    "schema_version": "midogpp_constrained_base_score_v1",
+                    "outer_center": outer,
+                    "inner_center": inner,
+                    "sample_id": str(sample_id),
+                    "y_true": int(truth[index]),
+                    "fit_row_hash": fit_row_hash,
+                    "eval_row_hash": eval_row_hash,
+                    "linear_logit": float(linear_logit[index]),
+                }
+                for objective in config.objectives:
+                    row[f"{objective}_logit"] = float(objective_logits[objective][index])
+                score_rows.append(row)
+        return baseline_rows, cell_rows, score_rows
+
+
+def select_constrained_candidates(
+    cells: Sequence[Mapping[str, object]],
+    config: ConstrainedNystroemConfig,
+) -> tuple[list[dict[str, object]], dict[str, dict[str, object]]]:
+    summaries: list[dict[str, object]] = []
+    selected: dict[str, dict[str, object]] = {}
+    complexity = {value: index for index, value in enumerate(config.objectives)}
+    tolerance = 1e-12
+    for outer in config.heldout_centers:
+        outer_summaries: list[dict[str, object]] = []
+        for objective in config.objectives:
+            for alpha in config.alphas:
+                rows = [
+                    row
+                    for row in cells
+                    if row["outer_center"] == outer
+                    and row["objective"] == objective
+                    and np.isclose(float(row["alpha"]), alpha)
+                ]
+                if (
+                    len(rows) != 8
+                    or {str(row["inner_center"]) for row in rows}
+                    != set(config.heldout_centers).difference({outer})
+                ):
+                    raise ProtocolError("Constrained source-inner coverage is incomplete.")
+                values = {
+                    key: np.asarray([float(row[key]) for row in rows])
+                    for key in (
+                        "bacc",
+                        "delta_bacc",
+                        "delta_recall",
+                        "delta_specificity",
+                    )
+                }
+                feasible = bool(
+                    np.min(values["delta_recall"])
+                    >= config.constraints.per_inner_recall_delta_min - tolerance
+                    and np.min(values["delta_specificity"])
+                    >= config.constraints.per_inner_specificity_delta_min - tolerance
+                    and np.min(values["delta_bacc"])
+                    >= config.constraints.per_inner_bacc_delta_min - tolerance
+                    and np.mean(values["delta_recall"])
+                    > config.constraints.mean_recall_delta_exclusive + tolerance
+                    and np.mean(values["delta_specificity"])
+                    >= config.constraints.mean_specificity_delta_min - tolerance
+                    and np.mean(values["delta_bacc"])
+                    > config.constraints.mean_bacc_delta_exclusive + tolerance
+                )
+                summary = {
+                    "schema_version": "midogpp_constrained_candidate_summary_v1",
+                    "outer_center": outer,
+                    "objective": objective,
+                    "alpha": alpha,
+                    "candidate_id": f"{objective}__alpha_{alpha:g}",
+                    "mean_inner_bacc": float(np.mean(values["bacc"])),
+                    "mean_delta_bacc": float(np.mean(values["delta_bacc"])),
+                    "mean_delta_recall": float(np.mean(values["delta_recall"])),
+                    "mean_delta_specificity": float(
+                        np.mean(values["delta_specificity"])
+                    ),
+                    "worst_delta_bacc": float(np.min(values["delta_bacc"])),
+                    "worst_direction_delta": float(
+                        min(
+                            np.min(values["delta_recall"]),
+                            np.min(values["delta_specificity"]),
+                        )
+                    ),
+                    "hard_feasible": feasible,
+                    "selected": False,
+                }
+                summaries.append(summary)
+                outer_summaries.append(summary)
+        feasible_rows = [row for row in outer_summaries if row["hard_feasible"]]
+        if not feasible_rows:
+            selected[outer] = {
+                "outer_center": outer,
+                "objective": "linear_fallback",
+                "alpha": config.fallback_alpha,
+                "candidate_id": f"{config.fallback_role}__alpha_0",
+                "hard_feasible": False,
+                "fallback": True,
+                "feasible_nonlinear_candidates": 0,
+            }
+            continue
+        winner = min(
+            feasible_rows,
+            key=lambda row: (
+                -float(row["mean_delta_bacc"]),
+                -float(row["worst_direction_delta"]),
+                -float(row["worst_delta_bacc"]),
+                float(row["alpha"]),
+                complexity[str(row["objective"])],
+                str(row["candidate_id"]),
+            ),
+        )
+        winner["selected"] = True
+        selected[outer] = {
+            "outer_center": outer,
+            "objective": winner["objective"],
+            "alpha": winner["alpha"],
+            "candidate_id": winner["candidate_id"],
+            "hard_feasible": True,
+            "fallback": False,
+            "feasible_nonlinear_candidates": len(feasible_rows),
+        }
+    return summaries, selected
+
+
+def fit_locked_outer_models(
+    x: np.ndarray,
+    y: np.ndarray,
+    centers: np.ndarray,
+    sample_ids: np.ndarray,
+    case_ids: np.ndarray,
+    *,
+    config: ConstrainedNystroemConfig,
+    kernels: Mapping[str, Candidate],
+    linear_specs: Mapping[str, Mapping[str, object]],
+    selected: Mapping[str, Mapping[str, object]],
+) -> list[dict[str, object]]:
+    return Parallel(
+        n_jobs=config.pair_jobs,
+        backend="loky",
+        max_nbytes="10M",
+        mmap_mode="r",
+    )(
+        delayed(_fit_outer)(
+            outer,
+            x,
+            y,
+            centers,
+            sample_ids,
+            case_ids,
+            config,
+            kernels[outer],
+            linear_specs[outer],
+            selected[outer],
+        )
+        for outer in config.heldout_centers
+    )
+
+
+def _fit_outer(
+    outer: str,
+    x: np.ndarray,
+    y: np.ndarray,
+    centers: np.ndarray,
+    sample_ids: np.ndarray,
+    case_ids: np.ndarray,
+    config: ConstrainedNystroemConfig,
+    kernel: Candidate,
+    linear_spec: Mapping[str, object],
+    selection: Mapping[str, object],
+) -> dict[str, object]:
+    with threadpool_limits(limits=config.threads_per_job):
+        train_mask = centers != outer
+        target_mask = centers == outer
+        scaler = StandardScaler()
+        train_x = scaler.fit_transform(x[train_mask]).astype(np.float32, copy=False)
+        target_x = scaler.transform(x[target_mask]).astype(np.float32, copy=False)
+        linear_scaler = StandardScaler()
+        linear_train_x = linear_scaler.fit_transform(
+            np.asarray(x[train_mask], dtype=float)
+        )
+        linear_target_x = linear_scaler.transform(
+            np.asarray(x[target_mask], dtype=float)
+        )
+        linear = _fit_linear(linear_train_x, y[train_mask], linear_spec)
+        linear_logit = linear.decision_function(linear_target_x)
+        alpha = float(selection["alpha"])
+        objective = str(selection["objective"])
+        median = None
+        seed_rows = []
+        for seed in (config.primary_seed, *config.stability_seeds):
+            if alpha == 0.0:
+                nonlinear_logit = linear_logit
+            else:
+                if median is None:
+                    median = median_distance_fit(
+                        train_x,
+                        sample_ids[train_mask],
+                        seed=config.gamma_sample_seed,
+                        cap=config.gamma_sample_cap,
+                        fit_key="outer:" + outer,
+                    )
+                transformer = Nystroem(
+                    kernel="rbf",
+                    gamma=effective_gamma(
+                        kernel.width_multiplier, float(median["median_distance"])
+                    ),
+                    n_components=kernel.n_components,
+                    random_state=seed,
+                    n_jobs=1,
+                )
+                train_z = transformer.fit_transform(train_x)
+                target_z = transformer.transform(target_x)
+                nonlinear = _fit_nonlinear(
+                    train_z,
+                    y[train_mask],
+                    centers[train_mask],
+                    kernel,
+                    linear_spec,
+                    objective,
+                    config,
+                )
+                nonlinear_logit = nonlinear.decision_function(target_z)
+            mixed = linear_logit + alpha * (nonlinear_logit - linear_logit)
+            probability = expit(mixed)
+            prediction = (mixed >= 0.0).astype(np.int8)
+            metrics = binary_metrics(y[target_mask], prediction)
+            predictions = [
+                {
+                    "schema_version": "midogpp_constrained_outer_prediction_v1",
+                    "outer_center": outer,
+                    "sample_id": str(sample_id),
+                    "case_id": str(case_id),
+                    "center": outer,
+                    "y_true": int(label),
+                    "y_pred": int(pred),
+                    "prob_pos": float(prob),
+                    "linear_logit": float(linear_value),
+                    "nonlinear_logit": float(nonlinear_value),
+                    "mixed_logit": float(mixed_value),
+                    "objective": objective,
+                    "alpha": alpha,
+                    "landmark_seed": seed,
+                    "threshold": config.threshold,
+                    "selection_used_outer_labels": False,
+                    "fit_used_outer_center": False,
+                }
+                for sample_id, case_id, label, pred, prob, linear_value, nonlinear_value, mixed_value in zip(
+                    sample_ids[target_mask],
+                    case_ids[target_mask],
+                    y[target_mask],
+                    prediction,
+                    probability,
+                    linear_logit,
+                    nonlinear_logit,
+                    mixed,
+                )
+            ]
+            seed_rows.append(
+                {
+                    "seed": seed,
+                    "metrics": metrics,
+                    "predictions": predictions,
+                }
+            )
+        return {"outer_center": outer, "selection": dict(selection), "seed_rows": seed_rows}
+
+
+def _fit_linear(
+    x: np.ndarray, y: np.ndarray, spec: Mapping[str, object]
+) -> LogisticRegression:
+    model = LogisticRegression(
+        C=float(spec["C"]),
+        class_weight=spec["class_weight"],
+        solver="lbfgs",
+        max_iter=int(spec["max_iter"]),
+        random_state=int(spec["random_state"]),
+    )
+    with threadpool_limits(limits=1):
+        model.fit(x, y)
+    if int(np.max(model.n_iter_)) >= int(spec["max_iter"]):
+        raise ProtocolError("Constrained linear-B comparator did not converge.")
+    return model
+
+
+def _fit_nonlinear(
+    x: np.ndarray,
+    y: np.ndarray,
+    centers: np.ndarray,
+    kernel: Candidate,
+    linear_spec: Mapping[str, object],
+    objective: str,
+    config: ConstrainedNystroemConfig,
+) -> LogisticRegression:
+    if objective == "canonical_class_weight":
+        return fit_logistic(
+            x,
+            y,
+            c_value=kernel.logistic_c,
+            class_weight=linear_spec["class_weight"],
+            max_iter=5000,
+        )
+    model = fit_weighted_logistic(
+        x,
+        y,
+        centers,
+        objective=objective,
+        c_value=kernel.logistic_c,
+        dro_iterations=config.dro_iterations,
+    )
+    if int(np.max(model.n_iter_)) >= 5000:
+        raise ProtocolError("Constrained weighted Nyström fit did not converge.")
+    return model
+
+
+def _weight_name(value: object) -> str:
+    return "none" if value is None else str(value)
+
+
+def _hash_strings(values: np.ndarray) -> str:
+    digest = hashlib.sha256()
+    for value in sorted(str(item) for item in values.tolist()):
+        digest.update(value.encode("utf-8"))
+        digest.update(b"\0")
+    return digest.hexdigest()

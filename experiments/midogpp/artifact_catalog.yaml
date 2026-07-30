@@ -1,6 +1,6 @@
 schema_version: 2
 catalog_kind: midogpp_artifact_catalog
-last_reviewed: 2026-07-12
+last_reviewed: 2026-07-23
 path_base: repository_root
 
 catalog_policy:
@@ -13,9 +13,24 @@ catalog_policy:
   expected_file_hashes_are_verified_during_prepare: true
   provenance_files_receive_computed_sha256_during_prepare: true
   evidence_authority: pointed_protocol_manifests_and_reports
-  new_outputs_belong_under: artifacts/midogpp
+  new_run_outputs_belong_under: artifacts/midogpp
+  new_dataset_contracts_belong_under: datasets/midogpp/contract
+  new_derived_feature_caches_belong_under: datasets/midogpp/derived/features
 
 artifacts:
+  - artifact_id: midogpp_raw_tiff_source_v1
+    stage: raw_source
+    physical_path: datasets/midogpp/raw/MIDOGpp
+    availability: workstation_only
+    migration: hash_verified_move
+    evidence_label: AUDIT_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    required_files:
+      - midogpp_scanner_metadata_full_resplit.csv
+    notes:
+      - Workstation-only raw MIDOG++ TIFF source; the approximately 65 GB payload is intentionally not synced to the Mac.
+      - Physical multiscale contracts must bind individual level-0 TIFF hashes before feature extraction.
+
   - artifact_id: midogpp_dataset_contract_annotation_patch_v1
     stage: dataset_contract
     physical_path: datasets/midogpp/contract/annotation_patch_v1
@@ -52,6 +67,119 @@ artifacts:
       - path_relocation.json maps only that audited prefix to the canonical contract tree.
       - The complete 22569-patch payload is present locally and on the workstation at the canonical path.
 
+  - artifact_id: midogpp_dataset_contract_physical_multiscale_center_pooling_pilot_v1
+    stage: dataset_contract
+    canonical_path: datasets/midogpp/contract/physical_multiscale_center_pooling_pilot_v1
+    availability: workstation_build_required
+    migration: canonical_dataset_contract
+    evidence_label: TODO_BUILD
+    claim_scope: dataset_contract_and_split_provenance
+    required_files:
+      - config.resolved.yaml
+      - physical_multiscale_contract.json
+      - physical_multiscale_manifest.csv
+      - resolution_audit.csv
+      - row_alignment_report.json
+      - leakage_report.json
+    forbidden_reuse:
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Immutable train-only raw-TIFF geometry contract for the non-adoptive Stage-10 pilot.
+      - Expected file hashes must be promoted after the workstation build and before diagnostic activation.
+
+  - artifact_id: midogpp_dataset_contract_physical_multiscale_annotation_local_pooling_pilot_v2
+    stage: dataset_contract
+    canonical_path: datasets/midogpp/contract/physical_multiscale_annotation_local_pooling_pilot_v2
+    availability: workstation_build_required
+    migration: canonical_dataset_contract
+    evidence_label: TODO_BUILD
+    claim_scope: dataset_contract_and_split_provenance
+    required_files:
+      - config.resolved.yaml
+      - physical_multiscale_contract.json
+      - physical_multiscale_manifest.csv
+      - resolution_audit.csv
+      - source_geometry_audit.json
+      - row_alignment_report.json
+      - leakage_report.json
+    forbidden_reuse:
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Immutable train-only v2 contract for deterministic in-bounds physical crops.
+      - Geometry uses no labels, center identity, target outcomes, row drops, or synthesized pixels.
+      - Hash promotion is required after independent workstation validation.
+
+  - artifact_id: midogpp_dataset_contract_physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3
+    stage: dataset_contract
+    canonical_path: datasets/midogpp/contract/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3
+    availability: workstation_only
+    migration: canonical_dataset_contract
+    evidence_label: AUDIT_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    required_files:
+      - config.resolved.yaml
+      - physical_multiscale_contract.json
+      - physical_multiscale_manifest.csv
+      - resolution_audit.csv
+      - source_geometry_audit.json
+      - row_alignment_report.json
+      - leakage_report.json
+    expected_file_hashes:
+      config.resolved.yaml:
+        algorithm: sha256
+        digest: eb2953c5c3d1b314d4f4fa7508d11abd7ad6aa1dfabe9274826d772557d724eb
+      physical_multiscale_contract.json:
+        algorithm: sha256
+        digest: 88b470751362355e0e9e063cb1a617e8fe820454f9f6b9a3cab50706a1460bbe
+      physical_multiscale_manifest.csv:
+        algorithm: sha256
+        digest: e81031037cba778a636c35d805516dc811d29e2e7a03b7925570ca0fef358d47
+      resolution_audit.csv:
+        algorithm: sha256
+        digest: 958a5430021a302a9e293b18549d0f00e16593ca4300faf2e61d6f513ba8c7fb
+      source_geometry_audit.json:
+        algorithm: sha256
+        digest: 16ada7d08c7ace44cd7509b26ec3aecafdd935c1d2e7e9eebb4d867023cde242
+      row_alignment_report.json:
+        algorithm: sha256
+        digest: 7d35d035473aae94d6f5f400a666c74c58dfc4a23cd800580b5ccf330d62c638
+      leakage_report.json:
+        algorithm: sha256
+        digest: a61efd3edd8788882cb1f79810e994b1dbf5074cc8cec5fed58433c62dc0c8d8
+    forbidden_reuse:
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Immutable train-only v3 contract for clipped-bbox annotation-local physical crops.
+      - Geometry is label-blind and cannot drop rows or synthesize pixels.
+      - Hash promotion is required after independent workstation validation.
+
   - artifact_id: midogpp_virchow2_xyxy_feature_cache_seed42
     stage: derived_features
     canonical_path: datasets/midogpp/derived/features/virchow2/annotation_patch_xyxy/seed42
@@ -71,6 +199,366 @@ artifacts:
       - Active corrected xyxy cache lineage for current experiments.
       - Local and workstation copies were moved to this canonical path and hash-verified.
       - The historical train-only cache is not an acceptable fallback.
+
+  - artifact_id: midogpp_virchow2_jpeg_center_pooling_3840_seed42
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/annotation_patch_xyxy_jpeg_center_pooling_3840/seed42
+    availability: workstation_build_required
+    migration: canonical_derived_feature_cache
+    evidence_label: TODO_BUILD
+    claim_scope: feature_cache_provenance
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+    forbidden_reuse:
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - B representation: exact canonical JPEG extraction plus center 4x4 patch-token mean.
+      - The build must pass both the canonical-A numeric extractor bridge and the frozen-reference task-semantic bridge before hash promotion.
+      - The bridge report binds SHA-256 values for the exact canonical-v2 protocol, result, and y_pred tables used as comparators.
+
+  - artifact_id: midogpp_virchow2_physical_multiscale_center_pooling_11520_seed42
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/physical_multiscale_center_pooling_11520/seed42
+    availability: workstation_build_required
+    migration: canonical_derived_feature_cache
+    evidence_label: TODO_BUILD
+    claim_scope: feature_cache_provenance
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+    forbidden_reuse:
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - C representation: 28um, 56um, and 112um raw-TIFF crops with frozen CLS/global/center pooling.
+      - Expected file hashes must be promoted after the workstation build and before diagnostic activation.
+
+  - artifact_id: midogpp_virchow2_annotation_local_pooling_bc_bundle_seed42_v2
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/physical_multiscale_annotation_local_pooling_pilot_v2/seed42
+    availability: workstation_build_required
+    migration: canonical_derived_feature_cache
+    evidence_label: TODO_BUILD
+    claim_scope: feature_cache_provenance
+    required_files:
+      - manifests/bundle_manifest.json
+      - manifests/pooling_audit.csv
+      - manifests/content_index.json
+      - reports/cache_bundle_report.json
+      - b_3840/manifests/row_alignment.json
+      - b_3840/reports/cache_builder_report.json
+      - c_11520/manifests/row_alignment.json
+      - c_11520/reports/cache_builder_report.json
+    forbidden_reuse:
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - B and C are validated and published through one parent-directory rename.
+      - Concatenation is deterministic feature fusion, not a mixture, expert, router, or compatibility signal.
+
+  - artifact_id: midogpp_virchow2_annotation_jpeg_fixed_center_pooling_3840_v2_seed42
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/physical_multiscale_annotation_local_pooling_pilot_v2/seed42/b_3840
+    availability: workstation_build_required
+    migration: canonical_derived_feature_cache
+    evidence_label: TODO_BUILD
+    claim_scope: feature_cache_provenance
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+    forbidden_reuse:
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Distinct v2 B lineage; fixed spatial token start is row 6, column 6.
+      - Its 2560-dimensional prefix must pass numeric and task-semantic canonical-A replay.
+
+  - artifact_id: midogpp_virchow2_physical_multiscale_annotation_local_pooling_11520_v2_seed42
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/physical_multiscale_annotation_local_pooling_pilot_v2/seed42/c_11520
+    availability: workstation_build_required
+    migration: canonical_derived_feature_cache
+    evidence_label: TODO_BUILD
+    claim_scope: feature_cache_provenance
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+    forbidden_reuse:
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - C is ordered 28um, 56um, 112um feature concatenation.
+      - Each scale pools one annotation-local 4x4 window from the row-major 16x16 patch grid.
+
+  - artifact_id: midogpp_virchow2_clipped_bbox_annotation_local_pooling_bc_bundle_seed42_v3
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: AUDIT_ONLY
+    claim_scope: feature_cache_provenance
+    required_files:
+      - manifests/bundle_manifest.json
+      - manifests/pooling_audit.csv
+      - manifests/content_index.json
+      - reports/cache_bundle_report.json
+      - b_3840/manifests/row_alignment.json
+      - b_3840/reports/cache_builder_report.json
+      - c_11520/manifests/row_alignment.json
+      - c_11520/reports/cache_builder_report.json
+    expected_file_hashes:
+      manifests/bundle_manifest.json:
+        algorithm: sha256
+        digest: b32cc02b85357b0bb6ecfd7b4aa29d9e03bf0967888a30936f95748b08beb1eb
+      manifests/pooling_audit.csv:
+        algorithm: sha256
+        digest: 3a3a0986fa8b5054cfb15687781a9b64374058e03d4a016965bcdc976d7edead
+      manifests/content_index.json:
+        algorithm: sha256
+        digest: 12d2831bec64f91846cb65db015036b36f2439d6271df1e5a9af41504d54e7a2
+      reports/cache_bundle_report.json:
+        algorithm: sha256
+        digest: f2f5c54cabf567e1faa1e42450b4babfde21f78501f58af32bbcc9100bd07c60
+      b_3840/manifests/row_alignment.json:
+        algorithm: sha256
+        digest: 6ccadcf62703d62c133cfdbd7fdf1c5cdbdff87eb93dd23f1d0f53793a69bf4f
+      b_3840/reports/cache_builder_report.json:
+        algorithm: sha256
+        digest: 6c26aa9807dd9defb3d29fc878f65e13890ad1ed4d8ea079458cd03c5f7346cd
+      c_11520/manifests/row_alignment.json:
+        algorithm: sha256
+        digest: 6ccadcf62703d62c133cfdbd7fdf1c5cdbdff87eb93dd23f1d0f53793a69bf4f
+      c_11520/reports/cache_builder_report.json:
+        algorithm: sha256
+        digest: e9942721c1d10ce560f7961994eb01272700500d49f45d29c1cc3368786f2251
+    forbidden_reuse:
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - V3 B and C are validated and published through one parent-directory rename.
+      - Concatenation is deterministic feature fusion, not a mixture, expert, router, or compatibility signal.
+
+  - artifact_id: midogpp_virchow2_annotation_jpeg_fixed_center_pooling_3840_v3_seed42
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3/seed42/b_3840
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: AUDIT_ONLY
+    claim_scope: feature_cache_provenance
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+    expected_file_hashes:
+      embeddings/by_center/center_0.pt:
+        algorithm: sha256
+        digest: 13e2b3ba1cf2adce4e9cc61551b8bac4ede1dd824260a86484e35a7eb82a0aa4
+      embeddings/by_center/center_1.pt:
+        algorithm: sha256
+        digest: 5ebe269c3c4db2890dc141e23b56d02c899246708fa95e12dccb5871ea342cf5
+      embeddings/by_center/center_2.pt:
+        algorithm: sha256
+        digest: 3347ce3ad5e96d681677254c787bcb85790ce574ead7389175f5e819e3670f65
+      embeddings/by_center/center_3.pt:
+        algorithm: sha256
+        digest: 8fe8524ee40b349b293f2fec954af19b6c6b62f720f6a8d058592918b19ec231
+      embeddings/by_center/center_5.pt:
+        algorithm: sha256
+        digest: 70bd96b9d13300aa18c88dbc3faa3150d90fc941135d768df048100184954b06
+      embeddings/by_center/center_6.pt:
+        algorithm: sha256
+        digest: 58b11441e7e238b789eda31d666e4fb4f06f00ee1d6e81a37b1a528e49c82dbc
+      embeddings/by_center/center_7.pt:
+        algorithm: sha256
+        digest: 8778597397fa114c56e69aa4818d25ba9464d3c7f5300344164e2004f7b0b692
+      embeddings/by_center/center_8.pt:
+        algorithm: sha256
+        digest: a2dc235c27e9f85dcc023674a52bda69ec399fafdf479ca8dacc4f2b1e420eb5
+      embeddings/by_center/center_9.pt:
+        algorithm: sha256
+        digest: 9dc411a24c5427db6b2cf47677ac8782beccde7ef40430ee5211ee4f7c14f21f
+      manifests/row_alignment.json:
+        algorithm: sha256
+        digest: 6ccadcf62703d62c133cfdbd7fdf1c5cdbdff87eb93dd23f1d0f53793a69bf4f
+      reports/cache_builder_report.json:
+        algorithm: sha256
+        digest: 6c26aa9807dd9defb3d29fc878f65e13890ad1ed4d8ea079458cd03c5f7346cd
+    forbidden_reuse:
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Distinct v3 B lineage with the frozen fixed-center token-pooling rule.
+      - Its 2560-dimensional prefix must pass numeric and task-semantic canonical-A replay.
+
+  - artifact_id: midogpp_virchow2_physical_multiscale_clipped_bbox_annotation_local_pooling_11520_v3_seed42
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3/seed42/c_11520
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: AUDIT_ONLY
+    claim_scope: feature_cache_provenance
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+    expected_file_hashes:
+      embeddings/by_center/center_0.pt:
+        algorithm: sha256
+        digest: 056078b0d055a0ae7958c383006110e50a096c84fd836cdb1e90046d55aaf00f
+      embeddings/by_center/center_1.pt:
+        algorithm: sha256
+        digest: 8a6e65176cb2b9cc8c6a078cf02217bd127f637b6733b232e05f22094c848578
+      embeddings/by_center/center_2.pt:
+        algorithm: sha256
+        digest: 7b178d0d044ea2b953827809a7b6d97e8b72936a88c0e0f21075e65e4a70cb9f
+      embeddings/by_center/center_3.pt:
+        algorithm: sha256
+        digest: c882e9b775e419988cc7625e199dc29343280a00820c4e1e27ad1937af142285
+      embeddings/by_center/center_5.pt:
+        algorithm: sha256
+        digest: 439dacae70eebf0275ee67cfb22cb2ef22fcba4dae162548a8039171e2a3a3d0
+      embeddings/by_center/center_6.pt:
+        algorithm: sha256
+        digest: 1c1cb03090a6429d047cd86d6ffdc721affc69266e389981efa51cf2f51eb3bd
+      embeddings/by_center/center_7.pt:
+        algorithm: sha256
+        digest: d72aa81786c00ea4c01f25834ee32a41810b9f8345dce17a2b4f1f5af1814b3d
+      embeddings/by_center/center_8.pt:
+        algorithm: sha256
+        digest: e0a28c913cc2f7e6380481e8c7a2e6a5917c79d5559dbb218286ec9a9f3a289e
+      embeddings/by_center/center_9.pt:
+        algorithm: sha256
+        digest: dfdb545eabbf7052cd386ac1ae22a9dc0e4bfdc69efa3fa9edc9ec2ef1cea8d8
+      manifests/row_alignment.json:
+        algorithm: sha256
+        digest: 6ccadcf62703d62c133cfdbd7fdf1c5cdbdff87eb93dd23f1d0f53793a69bf4f
+      reports/cache_builder_report.json:
+        algorithm: sha256
+        digest: e9942721c1d10ce560f7961994eb01272700500d49f45d29c1cc3368786f2251
+    forbidden_reuse:
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - C is ordered 28um, 56um, 112um feature concatenation over the clipped-bbox contract.
+      - Each scale uses the frozen annotation-local token-pooling rule.
 
   - artifact_id: midogpp_virchow2_historical_train_only_cache_seed42
     stage: derived_features
@@ -433,6 +921,243 @@ artifacts:
     notes:
       - Standalone non-adoptive conditional-logit regularization diagnostic; only Stage-90 oracle and diagnostic evidence may consume it.
 
+  - artifact_id: midogpp_output_real_feature_physical_multiscale_center_pooling_pilot_v1
+    stage: 10_real_feature_reference
+    canonical_path: artifacts/midogpp/10_real_feature_reference/physical_multiscale_center_pooling_pilot_v1/seed42
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: TODO_VERIFY_ARTIFACT
+    claim_scope: real_feature_transfer_only
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/frozen_protocol_snapshot.json
+      - manifests/protocol_manifest.json
+      - manifests/content_index.json
+      - manifests/decision_lock_index.json
+      - manifests/decision_locks/center_0.json
+      - manifests/decision_locks/center_1.json
+      - manifests/decision_locks/center_2.json
+      - manifests/decision_locks/center_3.json
+      - manifests/decision_locks/center_5.json
+      - manifests/decision_locks/center_6.json
+      - manifests/decision_locks/center_7.json
+      - manifests/decision_locks/center_8.json
+      - manifests/decision_locks/center_9.json
+      - reports/leakage_provenance_report.json
+      - reports/decision_summary.json
+      - reports/decision_report.md
+      - reports/runtime_summary.json
+      - reports/conditional_bootstrap.json
+      - reports/validation_report.json
+      - tables/cache_alignment_audit.csv
+      - tables/source_inner_selector_cells.csv
+      - tables/source_inner_candidate_summary.csv
+      - tables/representation_decisions.csv
+      - tables/outer_locked_results.csv
+      - tables/outer_locked_predictions.csv
+      - tables/outer_fit_audit.csv
+      - tables/canonical_a_replay.csv
+      - tables/posthoc_candidate_isolation.csv
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Non-adoptive representation pilot; only Stage-90 oracle and diagnostic evidence may consume it.
+      - The claim is about the complete nested adaptive pipeline, not a representation in isolation.
+
+  - artifact_id: midogpp_output_real_feature_physical_multiscale_annotation_local_pooling_pilot_v2
+    stage: 10_real_feature_reference
+    canonical_path: artifacts/midogpp/10_real_feature_reference/physical_multiscale_annotation_local_pooling_pilot_v2/seed42
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: TODO_VERIFY_ARTIFACT
+    claim_scope: real_feature_transfer_only
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/frozen_protocol_snapshot.json
+      - manifests/protocol_manifest.json
+      - manifests/content_index.json
+      - manifests/decision_lock_index.json
+      - manifests/decision_locks/center_0.json
+      - manifests/decision_locks/center_1.json
+      - manifests/decision_locks/center_2.json
+      - manifests/decision_locks/center_3.json
+      - manifests/decision_locks/center_5.json
+      - manifests/decision_locks/center_6.json
+      - manifests/decision_locks/center_7.json
+      - manifests/decision_locks/center_8.json
+      - manifests/decision_locks/center_9.json
+      - reports/leakage_provenance_report.json
+      - reports/decision_summary.json
+      - reports/decision_report.md
+      - reports/runtime_summary.json
+      - reports/conditional_bootstrap.json
+      - reports/validation_report.json
+      - tables/cache_alignment_audit.csv
+      - tables/source_inner_selector_cells.csv
+      - tables/source_inner_candidate_summary.csv
+      - tables/representation_decisions.csv
+      - tables/outer_locked_results.csv
+      - tables/outer_locked_predictions.csv
+      - tables/outer_fit_audit.csv
+      - tables/canonical_a_replay.csv
+      - tables/posthoc_candidate_isolation.csv
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Non-adoptive v2 representation-plus-classifier diagnostic; only Stage-90 diagnostic evidence may consume it.
+      - Passing the heuristic decision rule is not a statistical test or representation adoption.
+
+  - artifact_id: midogpp_output_real_feature_physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3
+    stage: 10_real_feature_reference
+    canonical_path: artifacts/midogpp/10_real_feature_reference/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3/seed42
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: TODO_VERIFY_ARTIFACT
+    claim_scope: real_feature_transfer_only
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/frozen_protocol_snapshot.json
+      - manifests/protocol_manifest.json
+      - manifests/content_index.json
+      - manifests/decision_lock_index.json
+      - manifests/decision_locks/center_0.json
+      - manifests/decision_locks/center_1.json
+      - manifests/decision_locks/center_2.json
+      - manifests/decision_locks/center_3.json
+      - manifests/decision_locks/center_5.json
+      - manifests/decision_locks/center_6.json
+      - manifests/decision_locks/center_7.json
+      - manifests/decision_locks/center_8.json
+      - manifests/decision_locks/center_9.json
+      - reports/leakage_provenance_report.json
+      - reports/decision_summary.json
+      - reports/decision_report.md
+      - reports/runtime_summary.json
+      - reports/conditional_bootstrap.json
+      - reports/validation_report.json
+      - tables/cache_alignment_audit.csv
+      - tables/source_inner_selector_cells.csv
+      - tables/source_inner_candidate_summary.csv
+      - tables/representation_decisions.csv
+      - tables/outer_locked_results.csv
+      - tables/outer_locked_predictions.csv
+      - tables/outer_fit_audit.csv
+      - tables/canonical_a_replay.csv
+      - tables/posthoc_candidate_isolation.csv
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Non-adoptive v3 representation-plus-classifier diagnostic; only Stage-90 diagnostic evidence may consume it.
+      - Equal-center BACC gates are frozen and passing them is not a statistical test or representation adoption.
+
+  - artifact_id: midogpp_physical_multiscale_center_pooling_v1_failed_geometry_audit
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/physical_multiscale_geometry_audit/physical_multiscale_center_pooling_pilot_v1/2026-07-23_xai_master
+    availability: workstation_only
+    migration: canonical_output
+    evidence_label: AUDIT_ONLY
+    claim_scope: diagnostic_only
+    required_files:
+      - source_geometry_audit.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - The v1 pre-cache audit failed before any contract, cache, or Stage-10 run existed.
+      - 986 of 9648 samples exceeded the frozen padding cap; the record is audit-only and cannot be an input.
+
+  - artifact_id: midogpp_physical_multiscale_annotation_local_pooling_v2_failed_geometry_audit
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/physical_multiscale_geometry_audit/physical_multiscale_annotation_local_pooling_pilot_v2/2026-07-23_xai_master
+    availability: workstation_only
+    migration: canonical_output
+    evidence_label: AUDIT_ONLY
+    claim_scope: diagnostic_only
+    required_files:
+      - source_geometry_audit.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - The v2 xai-master geometry audit failed before any v2 contract, cache, or Stage-10 run existed.
+      - This record is audit-only and cannot activate or feed any experiment.
+
+  - artifact_id: midogpp_physical_multiscale_clipped_bbox_annotation_local_pooling_v3_geometry_audit
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/physical_multiscale_geometry_audit/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3/2026-07-23_xai_master
+    availability: workstation_only
+    migration: canonical_output
+    evidence_label: AUDIT_ONLY
+    claim_scope: diagnostic_only
+    required_files:
+      - source_geometry_audit.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Label-blind v3 clipped-bbox geometry audit retained only for provenance review.
+      - Audit success alone cannot activate Stage 10 or feed any downstream experiment.
+
   - artifact_id: midogpp_output_real_feature_signal_controls_v1
     stage: 10_real_feature_reference
     canonical_path: artifacts/midogpp/10_real_feature_reference/midogpp_virchow2_real_feature_signal_controls/v1
@@ -733,6 +1458,92 @@ artifacts:
     may_feed_recipe_selection: false
     may_feed_deployable_selection: false
 
+  - artifact_id: midogpp_output_cvae_aggregate_posterior_mixture_geco_source_inner_v3
+    stage: 20_cvae_preservation
+    canonical_path: artifacts/midogpp/20_cvae_preservation/aggregate_posterior_mixture_geco_source_inner_v3/seeds17_42_101
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: TODO_VERIFY_ARTIFACT
+    claim_scope: cvae_source_inner_study_only
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/protocol_manifest.json
+      - manifests/coverage_manifest.json
+      - manifests/selection_evidence_manifest.json
+      - manifests/source_expert_checkpoint_index.json
+      - manifests/feature_frame_index.json
+      - manifests/mixture_prior_state_index.json
+      - manifests/geco_state_index.json
+      - manifests/generation_budget_manifest.json
+      - reports/child_decisions/seed17/0.json
+      - reports/child_decisions/seed17/1.json
+      - reports/child_decisions/seed17/2.json
+      - reports/child_decisions/seed17/3.json
+      - reports/child_decisions/seed17/5.json
+      - reports/child_decisions/seed17/6.json
+      - reports/child_decisions/seed17/7.json
+      - reports/child_decisions/seed17/8.json
+      - reports/child_decisions/seed17/9.json
+      - reports/child_decisions/seed42/0.json
+      - reports/child_decisions/seed42/1.json
+      - reports/child_decisions/seed42/2.json
+      - reports/child_decisions/seed42/3.json
+      - reports/child_decisions/seed42/5.json
+      - reports/child_decisions/seed42/6.json
+      - reports/child_decisions/seed42/7.json
+      - reports/child_decisions/seed42/8.json
+      - reports/child_decisions/seed42/9.json
+      - reports/child_decisions/seed101/0.json
+      - reports/child_decisions/seed101/1.json
+      - reports/child_decisions/seed101/2.json
+      - reports/child_decisions/seed101/3.json
+      - reports/child_decisions/seed101/5.json
+      - reports/child_decisions/seed101/6.json
+      - reports/child_decisions/seed101/7.json
+      - reports/child_decisions/seed101/8.json
+      - reports/child_decisions/seed101/9.json
+      - reports/consensus_decisions/0.json
+      - reports/consensus_decisions/1.json
+      - reports/consensus_decisions/2.json
+      - reports/consensus_decisions/3.json
+      - reports/consensus_decisions/5.json
+      - reports/consensus_decisions/6.json
+      - reports/consensus_decisions/7.json
+      - reports/consensus_decisions/8.json
+      - reports/consensus_decisions/9.json
+      - reports/study_decision.json
+      - reports/expert_isolation_report.json
+      - reports/leakage_report.json
+      - reports/publication_state.json
+      - reports/runtime_summary.json
+      - reports/run_state.json
+      - tables/source_expert_metrics.csv
+      - tables/paired_deltas.csv
+      - tables/source_local_real_references.csv
+      - tables/nested_classifier_tuning.csv
+      - tables/source_expert_training_audit.csv
+      - tables/mixture_prior_diagnostics.csv
+      - tables/geco_trajectory.csv
+      - tables/training_epochs.csv
+      - tables/generation_budget_audit.csv
+      - tables/rng_pairing_audit.csv
+      - tables/identity_overlap_audit.csv
+      - tables/runtime_timings.csv
+    forbidden_reuse:
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - A positive study result is not a RecipeLock and cannot alter the active Stage-30 input edge.
+      - The mixture rate is a variational upper bound, not an exact NELBO.
+
   - artifact_id: midogpp_output_cvae_prior_recovery_outer_v1
     stage: 20_cvae_preservation
     canonical_path: artifacts/midogpp/20_cvae_preservation/prior_recovery_outer_v1/seeds17_42_101
@@ -798,3 +1609,119 @@ artifacts:
     migration: canonical_output
     evidence_label: TODO_VERIFY_ARTIFACT
     claim_scope: expert_bank_construction_only
+
+  - artifact_id: midogpp_virchow2_uniform_b_canonical_train_cache_seed42
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_canonical_reference_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CANONICAL INPUT
+    semantic_identities:
+      feature_cache_hash: 1ed7602f225c592a6f8103b24ebfc93f72dc6d5d0c27565566a8b2260783d1dc
+    claim_scope: feature_cache_provenance
+    required_files:
+      - embeddings/train.pt
+      - manifests/frozen_cache_protocol.json
+      - manifests/content_index.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    expected_file_hashes:
+      embeddings/train.pt:
+        algorithm: sha256
+        digest: 1ed7602f225c592a6f8103b24ebfc93f72dc6d5d0c27565566a8b2260783d1dc
+      manifests/frozen_cache_protocol.json:
+        algorithm: sha256
+        digest: a4faf27a427cfb424789e5592048aa748a057f37124566d46b8b6c557e2bfe69
+      manifests/content_index.json:
+        algorithm: sha256
+        digest: 307991668f11454da69e3798feb23a2e899e1a00c2ee5132b031e7f7fb9ab82e
+      reports/cache_builder_report.json:
+        algorithm: sha256
+        digest: 3e3c40449196dc6db9fe0ab982defa86afb1094e3d958e944875396bc363b0ec
+      reports/validation_report.json:
+        algorithm: sha256
+        digest: e8b69f557ea92ac8e70a20e504150aba1c947f2b47f735b34e3ca7147efcf6b7
+    forbidden_reuse:
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+
+  - artifact_id: midogpp_stage90_uniform_b_paired_reparameterization_snapshot_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/inputs/uniform_b_paired_reparameterization_snapshot_v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: AUDIT_ONLY
+    claim_scope: diagnostic_only
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/snapshot_manifest.json
+      - manifests/key_inventory.json
+      - manifests/content_index.json
+      - reports/leakage_report.json
+      - reports/validation_report.json
+      - reports/run_state.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Portable diagnostic snapshot built only from the canonical contract and canonical-B train cache.
+      - Historical v2 provenance and digests are inert strings, not resolvable workspace inputs.
+
+  - artifact_id: midogpp_output_uniform_b_paired_reparameterization_audit_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_paired_reparameterization_audit/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: AUDIT_ONLY
+    claim_scope: diagnostic_only
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/protocol_manifest.json
+      - manifests/snapshot_binding.json
+      - manifests/key_inventory.json
+      - manifests/content_index.json
+      - reports/run_state.json
+      - reports/leakage_provenance_report.json
+      - reports/validation_report.json
+      - reports/audit_decision.json
+      - reports/runtime_summary.json
+      - tables/job_inventory.csv
+      - tables/replay_trace_audit.csv
+      - tables/legacy_v2_validation.csv
+      - tables/controlled_metrics.csv
+      - tables/paired_comparison.csv
+      - tables/consumption_audit.csv
+      - tables/decoded_predictions.csv
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Audit-only replay of exactly 36 declared semantic keys from the bound snapshot.
+      - The result cannot revise Variant-B evidence, export checkpoints, or feed any non-diagnostic stage.

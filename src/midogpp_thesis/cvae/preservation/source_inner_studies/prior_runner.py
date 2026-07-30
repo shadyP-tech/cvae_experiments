@@ -46,7 +46,11 @@ from .preparation import (
     load_study_frame,
     prepare_outer_study_folds,
 )
-from .prior_artifacts import PRIOR_STATE_INDEX_SCHEMA, write_prior_study_bundle
+from .prior_artifacts import (
+    PRIOR_STATE_INDEX_SCHEMA,
+    learned_prior_partition_hash,
+    write_prior_study_bundle,
+)
 from .prior_decision import select_prior_study_decision
 from .training import (
     StudyRuntime,
@@ -787,12 +791,9 @@ def _learned_prior_record(
         "source_row_hash": runtime.training_key.fit_row_hash,
         "frame_hash": runtime.training_key.frame_hash,
         "state": state,
-        "final_prior_partition_hash": stable_hash(
-            {
-                "prior_mu": state["prior_mu"],
-                "prior_rho": state["prior_rho"],
-                "effective_logvar": state["effective_logvar"],
-            }
+        "final_prior_partition_hash": learned_prior_partition_hash(
+            state["prior_mu"],
+            state["prior_rho"],
         ),
         "diagnostics": diagnostics.to_payload(),
         "posterior_sufficient_statistics_by_class": posterior_statistics,

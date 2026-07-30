@@ -1,0 +1,45 @@
+experiment:
+  name: uniform_b_canonical_real_feature_reference_v1
+  artifact_root: output://midogpp_output_uniform_b_canonical_reference_v1
+
+inputs:
+  manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  feature_cache_path: artifact://midogpp_virchow2_uniform_b_canonical_train_cache_seed42/embeddings/train.pt
+  confirmation_root: artifact://midogpp_output_uniform_b_v3_prospective_test_confirmation_v1
+
+run:
+  experiment_seed: 42
+  classifier_seed: 23
+  heldout_centers: all
+  expected_feature_dim: 3840
+
+classifier_grid:
+  expected_candidate_count: 10
+  expected_grid_hash: 5abd0897d02bdcaa
+  c_grid: [0.01, 0.1, 1.0, 10.0, 100.0]
+  penalty: l2
+  solver: lbfgs
+  class_weight: [none, balanced]
+  max_iter: [5000]
+  threshold_policy: predict
+
+promotion_review:
+  review_id: uniform_b_phase_b_promotion_review_2026_07_25
+  status: approved
+  approved_representation: annotation_jpeg_fixed_center_b_v3
+  confirmation_decision: CONFIRMED_WITHIN_CENTER
+  confirmation_summary_sha256: 3fdb44acae1d6ed9220efb48310a6f36647fb0d49f8eddd47c0a070558d284a8
+  confirmation_protocol_sha256: 8382653658656ff14410785308fc30c82d77c7ade81c10e8dc14f907e43a12e2
+  test_split_consumed_for_representation_adoption: true
+  classifier_locks_imported_from_diagnostics: false
+  canonical_a_retained: true
+  automatic_downstream_migration: false
+
+claim_boundary:
+  claim_scope: real_feature_transfer_only
+  claim_role: canonical_real_feature_reference
+  new_center_generalization_claimed: false
+  external_dataset_generalization_claimed: false
+  test_split_available_for_fresh_representation_selection: false
+  uses_cvae: false
+  uses_router: false
