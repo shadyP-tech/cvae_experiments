@@ -19,12 +19,24 @@ does not make an unrun experiment claim-eligible.
 
 - `wiki/03-experiments/midogpp-real-feature-source-inner-classifier-reference.md`:
   validated Stage-10 v1 result and the separate matched-reference v2.
+- `wiki/03-experiments/midogpp-conditional-logit-alignment-diagnostic.md`:
+  completed protocol-clean Stage-10 CLA negative result, mechanism audit,
+  strict diagnostic-only boundary, and stop recommendation.
+- `wiki/03-experiments/midogpp-physical-multiscale-center-pooling-pilot.md`:
+  historical v1 plan and its failed workstation geometry audit.
+- `wiki/03-experiments/midogpp-physical-multiscale-clipped-bbox-annotation-local-pooling-pilot-v3.md`:
+  current v3 implementation, passing TIFF audit, dataset/cache build gates,
+  nested selection locks, and strict non-adoptive claim boundary.
 - `wiki/03-experiments/midogpp-cvae-tuned-classifier-preservation.md`:
   validated Stage-20 tuned-classifier preservation result.
 - `wiki/03-experiments/midogpp-prior-recovery-task-fisher.md`: validated
   Stage-10 matched reference, scalar Stage-20 source-inner and training-seed
   stability results, the separately registered unrun v2 prior/objective
   mechanism studies, and the blocked outer protocol boundary.
+- `wiki/03-experiments/midogpp-uniform-b-variant-diagnostics.md`: two
+  completed workstation-only Variant-B Stage-90 diagnostics, their remote
+  namespaces and artifact roots, negative tail-average stability result,
+  component-hash provenance correction, and non-promotion boundary.
 - `wiki/03-experiments/multipanel-tailrisk-center3-audit.md`: historical
   experiment-specific diagnostic context; retain its own evidence labels.
 

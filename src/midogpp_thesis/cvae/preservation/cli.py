@@ -36,6 +36,10 @@ def build_parser() -> argparse.ArgumentParser:
             "source-inner-aggregate-posterior-mixture-geco",
             "Run the independent-source K=2 aggregate-prior plus GECO study.",
         ),
+        (
+            "source-inner-uniform-b-geco-task-geometry",
+            "Run the non-consumable Uniform-B GECO/task-geometry study.",
+        ),
         ("prior-recovery-outer", "Run the locked outer A/B/C/D preservation matrix."),
     ):
         command = sub.add_parser(name, help=help_text)
@@ -152,6 +156,18 @@ def _surface_handler(surface: str) -> tuple[Loader, Runner]:
         return (
             load_aggregate_prior_study_config,
             run_aggregate_prior_source_inner_study,
+        )
+    if surface == "source-inner-uniform-b-geco-task-geometry":
+        from .uniform_b_task_geometry.config import (
+            load_uniform_b_task_geometry_config,
+        )
+        from .uniform_b_task_geometry.runner import (
+            run_uniform_b_task_geometry_source_inner_study,
+        )
+
+        return (
+            load_uniform_b_task_geometry_config,
+            run_uniform_b_task_geometry_source_inner_study,
         )
     if surface == "prior-recovery-outer":
         from .prior_recovery import run_outer_prior_recovery

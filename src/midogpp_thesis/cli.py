@@ -43,6 +43,10 @@ COMMANDS: dict[str, tuple[str, str]] = {
         "midogpp_thesis.cvae.expert_bank.cli:main",
         "Run CVAE source-expert adaptation pilots or expert-bank construction.",
     ),
+    "cvae-diagnostics": (
+        "midogpp_thesis.cvae.diagnostics.cli:main",
+        "Build and audit bounded CVAE diagnostic replay surfaces.",
+    ),
     "workspace": (
         "midogpp_thesis.workspace.cli:main",
         "Validate, inspect, prepare, or run registered experiments.",

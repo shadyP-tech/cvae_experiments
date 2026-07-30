@@ -29,6 +29,31 @@ it is not interchangeable with the corrected active `xyxy` cache hash
 `f6608e513fb2d06671e3ec117b093a85d58530b77b1fae44a3be1680d9feabd2`.
 Rejected `coco_xywh` lineage is isolated under `quarantine/`.
 
+The current planned v3 representation pilot reserves one atomic B/C parent:
+
+```text
+virchow2/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3/seed42/
+  b_3840/
+  c_11520/
+```
+
+The first child is the 3,840-dimensional B bridge on the exact canonical JPEG
+crop.
+Its first 2,560 dimensions must numerically reproduce canonical A within the
+frozen cosine and relative-L2 tolerances, while an exact canonical-A tensor
+copy is retained per center for independent verification. The newly extracted
+prefix must also replay the frozen matched-reference task with prediction
+agreement at least `0.999` and absolute equal-center mean BACC delta at most
+`0.001`, using the exact per-center reference classifiers without reselection.
+The cache report binds SHA-256 values for the canonical-v2 protocol, result,
+and prediction tables used by that gate. The second child is the
+11,520-dimensional C frame from frozen 28, 56, and 112 micrometer raw-TIFF
+crops, deterministic in-bounds translation, clipped-bbox centroids, and
+annotation-relative 4x4 token windows. Both children must align exactly to the
+v3 train-only contract, exclude center 4, validate together, and publish
+through one parent-directory rename. Neither cache exists yet. The failed v1
+and v2 roots are not eligible substitutes.
+
 Every cache must include or reference a report containing the dataset contract
 hash, manifest hash, backbone/model reference, feature dimension, split counts,
 seed, row-alignment audit, and geometry-sensitive provenance. Cache validation

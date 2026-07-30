@@ -588,7 +588,7 @@ predeclared conservative publication gate. It remains
 `claim_scope=cvae_recipe_lock_only`: no outer-preservation, routing,
 generation-quality, or downstream-utility claim follows.
 
-Stop Stage-20 tuning. Stage 30 now has an eligible consensus-lock input, but
+Stop open-ended Stage-20 tuning. Stage 30 now has an eligible consensus-lock input, but
 its registry entry remains a planned placeholder without a runnable expert-bank
 implementation. Implement and protocol-review that runner before attempting
 Stage 30. The stability bundle does not change or unlock outer v1, which still
@@ -638,6 +638,83 @@ scope is `cvae_source_inner_study_only`; the catalog forbids reuse as expert
 bank, generation, routing, NELBO-compatibility, or downstream-utility evidence.
 They have no publication state, no `RecipeLock`, and no Stage-30 consumption
 edge. The current consensus locks and outer-v1 gate remain unchanged.
+
+### Independent-source aggregate-prior v3 study
+
+The bounded prior-mismatch exception is registered as:
+
+```text
+midogpp.cvae.aggregate_posterior_mixture_geco_source_inner.v3
+```
+
+Run only through the workspace so the resolved source contract and corrected
+Virchow2 cache are snapshotted:
+
+```bash
+conda run -n thesis python -m midogpp_thesis workspace prepare \
+  midogpp.cvae.aggregate_posterior_mixture_geco_source_inner.v3
+conda run -n thesis python -m midogpp_thesis workspace run \
+  midogpp.cvae.aggregate_posterior_mixture_geco_source_inner.v3
+```
+
+Each reusable training key is neutral to `H` and `I` and binds one source
+center, source-only row/case hashes, source-local PCA frame, arm, and training
+seed. Evaluation keys separately enforce `H != I` and `E not in {H,I}`.
+Generated PCA128 samples are inverse-transformed into the common 2,560-d
+Virchow2 frame before classifier fitting. Each prior row is paired with a
+deterministic balanced source-posterior reconstruction reference. The
+predeclared gate requires `KG` both to preserve that posterior path and to
+reduce the posterior-minus-prior BACC gap relative to `SF`; posterior rows are
+diagnostic ceilings, not an alternative generator or a consumable result.
+
+The output is
+`artifacts/midogpp/20_cvae_preservation/aggregate_posterior_mixture_geco_source_inner_v3/seeds17_42_101/`.
+It is a non-consumable `cvae_source_inner_study_only` bundle. No outcome may
+alter Stage 30 until a separate promotion artifact is implemented, validated,
+and explicitly registered.
+
+## Registered Uniform-B Low-Noise Diagnostic
+
+The bounded Variant-B training-stability audit is a two-step Stage-90 workflow:
+
+```text
+midogpp.oracle.uniform_b_paired_reparameterization_snapshot.v1
+midogpp.oracle.uniform_b_paired_reparameterization_audit.v1
+```
+
+The snapshot consumes only the canonical MIDOG++ contract and the
+workstation-only canonical-B cache. Historical pilot-v2 paths are inert
+provenance strings and are never resolved as workspace inputs. The audit then
+consumes only that hash-promoted snapshot and executes 36 declared cells: 12
+legacy replay-only cells and 12 controlled pairs comparing fold-fixed
+one-epsilon against fold-fixed antithetic reconstruction.
+
+After syncing the reviewed implementation to `xai-master`, run from the remote
+repository root in this order:
+
+```bash
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace validate
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_paired_reparameterization_snapshot.v1
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_paired_reparameterization_audit.v1
+```
+
+`workspace run` performs preparation before execution. Do not add `--force` on
+the first run; a changed existing run snapshot must be investigated before any
+forced replacement. The two canonical output roots are:
+
+```text
+artifacts/midogpp/90_oracles_and_diagnostics/inputs/uniform_b_paired_reparameterization_snapshot_v1/
+artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_paired_reparameterization_audit/v1/
+```
+
+Current status: `IMPLEMENTED AND REGISTERED; NOT RUN`. Both outputs are absent
+locally and on `xai-master`. The workstation contract/cache hashes match the
+catalog and both RTX A5000 devices are visible, but the new implementation is
+not yet present in the remote checkout. Code readiness is not artifact
+evidence. A completed audit remains `AUDIT_ONLY`, cannot export a recipe or
+checkpoint for reuse, and cannot feed Stage 20 through Stage 70.
 
 ## Fail-Closed Preparation
 

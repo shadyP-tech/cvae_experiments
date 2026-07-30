@@ -24,7 +24,7 @@ later-stage claim.
 Install the package into the thesis environment once:
 
 ```bash
-conda run -n thesis python -m pip install -e .
+conda run -n thesis python -m pip install -e '.[cache,dataset-full]'
 ```
 
 Then run the workspace from the repository root:

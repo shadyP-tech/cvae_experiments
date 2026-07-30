@@ -595,6 +595,37 @@ experiments:
       - Trains every candidate CVAE, PCA frame, aggregate prior, and GECO target on exactly one source center.
       - This is a non-consumable source-inner study; even a positive result requires a separate validated promotion artifact before Stage 30 may change.
 
+  - experiment_id: midogpp.cvae.uniform_b_geco_task_geometry_source_inner.v1
+    stage: 20_cvae_preservation
+    status: active
+    claim_scope: cvae_source_inner_study_only
+    config_path: experiments/midogpp/stages/20_cvae_preservation/configs/uniform_b_geco_task_geometry_source_inner_v1.yaml
+    output_artifact_id: midogpp_output_cvae_uniform_b_geco_task_geometry_source_inner_v1
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_uniform_b_canonical_train_cache_seed42
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-preservation
+        - source-inner-uniform-b-geco-task-geometry
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_cvae_uniform_b_geco_task_geometry_source_inner_v1
+    notes:
+      - Uses only the canonical 3,840-D Uniform-B cache; Stage-90 snapshots and the v3 aggregate-mixture output are forbidden inputs.
+      - BF/BG/BM/BT remain a non-consumable source-inner mechanism study with equal-total and expanded-budget composition controls.
+      - Even a positive result cannot change a RecipeLock or enter Stage 30 without a separate protocol-reviewed promotion artifact.
+
   - experiment_id: midogpp.cvae.prior_recovery_outer.v1
     stage: 20_cvae_preservation
     status: active

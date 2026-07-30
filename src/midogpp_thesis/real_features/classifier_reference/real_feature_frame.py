@@ -109,7 +109,19 @@ def load_midogpp_real_feature_frame(
         )
     missing_cache = sorted(set(manifest_by_id).difference(seen_cache_ids))
     if missing_cache:
-        raise ProtocolError(f"Feature cache is missing train manifest sample_ids: {missing_cache[:5]}")
+        missing_centers = {
+            _center_value(manifest_by_id[sample_id])
+            for sample_id in missing_cache
+        }
+        allowed_omission = (
+            allow_excluded_center_omission
+            and missing_centers.issubset(set(MIDOGPP_EXCLUDED_CENTERS))
+        )
+        if not allowed_omission:
+            raise ProtocolError(
+                "Feature cache is missing train manifest sample_ids: "
+                f"{missing_cache[:5]}"
+            )
     return RealFeatureFrame(
         embeddings=embeddings,
         rows=tuple(rows),
