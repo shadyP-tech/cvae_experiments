@@ -23,13 +23,25 @@ def write_resolved_config(
 ) -> None:
     import yaml
 
+    path = root / "config.resolved.yaml"
+    if path.is_file():
+        existing = yaml.safe_load(path.read_text(encoding="utf-8"))
+        if (
+            isinstance(existing, Mapping)
+            and isinstance(existing.get("experiment"), Mapping)
+            and isinstance(existing.get("inputs"), Mapping)
+        ):
+            # The registered workspace owns this nested, URI-resolved
+            # snapshot. Preserve it byte-for-byte so interrupted runs can pass
+            # the workspace's immutable-snapshot check and resume normally.
+            return
     payload = asdict(config)
     for key, value in list(payload.items()):
         if isinstance(value, Path):
             payload[key] = str(value)
         elif isinstance(value, tuple):
             payload[key] = list(value)
-    (root / "config.resolved.yaml").write_text(
+    path.write_text(
         yaml.safe_dump(payload, sort_keys=True),
         encoding="utf-8",
     )

@@ -17,6 +17,9 @@ from midogpp_thesis.cvae.preservation.uniform_b_task_geometry.composition import
 from midogpp_thesis.cvae.preservation.uniform_b_task_geometry.checkpoint_store import (
     TaskGeometryCheckpointStore,
 )
+from midogpp_thesis.cvae.preservation.uniform_b_task_geometry.artifacts import (
+    write_resolved_config,
+)
 from midogpp_thesis.cvae.preservation.uniform_b_task_geometry.config import (
     load_uniform_b_task_geometry_config,
 )
@@ -83,6 +86,19 @@ def test_production_config_and_cli_are_locked() -> None:
         ]
     )
     assert parsed.surface == "source-inner-uniform-b-geco-task-geometry"
+
+
+def test_study_preserves_workspace_owned_resolved_config(tmp_path: Path) -> None:
+    path = tmp_path / "config.resolved.yaml"
+    frozen = (
+        "experiment:\n"
+        "  name: frozen-workspace-snapshot\n"
+        "inputs:\n"
+        "  manifest_path: /resolved/manifest.csv\n"
+    )
+    path.write_text(frozen, encoding="utf-8")
+    write_resolved_config(tmp_path, _small_config())
+    assert path.read_text(encoding="utf-8") == frozen
 
 
 def test_candidate_pool_excludes_outer_and_inner() -> None:
