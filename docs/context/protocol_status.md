@@ -1,6 +1,6 @@
 # Protocol Status
 
-Last updated: 2026-07-16
+Last updated: 2026-07-23
 
 ## Active MIDOG++ surfaces
 
@@ -20,6 +20,8 @@ centers `0,1,2,3,5,6,7,8,9`. Target-evaluation labels are scoring-only.
 The working tree contains active implementations for:
 
 - the eligible-only, predict-policy Stage-10 matched reference v2;
+- the audit-blocked v1/v2 physical-multiscale histories and the pre-activation,
+  non-adoptive v3 clipped-bbox annotation-local Stage-10 pilot;
 - fully nested Stage-20 source-inner ex-post-prior and Task-Fisher
   `RecipeLock` selection;
 - the bounded Stage-20 training-seed stability panel and fold-level consensus
@@ -67,6 +69,15 @@ recipe bank. It is not outer-preservation, routing, generation, or downstream
 utility evidence.
 
 ## Planned surfaces
+
+Physical-multiscale v1 and v2 remain `planned` only as non-runnable
+failed-audit histories. V3 is registered as `diagnostic`; its label-blind
+`xai-master` source audit passes all 9,648 eligible rows and 216 TIFFs with 84
+clipped bboxes, no row exclusion, and no synthesized pixels. Its immutable
+contract and atomic B/C feature bundle are independently validated and have
+complete required-file SHA-256 coverage. The Stage-10 run is authorized but
+has not executed. All three lineages remain forbidden from Stage 20 through
+Stage 70.
 
 Stages 30 through 70 are not active implementations:
 

@@ -21,6 +21,67 @@ def test_repository_workspace_validates() -> None:
     )
 
 
+def test_catalog_policy_distinguishes_run_outputs_from_reusable_inputs() -> None:
+    workspace = MidogppWorkspace.load()
+    policy = workspace.catalog_payload["catalog_policy"]
+
+    assert policy["new_run_outputs_belong_under"] == "artifacts/midogpp"
+    assert policy["new_dataset_contracts_belong_under"] == "datasets/midogpp/contract"
+    assert (
+        policy["new_derived_feature_caches_belong_under"]
+        == "datasets/midogpp/derived/features"
+    )
+    assert "new_outputs_belong_under" not in policy
+
+
+def test_workspace_rejects_canonical_dataset_contract_outside_dataset_root() -> None:
+    source = MidogppWorkspace.load()
+    catalog = deepcopy(source.catalog_payload)
+    entry = next(
+        item
+        for item in catalog["artifacts"]
+        if item["artifact_id"] == "midogpp_dataset_contract_annotation_patch_v1"
+    )
+    entry["canonical_path"] = "artifacts/midogpp/10_real_feature_reference/test_contract"
+    unsafe = MidogppWorkspace(
+        repo_root=source.repo_root,
+        registry=source.registry_payload,
+        catalog=catalog,
+        workspace=source.workspace_payload,
+        protocol_defaults=source.protocol_defaults_payload,
+    )
+
+    with pytest.raises(
+        WorkspaceError,
+        match="canonical dataset contract escapes datasets/midogpp/contract",
+    ):
+        unsafe.validate()
+
+
+def test_workspace_rejects_canonical_derived_cache_outside_dataset_root() -> None:
+    source = MidogppWorkspace.load()
+    catalog = deepcopy(source.catalog_payload)
+    entry = next(
+        item
+        for item in catalog["artifacts"]
+        if item["artifact_id"] == "midogpp_virchow2_xyxy_feature_cache_seed42"
+    )
+    entry["canonical_path"] = "artifacts/midogpp/10_real_feature_reference/test_cache"
+    unsafe = MidogppWorkspace(
+        repo_root=source.repo_root,
+        registry=source.registry_payload,
+        catalog=catalog,
+        workspace=source.workspace_payload,
+        protocol_defaults=source.protocol_defaults_payload,
+    )
+
+    with pytest.raises(
+        WorkspaceError,
+        match="canonical derived feature escapes datasets/midogpp/derived/features",
+    ):
+        unsafe.validate()
+
+
 def test_repository_experiments_tree_is_declarative_only() -> None:
     workspace = MidogppWorkspace.load()
 
@@ -167,7 +228,10 @@ def test_prepare_writes_resolved_snapshot_for_argument_driven_runner(tmp_path: P
     ]
     catalog = deepcopy(source.catalog_payload)
     contract_root = tmp_path / "contract"
-    feature_root = tmp_path / "feature_cache"
+    feature_root = (
+        tmp_path
+        / "datasets/midogpp/derived/features/virchow2/annotation_patch_xyxy/seed42"
+    )
     contract_root.mkdir()
     (feature_root / "embeddings").mkdir(parents=True)
     (contract_root / "manifest.csv").write_text("sample_id\n", encoding="utf-8")
@@ -399,7 +463,10 @@ def test_prepare_rejects_expected_file_hash_mismatch_before_writing(tmp_path: Pa
     ]
     catalog = deepcopy(source.catalog_payload)
     contract_root = tmp_path / "contract"
-    feature_root = tmp_path / "feature"
+    feature_root = (
+        tmp_path
+        / "datasets/midogpp/derived/features/virchow2/annotation_patch_xyxy/seed42"
+    )
     contract_root.mkdir()
     (feature_root / "embeddings").mkdir(parents=True)
     (contract_root / "manifest.csv").write_bytes(b"changed")

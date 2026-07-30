@@ -5,6 +5,12 @@ artifact catalog, and shared protocol defaults. Reusable implementation lives
 only under `src/midogpp_thesis/`; generated evidence lives only under
 `artifacts/midogpp/`.
 
+Generated experiment evidence and canonical run outputs are distinct from
+reusable data inputs. Frozen dataset contracts remain under
+`datasets/midogpp/contract/`, and derived feature caches remain under
+`datasets/midogpp/derived/features/`; both are consumed through cataloged
+`artifact://` references.
+
 The stage order makes the claim boundary explicit:
 
 1. `10_real_feature_reference`

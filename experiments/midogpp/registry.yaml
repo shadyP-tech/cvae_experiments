@@ -317,6 +317,110 @@ experiments:
       - Gamma is selected separately per outer center using source-inner center LODO only.
       - The output is a standalone non-adoptive real-feature diagnostic and cannot feed Stage 20 or later selection.
 
+  - experiment_id: midogpp.real_feature.physical_multiscale_center_pooling_pilot.v1
+    stage: 10_real_feature_reference
+    status: planned
+    claim_scope: real_feature_transfer_only
+    config_path: experiments/midogpp/stages/10_real_feature_reference/configs/physical_multiscale_center_pooling_pilot_v1.yaml
+    output_artifact_id: midogpp_output_real_feature_physical_multiscale_center_pooling_pilot_v1
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_dataset_contract_physical_multiscale_center_pooling_pilot_v1
+      - midogpp_virchow2_xyxy_feature_cache_seed42
+      - midogpp_virchow2_jpeg_center_pooling_3840_seed42
+      - midogpp_virchow2_physical_multiscale_center_pooling_11520_seed42
+      - midogpp_output_eligible_tuned_real_reference_v2
+    input_claim_scope_exceptions:
+      midogpp_output_eligible_tuned_real_reference_v2: Protocol review requires this frozen Stage-10 output only as the exact canonical-A replay comparator; it is not a selection candidate or upstream claim.
+    runner:
+      environment:
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - real-feature-classifier
+        - physical-multiscale-center-pooling-pilot
+        - --config
+        - "{resolved_config}"
+    notes:
+      - Non-runnable historical plan; the xai-master geometry audit failed before any contract, cache, or Stage-10 run was created.
+      - Failure evidence is retained only as midogpp_physical_multiscale_center_pooling_v1_failed_geometry_audit.
+      - Do not activate, resume, or repoint this v1 entry.
+
+  - experiment_id: midogpp.real_feature.physical_multiscale_annotation_local_pooling_pilot.v2
+    stage: 10_real_feature_reference
+    status: planned
+    claim_scope: real_feature_transfer_only
+    config_path: experiments/midogpp/stages/10_real_feature_reference/configs/physical_multiscale_annotation_local_pooling_pilot_v2.yaml
+    output_artifact_id: midogpp_output_real_feature_physical_multiscale_annotation_local_pooling_pilot_v2
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_dataset_contract_physical_multiscale_annotation_local_pooling_pilot_v2
+      - midogpp_virchow2_xyxy_feature_cache_seed42
+      - midogpp_virchow2_annotation_local_pooling_bc_bundle_seed42_v2
+      - midogpp_virchow2_annotation_jpeg_fixed_center_pooling_3840_v2_seed42
+      - midogpp_virchow2_physical_multiscale_annotation_local_pooling_11520_v2_seed42
+      - midogpp_output_eligible_tuned_real_reference_v2
+    input_claim_scope_exceptions:
+      midogpp_output_eligible_tuned_real_reference_v2: Frozen Stage-10 output is used only as the exact canonical-A replay comparator; it is not a selection candidate or upstream claim.
+    runner:
+      environment:
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - real-feature-classifier
+        - physical-multiscale-annotation-local-pooling-pilot
+        - --config
+        - "{resolved_config}"
+    notes:
+      - Non-runnable historical plan; the xai-master geometry audit failed before any v2 contract, cache, or Stage-10 run was created.
+      - Failure evidence is retained only as midogpp_physical_multiscale_annotation_local_pooling_v2_failed_geometry_audit.
+      - Do not activate, resume, or repoint this v2 entry.
+
+  - experiment_id: midogpp.real_feature.physical_multiscale_clipped_bbox_annotation_local_pooling_pilot.v3
+    stage: 10_real_feature_reference
+    status: diagnostic
+    claim_scope: real_feature_transfer_only
+    config_path: experiments/midogpp/stages/10_real_feature_reference/configs/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3.yaml
+    output_artifact_id: midogpp_output_real_feature_physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_dataset_contract_physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3
+      - midogpp_virchow2_xyxy_feature_cache_seed42
+      - midogpp_virchow2_clipped_bbox_annotation_local_pooling_bc_bundle_seed42_v3
+      - midogpp_virchow2_annotation_jpeg_fixed_center_pooling_3840_v3_seed42
+      - midogpp_virchow2_physical_multiscale_clipped_bbox_annotation_local_pooling_11520_v3_seed42
+      - midogpp_output_eligible_tuned_real_reference_v2
+    input_claim_scope_exceptions:
+      midogpp_output_eligible_tuned_real_reference_v2: Frozen Stage-10 output is used only as the exact canonical-A replay comparator; it is not a selection candidate or upstream claim.
+    runner:
+      environment:
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - real-feature-classifier
+        - physical-multiscale-annotation-local-pooling-pilot
+        - --config
+        - "{resolved_config}"
+    notes:
+      - Diagnostic activation followed the clipped-bbox workstation audit, atomic contract/cache publication, independent validation, complete expected-hash promotion, and reviewer approval.
+      - The run remains non-adoptive and cannot revise the frozen reference, representation recipe, or any downstream stage.
+      - The maximum claim is performance of the complete nested representation-plus-classifier diagnostic; no Stage-20-through-70 reuse is allowed.
+
   - experiment_id: midogpp.real_feature.signal_controls.v1
     stage: 10_real_feature_reference
     status: diagnostic
@@ -461,6 +565,67 @@ experiments:
         - --artifact-root
         - output://midogpp_output_cvae_task_fisher_shrinkage_source_inner_v2
 
+  - experiment_id: midogpp.cvae.aggregate_posterior_mixture_geco_source_inner.v3
+    stage: 20_cvae_preservation
+    status: active
+    claim_scope: cvae_source_inner_study_only
+    config_path: experiments/midogpp/stages/20_cvae_preservation/configs/aggregate_posterior_mixture_geco_source_inner_v3.yaml
+    output_artifact_id: midogpp_output_cvae_aggregate_posterior_mixture_geco_source_inner_v3
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_xyxy_feature_cache_seed42
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-preservation
+        - source-inner-aggregate-posterior-mixture-geco
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_cvae_aggregate_posterior_mixture_geco_source_inner_v3
+    notes:
+      - Trains every candidate CVAE, PCA frame, aggregate prior, and GECO target on exactly one source center.
+      - This is a non-consumable source-inner study; even a positive result requires a separate validated promotion artifact before Stage 30 may change.
+
+  - experiment_id: midogpp.cvae.uniform_b_geco_task_geometry_source_inner.v1
+    stage: 20_cvae_preservation
+    status: active
+    claim_scope: cvae_source_inner_study_only
+    config_path: experiments/midogpp/stages/20_cvae_preservation/configs/uniform_b_geco_task_geometry_source_inner_v1.yaml
+    output_artifact_id: midogpp_output_cvae_uniform_b_geco_task_geometry_source_inner_v1
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_uniform_b_canonical_train_cache_seed42
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-preservation
+        - source-inner-uniform-b-geco-task-geometry
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_cvae_uniform_b_geco_task_geometry_source_inner_v1
+    notes:
+      - Uses only the canonical 3,840-D Uniform-B cache; Stage-90 snapshots and the v3 aggregate-mixture output are forbidden inputs.
+      - BF/BG/BM/BT remain a non-consumable source-inner mechanism study with equal-total and expanded-budget composition controls.
+      - Even a positive result cannot change a RecipeLock or enter Stage 30 without a separate protocol-reviewed promotion artifact.
+
   - experiment_id: midogpp.cvae.prior_recovery_outer.v1
     stage: 20_cvae_preservation
     status: active
@@ -566,3 +731,62 @@ experiments:
         - "raise SystemExit('PLANNED: provenance-clean expert-bank runner is not registered yet')"
     notes:
       - This replaces the rejected dense-late legacy bank; it is not runnable until its protocol-reviewed runner exists.
+
+  - experiment_id: midogpp.oracle.uniform_b_paired_reparameterization_snapshot.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_paired_reparameterization_snapshot_v1.yaml
+    output_artifact_id: midogpp_stage90_uniform_b_paired_reparameterization_snapshot_v1
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_uniform_b_canonical_train_cache_seed42
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - build-b-paired-reparameterization-snapshot
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_stage90_uniform_b_paired_reparameterization_snapshot_v1
+    notes:
+      - Builds a portable Stage-90 replay snapshot from only the canonical contract and canonical-B train cache.
+      - Historical v2 provenance and digests are inert config strings and are not workspace artifact inputs.
+
+  - experiment_id: midogpp.oracle.uniform_b_paired_reparameterization_audit.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_paired_reparameterization_audit_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_paired_reparameterization_audit_v1
+    input_artifact_ids:
+      - midogpp_stage90_uniform_b_paired_reparameterization_snapshot_v1
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - b-paired-reparameterization-audit
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_paired_reparameterization_audit_v1
+    notes:
+      - Runs exactly 36 declared semantic replay keys over the immutable portable snapshot.
+      - Audit results remain diagnostic-only and cannot update Variant-B evidence or any selection policy.

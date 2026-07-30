@@ -22,6 +22,8 @@ Canonical configs are:
 - `configs/prior_recovery_source_inner_training_seed_stability_v1.yaml`
 - `configs/learned_conditional_prior_source_inner_v2.yaml`
 - `configs/task_fisher_shrinkage_source_inner_v2.yaml`
+- `configs/aggregate_posterior_mixture_geco_source_inner_v3.yaml`
+- `configs/uniform_b_geco_task_geometry_source_inner_v1.yaml`
 - `configs/prior_recovery_outer_v1.yaml`
 
 They use logical artifact IDs for the dataset contract, corrected `xyxy`
@@ -137,6 +139,111 @@ compatibility, generation, or downstream-utility inputs. Running either study
 does not alter the scalar v1 gate, the published training-seed consensus locks,
 outer v1, or the existing Stage-30 input edge.
 
+## Independent-Source Aggregate-Prior V3 Study
+
+`midogpp.cvae.aggregate_posterior_mixture_geco_source_inner.v3` is an isolated,
+non-adoptive response to the observed prior-posterior mismatch. Unlike both v2
+mechanism studies, it does not train one pooled CVAE per `(H,I)` cell. It
+trains each candidate expert, scaler, PCA frame, GECO target, and latent prior
+from exactly one source center `E`, then reuses that content-addressed
+checkpoint only where `E` differs from both the outer target `H` and the inner
+pseudo-target `I`.
+
+The frozen four-arm panel is:
+
+| Arm | Prior | Training objective |
+| --- | --- | --- |
+| `SF` | standard normal | fixed beta |
+| `KF` | class-conditional `K=2`, `diag + UU^T`, rank-2 aggregate-posterior mixture | fixed beta |
+| `SG` | standard normal | GECO reconstruction constraint |
+| `KG` | the same aggregate-posterior mixture | GECO reconstruction constraint |
+
+All arms branch from one source-only standard-prior warmup and share the
+training schedule and posterior-noise stream. Mixture arms use deterministic
+source-aggregate coordinate updates: fit from all source posterior means and
+variances, freeze the prior while updating the encoder/decoder, refit every
+five epochs, and perform a final five-epoch frozen stabilization block. The
+mixture regularizer is the analytic variational upper bound
+
+```text
+-log sum_k pi_k exp(-KL(q || p_k))
+```
+
+formed before latent-dimension normalization. It is explicitly not an exact
+NELBO. GECO's target is derived only from the source warmup reconstruction and
+cannot use inner or outer data.
+
+Generation uses a fixed 256 samples per source and class with paired Gaussian
+noise and categorical uniforms. Each source-local PCA decode is inverse
+transformed into the common 2,560-dimensional Virchow2 frame before a
+synthetic-only classifier is fit and scored on real inner-center rows. Sources
+and inner centers receive equal weight; patch counts never weight the
+decision.
+
+Every prior-generated classifier row has a paired source-posterior
+reconstruction reference built from a deterministic, balanced source-only row
+sample and the same Gaussian noise. This is a diagnostic ceiling for the
+remaining prior-posterior classifier-utility gap, not a second generation
+method and not consumable evidence. `KG` must improve the prior-generated BACC
+over `SF`, avoid more than a 0.01 posterior-reference regression, and reduce
+the mean posterior-minus-prior BACC gap by at least 0.01. Thus a nominal BACC
+gain cannot pass if it merely damages the encoder/decoder path or leaves the
+measured mismatch unchanged.
+
+This implementation has `claim_scope=cvae_source_inner_study_only`. Its
+publication state is always non-consumable, even when all predeclared `KG`
+gates pass. A positive result can only request a separate protocol-reviewed
+promotion artifact; it cannot emit a `RecipeLock`, change current consensus
+locks, or enter Stage 30 directly.
+
+## Uniform-B GECO And Task-Geometry V1 Study
+
+`midogpp.cvae.uniform_b_geco_task_geometry_source_inner.v1` is the bounded
+follow-up to the v3 finding that the standard-normal GECO arm was directionally
+better while the `K=2` aggregate-posterior mixture should stop. It uses only the
+cataloged 3,840-dimensional Uniform-B cache and fits a fresh source-local
+96+32 block-PCA frame for every independent source expert. Stage-90 snapshots,
+the v3 result bundle, target support, and inner/outer rows are not training
+inputs.
+
+The four paired arms isolate fixed-beta (`BF`), GECO (`BG`), GECO plus
+class-conditional multi-scale MMD (`BM`), and GECO plus MMD with a combined
+smooth-margin-CDF and curvature-whitened logistic-gradient objective (`BT`).
+The task state is case-cross-fitted within one source center; every real
+reference row is scored by a frozen teacher that did not train on its case.
+The auxiliary acts on requested-class samples decoded from
+`z ~ Normal(0,I)`. It can improve the functional utility of prior samples, but
+it does not prove aggregate-posterior matching, posterior recovery, an exact
+NELBO, routing quality, or downstream synthetic utility.
+
+Generated data are evaluated in four fixed modes:
+
+| Mode | Per-class synthetic budget | Purpose |
+| --- | --- | --- |
+| `single_base` | `n` from one expert | single-expert baseline |
+| `single_budget_matched` | `K*n` from one expert | expanded-budget control |
+| `union_equal_total` | `n` split equally over `K` legal experts | equal-budget source-diversity contrast |
+| `union_expanded` | `n` from each legal expert | expanded equal-source union |
+
+All unions are generated-data concatenation with fixed design weights, never
+compatibility weighting or routing. Inner labels are used only for final BACC,
+macro-F1, and predeclared diversity safety diagnostics. The publication state
+is always `NON_CONSUMABLE_STUDY_COMPLETE` with `DO_NOT_PROMOTE`; a separate
+validated promotion experiment is required before any Stage-30–70 use.
+
+Run only through the registered workspace entry:
+
+```bash
+conda run -n thesis python -m midogpp_thesis workspace run \
+  midogpp.cvae.uniform_b_geco_task_geometry_source_inner.v1
+```
+
+The canonical destination is:
+
+```text
+artifacts/midogpp/20_cvae_preservation/uniform_b_geco_task_geometry_source_inner_v1/seeds17_42_101/
+```
+
 PCA128 is one fixed, source-fit preprocessing step per fold, not another
 hyperparameter sweep. Exact protocol keys cache each fitted frame. CVAE
 checkpoints are persisted incrementally under exact training-key sidecars, so
@@ -208,6 +315,25 @@ Status: `IMPLEMENTED AND REGISTERED, NOT YET PRODUCTION-RUN`. Do not infer a
 mechanism result until a complete canonical bundle passes its own validator.
 Neither run is a prerequisite for proceeding with the already frozen Stage-30
 consensus locks.
+
+Run the independent-source v3 study separately:
+
+```bash
+conda run -n thesis python -m midogpp_thesis workspace prepare \
+  midogpp.cvae.aggregate_posterior_mixture_geco_source_inner.v3
+conda run -n thesis python -m midogpp_thesis workspace run \
+  midogpp.cvae.aggregate_posterior_mixture_geco_source_inner.v3
+```
+
+Its canonical destination is:
+
+```text
+artifacts/midogpp/20_cvae_preservation/aggregate_posterior_mixture_geco_source_inner_v3/seeds17_42_101/
+```
+
+Status: `IMPLEMENTED AND REGISTERED, NOT PRODUCTION-RUN`. Do not interpret a
+mechanism effect until the complete independent-source matrix and its
+fail-closed validator pass.
 
 Independently of the stability run, only when the scalar source-inner bundle
 validates with `factorial_triggered=true` run:

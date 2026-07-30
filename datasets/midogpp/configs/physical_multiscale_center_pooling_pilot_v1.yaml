@@ -1,0 +1,48 @@
+artifact:
+  name: physical_multiscale_center_pooling_pilot_v1
+
+inputs:
+  raw_root: artifact://midogpp_raw_tiff_source_v1
+  raw_metadata_path: artifact://midogpp_raw_tiff_source_v1/midogpp_scanner_metadata_full_resplit.csv
+  base_manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  canonical_cache_path: artifact://midogpp_virchow2_xyxy_feature_cache_seed42/embeddings/train.pt
+  canonical_reference_root: artifact://midogpp_output_eligible_tuned_real_reference_v2
+
+outputs:
+  contract_root: datasets/midogpp/contract/physical_multiscale_center_pooling_pilot_v1
+  b_cache_root: datasets/midogpp/derived/features/virchow2/annotation_patch_xyxy_jpeg_center_pooling_3840/seed42
+  c_cache_root: datasets/midogpp/derived/features/virchow2/physical_multiscale_center_pooling_11520/seed42
+
+physical_scale:
+  fov_um: [28.0, 56.0, 112.0]
+  mpp_min: 0.15
+  mpp_max: 0.40
+  anisotropy_relative_max: 0.01
+  dual_source_relative_max: 0.01
+
+geometry:
+  padding_fraction_max: 0.10
+  padding_rgb: [255, 255, 255]
+  resize_interpolation: bicubic
+  resize_antialias: true
+
+bridge:
+  minimum_cosine: 0.99999
+  maximum_relative_l2: 0.001
+  minimum_prediction_agreement: 0.999
+  maximum_absolute_equal_center_bacc_delta: 0.001
+
+model:
+  model_ref: hf-hub:paige-ai/Virchow2
+  model_revision: 3158645804b69e3f3bc4439d4116edddf0840a72
+  expected_model_config_sha256: 7db445b996bb165e88fe70e826c2ebb530539a2b1d136aa16eeb847df5f1e3db
+  expected_checkpoint_file_sha256: 8d6cea947eb2418c3b0dff48cfb9b238e47744ab0dfca21b2b0637b140769b4b
+  expected_state_dict_sha256: 91084959869cb53bf76e5038e5dc8a8ddc1ef8359a886fa22c19b4e8c62e112a
+  expected_preprocessing_config_hash: 4fb7d9ab76d1da72
+
+run:
+  eligible_centers: ["0", "1", "2", "3", "5", "6", "7", "8", "9"]
+  experiment_seed: 42
+  device: cuda
+  batch_size: 32
+  require_tiled_reader: true

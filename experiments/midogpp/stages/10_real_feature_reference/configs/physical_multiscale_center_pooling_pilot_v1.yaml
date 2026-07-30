@@ -1,0 +1,104 @@
+experiment:
+  name: physical_multiscale_center_pooling_pilot_v1
+  artifact_root: output://midogpp_output_real_feature_physical_multiscale_center_pooling_pilot_v1
+
+inputs:
+  base_manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  physical_contract_root: artifact://midogpp_dataset_contract_physical_multiscale_center_pooling_pilot_v1
+  canonical_a_cache_path: artifact://midogpp_virchow2_xyxy_feature_cache_seed42/embeddings/train.pt
+  b_cache_root: artifact://midogpp_virchow2_jpeg_center_pooling_3840_seed42
+  c_cache_root: artifact://midogpp_virchow2_physical_multiscale_center_pooling_11520_seed42
+  canonical_reference_root: artifact://midogpp_output_eligible_tuned_real_reference_v2
+  split: train
+
+representations:
+  canonical_a:
+    feature_dim: 2560
+    source: canonical corrected-xyxy JPEG Virchow2 CLS plus global patch mean
+  jpeg_center_b:
+    feature_dim: 3840
+    source: exact canonical JPEG preprocessing plus center 4x4 patch-token mean
+  physical_multiscale_center_c:
+    feature_dim: 11520
+    source: 28um, 56um, and 112um raw-TIFF crops with CLS, global, and center pooling
+
+run:
+  experiment_seed: 42
+  classifier_seed: 23
+  heldout_centers: ["0", "1", "2", "3", "5", "6", "7", "8", "9"]
+  expected_selector_cells: 2160
+  expected_candidate_summaries: 270
+  allow_partial_test_coverage: false
+
+classifier_grid:
+  expected_candidate_count: 10
+  expected_grid_hash: 5abd0897d02bdcaa
+  expected_representation_candidate_count: 30
+  expected_representation_candidate_hash: b572cc680b088ecd
+  c_grid: [0.01, 0.1, 1.0, 10.0, 100.0]
+  penalty: l2
+  solver: lbfgs
+  class_weight: [none, balanced]
+  max_iter: [5000]
+  threshold_policy: predict
+  literal_candidate_ids:
+    - canonical_a:86378e6ceb12136e
+    - canonical_a:878e04f48c4f8c04
+    - canonical_a:95df03a03d14f83c
+    - canonical_a:0fdbc3aa3f8545ad
+    - canonical_a:169007a09ed77d62
+    - canonical_a:0a887a5ae7b095a2
+    - canonical_a:ef05fe942e401f85
+    - canonical_a:c04c93b8a28f32da
+    - canonical_a:6bdd36690891dfc3
+    - canonical_a:6fae00a91ffee06b
+    - jpeg_center_b:86378e6ceb12136e
+    - jpeg_center_b:878e04f48c4f8c04
+    - jpeg_center_b:95df03a03d14f83c
+    - jpeg_center_b:0fdbc3aa3f8545ad
+    - jpeg_center_b:169007a09ed77d62
+    - jpeg_center_b:0a887a5ae7b095a2
+    - jpeg_center_b:ef05fe942e401f85
+    - jpeg_center_b:c04c93b8a28f32da
+    - jpeg_center_b:6bdd36690891dfc3
+    - jpeg_center_b:6fae00a91ffee06b
+    - physical_multiscale_center_c:86378e6ceb12136e
+    - physical_multiscale_center_c:878e04f48c4f8c04
+    - physical_multiscale_center_c:95df03a03d14f83c
+    - physical_multiscale_center_c:0fdbc3aa3f8545ad
+    - physical_multiscale_center_c:169007a09ed77d62
+    - physical_multiscale_center_c:0a887a5ae7b095a2
+    - physical_multiscale_center_c:ef05fe942e401f85
+    - physical_multiscale_center_c:c04c93b8a28f32da
+    - physical_multiscale_center_c:6bdd36690891dfc3
+    - physical_multiscale_center_c:6fae00a91ffee06b
+
+representation_gate:
+  mean_delta_min: 0.02
+  strict_win_delta_min: 1.0e-12
+  strict_win_count_min: 6
+  worst_delta_min: -0.01
+  fallback: canonical_a
+
+bootstrap:
+  seed: 42
+  valid_replicates: 2000
+  max_attempts: 20000
+  resampling_unit: evaluation_case_within_center
+  interval_role: conditional_on_fixed_fits_and_locked_selection
+
+claim_boundary:
+  claim_scope: real_feature_transfer_only
+  diagnostic_only: true
+  non_adoptive: true
+  may_feed_recipe_selection: false
+  may_feed_deployable_selection: false
+  target_evaluation_labels_used_for_selection: false
+  target_evaluation_labels_used_for_scoring_only: true
+  uses_cvae: false
+  uses_nelbo: false
+  uses_router: false
+  performs_aggregation: false
+  allowed: diagnostic performance of the complete nested adaptive representation pipeline
+  forbidden: representation-only, probabilistic, calibration, new-center, NELBO, deployment, routing, CVAE preservation, or Stage-20-through-70 claims
+

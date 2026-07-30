@@ -3,6 +3,7 @@ import csv
 import json
 
 import numpy as np
+import pytest
 
 from midogpp_thesis.real_features.classifier_reference.classifiers import ClassifierSpec
 from midogpp_thesis.real_features.classifier_reference.protocol import ProtocolError
@@ -123,6 +124,70 @@ def test_midogpp_real_feature_cache_alignment_rejects_label_mismatch(tmp_path: P
         raise AssertionError("cache/manifest label mismatch was accepted")
 
 
+def test_real_feature_frame_allows_only_excluded_center_cache_omission(
+    tmp_path: Path,
+) -> None:
+    manifest, cache = _write_midogpp_real_feature_fixture(tmp_path)
+    with manifest.open("a", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=(
+                "sample_id",
+                "case_id",
+                "image_path",
+                "label",
+                "split",
+                "center",
+            ),
+        )
+        writer.writerow(
+            {
+                "sample_id": "excluded-center-4",
+                "case_id": "excluded-center-4",
+                "image_path": "excluded-center-4.png",
+                "label": "0",
+                "split": "train",
+                "center": "4",
+            }
+        )
+
+    with pytest.raises(ProtocolError, match="missing train manifest"):
+        load_midogpp_real_feature_frame(
+            manifest_path=manifest,
+            feature_cache_path=cache,
+            expected_feature_dim=4,
+        )
+    frame = load_midogpp_real_feature_frame(
+        manifest_path=manifest,
+        feature_cache_path=cache,
+        expected_feature_dim=4,
+        allow_excluded_center_omission=True,
+    )
+    assert {row.center for row in frame.rows} == {"0", "1", "2"}
+
+
+def test_real_feature_frame_never_allows_eligible_center_cache_omission(
+    tmp_path: Path,
+) -> None:
+    manifest, cache = _write_midogpp_real_feature_fixture(tmp_path)
+    payload = np.load(cache, allow_pickle=False)
+    metadata = json.loads(str(payload["metadata_json"].item()))
+    np.savez(
+        cache,
+        embeddings=payload["embeddings"][:-1],
+        metadata_json=json.dumps(metadata[:-1], sort_keys=True),
+        feature_extractor_json=str(payload["feature_extractor_json"].item()),
+    )
+
+    with pytest.raises(ProtocolError, match="missing train manifest"):
+        load_midogpp_real_feature_frame(
+            manifest_path=manifest,
+            feature_cache_path=cache,
+            expected_feature_dim=4,
+            allow_excluded_center_omission=True,
+        )
+
+
 def test_midogpp_real_feature_folds_require_both_classes(tmp_path: Path) -> None:
     manifest, cache = _write_midogpp_real_feature_fixture(tmp_path, center2_single_class=True)
     frame = load_midogpp_real_feature_frame(
@@ -165,6 +230,8 @@ def test_real_feature_cli_help_exposes_registered_diagnostics() -> None:
         "matched-reference",
         "fixed-c-risk-diagnostic",
         "conditional-logit-alignment",
+        "physical-multiscale-center-pooling-pilot",
+        "physical-multiscale-annotation-local-pooling-pilot",
     }
 
 

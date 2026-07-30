@@ -37,6 +37,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run the nested conditional-logit alignment diagnostic.",
     )
     alignment.add_argument("--config", required=True)
+    physical_multiscale = subparsers.add_parser(
+        "physical-multiscale-center-pooling-pilot",
+        help="Run the locked non-adoptive physical-multiscale representation pilot.",
+    )
+    physical_multiscale.add_argument("--config", required=True)
+    annotation_local = subparsers.add_parser(
+        "physical-multiscale-annotation-local-pooling-pilot",
+        help="Run a locked versioned annotation-local representation pilot.",
+    )
+    annotation_local.add_argument("--config", required=True)
     return parser
 
 
@@ -73,6 +83,19 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_conditional_logit_alignment_config(args.config)
         output = run_conditional_logit_alignment(config)
+        print(output)
+        return 0
+    if args.surface in {
+        "physical-multiscale-center-pooling-pilot",
+        "physical-multiscale-annotation-local-pooling-pilot",
+    }:
+        from .physical_multiscale_center_pooling import (
+            load_physical_multiscale_pilot_config,
+            run_physical_multiscale_center_pooling_pilot,
+        )
+
+        config = load_physical_multiscale_pilot_config(args.config)
+        output = run_physical_multiscale_center_pooling_pilot(config)
         print(output)
         return 0
     if args.preflight_only:

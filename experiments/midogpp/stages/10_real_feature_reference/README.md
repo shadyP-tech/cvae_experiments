@@ -18,10 +18,16 @@ Current canonical definitions:
 - `configs/eligible_tuned_real_reference_v2.yaml`
 - `configs/fixed_c_risk_diagnostic_v1.yaml`
 - `configs/conditional_logit_alignment_v1.yaml`
+- `configs/physical_multiscale_center_pooling_pilot_v1.yaml`
+- `configs/physical_multiscale_annotation_local_pooling_pilot_v2.yaml`
+- `configs/physical_multiscale_clipped_bbox_annotation_local_pooling_pilot_v3.yaml`
 - registry entry `midogpp.real_feature.tuned_classifier.seed42`
 - registry entry `midogpp.real_feature.eligible_tuned_predict_reference.v2`
 - registry entry `midogpp.real_feature.fixed_c_risk_diagnostic.v1`
 - registry entry `midogpp.real_feature.conditional_logit_alignment.v1`
+- registry entry `midogpp.real_feature.physical_multiscale_center_pooling_pilot.v1`
+- registry entry `midogpp.real_feature.physical_multiscale_annotation_local_pooling_pilot.v2`
+- registry entry `midogpp.real_feature.physical_multiscale_clipped_bbox_annotation_local_pooling_pilot.v3`
 - registry entry `midogpp.real_feature.signal_controls.v1`
 - registry entry `midogpp.real_feature.multiaxis.v1`
 
@@ -180,3 +186,75 @@ of this source-inner-selected pooled real-feature regularizer against its
 replacing the canonical matched denominator. It establishes no CVAE,
 generation, expert-compatibility, routing, composition, or synthetic-utility
 claim. No metric or result exists until the complete bundle validates.
+
+## Physical Multiscale Center-Pooling Pilot v1
+
+This historical, non-adoptive plan compares three frozen source-only
+representations: canonical A (2,560 dimensions), JPEG center-aware B (3,840
+dimensions), and physical multiscale center-aware C (11,520 dimensions).
+Physical crops use 28, 56, and 112 micrometer fields of view after a
+fail-closed TIFF-resolution audit.
+
+For each outer center `H`, the runner opens only the other eight center shards.
+It evaluates the literal ordered `3 representations x 10 classifier specs x 8
+inner centers = 240` selector cells, yielding 2,160 cells and 270 candidate
+summaries across all nine `H`. One immutable decision lock per `H` is written
+and reloaded before the held-out shard is opened. A candidate replaces A only
+when its source-inner BACC delta has mean at least `+0.02`, at least six strict
+wins, and no loss below `-0.01`; otherwise the policy falls back exactly to A.
+
+The registry status remains `planned`, but the entry is permanently
+audit-blocked: 986 of 9,648 rows exceeded the frozen padding cap before any
+contract, cache, or Stage-10 run existed. Do not execute, activate, resume, or
+repoint the following historical commands:
+
+```bash
+conda run -n thesis python -m midogpp_thesis workspace prepare \
+  midogpp.real_feature.physical_multiscale_center_pooling_pilot.v1
+conda run -n thesis python -m midogpp_thesis workspace run \
+  midogpp.real_feature.physical_multiscale_center_pooling_pilot.v1
+```
+
+The maximum claim is diagnostic performance of the complete nested adaptive
+pipeline. Exact canonical-A replay is mandatory. Target labels are scoring-only,
+all other candidate scores are isolated as posthoc rows, and neither decisions
+nor output may feed Stage 20 through Stage 70. No representation, calibration,
+probabilistic, NELBO, CVAE, routing, deployment, or new-center claim is allowed.
+The runner writes a pending bundle first; protocol and leakage manifests become
+`PASS` only after the independent validator reconstructs selector decisions,
+locks, bootstrap output, summaries, and every content-index member.
+
+## Physical Multiscale Clipped-Bbox Annotation-Local Pilot v3
+
+V3 is the clean current lineage. It clips each continuous half-open annotation
+bbox to the audited image, requires retained area fraction at least `0.25`,
+uses the clipped-bbox centroid as the anchor, translates each physical crop to
+the nearest wholly in-bounds square, and maps the anchor to the Virchow2 4x4
+token window with `clamp(floor(16*p-2),0,12)`. Invalid geometry aborts the
+complete build; it never filters rows.
+
+The 2026-07-23 `xai-master` audit passes 9,648 rows and 216 TIFFs. It records 84
+clipped boxes, no excluded rows, and no padded or synthesized pixels. This is
+Stage-90 audit evidence only. The v3 contract and atomic B/C cache bundle are
+now workstation-built, independently validated, and fully hash-promoted. No
+Stage-10 result exists yet.
+
+The distinct v3 profile keeps the unchanged ten-spec classifier grid and
+equal-center BACC decision rule. Its frozen 30-candidate hash is
+`2f651b2f8bd53c1a`. Any future result is evidence only for the complete
+clipped-bbox-anchor, shifted-in-bounds, multiscale annotation-local
+representation-plus-classifier pipeline; it cannot isolate anchor, scale,
+pooling, crop, or classifier effects.
+
+The reviewed `diagnostic` activation is complete. The registered non-adoptive
+run surface is:
+
+```bash
+conda run -n thesis python -m midogpp_thesis workspace run \
+  midogpp.real_feature.physical_multiscale_clipped_bbox_annotation_local_pooling_pilot.v3
+```
+
+`workspace run` performs the frozen prepare step itself. Do not add `--force`
+for the first run. The v3 contract, caches, and output are forbidden from Stage
+20 through Stage 70 and have no CVAE, likelihood, NELBO, mixture, expert,
+routing, generation, deployment, calibration, or new-center interpretation.

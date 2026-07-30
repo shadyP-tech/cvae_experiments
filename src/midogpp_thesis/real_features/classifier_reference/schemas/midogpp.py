@@ -13,15 +13,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
+from midogpp_thesis.common.midogpp import (
+    MIDOGPP_ELIGIBLE_CENTERS,
+    MIDOGPP_EXCLUDED_CENTERS,
+)
+
 from ..protocol import ProtocolError
 from . import DIAGNOSTIC_ONLY, SELECTION_ELIGIBLE
 
 MIDOGPP_DATASET_NAME = "midogpp"
 MIDOGPP_DOMAIN_KEY = "center"
 MIDOGPP_MATRIX_SCHEMA_VERSION = "midogpp_all_candidate_downstream_matrix_v1"
-MIDOGPP_ELIGIBLE_CENTERS = ("0", "1", "2", "3", "5", "6", "7", "8", "9")
-MIDOGPP_EXCLUDED_CENTERS = ("4",)
-
 NO_SUPPORT_SIZE = 0
 NO_SUPPORT_SEED = "none"
 NO_SUPPORT_SET_ID = "none"
