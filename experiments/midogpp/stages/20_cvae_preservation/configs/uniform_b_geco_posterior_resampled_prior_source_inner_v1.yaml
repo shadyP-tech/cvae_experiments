@@ -1,0 +1,101 @@
+experiment:
+  name: virchow2_cvae_midogpp_uniform_b_geco_posterior_resampled_prior_source_inner_v1
+  mode: uniform_b_geco_posterior_resampled_prior_source_inner_study
+  study_version: v1
+  artifact_root: output://midogpp_output_cvae_uniform_b_geco_posterior_resampled_prior_source_inner_v1
+  code_version: uniform_b_geco_posterior_resampled_prior_source_inner_v1
+
+inputs:
+  manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  feature_cache_path: artifact://midogpp_virchow2_uniform_b_canonical_train_cache_seed42/embeddings/train.pt
+  feature_cache_artifact_id: midogpp_virchow2_uniform_b_canonical_train_cache_seed42
+  expected_feature_cache_hash: 1ed7602f225c592a6f8103b24ebfc93f72dc6d5d0c27565566a8b2260783d1dc
+
+run:
+  heldout_centers: all
+  expected_feature_dim: 3840
+  training_seeds: [17, 42, 101]
+  generation_seeds: [17, 42, 101]
+  device: cuda:0
+
+model:
+  training_arm: BG
+  priors: [P0, Pq]
+  block_frame: b_block_pca96_32
+  pca_output_dim: 128
+  hidden_dim: 512
+  latent_dim: 32
+  batch_size: 128
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  beta_final: 0.001
+  gradient_clip_norm: 5.0
+  warmup_steps: 250
+  total_steps: 1000
+
+geco:
+  target_policy: source_warmup_mean_mse_times_slack
+  target_slack: 1.05
+  ema_decay: 0.99
+  dual_step_size: 0.001
+  initial_multiplier: 1.0
+  minimum_multiplier: 0.000001
+  maximum_multiplier: 1000000.0
+  target_uses_inner_or_outer_data: false
+
+posterior_ratio:
+  family: class_conditional_diagonal_quadratic_logistic
+  features: [z, z_squared]
+  crossfit_folds: 3
+  classifier_c: 1.0
+  classifier_max_iter: 2000
+  lambda: 1.0
+  acceptance_floor: 0.05
+  proposal_multiplier: 8
+  min_crossfit_auc: 0.55
+  min_log_loss_gain: 0.01
+  min_acceptance_rate: 0.20
+  min_ess_ratio: 0.25
+  reliability_failure_policy: exact_p0_fallback
+  source_only: true
+
+generation:
+  base_per_class: 256
+  composition_mode: single_base
+  requested_class_law: balanced_uniform_binary
+  paired_candidate_bank: true
+  source_or_target_prevalence_used: false
+  generation_streams_include_outer_or_inner_identity: false
+  inverse_transform_to_common_uniform_b_3840: true
+
+classifier:
+  family: sklearn_logistic_regression
+  C: 1.0
+  penalty: l2
+  solver: lbfgs
+  max_iter: 2000
+  seed: 23
+  scaler_fit: synthetic_train_only
+
+diversity_gates:
+  min_effective_rank_ratio: 0.25
+  min_pairwise_distance_ratio: 0.25
+  max_pairwise_distance_ratio: 4.0
+  candidate_specific: true
+
+decision_gates:
+  primary_contrast: Pq_minus_P0
+  max_source_mean_regression: 0.005
+  unique_score_reuse_required: true
+
+claim_boundary:
+  claim_scope: cvae_source_inner_study_only
+  allowed: held-out-inner P0-versus-Pq prior-TSTR mechanism evidence only
+  forbidden: recipe adoption, expert-bank input, routing, compatibility, expert selection, NELBO evidence, or downstream utility
+  inner_labels_scoring_only: true
+  target_support_labels_for_selection: false
+  fresh_bg_training_required: true
+  existing_checkpoint_input_allowed: false
+  may_feed_recipe_selection: false
+  may_feed_deployable_selection: false
+  separate_promotion_artifact_required: true
