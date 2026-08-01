@@ -1592,6 +1592,51 @@ artifacts:
       - Equal-source unions are fixed generated-data concatenations with explicit total-budget controls, not routing or compatibility.
       - The task term optimizes prior-sample source geometry and does not establish latent posterior recovery or an exact NELBO.
 
+  - artifact_id: midogpp_output_cvae_uniform_b_geco_posterior_resampled_prior_source_inner_v1
+    stage: 20_cvae_preservation
+    canonical_path: artifacts/midogpp/20_cvae_preservation/uniform_b_geco_posterior_resampled_prior_source_inner_v1/seeds17_42_101
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: TODO_RUN_ARTIFACT
+    claim_scope: cvae_source_inner_study_only
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/protocol_manifest.json
+      - manifests/coverage_manifest.json
+      - manifests/frame_index.json
+      - manifests/checkpoint_index.json
+      - manifests/posterior_ratio_state_index.json
+      - manifests/score_reuse_mapping.json
+      - manifests/generation_budget_manifest.json
+      - reports/run_state.json
+      - reports/leakage_report.json
+      - reports/study_decision.json
+      - reports/publication_state.json
+      - reports/runtime_summary.json
+      - reports/validation_report.json
+      - tables/unique_tstr_scores.csv
+      - tables/source_inner_metrics.csv
+      - tables/paired_deltas.csv
+      - tables/posterior_ratio_diagnostics.csv
+      - tables/generation_budget_audit.csv
+      - tables/identity_overlap_audit.csv
+      - tables/runtime_timings.csv
+    forbidden_reuse:
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Contains fresh BG checkpoints and source-only posterior-ratio states; it has no input edge from the completed task-geometry bundle.
+      - P0/Pq scores are unique by E/I/training seed/generation seed/prior and are mapped without recomputation to all legal outer centers.
+      - Even CANDIDATE_FOR_SEPARATE_PROMOTION remains non-consumable until a separate protocol-reviewed promotion artifact passes.
+
   - artifact_id: midogpp_output_cvae_prior_recovery_outer_v1
     stage: 20_cvae_preservation
     canonical_path: artifacts/midogpp/20_cvae_preservation/prior_recovery_outer_v1/seeds17_42_101

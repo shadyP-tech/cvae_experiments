@@ -628,6 +628,41 @@ experiments:
       - BF/BG/BM/BT remain a non-consumable source-inner mechanism study with equal-total and expanded-budget composition controls.
       - Even a positive result cannot change a RecipeLock or enter Stage 30 without a separate protocol-reviewed promotion artifact.
 
+  - experiment_id: midogpp.cvae.uniform_b_geco_posterior_resampled_prior_source_inner.v1
+    stage: 20_cvae_preservation
+    status: active
+    claim_scope: cvae_source_inner_study_only
+    config_path: experiments/midogpp/stages/20_cvae_preservation/configs/uniform_b_geco_posterior_resampled_prior_source_inner_v1.yaml
+    output_artifact_id: midogpp_output_cvae_uniform_b_geco_posterior_resampled_prior_source_inner_v1
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_uniform_b_canonical_train_cache_seed42
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        MIDOGPP_RESAMPLED_PRIOR_SCORING_WORKERS: "8"
+        MIDOGPP_RESAMPLED_PRIOR_TRAINING_DEVICES: "cuda:0,cuda:1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-preservation
+        - source-inner-uniform-b-geco-posterior-resampled-prior
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_cvae_uniform_b_geco_posterior_resampled_prior_source_inner_v1
+    notes:
+      - Retrains all 27 BG checkpoints from canonical source rows; the completed task-geometry artifact and its checkpoints are forbidden inputs.
+      - Fits class-conditional posterior-ratio states from source cases only and compares only P0 versus Pq in single-base mode.
+      - Scores each unique E/I/training-seed/generation-seed/prior key once, then maps the immutable score to the seven legal outer centers.
+      - Runtime uses one deterministic process per RTX A5000 and eight bounded CPU scoring workers; runtime controls do not change the scientific contract hash.
+      - A positive result is only a candidate for a separate promotion artifact and cannot directly feed Stage 30.
+
   - experiment_id: midogpp.cvae.prior_recovery_outer.v1
     stage: 20_cvae_preservation
     status: active
