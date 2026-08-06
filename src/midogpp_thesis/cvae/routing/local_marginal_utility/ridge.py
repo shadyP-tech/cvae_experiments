@@ -12,6 +12,9 @@ from ...protocol import ProtocolError
 
 DEFAULT_RIDGE_ALPHAS = (0.01, 0.1, 1.0, 10.0)
 PSD_RELATIVE_TOLERANCE = 1e-10
+_CONSTRUCTED_COVARIANCE_RELATIVE_SKEW_TOLERANCE = float(
+    4.0 * np.sqrt(np.finfo(np.float64).eps)
+)
 
 
 @dataclass(frozen=True)
@@ -57,10 +60,9 @@ class ClusterWeightedRidgeModel:
         standardized = (matrix - self.feature_mean) / self.feature_scale
         design = np.column_stack((np.ones(len(matrix), dtype=np.float64), standardized))
         covariance = design @ self.coefficient_covariance @ design.T
-        covariance = 0.5 * (covariance + covariance.T)
         if include_residual_variance:
             covariance += np.eye(len(matrix), dtype=np.float64) * self.residual_variance
-        covariance = validate_psd_covariance(
+        covariance = _validate_constructed_covariance(
             covariance, dimension=len(matrix), name="ridge prediction covariance"
         )
         mean = self.predict(matrix)
@@ -151,7 +153,10 @@ def fit_cluster_weighted_ridge(
     rhs = design.T @ (weights * response)
     try:
         theta = np.linalg.solve(normal, rhs)
-        inverse_normal = np.linalg.inv(normal)
+        bread = np.linalg.solve(
+            normal,
+            np.eye(normal.shape[0], dtype=np.float64),
+        )
     except np.linalg.LinAlgError as exc:
         raise ProtocolError("Ridge normal equations are singular.") from exc
     fitted = design @ theta
@@ -169,10 +174,10 @@ def fit_cluster_weighted_ridge(
         correction = float(n_clusters / (n_clusters - 1))
         if n_rows > rank:
             correction *= float((n_rows - 1) / (n_rows - rank))
-        covariance = correction * (inverse_normal @ meat @ inverse_normal)
+        covariance = correction * (bread @ meat @ bread.T)
     else:
-        covariance = residual_variance * (inverse_normal @ gram @ inverse_normal)
-    covariance = validate_psd_covariance(
+        covariance = residual_variance * (bread @ gram @ bread.T)
+    covariance = _validate_constructed_covariance(
         covariance,
         dimension=design.shape[1],
         name="ridge coefficient covariance",
@@ -381,6 +386,28 @@ def validate_psd_covariance(
         raise ProtocolError(f"{name} PSD projection is non-finite.")
     result.setflags(write=False)
     return result
+
+
+def _validate_constructed_covariance(
+    covariance: Sequence[Sequence[float]] | np.ndarray,
+    *,
+    dimension: int,
+    name: str,
+) -> np.ndarray:
+    """Project only bounded skew from an internally symmetric construction."""
+
+    matrix = np.asarray(covariance, dtype=np.float64)
+    if matrix.shape != (dimension, dimension) or not np.isfinite(matrix).all():
+        return validate_psd_covariance(matrix, dimension=dimension, name=name)
+    scale = max(
+        float(np.linalg.norm(matrix, ord="fro")),
+        np.finfo(np.float64).tiny,
+    )
+    relative_skew = float(np.linalg.norm(matrix - matrix.T, ord="fro") / scale)
+    if relative_skew > _CONSTRUCTED_COVARIANCE_RELATIVE_SKEW_TOLERANCE:
+        raise ProtocolError(f"{name} numerical asymmetry exceeds roundoff tolerance.")
+    symmetric = 0.5 * (matrix + matrix.T)
+    return validate_psd_covariance(symmetric, dimension=dimension, name=name)
 
 
 def _validated_training_inputs(

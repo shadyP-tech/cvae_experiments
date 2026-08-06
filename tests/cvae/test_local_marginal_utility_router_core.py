@@ -139,6 +139,61 @@ def test_cluster_weighted_ridge_and_nested_loqdo_are_finite_and_query_heldout() 
         assert fold.selected_alpha in {0.01, 0.1}
 
 
+def test_cluster_weighted_ridge_projects_only_sandwich_roundoff() -> None:
+    """Regression for the rank-deficient production Phase-4 design geometry."""
+
+    rng = np.random.default_rng(0)
+    base = rng.normal(size=(270, 10))
+    matrix = np.column_stack(
+        (
+            base,
+            base[:, 0] + base[:, 1],
+            2.0 * base[:, 2] - base[:, 3],
+        )
+    )
+    response = (
+        base @ np.linspace(-0.5, 0.5, 10)
+        + rng.normal(scale=0.2, size=270)
+    )
+    clusters = tuple(f"q{index // 45}" for index in range(len(matrix)))
+
+    design = np.column_stack((np.ones(len(matrix)), matrix))
+    assert np.linalg.matrix_rank(design) == 11
+    model = fit_cluster_weighted_ridge(
+        matrix,
+        response,
+        clusters,
+        alpha=0.01,
+    )
+
+    covariance = model.coefficient_covariance
+    assert covariance.shape == (13, 13)
+    assert np.array_equal(covariance, covariance.T)
+    assert np.linalg.eigvalsh(covariance).min() >= -1e-12
+
+
+def test_constructed_covariance_roundoff_projection_is_bounded() -> None:
+    import midogpp_thesis.cvae.routing.local_marginal_utility.ridge as ridge
+
+    roundoff_skew = np.eye(3, dtype=np.float64)
+    roundoff_skew[0, 1] = 1e-12
+    projected = ridge._validate_constructed_covariance(
+        roundoff_skew,
+        dimension=3,
+        name="test covariance",
+    )
+    assert np.array_equal(projected, projected.T)
+
+    material_skew = np.eye(3, dtype=np.float64)
+    material_skew[0, 1] = 1e-5
+    with pytest.raises(ProtocolError, match="exceeds roundoff tolerance"):
+        ridge._validate_constructed_covariance(
+            material_skew,
+            dimension=3,
+            name="test covariance",
+        )
+
+
 def test_strict_nested_loqdo_excludes_domain_from_query_and_source_roles() -> None:
     domains = tuple(f"q{index}" for index in range(8))
     rows: list[list[float]] = []
@@ -229,6 +284,10 @@ def test_robust_optimizer_has_exact_uniform_fallback_and_rejects_bad_covariance(
     nonfinite[0, 0] = np.nan
     with pytest.raises(ProtocolError, match="finite"):
         robust_local_utility_weights(marginal, nonfinite)
+    nonsymmetric = np.eye(8)
+    nonsymmetric[0, 1] = 1e-5
+    with pytest.raises(ProtocolError, match="symmetric"):
+        robust_local_utility_weights(marginal, nonsymmetric)
 
     def fail_solver(*args: object, **kwargs: object) -> object:
         raise RuntimeError("forced failure")
