@@ -35,6 +35,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     residual.add_argument("--config", required=True)
     residual.add_argument("--artifact-root", required=True)
+
+    marginal_utility = sub.add_parser(
+        "local-marginal-utility-router-diagnostic",
+        help=(
+            "Run the consumed-validation Stage-90 local marginal-utility "
+            "router diagnostic."
+        ),
+    )
+    marginal_utility.add_argument("--config", required=True)
+    marginal_utility.add_argument("--artifact-root", required=True)
     return parser
 
 
@@ -77,6 +87,22 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_dense_residual_diagnostic_config(args.config)
         output = run_dense_residual_router_diagnostic(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "local-marginal-utility-router-diagnostic":
+        from .local_marginal_utility_router.config import (
+            load_local_marginal_utility_router_config,
+        )
+        from .local_marginal_utility_router.runner import (
+            run_local_marginal_utility_router_diagnostic,
+        )
+
+        config = load_local_marginal_utility_router_config(args.config)
+        output = run_local_marginal_utility_router_diagnostic(
             config,
             artifact_root=artifact_root,
         )

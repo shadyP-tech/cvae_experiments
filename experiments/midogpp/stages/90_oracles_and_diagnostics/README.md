@@ -219,3 +219,70 @@ The publication label is `EXPLORATORY_CONSUMED_DATA_ONLY`. The output is
 `diagnostic_only`; it claims neither routing quality nor fresh confirmation and
 cannot reopen or feed Stage 60, Stage 70, recipe selection, deployable
 selection, promotion, or deployment.
+
+## Uniform-B v2 Local Marginal-Utility Router v1
+
+`midogpp.oracle.uniform_b_v2_consumed_validation_local_marginal_utility_router.v1`
+is the next Stage-90 diagnostic after the dense residual router. It asks the
+utility-aligned question that compatibility rank alone could not answer: near
+equal union, does adding mass to source `e` improve downstream BACC on query
+center `q`?
+
+For every outer target `H`, query center `q != H`, and legal source
+`e != H,q`, the experiment pairs an exact equal-union control with the fixed
+one-sided perturbation
+
+```text
+w(+e) = (1 - epsilon) u + epsilon one_hot(e),  epsilon = 1/8
+Y(H,q,e,s,g) = [BACC(w(+e)) - BACC(u)] / epsilon
+```
+
+The seven-source development control allocates 144 samples per source and
+class. A perturbation allocates 252 to the boosted source and 126 to each of
+the other six sources, preserving exactly 1,008 generated samples per class,
+a maximum source weight of `0.25`, and an effective source count of `6.4`.
+All three training seeds and all three generation seeds are retained and
+reported; no seed is selected.
+
+The global prediction phase materializes 5,184 classifier cells and seals all
+prediction bytes and evaluation-row identities before any validation label is
+opened. Only then are 4,536 paired marginal-utility rows scored. Support cases
+are label-free and case-disjoint from evaluation. For a given outer fold,
+`H` is excluded both from development queries and from every development
+expert pool.
+
+Learnability is evaluated with nested leave-one-domain-out ridge fits. In every
+outer and inner fold, the held-out domain is excluded from both query-center
+and source-center roles. The feature interface is label-free: calibrated
+compatibility energy, within-query centered/scaled energy, rank and gap
+geometry, plus source identity indicators. Alpha is selected by equal-query
+cluster MSE wholly inside the strict inner folds. Learnability is reported in
+the thesis-relevant order—top-1 utility agreement, utility Spearman,
+normalized oracle gap, fold stability, and secondary RMSE. A robust constrained
+optimizer may emit target-center weight plans from label-free target features,
+but those plans are deliberately unscored: target-`H` labels are never opened
+to evaluate or choose the plan for `H`. The plan also crosses from seven-source
+development responses (1,008/class) to an eight-source target geometry
+(1,024/class), so it is explicitly recorded as extrapolative and cannot be
+treated as deployable or as evidence that equal union was beaten.
+
+Run the registered diagnostic with:
+
+```bash
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_v2_consumed_validation_local_marginal_utility_router.v1
+```
+
+Canonical output:
+
+```text
+artifacts/midogpp/90_oracles_and_diagnostics/
+  uniform_b_v2_consumed_validation_local_marginal_utility_router/v1/
+```
+
+This uses newly experiment-fenced aliases of the same already-consumed,
+hash-pinned validation manifest and label-free cache bytes. Its publication
+label is `EXPLORATORY_CONSUMED_DATA_ONLY`: the surface can diagnose whether
+local utility is learnable, but it is not fresh routing evidence, does not
+establish target BACC, and cannot feed Stage 60, Stage 70, recipe selection,
+deployable selection, promotion, or deployment.

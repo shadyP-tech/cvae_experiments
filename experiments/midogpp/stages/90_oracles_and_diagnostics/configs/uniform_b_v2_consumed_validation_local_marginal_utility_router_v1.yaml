@@ -1,0 +1,270 @@
+experiment:
+  id: midogpp.oracle.uniform_b_v2_consumed_validation_local_marginal_utility_router.v1
+  name: uniform_b_v2_consumed_validation_local_marginal_utility_router_v1
+  artifact_root: output://midogpp_output_uniform_b_v2_consumed_validation_local_marginal_utility_router_v1
+  claim_scope: diagnostic_only
+  status: EXPLORATORY_CONSUMED_DATA_ONLY
+inputs:
+  expert_bank_root: artifact://midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_root: artifact://midogpp_output_uniform_b_v2_generation_lock_v1
+  validation_cache_root: artifact://midogpp_stage90_local_marginal_utility_router_validation_cache_v1
+  validation_manifest_path: artifact://midogpp_stage90_local_marginal_utility_router_validation_manifest_v1/manifest.csv
+  expert_bank_artifact_id: midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_artifact_id: midogpp_output_uniform_b_v2_generation_lock_v1
+  validation_cache_artifact_id: midogpp_stage90_local_marginal_utility_router_validation_cache_v1
+  validation_manifest_artifact_id: midogpp_stage90_local_marginal_utility_router_validation_manifest_v1
+  expected_bank_lock_hash: 9972a41dcd4814cd
+  expected_generation_lock_hash: 34e551425710362e
+  expected_validation_cache_semantic_id: uniform_b_v2_routing_validation_cache_v1
+  expected_validation_cache_representation_id: annotation_jpeg_fixed_center_b_v3
+  expected_manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+protocol:
+  dataset_family: MIDOG++
+  stage: 90_oracles_and_diagnostics
+  validation_split: val
+  centers: ['0', '1', '2', '3', '5', '6', '7', '8', '9']
+  excluded_center: '4'
+  training_seeds: [17, 42, 101]
+  generation_seeds: [17, 42, 101]
+  seed_pairing: cartesian_product_report_all_nine_no_seed_selection
+  support_case_count_per_center: 2
+  support_split_seed: 20260806
+  support_partition_namespace: midogpp_local_marginal_utility_support_v1
+  support_partition_source: label_free_case_identity_hash_rank
+  support_evaluation_case_disjoint: true
+  support_evaluation_sample_disjoint: true
+  support_labels_used: false
+  development_queries_by_outer_target:
+    '0': ['1', '2', '3', '5', '6', '7', '8', '9']
+    '1': ['0', '2', '3', '5', '6', '7', '8', '9']
+    '2': ['0', '1', '3', '5', '6', '7', '8', '9']
+    '3': ['0', '1', '2', '5', '6', '7', '8', '9']
+    '5': ['0', '1', '2', '3', '6', '7', '8', '9']
+    '6': ['0', '1', '2', '3', '5', '7', '8', '9']
+    '7': ['0', '1', '2', '3', '5', '6', '8', '9']
+    '8': ['0', '1', '2', '3', '5', '6', '7', '9']
+    '9': ['0', '1', '2', '3', '5', '6', '7', '8']
+  development_sources_by_outer_target_and_query:
+    '0':
+      '1': ['2', '3', '5', '6', '7', '8', '9']
+      '2': ['1', '3', '5', '6', '7', '8', '9']
+      '3': ['1', '2', '5', '6', '7', '8', '9']
+      '5': ['1', '2', '3', '6', '7', '8', '9']
+      '6': ['1', '2', '3', '5', '7', '8', '9']
+      '7': ['1', '2', '3', '5', '6', '8', '9']
+      '8': ['1', '2', '3', '5', '6', '7', '9']
+      '9': ['1', '2', '3', '5', '6', '7', '8']
+    '1':
+      '0': ['2', '3', '5', '6', '7', '8', '9']
+      '2': ['0', '3', '5', '6', '7', '8', '9']
+      '3': ['0', '2', '5', '6', '7', '8', '9']
+      '5': ['0', '2', '3', '6', '7', '8', '9']
+      '6': ['0', '2', '3', '5', '7', '8', '9']
+      '7': ['0', '2', '3', '5', '6', '8', '9']
+      '8': ['0', '2', '3', '5', '6', '7', '9']
+      '9': ['0', '2', '3', '5', '6', '7', '8']
+    '2':
+      '0': ['1', '3', '5', '6', '7', '8', '9']
+      '1': ['0', '3', '5', '6', '7', '8', '9']
+      '3': ['0', '1', '5', '6', '7', '8', '9']
+      '5': ['0', '1', '3', '6', '7', '8', '9']
+      '6': ['0', '1', '3', '5', '7', '8', '9']
+      '7': ['0', '1', '3', '5', '6', '8', '9']
+      '8': ['0', '1', '3', '5', '6', '7', '9']
+      '9': ['0', '1', '3', '5', '6', '7', '8']
+    '3':
+      '0': ['1', '2', '5', '6', '7', '8', '9']
+      '1': ['0', '2', '5', '6', '7', '8', '9']
+      '2': ['0', '1', '5', '6', '7', '8', '9']
+      '5': ['0', '1', '2', '6', '7', '8', '9']
+      '6': ['0', '1', '2', '5', '7', '8', '9']
+      '7': ['0', '1', '2', '5', '6', '8', '9']
+      '8': ['0', '1', '2', '5', '6', '7', '9']
+      '9': ['0', '1', '2', '5', '6', '7', '8']
+    '5':
+      '0': ['1', '2', '3', '6', '7', '8', '9']
+      '1': ['0', '2', '3', '6', '7', '8', '9']
+      '2': ['0', '1', '3', '6', '7', '8', '9']
+      '3': ['0', '1', '2', '6', '7', '8', '9']
+      '6': ['0', '1', '2', '3', '7', '8', '9']
+      '7': ['0', '1', '2', '3', '6', '8', '9']
+      '8': ['0', '1', '2', '3', '6', '7', '9']
+      '9': ['0', '1', '2', '3', '6', '7', '8']
+    '6':
+      '0': ['1', '2', '3', '5', '7', '8', '9']
+      '1': ['0', '2', '3', '5', '7', '8', '9']
+      '2': ['0', '1', '3', '5', '7', '8', '9']
+      '3': ['0', '1', '2', '5', '7', '8', '9']
+      '5': ['0', '1', '2', '3', '7', '8', '9']
+      '7': ['0', '1', '2', '3', '5', '8', '9']
+      '8': ['0', '1', '2', '3', '5', '7', '9']
+      '9': ['0', '1', '2', '3', '5', '7', '8']
+    '7':
+      '0': ['1', '2', '3', '5', '6', '8', '9']
+      '1': ['0', '2', '3', '5', '6', '8', '9']
+      '2': ['0', '1', '3', '5', '6', '8', '9']
+      '3': ['0', '1', '2', '5', '6', '8', '9']
+      '5': ['0', '1', '2', '3', '6', '8', '9']
+      '6': ['0', '1', '2', '3', '5', '8', '9']
+      '8': ['0', '1', '2', '3', '5', '6', '9']
+      '9': ['0', '1', '2', '3', '5', '6', '8']
+    '8':
+      '0': ['1', '2', '3', '5', '6', '7', '9']
+      '1': ['0', '2', '3', '5', '6', '7', '9']
+      '2': ['0', '1', '3', '5', '6', '7', '9']
+      '3': ['0', '1', '2', '5', '6', '7', '9']
+      '5': ['0', '1', '2', '3', '6', '7', '9']
+      '6': ['0', '1', '2', '3', '5', '7', '9']
+      '7': ['0', '1', '2', '3', '5', '6', '9']
+      '9': ['0', '1', '2', '3', '5', '6', '7']
+    '9':
+      '0': ['1', '2', '3', '5', '6', '7', '8']
+      '1': ['0', '2', '3', '5', '6', '7', '8']
+      '2': ['0', '1', '3', '5', '6', '7', '8']
+      '3': ['0', '1', '2', '5', '6', '7', '8']
+      '5': ['0', '1', '2', '3', '6', '7', '8']
+      '6': ['0', '1', '2', '3', '5', '7', '8']
+      '7': ['0', '1', '2', '3', '5', '6', '8']
+      '8': ['0', '1', '2', '3', '5', '6', '7']
+  outer_target_excluded_from_development_queries: true
+  outer_target_excluded_from_development_experts: true
+  pseudo_target_excluded_from_development_experts: true
+  source_experts_frozen_source_only: true
+  expert_checkpoint_frame_sampler_updates_allowed: false
+  global_development_predictions_sealed_before_any_development_label_access: true
+  labels_may_only_score_globally_sealed_development_predictions: true
+  target_H_labels_used_for_target_plan: false
+  target_predictions_materialized: false
+  target_labels_opened: false
+compatibility:
+  semantics: aggregate_prior_variational_compatibility_energy_v1
+  energy_definition: class_marginalized_common_space_posterior_mean_reconstruction_mse_plus_latent_dim_normalized_analytic_ps_kl_fixed_class_prior_half
+  target_support_labels_used: false
+  query_rows_consumed: support_partition_rows_only
+  query_evaluation_embeddings_consumed: false
+  class_prior: [0.5, 0.5]
+  class_prior_source: fixed_protocol_prior
+  posterior_latent_evaluation: posterior_mean_deterministic
+  reconstruction_term: common_3840_inverse_frame_mse_mean
+  kl_term: analytic_kl_q_diag_to_ps_class_full_gaussian_normalized_by_latent_dim
+  class_marginalization: negative_logsumexp_with_fixed_class_prior
+  own_source_calibration_location: case_equal_median
+  own_source_calibration_scale: 1.4826_mad_with_sample_std_fallback
+  own_source_calibration_scale_floor: fixed_positive_numeric_floor
+  own_source_calibration_scale_floor_value: 1.0e-06
+  query_calibration: robust_difference_z_score
+  calibration_semantics: own_source_case_equal_median_mad_robust_z_then_fixed_three_seed_mean
+  replica_aggregation: arithmetic_mean_across_all_three_training_seed_scores
+  score_direction: lower_energy_z_is_more_compatible
+  exact_nelbo_claimed: false
+  compatibility_is_proxy: true
+perturbations:
+  family: equal_union_local_one_source_finite_difference_v1
+  epsilon: 0.125
+  formula: w_plus_e_equals_one_minus_epsilon_times_uniform_plus_epsilon_times_one_hot_e
+  control_action_id: control
+  boost_action_prefix: boost_source_
+  candidate_source_count: 7
+  action_count_per_outer_query: 8
+  control_weight_per_source: 0.14285714285714285
+  control_allocation_per_source_per_class: 144
+  boosted_source_weight: 0.25
+  nonboosted_source_weight: 0.125
+  boosted_source_allocation_per_class: 252
+  nonboosted_source_allocation_per_class: 126
+  maximum_source_weight: 0.25
+  perturbed_effective_source_count: 6.4
+  minimum_effective_source_count: 6.0
+  minimum_integer_allocation_per_source: 1
+  development_total_generated_samples_per_class: 1008
+  integer_allocation: exact_predeclared_integer_counts
+  class_labels: [0, 1]
+  source_stream_slice: frozen_generation_lock_first_n_prefix_per_class
+  composition_semantics: canonical_source_order_class_prefix_then_fixed_classwise_shuffle
+  control_fit_reused_for_all_paired_source_deltas: true
+  perturbation_library_hash: 74d40888b84ede56
+  global_action_count: 576
+classifier:
+  family: sklearn_logistic_regression
+  C: 0.01
+  penalty: l2
+  solver: lbfgs
+  max_iter: 3000
+  class_weight: null
+  random_state: 23
+  l1_ratio: null
+  threshold_policy: predict
+  scaler_fit: synthetic_train_only
+model:
+  family: cluster_weighted_ridge_local_marginal_utility_v1
+  response: paired_bacc_delta_divided_by_epsilon
+  response_pairing: same_outer_query_training_seed_generation_seed_boost_minus_control
+  base_feature_names: [calibrated_energy_z, query_centered_energy_z, query_scaled_energy_z, query_rank_fraction, query_gap_from_best_z]
+  source_indicator_encoding: deterministic_dropped_reference_lexicographically_first_source
+  feature_label_status: label_free
+  standardization: fit_partition_only
+  intercept: unpenalized
+  sample_weighting: each_query_cluster_total_weight_one
+  ridge_alpha_grid: [0.01, 0.1, 1.0, 10.0]
+  alpha_selection: nested_loqdo_equal_query_cluster_mse_strict_domain_role_exclusion
+  outer_evaluation: leave_one_domain_out
+  outer_fold_domain_exclusion: heldout_domain_excluded_from_both_query_center_and_source_roles
+  inner_alpha_fold_domain_exclusion: heldout_inner_domain_excluded_from_both_query_center_and_source_roles
+  learnability_metric_priority: [top1_utility_oracle_agreement, spearman_true_per_source_utility, normalized_oracle_gap, seed_and_fold_stability, rmse_secondary]
+  primary_learnability_metric: top1_utility_oracle_agreement
+  rmse_may_override_primary_metrics: false
+  additional_descriptive_metrics: [mae, pearson, sign_accuracy]
+  uncertainty: cluster_sandwich_covariance_by_query_center
+  target_prediction_covariance: parameter_covariance_plus_residual_variance_conservative
+  target_plan_fit_scope: all_q_not_H_for_each_outer_target_H
+  development_response_geometry: seven_sources_excluding_outer_H_and_query_q_1008_per_class
+  target_feature_geometry: eight_non_target_sources_1024_per_class
+  geometry_transfer_status: extrapolative_unscored_diagnostic_only
+  target_H_labels_used: false
+  hyperparameters_selected_with_target_H_labels: false
+optimizer:
+  family: robust_local_utility_weights_v1
+  objective: maximize_d_dot_mean_minus_kappa_sqrt_d_dot_covariance_dot_d_minus_l2_penalty_times_squared_l2_norm_d
+  delta_definition: d_equals_w_minus_uniform
+  kappa: 1.0
+  l2_penalty: 0.01
+  max_source_weight: 0.25
+  min_effective_sources: 6.0
+  simplex_constraint: true
+  nonnegative_weights: true
+  objective_tolerance: 1.0e-10
+  max_iterations: 1000
+  solver_tolerance: 1.0e-12
+  uniform_fallback_reasons: [nonpositive_robust_gain_uniform, solver_failure_uniform, postsolve_infeasible_uniform]
+  invalid_nonfinite_or_non_psd_inputs: protocol_error
+  target_labels_used: false
+runtime:
+  compatibility_device: cuda:0
+  generation_device: cuda:0
+  classifier_device: cpu
+  threads_per_fit: 1
+  expected_development_classifier_fit_count: 5184
+  expected_marginal_utility_row_count: 4536
+  maximum_total_classifier_fit_count: 5184
+  maximum_resident_generated_source_blocks: 9
+  maximum_resident_generated_embedding_bytes: 283115520
+  control_fit_reused_within_outer_query_seed_cell: true
+claim_boundary:
+  diagnostic_only: true
+  publication_status: EXPLORATORY_CONSUMED_DATA_ONLY
+  consumed_validation_data: true
+  fresh_evidence: false
+  fresh_confirmation: false
+  routing_quality_claimed: false
+  target_performance_claimed: false
+  equal_union_superiority_claim_allowed: false
+  promotion_allowed: false
+  expert_bank_promotion_allowed: false
+  routing_policy_promotion_allowed: false
+  may_feed_stage60: false
+  may_feed_stage70: false
+  may_feed_recipe_selection: false
+  may_feed_deployable_selection: false
+  deployment_claim_allowed: false
+  test_labels_consumed: false
+  external_generalization_claim_allowed: false

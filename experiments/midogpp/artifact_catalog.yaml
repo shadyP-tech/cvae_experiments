@@ -3061,3 +3061,207 @@ artifacts:
       - Stage-90 consumed-validation prototype only; any selected nonuniform action is exploratory and is not a Stage-60 policy lock.
       - The output cannot feed Stage 60, Stage 70, recipe selection, promotion, deployment, or any deployable selection.
       - routing_quality_claimed=false and fresh_confirmation=false remain mandatory regardless of diagnostic metrics.
+
+  - artifact_id: midogpp_stage90_local_marginal_utility_router_validation_manifest_v1
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_STAGE90_LOCAL_MARGINAL_UTILITY_DIAGNOSTIC_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      split_role: val_consumed_stage90_local_marginal_utility_diagnostic_only
+      policy_consumption_lock_hash: 6c18c72a017403a7
+      alias_of_artifact_id: midogpp_source_inner_validation_manifest_v1
+      consumption_status: CONSUMED_FOR_STAGE90_LOCAL_MARGINAL_UTILITY_DIAGNOSTIC
+      fresh_evidence: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_validation_local_marginal_utility_router.v1
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Exact experiment-fenced alias over the current hash-pinned validation manifest bytes; it creates no fresh evidence.
+      - Only midogpp.oracle.uniform_b_v2_consumed_validation_local_marginal_utility_router.v1 may consume this alias, and only for oracle_and_diagnostic_evidence.
+      - This consumed-data alias cannot reopen or feed Stage 60 or Stage 70 and cannot support recipe selection, promotion, deployment, or deployable policy selection.
+
+  - artifact_id: midogpp_stage90_local_marginal_utility_router_validation_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_routing_validation_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_STAGE90_LOCAL_MARGINAL_UTILITY_DIAGNOSTIC_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      cache_name: uniform_b_v2_routing_validation_cache_v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: val
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      labels_persisted: 'false'
+      policy_consumption_lock_hash: 6c18c72a017403a7
+      frozen_build_protocol_hash: f57aad1bf7f7efed
+      content_hash: e1d281d44e47c7b2
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_routing_validation_cache_seed42
+      consumption_status: CONSUMED_FOR_STAGE90_LOCAL_MARGINAL_UTILITY_DIAGNOSTIC
+      fresh_evidence: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_validation_local_marginal_utility_router.v1
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - manifests/consumption_lock.json
+      - manifests/content_index.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    expected_file_hashes:
+      embeddings/by_center/center_0.pt:
+        algorithm: sha256
+        digest: 9173a27896d4da6b03e16a9ff74728e833c523c7f8c0e3133a326bd811157846
+      embeddings/by_center/center_1.pt:
+        algorithm: sha256
+        digest: afa13f0db6da02183c634708f324910f23b431a8ad27d397d519b828c05837e1
+      embeddings/by_center/center_2.pt:
+        algorithm: sha256
+        digest: 9dddfae085858c97fa8839029459f288e256e79c2d85ec4023e129fe09e9ca15
+      embeddings/by_center/center_3.pt:
+        algorithm: sha256
+        digest: 11e0168a2f86179af1ecd7bae3373fafa1d457e127c2b02fdc3bafa627286772
+      embeddings/by_center/center_5.pt:
+        algorithm: sha256
+        digest: f2389563717108f649249bbc1ef519f4690b5120899be0620479ac635d2856e4
+      embeddings/by_center/center_6.pt:
+        algorithm: sha256
+        digest: 801529fdb8b1075224963a39b08a2352c477a6d44e6993d0dfbfa81c7c1f39f9
+      embeddings/by_center/center_7.pt:
+        algorithm: sha256
+        digest: 3088737286a406c42a6188a9ae951ddbc29007afe90ece47abd074040d62780f
+      embeddings/by_center/center_8.pt:
+        algorithm: sha256
+        digest: dade7283a833b948344e9b60c83fda350ff7856b191451c0e31451ff444e4fba
+      embeddings/by_center/center_9.pt:
+        algorithm: sha256
+        digest: cdade0c468c5ad70cc51588ed6a0e195135eb7651fc80af758d2e992666f610d
+      manifests/frozen_build_protocol.json:
+        algorithm: sha256
+        digest: cda5e0c351b9f78ff2b8e469341a56e5b5fba2e7907be382d8422f2ce83c14e1
+      manifests/row_alignment.json:
+        algorithm: sha256
+        digest: 8e92e987d121efdaadf547c20996777ea924009443f40dadc664a4f271125f7b
+      manifests/consumption_lock.json:
+        algorithm: sha256
+        digest: 2cef95465c66c59a8d9cbff66c471a38dd30e83ff411246c8510487f3fd79b14
+      manifests/content_index.json:
+        algorithm: sha256
+        digest: 6b46a1777c90a838e67ba1892134c748529169c6034c6865fc8a616039ec5fe2
+      reports/cache_builder_report.json:
+        algorithm: sha256
+        digest: d51ff4bc588554289fa58e64b149f7c696df1ddb4b3a45a6fd3df5f2094234af
+      reports/validation_report.json:
+        algorithm: sha256
+        digest: 2698c5a4335cb209012f4e3f495d57b27f395f0c51fa556083bbab9c02f0872d
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Exact experiment-fenced alias over the current hash-pinned, label-free validation-cache bytes; it creates no fresh evidence.
+      - Only midogpp.oracle.uniform_b_v2_consumed_validation_local_marginal_utility_router.v1 may consume this alias, and only for oracle_and_diagnostic_evidence.
+      - This consumed-data alias cannot reopen or feed Stage 60 or Stage 70 and cannot support recipe selection, promotion, deployment, or deployable policy selection.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_validation_local_marginal_utility_router_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_validation_local_marginal_utility_router/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: EXPLORATORY_CONSUMED_DATA_ONLY
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: EXPLORATORY_CONSUMED_DATA_ONLY
+      consumed_validation_data: 'true'
+      fresh_evidence: 'false'
+      fresh_confirmation: 'false'
+      routing_quality_claimed: 'false'
+      target_performance_claimed: 'false'
+      target_labels_opened_for_target_plans: 'false'
+      target_plans_unscored: 'true'
+      may_feed_stage60: 'false'
+      may_feed_stage70: 'false'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/protocol_manifest.json
+      - manifests/perturbation_library.json
+      - manifests/support_partition_lock.json
+      - manifests/compatibility_index.json
+      - manifests/global_development_prediction_seal.json
+      - manifests/content_index.json
+      - arrays/development_predictions.npz
+      - tables/support_partitions.csv
+      - tables/compatibility_case_energy.csv
+      - tables/compatibility_scores.csv
+      - tables/development_prediction_index.csv
+      - tables/development_metrics.csv
+      - tables/marginal_utilities.csv
+      - tables/loqdo_predictions.csv
+      - tables/loqdo_summary.csv
+      - tables/model_fits.csv
+      - tables/target_plans.csv
+      - reports/phase_01_support_and_compatibility_complete.json
+      - reports/phase_02_global_predictions_sealed.json
+      - reports/phase_03_utility_surface_complete.json
+      - reports/phase_04_model_and_plans_complete.json
+      - reports/label_access_report.json
+      - reports/leakage_report.json
+      - reports/learnability_report.json
+      - reports/optimizer_report.json
+      - reports/publication_decision.json
+      - reports/run_state.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Stage-90 consumed-validation diagnostic of a sealed local marginal-utility surface and nested LOQDO learnability only.
+      - Target-center plans are generated from label-free features but deliberately remain unscored; target H labels never select or evaluate the plan for H.
+      - The output cannot feed Stage 60, Stage 70, recipe selection, promotion, deployment, or any deployable selection, regardless of diagnostic metrics.
