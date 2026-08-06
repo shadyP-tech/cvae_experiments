@@ -313,6 +313,20 @@ class MidogppWorkspace:
                         f"may_feed_deployable_selection=true for {artifact_id}; got "
                         f"{artifact.may_feed_deployable_selection!r}"
                     )
+                authorized_consumers = artifact.semantic_identities.get(
+                    "authorized_consumer_experiment_ids"
+                )
+                if authorized_consumers:
+                    allowed_consumers = {
+                        value.strip()
+                        for value in authorized_consumers.split("|")
+                        if value.strip()
+                    }
+                    if experiment.experiment_id not in allowed_consumers:
+                        errors.append(
+                            f"{experiment.experiment_id}: input {artifact_id} is fenced to "
+                            f"authorized consumers {sorted(allowed_consumers)}"
+                        )
                 forbidden_reuse = reuse_purposes.intersection(artifact.forbidden_reuse)
                 if forbidden_reuse:
                     errors.append(

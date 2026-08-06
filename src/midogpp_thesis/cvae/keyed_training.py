@@ -140,6 +140,7 @@ def initialize_training_state(
     spec: KeyedTrainingSpec,
     pairing_key: str,
     device: str,
+    num_hidden_layers: int = 2,
 ) -> KeyedTrainingState:
     """Create a source-local standard-normal CVAE and AdamW state."""
 
@@ -155,7 +156,7 @@ def initialize_training_state(
         input_dim=input_dim,
         hidden_dim=spec.hidden_dim,
         latent_dim=spec.latent_dim,
-        num_hidden_layers=2,
+        num_hidden_layers=num_hidden_layers,
     ).to(resolved)
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -191,7 +192,7 @@ def clone_training_state(state: KeyedTrainingState) -> KeyedTrainingState:
         hidden_dim=state.model.hidden_dim,
         latent_dim=state.model.latent_dim,
         n_classes=state.model.n_classes,
-        num_hidden_layers=2,
+        num_hidden_layers=state.model.num_hidden_layers,
     ).to(state.device)
     model.load_state_dict(deepcopy(state.model.state_dict()), strict=True)
     optimizer = torch.optim.AdamW(

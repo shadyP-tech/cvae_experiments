@@ -17,14 +17,19 @@ locally, and their catalog destinations still carry stale
 `TODO_VERIFY_ARTIFACT` lifecycle labels pending catalog promotion. Earlier
 invalid or terminated partial roots remain non-evidence.
 
+Later status: a separate Uniform-B v2 lineage has produced an active,
+routing-authorized Stage-30 expert bank. It did not consume these consensus
+locks. The consensus-recipe `midogpp.expert_bank.provenance_clean.v1` path
+documented here remains a planned alternative.
+
 ## Evidence Sequence
 
 ```text
 eligible-only Stage-10 matched reference v2
   -> fully nested Stage-20 source-inner RecipeLocks
        -> bounded training-seed consensus RecipeLocks
-            -> planned Stage-30 independent expert bank
-                 -> planned Stage-40 frozen-expert generation validation
+            -> planned consensus-recipe Stage-30 bank alternative
+                 -> planned Stage-40 generation validation
        -> conditional Stage-20 outer A/B/C/D preservation (scoring only)
 ```
 
@@ -407,9 +412,9 @@ Claim boundary: `cvae_recipe_lock_only`. This result does not establish outer
 preservation, routing, compatibility, generation quality, or downstream
 utility. Outer v1 continues to consume the scalar source-inner locks and
 remains blocked by its original gate. The stability publication is an eligible
-Stage-30 input, but Stage 30 still has only a planned placeholder and no
-runnable expert-bank implementation. Stop Stage-20 tuning and implement the
-provenance-clean Stage-30 runner next.
+input to the planned consensus-recipe Stage-30 path, whose runner remains a
+placeholder. It is not the input to the separately authorized Uniform-B v2
+bank, and it does not inherit routing evidence from that bank.
 
 ## Separate V2 Prior And Objective Studies
 

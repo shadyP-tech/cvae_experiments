@@ -1,0 +1,78 @@
+# EXECUTION-AUTHORIZED / NO FRESH EVIDENCE.
+# These identities come from the independently validated cache and final
+# prediction-only authorization. Independent protocol, architecture, and
+# generative-model reviews authorize exactly this descriptive consumed-test run.
+# The consumed test split is never fresh evidence and cannot promote a policy.
+experiment:
+  name: uniform_b_v2_descriptive_frozen_policy_comparison_v1
+  artifact_root: output://midogpp_output_uniform_b_v2_descriptive_frozen_policy_comparison_v1
+  claim_scope: descriptive_frozen_policy_comparison_on_previously_consumed_test
+
+inputs:
+  final_authorization_root: artifact://midogpp_output_uniform_b_v2_descriptive_test_final_authorization_v1
+  bank_root: artifact://midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_root: artifact://midogpp_output_uniform_b_v2_generation_lock_v1
+  equal_union_policy_root: artifact://midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+  metadata_policy_root: artifact://midogpp_output_uniform_b_v2_metadata_tie_union_policy_lock_v1
+  utility_policy_root: artifact://midogpp_output_uniform_b_v2_utility_regret_policy_lock_v1
+  target_cache_root: artifact://midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+  scoring_manifest_path: artifact://midogpp_frozen_policy_test_scoring_manifest_v1/manifest.csv
+  artifact_ids:
+    - midogpp_output_uniform_b_v2_descriptive_test_final_authorization_v1
+    - midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+    - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+    - midogpp_output_uniform_b_v2_generation_lock_v1
+    - midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+    - midogpp_output_uniform_b_v2_metadata_tie_union_policy_lock_v1
+    - midogpp_output_uniform_b_v2_utility_regret_policy_lock_v1
+    - midogpp_frozen_policy_test_scoring_manifest_v1
+
+protocol:
+  authorized_consumer_experiment_id: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_frozen_policy_comparison.v1
+  eligible_centers:
+    - "0"
+    - "1"
+    - "2"
+    - "3"
+    - "5"
+    - "6"
+    - "7"
+    - "8"
+    - "9"
+  training_seeds: [17, 42, 101]
+  generation_seeds: [17, 42, 101]
+  synthetic_samples_per_class: 1024
+  evaluation_split: test_previously_consumed_for_representation_adoption
+  predictions_persisted_before_labels_opened: true
+  final_authorization_hash: a344cd66fc88daae
+  dataset_contract_hash: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+  target_cache_content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+  target_row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+  scoring_manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+  representation_id: annotation_jpeg_fixed_center_b_v3
+  backbone_identity_hash: 1b5071f2e605fa60
+  device: cuda
+
+classifier:
+  family: sklearn_logistic_regression
+  C: 0.01
+  penalty: l2
+  solver: lbfgs
+  max_iter: 3000
+  class_weight: null
+  random_state: 23
+  l1_ratio: null
+  threshold_policy: predict
+  scaler_fit: synthetic_train_only
+
+bootstrap:
+  seed: 42
+  valid_replicates: 2000
+  max_attempts: 20000
+
+claim_boundary:
+  descriptive_comparison_only: true
+  previously_consumed_test: true
+  fresh_confirmatory_evidence: false
+  routing_policy_promotion_allowed: false
+  deployment_claim_allowed: false

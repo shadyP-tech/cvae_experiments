@@ -94,6 +94,7 @@ stages:
     evidence_surface: generation_and_prior_diagnostics
     allowed_claim_scopes:
       - generation_diagnostics_only
+      - generation_settings_and_frame_lock
     allowed_input_claim_scopes:
       - dataset_contract_and_split_provenance
       - feature_cache_provenance
@@ -135,11 +136,13 @@ stages:
     artifact_prefix: 60_routing_and_composition
     evidence_surface: pre_evaluation_routing
     allowed_claim_scopes:
+      - routing_compatibility_only
       - routing_and_composition
     allowed_input_claim_scopes:
       - dataset_contract_and_split_provenance
       - feature_cache_provenance
       - expert_bank_construction_only
+      - generation_settings_and_frame_lock
       - routing_compatibility_only
       - routing_and_composition
     input_reuse_purposes:
@@ -148,13 +151,23 @@ stages:
       - nelbo_compatibility_evidence
     performs_deployable_selection: true
     required_upstream:
-      - validated_expert_bank
-      - source_inner_or_unlabeled_support_compatibility
+      - validated_expert_bank_for_policy_artifacts
+      - frozen_generation_settings_for_policy_artifacts
+      - predeclared_compatibility_artifact_from_unconsumed_source_inner_evidence_or_frozen_query_metadata_available_at_routing_time_or_disjoint_unlabeled_target_support_for_ranked_selected_or_weighted_policies
     hard_requirements:
       - target_support_disjoint_from_target_evaluation
       - target_labels_not_used_for_selection
       - target_expert_excluded
       - routing_policy_frozen_before_stage_70
+      - fixed_all_eligible_source_controls_may_omit_compatibility_only_when_no_ranking_selection_or_weighting_occurs
+      - metadata_proxy_fields_must_be_frozen_and_available_at_routing_time
+      - target_identity_may_bind_a_metadata_profile_but_must_not_enter_the_score_function
+      - compatibility_only_artifacts_must_not_rank_select_weight_or_claim_utility
+      - source_inner_validation_labels_may_be_consumed_once_only_for_a_predeclared_policy_family
+      - outer_target_rows_must_be_removed_for_both_query_q_and_candidate_e_before_regret_normalization_or_bootstrap
+      - alternative_router_or_policy_tuning_is_forbidden_after_source_inner_label_consumption
+      - macro_f1_and_seed_identity_must_not_select_or_break_ties
+      - uncertain_utility_regret_decisions_must_reuse_the_exact_frozen_equal_union_control
     forbidden_upstream:
       - 50_all_candidate_utility_matrix
       - 90_oracles_and_diagnostics
@@ -166,12 +179,16 @@ stages:
     evidence_surface: heldout_downstream_utility
     allowed_claim_scopes:
       - synthetic_downstream_utility
+      - target_evaluation_authorization
+      - descriptive_frozen_policy_comparison_on_previously_consumed_test
     allowed_input_claim_scopes:
       - dataset_contract_and_split_provenance
       - feature_cache_provenance
       - expert_bank_construction_only
       - generation_diagnostics_only
+      - generation_settings_and_frame_lock
       - routing_and_composition
+      - target_evaluation_authorization
     input_reuse_purposes:
       - synthetic_downstream_utility_evidence
     required_upstream:
@@ -182,6 +199,12 @@ stages:
       - target_evaluation_labels_used_for_scoring_only
       - matched_candidate_eligibility_and_budget
       - leakage_and_identity_overlap_audits
+      - consumed_test_rows_may_support_descriptive_locked_policy_scoring_only
+      - fresh_confirmation_requires_a_new_unconsumed_case_disjoint_surface
+      - reservation_precedes_cache_extraction
+      - final_authorization_binds_cache_content_before_prediction
+      - all_predictions_persist_before_scoring_manifest_labels_open
+      - generic_or_fresh_consumers_reject_consumed_test_reservation_cache_and_authorization
 
   - order: 90
     id: oracles_and_diagnostics
@@ -662,6 +685,386 @@ experiments:
       - Scores each unique E/I/training-seed/generation-seed/prior key once, then maps the immutable score to the seven legal outer centers.
       - Runtime uses one deterministic process per RTX A5000 and eight bounded CPU scoring workers; runtime controls do not change the scientific contract hash.
       - A positive result is only a candidate for a separate promotion artifact and cannot directly feed Stage 30.
+
+  - experiment_id: midogpp.cvae.uniform_b_geco_aggregate_prior_union_source_inner.v2
+    stage: 20_cvae_preservation
+    status: active
+    claim_scope: cvae_source_inner_study_only
+    config_path: experiments/midogpp/stages/20_cvae_preservation/configs/uniform_b_geco_aggregate_prior_union_source_inner_v2.yaml
+    output_artifact_id: midogpp_output_cvae_uniform_b_geco_aggregate_prior_union_source_inner_v2
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_uniform_b_canonical_train_cache_seed42
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        MIDOGPP_OPTIMIZED_PRIOR_SCORING_WORKERS: "12"
+        MIDOGPP_OPTIMIZED_PRIOR_TRAINING_DEVICES: "cuda:0,cuda:1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-preservation
+        - source-inner-uniform-b-geco-aggregate-prior-union
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_cvae_uniform_b_geco_aggregate_prior_union_source_inner_v2
+    notes:
+      - Uses PCA256, a 1024-wide three-layer CVAE, latent dimension 64, and 4,000 keyed steps to raise the posterior/decode ceiling before judging the prior.
+      - Replaces unreliable density-ratio acceptance with a source-only full-shrinkage aggregate posterior and all-or-none fallback across classes.
+      - Scores a fixed 1,024-per-class equal-total union of all seven legal sources for every outer/inner task; inner labels are scoring-only.
+      - PCA-only, posterior-sample, and posterior-mean controls separate frame, decoder, and prior ceilings.
+      - Runs one deterministic process per RTX A5000 and 12 one-thread CPU scoring workers; runtime settings are excluded from the scientific contract hash.
+      - Results remain non-consumable until a separate protocol-reviewed promotion artifact passes.
+
+  - experiment_id: midogpp.expert_bank.uniform_b_v2_routing_promotion.v1
+    stage: 30_expert_bank
+    status: active
+    claim_scope: expert_bank_construction_only
+    config_path: experiments/midogpp/stages/30_expert_bank/configs/uniform_b_v2_routing_promotion_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_virchow2_uniform_b_canonical_train_cache_seed42
+      - midogpp_output_cvae_uniform_b_geco_aggregate_prior_union_source_inner_v2
+    input_claim_scope_exceptions:
+      midogpp_output_cvae_uniform_b_geco_aggregate_prior_union_source_inner_v2: >-
+        Protocol review uniform_b_v2_expert_bank_routing_promotion_review_2026_08_05
+        authorizes this completed source-inner artifact only as evidence for whole-bank
+        Stage-30 adoption; it does not authorize direct routing use or per-expert selection.
+    runner:
+      environment:
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        MIDOGPP_V2_PROMOTION_DEVICE: "cuda:0"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-expert-bank
+        - uniform-b-v2-routing-promotion
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+    notes:
+      - Re-audits the completed v2 evidence and every checkpoint hash before authorization.
+      - Retains all nine independently trained source centers and all three training seeds; no expert or seed is selected by validation performance.
+      - Materializes source-only aggregate-prior states and freezes equal-union PS as the canonical control for future routing experiments.
+      - The Stage-20 source remains forbidden as a direct routing input; only this validated Stage-30 output may feed deployable selection.
+
+  - experiment_id: midogpp.prior_and_generation.uniform_b_v2_generation_lock.v1
+    stage: 40_prior_and_generation
+    status: active
+    claim_scope: generation_settings_and_frame_lock
+    config_path: experiments/midogpp/stages/40_prior_and_generation/configs/uniform_b_v2_generation_lock_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_generation_lock_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+    runner:
+      environment:
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-generation
+        - uniform-b-v2-generation-lock
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_generation_lock_v1
+    notes:
+      - Consumes only the validated routing-authorized bank and verifies its frozen bank, control, content, index, frame, checkpoint, and sampler identities.
+      - Freezes source-local inverse frames, aggregate-prior sampling, deterministic replicate identities, equal-union budgets, and the downstream classifier contract before Stage-60 routing.
+      - Runs a finite-shape health probe for every retained expert, generation seed, and class without target data, target labels, routing scores, NELBO, or downstream utility.
+      - This artifact authorizes reuse of generation settings and frames; it does not claim routing quality or a new eight-source control result.
+
+  - experiment_id: midogpp.routing_and_composition.uniform_b_v2_equal_union_policy_lock.v1
+    stage: 60_routing_and_composition
+    status: active
+    claim_scope: routing_and_composition
+    config_path: experiments/midogpp/stages/60_routing_and_composition/configs/uniform_b_v2_equal_union_policy_lock_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+    runner:
+      environment:
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-routing
+        - uniform-b-v2-equal-union-policy-lock
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+    notes:
+      - Freezes the canonical non-adaptive equal-union composition policy over all eight eligible non-target sources for every target and retained seed replicate.
+      - Consumes only the routing-authorized expert bank and validated GenerationLock; no Stage-50 utility or Stage-90 oracle artifact may enter the policy.
+      - Uses no target samples, support rows, labels, target-conditioned weights, expert ranking, or seed selection and never includes the target expert.
+      - Establishes a deployable direct-control policy contract only; BACC, macro-F1, and routing-quality claims require fresh Stage-70 scoring after comparison policies are frozen.
+
+  - experiment_id: midogpp.routing_and_composition.uniform_b_v2_source_inner_candidate_utility.v1
+    stage: 60_routing_and_composition
+    status: active
+    claim_scope: routing_and_composition
+    config_path: experiments/midogpp/stages/60_routing_and_composition/configs/uniform_b_v2_source_inner_candidate_utility_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_source_inner_candidate_utility_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_virchow2_uniform_b_v2_routing_validation_cache_seed42
+      - midogpp_source_inner_validation_manifest_v1
+    runner:
+      environment:
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-routing
+        - uniform-b-v2-source-inner-candidate-utility
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_source_inner_candidate_utility_v1
+    notes:
+      - Consumes the fresh label-blind validation cache and the narrow one-time validation-manifest alias only after freezing policy-consumption lock 6c18c72a017403a7.
+      - Fits exactly 81 source-only synthetic classifiers, predicts all 2,615 validation rows before opening labels, and emits all 648 q != e utilities plus paired per-case confusion counts without ranking or selection.
+      - Train, test, center-4, Stage-20 metric, Stage-50, Stage-90, target-support, alternative-router, and seed-selection reuse remain forbidden.
+
+  - experiment_id: midogpp.routing_and_composition.uniform_b_v2_utility_regret_policy_lock.v1
+    stage: 60_routing_and_composition
+    status: active
+    claim_scope: routing_and_composition
+    config_path: experiments/midogpp/stages/60_routing_and_composition/configs/uniform_b_v2_utility_regret_policy_lock_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_utility_regret_policy_lock_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+      - midogpp_output_uniform_b_v2_source_inner_candidate_utility_v1
+    runner:
+      environment:
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-routing
+        - uniform-b-v2-utility-regret-policy-lock
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_utility_regret_policy_lock_v1
+    notes:
+      - Applies the sole predeclared mean paired-BACC regret policy after removing both q = H and e = H for each outer target center H.
+      - Uses a fixed paired three-level pseudo-target, case-cluster, and training-generation-seed bootstrap; macro-F1 is descriptive only and no seed is selected.
+      - Selects one source at full budget only on a unique robust winner; every uncertain fold reuses the exact canonical equal-union control. Routing quality remains deferred to Stage 70.
+
+  - experiment_id: midogpp.routing_compatibility.uniform_b_v2_metadata_exact_match_lock.v1
+    stage: 60_routing_and_composition
+    status: active
+    claim_scope: routing_compatibility_only
+    config_path: experiments/midogpp/stages/60_routing_and_composition/configs/uniform_b_v2_metadata_exact_match_compatibility_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_metadata_exact_match_compatibility_v1
+    input_artifact_ids:
+      - midogpp_routing_metadata_profiles_v1
+    runner:
+      environment:
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-routing
+        - uniform-b-v2-metadata-exact-match-compatibility
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_metadata_exact_match_compatibility_v1
+    notes:
+      - Sanitizes the hash-pinned MIDOG++ domain mapping into nine routing-time profiles with exactly tumor type, lab or origin, and scanner model fields.
+      - Scores every target-excluded source by an unweighted componentwise exact-match count and publishes all 72 proxy-score rows without ranking, selection, weighting, NELBO, or target utility.
+      - Metadata similarity is a deployable routing proxy only; it does not establish expected utility, oracle agreement, routing quality, or downstream utility.
+
+  - experiment_id: midogpp.routing_and_composition.uniform_b_v2_metadata_tie_union_policy_lock.v1
+    stage: 60_routing_and_composition
+    status: active
+    claim_scope: routing_and_composition
+    config_path: experiments/midogpp/stages/60_routing_and_composition/configs/uniform_b_v2_metadata_tie_union_policy_lock_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_metadata_tie_union_policy_lock_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+      - midogpp_output_uniform_b_v2_metadata_exact_match_compatibility_v1
+    runner:
+      environment:
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-routing
+        - uniform-b-v2-metadata-tie-union-policy-lock
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_metadata_tie_union_policy_lock_v1
+    notes:
+      - Selects every source tied for the maximum frozen metadata-proxy score; canonical source order only orders the retained tie set and never breaks it.
+      - Splits the fixed 1,024-per-class budget equally across the retained tie set using prefixes of the same frozen source streams and preserves all 81 training-seed x generation-seed replicates without seed selection.
+      - Consumes the validated bank, GenerationLock, equal-union control, and metadata-compatibility lock only; Stage-50 utilities and Stage-90 oracle identities remain forbidden.
+      - Freezes a matched comparison policy contract only. BACC, macro-F1, routing quality, and downstream utility require fresh paired Stage-70 scoring.
+
+
+  - experiment_id: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_reservation.v1
+    stage: 70_frozen_policy_downstream
+    status: active
+    claim_scope: target_evaluation_authorization
+    config_path: experiments/midogpp/stages/70_frozen_policy_downstream/configs/uniform_b_v2_descriptive_test_reservation_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_descriptive_test_reservation_v1
+    input_artifact_ids:
+      - midogpp_dataset_contract_annotation_patch_v1
+      - midogpp_uniform_b_test_consumption_ledger_v1
+      - midogpp_output_uniform_b_canonical_reference_v1
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+      - midogpp_output_uniform_b_v2_metadata_tie_union_policy_lock_v1
+      - midogpp_output_uniform_b_v2_utility_regret_policy_lock_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_canonical_reference_v1: >-
+        Protocol review authorizes this frozen canonical reference only for
+        independent representation-identity and consumed-test-ledger validation;
+        it contributes no tuning, selection, target utility, or fresh evidence.
+    runner:
+      environment:
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-frozen-policy-downstream
+        - reserve-consumed-test
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_descriptive_test_reservation_v1
+    notes:
+      - Consumes the narrow test-consumption ledger and freezes opaque evaluation identities before any cache extraction.
+      - The 9,928 eligible test rows were already consumed for representation adoption; this gate authorizes descriptive locked-policy use only.
+      - No generation, prediction, label access, metric scoring, policy change, or fresh confirmation occurs here.
+
+  - experiment_id: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_final_authorization.v1
+    stage: 70_frozen_policy_downstream
+    status: active
+    claim_scope: target_evaluation_authorization
+    config_path: experiments/midogpp/stages/70_frozen_policy_downstream/configs/uniform_b_v2_descriptive_test_final_authorization_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_descriptive_test_final_authorization_v1
+    input_artifact_ids:
+      - midogpp_frozen_policy_test_scoring_manifest_v1
+      - midogpp_output_uniform_b_canonical_reference_v1
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+      - midogpp_output_uniform_b_v2_metadata_tie_union_policy_lock_v1
+      - midogpp_output_uniform_b_v2_utility_regret_policy_lock_v1
+      - midogpp_output_uniform_b_v2_descriptive_test_reservation_v1
+      - midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_canonical_reference_v1: >-
+        Protocol review authorizes this frozen canonical reference only for
+        independent representation-identity and consumed-test-ledger validation;
+        it contributes no tuning, selection, target utility, or fresh evidence.
+    runner:
+      environment:
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-frozen-policy-downstream
+        - authorize-prediction
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_descriptive_test_final_authorization_v1
+    notes:
+      - Revalidates the reservation, completed cache, frozen policies, generation lock, classifier contract, and scoring-manifest digest.
+      - Emits prediction-only authorization; the scoring manifest may be hashed but not parsed and labels remain sealed.
+      - The token hash is generated only after the cache validates and does not create fresh evidence.
+
+  - experiment_id: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_frozen_policy_comparison.v1
+    stage: 70_frozen_policy_downstream
+    status: active
+    claim_scope: descriptive_frozen_policy_comparison_on_previously_consumed_test
+    config_path: experiments/midogpp/stages/70_frozen_policy_downstream/configs/uniform_b_v2_descriptive_frozen_policy_comparison_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_descriptive_frozen_policy_comparison_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_descriptive_test_final_authorization_v1
+      - midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+      - midogpp_output_uniform_b_v2_metadata_tie_union_policy_lock_v1
+      - midogpp_output_uniform_b_v2_utility_regret_policy_lock_v1
+      - midogpp_frozen_policy_test_scoring_manifest_v1
+    runner:
+      environment:
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-frozen-policy-downstream
+        - evaluate-descriptively
+        - --config
+        - "{resolved_config}"
+    notes:
+      - Execution-authorized after independent protocol, architecture, and generative-model review of the hash-bound evaluator, validated cache, and final prediction-only authorization.
+      - All 243 prediction cells must be durably sealed before the previously consumed test labels are opened for scoring.
+      - This active status authorizes exactly one descriptive consumed-test evaluation; it does not create fresh confirmation, permit policy selection or promotion, or support deployment or external-generalization claims.
+      - Any resulting BACC and macro-F1 are descriptive only; 0.7701 is Stage-20 context, not a Stage-70 expectation.
 
   - experiment_id: midogpp.cvae.prior_recovery_outer.v1
     stage: 20_cvae_preservation

@@ -1,0 +1,46 @@
+cache:
+  name: uniform_b_v2_descriptive_test_cache_v1
+  artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+  root: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+
+inputs:
+  repo_root: .
+  manifest_path: datasets/midogpp/contract/annotation_patch_v1/manifest.csv
+  target_evaluation_reservation_path: artifacts/midogpp/70_frozen_policy_downstream/uniform_b_v2_descriptive_test_reservation/v1
+
+authorization_binding:
+  scoring_manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+  target_evaluation_reservation_id: reservation_b541f28d223a315edbec2b630c915fc2e7cd47cbfcc064dabecda860aa14c9e3
+  target_evaluation_reservation_protocol_hash: 30596a19ea6a2e37a5ae5baa51bd1f1eb63fa64bd589b44e6d7a87df4800b15a
+  cache_extractor_protocol_hash: 8bae5653e53b087f1662216308dcf2352975f5efa6fdda5fae4e72ff04d3790b
+
+run:
+  eligible_centers:
+    - "0"
+    - "1"
+    - "2"
+    - "3"
+    - "5"
+    - "6"
+    - "7"
+    - "8"
+    - "9"
+  expected_row_count: 9928
+  expected_rows_by_center:
+    "0": 1532
+    "1": 866
+    "2": 3210
+    "3": 1278
+    "5": 628
+    "6": 742
+    "7": 282
+    "8": 726
+    "9": 664
+  experiment_seed: 42
+  device: cuda
+  batch_size: 32
+
+protocol:
+  authorized_consumer_experiment_id: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_frozen_policy_comparison.v1
+  purpose: descriptive_frozen_policy_comparison_on_previously_consumed_test
+  fresh_evidence: false

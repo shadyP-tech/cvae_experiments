@@ -196,6 +196,28 @@ gates pass. A positive result can only request a separate protocol-reviewed
 promotion artifact; it cannot emit a `RecipeLock`, change current consensus
 locks, or enter Stage 30 directly.
 
+## Uniform-B GECO Aggregate-Prior Union V2 Result
+
+`midogpp.cvae.uniform_b_geco_aggregate_prior_union_source_inner.v2` is
+`COMPLETE` and validates `PASS`. It uses PCA256, a 1,024-wide three-layer
+CVAE, latent dimension 64, 4,000 keyed steps, source-only class-conditional
+full-shrinkage aggregate-posterior states, and a fixed equal-total union of
+the seven legal sources in each source-inner task.
+
+The PS arm reaches mean BACC `0.770112`, versus `0.757348` for P0 and
+`0.771571` for the posterior-sample ceiling. PS improves over P0 by
+`+0.012764`; its remaining posterior-ceiling gap is `0.001459`; and all three
+training-seed means exceed `0.75` (`0.772334`, `0.773440`, `0.764562`). The
+decision is `TARGET_METRIC_REACHED_REQUIRES_SEPARATE_PROMOTION`.
+
+The Stage-20 artifact remains non-consumable directly. Its evidence was
+subsequently consumed once by the separately reviewed
+`midogpp.expert_bank.uniform_b_v2_routing_promotion.v1`, which retained all 27
+experts without expert/seed selection and emitted the routing-authorized
+Stage-30 bank. Future code must consume that Stage-30 artifact, never this
+Stage-20 source study. The source-inner labels may not be reused as fresh
+router-selection evidence.
+
 ## Uniform-B GECO And Task-Geometry V1 Study
 
 `midogpp.cvae.uniform_b_geco_task_geometry_source_inner.v1` is the bounded

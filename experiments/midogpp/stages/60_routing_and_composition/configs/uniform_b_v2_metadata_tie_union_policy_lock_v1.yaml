@@ -1,0 +1,155 @@
+experiment:
+  id: midogpp.routing_and_composition.uniform_b_v2_metadata_tie_union_policy_lock.v1
+  name: uniform_b_v2_metadata_tie_union_policy_lock_v1
+  artifact_root: output://midogpp_output_uniform_b_v2_metadata_tie_union_policy_lock_v1
+
+inputs:
+  bank_root: artifact://midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_root: artifact://midogpp_output_uniform_b_v2_generation_lock_v1
+  equal_union_policy_root: artifact://midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+  metadata_compatibility_root: artifact://midogpp_output_uniform_b_v2_metadata_exact_match_compatibility_v1
+  bank_artifact_id: midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_artifact_id: midogpp_output_uniform_b_v2_generation_lock_v1
+  equal_union_policy_artifact_id: midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+  metadata_compatibility_artifact_id: midogpp_output_uniform_b_v2_metadata_exact_match_compatibility_v1
+  expected_bank_lock_hash: 9972a41dcd4814cd
+  expected_generation_lock_hash: 34e551425710362e
+  expected_generation_content_hash: 0d1ed12ee31c6427
+  expected_source_plan_hash: 4571805ace4777a4
+  expected_replicate_plan_hash: 2040f9bb67a6f49d
+  expected_equal_union_policy_lock_hash: 4b9ea514308b084f
+  expected_equal_union_policy_plan_hash: 9ec24122d7d0cdf1
+  expected_equal_union_assignment_table_hash: c85415c1b953c04e
+  expected_compatibility_lock_hash: 4b46b3d157b07781
+  expected_compatibility_score_table_hash: aec9e0b5b09a1fe5
+
+policy_contract:
+  family: metadata_exact_match_all_max_ties_equal_union_fixed_count
+  namespace: uniform_b_v2_metadata_tie_union_policy_lock_v1
+  centers: ['0', '1', '2', '3', '5', '6', '7', '8', '9']
+  class_labels: [0, 1]
+  training_seeds: [17, 42, 101]
+  generation_seeds: [17, 42, 101]
+  seed_pairing: cartesian_product
+  replicate_policy: report_each_replication_and_predeclared_mean_no_seed_selection
+  candidate_sources_by_target:
+    '0': ['1', '2', '3', '5', '6', '7', '8', '9']
+    '1': ['0', '2', '3', '5', '6', '7', '8', '9']
+    '2': ['0', '1', '3', '5', '6', '7', '8', '9']
+    '3': ['0', '1', '2', '5', '6', '7', '8', '9']
+    '5': ['0', '1', '2', '3', '6', '7', '8', '9']
+    '6': ['0', '1', '2', '3', '5', '7', '8', '9']
+    '7': ['0', '1', '2', '3', '5', '6', '8', '9']
+    '8': ['0', '1', '2', '3', '5', '6', '7', '9']
+    '9': ['0', '1', '2', '3', '5', '6', '7', '8']
+  selected_sources_by_target:
+    '0': ['5']
+    '1': ['2']
+    '2': ['1']
+    '3': ['1', '2']
+    '5': ['6', '7']
+    '6': ['5', '7']
+    '7': ['5', '6', '8', '9']
+    '8': ['7', '9']
+    '9': ['7', '8']
+  target_identity_role: fold_identity_candidate_exclusion_metadata_profile_binding_and_label_blind_shuffle_namespace_only
+  selection_rule: retain_all_sources_tied_at_maximum_exact_match_score
+  canonical_candidate_order_role: ordering_only_never_tie_break
+  source_policy: equal_fixed_count_union_of_all_maximum_metadata_ties
+  source_budget_by_tie_count:
+    '1': 1024
+    '2': 512
+    '4': 256
+  stage40_max_source_block_per_class: 1024
+  total_per_class: 1024
+  prefix_allocation: true
+  source_counts_equal_within_tie_set: true
+  target_expert_excluded: true
+  all_maximum_ties_retained: true
+  tie_break_forbidden: true
+  metadata_proxy_selection_only: true
+  no_seed_selection: true
+  no_learned_source_weighting: true
+  expected_selection_count: 9
+  expected_replicate_count: 81
+  expected_assignment_count: 153
+  policy_frozen_before_target_evaluation: true
+
+composition_execution:
+  source_slice: first_n_from_generation_lock_stream
+  source_prefix_start_per_class: 0
+  source_prefix_per_class_source: policy_selection_tie_count_allocation
+  source_concatenation_order: selected_sources_in_canonical_candidate_order
+  class_composition_order: [0, 1]
+  shuffle_scope: independently_within_class_after_union
+  shuffle_algorithm: numpy_generator_pcg64_permutation
+  shuffle_seed_source: generation_lock_equal_union_replicate_plan
+  shuffle_seed_field: class_shuffle_seed_by_label
+  shuffle_seed_reused_exactly: true
+  shuffle_applied_once_per_class: true
+  final_class_concatenation_order: [0, 1]
+  embedding_dtype: float32
+  embedding_dim: 3840
+  labels_derived_from_class_stream: true
+
+future_evaluation_contract:
+  authorization: separate_stage70_target_eval_artifact_required
+  future_target_evaluation_rows: all_authorized_target_rows_paired_across_policies
+  row_filtering: none
+  row_subsampling: none
+  row_order: authorized_artifact_canonical_order
+  labels_access: metrics_only_after_predictions
+  support_rows_used: false
+  target_identity_role: fold_membership_candidate_exclusion_metadata_profile_binding_and_label_blind_shuffle_namespace_only
+  target_identity_as_predictive_feature: false
+  identity_overlap_audit_required: true
+  evaluation_occurs_in_stage60: false
+  evaluation_stage: 70_frozen_policy_downstream
+
+execution:
+  lock_only: true
+  generation_performed: false
+  model_training_allowed: false
+  sampler_refit_allowed: false
+  frame_refit_allowed: false
+  classifier_fit_allowed: false
+  target_dataset_access_allowed: false
+  support_set_access_allowed: false
+  metric_computation_allowed: false
+  stage50_access_allowed: false
+  stage90_access_allowed: false
+
+claim_boundary:
+  strict_claim_firewall: true
+  claim_scope: routing_and_composition
+  lock_only: true
+  comparison_policy: true
+  canonical_control: false
+  may_feed_deployable_selection: true
+  policy_frozen_before_stage70: true
+  source_only_frozen_state: true
+  target_identity_used_for_fold_exclusion_profile_binding_and_shuffle_only: true
+  target_identity_used_as_predictive_feature: false
+  target_samples_used: false
+  target_support_used: false
+  target_labels_used: false
+  target_evaluation_labels_used: false
+  sanitized_target_metadata_profile_used: true
+  compatibility_scores_consumed: true
+  compatibility_scores_computed_in_policy: false
+  metadata_proxy_selection_performed: true
+  all_maximum_ties_retained: true
+  seed_selection_performed: false
+  tie_break_applied: false
+  source_weighting_learned: false
+  routing_policy_frozen: true
+  routing_quality_claimed: false
+  nelbo_computed: false
+  generation_performed: false
+  classifier_fit_performed: false
+  bacc_computed: false
+  macro_f1_computed: false
+  downstream_utility_computed: false
+  stage20_scores_reused: false
+  stage50_artifacts_used: false
+  stage90_artifacts_used: false

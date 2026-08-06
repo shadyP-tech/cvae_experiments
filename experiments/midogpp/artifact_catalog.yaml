@@ -1,6 +1,6 @@
 schema_version: 2
 catalog_kind: midogpp_artifact_catalog
-last_reviewed: 2026-07-23
+last_reviewed: 2026-08-05
 path_base: repository_root
 
 catalog_policy:
@@ -66,6 +66,112 @@ artifacts:
       - Frozen manifest paths retain their original repository prefix for hash stability.
       - path_relocation.json maps only that audited prefix to the canonical contract tree.
       - The complete 22569-patch payload is present locally and on the workstation at the canonical path.
+
+  - artifact_id: midogpp_routing_metadata_profiles_v1
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: ROUTING_METADATA_INPUT_AUTHORIZED
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      routing_metadata_source: midogpp_domain_mapping_v1
+      domain_axis: tumor_type|lab_or_origin|scanner_model
+      domain_mapping_sha256: 79d703ccf3085ae3968698c2ac44a3eabc2713b434762cc6b2fd2fa90126a211
+    required_files:
+      - domain_mapping.json
+    expected_file_hashes:
+      domain_mapping.json:
+        algorithm: sha256
+        digest: 79d703ccf3085ae3968698c2ac44a3eabc2713b434762cc6b2fd2fa90126a211
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+    notes:
+      - Narrow routing-time metadata input; it authorizes only the hash-pinned domain mapping, not the labeled sample manifest or target outcomes.
+      - Compatibility consumers may expose only tumor type, lab or origin, and scanner model profiles and must not use domain counts, labels, sample identities, or held-out metrics.
+      - Query metadata is a routing proxy input, not NELBO, expected utility, oracle agreement, routing-quality evidence, or downstream utility.
+
+  - artifact_id: midogpp_source_inner_validation_manifest_v1
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: SOURCE_INNER_VALIDATION_LABELS_RESERVED
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      split_role: val_source_inner_pseudo_target_scoring_only
+      policy_consumption_lock_hash: 6c18c72a017403a7
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse:
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+    notes:
+      - Narrow alias for the hash-pinned manifest used in one predeclared Stage-60 source-inner pseudo-target scoring event.
+      - Validation labels may be opened only after all candidate predictions are materialized and may authorize only policy-consumption lock 6c18c72a017403a7.
+      - This alias does not authorize representation selection, expert or seed tuning, alternative routers, target support, Stage-70 scoring, or oracle analysis.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: TEST_ROWS_CONSUMED_DESCRIPTIVE_LOCKED_SCORING_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      split: test
+      row_count: "9928"
+      consumption_status: CONSUMED_FOR_REPRESENTATION_ADOPTION
+      fresh_evidence: "false"
+      authorized_consumer_experiment_ids: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_reservation.v1
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Narrow alias for the canonical Uniform-B test-consumption ledger; it does not expose representation-confirmation metrics or any Stage-90 result artifact.
+      - The 9,928 eligible test rows are already consumed and may support descriptive scoring of already locked systems only.
+      - This alias may authorize only the named Stage-70 reservation and can never establish fresh confirmation, policy selection, promotion, or deployment utility.
+
+  - artifact_id: midogpp_frozen_policy_test_scoring_manifest_v1
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: PREVIOUSLY_CONSUMED_TEST_LABELS_SCORING_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      split_role: test_previously_consumed_scoring_only
+      fresh_evidence: "false"
+      authorized_consumer_experiment_ids: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_final_authorization.v1|midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_frozen_policy_comparison.v1
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Narrow scoring alias for the previously consumed test labels; final authorization may hash the file but must not parse any row.
+      - Only the named descriptive evaluator may open labels, and only after all 243 prediction cells are durably sealed.
+      - Generic or fresh Stage-70 evidence, alternative policies, Stages 10-60, Stage 50, Stage 90, recipe selection, and deployable selection are forbidden consumers.
 
   - artifact_id: midogpp_dataset_contract_physical_multiscale_center_pooling_pilot_v1
     stage: dataset_contract
@@ -199,6 +305,39 @@ artifacts:
       - Active corrected xyxy cache lineage for current experiments.
       - Local and workstation copies were moved to this canonical path and hash-verified.
       - The historical train-only cache is not an acceptable fallback.
+
+  - artifact_id: midogpp_virchow2_xyxy_validation_cache_seed42
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/annotation_patch_xyxy/seed42
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: AUDIT_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      validation_feature_cache_hash: 23b0a76d1fb56e033556b44f7f939f957be0284269c218655ace18857cafa117
+      split: val
+      feature_dim: "2560"
+    required_files:
+      - embeddings/val.pt
+    expected_file_hashes:
+      embeddings/val.pt:
+        algorithm: sha256
+        digest: 23b0a76d1fb56e033556b44f7f939f957be0284269c218655ace18857cafa117
+    forbidden_reuse:
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Narrow validation-split alias used only as the numeric prefix comparator while building the label-blind Uniform-B routing-validation cache.
+      - It is not a routing input and cannot feed recipe selection, expert selection, policy selection, Stage-70 scoring, or oracle analysis.
 
   - artifact_id: midogpp_virchow2_jpeg_center_pooling_3840_seed42
     stage: derived_features
@@ -491,6 +630,99 @@ artifacts:
     notes:
       - Distinct v3 B lineage with the frozen fixed-center token-pooling rule.
       - Its 2560-dimensional prefix must pass numeric and task-semantic canonical-A replay.
+
+  - artifact_id: midogpp_virchow2_uniform_b_v2_routing_validation_cache_seed42
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_routing_validation_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: SOURCE_INNER_ROUTING_CACHE_VALIDATED
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      cache_name: uniform_b_v2_routing_validation_cache_v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: val
+      feature_dim: "3840"
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      labels_persisted: "false"
+      policy_consumption_lock_hash: 6c18c72a017403a7
+      frozen_build_protocol_hash: f57aad1bf7f7efed
+      content_hash: e1d281d44e47c7b2
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - manifests/consumption_lock.json
+      - manifests/content_index.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    expected_file_hashes:
+      embeddings/by_center/center_0.pt:
+        algorithm: sha256
+        digest: 9173a27896d4da6b03e16a9ff74728e833c523c7f8c0e3133a326bd811157846
+      embeddings/by_center/center_1.pt:
+        algorithm: sha256
+        digest: afa13f0db6da02183c634708f324910f23b431a8ad27d397d519b828c05837e1
+      embeddings/by_center/center_2.pt:
+        algorithm: sha256
+        digest: 9dddfae085858c97fa8839029459f288e256e79c2d85ec4023e129fe09e9ca15
+      embeddings/by_center/center_3.pt:
+        algorithm: sha256
+        digest: 11e0168a2f86179af1ecd7bae3373fafa1d457e127c2b02fdc3bafa627286772
+      embeddings/by_center/center_5.pt:
+        algorithm: sha256
+        digest: f2389563717108f649249bbc1ef519f4690b5120899be0620479ac635d2856e4
+      embeddings/by_center/center_6.pt:
+        algorithm: sha256
+        digest: 801529fdb8b1075224963a39b08a2352c477a6d44e6993d0dfbfa81c7c1f39f9
+      embeddings/by_center/center_7.pt:
+        algorithm: sha256
+        digest: 3088737286a406c42a6188a9ae951ddbc29007afe90ece47abd074040d62780f
+      embeddings/by_center/center_8.pt:
+        algorithm: sha256
+        digest: dade7283a833b948344e9b60c83fda350ff7856b191451c0e31451ff444e4fba
+      embeddings/by_center/center_9.pt:
+        algorithm: sha256
+        digest: cdade0c468c5ad70cc51588ed6a0e195135eb7651fc80af758d2e992666f610d
+      manifests/frozen_build_protocol.json:
+        algorithm: sha256
+        digest: cda5e0c351b9f78ff2b8e469341a56e5b5fba2e7907be382d8422f2ce83c14e1
+      manifests/row_alignment.json:
+        algorithm: sha256
+        digest: 8e92e987d121efdaadf547c20996777ea924009443f40dadc664a4f271125f7b
+      manifests/consumption_lock.json:
+        algorithm: sha256
+        digest: 2cef95465c66c59a8d9cbff66c471a38dd30e83ff411246c8510487f3fd79b14
+      manifests/content_index.json:
+        algorithm: sha256
+        digest: 6b46a1777c90a838e67ba1892134c748529169c6034c6865fc8a616039ec5fe2
+      reports/cache_builder_report.json:
+        algorithm: sha256
+        digest: d51ff4bc588554289fa58e64b149f7c696df1ddb4b3a45a6fd3df5f2094234af
+      reports/validation_report.json:
+        algorithm: sha256
+        digest: 2698c5a4335cb209012f4e3f495d57b27f395f0c51fa556083bbab9c02f0872d
+    forbidden_reuse:
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+    notes:
+      - Immutable label-blind 3,840-dimensional validation cache for the single predeclared Stage-60 source-inner utility family.
+      - Shards contain identities and embeddings only; labels are absent and may be joined from the narrow manifest alias only after all predictions are materialized.
+      - Direct Stage-70, Stage-50, Stage-90, preservation, bank, or generation reuse is forbidden; routing quality remains unclaimed.
 
   - artifact_id: midogpp_virchow2_physical_multiscale_clipped_bbox_annotation_local_pooling_11520_v3_seed42
     stage: derived_features
@@ -1637,6 +1869,813 @@ artifacts:
       - P0/Pq scores are unique by E/I/training seed/generation seed/prior and are mapped without recomputation to all legal outer centers.
       - Even CANDIDATE_FOR_SEPARATE_PROMOTION remains non-consumable until a separate protocol-reviewed promotion artifact passes.
 
+  - artifact_id: midogpp_output_cvae_uniform_b_geco_aggregate_prior_union_source_inner_v2
+    stage: 20_cvae_preservation
+    canonical_path: artifacts/midogpp/20_cvae_preservation/uniform_b_geco_aggregate_prior_union_source_inner_v2/seeds17_42_101
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: PASS_REQUIRES_REVIEWED_PROMOTION
+    claim_scope: cvae_source_inner_study_only
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/protocol_manifest.json
+      - manifests/coverage_manifest.json
+      - manifests/frame_index.json
+      - manifests/checkpoint_index.json
+      - manifests/generation_manifest.json
+      - manifests/content_index.json
+      - tables/task_metrics.csv
+      - tables/paired_deltas.csv
+      - tables/sampler_audit.csv
+      - tables/identity_overlap_audit.csv
+      - tables/runtime_timings.csv
+      - reports/study_decision.json
+      - reports/leakage_report.json
+      - reports/runtime_summary.json
+      - reports/publication_state.json
+      - reports/run_state.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - The fixed equal-total legal-source union changes the training geometry without target-conditioned routing or source selection.
+      - P0, full-shrinkage aggregate prior, posterior samples, posterior means, and PCA-only controls share class budgets and shuffle permutations.
+      - A result at or above 0.70 remains a non-consumable mechanism result pending separate promotion.
+
+  - artifact_id: midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+    stage: 30_expert_bank
+    canonical_path: artifacts/midogpp/30_expert_bank/uniform_b_v2_routing_authorized_expert_bank_v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: ROUTING_AUTHORIZED_AFTER_VALIDATION
+    claim_scope: expert_bank_construction_only
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/promotion_protocol.json
+      - manifests/promotion_review_snapshot.json
+      - manifests/source_evidence_lock.json
+      - manifests/expert_bank_index.json
+      - manifests/equal_union_ps_control_lock.json
+      - manifests/content_index.json
+      - reports/promotion_decision.json
+      - reports/test_consumption_ledger.json
+      - reports/leakage_report.json
+      - reports/promotion_report.md
+      - reports/run_state.json
+      - reports/validation_report.json
+      - tables/expert_inventory.csv
+      - tables/sampler_inventory.csv
+      - tables/source_gate_audit.csv
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+    notes:
+      - Contains all 27 independently trained v2 experts, source-local decoding frames, and source-only full-shrinkage aggregate-prior states.
+      - Authorizes routing and expert-selection experiments without asserting that any routing policy is successful.
+      - Equal-union PS with all eight non-target source centers is the frozen canonical control for each future routing fold.
+      - Source-inner evaluation evidence is consumed for whole-bank adoption and may not be reused to select an expert, seed, or routing policy.
+
+  - artifact_id: midogpp_output_uniform_b_v2_generation_lock_v1
+    stage: 40_prior_and_generation
+    canonical_path: artifacts/midogpp/40_prior_and_generation/uniform_b_v2_generation_lock/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: GENERATION_SETTINGS_LOCKED_AFTER_VALIDATION
+    claim_scope: generation_settings_and_frame_lock
+    semantic_identities:
+      generation_lock_contract: midogpp_uniform_b_v2_generation_lock_v1
+      generation_lock_hash: 34e551425710362e
+      expert_bank_lock_hash: 9972a41dcd4814cd
+      equal_union_control_lock_hash: cddbcc3b3343fe38
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/protocol_manifest.json
+      - manifests/generation_lock.json
+      - manifests/source_generation_plan.json
+      - manifests/equal_union_replicate_plan.json
+      - manifests/content_index.json
+      - reports/leakage_report.json
+      - reports/run_state.json
+      - reports/validation_report.json
+      - tables/generation_health.csv
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - all_candidate_utility_diagnostic
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+    notes:
+      - Freezes the source-local frames, source-only class-conditional aggregate-prior sampler, deterministic seed Cartesian product, equal-union budgets, and classifier settings inherited by Stage 60 and Stage 70.
+      - Contains health and integrity evidence only; no target data, target labels, routing score, NELBO, source weighting, expert selection, or downstream utility is computed.
+      - The locked 1,024-per-class eight-source control must be generated and scored afresh in later experiments; the Stage-20 seven-source BACC is not a Stage-40 or Stage-60 result.
+
+  - artifact_id: midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+    stage: 60_routing_and_composition
+    canonical_path: artifacts/midogpp/60_routing_and_composition/uniform_b_v2_equal_union_policy_lock/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: ROUTING_POLICY_FROZEN_AFTER_VALIDATION
+    claim_scope: routing_and_composition
+    semantic_identities:
+      policy_lock_contract: midogpp_uniform_b_v2_equal_union_policy_lock_v1
+      config_contract_hash: e581a1bf98762031
+      policy_lock_hash: 4b9ea514308b084f
+      policy_plan_hash: 9ec24122d7d0cdf1
+      assignment_table_hash: c85415c1b953c04e
+      generation_lock_hash: 34e551425710362e
+      expert_bank_lock_hash: 9972a41dcd4814cd
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/protocol_manifest.json
+      - manifests/policy_lock.json
+      - manifests/equal_union_policy_plan.json
+      - manifests/content_index.json
+      - reports/policy_decision.json
+      - reports/leakage_report.json
+      - reports/run_state.json
+      - reports/validation_report.json
+      - tables/policy_assignments.csv
+    expected_file_hashes:
+      config.resolved.yaml:
+        algorithm: sha256
+        digest: 9c438af6a6d90210340c5dca211073f4e8951a0eed6320dd1b81147568cfe288
+      provenance/input_artifacts.json:
+        algorithm: sha256
+        digest: 885805ed6b4f4f9030aa51090ae977df94262b2f0c88ab2803861c31da982234
+      manifests/protocol_manifest.json:
+        algorithm: sha256
+        digest: ba70c80e8ae023137508dbc8297f154fed1535184a92c82fd29c7415f1d9bbae
+      manifests/policy_lock.json:
+        algorithm: sha256
+        digest: 59dc4019941b5fcd72717ef465fcebb0c6dd99c631d66c4591023bbdb0b1b476
+      manifests/equal_union_policy_plan.json:
+        algorithm: sha256
+        digest: 161e02d8cd065a50d6c11d3f6d4106ab41df26247b79dde3519bb2e9cdeda9b9
+      manifests/content_index.json:
+        algorithm: sha256
+        digest: d283a201ae24e99f1b6e79e98404b59ec85c19e13f2ffdc02a62c4c42aa94b61
+      reports/policy_decision.json:
+        algorithm: sha256
+        digest: 2414847d43df853f0e00169ae796bee1a39f6f21f125f2b696c88a1435038680
+      reports/leakage_report.json:
+        algorithm: sha256
+        digest: 9b6f4f317bd03b4f4851754136f2282a415f4887e8c94ae8af467c714affa125
+      reports/run_state.json:
+        algorithm: sha256
+        digest: 42d2e7d4f250709f071014ee2bb8d6e32ae559d69d2c4aefe175e12666e144c9
+      reports/validation_report.json:
+        algorithm: sha256
+        digest: b1482658a8eebce2c7c164af54399b821e78e7a2654f2d245544453bb47340fe
+      tables/policy_assignments.csv:
+        algorithm: sha256
+        digest: e27a7bb238f9a67a632972e86301db886c685268901fbe1eefcd22290d2a7671
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - all_candidate_utility_diagnostic
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+    notes:
+      - Freezes the canonical equal-union direct control over all eight eligible non-target sources with the GenerationLock budgets, seeds, source-stream prefixes, shuffles, and classifier contract unchanged.
+      - Contains policy assignments and leakage evidence only; it consumes no target data, support rows, target labels, Stage-50 utilities, or Stage-90 oracle identities.
+      - Does not report BACC, macro-F1, synthetic utility, routing quality, or an expected Stage-70 result.
+      - Fresh target scoring belongs to Stage 70 and must wait until all comparison policies are frozen under matched eligibility, budget, seed, and evaluation-row rules.
+
+  - artifact_id: midogpp_output_uniform_b_v2_source_inner_candidate_utility_v1
+    stage: 60_routing_and_composition
+    canonical_path: artifacts/midogpp/60_routing_and_composition/uniform_b_v2_source_inner_candidate_utility/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: SOURCE_INNER_UTILITY_READY_AFTER_VALIDATION
+    claim_scope: routing_and_composition
+    semantic_identities:
+      utility_lock_contract: midogpp_uniform_b_v2_source_inner_utility_lock_v1
+      config_contract_hash: 7eaa6438d04116e8
+      policy_consumption_lock_hash: 6c18c72a017403a7
+      generation_lock_hash: 34e551425710362e
+      expert_bank_lock_hash: 9972a41dcd4814cd
+      validation_cache_contract: uniform_b_v2_routing_validation_cache_v1
+      validation_cache_representation: annotation_jpeg_fixed_center_b_v3
+      validation_manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      candidate_utility_row_count: "648"
+      case_confusion_row_count: "3168"
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/protocol_manifest.json
+      - manifests/policy_consumption_lock.json
+      - manifests/prediction_index.json
+      - manifests/utility_lock.json
+      - manifests/content_index.json
+      - reports/utility_decision.json
+      - reports/label_consumption_report.json
+      - reports/leakage_report.json
+      - reports/run_state.json
+      - reports/validation_report.json
+      - tables/evaluation_rows.csv
+      - tables/classifier_fits.csv
+      - tables/candidate_utility.csv
+      - tables/case_confusions.csv
+      - arrays/candidate_predictions.npz
+    expected_file_hashes:
+      config.resolved.yaml:
+        algorithm: sha256
+        digest: 2306a2a8de3cc07ff18025d0e4d45f617236de6d2cab0a1d867b926a5da88166
+      provenance/input_artifacts.json:
+        algorithm: sha256
+        digest: 7d007f522af494941642636c748111a2b1fdfea65d1008dc669482566ca9e0d5
+      manifests/protocol_manifest.json:
+        algorithm: sha256
+        digest: f84cfc873851cfadd2372078a4202dcff5952ff13b50bf8b2f139735fdb09c98
+      manifests/policy_consumption_lock.json:
+        algorithm: sha256
+        digest: 9f1fb1582ef47b48c87528ce5b6da7c44863e4c5d63dc9d7dbc253d780e2c0e2
+      manifests/prediction_index.json:
+        algorithm: sha256
+        digest: bfa96c50b0fae4ffd58f3354d95f00c9eb95e550ed0a96d3c28e620f6a05f62f
+      manifests/utility_lock.json:
+        algorithm: sha256
+        digest: cd50ea2420b332babc0788f2457e8e948410b8e88308d414d0c95db569ec6bac
+      manifests/content_index.json:
+        algorithm: sha256
+        digest: 5f171c812f976f5dde9514f64eb63f6a9577b655020642874ebcaa4c6e6cbb0c
+      reports/utility_decision.json:
+        algorithm: sha256
+        digest: 00d2627b91f3bfe59b8a05ca37fc64bddb34a101109c126b9b2439fffffcfe57
+      reports/label_consumption_report.json:
+        algorithm: sha256
+        digest: 894c5c4d9e5a5c75e066b29ececda2f9f3bcc06de9afe977e26239b172d8d4e0
+      reports/leakage_report.json:
+        algorithm: sha256
+        digest: dd606c60411cc215d023c930a6bbdfc41ef6bb7f6fd9be38b332774c1f508b63
+      reports/run_state.json:
+        algorithm: sha256
+        digest: 0cb5fbae540eb7debebe066da6d85cd59533e18f742756151bd8c923fd87cee1
+      reports/validation_report.json:
+        algorithm: sha256
+        digest: 56f70cb9f271667f59c234b7d80fb554a89de4cb538689f539c08ae45d074510
+      tables/evaluation_rows.csv:
+        algorithm: sha256
+        digest: 400face5697a00a96593cbbc1031cbab03810895b07f174505d45396dedf61e7
+      tables/classifier_fits.csv:
+        algorithm: sha256
+        digest: 55564f32ed34977b05b2f6448148f0653a6e4bdb34bf8fcd93272f2ca1729bed
+      tables/candidate_utility.csv:
+        algorithm: sha256
+        digest: 91d750e04a0eb8a7b44a9abe629fbcc1565a1206b20f530b8a9171c39bba5de3
+      tables/case_confusions.csv:
+        algorithm: sha256
+        digest: 78f638c361282b322a145af492d53e1690002ab8a49de3f67883a4f579e7a81f
+      arrays/candidate_predictions.npz:
+        algorithm: sha256
+        digest: 76d887b3181af8f31a825c2b877189e89c4fe74b029cb82bbbfed23a0437b0bc
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+    notes:
+      - Non-selecting 648-row source-inner utility surface over every q != e pair and all nine training-generation seed cells, scored on the one-time reserved validation split.
+      - Labels are opened only after all 81 prediction arrays are materialized; per-case confusion counts are the only uncertainty input exposed to the predeclared consumer.
+      - This artifact authorizes exactly policy-consumption lock 6c18c72a017403a7 and cannot tune alternative routers, select seeds, or feed Stage-70 directly.
+
+  - artifact_id: midogpp_output_uniform_b_v2_utility_regret_policy_lock_v1
+    stage: 60_routing_and_composition
+    canonical_path: artifacts/midogpp/60_routing_and_composition/uniform_b_v2_utility_regret_policy_lock/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: ROUTING_POLICY_FROZEN_AFTER_VALIDATION
+    claim_scope: routing_and_composition
+    semantic_identities:
+      policy_lock_contract: midogpp_uniform_b_v2_utility_regret_policy_lock_v1
+      config_contract_hash: 6a7a9a58c25fa2a5
+      policy_consumption_lock_hash: 6c18c72a017403a7
+      policy_family: source_inner_mean_paired_bacc_regret_three_level_case_cluster_bootstrap_v1
+      expert_bank_lock_hash: 9972a41dcd4814cd
+      generation_lock_hash: 34e551425710362e
+      equal_union_policy_lock_hash: 4b9ea514308b084f
+      equal_union_policy_plan_hash: 9ec24122d7d0cdf1
+      equal_union_assignment_table_hash: c85415c1b953c04e
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/protocol_manifest.json
+      - manifests/policy_lock.json
+      - manifests/utility_regret_policy_plan.json
+      - manifests/content_index.json
+      - reports/policy_decision.json
+      - reports/leakage_report.json
+      - reports/source_inner_training_summary.json
+      - reports/run_state.json
+      - reports/validation_report.json
+      - tables/outer_regret_cells.csv
+      - tables/candidate_regret_summary.csv
+      - tables/bootstrap_results.csv
+      - tables/policy_selections.csv
+      - tables/policy_assignments.csv
+    expected_file_hashes:
+      config.resolved.yaml:
+        algorithm: sha256
+        digest: a3b22d9c331847642f93c446faa109c971b785e95d6b2f2424cec44dfa2f5fcb
+      provenance/input_artifacts.json:
+        algorithm: sha256
+        digest: 9bab5f425841d283975444423fa20ad3c0b9df0a496a0cb644ef19ee8af19459
+      manifests/protocol_manifest.json:
+        algorithm: sha256
+        digest: a47de556e7baed7f45f548c50419e148ab0ec14df85ab91cb3038acdc21ec976
+      manifests/policy_lock.json:
+        algorithm: sha256
+        digest: 27538ba1d0ce99cd3ce3ef37c8ac59ec14ac3bbd5fc5e7061e623a0212cbc6d3
+      manifests/utility_regret_policy_plan.json:
+        algorithm: sha256
+        digest: 29ee32fe4c29adebb8c1f8fa198efc13aff471f9a742140f812916342d82364e
+      manifests/content_index.json:
+        algorithm: sha256
+        digest: d46439665f6b1269c78e7ced014f2c8bc4c98c6f3f32a1e9ab48088164542342
+      reports/policy_decision.json:
+        algorithm: sha256
+        digest: 69e3b54375d80e8691db8b3d1dfaaa95b5a4e2ce8d37f97a8c65ed9b3c9a5c61
+      reports/leakage_report.json:
+        algorithm: sha256
+        digest: 801d56e2346db0da03705b379a5095d1446d05012626ffbc8649161d2a162dee
+      reports/source_inner_training_summary.json:
+        algorithm: sha256
+        digest: d0641088c740a64352e2a5f63685c3d70220aa36c0e29de77b6f858a8359516b
+      reports/run_state.json:
+        algorithm: sha256
+        digest: dd6b15e7cc7c3a7500e829bd54594dc14792618bf135fb65c44fe96ce151c861
+      reports/validation_report.json:
+        algorithm: sha256
+        digest: 604cf11ecca188d059eb453f5cc6e05e080448a3378e59e51ba8282cab178884
+      tables/outer_regret_cells.csv:
+        algorithm: sha256
+        digest: 66d21a896e520cb52e83c7dd83b25bed02ddf9187d8424a6e570377285beaf52
+      tables/candidate_regret_summary.csv:
+        algorithm: sha256
+        digest: 7bb1e9c845223af848c042303ed5d65b13f05ac0cb8f817219c7a7565a9bbdde
+      tables/bootstrap_results.csv:
+        algorithm: sha256
+        digest: 4432063b11089c11e3dcebbf4959623f0ec598625b029677422967f40a280588
+      tables/policy_selections.csv:
+        algorithm: sha256
+        digest: 169da301a0d2df49365bbe680d6450f3a512a1cb76856fd30b0852f80daf99d1
+      tables/policy_assignments.csv:
+        algorithm: sha256
+        digest: ec47fc9420938c05728c8275075e6df10c6be939b9c1bd1dbb39b3b4161211a3
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+    notes:
+      - For each outer center H, removes both q = H and e = H before paired regret or three-level bootstrap computation.
+      - A unique source receives the full 1,024-per-class budget only when every predeclared uncertainty gate passes; otherwise the exact frozen equal-union assignments, streams, budgets, order, and shuffle seeds are reused.
+      - Freezes a deployable Stage-60 policy only. Routing quality and target downstream utility remain unclaimed until fresh matched Stage-70 scoring.
+
+  - artifact_id: midogpp_output_uniform_b_v2_metadata_exact_match_compatibility_v1
+    stage: 60_routing_and_composition
+    canonical_path: artifacts/midogpp/60_routing_and_composition/uniform_b_v2_metadata_exact_match_compatibility/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: ROUTING_COMPATIBILITY_PROXY_FROZEN_AFTER_VALIDATION
+    claim_scope: routing_compatibility_only
+    semantic_identities:
+      metadata_compatibility_contract: midogpp_uniform_b_v2_metadata_exact_match_compatibility_lock_v1
+      config_contract_hash: 89191838fbb3f1c8
+      metadata_profile_lock_hash: de23d1c8de734503
+      compatibility_lock_hash: 4b46b3d157b07781
+      metadata_profile_table_hash: eee8dececd62bef8
+      compatibility_score_table_hash: aec9e0b5b09a1fe5
+      domain_mapping_sha256: 79d703ccf3085ae3968698c2ac44a3eabc2713b434762cc6b2fd2fa90126a211
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/protocol_manifest.json
+      - manifests/metadata_profile_lock.json
+      - manifests/compatibility_lock.json
+      - manifests/content_index.json
+      - reports/compatibility_decision.json
+      - reports/leakage_report.json
+      - reports/run_state.json
+      - reports/validation_report.json
+      - tables/metadata_profiles.csv
+      - tables/compatibility_scores.csv
+    expected_file_hashes:
+      config.resolved.yaml:
+        algorithm: sha256
+        digest: 09931064fee3fb2e5fee05b3a0c4692e8cfec6953965abf0dd1957628a8c7580
+      provenance/input_artifacts.json:
+        algorithm: sha256
+        digest: aa1dc63a7cf7fc3f581d45fceb57e95fb29af80e897e0b5ede24bf1f94df2de1
+      manifests/protocol_manifest.json:
+        algorithm: sha256
+        digest: 49c11f7bf9ac23d259c68d24647c7ea7ab3a584749323e8ff9dd7ea0a6b3b26a
+      manifests/metadata_profile_lock.json:
+        algorithm: sha256
+        digest: 755593f8167d37c0bb4f125020c3c21779258ba15f566e38c016d9198f69f002
+      manifests/compatibility_lock.json:
+        algorithm: sha256
+        digest: ceab51603a13d6f43c2a313b46bedf0975cbc47ce49045742df3993c3359ba53
+      manifests/content_index.json:
+        algorithm: sha256
+        digest: f78c2b0ec4b31e75d6e4a43b626f6887363ce7562783e47ce9f15e67ad362904
+      reports/compatibility_decision.json:
+        algorithm: sha256
+        digest: 79559962dfc6fa2b63f219471ed27123d2ea273ce2e2a087c4fad30a19c1aaea
+      reports/leakage_report.json:
+        algorithm: sha256
+        digest: c81ac1ebebc53b18f1199d3f28b3871371508fe345c1f0a9eb2e4754cb9fb492
+      reports/run_state.json:
+        algorithm: sha256
+        digest: 8616bb36c45ce095002ccc431d7fea9d0b7903a88aaa3b0802689215f4fb58d2
+      reports/validation_report.json:
+        algorithm: sha256
+        digest: feef2f8d306ad05ecd2a17d10536b44585704920f77e016b6abbef6c56dfb002
+      tables/metadata_profiles.csv:
+        algorithm: sha256
+        digest: 16fbbb70f142222d6bc782c30a8779f69a4884a9c11b6444eee91f53835bf57c
+      tables/compatibility_scores.csv:
+        algorithm: sha256
+        digest: 927a99e2d645eca384651c6d6ccb6d77284a9cb896f53525da57be7a654046b0
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+    notes:
+      - Freezes a componentwise exact-match proxy over tumor type, lab or origin, and scanner model for all 72 target-excluded source pairs.
+      - Contains sanitized profiles and proxy scores only; it does not rank or select experts, consume target samples or labels, compute NELBO, or access Stage-50 or Stage-90 evidence.
+      - Metadata exact-match count is not expected utility, oracle agreement, routing quality, or downstream utility.
+
+  - artifact_id: midogpp_output_uniform_b_v2_metadata_tie_union_policy_lock_v1
+    stage: 60_routing_and_composition
+    canonical_path: artifacts/midogpp/60_routing_and_composition/uniform_b_v2_metadata_tie_union_policy_lock/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: ROUTING_POLICY_FROZEN_AFTER_VALIDATION
+    claim_scope: routing_and_composition
+    semantic_identities:
+      policy_lock_contract: midogpp_uniform_b_v2_metadata_tie_union_policy_lock_v1
+      config_contract_hash: df69d7481b0fd62a
+      policy_lock_hash: 27f16953b32c46cd
+      policy_plan_hash: ca10b4ed038ccdba
+      selection_table_hash: ba611c0180149d79
+      assignment_table_hash: b3bc2187806f8788
+      compatibility_lock_hash: 4b46b3d157b07781
+      compatibility_score_table_hash: aec9e0b5b09a1fe5
+      equal_union_policy_lock_hash: 4b9ea514308b084f
+      generation_lock_hash: 34e551425710362e
+      expert_bank_lock_hash: 9972a41dcd4814cd
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/protocol_manifest.json
+      - manifests/policy_lock.json
+      - manifests/metadata_tie_union_policy_plan.json
+      - manifests/content_index.json
+      - reports/policy_decision.json
+      - reports/leakage_report.json
+      - reports/run_state.json
+      - reports/validation_report.json
+      - tables/policy_selections.csv
+      - tables/policy_assignments.csv
+    expected_file_hashes:
+      config.resolved.yaml:
+        algorithm: sha256
+        digest: f1cb0945fbef86828be150db5ea58d50e23873322689e8260213afd5224992da
+      provenance/input_artifacts.json:
+        algorithm: sha256
+        digest: 30db64eb2999003300a20245fe1f0fcfa6805f45f5261655608e605bb53c7717
+      manifests/protocol_manifest.json:
+        algorithm: sha256
+        digest: 2039d71bbffb51fedf7271e5903268462240ebb33bd8f966e1a419cf532b11b3
+      manifests/policy_lock.json:
+        algorithm: sha256
+        digest: 43b8f7aaac782502cf4f530d3afc7dcef6ab0ffc7fb3f06bb576dac5561a0e9f
+      manifests/metadata_tie_union_policy_plan.json:
+        algorithm: sha256
+        digest: f725eb8728aa98501b45598e05d5f38341b1a1eb381bbd6740ad2203c18eb3f9
+      manifests/content_index.json:
+        algorithm: sha256
+        digest: 137e3c166c6555a277038b43fc047c5a5d9b8336aac9f54a1cd5f757c485b17f
+      reports/policy_decision.json:
+        algorithm: sha256
+        digest: 0e3e48f13e014677c316c92bc475c67fb08e2ef9e6ef9d0d1f4f526419532d54
+      reports/leakage_report.json:
+        algorithm: sha256
+        digest: 65ddeaf339e1c9b1bcc2ee21def68679bbea42b913b9ab11a2a323036ea8a072
+      reports/run_state.json:
+        algorithm: sha256
+        digest: 64128c704bcebb2e8b69eb3c04d362611b4a3bd952a2ebaf40b6960545f92754
+      reports/validation_report.json:
+        algorithm: sha256
+        digest: 2391dfa905a5974f69b3096dd5c3e80f2e092577bca3936f30be0756636fdd28
+      tables/policy_selections.csv:
+        algorithm: sha256
+        digest: 68ca6e2615fa06698f009751b42d3a7f46444f37d931641812fd35cae28928ff
+      tables/policy_assignments.csv:
+        algorithm: sha256
+        digest: 30237fe07fc94d54549e10f32ccdb271a1571fc808f045d103020181bc98ca9c
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - all_candidate_utility_diagnostic
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+    notes:
+      - Freezes the first metadata-proxy comparison against the canonical equal-union control by retaining every source tied at the maximum proxy score.
+      - Keeps the total budget at 1,024 per class, uses equal fixed allocation within each retained tie set, preserves source-stream prefixes and shuffles, and reports all 81 seed replicates without seed selection.
+      - Contains no Stage-60 generation, classifier fit, target metric, routing-quality result, or downstream-utility result; all such scoring belongs to a later matched Stage-70 artifact.
+
+
+  - artifact_id: midogpp_output_uniform_b_canonical_reference_v1
+    stage: 10_real_feature_reference
+    canonical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: canonical_output
+    evidence_label: CANONICAL REAL-FEATURE REFERENCE
+    claim_scope: real_feature_reference
+    semantic_identities:
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split_role: frozen_reference_and_consumption_audit_only
+      authorized_consumer_experiment_ids: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_reservation.v1|midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_final_authorization.v1
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/content_index.json
+      - manifests/promotion_review_snapshot.json
+      - manifests/protocol_manifest.json
+      - manifests/uniform_b_canonical_representation_lock.json
+      - reports/leakage_provenance_report.json
+      - reports/promotion_decision.json
+      - reports/promotion_report.md
+      - reports/test_consumption_ledger.json
+      - reports/validation_report.json
+      - tables/classifier_tuned_predictions.csv
+      - tables/classifier_tuned_source_results.csv
+      - tables/source_inner_classifier_tuning.csv
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Already-produced canonical Uniform-B real-feature reference retained on the workstation for independent Stage-70 representation and test-consumption validation only.
+      - Its previously observed metrics do not become Stage-70 results, fresh confirmation, routing evidence, or a policy-selection input.
+
+  - artifact_id: midogpp_output_uniform_b_v2_descriptive_test_reservation_v1
+    stage: 70_frozen_policy_downstream
+    canonical_path: artifacts/midogpp/70_frozen_policy_downstream/uniform_b_v2_descriptive_test_reservation/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: CONSUMED_TEST_RESERVED_FOR_LABEL_BLIND_CACHE_EXTRACTION
+    claim_scope: target_evaluation_authorization
+    semantic_identities:
+      authorization_phase: TARGET_EVALUATION_RESERVATION
+      purpose: descriptive_frozen_policy_comparison_on_previously_consumed_test
+      split: test
+      row_count: "9928"
+      scoring_manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      target_evaluation_reservation_id: reservation_b541f28d223a315edbec2b630c915fc2e7cd47cbfcc064dabecda860aa14c9e3
+      target_evaluation_reservation_protocol_hash: 30596a19ea6a2e37a5ae5baa51bd1f1eb63fa64bd589b44e6d7a87df4800b15a
+      cache_extractor_protocol_hash: 8bae5653e53b087f1662216308dcf2352975f5efa6fdda5fae4e72ff04d3790b
+      fresh_evidence: "false"
+      authorized_consumer_experiment_ids: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_cache.v1|midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_final_authorization.v1
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/input_binding.json
+      - manifests/protocol_manifest.json
+      - manifests/identity_lock.json
+      - manifests/evaluation_plan.json
+      - manifests/content_index.json
+      - reports/authorization_decision.json
+      - reports/leakage_report.json
+      - reports/run_state.json
+      - reports/validation_report.json
+      - tables/target_identity.csv
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Active authorization gate that consumes the narrow test-consumption ledger and freezes only opaque evaluation identities for the catalog-only cache.
+      - It performs no generation, prediction, label access, metric scoring, policy selection, or fresh confirmation.
+
+  - artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: VALIDATED_LABEL_BLIND_CONSUMED_TEST_CACHE
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      cache_experiment_id: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_cache.v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: test
+      row_count: "9928"
+      feature_dim: "3840"
+      scoring_manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      target_evaluation_reservation_id: reservation_b541f28d223a315edbec2b630c915fc2e7cd47cbfcc064dabecda860aa14c9e3
+      target_evaluation_reservation_protocol_hash: 30596a19ea6a2e37a5ae5baa51bd1f1eb63fa64bd589b44e6d7a87df4800b15a
+      cache_extractor_protocol_hash: 8bae5653e53b087f1662216308dcf2352975f5efa6fdda5fae4e72ff04d3790b
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      backbone_identity_hash: 1b5071f2e605fa60
+      purpose: descriptive_frozen_policy_comparison_on_previously_consumed_test
+      fresh_evidence: "false"
+      labels_persisted: "false"
+      sample_ids_persisted: "false"
+      image_paths_persisted: "false"
+      authorized_consumer_experiment_ids: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_final_authorization.v1|midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_frozen_policy_comparison.v1
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Catalog-only derived feature cache; there is deliberately no registry experiment output for this cache identity.
+      - The cache can be built only from the exact validated reservation, contains neutral identities and embeddings only, and cannot establish fresh evidence.
+      - Independent validation passed for all 9,928 rows with the pinned Virchow2 identity; content and row-order hashes are frozen above.
+
+  - artifact_id: midogpp_output_uniform_b_v2_descriptive_test_final_authorization_v1
+    stage: 70_frozen_policy_downstream
+    canonical_path: artifacts/midogpp/70_frozen_policy_downstream/uniform_b_v2_descriptive_test_final_authorization/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: VALIDATED_PREDICTION_ONLY_AUTHORIZATION
+    claim_scope: target_evaluation_authorization
+    semantic_identities:
+      authorization_phase: FINAL_PREDICTION_AUTHORIZATION
+      purpose: descriptive_frozen_policy_comparison_on_previously_consumed_test
+      scoring_manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      target_evaluation_reservation_id: reservation_b541f28d223a315edbec2b630c915fc2e7cd47cbfcc064dabecda860aa14c9e3
+      target_evaluation_reservation_protocol_hash: 30596a19ea6a2e37a5ae5baa51bd1f1eb63fa64bd589b44e6d7a87df4800b15a
+      cache_extractor_protocol_hash: 8bae5653e53b087f1662216308dcf2352975f5efa6fdda5fae4e72ff04d3790b
+      authorization_token_hash: a344cd66fc88daae
+      authorization_protocol_hash: 651117b6b8d29d79
+      target_cache_content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      target_cache_row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      fresh_evidence: "false"
+      authorized_consumer_experiment_ids: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_frozen_policy_comparison.v1
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/input_binding.json
+      - manifests/protocol_manifest.json
+      - manifests/identity_lock.json
+      - manifests/evaluation_plan.json
+      - manifests/authorization_token.json
+      - manifests/content_index.json
+      - reports/authorization_decision.json
+      - reports/leakage_report.json
+      - reports/run_state.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Active gate that revalidates the frozen inputs and completed cache, then emits a token authorizing prediction only.
+      - It may hash but may not parse the scoring manifest, and it cannot authorize label access, scoring, policy changes, or fresh confirmation.
+
+  - artifact_id: midogpp_output_uniform_b_v2_descriptive_frozen_policy_comparison_v1
+    stage: 70_frozen_policy_downstream
+    canonical_path: artifacts/midogpp/70_frozen_policy_downstream/uniform_b_v2_descriptive_frozen_policy_comparison/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: APPROVED_DESCRIPTIVE_EVALUATOR_PENDING_RUN
+    claim_scope: descriptive_frozen_policy_comparison_on_previously_consumed_test
+    semantic_identities:
+      purpose: descriptive_frozen_policy_comparison_on_previously_consumed_test
+      scoring_manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      expected_policy_arms: equal_union_control|metadata_max_tie_union|utility_regret_frozen_policy
+      expected_prediction_cells: "243"
+      expected_test_rows: "9928"
+      cache_content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      target_cache_row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      final_authorization_token_hash: a344cd66fc88daae
+      hardened_evaluator_status: approved_for_execution
+      fresh_evidence: "false"
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/protocol_manifest.json
+      - manifests/evaluation_plan.json
+      - manifests/source_block_index.json
+      - manifests/composition_index.json
+      - manifests/prediction_index.json
+      - manifests/prediction_seal.json
+      - manifests/content_index.json
+      - arrays/target_predictions.npz
+      - tables/target_metrics.csv
+      - tables/case_confusions.csv
+      - tables/arm_summaries.csv
+      - tables/paired_deltas.csv
+      - tables/bootstrap_summary.csv
+      - reports/phase_01_authorization_complete.json
+      - reports/phase_02_predictions_persisted.json
+      - reports/phase_03_labels_opened.json
+      - reports/phase_04_scoring_complete.json
+      - reports/leakage_report.json
+      - reports/identity_overlap_report.json
+      - reports/utility_control_equivalence.json
+      - reports/publication_decision.json
+      - reports/run_state.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Planned and non-runnable until the validated cache content/row-order hashes and final prediction-authorization token hash replace the explicit config placeholders.
+      - Any eventual metrics are descriptive results on a test split already consumed for representation adoption; they are not fresh confirmation and cannot revise the frozen policies.
+      - The Stage-20 seven-source BACC 0.7701 is context only and is not an expected Stage-70 value.
+
   - artifact_id: midogpp_output_cvae_prior_recovery_outer_v1
     stage: 20_cvae_preservation
     canonical_path: artifacts/midogpp/20_cvae_preservation/prior_recovery_outer_v1/seeds17_42_101
@@ -1735,7 +2774,6 @@ artifacts:
         algorithm: sha256
         digest: e8b69f557ea92ac8e70a20e504150aba1c947f2b47f735b34e3ca7147efcf6b7
     forbidden_reuse:
-      - expert_bank_evidence
       - generation_evidence
       - all_candidate_utility_diagnostic
       - synthetic_downstream_utility_evidence

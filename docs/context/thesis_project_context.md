@@ -1,6 +1,6 @@
 # Thesis Project Context
 
-Last updated: 2026-07-13
+Last updated: 2026-08-05
 
 This file is the stable context anchor for the thesis project. It should define
 the durable protocol vocabulary, evidence categories, and claim boundaries.
@@ -39,11 +39,22 @@ experiment definitions under `experiments/midogpp/`, MIDOG++ evidence under
 package roots are not active imports, runners, or artifact fallbacks.
 
 The active evidence stages are encoded in
-`experiments/midogpp/registry.yaml`. Stages 10 and 20 currently contain the
-real-feature and CVAE-preservation implementations. Stages 30 through 70 are
-planned: no current expert bank, prior/generation stack, deployable router, or
-frozen-policy downstream implementation survived the lineage review. Stage 90
-contains non-deployable diagnostics and rejected historical MIDOG++ lineages.
+`experiments/midogpp/registry.yaml`. Stages 10 and 20 contain the real-feature
+and CVAE-preservation implementations. Stage 30 now contains a validated bank
+of independently trained source-domain CVAE experts that is authorized as an
+input to future routing experiments. That authorization establishes expert-bank
+construction and provenance only; it does not establish routing quality.
+Stage 40 contains a validated, target-data-free GenerationLock, and Stage 60
+contains validated fixed equal-union, metadata-compatibility/max-tie, and
+source-inner utility/regret policy locks. The utility surface is a one-time,
+non-selecting source-inner policy-training input; its per-query best candidate
+is an oracle reference only for regret calculation. The policy may select one
+source only under its predeclared uncertainty gate and otherwise reuses the
+exact frozen equal-union control. These are generation, proxy, and
+policy-contract results only; they establish no routing-quality or downstream-
+utility result. Stage 70 remains planned pending separately authorized fresh
+target evaluation and matched scoring. Stage 90 contains non-deployable
+diagnostics and rejected historical MIDOG++ lineages.
 
 BreakHis, Camelyon17, and generic historical material is isolated under
 `artifacts/cross_dataset_archive/` and is outside the active MIDOG++ registry.
@@ -95,6 +106,12 @@ each held-out target fold, the target/query expert is excluded from deployable
 candidate pools. It may appear only as an explicitly marked diagnostic
 reference. Routing and composition must not update source expert checkpoints.
 
+A fixed all-eligible-source control need not consume target support or compute
+compatibility when it performs no ranking, selection, or learned weighting.
+For such a control, target-center identity may define the held-out fold,
+target-expert exclusion, and a predeclared label-blind shuffle namespace; it
+must not become a predictive feature, score, rank, or source weight.
+
 For real-feature source-only experiments, classifier selection and aggregation
 recipes must be selected inside source-inner pseudo-target folds, then frozen
 before held-out target-center scoring.
@@ -104,7 +121,10 @@ freeze a `RecipeLock` for later source-expert training. Real held-out outer
 preservation metrics are evaluation-only: they may never revise the objective,
 sampler family, expert recipe, generation policy, router, or composition rule.
 Stage-20 recipe selection and pooled preservation do not replace the later
-post-expert-bank Stage-40 generation-validation boundary.
+post-expert-bank Stage-40 generation boundary. The active Stage-40
+GenerationLock freezes source-only generation, frame, seed, budget, and
+classifier settings without target data; its health probes are not routing or
+utility evidence.
 
 ## Evidence Labels
 
@@ -145,6 +165,11 @@ Important baseline classes:
   by a validated compatibility estimator;
 - downstream oracle: diagnostic upper bound computed after all candidate
   downstream scores exist, never a deployable selection method.
+
+A source-inner per-query best candidate used to normalize regret is likewise a
+non-deployable oracle reference. It may define the predeclared source-inner
+policy objective, but it is neither target evidence nor a deployed selection
+rule.
 
 Budget matching matters. Claimed comparisons should use matched synthetic
 budgets, classifier seeds, candidate eligibility, and feature frames unless the

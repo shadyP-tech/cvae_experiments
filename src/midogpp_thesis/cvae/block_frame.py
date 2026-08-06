@@ -120,9 +120,15 @@ def fit_pilot_frame(
         "a_global_pca128": ((0, 2560, 128),),
         "b_joint_pca128": ((0, 3840, 128),),
         "b_block_pca96_32": ((0, 2560, 96), (2560, 3840, 32)),
+        "b_block_pca192_64": ((0, 2560, 192), (2560, 3840, 64)),
     }
     if arm not in layouts:
         raise ProtocolError(f"Unknown pilot arm: {arm!r}")
+    required_rows = max(output_dim for _, _, output_dim in layouts[arm])
+    if len(x) < required_rows:
+        raise ProtocolError(
+            f"Pilot PCA arm {arm!r} requires at least {required_rows} fit rows."
+        )
     blocks = []
     for start, stop, output_dim in layouts[arm]:
         scaler = StandardScaler()
@@ -149,7 +155,7 @@ def fit_pilot_frame(
     return PilotFeatureFrame(
         arm=arm,
         input_dim=2560 if arm == "a_global_pca128" else 3840,
-        output_dim=128,
+        output_dim=sum(block.output_dim for block in blocks),
         blocks=tuple(blocks),
         fit_sample_hash=str(fit_sample_hash),
     )

@@ -27,29 +27,32 @@ class ClassConditionedCVAE(nn.Module):
         num_hidden_layers: int = 2,
     ) -> None:
         super().__init__()
-        if num_hidden_layers != 2:
-            raise ValueError("Locked v1 CVAE uses exactly two hidden layers.")
+        if int(num_hidden_layers) < 2:
+            raise ValueError("CVAE requires at least two hidden layers.")
         self.input_dim = int(input_dim)
         self.hidden_dim = int(hidden_dim)
         self.latent_dim = int(latent_dim)
         self.n_classes = int(n_classes)
+        self.num_hidden_layers = int(num_hidden_layers)
         enc_in = self.input_dim + self.n_classes
         dec_in = self.latent_dim + self.n_classes
-        self.encoder = nn.Sequential(
-            nn.Linear(enc_in, self.hidden_dim),
-            nn.ReLU(),
-            nn.Linear(self.hidden_dim, self.hidden_dim),
-            nn.ReLU(),
-        )
+        encoder_layers: list[nn.Module] = []
+        for index in range(self.num_hidden_layers):
+            encoder_layers.extend((
+                nn.Linear(enc_in if index == 0 else self.hidden_dim, self.hidden_dim),
+                nn.ReLU(),
+            ))
+        self.encoder = nn.Sequential(*encoder_layers)
         self.fc_mu = nn.Linear(self.hidden_dim, self.latent_dim)
         self.fc_logvar = nn.Linear(self.hidden_dim, self.latent_dim)
-        self.decoder = nn.Sequential(
-            nn.Linear(dec_in, self.hidden_dim),
-            nn.ReLU(),
-            nn.Linear(self.hidden_dim, self.hidden_dim),
-            nn.ReLU(),
-            nn.Linear(self.hidden_dim, self.input_dim),
-        )
+        decoder_layers: list[nn.Module] = []
+        for index in range(self.num_hidden_layers):
+            decoder_layers.extend((
+                nn.Linear(dec_in if index == 0 else self.hidden_dim, self.hidden_dim),
+                nn.ReLU(),
+            ))
+        decoder_layers.append(nn.Linear(self.hidden_dim, self.input_dim))
+        self.decoder = nn.Sequential(*decoder_layers)
 
     def class_one_hot(self, y: torch.Tensor) -> torch.Tensor:
         y = y.long().view(-1)

@@ -1,6 +1,6 @@
 # MIDOG++ Experiment File Workflow
 
-Last updated: 2026-07-23
+Last updated: 2026-08-05
 
 This is the operational path and command reference for the active MIDOG++
 checkout. Result interpretation belongs in
@@ -55,6 +55,10 @@ The module groups are:
 - `real-feature-classifier` for the tuned and eligible matched references;
 - `cvae-preservation` for preservation, source-inner recipe locking, and the
   conditional outer factorial;
+- `cvae-expert-bank` for Stage-30 promotion, validation, and authorized expert
+  loading;
+- `cvae-generation` for Stage-40 GenerationLock materialization and validation;
+- `cvae-routing` for Stage-60 policy-lock materialization and validation;
 - `workspace` for registry validation, artifact resolution, preparation, and
   registered runs.
 
@@ -68,16 +72,19 @@ The registry orders evidence as follows:
 | --- | --- | --- |
 | 10 | real-feature reference | active and diagnostic entries |
 | 20 | CVAE preservation | active and diagnostic entries |
-| 30 | provenance-clean expert bank | planned |
-| 40 | prior and generation | planned |
+| 30 | provenance-clean expert bank | active Uniform-B v2 bank; alternative consensus-recipe v1 path planned |
+| 40 | prior and generation | active validated Uniform-B v2 GenerationLock |
 | 50 | all-candidate utility matrix | planned for new runs; local historical diagnostic retained |
-| 60 | routing and composition | planned |
-| 70 | frozen-policy downstream utility | planned |
+| 60 | routing and composition | active validated equal-union control, metadata compatibility, and metadata max-tie policy locks |
+| 70 | frozen-policy downstream utility | planned; blocked on remaining substantive comparison, authorized target evaluation, and matched scoring |
 | 90 | oracles, audits, and rejected lineages | diagnostic or rejected only |
 
-Stages 30 through 70 have no active routing/generation/downstream stack. A
+Stage 30 has an active, validated routing-authorized bank. Stages 40 and 60
+have validated generation, direct-control, compatibility-proxy, and comparison-
+policy contracts, but no routing-quality or downstream-utility result. A
 preservation result cannot be treated as an expert bank, router input, or
-synthetic downstream-utility result.
+synthetic downstream-utility result without an explicit registered promotion
+boundary.
 
 ## Dataset Contract
 
@@ -588,10 +595,11 @@ predeclared conservative publication gate. It remains
 `claim_scope=cvae_recipe_lock_only`: no outer-preservation, routing,
 generation-quality, or downstream-utility claim follows.
 
-Stop open-ended Stage-20 tuning. Stage 30 now has an eligible consensus-lock input, but
-its registry entry remains a planned placeholder without a runnable expert-bank
-implementation. Implement and protocol-review that runner before attempting
-Stage 30. The stability bundle does not change or unlock outer v1, which still
+The consensus-lock publication remains the eligible input to the separate
+planned `midogpp.expert_bank.provenance_clean.v1` path; that runner is still a
+placeholder. It is not the input to the active Uniform-B v2 bank. The latter
+uses its own reviewed aggregate-prior union v2 source evidence and completed
+Stage-30 promotion. Neither path changes or unlocks outer v1, which still
 consumes the scalar seed-42 lock bundle.
 
 ### Non-adoptive v2 source-inner mechanism studies
@@ -670,8 +678,167 @@ diagnostic ceilings, not an alternative generator or a consumable result.
 The output is
 `artifacts/midogpp/20_cvae_preservation/aggregate_posterior_mixture_geco_source_inner_v3/seeds17_42_101/`.
 It is a non-consumable `cvae_source_inner_study_only` bundle. No outcome may
-alter Stage 30 until a separate promotion artifact is implemented, validated,
-and explicitly registered.
+alter Stage 30 without its own implemented, validated, and explicitly
+registered promotion. The completed Uniform-B v2 promotion described below
+does not authorize this v3 artifact.
+
+## Uniform-B V2 Routing-Authorized Expert Bank
+
+The completed promotion is registered as:
+
+```text
+midogpp.expert_bank.uniform_b_v2_routing_promotion.v1
+```
+
+Run or revalidate it through the workstation venv and workspace boundary:
+
+```bash
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.expert_bank.uniform_b_v2_routing_promotion.v1
+```
+
+Canonical output:
+
+```text
+artifacts/midogpp/30_expert_bank/uniform_b_v2_routing_authorized_expert_bank_v1/
+```
+
+Current result: `COMPLETE`, validator `PASS`, decision
+`PROMOTED_AS_ROUTING_AUTHORIZED_EXPERT_BANK`, and publication state
+`ROUTING_AUTHORIZED`. The bank contains all nine source centers and training
+seeds `17,42,101` (27 checkpoints) with no expert or seed selection. It is the
+only current Stage-30 artifact allowed to feed deployable-selection work.
+
+The loader must reject the Stage-20 source artifact as a direct routing input.
+Source-inner labels were consumed for whole-bank adoption and may not be used
+again to select an expert, seed, or router. Consumers must bind bank lock
+`9972a41dcd4814cd` and control lock `cddbcc3b3343fe38`.
+
+The canonical routing control is `uniform_b_v2_equal_union_ps`: exclude target
+`H`, use all eight remaining sources, allocate 128 generated rows per source
+and class for a 1,024-per-class total, cross training/generation seeds
+`17,42,101`, and report the predeclared mean without seed selection. Future
+router and control arms must use paired RNG, shuffles, classifier budgets,
+candidate eligibility, and evaluation rows. The control needs fresh scoring;
+the promotion's `0.770112` source-inner PS BACC came from seven-source tasks.
+
+The output content is hash-locked, but its provenance records
+`repository_dirty=true` at revision
+`40221038ca714bf33fd21582857d21fa1db4e6f3`. Preserve the exact working-tree
+diff or reproduce and validate the artifact from a clean commit before final
+archival.
+
+## Uniform-B V2 GenerationLock And Stage-60 Policy Locks
+
+The completed Stage-40 and Stage-60 experiments are:
+
+```text
+midogpp.prior_and_generation.uniform_b_v2_generation_lock.v1
+midogpp.routing_and_composition.uniform_b_v2_equal_union_policy_lock.v1
+midogpp.routing_compatibility.uniform_b_v2_metadata_exact_match_lock.v1
+midogpp.routing_and_composition.uniform_b_v2_metadata_tie_union_policy_lock.v1
+midogpp.routing_and_composition.uniform_b_v2_source_inner_candidate_utility.v1
+midogpp.routing_and_composition.uniform_b_v2_utility_regret_policy_lock.v1
+```
+
+Run them only in dependency order through `workspace run`. Their canonical
+outputs are:
+
+```text
+artifacts/midogpp/40_prior_and_generation/uniform_b_v2_generation_lock/v1/
+artifacts/midogpp/60_routing_and_composition/uniform_b_v2_equal_union_policy_lock/v1/
+artifacts/midogpp/60_routing_and_composition/uniform_b_v2_metadata_exact_match_compatibility/v1/
+artifacts/midogpp/60_routing_and_composition/uniform_b_v2_metadata_tie_union_policy_lock/v1/
+artifacts/midogpp/60_routing_and_composition/uniform_b_v2_source_inner_candidate_utility/v1/
+artifacts/midogpp/60_routing_and_composition/uniform_b_v2_utility_regret_policy_lock/v1/
+```
+
+Both workstation artifacts are `COMPLETE`; production validation and separate
+validator reruns report `PASS`. Stage 40 binds GenerationLock
+`34e551425710362e`. Stage 60 binds policy lock `4b9ea514308b084f`, policy-plan
+hash `9ec24122d7d0cdf1`, and assignment-table hash `c85415c1b953c04e` over 81
+replicates and 648 source assignments. The Stage-60 decision is
+`FROZEN_AS_CANONICAL_EQUAL_UNION_ROUTING_CONTROL`, with publication state
+`POLICY_FROZEN_FOR_STAGE70_EVALUATION`.
+
+The Stage-60 bundle consumes only the validated bank and GenerationLock. It
+uses no target samples, labels, support rows, compatibility score, ranking,
+learned weighting, or individual seed selection. Target identity is structural
+only: held-out-fold identity, target-expert exclusion, and the predeclared
+label-blind within-class shuffle namespace. The bundle computes no BACC,
+macro-F1, routing quality, or downstream utility.
+
+The metadata compatibility command must run before the metadata policy command.
+It consumes only the hash-pinned `domain_mapping.json`, sanitizes exactly the
+three routing-time axes, and freezes all 72 ordered target-excluded exact-match
+proxy scores. It performs no selection. The consuming policy retains all
+maximum-score ties, uses 1,024/512/256 rows per selected source and class for a
+fixed 1,024-per-class total, and reuses the equal-union Stage-40 streams and
+shuffle seeds. It freezes nine selections, 81 replicates, and 153 assignments.
+
+Compatibility lock `4b46b3d157b07781` and metadata policy lock
+`27f16953b32c46cd` are independently validated. Every file in both 12-file
+artifacts is SHA-256-pinned in the catalog. Neither lock reports routing quality
+or downstream utility.
+
+The substantive source-inner comparison is also complete. First, the direct
+label-blind validation-cache surface builds and validates:
+
+```text
+datasets/midogpp/derived/features/virchow2/uniform_b_v2_routing_validation_cache_v1/seed42/
+experiments/midogpp/stages/60_routing_and_composition/configs/uniform_b_v2_routing_validation_cache_v1.yaml
+```
+
+It contains 2,615 rows from 44 cases, 3,840 dimensions, and all nine eligible
+centers; it persists no labels. Its content hash is `e1d281d44e47c7b2` and
+build-protocol hash is `f57aad1bf7f7efed`. The exact dependency sequence from
+the repository root on the workstation is:
+
+```bash
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis cvae-routing \
+  uniform-b-v2-routing-validation-cache \
+  --config experiments/midogpp/stages/60_routing_and_composition/configs/uniform_b_v2_routing_validation_cache_v1.yaml
+
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.routing_and_composition.uniform_b_v2_source_inner_candidate_utility.v1
+
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.routing_and_composition.uniform_b_v2_utility_regret_policy_lock.v1
+```
+
+Append `--validate-only` to the direct cache command for cache-only validation.
+The registered utility and policy configs are
+`experiments/midogpp/stages/60_routing_and_composition/configs/uniform_b_v2_source_inner_candidate_utility_v1.yaml`
+and
+`experiments/midogpp/stages/60_routing_and_composition/configs/uniform_b_v2_utility_regret_policy_lock_v1.yaml`.
+They consume the promoted bank, GenerationLock, and, for the policy, the exact
+equal-union control listed above.
+
+The utility artifact is non-selecting source-inner policy-training evidence:
+81 source-only synthetic classifier fits predict all rows before labels are
+opened, then produce 648 `q != e` utility rows and 3,168 case-confusion rows
+under utility lock `a787b24b8e62e203`. Its `selection_source` is source-inner
+validation case-confusion utility, its `prior_method` is promoted aggregate
+prior `PS`, and its `claim_role` is never target evidence. A per-query best
+source is a non-deployable source-inner oracle reference used only to compute
+regret, never a deployed choice or target result.
+
+The policy removes both `q = H` and `e = H`, forms 4,536 regret cells and 72
+candidate summaries, and freezes nine selections. No fold meets the unique
+winner gate: best-source win probabilities range `0.392`--`0.786` (below
+`0.80`) and all margin lower bounds are negative. Thus every `H` reuses the
+exact frozen equal-union fallback without re-estimation. The decision is
+`FROZEN_AS_SOURCE_INNER_UTILITY_REGRET_POLICY_WITH_EXACT_EQUAL_UNION_FALLBACK`,
+publication is `POLICY_FROZEN_FOR_MATCHED_STAGE70_EVALUATION`, policy lock is
+`d504ea0a07302acd`, plan hash is `cefe176313b1ea23`, and assignment hash is
+`bd004f2bbb49228b`.
+
+Stage 70 now needs a separately authorized fresh target-evaluation artifact,
+then matched scoring of equal-union, metadata, and utility/regret policies
+with identical candidates, GenerationLock/classifier settings, seed replicates,
+and evaluation rows. Labels may be exposed only for metrics after predictions.
+Neither this source-inner result nor its fallback establishes routing quality or
+downstream utility.
 
 ## Registered Uniform-B Low-Noise Diagnostic
 

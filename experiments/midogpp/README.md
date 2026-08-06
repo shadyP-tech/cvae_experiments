@@ -23,9 +23,15 @@ The stage order makes the claim boundary explicit:
 8. `90_oracles_and_diagnostics`
 
 Stages 50 and 90 are diagnostic and can never select a deployable policy.
-Stages 30 through 70 remain planned until their new MIDOG++ implementations
-and protocol tests are reviewed; removed legacy runners are not compatibility
-fallbacks.
+Stage 30 now contains the validated Uniform-B v2 routing-authorized expert
+bank. Stage 40 contains the validated Uniform-B v2 GenerationLock, and Stage 60
+contains independently validated equal-union, metadata-compatibility, metadata
+max-tie, source-inner utility, and utility/regret policy locks. The substantive
+utility/regret gate selected no single source, so every outer fold is frozen to
+the exact equal-union fallback. A separate target-evaluation artifact must now
+be authorized for matched Stage-70 evaluation; no Stage-60 lock establishes
+routing quality or downstream utility, and removed legacy runners are not
+compatibility fallbacks.
 
 Core workspace files:
 

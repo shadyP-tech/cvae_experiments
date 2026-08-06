@@ -1,0 +1,97 @@
+experiment:
+  name: virchow2_cvae_midogpp_uniform_b_geco_aggregate_prior_union_source_inner_v2
+  mode: uniform_b_geco_aggregate_prior_union_source_inner_study
+  study_version: v2
+  artifact_root: output://midogpp_output_cvae_uniform_b_geco_aggregate_prior_union_source_inner_v2
+  code_version: uniform_b_geco_aggregate_prior_union_source_inner_v2
+
+inputs:
+  manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  feature_cache_path: artifact://midogpp_virchow2_uniform_b_canonical_train_cache_seed42/embeddings/train.pt
+  feature_cache_artifact_id: midogpp_virchow2_uniform_b_canonical_train_cache_seed42
+  expected_feature_cache_hash: 1ed7602f225c592a6f8103b24ebfc93f72dc6d5d0c27565566a8b2260783d1dc
+
+run:
+  heldout_centers: all
+  training_seeds: [17, 42, 101]
+  generation_seeds: [17, 42, 101]
+  device: cuda:0
+
+model:
+  block_frame: b_block_pca192_64
+  pca_output_dim: 256
+  hidden_dim: 1024
+  latent_dim: 64
+  num_hidden_layers: 3
+  batch_size: 256
+  learning_rate: 0.0005
+  weight_decay: 0.0001
+  beta_final: 0.001
+  gradient_clip_norm: 5.0
+  warmup_steps: 750
+  total_steps: 4000
+
+geco:
+  target_policy: source_warmup_mean_mse_times_slack
+  target_slack: 1.05
+  ema_decay: 0.99
+  dual_step_size: 0.001
+  initial_multiplier: 1.0
+  minimum_multiplier: 0.000001
+  maximum_multiplier: 1000000.0
+  target_uses_inner_or_outer_data: false
+
+aggregate_prior:
+  family: class_conditional_shrinkage_full_total_moment
+  min_class_count: 64
+  max_condition_number: 1000000.0
+  covariance_estimator: ledoit_wolf_between_plus_mean_posterior_variance
+  reliability_failure_policy: all_classes_standard_normal_fallback
+  partial_class_fallback_allowed: false
+  source_only: true
+
+generation:
+  arms: [P0, PS, Q, QM, R]
+  composition_mode: union_equal_total
+  legal_sources: all_centers_except_outer_and_inner
+  total_per_class: 1024
+  requested_class_law: balanced_uniform_binary
+  same_shuffle_across_arms: true
+  inverse_transform_to_common_uniform_b_3840: true
+
+classifier:
+  family: sklearn_logistic_regression
+  C: 0.01
+  penalty: l2
+  solver: lbfgs
+  max_iter: 3000
+  seed: 23
+  scaler_fit: synthetic_train_only
+  selection_uses_inner_labels: false
+
+decision_gates:
+  target_prior_bacc: 0.70
+  required_posterior_ceiling: 0.73
+  stable_seed_floor_slack: 0.02
+  primary_contrast: PS_minus_P0
+  ceiling_controls: [R, Q, QM]
+
+runtime:
+  workstation_profile: xeon_w2265_12c24t_125gb_2x_rtx_a5000_24gb
+  training_devices: [cuda:0, cuda:1]
+  scoring_workers: 12
+  one_training_process_per_gpu: true
+  cpu_threads_per_training_process: 1
+  mixed_precision: false
+  tf32: false
+  cross_gpu_communication: false
+  generation_working_set: one_training_seed_at_a_time
+
+claim_boundary:
+  claim_scope: cvae_source_inner_study_only
+  allowed: prior-capacity, posterior-ceiling, and legal equal-total multi-source TSTR evidence only
+  forbidden: target-conditioned routing, recipe adoption, expert-bank input, or deployable selection
+  inner_labels_scoring_only: true
+  target_support_labels_for_selection: false
+  may_feed_deployable_selection: false
+  separate_promotion_artifact_required: true

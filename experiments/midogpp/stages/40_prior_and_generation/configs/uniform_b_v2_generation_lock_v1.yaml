@@ -1,0 +1,149 @@
+experiment:
+  id: midogpp.prior_and_generation.uniform_b_v2_generation_lock.v1
+  name: uniform_b_v2_generation_lock_v1
+  artifact_root: output://midogpp_output_uniform_b_v2_generation_lock_v1
+
+inputs:
+  bank_root: artifact://midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  bank_artifact_id: midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  expected_bank_lock_hash: 9972a41dcd4814cd
+  expected_control_lock_hash: cddbcc3b3343fe38
+  expected_bank_index_sha256: 5bc46728fd66d5c2c8a72d3da58cc6721e6c0b72c7291ed7b3b6931a4bcc41c9
+  expected_control_sha256: 3cae13d5755f27643e0387b1f106f7745b470fb7aafe8d46be41677a1cd8eedd
+  expected_content_index_sha256: 6b74fe794bd30cf6c1e42190427e506d1ff50ecd9280b9dcfee2a7592ec6a318
+  expected_content_hash: fb1f1194be44ca41
+
+generation_contract:
+  centers: ['0', '1', '2', '3', '5', '6', '7', '8', '9']
+  class_labels: [0, 1]
+  class_budget_policy: balanced_equal_per_class
+  training_seeds: [17, 42, 101]
+  generation_seeds: [17, 42, 101]
+  seed_pairing: cartesian_product
+  replicate_policy: report_each_replication_and_predeclared_mean_no_seed_selection
+  training_seed_policy: use_matching_frozen_expert_per_replicate
+  generation_seed_policy: generate_every_declared_seed_per_training_seed
+  total_per_class: 1024
+  sources_per_target: 8
+  source_budget_per_class: 128
+  budget_applies_independently_per_replicate: true
+  source_budgets_split_across_seeds: false
+  target_expert_excluded: true
+  target_conditioned_source_weighting: false
+  source_weighting: equal_fixed_count
+  no_expert_selection: true
+  no_seed_selection: true
+  expected_source_plan_rows: 81
+  expected_target_replicate_rows: 81
+  candidate_sources_by_target:
+    '0': ['1', '2', '3', '5', '6', '7', '8', '9']
+    '1': ['0', '2', '3', '5', '6', '7', '8', '9']
+    '2': ['0', '1', '3', '5', '6', '7', '8', '9']
+    '3': ['0', '1', '2', '5', '6', '7', '8', '9']
+    '5': ['0', '1', '2', '3', '6', '7', '8', '9']
+    '6': ['0', '1', '2', '3', '5', '7', '8', '9']
+    '7': ['0', '1', '2', '3', '5', '6', '8', '9']
+    '8': ['0', '1', '2', '3', '5', '6', '7', '9']
+    '9': ['0', '1', '2', '3', '5', '6', '7', '8']
+
+model:
+  family: conditional_variational_autoencoder
+  input_dim: 256
+  hidden_dim: 1024
+  latent_dim: 64
+  num_hidden_layers: 3
+  class_conditioning_dim: 2
+  frozen_checkpoint_required: true
+  training_allowed: false
+
+source_frame:
+  family: source_specific_pca
+  model_space_dim: 256
+  reconstructed_embedding_dim: 3840
+  inverse_transform_required: true
+  one_frame_per_source_center: true
+  fit_scope: source_center_rows_only
+  refit_allowed: false
+
+aggregate_prior:
+  family: class_conditional_shrinkage_full_total_moment
+  covariance: full
+  class_conditional: true
+  fit_scope: source_center_rows_only
+  min_class_count: 64
+  max_condition_number: 1000000.0
+  partial_class_fallback_allowed: false
+  refit_allowed: false
+
+deterministic_rng:
+  seed_derivation: sha256_first_unsigned_64_bit
+  global_rng_forbidden: true
+  namespaces:
+    latent_draw: uniform_b_v2_source_stream_v1
+    equal_union_shuffle: uniform_b_v2_composition_shuffle_v1
+    health_probe: uniform_b_v2_generation_lock.health_probe.v1
+  latent_draw_key_fields:
+    - namespace
+    - bank_lock_hash
+    - expert_lock_hash
+    - generation_seed
+    - class_label
+  equal_union_shuffle_key_fields:
+    - namespace
+    - generation_lock_hash
+    - target_center
+    - training_seed
+    - generation_seed
+    - class_label
+
+classifier:
+  family: sklearn_logistic_regression
+  C: 0.01
+  penalty: l2
+  solver: lbfgs
+  max_iter: 3000
+  class_weight: null
+  random_state: 23
+  threshold_policy: predict
+  scaler: sklearn.preprocessing.StandardScaler
+  scaler_fit: synthetic_train_only
+  fit_in_stage_40: false
+
+health_probe:
+  samples_per_class: 1
+  scope: every_source_training_seed_generation_seed_and_class
+  expected_rows: 162
+  device: cpu
+  require_finite_latents: true
+  require_finite_decoder_outputs: true
+  require_finite_reconstructed_embeddings: true
+  require_model_space_shape: [1, 256]
+  require_reconstructed_embedding_shape: [1, 3840]
+
+runtime:
+  default_device: cpu
+  one_expert_in_memory_at_a_time: true
+  no_training: true
+  no_sampler_refit: true
+  no_frame_refit: true
+  no_classifier_fit: true
+
+claim_boundary:
+  strict_claim_firewall: true
+  claim_scope: generation_settings_and_frame_lock
+  lock_only: true
+  may_feed_deployable_selection: true
+  source_only_frozen_state: true
+  target_data_used: false
+  target_support_used: false
+  target_labels_used: false
+  target_evaluation_labels_used: false
+  routing_evidence_computed: false
+  routing_quality_claimed: false
+  nelbo_computed: false
+  expert_selection_performed: false
+  source_weighting_learned: false
+  classifier_fit_performed: false
+  downstream_utility_computed: false
+  stage20_bacc_reused_as_stage40_result: false
+  eight_source_control_scored: false

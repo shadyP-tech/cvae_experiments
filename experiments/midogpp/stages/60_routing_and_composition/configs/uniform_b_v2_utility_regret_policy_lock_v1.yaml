@@ -1,0 +1,87 @@
+experiment:
+  id: midogpp.routing_and_composition.uniform_b_v2_utility_regret_policy_lock.v1
+  name: uniform_b_v2_utility_regret_policy_lock_v1
+  artifact_root: output://midogpp_output_uniform_b_v2_utility_regret_policy_lock_v1
+
+inputs:
+  bank_root: artifact://midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_root: artifact://midogpp_output_uniform_b_v2_generation_lock_v1
+  equal_union_root: artifact://midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+  utility_root: artifact://midogpp_output_uniform_b_v2_source_inner_candidate_utility_v1
+  bank_artifact_id: midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_artifact_id: midogpp_output_uniform_b_v2_generation_lock_v1
+  equal_union_artifact_id: midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+  utility_artifact_id: midogpp_output_uniform_b_v2_source_inner_candidate_utility_v1
+  expected_bank_lock_hash: 9972a41dcd4814cd
+  expected_generation_lock_hash: 34e551425710362e
+  expected_equal_union_policy_lock_hash: 4b9ea514308b084f
+  expected_equal_union_policy_plan_hash: 9ec24122d7d0cdf1
+  expected_equal_union_assignment_table_hash: c85415c1b953c04e
+  expected_consumption_rule_hash: 6c18c72a017403a7
+
+policy_contract:
+  family: source_inner_mean_paired_bacc_regret_three_level_case_cluster_bootstrap_v1
+  namespace: uniform_b_v2_source_inner_utility_regret_policy.v1
+  centers: ["0", "1", "2", "3", "5", "6", "7", "8", "9"]
+  training_seeds: [17, 42, 101]
+  generation_seeds: [17, 42, 101]
+  candidate_unit: source_center
+  primary_utility: balanced_accuracy
+  secondary_metric: macro_f1_descriptive_only
+  policy_consumption_lock_hash: 6c18c72a017403a7
+  outer_fold_filter: query_center_not_H_and_candidate_source_not_H
+  expected_queries_per_outer: 8
+  expected_candidates_per_outer: 8
+  expected_legal_candidates_per_query: 7
+  expected_seed_pairs: 9
+  expected_utility_rows: 648
+  expected_outer_regret_cells: 4536
+  expected_candidate_summaries: 72
+  expected_selections: 9
+  target_expert_excluded: true
+  target_query_rows_excluded_before_any_transform: true
+  target_candidate_rows_excluded_before_any_transform: true
+  regret_definition: paired_best_candidate_bacc_within_q_training_generation_cell_minus_candidate_bacc
+  aggregation: equal_mean_over_7_retained_pseudo_targets_and_all_9_paired_training_generation_seed_cells
+  bootstrap_levels:
+    - pseudo_target_centers
+    - cases_within_pseudo_target
+    - paired_training_generation_seed_cells
+  pass_action: unique_winner_single_source_full_budget
+  fallback_action: exact_frozen_equal_union
+  macro_f1_may_select: false
+  no_seed_selection: true
+  policy_frozen_before_stage70: true
+
+execution:
+  generation_allowed: false
+  classifier_fit_allowed: false
+  dataset_manifest_access_allowed: false
+  feature_cache_access_allowed: false
+  raw_label_access_allowed: false
+  utility_table_access_allowed: true
+  case_confusion_table_access_allowed: true
+  bootstrap_seed: 6042026
+  bootstrap_valid_replicates: 2000
+  bootstrap_max_attempts: 20000
+  unique_winner_probability_threshold: 0.8
+  margin_lower_quantile: 0.025
+
+claim_boundary:
+  strict_claim_firewall: true
+  claim_scope: routing_and_composition
+  may_feed_deployable_selection: true
+  source_inner_training_evidence_only: true
+  target_data_used: false
+  target_support_used: false
+  target_labels_used: false
+  target_evaluation_labels_used: false
+  stage20_consumed_rows_used: false
+  stage50_used: false
+  stage90_used: false
+  nelbo_used: false
+  macro_f1_used_for_selection: false
+  seed_selection_performed: false
+  routing_policy_frozen: true
+  routing_quality_claimed: false
+  downstream_utility_claimed: false

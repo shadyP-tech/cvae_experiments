@@ -1,0 +1,180 @@
+experiment:
+  id: midogpp.routing_and_composition.uniform_b_v2_source_inner_candidate_utility.v1
+  name: uniform_b_v2_source_inner_candidate_utility_v1
+  artifact_root: output://midogpp_output_uniform_b_v2_source_inner_candidate_utility_v1
+
+inputs:
+  bank_root: artifact://midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_root: artifact://midogpp_output_uniform_b_v2_generation_lock_v1
+  validation_cache_root: artifact://midogpp_virchow2_uniform_b_v2_routing_validation_cache_seed42
+  manifest_path: artifact://midogpp_source_inner_validation_manifest_v1/manifest.csv
+  bank_artifact_id: midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_artifact_id: midogpp_output_uniform_b_v2_generation_lock_v1
+  validation_cache_artifact_id: midogpp_virchow2_uniform_b_v2_routing_validation_cache_seed42
+  validation_manifest_artifact_id: midogpp_source_inner_validation_manifest_v1
+  expected_bank_lock_hash: 9972a41dcd4814cd
+  expected_generation_lock_hash: 34e551425710362e
+  expected_cache_semantic_id: uniform_b_v2_routing_validation_cache_v1
+  expected_cache_representation_id: annotation_jpeg_fixed_center_b_v3
+  expected_manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+
+evaluation_contract:
+  dataset_family: MIDOG++
+  feature_backbone: Virchow2
+  feature_frame: annotation_jpeg_fixed_center_b_v3
+  feature_dim: 3840
+  split: val
+  centers: ['0', '1', '2', '3', '5', '6', '7', '8', '9']
+  excluded_center: '4'
+  expected_eval_rows: 2615
+  expected_eval_cases: 44
+  class_labels: [0, 1]
+  training_seeds: [17, 42, 101]
+  generation_seeds: [17, 42, 101]
+  seed_pairing: cartesian_product
+  replicate_policy: report_all_nine_paired_training_generation_cells_no_seed_selection
+  source_budget_per_class: 1024
+  source_budget_policy: full_single_source_generation_lock_prefix
+  candidate_sources_by_pseudo_target:
+    '0': ['1', '2', '3', '5', '6', '7', '8', '9']
+    '1': ['0', '2', '3', '5', '6', '7', '8', '9']
+    '2': ['0', '1', '3', '5', '6', '7', '8', '9']
+    '3': ['0', '1', '2', '5', '6', '7', '8', '9']
+    '5': ['0', '1', '2', '3', '6', '7', '8', '9']
+    '6': ['0', '1', '2', '3', '5', '7', '8', '9']
+    '7': ['0', '1', '2', '3', '5', '6', '8', '9']
+    '8': ['0', '1', '2', '3', '5', '6', '7', '9']
+    '9': ['0', '1', '2', '3', '5', '6', '7', '8']
+  pseudo_target_must_differ_from_candidate: true
+  expected_classifier_fits: 81
+  expected_candidate_utility_rows: 648
+  expected_case_confusion_rows: 3168
+  predict_every_eval_row_once_per_classifier: true
+  slice_by_pseudo_target_only_after_prediction: true
+  labels_absent_from_validation_cache: true
+  labels_joined_from_hash_pinned_manifest: true
+  labels_opened_after_all_prediction_arrays_materialized: true
+  train_rows_consumed: false
+  test_rows_consumed: false
+  outer_target_instantiated: false
+
+classifier:
+  family: sklearn_logistic_regression
+  C: 0.01
+  penalty: l2
+  solver: lbfgs
+  max_iter: 3000
+  class_weight: null
+  random_state: 23
+  l1_ratio: null
+  threshold_policy: predict
+  scaler: sklearn.preprocessing.StandardScaler
+  scaler_fit: synthetic_train_only
+
+policy_consumption_lock:
+  schema_version: midogpp_uniform_b_v2_policy_consumption_lock_v1
+  policy_family: source_inner_mean_paired_bacc_regret_three_level_case_cluster_bootstrap_v1
+  label_consumption_scope: single_predeclared_source_inner_utility_regret_policy_family
+  candidate_unit: source_center
+  candidate_replica_handling: pair_all_nine_training_generation_seed_cells_no_seed_selection
+  primary_metric: balanced_accuracy
+  primary_objective: mean_paired_bacc_regret
+  regret_definition: paired_best_candidate_bacc_within_q_training_generation_cell_minus_candidate_bacc
+  regret_aggregation: equal_mean_over_retained_pseudo_targets_and_paired_training_generation_seed_cells
+  secondary_metric: macro_f1_descriptive_only
+  secondary_metric_may_select: false
+  future_outer_filter:
+    rule: remove_q_equal_H_and_e_equal_H_before_policy_computation
+    outer_H_instantiated_in_utility_artifact: false
+    apply_before_bootstrap: true
+  bootstrap:
+    family: paired_three_level_case_cluster_bootstrap
+    levels:
+      - pseudo_target_centers
+      - cases_within_pseudo_target
+      - paired_training_generation_seed_cells
+    case_sampling: with_replacement_within_resampled_pseudo_target
+    case_confusion_reaggregation: sum_tn_fp_fn_tp_then_recompute_bacc
+    class_missing_resample_policy: reject_and_resample
+    seed_cell_sampling: with_replacement_over_paired_training_generation_cells
+    valid_replicates: 2000
+    max_attempts: 20000
+    seed: 6042026
+    interval: percentile
+    paired_margin_lower_quantile: 0.025
+  winner_rule:
+    candidate_direction: minimum_mean_paired_bacc_regret
+    unique_winner_required: true
+    minimum_unique_winner_probability: 0.80
+    probability_comparator: ">="
+    paired_margin_definition: runner_up_mean_paired_bacc_regret_minus_winner_mean_paired_bacc_regret
+    paired_margin_lower_quantile: 0.025
+    paired_margin_lower_bound: 0.0
+    margin_comparator: ">"
+  pass_action:
+    policy: unique_winner_single_source_full_budget
+    source_budget_per_class: 1024
+    source_prefix_start_per_class: 0
+    generation_stream_reused_from_generation_lock: true
+  fallback_policy: exact_equal_union
+  fallback_policy_artifact_id: midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+  fallback_is_exact_not_reestimated: true
+  alternative_router_tuning_authorized: false
+  alternative_policy_family_authorized: false
+  hyperparameter_search_authorized: false
+  seed_selection_authorized: false
+  macro_f1_selection_authorized: false
+  policy_selection_performed_in_utility_artifact: false
+
+execution:
+  fresh_generation_required: true
+  fresh_classifier_fit_required: true
+  reuse_generation_health_outputs: false
+  one_expert_in_memory_at_a_time: true
+  fit_count: 81
+  prediction_pass_is_label_free: true
+  scoring_pass_is_separate: true
+  prediction_array_format: numpy_npz_compressed
+  probability_dtype: float32
+  prediction_dtype: uint8
+  source_model_training_allowed: false
+  sampler_refit_allowed: false
+  frame_refit_allowed: false
+  candidate_ranking_allowed: false
+  policy_selection_allowed: false
+  all_classifiers_must_converge: true
+
+runtime:
+  generation_device: cuda:0
+  classifier_device: cpu
+  threads_per_fit: 1
+  bounded_thread_scoring: true
+
+claim_boundary:
+  strict_claim_firewall: true
+  claim_scope: routing_and_composition
+  may_feed_deployable_selection: true
+  non_selecting_utility_artifact: true
+  source_inner_pseudo_target_utility_only: true
+  validation_labels_consumed: true
+  validation_labels_consumed_for_predeclared_policy_family_only: true
+  validation_labels_may_authorize_alternative_router_tuning: false
+  target_support_used: false
+  target_metadata_used: false
+  target_train_rows_used: false
+  target_test_rows_used: false
+  outer_target_instantiated: false
+  outer_target_expert_used: false
+  nelbo_computed: false
+  stage20_metrics_used: false
+  stage50_artifacts_used: false
+  stage90_artifacts_used: false
+  expert_selection_performed: false
+  candidate_ranking_performed: false
+  policy_selection_performed: false
+  seed_selection_performed: false
+  bacc_computed: true
+  macro_f1_computed: true
+  macro_f1_is_secondary_only: true
+  routing_quality_claimed: false
+  outer_target_downstream_utility_claimed: false

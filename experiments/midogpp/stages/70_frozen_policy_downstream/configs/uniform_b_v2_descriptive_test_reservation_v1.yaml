@@ -1,0 +1,38 @@
+experiment:
+  id: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_reservation.v1
+  name: uniform_b_v2_descriptive_test_reservation_v1
+  artifact_root: output://midogpp_output_uniform_b_v2_descriptive_test_reservation_v1
+  output_artifact_id: midogpp_output_uniform_b_v2_descriptive_test_reservation_v1
+
+inputs:
+  canonical_reference_root: artifact://midogpp_output_uniform_b_canonical_reference_v1
+  bank_root: artifact://midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_root: artifact://midogpp_output_uniform_b_v2_generation_lock_v1
+  equal_union_policy_root: artifact://midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+  metadata_policy_root: artifact://midogpp_output_uniform_b_v2_metadata_tie_union_policy_lock_v1
+  utility_policy_root: artifact://midogpp_output_uniform_b_v2_utility_regret_policy_lock_v1
+  scoring_manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  test_consumption_ledger_path: artifact://midogpp_uniform_b_test_consumption_ledger_v1/reports/test_consumption_ledger.json
+  prospective_cache_root: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+  cache_experiment_id: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_cache.v1
+  cache_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+
+protocol:
+  consumer_experiment_id: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_frozen_policy_comparison.v1
+  purpose: descriptive_frozen_policy_comparison_on_previously_consumed_test
+  claim_scope: target_evaluation_authorization
+  expected_test_rows: 9928
+  expected_scoring_manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+  expected_cache_extractor_protocol_hash: 8bae5653e53b087f1662216308dcf2352975f5efa6fdda5fae4e72ff04d3790b
+  policy_arms:
+    - equal_union_control
+    - metadata_max_tie_union
+    - utility_regret_frozen_policy
+
+execution:
+  production_workspace_binding: true
+  allow_test_validation_injection: false
+  generation_allowed: false
+  prediction_allowed: false
+  label_access_allowed: false
+  metric_scoring_allowed: false

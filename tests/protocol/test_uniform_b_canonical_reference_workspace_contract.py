@@ -30,14 +30,14 @@ def test_uniform_b_canonical_reference_is_distinct_and_review_gated() -> None:
     assert output.may_feed_deployable_selection is False
 
 
-def test_uniform_b_canonical_cache_may_feed_stage20_but_not_later_stages_directly() -> None:
+def test_uniform_b_canonical_cache_may_feed_stage20_and_reviewed_stage30_only() -> None:
     workspace = MidogppWorkspace.load()
     cache = workspace.artifacts[CACHE_ID]
 
     assert cache.evidence_label == "CANONICAL INPUT"
     assert "cvae_preservation_evidence" not in cache.forbidden_reuse
+    assert "expert_bank_evidence" not in cache.forbidden_reuse
     assert {
-        "expert_bank_evidence",
         "routing_evidence",
         "synthetic_downstream_utility_evidence",
     }.issubset(cache.forbidden_reuse)

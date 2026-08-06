@@ -133,12 +133,12 @@ GMM-composition, or downstream synthetic-utility claim.
 
 ## Next Evidence Needed
 
-- Run a predeclared seed or variant stability check for the preservation
-  surface.
-- Treat prior generation as a separate bottleneck requiring its own
-  generation and held-out downstream evidence.
-- Build the provenance-clean independently trained source-expert bank before
-  starting routing or composition claims.
+- Keep this preservation artifact outside expert selection and routing; it was
+  not the evidence used to authorize the Uniform-B v2 bank.
+- Use the separately validated Stage-30 bank for fresh Stage-40/60 experiments
+  with its locked eight-source equal-union control.
+- Require held-out generation and downstream evidence before broadening the
+  claim beyond preservation.
 
 ## Relationship To The Prior-Recovery Surface
 

@@ -1,0 +1,91 @@
+experiment:
+  id: midogpp.routing_compatibility.uniform_b_v2_metadata_exact_match_lock.v1
+  name: uniform_b_v2_metadata_exact_match_compatibility_v1
+  artifact_root: output://midogpp_output_uniform_b_v2_metadata_exact_match_compatibility_v1
+
+inputs:
+  metadata_mapping_path: artifact://midogpp_routing_metadata_profiles_v1/domain_mapping.json
+  metadata_artifact_id: midogpp_routing_metadata_profiles_v1
+  expected_domain_mapping_sha256: 79d703ccf3085ae3968698c2ac44a3eabc2713b434762cc6b2fd2fa90126a211
+
+profile_contract:
+  domain_axis: tumor_type|lab_or_origin|scanner_model
+  ordered_axes: [tumor_type, lab_or_origin, scanner_model]
+  domain_name_separator: '|'
+  source_centers: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+  eligible_centers: ['0', '1', '2', '3', '5', '6', '7', '8', '9']
+  excluded_centers: ['4']
+  parsed_input_fields: [domain_axis, domain_name_to_id]
+  all_other_input_fields_ignored: true
+  strip_surrounding_whitespace: true
+  reject_empty_components: true
+  preserve_case: true
+  expected_source_domain_count: 10
+  expected_profile_count: 9
+  center_4_profile_emitted: false
+
+compatibility_contract:
+  family: unweighted_component_exact_match_count
+  namespace: uniform_b_v2_metadata_exact_match_compatibility_v1
+  ordered_axes: [tumor_type, lab_or_origin, scanner_model]
+  component_weights:
+    tumor_type: 1
+    lab_or_origin: 1
+    scanner_model: 1
+  scorer_inputs: metadata_profile_values_only
+  center_or_domain_ids_passed_to_scorer: false
+  directionality: all_ordered_target_source_pairs
+  candidate_sources_by_target:
+    '0': ['1', '2', '3', '5', '6', '7', '8', '9']
+    '1': ['0', '2', '3', '5', '6', '7', '8', '9']
+    '2': ['0', '1', '3', '5', '6', '7', '8', '9']
+    '3': ['0', '1', '2', '5', '6', '7', '8', '9']
+    '5': ['0', '1', '2', '3', '6', '7', '8', '9']
+    '6': ['0', '1', '2', '3', '5', '7', '8', '9']
+    '7': ['0', '1', '2', '3', '5', '6', '8', '9']
+    '8': ['0', '1', '2', '3', '5', '6', '7', '9']
+    '9': ['0', '1', '2', '3', '5', '6', '7', '8']
+  target_expert_excluded: true
+  sources_per_target: 8
+  minimum_score: 0
+  maximum_score: 3
+  expected_ordered_score_count: 72
+  ties_allowed: true
+  score_semantics: metadata_similarity_proxy_not_probability_or_utility
+  ranking_performed: false
+  selection_performed: false
+  weighting_performed: false
+
+execution:
+  lock_only: true
+  model_training_allowed: false
+  sample_manifest_access_allowed: false
+  feature_cache_access_allowed: false
+  support_set_access_allowed: false
+  target_label_access_allowed: false
+  nelbo_access_allowed: false
+  stage20_input_allowed: false
+  stage50_input_allowed: false
+  stage90_input_allowed: false
+  metric_computation_allowed: false
+
+claim_boundary:
+  strict_claim_firewall: true
+  claim_scope: routing_compatibility_only
+  lock_only: true
+  metadata_score_is_proxy_only: true
+  may_feed_deployable_selection: true
+  target_identity_binds_profile_only: true
+  target_identity_used_by_scorer: false
+  target_expert_excluded: true
+  target_sample_rows_used: false
+  target_support_used: false
+  target_labels_used: false
+  nelbo_computed: false
+  true_utility_computed: false
+  expert_selection_performed: false
+  source_ranking_performed: false
+  source_weighting_performed: false
+  routing_policy_emitted: false
+  routing_quality_claimed: false
+  downstream_utility_claimed: false

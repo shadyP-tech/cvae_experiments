@@ -21,6 +21,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     stability.add_argument("--config", required=True)
     stability.add_argument("--artifact-root", default=None)
+    promotion = sub.add_parser(
+        "uniform-b-v2-routing-promotion",
+        help="Promote the validated Uniform-B v2 source experts for routing.",
+    )
+    promotion.add_argument("--config", required=True)
+    promotion.add_argument("--artifact-root", default=None)
     args = parser.parse_args(argv)
     if args.surface == "uniform-b-adaptation-pilot":
         from .b_adaptation_pilot import load_pilot_config, run_pilot
@@ -37,6 +43,20 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_stability_config(args.config)
         output = run_stability_probe(
+            config,
+            artifact_root=Path(args.artifact_root) if args.artifact_root else None,
+        )
+        print(output)
+        return 0
+    if args.surface == "uniform-b-v2-routing-promotion":
+        from .uniform_b_v2_promotion import load_promotion_config, run_promotion
+        from .uniform_b_v2_promotion.workspace_binding import (
+            validate_production_workspace_binding,
+        )
+
+        config = load_promotion_config(args.config)
+        validate_production_workspace_binding(config)
+        output = run_promotion(
             config,
             artifact_root=Path(args.artifact_root) if args.artifact_root else None,
         )

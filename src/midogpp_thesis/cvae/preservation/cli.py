@@ -44,6 +44,10 @@ def build_parser() -> argparse.ArgumentParser:
             "source-inner-uniform-b-geco-posterior-resampled-prior",
             "Run fresh Uniform-B BG checkpoints with paired P0/Pq generation.",
         ),
+        (
+            "source-inner-uniform-b-geco-aggregate-prior-union",
+            "Run the capacity-and-composition Uniform-B aggregate-prior v2 study.",
+        ),
         ("prior-recovery-outer", "Run the locked outer A/B/C/D preservation matrix."),
     ):
         command = sub.add_parser(name, help=help_text)
@@ -184,6 +188,16 @@ def _surface_handler(surface: str) -> tuple[Loader, Runner]:
         return (
             load_uniform_b_resampled_prior_config,
             run_uniform_b_resampled_prior_source_inner_study,
+        )
+    if surface == "source-inner-uniform-b-geco-aggregate-prior-union":
+        from .uniform_b_optimized_prior.config import load_optimized_prior_config
+        from .uniform_b_optimized_prior.runner import (
+            run_optimized_prior_source_inner_study,
+        )
+
+        return (
+            load_optimized_prior_config,
+            run_optimized_prior_source_inner_study,
         )
     if surface == "prior-recovery-outer":
         from .prior_recovery import run_outer_prior_recovery

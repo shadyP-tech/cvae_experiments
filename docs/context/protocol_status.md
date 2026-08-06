@@ -1,6 +1,6 @@
 # Protocol Status
 
-Last updated: 2026-07-25
+Last updated: 2026-08-05
 
 ## Active MIDOG++ surfaces
 
@@ -10,6 +10,12 @@ Last updated: 2026-07-25
   `src/midogpp_thesis/real_features/`
 - CVAE preservation surfaces:
   `src/midogpp_thesis/cvae/preservation/`
+- Stage-30 expert-bank promotion and fail-closed loading:
+  `src/midogpp_thesis/cvae/expert_bank/`
+- Stage-40 generation locking and validation:
+  `src/midogpp_thesis/cvae/generation/`
+- Stage-60 policy locking and validation:
+  `src/midogpp_thesis/cvae/routing/`
 - Registry, artifact resolution, and fail-closed launch preparation:
   `src/midogpp_thesis/workspace/`
 
@@ -33,6 +39,12 @@ The working tree contains active implementations for:
 - the separate non-adoptive learned class-conditional diagonal-prior
   source-inner v2 study;
 - the separate non-adoptive Task-Fisher shrinkage source-inner v2 study;
+- the completed Uniform-B GECO aggregate-prior union v2 source-inner study;
+- the completed Uniform-B v2 Stage-30 promotion, validation, and
+  routing-authorized expert loader;
+- the completed Uniform-B v2 Stage-40 GenerationLock;
+- the completed Uniform-B v2 Stage-60 equal-union, metadata, source-inner
+  utility, and uncertainty-gated utility/regret policy locks;
 - a conditionally unlocked Stage-20 outer A/B/C/D preservation factorial.
 
 The first three runs are complete on `xai-master` and pass their full
@@ -55,6 +67,37 @@ eight center structure. Their only allowed claim scope is
 consumption fixed false. They cannot change the scalar v1 gate, the published
 stability consensus, outer v1, or the registered Stage-30 input.
 
+The completed Uniform-B aggregate-prior union v2 study is a separate source-
+inner lineage. Its PS arm reaches mean BACC `0.770112`, improves over P0 by
+`+0.012764`, and lies `0.001459` below the posterior-sample ceiling. The
+minimum training-seed PS mean is `0.764562`. Its direct publication remains
+non-consumable, but the separate reviewed Stage-30 promotion passed every
+gate and consumed that evidence for whole-bank adoption.
+
+The promoted artifact is `COMPLETE`, validation is `PASS`, and publication
+state is `ROUTING_AUTHORIZED`. It retains all 27 independently trained
+source/seed experts without individual selection. The bank may feed future
+deployable-selection experiments; the Stage-20 source artifact may not.
+
+The Stage-40 GenerationLock and the Stage-60 equal-union, metadata, and
+utility/regret locks are
+`COMPLETE`; their production runs and independent validator reruns report
+`PASS`. The equal-union control freezes 81 target/seed replicates and 648
+target-excluded assignments under policy lock `4b9ea514308b084f`. The
+non-selecting metadata compatibility artifact freezes 72 target-excluded
+exact-match proxy scores under lock `4b46b3d157b07781`. The max-tie policy then
+retains every maximum-score tie and freezes nine selections, 81 replicates,
+and 153 assignments under lock `27f16953b32c46cd`. The completed source-inner
+utility surface is label-blind until its 81 predictions are materialized, then
+uses one-time validation labels only to produce 648 `q != e` utility and 3,168
+case-confusion rows under lock `a787b24b8e62e203`. Its sole consumer creates
+4,536 regret cells and 72 candidate summaries, then freezes all nine folds as
+the exact equal-union fallback: no best-source win probability reaches `0.80`
+and all margin lower bounds are negative. The policy lock is
+`d504ea0a07302acd`; publication state is
+`POLICY_FROZEN_FOR_MATCHED_STAGE70_EVALUATION`. No Stage-60 artifact supports
+a routing-quality or target downstream-utility claim.
+
 ## Current thesis-facing evidence
 
 The tuned-classifier preservation result supports only
@@ -71,6 +114,22 @@ predeclared consensus rule. This is a `NEGATIVE_RESULT` for broad recipe
 stability and an operational `PASS` for publishing a conservative complete
 recipe bank. It is not outer-preservation, routing, generation, or downstream
 utility evidence.
+
+The Stage-30 promotion supports the narrow
+`expert_bank_construction_only` claim. It establishes a validated bank of
+independently trained experts and freezes equal-union PS as the future direct
+control. It does not establish routing, compatibility estimation, generation
+quality on outer targets, or downstream synthetic utility. Source-inner
+labels used for whole-bank adoption may not be reused to select an expert,
+seed, or routing policy.
+
+Stage 40 supports only the frozen generation-contract claim. Stage 60 supports
+only that the all-eligible-source equal-union control, metadata compatibility
+proxy/max-tie comparison, and predeclared source-inner utility/regret policy
+are fully specified, target-excluded, and frozen before evaluation. The utility
+rows are policy-training only, and their per-query best source is a
+non-deployable regret oracle, not target evidence. Neither stage establishes a
+held-out BACC, a routing advantage, or downstream utility.
 
 ## Planned surfaces
 
@@ -106,20 +165,22 @@ not resolve center-sampling uncertainty, external-dataset transfer, or
 deployment utility. Phase B therefore remains `DIAGNOSTIC ONLY` in Stage 90
 and is forbidden from revising the matched denominator or feeding later stages.
 
-Stages 30 through 70 are not active implementations:
+Stages 30 and 40 plus the equal-union control, metadata comparison, and
+utility/regret policy in Stage 60 are active and validated. The remaining
+planned surfaces are:
 
-- provenance-clean expert bank
-- prior and generation validation
+- the alternative consensus-recipe provenance-clean v1 bank
 - all-candidate utility matrix for a clean bank
-- support-based routing or composition
-- frozen-policy downstream synthetic utility
+- a separately authorized target-evaluation artifact
+- matched Stage-70 control-versus-metadata-versus-utility-router downstream utility
 
 Legacy source trees were retired rather than exposed as fallbacks. Any new
 implementation must use only the canonical dataset/cache lineage and must pass
 target-leakage, expert-isolation, candidate-exclusion, and proxy-versus-utility
 checks before activation.
 
-The published training-seed consensus `RecipeLock` files are now eligible to
+For the separate planned `midogpp.expert_bank.provenance_clean.v1` path, the
+published training-seed consensus `RecipeLock` files remain eligible to
 feed the fold-matched Stage-30 expert recipe. Consensus is `A` for centers
 `0,1,2,3,5,9`, `D` with the full conditional sampler for centers `6,7`, and
 `C` with the full conditional sampler for center `8`. The bundle's protocol
@@ -128,18 +189,25 @@ hash is `bbde3e5c5a1e3374`, and its selection-bundle hash is
 passes, and the Stage-30 loader accepts the publication.
 
 Scalar seed-42 locks remain evidence for the completed source-inner result but
-are no longer the registered Stage-30 input. Stage-30 consumption remains
+are no longer the input to that planned path. Its consumption remains
 fail-closed: the stability bundle must be `PUBLISHED`, and every consensus lock
 must be valid and export-ready before the loader returns lock `H` for fold `H`.
-The Stage-30 registry entry is still planned and has no runnable expert-bank
-runner, so the eligible input does not activate Stage 30. Outer v1 still
-consumes the scalar source-inner bundle and retains its original
-all-conditional/factorial gate. Outer preservation metrics and decisions may
-never feed model, sampler, expert, routing, or composition selection. Stage 40
-remains a post-expert-bank generation-validation stage.
+That alternative runner remains unimplemented and is distinct from the active
+Uniform-B v2 promotion. Outer v1 still consumes the scalar source-inner bundle
+and retains its original all-conditional/factorial gate. Outer preservation
+metrics and decisions may never feed model, sampler, expert, routing, or
+composition selection. Stage 40 now has a complete, independently validated,
+target-data-free GenerationLock artifact. It freezes settings and records 162
+passing integrity health checks only; it does not establish an eight-source
+BACC, routing result, or downstream utility claim. Stage 60 now has complete,
+independently validated equal-union, metadata-compatibility/max-tie, and
+source-inner utility/regret locks. The latter uses source-inner case-confusion
+evidence only and falls back exactly to equal-union for every outer fold. These
+artifacts contain no target evaluation or performance result.
 
-The v2 mechanism studies may run independently while Stage-30 implementation
-proceeds; they are not prerequisites for it. A fully executed v2 bundle may
+The older v2 mechanism studies may run independently of the active Uniform-B
+bank and the planned consensus-recipe bank; they are prerequisites for
+neither. A fully executed v2 bundle may
 still report `INVALID_INCOMPLETE`, for example when a raw Fisher state is
 invalid. In that case `run_state=COMPLETE` means execution and mechanical
 bundle validation finished, not that a scientific mechanism decision passed.

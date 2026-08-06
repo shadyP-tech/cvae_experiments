@@ -1,0 +1,78 @@
+cache:
+  name: uniform_b_v2_routing_validation_cache_v1
+  root: datasets/midogpp/derived/features/virchow2/uniform_b_v2_routing_validation_cache_v1/seed42
+
+inputs:
+  repo_root: .
+  manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  canonical_train_cache_path: artifact://midogpp_virchow2_xyxy_feature_cache_seed42/embeddings/train.pt
+  canonical_validation_cache_path: artifact://midogpp_virchow2_xyxy_validation_cache_seed42/embeddings/val.pt
+  source_train_b_cache_root: artifact://midogpp_virchow2_annotation_jpeg_fixed_center_pooling_3840_v3_seed42
+  source_train_b_report_path: artifact://midogpp_virchow2_annotation_jpeg_fixed_center_pooling_3840_v3_seed42/reports/cache_builder_report.json
+
+input_hashes:
+  manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+  canonical_train_cache_sha256: f6608e513fb2d06671e3ec117b093a85d58530b77b1fae44a3be1680d9feabd2
+  canonical_validation_cache_sha256: 23b0a76d1fb56e033556b44f7f939f957be0284269c218655ace18857cafa117
+  source_train_b_report_sha256: 6c26aa9807dd9defb3d29fc878f65e13890ad1ed4d8ea079458cd03c5f7346cd
+
+model:
+  model_ref: hf-hub:paige-ai/Virchow2
+  model_revision: 3158645804b69e3f3bc4439d4116edddf0840a72
+  expected_model_config_sha256: 7db445b996bb165e88fe70e826c2ebb530539a2b1d136aa16eeb847df5f1e3db
+  expected_checkpoint_file_sha256: 8d6cea947eb2418c3b0dff48cfb9b238e47744ab0dfca21b2b0637b140769b4b
+  expected_state_dict_sha256: 91084959869cb53bf76e5038e5dc8a8ddc1ef8359a886fa22c19b4e8c62e112a
+  expected_preprocessing_config_hash: 4fb7d9ab76d1da72
+
+runtime_identity:
+  timm: 1.0.27
+  torch: 2.6.0+cu124
+  pillow: 12.0.0
+
+run:
+  eligible_centers: ["0", "1", "2", "3", "5", "6", "7", "8", "9"]
+  expected_manifest_rows_by_split:
+    train: 9886
+    val: 2677
+    test: 10006
+  expected_eligible_train_rows: 9648
+  expected_validation_rows: 2615
+  expected_validation_rows_by_center:
+    "0": 375
+    "1": 62
+    "2": 1304
+    "3": 152
+    "5": 122
+    "6": 56
+    "7": 122
+    "8": 154
+    "9": 268
+  expected_class_labels: [0, 1]
+  experiment_seed: 42
+  device: cuda
+  batch_size: 32
+
+bridge:
+  minimum_canonical_a_prefix_cosine: 0.99999
+  maximum_canonical_a_prefix_relative_l2: 0.001
+
+protocol:
+  artifact_dataset_family: MIDOG++
+  claim_dataset_family: MIDOG++
+  dataset_contract: midogpp_annotation_patch_v1
+  cache_role: stage60_utility_regret_prerequisite_only
+  stage20_train_consumed: true
+  test_representation_adoption_consumed: true
+  validation_split_reserved: true
+  validation_labels_unobserved_before_lock: true
+  validation_labels_used_for_feature_extraction: false
+  validation_labels_persisted_in_cache: false
+  validation_opened_only_for_later_source_inner_scoring: true
+  feature_extraction_label_free: true
+  output_metric_computed: false
+  all_expected_classes_present_in_hash_pinned_manifest: true
+  center_4_excluded: true
+  routing_performed: false
+  expert_selection_performed: false
+  utility_computed: false
+  downstream_utility_claimed: false

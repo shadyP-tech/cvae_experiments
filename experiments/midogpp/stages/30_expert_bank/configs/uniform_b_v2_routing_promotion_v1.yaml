@@ -1,0 +1,83 @@
+experiment:
+  name: uniform_b_v2_routing_authorized_expert_bank_v1
+  artifact_root: output://midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+
+inputs:
+  source_study_root: artifact://midogpp_output_cvae_uniform_b_geco_aggregate_prior_union_source_inner_v2
+  source_artifact_id: midogpp_output_cvae_uniform_b_geco_aggregate_prior_union_source_inner_v2
+  manifest_path: artifact://midogpp_dataset_contract_annotation_patch_v1/manifest.csv
+  feature_cache_path: artifact://midogpp_virchow2_uniform_b_canonical_train_cache_seed42/embeddings/train.pt
+  expected_manifest_hash: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+  expected_feature_cache_hash: 1ed7602f225c592a6f8103b24ebfc93f72dc6d5d0c27565566a8b2260783d1dc
+  expected_source_protocol_hash: 70d54442a031a43e
+  expected_source_config_hash: 09d5b264d066633b
+  expected_source_content_index_sha256: 7fae389151618950102905f85c5fce300ef9821f15cf304d8469b5a147110279
+  expected_source_checkpoint_index_sha256: 15691c0414ed0cad7796c91a08965c652a3513064e3d43de1e8d24277d4fe1ac
+  expected_source_frame_index_sha256: 95bfccd220b9aee61b2c7487ad1da51f6b8b1e575db923f016489c6a3204cd07
+  expected_source_decision_sha256: 15da51d54823c00ed8d070f58d5e1373fd547daadcc8d18f6fc3b2e36c3addad
+
+promotion_gates:
+  centers: ['0', '1', '2', '3', '5', '6', '7', '8', '9']
+  training_seeds: [17, 42, 101]
+  generation_seeds: [17, 42, 101]
+  min_ps_mean_bacc: 0.70
+  min_ps_seed_bacc: 0.75
+  min_ps_minus_p0: 0.005
+  max_posterior_ceiling_gap: 0.01
+  required_checkpoint_records: 27
+  required_sampler_records: 81
+  required_task_metric_rows: 3240
+  required_generation_blocks: 405
+  require_all_sampler_realizations_full_shrinkage: true
+  require_zero_identity_overlap: true
+  require_zero_classifier_convergence_failures: true
+
+model:
+  input_dim: 256
+  hidden_dim: 1024
+  latent_dim: 64
+  num_hidden_layers: 3
+
+aggregate_prior:
+  family: class_conditional_shrinkage_full_total_moment
+  min_class_count: 64
+  max_condition_number: 1000000.0
+  fit_scope: source_center_rows_only
+  partial_class_fallback_allowed: false
+
+canonical_control:
+  id: uniform_b_v2_equal_union_ps
+  composition: all_eligible_source_experts_equal_union_fixed_total
+  total_per_class: 1024
+  sources_per_target: 8
+  source_budget_per_class: 128
+  target_expert_excluded: true
+  target_conditioned_source_weighting: false
+  replicate_policy: report_each_replication_and_predeclared_mean_no_seed_selection
+
+promotion_review:
+  review_id: uniform_b_v2_expert_bank_routing_promotion_review_2026_08_05
+  status: approved
+  review_effect: authorizes_new_stage30_expert_bank_only
+  whole_bank_adoption: true
+  individual_expert_or_seed_selection: false
+  source_inner_evidence_consumed_for_adoption: true
+
+runtime:
+  workstation_profile: xeon_w2265_12c24t_125gb_2x_rtx_a5000_24gb
+  device: cuda:0
+  checkpoint_materialization: hard_link_same_filesystem_copy_fallback
+  checkpoint_hash_buffer_mib: 1
+  one_expert_in_gpu_memory_at_a_time: true
+  no_training_or_classifier_refit: true
+
+claim_boundary:
+  claim_scope: expert_bank_construction_only
+  independently_trained_source_experts: true
+  all_27_experts_retained: true
+  target_expert_excluded_in_every_routing_fold: true
+  source_inner_evaluation_labels_consumed_for_whole_bank_adoption: true
+  target_labels_used_for_individual_expert_selection: false
+  target_labels_may_be_used_for_routing_selection: false
+  routing_quality_claimed: false
+  may_feed_deployable_selection: true

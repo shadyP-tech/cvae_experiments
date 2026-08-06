@@ -43,6 +43,18 @@ COMMANDS: dict[str, tuple[str, str]] = {
         "midogpp_thesis.cvae.expert_bank.cli:main",
         "Run CVAE source-expert adaptation pilots or expert-bank construction.",
     ),
+    "cvae-generation": (
+        "midogpp_thesis.cvae.generation.cli:main",
+        "Freeze and validate CVAE generation contracts.",
+    ),
+    "cvae-routing": (
+        "midogpp_thesis.cvae.routing.cli:main",
+        "Freeze and validate CVAE routing and composition policies.",
+    ),
+    "cvae-frozen-policy-downstream": (
+        "midogpp_thesis.cvae.frozen_policy_downstream.cli:main",
+        "Reserve, authorize, and descriptively score frozen CVAE policies.",
+    ),
     "cvae-diagnostics": (
         "midogpp_thesis.cvae.diagnostics.cli:main",
         "Build and audit bounded CVAE diagnostic replay surfaces.",
