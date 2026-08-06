@@ -17,3 +17,12 @@ the canonical workstation migration. It contains matching pre/post SHA-256
 manifests for the contract, corrected cache, tuned reference, and tuned
 preservation bundle, plus stable raw-tree metadata and critical raw-file
 hashes. It does not add a new experimental claim.
+
+`uniform_b_v2_consumed_validation_dense_residual_router/v1/` is the registered
+destination for the Stage-90 dense residual router prototype. Its evidence
+label is `EXPLORATORY_CONSUMED_DATA_ONLY`: it uses experiment-fenced aliases of
+already-consumed validation bytes and cannot feed Stage 60, Stage 70, recipe or
+deployable selection, promotion, or deployment. The directory is a run
+destination; no result exists until its complete bundle validates. Its bundle
+must include the pre-label all-target-action seal proving that all candidate
+target predictions were immutable before development labels were opened.

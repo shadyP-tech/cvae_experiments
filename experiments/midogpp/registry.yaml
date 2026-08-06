@@ -1230,3 +1230,37 @@ experiments:
     notes:
       - Runs exactly 36 declared semantic replay keys over the immutable portable snapshot.
       - Audit results remain diagnostic-only and cannot update Variant-B evidence or any selection policy.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_validation_dense_residual_router.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_validation_dense_residual_router_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_validation_dense_residual_router_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_dense_residual_router_validation_cache_v1
+      - midogpp_stage90_dense_residual_router_validation_manifest_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Protocol-reviewed Stage-90 diagnostic reuse of the immutable source-local frame, sampler, seed Cartesian product, budgets, and classifier settings only; no Stage-60 or Stage-70 policy, utility, recipe, promotion, or deployment authority is inherited.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - dense-residual-router-diagnostic
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_validation_dense_residual_router_v1
+    notes:
+      - Consumes only the frozen Uniform-B v2 expert bank and GenerationLock plus two experiment-fenced aliases of the already-consumed, hash-pinned validation bytes.
+      - This Stage-90 prototype is exploratory consumed-data evidence only; it cannot reopen Stage 60 or 70, revise a frozen policy, feed recipe or deployable selection, or establish routing quality, fresh confirmation, promotion, or deployment evidence.

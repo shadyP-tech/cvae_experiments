@@ -153,3 +153,69 @@ remain untouched.
 
 Canonical output:
 `artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_sens_spec_constrained_nystroem_probe_v1/seed42/`.
+
+## Uniform-B v2 Consumed-Validation Dense Residual Router v1
+
+`midogpp.oracle.uniform_b_v2_consumed_validation_dense_residual_router.v1`
+is a Stage-90 mechanism prototype over validation bytes already consumed by
+the frozen Stage-60 source-inner policy family. It reads the original frozen
+expert bank and GenerationLock, but accesses the validation cache and manifest
+only through these experiment-fenced aliases:
+
+- `midogpp_stage90_dense_residual_router_validation_cache_v1`
+- `midogpp_stage90_dense_residual_router_validation_manifest_v1`
+
+The aliases retain the exact physical paths and required SHA-256 hashes of the
+current Stage-60 inputs. They declare
+`CONSUMED_FOR_STAGE90_DIAGNOSTIC_ROUTER_PROTOTYPING`, create no fresh evidence,
+and authorize only this experiment for `oracle_and_diagnostic_evidence`.
+
+For each outer target `H`, two cases per remaining query center are assigned to
+label-free compatibility support with seed `20260806`. The fixed compatibility
+proxy is the class-marginalized PS variational energy with prior `[0.5, 0.5]`
+in the common 3,840-dimensional frame, own-source median/MAD calibration, and
+an arithmetic mean across all three expert replicas. It is explicitly not an
+exact NELBO claim. The router evaluates `rho` in `{0, 0.25, 0.5}` with
+temperature `1`, maximum source weight `0.25`, minimum effective source count
+`6`, and a minimum integer allocation of one sample per legal source. Nested
+seven-source development uses exactly 1,008 samples per class (144 per source
+at `rho=0`); eight-source target scoring uses the canonical 1,024 per class
+(128 per source at `rho=0`) for every `(training_seed, generation_seed)` cell
+in `{17,42,101} x {17,42,101}`.
+
+Before any validation label is opened, the runner materializes and durably
+seals all 324 target prediction cells (three candidate actions plus the
+separate exact-control alias for every target and seed cell). Development
+label access requires that global seal and rehashes both target prediction
+files, closing the circular case where a center is target `H` in one fold and
+pseudo-target `q` in another. The control alias reuses the already fitted
+`rho=0` model, so the frozen runtime budget is 1,944 development fits plus 243
+unique target fits (2,187 total), with at most nine generated source blocks
+resident at once.
+
+Selection minimizes mean regret plus `0.5` times upper-quartile CVaR regret
+plus `0.01` times mean squared L2 distance from uniform, equally weighting all
+`q != H` queries and all nine paired seed cells. A nonuniform action must also
+have a strictly positive mean paired BACC delta versus `rho=0`; otherwise the
+diagnostic falls back to `rho=0`. Ties prefer smaller `rho`, then `action_id`.
+The classifier is fixed synthetic-only L2 logistic regression with `C=0.01`,
+`lbfgs`, `max_iter=3000`, and `random_state=23`.
+
+Run the registered diagnostic with:
+
+```bash
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_v2_consumed_validation_dense_residual_router.v1
+```
+
+Canonical output:
+
+```text
+artifacts/midogpp/90_oracles_and_diagnostics/
+  uniform_b_v2_consumed_validation_dense_residual_router/v1/
+```
+
+The publication label is `EXPLORATORY_CONSUMED_DATA_ONLY`. The output is
+`diagnostic_only`; it claims neither routing quality nor fresh confirmation and
+cannot reopen or feed Stage 60, Stage 70, recipe selection, deployable
+selection, promotion, or deployment.

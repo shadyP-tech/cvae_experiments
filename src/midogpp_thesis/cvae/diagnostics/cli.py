@@ -25,6 +25,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     audit.add_argument("--config", required=True)
     audit.add_argument("--artifact-root", required=True)
+
+    residual = sub.add_parser(
+        "dense-residual-router-diagnostic",
+        help=(
+            "Run the consumed-validation Stage-90 dense residual router "
+            "diagnostic."
+        ),
+    )
+    residual.add_argument("--config", required=True)
+    residual.add_argument("--artifact-root", required=True)
     return parser
 
 
@@ -53,6 +63,22 @@ def main(argv: list[str] | None = None) -> int:
             config,
             artifact_root=artifact_root,
             resolved_config_path=args.config,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "dense-residual-router-diagnostic":
+        from .dense_residual_router.config import (
+            load_dense_residual_diagnostic_config,
+        )
+        from .dense_residual_router.runner import (
+            run_dense_residual_router_diagnostic,
+        )
+
+        config = load_dense_residual_diagnostic_config(args.config)
+        output = run_dense_residual_router_diagnostic(
+            config,
+            artifact_root=artifact_root,
         )
         print(output)
         return 0
