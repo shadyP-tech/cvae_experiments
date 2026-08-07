@@ -58,7 +58,7 @@ class MMDKMMProtocol:
     support_labels_used: bool = False
     evaluation_labels_available_to_router: bool = False
     evaluation_embeddings_available_to_router: bool = False
-    stage90_inputs_used: bool = False
+    previous_stage90_router_or_utility_inputs_used: bool = False
 
     def __post_init__(self) -> None:
         target = str(self.target_center)
@@ -87,7 +87,7 @@ class MMDKMMProtocol:
             or self.support_labels_used is not False
             or self.evaluation_labels_available_to_router is not False
             or self.evaluation_embeddings_available_to_router is not False
-            or self.stage90_inputs_used is not False
+            or self.previous_stage90_router_or_utility_inputs_used is not False
         ):
             raise ProtocolError("MMD/KMM protocol violates the routing claim firewall.")
         object.__setattr__(self, "target_center", target)
@@ -685,7 +685,7 @@ class KMMRouteDecision:
     downstream_utility_claimed: bool = False
     promotion_eligible: bool = False
     target_labels_used: bool = False
-    stage90_inputs_used: bool = False
+    previous_stage90_router_or_utility_inputs_used: bool = False
 
     def __post_init__(self) -> None:
         sources = _canonical_ids(self.candidate_sources, "route-decision source")
@@ -700,7 +700,7 @@ class KMMRouteDecision:
             or self.downstream_utility_claimed is not False
             or self.promotion_eligible is not False
             or self.target_labels_used is not False
-            or self.stage90_inputs_used is not False
+            or self.previous_stage90_router_or_utility_inputs_used is not False
             or self.used_uniform_fallback is not (self.fallback_reason is not None)
             or float(weight_vector.max()) > DEFAULT_MAX_SOURCE_WEIGHT + 1e-8
             or 1.0 / float(np.dot(weight_vector, weight_vector))

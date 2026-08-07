@@ -32,7 +32,7 @@ def _kwargs() -> dict[str, object]:
         ("support_labels_used", True),
         ("evaluation_labels_available_to_router", True),
         ("evaluation_embeddings_available_to_router", True),
-        ("stage90_inputs_used", True),
+        ("previous_stage90_router_or_utility_inputs_used", True),
     ),
 )
 def test_protocol_claim_firewall_rejects_forbidden_inputs(

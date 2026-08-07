@@ -142,7 +142,7 @@ def route_mmd_kmm(
         downstream_utility_claimed=False,
         promotion_eligible=False,
         target_labels_used=False,
-        stage90_inputs_used=False,
+        previous_stage90_router_or_utility_inputs_used=False,
     )
 
 

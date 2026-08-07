@@ -45,6 +45,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     marginal_utility.add_argument("--config", required=True)
     marginal_utility.add_argument("--artifact-root", required=True)
+
+    mmd_kmm = sub.add_parser(
+        "mmd-kmm-router-diagnostic",
+        help=(
+            "Run the consumed-validation Stage-90 label-free MMD/KMM "
+            "mixture-router diagnostic."
+        ),
+    )
+    mmd_kmm.add_argument("--config", required=True)
+    mmd_kmm.add_argument("--artifact-root", required=True)
     return parser
 
 
@@ -103,6 +113,18 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_local_marginal_utility_router_config(args.config)
         output = run_local_marginal_utility_router_diagnostic(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "mmd-kmm-router-diagnostic":
+        from .mmd_kmm_router.config import load_mmd_kmm_router_config
+        from .mmd_kmm_router.runner import run_mmd_kmm_router_diagnostic
+
+        config = load_mmd_kmm_router_config(args.config)
+        output = run_mmd_kmm_router_diagnostic(
             config,
             artifact_root=artifact_root,
         )

@@ -347,7 +347,7 @@ def test_route_requires_stability_and_rejects_duplicate_energy_direction() -> No
     assert all(audit.passed for audit in accepted.stability_audits)
     assert accepted.promotion_eligible is False
     assert accepted.target_labels_used is False
-    assert accepted.stage90_inputs_used is False
+    assert accepted.previous_stage90_router_or_utility_inputs_used is False
 
     valid_reference = _energy_reference(base, opposite_reference)
     with pytest.raises(ProtocolError, match="reference contract"):
