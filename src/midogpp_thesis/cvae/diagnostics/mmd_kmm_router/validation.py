@@ -38,6 +38,7 @@ from .prediction import (
     read_prediction_store,
     validate_prediction_store_binding,
 )
+from .profiles import CONDITIONAL_ROUTER_MODE
 from .seals import open_evaluation_labels, validate_global_prediction_seal
 from .source_products import load_source_products, validate_source_products_lock
 
@@ -101,7 +102,25 @@ def validate_mmd_kmm_router_bundle(
             source_lock["source_products_lock_hash"]
         ),
     )
-    _validate_plans(plans.plans_by_target)
+    _validate_plans(
+        plans.plans_by_target,
+        config=resolved,
+        expected_support_case_row_counts={
+            target: {
+                case_id: sum(
+                    row.case_id == case_id
+                    for row in partitions.support_rows_by_center[target]
+                )
+                for case_id in sorted(
+                    {
+                        row.case_id
+                        for row in partitions.support_rows_by_center[target]
+                    }
+                )
+            }
+            for target in CENTERS
+        },
+    )
     predictions = read_prediction_store(
         path / TARGET_PREDICTION_ARRAY_MEMBER,
         path / TARGET_PREDICTION_INDEX_MEMBER,
@@ -305,16 +324,33 @@ def _validate_source_products(
         raise ProtocolError("MMD/KMM compatibility-case coverage drifted.")
 
 
-def _validate_plans(plans: Mapping[str, Mapping[str, object]]) -> None:
+def _validate_plans(
+    plans: Mapping[str, Mapping[str, object]],
+    *,
+    config: MMDKMMRouterDiagnosticConfig,
+    expected_support_case_row_counts: Mapping[str, Mapping[str, int]],
+) -> None:
     if tuple(plans) != CENTERS:
         raise ProtocolError("MMD/KMM plan target coverage drifted.")
+    if tuple(expected_support_case_row_counts) != CENTERS:
+        raise ProtocolError("MMD/KMM support-case target coverage drifted.")
     for target in CENTERS:
         plan = plans[target]
         sources = candidate_sources(target)
-        weights = {str(key): float(value) for key, value in plan["final_weights"].items()}
-        control = {str(key): float(value) for key, value in plan["control_weights"].items()}
-        allocations = {str(key): int(value) for key, value in plan["mmd_allocations_per_class"].items()}
-        control_allocations = {str(key): int(value) for key, value in plan["control_allocations_per_class"].items()}
+        weights = {
+            str(key): float(value) for key, value in plan["final_weights"].items()
+        }
+        control = {
+            str(key): float(value) for key, value in plan["control_weights"].items()
+        }
+        allocations = {
+            str(key): int(value)
+            for key, value in plan["mmd_allocations_per_class"].items()
+        }
+        control_allocations = {
+            str(key): int(value)
+            for key, value in plan["control_allocations_per_class"].items()
+        }
         vector = np.asarray([weights[source] for source in sources])
         if (
             tuple(weights) != sources
@@ -330,13 +366,51 @@ def _validate_plans(plans: Mapping[str, Mapping[str, object]]) -> None:
             or set(control.values()) != {0.125}
         ):
             raise ProtocolError(f"MMD/KMM target {target} plan constraints drifted.")
-        if bool(plan["used_uniform_fallback"]) and (
+        used_uniform_fallback = _strict_bool(
+            plan.get("used_uniform_fallback"),
+            f"target {target} uniform-fallback flag",
+        )
+        fallback_reason = plan.get("fallback_reason")
+        if used_uniform_fallback != (
+            isinstance(fallback_reason, str) and bool(fallback_reason.strip())
+        ):
+            raise ProtocolError(
+                f"MMD/KMM target {target} fallback flag/reason drifted."
+            )
+        if used_uniform_fallback and (
             weights != control or allocations != control_allocations
         ):
             raise ProtocolError("MMD/KMM uniform fallback is not exact equal union.")
+        if config.router_mode == CONDITIONAL_ROUTER_MODE:
+            from ..conditional_contrast_mmd_router.plan_validation import (
+                validate_conditional_plan,
+            )
+
+            validate_conditional_plan(
+                plan,
+                target=target,
+                sources=sources,
+                final_weights=weights,
+                control_weights=control,
+                final_allocations=allocations,
+                control_allocations=control_allocations,
+                used_uniform_fallback=used_uniform_fallback,
+                expected_support_case_row_counts=expected_support_case_row_counts[
+                    target
+                ],
+                config=config,
+            )
+        elif "conditional_contrast_diagnostics" in plan:
+            raise ProtocolError("Pooled MMD/KMM plan contains conditional diagnostics.")
         unhashed = {key: value for key, value in plan.items() if key != "plan_hash"}
         if plan.get("plan_hash") != stable_hash(unhashed):
             raise ProtocolError("MMD/KMM target plan hash drifted.")
+
+
+def _strict_bool(value: object, role: str) -> bool:
+    if not isinstance(value, bool):
+        raise ProtocolError(f"MMD/KMM {role} is not boolean.")
+    return value
 
 
 def _validate_content_index(path: Path) -> None:

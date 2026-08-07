@@ -13,9 +13,16 @@ from ....common.hashing import stable_hash
 from ....real_features.classifier_reference.classifiers import ClassifierSpec
 from ...protocol import ProtocolError
 from ...routing.mmd_kmm_mixture import (
+    ConditionalContrastConfig,
     KMMGateConfig,
     KMMOptimizationConfig,
     PriorControlConfig,
+)
+from .profiles import (
+    CONDITIONAL_ROUTER_MODE,
+    MMDKMMExperimentProfile,
+    POOLED_PROFILE,
+    profile_for_experiment,
 )
 from .contracts import (
     CENTERS,
@@ -34,33 +41,23 @@ from .contracts import (
     EXPECTED_EQUAL_UNION_POLICY_LOCK_HASH,
     EXPECTED_GENERATION_LOCK_HASH,
     EXPECTED_MANIFEST_SHA256,
-    EXPERIMENT_ID,
-    EXPERIMENT_NAME,
     EXPERT_BANK_ARTIFACT_ID,
     GENERATION_DEVICES,
     GENERATION_LOCK_ARTIFACT_ID,
     GENERATION_SEEDS,
-    INPUT_ARTIFACT_IDS,
     KERNEL_BATCH_ROWS,
     KERNEL_DEVICES,
     KMM_MAX_ITERATIONS,
     KMM_MINIMUM_PROXY_IMPROVEMENT,
     KMM_OPTIMALITY_TOLERANCE,
-    KMM_REGULARIZATION,
     KMM_SOLVER_TOLERANCE,
-    MAXIMUM_GENERATION_SEED_L1,
-    MAXIMUM_PRIOR_SENSITIVITY_L1,
-    MAXIMUM_SUPPORT_L1,
-    MAXIMUM_TRAINING_SEED_L1,
     MAXIMUM_UNIQUE_CLASSIFIER_FIT_COUNT,
     MAX_SOURCE_PREFIX_PER_CLASS,
     MAX_SOURCE_WEIGHT,
-    MINIMUM_DIRECTION_COSINE,
     MIN_EFFECTIVE_SOURCES,
     NYSTROEM_COMPONENTS,
     NYSTROEM_GAMMA,
     NYSTROEM_RANDOM_STATE,
-    OUTPUT_ARTIFACT_ID,
     PRIOR_CLASSIFIER,
     PRIOR_PROBABILITY_CLIP,
     PRIOR_SENSITIVITY_POSITIVE_PRIORS,
@@ -72,10 +69,8 @@ from .contracts import (
     SUPPORT_PARTITION_NAMESPACE,
     SUPPORT_SPLIT_SEED,
     TRAINING_SEEDS,
-    VALIDATION_CACHE_ARTIFACT_ID,
     VALIDATION_CACHE_REPRESENTATION_ID,
     VALIDATION_CACHE_SEMANTIC_ID,
-    VALIDATION_MANIFEST_ARTIFACT_ID,
     WORKSTATION_PROFILE,
 )
 
@@ -106,7 +101,9 @@ _INPUT_KEYS = frozenset(
 )
 
 
-def canonical_protocol_payload() -> dict[str, object]:
+def canonical_protocol_payload(
+    profile: MMDKMMExperimentProfile = POOLED_PROFILE,
+) -> dict[str, object]:
     return {
         "dataset_family": "MIDOG++",
         "stage": STAGE_ID,
@@ -131,8 +128,10 @@ def canonical_protocol_payload() -> dict[str, object]:
     }
 
 
-def canonical_proxy_payload() -> dict[str, object]:
-    return {
+def canonical_proxy_payload(
+    profile: MMDKMMExperimentProfile = POOLED_PROFILE,
+) -> dict[str, object]:
+    payload: dict[str, object] = {
         "family": "class_prior_controlled_mmd_kmm",
         "common_frame_semantics": "common_inverse_virchow2",
         "common_feature_dim": COMMON_FEATURE_DIM,
@@ -150,18 +149,18 @@ def canonical_proxy_payload() -> dict[str, object]:
         "prior_temperature": PRIOR_TEMPERATURE,
         "prior_reference_positive_prior": 0.5,
         "prior_sensitivity_positive_priors": list(PRIOR_SENSITIVITY_POSITIVE_PRIORS),
-        "kmm_regularization": KMM_REGULARIZATION,
+        "kmm_regularization": profile.kmm_regularization,
         "minimum_proxy_improvement": KMM_MINIMUM_PROXY_IMPROVEMENT,
         "maximum_source_weight": MAX_SOURCE_WEIGHT,
         "minimum_effective_sources": MIN_EFFECTIVE_SOURCES,
         "solver_tolerance": KMM_SOLVER_TOLERANCE,
         "optimality_tolerance": KMM_OPTIMALITY_TOLERANCE,
         "max_iterations": KMM_MAX_ITERATIONS,
-        "maximum_support_l1": MAXIMUM_SUPPORT_L1,
-        "maximum_training_seed_l1": MAXIMUM_TRAINING_SEED_L1,
-        "maximum_generation_seed_l1": MAXIMUM_GENERATION_SEED_L1,
-        "maximum_prior_sensitivity_l1": MAXIMUM_PRIOR_SENSITIVITY_L1,
-        "minimum_direction_cosine": MINIMUM_DIRECTION_COSINE,
+        "maximum_support_l1": profile.maximum_support_l1,
+        "maximum_training_seed_l1": profile.maximum_training_seed_l1,
+        "maximum_generation_seed_l1": profile.maximum_generation_seed_l1,
+        "maximum_prior_sensitivity_l1": profile.maximum_prior_sensitivity_l1,
+        "minimum_direction_cosine": profile.minimum_direction_cosine,
         "duplicate_direction_cosine": DUPLICATE_DIRECTION_COSINE,
         "duplicate_weight_l1": DUPLICATE_WEIGHT_L1,
         "energy_reference_rho": ENERGY_REFERENCE_RHO,
@@ -170,6 +169,34 @@ def canonical_proxy_payload() -> dict[str, object]:
         "integer_allocation": "positive_hamilton_largest_remainder",
         "total_generated_samples_per_class": 1024,
     }
+    if profile.router_mode == CONDITIONAL_ROUTER_MODE:
+        payload.update(
+            {
+                "family": "class_conditional_contrast_mmd_kmm",
+                "source_moment_semantics": (
+                    "class_specific_equal_training_generation_seed_mean"
+                ),
+                "target_moment_semantics": (
+                    "case_equal_soft_class_conditional_mean_from_one_"
+                    "target_excluded_source_only_reference"
+                ),
+                "class_weights": [0.5, 0.5],
+                "contrast_weight": 1.0,
+                "maximum_uniform_l1": 0.25,
+                "minimum_soft_class_mass_per_case": 1.0,
+                "minimum_soft_class_effective_rows_per_case": 2.0,
+                "conditional_component_nonworsening_required": True,
+                "pooled_reference_source": (
+                    "recomputed_label_free_base_kmm_solution_before_"
+                    "stability_gates"
+                ),
+                "pooled_reference_regularization": (
+                    POOLED_PROFILE.kmm_regularization
+                ),
+                "previous_pooled_mmd_output_used": False,
+            }
+        )
+    return payload
 
 
 def canonical_runtime_payload() -> dict[str, object]:
@@ -208,6 +235,7 @@ def canonical_claim_boundary_payload() -> dict[str, object]:
 
 @dataclass(frozen=True)
 class MMDKMMRouterDiagnosticConfig:
+    profile: MMDKMMExperimentProfile
     source_path: Path
     artifact_root: Path
     expert_bank_root: Path
@@ -224,7 +252,19 @@ class MMDKMMRouterDiagnosticConfig:
 
     @property
     def input_artifact_ids(self) -> tuple[str, ...]:
-        return INPUT_ARTIFACT_IDS
+        return self.profile.input_artifact_ids
+
+    @property
+    def experiment_id(self) -> str:
+        return self.profile.experiment_id
+
+    @property
+    def output_artifact_id(self) -> str:
+        return self.profile.output_artifact_id
+
+    @property
+    def router_mode(self) -> str:
+        return self.profile.router_mode
 
     @property
     def prior_control(self) -> PriorControlConfig:
@@ -238,7 +278,7 @@ class MMDKMMRouterDiagnosticConfig:
     @property
     def optimization(self) -> KMMOptimizationConfig:
         return KMMOptimizationConfig(
-            regularization=KMM_REGULARIZATION,
+            regularization=self.profile.kmm_regularization,
             minimum_proxy_improvement=KMM_MINIMUM_PROXY_IMPROVEMENT,
             max_source_weight=MAX_SOURCE_WEIGHT,
             minimum_effective_sources=MIN_EFFECTIVE_SOURCES,
@@ -250,13 +290,40 @@ class MMDKMMRouterDiagnosticConfig:
     @property
     def gates(self) -> KMMGateConfig:
         return KMMGateConfig(
-            maximum_support_l1=MAXIMUM_SUPPORT_L1,
-            maximum_training_seed_l1=MAXIMUM_TRAINING_SEED_L1,
-            maximum_generation_seed_l1=MAXIMUM_GENERATION_SEED_L1,
-            maximum_prior_sensitivity_l1=MAXIMUM_PRIOR_SENSITIVITY_L1,
-            minimum_direction_cosine=MINIMUM_DIRECTION_COSINE,
+            maximum_support_l1=self.profile.maximum_support_l1,
+            maximum_training_seed_l1=self.profile.maximum_training_seed_l1,
+            maximum_generation_seed_l1=self.profile.maximum_generation_seed_l1,
+            maximum_prior_sensitivity_l1=self.profile.maximum_prior_sensitivity_l1,
+            minimum_direction_cosine=self.profile.minimum_direction_cosine,
             duplicate_direction_cosine=DUPLICATE_DIRECTION_COSINE,
             duplicate_weight_l1=DUPLICATE_WEIGHT_L1,
+        )
+
+    @property
+    def conditional_contrast(self) -> ConditionalContrastConfig:
+        if self.router_mode != CONDITIONAL_ROUTER_MODE:
+            raise ProtocolError("Pooled MMD/KMM has no conditional contrast state.")
+        return ConditionalContrastConfig(
+            class_weights=(0.5, 0.5),
+            contrast_weight=1.0,
+            maximum_uniform_l1=0.25,
+            minimum_soft_class_mass_per_case=1.0,
+            minimum_soft_class_effective_rows_per_case=2.0,
+            component_tolerance=1.0e-10,
+        )
+
+    @property
+    def pooled_reference_optimization(self) -> KMMOptimizationConfig:
+        """The exact label-free pooled-MMD numerical reference, recomputed in-run."""
+
+        return KMMOptimizationConfig(
+            regularization=POOLED_PROFILE.kmm_regularization,
+            minimum_proxy_improvement=KMM_MINIMUM_PROXY_IMPROVEMENT,
+            max_source_weight=MAX_SOURCE_WEIGHT,
+            minimum_effective_sources=MIN_EFFECTIVE_SOURCES,
+            solver_tolerance=KMM_SOLVER_TOLERANCE,
+            optimality_tolerance=KMM_OPTIMALITY_TOLERANCE,
+            max_iterations=KMM_MAX_ITERATIONS,
         )
 
 
@@ -271,6 +338,7 @@ def load_mmd_kmm_router_config(path: str | Path) -> MMDKMMRouterDiagnosticConfig
     _exact_keys(payload, _TOP_LEVEL_KEYS, "top level")
     _reject_pending(payload)
     experiment = _mapping(payload, "experiment")
+    profile = profile_for_experiment(experiment.get("id"))
     inputs = _mapping(payload, "inputs")
     protocol = _mapping(payload, "protocol")
     proxy = _mapping(payload, "proxy")
@@ -279,8 +347,8 @@ def load_mmd_kmm_router_config(path: str | Path) -> MMDKMMRouterDiagnosticConfig
     claim = _mapping(payload, "claim_boundary")
     _exact_keys(experiment, _EXPERIMENT_KEYS, "experiment")
     _exact_keys(inputs, _INPUT_KEYS, "inputs")
-    _require_exact(protocol, canonical_protocol_payload(), "protocol")
-    _require_exact(proxy, canonical_proxy_payload(), "proxy")
+    _require_exact(protocol, canonical_protocol_payload(profile), "protocol")
+    _require_exact(proxy, canonical_proxy_payload(profile), "proxy")
     _require_exact(runtime, canonical_runtime_payload(), "runtime")
     _require_exact(claim, canonical_claim_boundary_payload(), "claim boundary")
     classifier = _classifier(classifier_raw)
@@ -288,15 +356,15 @@ def load_mmd_kmm_router_config(path: str | Path) -> MMDKMMRouterDiagnosticConfig
         raise ProtocolError("MMD/KMM downstream classifier differs from GenerationLock.")
 
     exact = {
-        "experiment id": (experiment.get("id"), EXPERIMENT_ID),
-        "experiment name": (experiment.get("name"), EXPERIMENT_NAME),
+        "experiment id": (experiment.get("id"), profile.experiment_id),
+        "experiment name": (experiment.get("name"), profile.experiment_name),
         "claim scope": (experiment.get("claim_scope"), CLAIM_SCOPE),
         "status": (experiment.get("status"), PUBLICATION_STATUS),
         "expert bank id": (inputs.get("expert_bank_artifact_id"), EXPERT_BANK_ARTIFACT_ID),
         "generation lock id": (inputs.get("generation_lock_artifact_id"), GENERATION_LOCK_ARTIFACT_ID),
         "control policy id": (inputs.get("equal_union_policy_artifact_id"), EQUAL_UNION_POLICY_ARTIFACT_ID),
-        "cache alias id": (inputs.get("validation_cache_artifact_id"), VALIDATION_CACHE_ARTIFACT_ID),
-        "manifest alias id": (inputs.get("validation_manifest_artifact_id"), VALIDATION_MANIFEST_ARTIFACT_ID),
+        "cache alias id": (inputs.get("validation_cache_artifact_id"), profile.validation_cache_artifact_id),
+        "manifest alias id": (inputs.get("validation_manifest_artifact_id"), profile.validation_manifest_artifact_id),
         "bank lock": (inputs.get("expected_bank_lock_hash"), EXPECTED_BANK_LOCK_HASH),
         "generation lock": (inputs.get("expected_generation_lock_hash"), EXPECTED_GENERATION_LOCK_HASH),
         "control policy lock": (inputs.get("expected_equal_union_policy_lock_hash"), EXPECTED_EQUAL_UNION_POLICY_LOCK_HASH),
@@ -311,24 +379,25 @@ def load_mmd_kmm_router_config(path: str | Path) -> MMDKMMRouterDiagnosticConfig
         ("expert_bank_root", EXPERT_BANK_ARTIFACT_ID, ""),
         ("generation_lock_root", GENERATION_LOCK_ARTIFACT_ID, ""),
         ("equal_union_policy_root", EQUAL_UNION_POLICY_ARTIFACT_ID, ""),
-        ("validation_cache_root", VALIDATION_CACHE_ARTIFACT_ID, ""),
-        ("validation_manifest_path", VALIDATION_MANIFEST_ARTIFACT_ID, "manifest.csv"),
+        ("validation_cache_root", profile.validation_cache_artifact_id, ""),
+        ("validation_manifest_path", profile.validation_manifest_artifact_id, "manifest.csv"),
     )
     for key, artifact_id, member in locations:
         _validate_artifact_uri(inputs[key], artifact_id=artifact_id, member=member)
     artifact_root_raw = _string(experiment["artifact_root"], "artifact root")
-    if artifact_root_raw.startswith("output://") and artifact_root_raw != f"output://{OUTPUT_ARTIFACT_ID}":
+    if artifact_root_raw.startswith("output://") and artifact_root_raw != f"output://{profile.output_artifact_id}":
         raise ProtocolError("MMD/KMM output artifact identity drifted.")
 
     scientific = {
-        "experiment_id": EXPERIMENT_ID,
-        "input_artifact_ids": list(INPUT_ARTIFACT_IDS),
+        "experiment_id": profile.experiment_id,
+        "input_artifact_ids": list(profile.input_artifact_ids),
         "protocol": dict(protocol),
         "proxy": dict(proxy),
         "classifier": classifier.to_payload(),
         "claim_boundary": dict(claim),
     }
     return MMDKMMRouterDiagnosticConfig(
+        profile=profile,
         source_path=source,
         artifact_root=_path(source.parent, artifact_root_raw),
         expert_bank_root=_path(source.parent, inputs["expert_bank_root"]),

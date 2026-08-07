@@ -34,7 +34,6 @@ from .contracts import (
     EXPECTED_BANK_LOCK_HASH,
     EXPECTED_EQUAL_UNION_POLICY_LOCK_HASH,
     EXPECTED_GENERATION_LOCK_HASH,
-    INPUT_ARTIFACT_IDS,
     SUPPORT_CASE_COUNT,
     SUPPORT_PARTITION_NAMESPACE,
     SUPPORT_SPLIT_SEED,
@@ -291,8 +290,7 @@ def validate_workspace_provenance(
     if (
         payload.get("schema_version") != "midogpp_input_artifacts_v2"
         or payload.get("dataset_id") != "midogpp"
-        or payload.get("experiment_id")
-        != "midogpp.oracle.uniform_b_v2_consumed_validation_mmd_kmm_router.v1"
+        or payload.get("experiment_id") != config.experiment_id
         or payload.get("stage") != "90_oracles_and_diagnostics"
         or payload.get("claim_scope") != "diagnostic_only"
     ):
@@ -301,7 +299,7 @@ def validate_workspace_provenance(
     if not isinstance(raw_rows, list) or not all(isinstance(row, Mapping) for row in raw_rows):
         raise ProtocolError("MMD/KMM workspace provenance rows are malformed.")
     by_id = {str(row.get("artifact_id")): row for row in raw_rows}
-    if len(by_id) != len(raw_rows) or set(by_id) != set(INPUT_ARTIFACT_IDS):
+    if len(by_id) != len(raw_rows) or set(by_id) != set(config.input_artifact_ids):
         raise ProtocolError("MMD/KMM workspace provenance input set drifted.")
     expected_paths = (
         config.expert_bank_root,
@@ -310,7 +308,9 @@ def validate_workspace_provenance(
         config.validation_cache_root,
         config.validation_manifest_path.parent,
     )
-    for artifact_id, expected_path in zip(INPUT_ARTIFACT_IDS, expected_paths, strict=True):
+    for artifact_id, expected_path in zip(
+        config.input_artifact_ids, expected_paths, strict=True
+    ):
         row = by_id[artifact_id]
         if (
             Path(str(row.get("resolved_path", ""))).resolve() != expected_path.resolve()
@@ -319,7 +319,9 @@ def validate_workspace_provenance(
             or not isinstance(row.get("file_integrity"), Mapping)
         ):
             raise ProtocolError(f"MMD/KMM provenance identity drifted: {artifact_id}.")
-    return {artifact_id: by_id[artifact_id] for artifact_id in INPUT_ARTIFACT_IDS}
+    return {
+        artifact_id: by_id[artifact_id] for artifact_id in config.input_artifact_ids
+    }
 
 
 def _json(path: Path) -> dict[str, object]:

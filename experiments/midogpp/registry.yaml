@@ -1337,3 +1337,42 @@ experiments:
       - Uses new experiment-fenced aliases over already-consumed validation bytes; every target prediction is globally sealed before any evaluation label is opened.
       - The dual-A5000 runner loads each expert only once per training seed, persists a hash-validated 256-per-class prefix cache, and resumes completed source, route, and classifier cells.
       - Results remain exploratory consumed-data diagnostics and cannot feed Stage 60, Stage 70, recipe selection, promotion, deployment, or a routing-quality claim.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_validation_conditional_contrast_mmd_router.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_validation_conditional_contrast_mmd_router_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_validation_conditional_contrast_mmd_router_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+      - midogpp_stage90_conditional_contrast_mmd_router_validation_cache_v1
+      - midogpp_stage90_conditional_contrast_mmd_router_validation_manifest_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Protocol-reviewed Stage-90 diagnostic reuse of immutable source-local frames, samplers, the full seed Cartesian product, budgets, and classifier settings only; no Stage-60 or Stage-70 policy, utility, promotion, or deployment authority is inherited.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - conditional-contrast-mmd-router-diagnostic
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_validation_conditional_contrast_mmd_router_v1
+    notes:
+      - Runs one predeclared class-conditional and class-contrast MMD/KMM proxy against the exact frozen equal-union control over all nine targets and all retained 3x3 seed cells.
+      - Uses experiment-fenced aliases over already-consumed validation bytes; target-support soft responsibilities are produced by one target-excluded source-only reference classifier and every target prediction is globally sealed before labels are opened.
+      - Fails closed to exact equal union on weak soft-class mass, component worsening, support-case disagreement, seed or prior instability, excessive departure from uniform, duplicate directions, solver failure, or identical integer allocation.
+      - Reuses the dual-A5000 resumable execution engine but consumes no previous Stage-90 router or utility artifact.
+      - Results remain exploratory consumed-data diagnostics and cannot feed Stage 60, Stage 70, recipe selection, promotion, deployment, or a routing-quality claim.

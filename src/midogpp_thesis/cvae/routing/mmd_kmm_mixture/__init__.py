@@ -1,11 +1,23 @@
 """Protocol-fenced class-prior-controlled MMD/KMM routing mathematics.
 
-This package intentionally exposes no runner or workspace binding.  It is a
-label-free proxy core awaiting a separately authorized, unconsumed experiment
-surface.
+This package intentionally exposes no runner or workspace binding. Experiment
+scope, evidence consumption, scoring, and publication claims remain the
+responsibility of separately fenced diagnostic packages.
 """
 
 from .config import KMMGateConfig, KMMOptimizationConfig, PriorControlConfig
+from .conditional import (
+    CONDITIONAL_PROXY_FAMILY,
+    ConditionalContrastConfig,
+    ConditionalContrastProblem,
+    ConditionalRouteResult,
+    build_conditional_contrast_problem,
+    build_conditional_prior_sensitivity_problems,
+    build_conditional_seed_axis_problems,
+    build_conditional_support_case_problems,
+    case_equal_soft_class_kernel_means,
+    route_conditional_contrast_mmd,
+)
 from .contracts import (
     DirectionIdentityAudit,
     EnergyDirectionReference,
@@ -37,6 +49,10 @@ from .prior import (
 )
 
 __all__ = (
+    "CONDITIONAL_PROXY_FAMILY",
+    "ConditionalContrastConfig",
+    "ConditionalContrastProblem",
+    "ConditionalRouteResult",
     "DirectionIdentityAudit",
     "EnergyDirectionReference",
     "FrozenNystroemFeatureMap",
@@ -55,12 +71,18 @@ __all__ = (
     "audit_direction_identity",
     "audit_weight_stability",
     "build_kernel_mean_problem",
+    "build_conditional_contrast_problem",
+    "build_conditional_prior_sensitivity_problems",
+    "build_conditional_seed_axis_problems",
+    "build_conditional_support_case_problems",
     "build_prior_sensitivity_problems",
     "build_seed_axis_problems",
     "build_support_case_problems",
     "case_equal_class_balanced_kernel_mean",
+    "case_equal_soft_class_kernel_means",
     "prepare_source_only_responsibilities",
     "route_mmd_kmm",
+    "route_conditional_contrast_mmd",
     "shift_binary_prior",
     "shift_source_only_prior_prediction",
     "solve_kmm_weights",

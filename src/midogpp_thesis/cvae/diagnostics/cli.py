@@ -55,6 +55,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     mmd_kmm.add_argument("--config", required=True)
     mmd_kmm.add_argument("--artifact-root", required=True)
+
+    conditional = sub.add_parser(
+        "conditional-contrast-mmd-router-diagnostic",
+        help=(
+            "Run the consumed-validation Stage-90 uncertainty-gated "
+            "class-conditional contrast-MMD router diagnostic."
+        ),
+    )
+    conditional.add_argument("--config", required=True)
+    conditional.add_argument("--artifact-root", required=True)
     return parser
 
 
@@ -125,6 +135,22 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_mmd_kmm_router_config(args.config)
         output = run_mmd_kmm_router_diagnostic(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "conditional-contrast-mmd-router-diagnostic":
+        from .conditional_contrast_mmd_router.config import (
+            load_conditional_contrast_mmd_router_config,
+        )
+        from .conditional_contrast_mmd_router.runner import (
+            run_conditional_contrast_mmd_router_diagnostic,
+        )
+
+        config = load_conditional_contrast_mmd_router_config(args.config)
+        output = run_conditional_contrast_mmd_router_diagnostic(
             config,
             artifact_root=artifact_root,
         )

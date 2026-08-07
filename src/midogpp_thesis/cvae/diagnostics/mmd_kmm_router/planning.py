@@ -11,7 +11,7 @@ import multiprocessing as mp
 import os
 from pathlib import Path
 import shutil
-from typing import Mapping, Sequence
+from typing import Mapping
 
 import numpy as np
 
@@ -58,6 +58,7 @@ from .contracts import (
 )
 from .inputs import LabelFreeValidationFrame, PartitionSurface
 from .source_products import SourceProducts
+from .profiles import CONDITIONAL_ROUTER_MODE
 
 
 ROUTER_STATE_MEMBER = "arrays/router_states.npz"
@@ -175,6 +176,13 @@ def build_router_plans(
                 "prior_control": config.prior_control,
                 "optimization": config.optimization,
                 "gates": config.gates,
+                "router_mode": config.router_mode,
+                "conditional_contrast": (
+                    config.conditional_contrast
+                    if config.router_mode == CONDITIONAL_ROUTER_MODE
+                    else None
+                ),
+                "pooled_reference_optimization": config.pooled_reference_optimization,
                 "classifier_threads": int(config.runtime["classifier_threads_per_worker"]),
             }
         )
@@ -481,7 +489,7 @@ def _route_target_task(task: Mapping[str, object]) -> dict[str, object]:
                 kernel_features=features,
             )
         )
-    base = build_kernel_mean_problem(protocol, replicas, target_support)
+    pooled_base = build_kernel_mean_problem(protocol, replicas, target_support)
     energy_scores = {str(key): float(value) for key, value in task["calibrated_energy"].items()}
     energy_weights = residual_soft_weights(
         energy_scores,
@@ -512,17 +520,52 @@ def _route_target_task(task: Mapping[str, object]) -> dict[str, object]:
         ),
         action_id="rho_0.50",
     )
-    decision = route_mmd_kmm(
-        base,
-        support_case_problems=build_support_case_problems(protocol, replicas, target_support),
-        training_seed_problems=build_seed_axis_problems(protocol, replicas, target_support, axis="training_seed"),
-        generation_seed_problems=build_seed_axis_problems(protocol, replicas, target_support, axis="generation_seed"),
-        prior_sensitivity_problems=build_prior_sensitivity_problems(protocol, replicas, target_support, config=task["prior_control"]),
-        energy_direction_reference=energy_reference,
-        prior_control=task["prior_control"],
-        optimization=task["optimization"],
-        gates=task["gates"],
-    )
+    conditional_diagnostics: dict[str, object] | None = None
+    if task["router_mode"] == CONDITIONAL_ROUTER_MODE:
+        conditional_config = task["conditional_contrast"]
+        if conditional_config is None:
+            raise ProtocolError("Conditional router task lacks its frozen objective.")
+        from ..conditional_contrast_mmd_router.planning import (
+            build_conditional_route_and_diagnostics,
+        )
+
+        decision, conditional_diagnostics = build_conditional_route_and_diagnostics(
+            protocol,
+            replicas,
+            target_support,
+            pooled_problem=pooled_base,
+            energy_direction_reference=energy_reference,
+            prior_control=task["prior_control"],
+            optimization=task["optimization"],
+            gates=task["gates"],
+            conditional_config=conditional_config,
+            pooled_reference_optimization=task["pooled_reference_optimization"],
+            duplicate_direction_cosine=DUPLICATE_DIRECTION_COSINE,
+            duplicate_weight_l1=DUPLICATE_WEIGHT_L1,
+        )
+    else:
+        decision = route_mmd_kmm(
+            pooled_base,
+            support_case_problems=build_support_case_problems(
+                protocol, replicas, target_support
+            ),
+            training_seed_problems=build_seed_axis_problems(
+                protocol, replicas, target_support, axis="training_seed"
+            ),
+            generation_seed_problems=build_seed_axis_problems(
+                protocol, replicas, target_support, axis="generation_seed"
+            ),
+            prior_sensitivity_problems=build_prior_sensitivity_problems(
+                protocol,
+                replicas,
+                target_support,
+                config=task["prior_control"],
+            ),
+            energy_direction_reference=energy_reference,
+            prior_control=task["prior_control"],
+            optimization=task["optimization"],
+            gates=task["gates"],
+        )
     control_weights = {source: 1.0 / len(candidates) for source in candidates}
     control_allocation = build_hamilton_allocation(control_weights, total=TOTAL_PER_CLASS)
     final_weights = dict(decision.final_weights)
@@ -581,6 +624,11 @@ def _route_target_task(task: Mapping[str, object]) -> dict[str, object]:
         ),
         "integer_allocation_identity_gate_applied": True,
         "energy_calibration_hash": energy_reference.energy_calibration_hash,
+        **(
+            {"conditional_contrast_diagnostics": conditional_diagnostics}
+            if conditional_diagnostics is not None
+            else {}
+        ),
         "kernel_gpu_probe_max_abs_error": max(pool_probe_error, support_probe_error),
         "target_labels_used": False,
         "support_labels_used": False,

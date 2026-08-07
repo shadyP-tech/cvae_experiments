@@ -23,6 +23,12 @@ from .config import (
 DATASET_FAMILY = "MIDOG++"
 COMMON_FRAME_SEMANTICS = "common_inverse_virchow2"
 PROXY_CLAIM_ROLE = "proxy_compatibility_only"
+PROXY_FAMILIES = frozenset(
+    {
+        "class_prior_controlled_mmd_kmm",
+        "class_conditional_contrast_mmd_kmm",
+    }
+)
 SOURCE_EXPERT_TRAINING_ROLE = "source_only_frozen"
 TARGET_SUPPORT_ROLE = "disjoint_unlabeled_target_support"
 SOURCE_GENERATION_ROLE = "frozen_prior_generation"
@@ -342,7 +348,7 @@ class KernelMeanProblem:
             or int(self.source_replica_count) <= 0
             or isinstance(self.target_support_row_count, bool)
             or int(self.target_support_row_count) <= 0
-            or self.proxy_family != "class_prior_controlled_mmd_kmm"
+            or self.proxy_family not in PROXY_FAMILIES
             or self.claim_role != PROXY_CLAIM_ROLE
         ):
             raise ProtocolError("Kernel-mean routing problem contract is invalid.")

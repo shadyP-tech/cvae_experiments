@@ -286,3 +286,62 @@ label is `EXPLORATORY_CONSUMED_DATA_ONLY`: the surface can diagnose whether
 local utility is learnable, but it is not fresh routing evidence, does not
 establish target BACC, and cannot feed Stage 60, Stage 70, recipe selection,
 deployable selection, promotion, or deployment.
+
+## Uniform-B v2 Conditional-Contrast MMD Router v1
+
+`midogpp.oracle.uniform_b_v2_consumed_validation_conditional_contrast_mmd_router.v1`
+is a separately fenced Stage-90 diagnostic that addresses the pooled-MMD
+router's main identifiability failure: class-0 and class-1 kernel means can
+cancel after marginal pooling even when an expert has the wrong class
+geometry. For each target, one target-excluded, equal-source/class-balanced
+synthetic pool fits the scaler, source-only soft-class reference, and shared
+Nyström map. The target support cases remain unlabeled and case-disjoint from
+evaluation.
+
+The fixed proxy is
+
+```text
+sum_c alpha_c ||sum_e w_e mu[e,c] - mu[H,c]||^2
+  + kappa ||sum_e w_e (mu[e,1]-mu[e,0]) - (mu[H,1]-mu[H,0])||^2
+  + lambda ||w-u||^2
+```
+
+with `alpha=(0.5,0.5)`, `kappa=1`, and `lambda=0.1`. It is solved through an
+exact lifted feature representation under the existing source cap and
+effective-source constraint. The runner abstains to exact equal union when a
+support case has insufficient soft-class mass/effective rows, any class or
+contrast component worsens, leave-one-support-case/seed/prior checks fail, the
+raw solution exceeds `L1(w,u)=0.25`, the action duplicates the recomputed raw
+pooled-MMD numerical direction or energy direction, or integer allocation
+equals the control. The pooled reference uses the original `lambda=0.05`
+base solve before its policy-level stability gates; no prior Stage-90 output is
+consumed.
+
+The workstation profile is frozen for the Xeon W-2265 and two RTX A5000s:
+one persistent worker per GPU for generation and target routing, followed by
+four classifier workers with three BLAS threads each. The 81 source/seed
+prefix blocks are generated once into a hash-bound float32 memmap; source,
+route, and prediction-cell checkpoints support phase resume. All 162 route and
+control prediction cells are globally sealed before evaluation labels open.
+For backward compatibility with the shared scorer, routed table rows retain
+the generic `mmd_kmm` arm role; the authoritative method identity is
+`protocol_manifest.proxy.family=class_conditional_contrast_mmd_kmm`.
+
+Run the registered diagnostic with:
+
+```bash
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_v2_consumed_validation_conditional_contrast_mmd_router.v1
+```
+
+Canonical output:
+
+```text
+artifacts/midogpp/90_oracles_and_diagnostics/
+  uniform_b_v2_consumed_validation_conditional_contrast_mmd_router/v1/
+```
+
+The proxy is compatibility-only, not downstream utility. Because the target
+validation labels are already consumed, any score is exploratory and cannot
+feed Stage 60, Stage 70, recipe selection, deployable selection, promotion, or
+a routing-quality claim.

@@ -43,6 +43,11 @@ def test_workspace_sorted_provenance_is_returned_in_canonical_input_order(
 ) -> None:
     configured_paths = [tmp_path / f"input-{index}" for index in range(5)]
     config = SimpleNamespace(
+        experiment_id=(
+            "midogpp.oracle.uniform_b_v2_consumed_validation_"
+            "mmd_kmm_router.v1"
+        ),
+        input_artifact_ids=INPUT_ARTIFACT_IDS,
         expert_bank_root=configured_paths[0],
         generation_lock_root=configured_paths[1],
         equal_union_policy_root=configured_paths[2],

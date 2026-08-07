@@ -19,9 +19,6 @@ from .config import MMDKMMRouterDiagnosticConfig
 from .contracts import (
     CENTERS,
     CLAIM_SCOPE,
-    EXPERIMENT_ID,
-    INPUT_ARTIFACT_IDS,
-    OUTPUT_ARTIFACT_ID,
     PUBLICATION_STATUS,
 )
 from .inputs import (
@@ -34,6 +31,7 @@ from .inputs import (
 from .metrics import PAIRED_DELTA_COLUMNS, TARGET_METRIC_COLUMNS, score_predictions
 from .planning import build_router_plans
 from .prediction import materialize_target_predictions
+from .profiles import CONDITIONAL_ROUTER_MODE
 from .seals import build_global_prediction_seal, open_evaluation_labels
 from .source_products import (
     materialize_source_products,
@@ -56,9 +54,7 @@ def run_mmd_kmm_router_diagnostic(
         _prune_stale_temp_files(root)
         state_path = root / "reports/run_state.json"
         if state_path.is_file() and _json(state_path).get("status") == "COMPLETE":
-            from .validation import validate_mmd_kmm_router_bundle
-
-            validate_mmd_kmm_router_bundle(root, config=config)
+            _validate_bundle(root, config=config)
             return root
         started = time.monotonic()
         phase = "INITIALIZING"
@@ -212,24 +208,27 @@ def run_mmd_kmm_router_diagnostic(
             phase = "VALIDATING"
             _write_state(root, status="RUNNING", phase=phase)
             _write_content_index(root)
-            from .validation import validate_mmd_kmm_router_bundle
-
-            checks = validate_mmd_kmm_router_bundle(
+            checks = _validate_bundle(
                 root,
                 config=config,
                 allow_pending=True,
+            )
+            validator_name = (
+                "validate_conditional_contrast_mmd_router_bundle"
+                if config.router_mode == CONDITIONAL_ROUTER_MODE
+                else "validate_mmd_kmm_router_bundle"
             )
             write_json(
                 root / "reports/validation_report.json",
                 {
                     "schema_version": "midogpp_mmd_kmm_validation_report_v1",
                     "status": "PASS",
-                    "validator": "validate_mmd_kmm_router_bundle",
+                    "validator": validator_name,
                     "checks": checks,
                 },
             )
             _write_state(root, status="COMPLETE", phase="COMPLETE")
-            validate_mmd_kmm_router_bundle(root, config=config)
+            _validate_bundle(root, config=config)
             return root
         except BaseException as exc:
             _write_state(
@@ -242,6 +241,31 @@ def run_mmd_kmm_router_diagnostic(
             raise
 
 
+def _validate_bundle(
+    root: Path,
+    *,
+    config: MMDKMMRouterDiagnosticConfig,
+    allow_pending: bool = False,
+) -> dict[str, object]:
+    if config.router_mode == CONDITIONAL_ROUTER_MODE:
+        from ..conditional_contrast_mmd_router.validation import (
+            validate_conditional_contrast_mmd_router_bundle,
+        )
+
+        return validate_conditional_contrast_mmd_router_bundle(
+            root,
+            config=config,
+            allow_pending=allow_pending,
+        )
+    from .validation import validate_mmd_kmm_router_bundle
+
+    return validate_mmd_kmm_router_bundle(
+        root,
+        config=config,
+        allow_pending=allow_pending,
+    )
+
+
 def _protocol_manifest(
     config: MMDKMMRouterDiagnosticConfig,
     *,
@@ -251,17 +275,17 @@ def _protocol_manifest(
 ) -> dict[str, object]:
     input_hashes = {
         artifact_id: stable_hash(dict(provenance[artifact_id]))
-        for artifact_id in INPUT_ARTIFACT_IDS
+        for artifact_id in config.input_artifact_ids
     }
     payload: dict[str, object] = {
         "schema_version": "midogpp_mmd_kmm_protocol_manifest_v1",
-        "experiment_id": EXPERIMENT_ID,
-        "output_artifact_id": OUTPUT_ARTIFACT_ID,
+        "experiment_id": config.experiment_id,
+        "output_artifact_id": config.output_artifact_id,
         "stage": "90_oracles_and_diagnostics",
         "claim_scope": CLAIM_SCOPE,
         "publication_status": PUBLICATION_STATUS,
         "config_contract_hash": config.contract_hash,
-        "input_artifact_ids": list(INPUT_ARTIFACT_IDS),
+        "input_artifact_ids": list(config.input_artifact_ids),
         "input_artifact_hashes": input_hashes,
         "validation_cache_binding_hash": validation_cache_binding_hash,
         "support_partition_lock_hash": support_partition_lock_hash,
