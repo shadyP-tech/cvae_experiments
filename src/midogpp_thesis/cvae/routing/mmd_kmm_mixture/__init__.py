@@ -19,6 +19,7 @@ from .conditional import (
     route_conditional_contrast_mmd,
 )
 from .contracts import (
+    CROSSFIT_COHORT_SUPPORT_ROLE,
     DirectionIdentityAudit,
     EnergyDirectionReference,
     FrozenNystroemFeatureMap,
@@ -49,6 +50,7 @@ from .prior import (
 )
 
 __all__ = (
+    "CROSSFIT_COHORT_SUPPORT_ROLE",
     "CONDITIONAL_PROXY_FAMILY",
     "ConditionalContrastConfig",
     "ConditionalContrastProblem",

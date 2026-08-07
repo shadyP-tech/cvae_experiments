@@ -345,3 +345,68 @@ The proxy is compatibility-only, not downstream utility. Because the target
 validation labels are already consumed, any score is exploratory and cannot
 feed Stage 60, Stage 70, recipe selection, deployable selection, promotion, or
 a routing-quality claim.
+
+## Uniform-B v2 Antisymmetric Residual-MMD Router v1
+
+`midogpp.oracle.uniform_b_v2_consumed_validation_antisymmetric_residual_mmd_router.v1`
+is the terminal consumed-validation diagnostic for a solver-constrained,
+class-specific residual route. For eight eligible non-target sources, it uses
+
+```text
+w[class 0] = u + d
+w[class 1] = u - d
+sum_e d[e] = 0
+```
+
+where `u[e]=1/8`. This preserves each source's total exposure across the two
+balanced generated classes. The optimizer minimizes the predeclared robust
+class-conditional/contrast MMD proxy over support-case, training-seed,
+generation-seed, and source-only prior variants. The source cap, effective
+source floor, and `L1(d)<=0.25` trust region are constraints of the numerical
+problem itself. Solver failure, weak soft-class support, nonpositive robust
+improvement, or any variant worsening produces the byte-equivalent equal-union
+fallback. Continuous residuals are realized as paired integer counts
+`n0[e]=128+k[e]`, `n1[e]=128-k[e]`, with `sum_e k[e]=0`.
+
+The estimand is explicitly cohort-adaptive and transductive. The deterministic
+two support cases per center remain calibration-only and are never scored. For
+each of the 26 remaining cases, the route may use those fixed cases plus the
+unlabeled embeddings of every other evaluation case in that center; all rows
+of the case being predicted are excluded from its own route. The 468 case-arm
+prediction cells are globally sealed before any validation label is opened,
+then case slices are reassembled before one target-level BACC and macro-F1 is
+computed per seed cell. This is not a static online policy or held-out-target
+evaluation.
+
+The workstation runner fits source generation in 27 resumable jobs with one
+persistent process on each RTX A5000. It then fits one target-excluded scaler,
+source-only class prior, and shared Nyström map per target in nine two-GPU
+jobs and reuses each target workspace across its case folds. Downstream work
+uses 81 target/seed tasks, four CPU workers, and three BLAS threads per worker;
+the equal-union classifier is fit once per target/seed cell and routed fits are
+reused by composition hash. The worst-case classifier-fit count is 315.
+Before source jobs start, a no-context `nvidia-smi` preflight verifies the two
+visible RTX A5000 devices, configured VRAM reserve, 12-CPU affinity, 100 GiB
+RAM, 8 GiB artifact-disk reserve, deterministic thread environment, spawn
+support, dependencies, and atomic rename behavior. It also rejects a CUDA
+context initialized in the parent process.
+
+Run the registered diagnostic with:
+
+```bash
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_v2_consumed_validation_antisymmetric_residual_mmd_router.v1
+```
+
+Canonical output:
+
+```text
+artifacts/midogpp/90_oracles_and_diagnostics/
+  uniform_b_v2_consumed_validation_antisymmetric_residual_mmd_router/v1/
+```
+
+The MMD objective is a label-free compatibility proxy, not NELBO or downstream
+utility. These validation labels are already consumed, so the artifact cannot
+feed Stage 60, Stage 70, recipe selection, deployable selection, promotion, or
+a routing-quality claim. A positive descriptive delta would require a frozen
+rerun on separately authorized fresh case-disjoint evidence before promotion.

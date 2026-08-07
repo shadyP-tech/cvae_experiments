@@ -31,6 +31,9 @@ PROXY_FAMILIES = frozenset(
 )
 SOURCE_EXPERT_TRAINING_ROLE = "source_only_frozen"
 TARGET_SUPPORT_ROLE = "disjoint_unlabeled_target_support"
+CROSSFIT_COHORT_SUPPORT_ROLE = (
+    "cross_fitted_unlabeled_cohort_support_excluding_own_heldout_case"
+)
 SOURCE_GENERATION_ROLE = "frozen_prior_generation"
 KERNEL_MAP_FIT_ROLE = "target_excluded_candidate_pool_generated_common_frame"
 KERNEL_TRANSFORM_ROLE = "shared_frozen_source_pool_nystroem"
@@ -64,6 +67,9 @@ class MMDKMMProtocol:
     support_labels_used: bool = False
     evaluation_labels_available_to_router: bool = False
     evaluation_embeddings_available_to_router: bool = False
+    cross_fitted_transductive_diagnostic: bool = False
+    cohort_evaluation_embeddings_available_for_other_case_routes: bool = False
+    heldout_evaluation_embeddings_available_to_own_route: bool = False
     previous_stage90_router_or_utility_inputs_used: bool = False
 
     def __post_init__(self) -> None:
@@ -86,13 +92,14 @@ class MMDKMMProtocol:
             or self.claim_dataset_family != DATASET_FAMILY
             or self.common_frame_semantics != COMMON_FRAME_SEMANTICS
             or self.source_expert_training_role != SOURCE_EXPERT_TRAINING_ROLE
-            or self.target_support_role != TARGET_SUPPORT_ROLE
+            or self.target_support_role
+            not in {TARGET_SUPPORT_ROLE, CROSSFIT_COHORT_SUPPORT_ROLE}
             or self.claim_role != PROXY_CLAIM_ROLE
             or self.source_experts_frozen is not True
             or self.target_expert_excluded is not True
             or self.support_labels_used is not False
             or self.evaluation_labels_available_to_router is not False
-            or self.evaluation_embeddings_available_to_router is not False
+            or not self._embedding_access_is_fenced()
             or self.previous_stage90_router_or_utility_inputs_used is not False
         ):
             raise ProtocolError("MMD/KMM protocol violates the routing claim firewall.")
@@ -103,14 +110,41 @@ class MMDKMMProtocol:
         object.__setattr__(self, "training_seeds", training_seeds)
         object.__setattr__(self, "generation_seeds", generation_seeds)
 
+    def _embedding_access_is_fenced(self) -> bool:
+        ordinary = (
+            self.target_support_role == TARGET_SUPPORT_ROLE
+            and self.evaluation_embeddings_available_to_router is False
+            and self.cross_fitted_transductive_diagnostic is False
+            and self.cohort_evaluation_embeddings_available_for_other_case_routes
+            is False
+            and self.heldout_evaluation_embeddings_available_to_own_route is False
+        )
+        cross_fitted = (
+            self.target_support_role == CROSSFIT_COHORT_SUPPORT_ROLE
+            and self.evaluation_embeddings_available_to_router is True
+            and self.cross_fitted_transductive_diagnostic is True
+            and self.cohort_evaluation_embeddings_available_for_other_case_routes
+            is True
+            and self.heldout_evaluation_embeddings_available_to_own_route is False
+        )
+        return ordinary or cross_fitted
+
     @property
     def support_partition_hash(self) -> str:
-        return _text_sha256(
+        values = (
             self.target_center,
             *self.support_case_ids,
             "evaluation_partition",
             *self.evaluation_case_ids,
         )
+        if self.cross_fitted_transductive_diagnostic:
+            values = (
+                *values,
+                self.target_support_role,
+                "cohort_evaluation_embeddings_for_other_case_routes",
+                "heldout_evaluation_embeddings_excluded_from_own_route",
+            )
+        return _text_sha256(*values)
 
 
 @dataclass(frozen=True)
@@ -256,6 +290,9 @@ class TargetSupportKernelFeatures:
     prior_prediction: SourceOnlyPriorPrediction
     support_labels_used: bool = False
     evaluation_embeddings_used: bool = False
+    cross_fitted_transductive_support: bool = False
+    cohort_evaluation_embeddings_used: bool = False
+    heldout_evaluation_embeddings_used: bool = False
 
     def __post_init__(self) -> None:
         features = self.kernel_features
@@ -273,11 +310,26 @@ class TargetSupportKernelFeatures:
             or prediction.target_center != str(self.target_center)
             or prediction.common_frame_hash != features.common_frame_hash
             or self.support_labels_used is not False
-            or self.evaluation_embeddings_used is not False
+            or not self._embedding_use_is_fenced()
         ):
             raise ProtocolError("Target support kernel-feature contract is invalid.")
         object.__setattr__(self, "target_center", str(self.target_center))
         object.__setattr__(self, "case_ids", cases)
+
+    def _embedding_use_is_fenced(self) -> bool:
+        ordinary = (
+            self.evaluation_embeddings_used is False
+            and self.cross_fitted_transductive_support is False
+            and self.cohort_evaluation_embeddings_used is False
+            and self.heldout_evaluation_embeddings_used is False
+        )
+        cross_fitted = (
+            self.evaluation_embeddings_used is True
+            and self.cross_fitted_transductive_support is True
+            and self.cohort_evaluation_embeddings_used is True
+            and self.heldout_evaluation_embeddings_used is False
+        )
+        return ordinary or cross_fitted
 
     @property
     def soft_class_probabilities(self) -> np.ndarray:

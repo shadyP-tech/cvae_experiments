@@ -339,7 +339,16 @@ def build_conditional_support_case_problems(
                 probabilities=target_support.soft_class_probabilities[mask],
             ),
             support_labels_used=False,
-            evaluation_embeddings_used=False,
+            evaluation_embeddings_used=target_support.evaluation_embeddings_used,
+            cross_fitted_transductive_support=(
+                target_support.cross_fitted_transductive_support
+            ),
+            cohort_evaluation_embeddings_used=(
+                target_support.cohort_evaluation_embeddings_used
+            ),
+            heldout_evaluation_embeddings_used=(
+                target_support.heldout_evaluation_embeddings_used
+            ),
         )
         output[case_id] = build_conditional_contrast_problem(
             protocol,

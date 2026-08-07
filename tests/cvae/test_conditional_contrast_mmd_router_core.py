@@ -8,6 +8,7 @@ import pytest
 
 from midogpp_thesis.cvae.protocol import ProtocolError
 from midogpp_thesis.cvae.routing.mmd_kmm_mixture import (
+    CROSSFIT_COHORT_SUPPORT_ROLE,
     ConditionalContrastConfig,
     ConditionalContrastProblem,
     DirectionIdentityAudit,
@@ -209,6 +210,51 @@ def test_lifted_kernel_problem_equals_explicit_conditional_contrast_loss() -> No
             _target_support(protocol),
             config=_conditional_config(),
             training_seeds=(17.5,),
+        )
+
+
+def test_cross_fitted_cohort_embedding_semantics_propagate_to_variants() -> None:
+    protocol = MMDKMMProtocol(
+        target_center="target",
+        candidate_sources=tuple(f"source-{index}" for index in range(7)),
+        support_case_ids=("case-a", "case-b"),
+        evaluation_case_ids=("heldout-case",),
+        common_frame_hash="common-frame",
+        target_support_role=CROSSFIT_COHORT_SUPPORT_ROLE,
+        evaluation_embeddings_available_to_router=True,
+        cross_fitted_transductive_diagnostic=True,
+        cohort_evaluation_embeddings_available_for_other_case_routes=True,
+        heldout_evaluation_embeddings_available_to_own_route=False,
+    )
+    ordinary = _target_support(protocol)
+    support = replace(
+        ordinary,
+        evaluation_embeddings_used=True,
+        cross_fitted_transductive_support=True,
+        cohort_evaluation_embeddings_used=True,
+        heldout_evaluation_embeddings_used=False,
+    )
+    problem = build_conditional_contrast_problem(
+        protocol,
+        _replicas(protocol),
+        support,
+        config=_conditional_config(),
+    )
+    variants = build_conditional_support_case_problems(
+        protocol,
+        _replicas(protocol),
+        support,
+        config=_conditional_config(),
+    )
+    assert problem.kernel_problem.protocol.cross_fitted_transductive_diagnostic is True
+    assert tuple(variants) == protocol.support_case_ids
+
+    with pytest.raises(ProtocolError, match="embedding use"):
+        build_conditional_contrast_problem(
+            protocol,
+            _replicas(protocol),
+            ordinary,
+            config=_conditional_config(),
         )
 
 

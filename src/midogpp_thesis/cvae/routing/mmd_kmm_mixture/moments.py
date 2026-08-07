@@ -89,6 +89,19 @@ def build_kernel_mean_problem(
         != protocol.common_frame_hash
     ):
         raise ProtocolError("Target support prior crossed the frozen routing family.")
+    if (
+        target_support.evaluation_embeddings_used
+        is not protocol.evaluation_embeddings_available_to_router
+        or target_support.cross_fitted_transductive_support
+        is not protocol.cross_fitted_transductive_diagnostic
+        or target_support.cohort_evaluation_embeddings_used
+        is not protocol.cohort_evaluation_embeddings_available_for_other_case_routes
+        or target_support.heldout_evaluation_embeddings_used
+        is not protocol.heldout_evaluation_embeddings_available_to_own_route
+    ):
+        raise ProtocolError(
+            "Target support embedding use differs from the routing protocol."
+        )
     target_cases = set(target_support.case_ids)
     declared_cases = set(protocol.support_case_ids)
     if (
@@ -228,7 +241,16 @@ def build_support_case_problems(
             kernel_features=subset_features,
             prior_prediction=subset_prediction,
             support_labels_used=False,
-            evaluation_embeddings_used=False,
+            evaluation_embeddings_used=target_support.evaluation_embeddings_used,
+            cross_fitted_transductive_support=(
+                target_support.cross_fitted_transductive_support
+            ),
+            cohort_evaluation_embeddings_used=(
+                target_support.cohort_evaluation_embeddings_used
+            ),
+            heldout_evaluation_embeddings_used=(
+                target_support.heldout_evaluation_embeddings_used
+            ),
         )
         output[case_id] = build_kernel_mean_problem(
             protocol,
@@ -313,7 +335,16 @@ def build_prior_sensitivity_problems(
             kernel_features=target_support.kernel_features,
             prior_prediction=shifted_prediction,
             support_labels_used=False,
-            evaluation_embeddings_used=False,
+            evaluation_embeddings_used=target_support.evaluation_embeddings_used,
+            cross_fitted_transductive_support=(
+                target_support.cross_fitted_transductive_support
+            ),
+            cohort_evaluation_embeddings_used=(
+                target_support.cohort_evaluation_embeddings_used
+            ),
+            heldout_evaluation_embeddings_used=(
+                target_support.heldout_evaluation_embeddings_used
+            ),
         )
         output[key] = build_kernel_mean_problem(
             protocol,

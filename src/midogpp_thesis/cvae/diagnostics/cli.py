@@ -65,6 +65,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     conditional.add_argument("--config", required=True)
     conditional.add_argument("--artifact-root", required=True)
+
+    antisymmetric = sub.add_parser(
+        "antisymmetric-residual-mmd-router-diagnostic",
+        help=(
+            "Run the consumed-validation Stage-90 case-cross-fitted "
+            "antisymmetric residual-MMD router diagnostic."
+        ),
+    )
+    antisymmetric.add_argument("--config", required=True)
+    antisymmetric.add_argument("--artifact-root", required=True)
     return parser
 
 
@@ -151,6 +161,22 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_conditional_contrast_mmd_router_config(args.config)
         output = run_conditional_contrast_mmd_router_diagnostic(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "antisymmetric-residual-mmd-router-diagnostic":
+        from .antisymmetric_residual_mmd_router.config import (
+            load_antisymmetric_residual_mmd_config,
+        )
+        from .antisymmetric_residual_mmd_router.runner import (
+            run_antisymmetric_residual_mmd_router_diagnostic,
+        )
+
+        config = load_antisymmetric_residual_mmd_config(args.config)
+        output = run_antisymmetric_residual_mmd_router_diagnostic(
             config,
             artifact_root=artifact_root,
         )

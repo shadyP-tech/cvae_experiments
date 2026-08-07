@@ -456,6 +456,14 @@ def _generate_source_task(task: Mapping[str, object]) -> dict[str, object]:
     keys = tuple(task["generation_keys"])
     if not all(isinstance(key, SourceGenerationKey) for key in keys):
         raise ProtocolError("MMD/KMM worker received invalid generation keys.")
+    if device.startswith("cuda"):
+        # This runs after process spawn.  Keep Ampere math explicit so source
+        # block hashes do not depend on ambient PyTorch TF32 defaults.
+        import torch
+
+        torch.cuda.set_device(device)
+        torch.backends.cuda.matmul.allow_tf32 = False
+        torch.backends.cudnn.allow_tf32 = False
     support_index = _json(Path(str(task["support_index_path"])))
     support = np.load(Path(str(task["support_array_path"])), mmap_mode="r")
     scratch_unhashed = {

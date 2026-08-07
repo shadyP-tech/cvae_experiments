@@ -5,7 +5,10 @@ from pathlib import Path
 import pytest
 
 from midogpp_thesis.cvae.protocol import ProtocolError
-from midogpp_thesis.cvae.routing.mmd_kmm_mixture import MMDKMMProtocol
+from midogpp_thesis.cvae.routing.mmd_kmm_mixture import (
+    CROSSFIT_COHORT_SUPPORT_ROLE,
+    MMDKMMProtocol,
+)
 
 
 def _kwargs() -> dict[str, object]:
@@ -70,6 +73,30 @@ def test_protocol_requires_all_retained_seeds_without_selection() -> None:
     with pytest.raises(ProtocolError, match="claim firewall"):
         MMDKMMProtocol(**kwargs)  # type: ignore[arg-type]
 
+
+def test_protocol_allows_only_explicit_own_case_excluded_transductive_mode() -> None:
+    protocol = MMDKMMProtocol(
+        **_kwargs(),
+        target_support_role=CROSSFIT_COHORT_SUPPORT_ROLE,
+        evaluation_embeddings_available_to_router=True,
+        cross_fitted_transductive_diagnostic=True,
+        cohort_evaluation_embeddings_available_for_other_case_routes=True,
+        heldout_evaluation_embeddings_available_to_own_route=False,
+    )
+    assert protocol.cross_fitted_transductive_diagnostic is True
+    assert protocol.evaluation_embeddings_available_to_router is True
+    assert protocol.heldout_evaluation_embeddings_available_to_own_route is False
+
+    unsafe = _kwargs()
+    unsafe.update(
+        target_support_role=CROSSFIT_COHORT_SUPPORT_ROLE,
+        evaluation_embeddings_available_to_router=True,
+        cross_fitted_transductive_diagnostic=True,
+        cohort_evaluation_embeddings_available_for_other_case_routes=True,
+        heldout_evaluation_embeddings_available_to_own_route=True,
+    )
+    with pytest.raises(ProtocolError, match="claim firewall"):
+        MMDKMMProtocol(**unsafe)  # type: ignore[arg-type]
 
 def test_router_is_math_only_and_has_no_runnable_experiment_surface() -> None:
     package_root = (
