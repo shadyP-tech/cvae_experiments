@@ -1416,3 +1416,43 @@ experiments:
       - Preserves equal-union total source exposure across classes with w0=u+d and w1=u-d, while enforcing the L1 trust region, source cap, and effective-source floor inside the optimizer.
       - Fits one target-excluded source-only scaler, prior, and Nyström map per target on two A5000 workers, then reuses that workspace over all 26 folds; downstream fits use four workers with three BLAS threads each.
       - Every case-fold prediction is sealed before any validation label is opened. Results are terminal exploratory consumed-data diagnostics and cannot feed Stage 60, Stage 70, recipe selection, promotion, deployment, or a routing-quality claim.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_validation_residual_topup_router.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_validation_residual_topup_router_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_validation_residual_topup_router_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+      - midogpp_stage90_residual_topup_router_validation_cache_v1
+      - midogpp_stage90_residual_topup_router_validation_manifest_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Protocol-reviewed Stage-90 diagnostic reuse of immutable source-local frames, samplers, the full seed Cartesian product, budgets, and classifier settings only; no Stage-60 or Stage-70 policy, utility, promotion, or deployment authority is inherited.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - residual-topup-router-diagnostic
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_validation_residual_topup_router_v1
+    notes:
+      - Compares a fixed label-free energy-directed residual top-up with a matched-budget uniform top-up while preserving the immutable equal-union backbone; the original equal-union budget is reported separately.
+      - Uses strict outer-target and inner-query exclusion, all retained 3x3 seed cells, and a fixed one-sided query-cluster confidence gate with exact uniform fallback.
+      - Reuses only frozen bank, generation, and equal-union locks plus byte-exact experiment-fenced aliases of the already-consumed validation bytes; no prior Stage-90 router or utility output is an input.
+      - The dual-A5000 runner materializes one hash-validated 256-per-class source prefix cache, then uses four CPU workers with three BLAS threads each; interrupted expensive work resumes from source-task and prediction-task checkpoints, while completed products are independently revalidated before reuse.
+      - Every development and target action prediction is globally sealed before any validation label is opened. This terminal exploratory diagnostic cannot feed Stage 60, Stage 70, recipe selection, promotion, deployment, or a routing-quality claim.

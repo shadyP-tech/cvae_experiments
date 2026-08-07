@@ -410,3 +410,56 @@ utility. These validation labels are already consumed, so the artifact cannot
 feed Stage 60, Stage 70, recipe selection, deployable selection, promotion, or
 a routing-quality claim. A positive descriptive delta would require a frozen
 rerun on separately authorized fresh case-disjoint evidence before promotion.
+
+## Uniform-B v2 Residual Top-up Router v1
+
+`midogpp.oracle.uniform_b_v2_consumed_validation_residual_topup_router.v1`
+tests a deliberately conservative composition architecture: retain an
+immutable equal-union backbone and route only a small additive suffix. The
+target geometry uses eight non-target sources, the canonical 128 rows per
+source and class as the 1,024-row backbone, and a fixed 128-row top-up. Its
+matched control adds the same budget uniformly; the original 1,024-row
+equal-union arm remains a separate budget reference.
+
+The only routed action is a parameter-free, label-free ordering of calibrated
+variational energy. Lower-energy sources receive larger linear rank priority,
+ties are broken by canonical source ID, and Hamilton allocation realizes the
+fixed top-up budget. There is no temperature, action-strength, source, expert,
+seed, or budget search. Development folds exclude both outer target `H` and
+query `q`; their seven-source geometry uses a 1,008-row equal backbone plus a
+126-row matched top-up, preserving the same `1/8` top-up ratio.
+
+All development and target predictions for all three training seeds and all
+three generation seeds are materialized and globally sealed before any label
+is opened. Only after that seal, the fixed action gate computes paired BACC
+gains over the eight `q != H` query centers. It selects the routed top-up for
+`H` only when the one-sided 95% query-center Student-t lower bound is strictly
+positive; otherwise it uses the exact uniform top-up. Labels from `H` never
+select the action for `H`.
+
+The workstation schedule is frozen for the Xeon W-2265 and two RTX A5000s.
+Twenty-seven source/training-seed jobs are split across one spawned worker per
+GPU and materialize 81 hash-validated float32 blocks. Downstream prediction
+uses four spawned CPU workers with three BLAS threads each. Source and
+prediction checkpoints are hash-validated, global products are independently
+revalidated on resume, and source-cache publication uses fsync plus atomic
+replacement. GPU and CPU pools are phase-disjoint.
+
+Run the registered diagnostic with:
+
+```bash
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_v2_consumed_validation_residual_topup_router.v1
+```
+
+Canonical output:
+
+```text
+artifacts/midogpp/90_oracles_and_diagnostics/
+  uniform_b_v2_consumed_validation_residual_topup_router/v1/
+```
+
+This is a terminal `EXPLORATORY_CONSUMED_DATA_ONLY` Stage-90 diagnostic. Its
+energy score is a proxy, not NELBO or downstream utility, and the resulting
+artifact cannot feed Stage 60, Stage 70, recipe selection, deployable
+selection, promotion, or a routing-quality claim.

@@ -75,6 +75,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     antisymmetric.add_argument("--config", required=True)
     antisymmetric.add_argument("--artifact-root", required=True)
+
+    residual_topup = sub.add_parser(
+        "residual-topup-router-diagnostic",
+        help=(
+            "Run the consumed-validation Stage-90 immutable equal-union "
+            "backbone plus residual top-up diagnostic."
+        ),
+    )
+    residual_topup.add_argument("--config", required=True)
+    residual_topup.add_argument("--artifact-root", required=True)
     return parser
 
 
@@ -177,6 +187,20 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_antisymmetric_residual_mmd_config(args.config)
         output = run_antisymmetric_residual_mmd_router_diagnostic(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "residual-topup-router-diagnostic":
+        from .residual_topup_router.config import load_residual_topup_config
+        from .residual_topup_router.runner import (
+            run_residual_topup_router_diagnostic,
+        )
+
+        config = load_residual_topup_config(args.config)
+        output = run_residual_topup_router_diagnostic(
             config,
             artifact_root=artifact_root,
         )
