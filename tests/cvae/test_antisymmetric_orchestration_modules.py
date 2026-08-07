@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from types import SimpleNamespace
+from types import MappingProxyType, SimpleNamespace
 
 import numpy as np
 import pytest
@@ -18,6 +18,7 @@ from midogpp_thesis.cvae.diagnostics.antisymmetric_residual_mmd_router import (
 )
 from midogpp_thesis.cvae.diagnostics.antisymmetric_residual_mmd_router.artifact_io import (
     atomic_write_json,
+    read_json,
 )
 from midogpp_thesis.cvae.diagnostics.antisymmetric_residual_mmd_router.contracts import (
     EXPECTED_CROSS_FIT_FOLD_COUNT,
@@ -66,6 +67,37 @@ def _runtime_config() -> SimpleNamespace:
             "resume_policy": "resume_hash_validated_checkpoints",
         }
     )
+
+
+def test_atomic_json_writer_serializes_frozen_protocol_mappings(
+    tmp_path: Path,
+) -> None:
+    payload = MappingProxyType(
+        {
+            "targets": MappingProxyType(
+                {
+                    "0": (
+                        MappingProxyType({"fold_id": "fold-0"}),
+                        MappingProxyType({"fold_id": "fold-1"}),
+                    )
+                }
+            ),
+            "support_labels_used": False,
+        }
+    )
+
+    path = tmp_path / "crossfit_surface_lock.json"
+    atomic_write_json(path, payload)
+
+    assert read_json(path) == {
+        "targets": {
+            "0": [
+                {"fold_id": "fold-0"},
+                {"fold_id": "fold-1"},
+            ]
+        },
+        "support_labels_used": False,
+    }
 
 
 def test_facades_delegate_to_cohesive_modules_without_public_api_drift() -> None:

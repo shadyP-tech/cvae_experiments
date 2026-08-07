@@ -13,6 +13,10 @@ from midogpp_thesis.cvae.diagnostics.antisymmetric_residual_mmd_router import (
     prediction_store,
     prediction_worker,
 )
+from midogpp_thesis.cvae.diagnostics.antisymmetric_residual_mmd_router.artifact_io import (
+    atomic_write_json,
+    read_json,
+)
 from midogpp_thesis.cvae.diagnostics.antisymmetric_residual_mmd_router.contracts import (
     ARM_ROLES,
     CENTERS,
@@ -232,6 +236,17 @@ def test_case_crossfit_surface_excludes_each_heldout_case_exactly_once() -> None
     assert len(center_6_fold[0].router_support_case_ids) == 2
     assert crossfit.lock_payload["support_labels_used"] is False
     assert crossfit.lock_payload["evaluation_labels_used"] is False
+
+
+def test_real_crossfit_lock_is_atomically_json_serializable(tmp_path: Path) -> None:
+    crossfit = _crossfit()
+    path = tmp_path / "crossfit_surface_lock.json"
+
+    atomic_write_json(path, crossfit.lock_payload)
+
+    persisted = read_json(path)
+    assert persisted == dict(crossfit.lock_payload)
+    assert persisted["crossfit_surface_lock_hash"] == crossfit.lock_hash
 
 
 def test_target_seed_task_reuses_control_and_duplicate_route_compositions(

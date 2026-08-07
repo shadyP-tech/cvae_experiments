@@ -19,7 +19,7 @@ def atomic_write_json(path: Path, payload: Mapping[str, object]) -> None:
     temporary = path.with_name(path.name + f".{os.getpid()}.tmp")
     try:
         with temporary.open("w", encoding="utf-8") as handle:
-            json.dump(payload, handle, indent=2, sort_keys=True)
+            json.dump(_json_ready(payload), handle, indent=2, sort_keys=True)
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
@@ -27,6 +27,23 @@ def atomic_write_json(path: Path, payload: Mapping[str, object]) -> None:
     except BaseException:
         temporary.unlink(missing_ok=True)
         raise
+
+
+def _json_ready(value: object) -> object:
+    """Copy immutable protocol containers into JSON-native containers.
+
+    Frozen protocol objects deliberately expose ``MappingProxyType`` values.
+    The standard JSON encoder accepts concrete dictionaries but not arbitrary
+    ``Mapping`` implementations, despite this module's public writer contract
+    accepting mappings.  Keep unsupported scientific values fail-closed while
+    recursively normalizing only mappings and ordinary list/tuple containers.
+    """
+
+    if isinstance(value, Mapping):
+        return {key: _json_ready(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_ready(item) for item in value]
+    return value
 
 
 def atomic_write_csv_rows(
