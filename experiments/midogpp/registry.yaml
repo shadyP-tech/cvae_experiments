@@ -1456,3 +1456,116 @@ experiments:
       - Reuses only frozen bank, generation, and equal-union locks plus byte-exact experiment-fenced aliases of the already-consumed validation bytes; no prior Stage-90 router or utility output is an input.
       - The dual-A5000 runner materializes one hash-validated 256-per-class source prefix cache, then uses four CPU workers with three BLAS threads each; interrupted expensive work resumes from source-task and prediction-task checkpoints, while completed products are independently revalidated before reuse.
       - Every development and target action prediction is globally sealed before any validation label is opened. This terminal exploratory diagnostic cannot feed Stage 60, Stage 70, recipe selection, promotion, deployment, or a routing-quality claim.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_validation_residual_topup_b_u_g_s_case_oof.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_validation_residual_topup_b_u_g_s_case_oof_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_validation_residual_topup_b_u_g_s_case_oof_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+      - midogpp_stage90_residual_topup_b_u_g_s_case_oof_validation_cache_v1
+      - midogpp_stage90_residual_topup_b_u_g_s_case_oof_validation_manifest_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Protocol-reviewed Stage-90 diagnostic reuse of immutable source-local frames, samplers, the full seed Cartesian product, budgets, and classifier settings only; no Stage-60 or Stage-70 policy, utility, promotion, or deployment authority is inherited.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - residual-topup-case-oof-diagnostic
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_validation_residual_topup_b_u_g_s_case_oof_v1
+    notes:
+      - Runs the fixed B/U/G/S residual-top-up decomposition on the already-consumed MIDOG++ validation surface as a terminal whole-case OOF Stage-90 diagnostic.
+      - Reserves two unlabeled support cases per center; S uses only S_H, while each G ballot excludes both outer H and pseudoquery q. Other evaluation embeddings never enter the route.
+      - Freezes B/U/G/S, the source-identity permutation control, and all H-by-e single-source tails before prediction. Every target/action/seed prediction is globally sealed before labels open.
+      - Uses two persistent A5000 workers for 27 source-expert jobs, float32 memmaps, and four classifier workers with three BLAS threads each; hash-valid checkpoints support safe resume.
+      - Primary evidence is center-level S-U and S-G under the all-nine-seed probability ensemble. No selector, fallback, expert update, policy update, routing-quality claim, promotion, or Stage-60/70 feed is permitted.
+
+  - experiment_id: midogpp.routing_and_composition.uniform_b_v2_residual_topup_b_u_g_s_policy_lock.v1
+    stage: 60_routing_and_composition
+    status: planned
+    claim_scope: routing_and_composition
+    config_path: experiments/midogpp/stages/60_routing_and_composition/configs/uniform_b_v2_residual_topup_b_u_g_s_policy_lock_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_residual_topup_b_u_g_s_policy_lock_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+      - midogpp_residual_topup_fresh_proxy_surface_v1
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-routing
+        - uniform-b-v2-residual-topup-b-u-g-s-policy-lock
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_residual_topup_b_u_g_s_policy_lock_v1
+    notes:
+      - Planned and deliberately non-runnable until an independently reserved unlabeled pseudoquery/support surface passes the fresh-surface attestation.
+      - Freezes B/U/G/S, a source-identity permutation control, and every H-by-e single-source tail before Stage-70 cache extraction; no utility selector, fallback gate, or empirical-Bayes shrinkage is fitted.
+      - Averages all three expert replicas before each case-level normalized-midrank ballot. G excludes both H and q; S uses only evaluation-disjoint unlabeled support for H.
+      - The proxy remains reconstruction-MSE plus normalized analytic PS-prior KL, not NELBO, downstream utility, or a BACC prediction.
+
+  - experiment_id: midogpp.frozen_policy_downstream.uniform_b_v2_residual_topup_b_u_g_s_fresh.v1
+    stage: 70_frozen_policy_downstream
+    status: planned
+    claim_scope: synthetic_downstream_utility
+    config_path: experiments/midogpp/stages/70_frozen_policy_downstream/configs/uniform_b_v2_residual_topup_b_u_g_s_fresh_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_residual_topup_b_u_g_s_fresh_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_output_uniform_b_v2_residual_topup_b_u_g_s_policy_lock_v1
+      - midogpp_residual_topup_fresh_target_reservation_v1
+      - midogpp_residual_topup_fresh_target_cache_v1
+      - midogpp_residual_topup_fresh_target_manifest_v1
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-frozen-policy-downstream
+        - evaluate-residual-topup-fresh
+        - --config
+        - "{resolved_config}"
+        - --enable-local-scratch
+    notes:
+      - Planned and deliberately non-runnable until the policy lock, reservation, label-blind cache, and scoring manifest are fresh, case-disjoint, hash-bound, and complete.
+      - Seals every B/U/G/S, permutation-control, and H-by-e prediction before labels open. H-by-e utilities are terminal oracle diagnostics and cannot update the policy.
+      - Predeclares all-nine-seed probability-ensemble BACC as the operational endpoint and target center as the inference unit; seed-cell means are descriptive technical repeats.
+      - Uses one persistent spawned worker per RTX A5000 for 256-per-class source blocks, then four classifier workers with three BLAS threads each and hash-validated resume checkpoints.

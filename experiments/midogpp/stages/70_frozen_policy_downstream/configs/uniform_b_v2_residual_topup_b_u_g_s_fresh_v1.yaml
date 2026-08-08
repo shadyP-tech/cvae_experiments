@@ -1,0 +1,106 @@
+experiment:
+  id: midogpp.frozen_policy_downstream.uniform_b_v2_residual_topup_b_u_g_s_fresh.v1
+  name: uniform_b_v2_residual_topup_b_u_g_s_fresh_v1
+  artifact_root: output://midogpp_output_uniform_b_v2_residual_topup_b_u_g_s_fresh_v1
+  status: BLOCKED_PENDING_FRESH_SURFACE
+inputs:
+  expert_bank_root: artifact://midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_root: artifact://midogpp_output_uniform_b_v2_generation_lock_v1
+  policy_root: artifact://midogpp_output_uniform_b_v2_residual_topup_b_u_g_s_policy_lock_v1
+  fresh_target_cache_root: artifact://midogpp_residual_topup_fresh_target_cache_v1
+  fresh_scoring_manifest_path: artifact://midogpp_residual_topup_fresh_target_manifest_v1/manifest.csv
+  fresh_reservation_path: artifact://midogpp_residual_topup_fresh_target_reservation_v1/manifests/reservation.json
+  expert_bank_artifact_id: midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_artifact_id: midogpp_output_uniform_b_v2_generation_lock_v1
+  policy_artifact_id: midogpp_output_uniform_b_v2_residual_topup_b_u_g_s_policy_lock_v1
+  target_cache_artifact_id: midogpp_residual_topup_fresh_target_cache_v1
+  scoring_manifest_artifact_id: midogpp_residual_topup_fresh_target_manifest_v1
+  reservation_artifact_id: midogpp_residual_topup_fresh_target_reservation_v1
+  expected_bank_lock_hash: 9972a41dcd4814cd
+  expected_generation_lock_hash: 34e551425710362e
+protocol:
+  dataset_family: MIDOG++
+  feature_backbone: Virchow2
+  feature_frame: annotation_jpeg_fixed_center_b_v3
+  stage: 70_frozen_policy_downstream
+  centers: ['0', '1', '2', '3', '5', '6', '7', '8', '9']
+  training_seeds: [17, 42, 101]
+  generation_seeds: [17, 42, 101]
+  target_support_evaluation_case_disjoint: true
+  target_expert_excluded: true
+  policy_lock_frozen_before_target_cache_extraction: true
+  reservation_frozen_before_target_cache_extraction: true
+  all_main_permutation_and_H_by_e_predictions_sealed_before_labels: true
+  evaluation_labels_available_to_generation: false
+  evaluation_labels_available_to_prediction: false
+  labels_used_for_scoring_only_after_global_seal: true
+  policy_update_after_scoring_forbidden: true
+evaluation:
+  main_action_ids:
+    - base_equal_union
+    - uniform_residual_topup
+    - global_rank_residual_topup
+    - support_rank_residual_topup
+  permutation_control_action_id: support_rank_permutation_control
+  single_source_tail_action_namespace: single_source_tail
+  primary_endpoint: all_nine_seed_probability_ensemble_bacc
+  primary_threshold: 0.5
+  seed_cell_mean_endpoint_role: descriptive_only
+  inference_unit: target_center
+  effective_sample_size: 9
+  primary_contrasts: [S-U, S-G]
+  secondary_contrasts: [G-U, U-B, S-B]
+  permutation_contrast: S-P
+  success_requires_positive_center_mean: [S-U, S-G]
+  report_two_sided_95_percent_t_interval: true
+  report_one_sided_95_percent_lower_bound: true
+  report_wins_ties_losses: true
+  oracle_diagnostics:
+    - support_score_utility_spearman
+    - top1_oracle_agreement
+    - oracle_headroom
+    - normalized_oracle_gap
+  oracle_may_update_policy: false
+classifier:
+  family: sklearn_logistic_regression
+  C: 0.01
+  penalty: l2
+  solver: lbfgs
+  max_iter: 3000
+  class_weight: null
+  random_state: 23
+  l1_ratio: null
+  threshold_policy: predict
+  scaler_fit: synthetic_train_only
+runtime:
+  workstation_profile: xeon_w2265_12c24t_125gb_2x_rtx_a5000_24gb
+  generation_devices: ['cuda:0', 'cuda:1']
+  cuda_visible_devices: '0,1'
+  generation_workers_per_device: 1
+  source_block_per_class: 256
+  classifier_workers: 4
+  classifier_threads_per_worker: 3
+  multiprocessing_start_method: spawn
+  tf32_disabled_in_gpu_workers: true
+  amp_enabled: false
+  parent_cuda_context_forbidden: true
+  gpu_and_cpu_phases_disjoint: true
+  source_cache_format: float32_npy_memmap
+  prediction_cache_format: float32_npy_memmap
+  persistent_cache_policy: hash_validated_resume
+  optional_local_scratch_root: /data/local
+  canonical_publication_requires_validated_atomic_copy: true
+  minimum_logical_cpu_count: 12
+  minimum_physical_ram_bytes: 107374182400
+  minimum_artifact_disk_free_bytes: 8589934592
+  minimum_gpu_free_mib_per_device: 18000
+claim_boundary:
+  strict_claim_firewall: true
+  claim_scope: synthetic_downstream_utility
+  current_checkout_has_eligible_fresh_surface: false
+  consumed_test_used: false
+  consumed_validation_used: false
+  consumed_stage90_used: false
+  fresh_confirmation_claim_requires_complete_validated_bundle: true
+  negative_result_is_valid: true
+  policy_selection_after_labels_forbidden: true

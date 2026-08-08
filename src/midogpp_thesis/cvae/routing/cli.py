@@ -51,6 +51,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     regret_policy.add_argument("--config", required=True)
     regret_policy.add_argument("--artifact-root", default=None)
+    residual_topup = sub.add_parser(
+        "uniform-b-v2-residual-topup-b-u-g-s-policy-lock",
+        help=(
+            "Freeze the fresh label-blind B/U/G/S residual-top-up policy and "
+            "all permutation/H-by-e controls."
+        ),
+    )
+    residual_topup.add_argument("--config", required=True)
+    residual_topup.add_argument("--artifact-root", default=None)
     args = parser.parse_args(argv)
     if args.surface == "uniform-b-v2-equal-union-policy-lock":
         from .config import load_equal_union_policy_config
@@ -148,6 +157,25 @@ def main(argv: list[str] | None = None) -> int:
                 "Utility/regret policy output must remain at its canonical workspace path."
             )
         print(run_utility_regret_policy_lock(config, artifact_root=requested))
+        return 0
+    if args.surface == "uniform-b-v2-residual-topup-b-u-g-s-policy-lock":
+        from .residual_topup_policy.config import (
+            load_residual_topup_policy_lock_config,
+        )
+        from .residual_topup_policy.runner import run_residual_topup_policy_lock
+        from .residual_topup_policy.workspace_binding import (
+            validate_production_workspace_binding,
+        )
+
+        config = load_residual_topup_policy_lock_config(args.config)
+        validate_production_workspace_binding(config)
+        requested = Path(args.artifact_root) if args.artifact_root else config.artifact_root
+        if requested.resolve() != config.artifact_root.resolve():
+            raise ProtocolError(
+                "Residual-top-up B/U/G/S policy output must remain at its "
+                "canonical workspace path."
+            )
+        print(run_residual_topup_policy_lock(config, artifact_root=requested))
         return 0
     raise AssertionError(f"Unknown routing surface: {args.surface}")
 

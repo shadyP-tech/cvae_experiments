@@ -85,6 +85,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     residual_topup.add_argument("--config", required=True)
     residual_topup.add_argument("--artifact-root", required=True)
+
+    residual_topup_case_oof = sub.add_parser(
+        "residual-topup-case-oof-diagnostic",
+        help=(
+            "Run the consumed-validation Stage-90 case-OOF B/U/G/S "
+            "residual top-up decomposition diagnostic."
+        ),
+    )
+    residual_topup_case_oof.add_argument("--config", required=True)
+    residual_topup_case_oof.add_argument("--artifact-root", required=True)
     return parser
 
 
@@ -201,6 +211,20 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_residual_topup_config(args.config)
         output = run_residual_topup_router_diagnostic(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "residual-topup-case-oof-diagnostic":
+        from .residual_topup_case_oof import (
+            load_residual_topup_case_oof_config,
+            run_residual_topup_case_oof_diagnostic,
+        )
+
+        config = load_residual_topup_case_oof_config(args.config)
+        output = run_residual_topup_case_oof_diagnostic(
             config,
             artifact_root=artifact_root,
         )

@@ -463,3 +463,52 @@ This is a terminal `EXPLORATORY_CONSUMED_DATA_ONLY` Stage-90 diagnostic. Its
 energy score is a proxy, not NELBO or downstream utility, and the resulting
 artifact cannot feed Stage 60, Stage 70, recipe selection, deployable
 selection, promotion, or a routing-quality claim.
+
+## Uniform-B v2 Residual Top-up B/U/G/S Case-OOF v1
+
+`midogpp.oracle.uniform_b_v2_consumed_validation_residual_topup_b_u_g_s_case_oof.v1`
+is the quarantined same-dataset decomposition of the positive residual-top-up
+mechanism. It uses the already-consumed MIDOG++ validation surface, so it is a
+terminal Stage-90 diagnostic rather than a fresh policy or downstream
+confirmation.
+
+For each target center `H`, two whole cases are frozen as label-free support
+`S_H`. The remaining 26 evaluation cases form whole-case OOF scoring folds,
+and no evaluation embedding participates in its own route. `G` aggregates
+true normalized-midrank ballots over fixed support cases from `q != H` while
+excluding both `H` and `q`; `S` uses only fixed `S_H`. All three training
+replicas are averaged before each case ballot and Hamilton allocation receives
+the explicit Borda priority `1-b`.
+
+The action library contains the original equal-union base `B`, matched uniform
+top-up `U`, global-rank top-up `G`, support-rank top-up `S`, one fixed
+source-identity permutation control, and all eight `H x e` single-source-tail
+diagnostics. Every target/action/training-seed/generation-seed prediction is
+globally sealed before the label-bearing manifest can open. No utility
+selector, fallback gate, temperature, budget, source, expert, or seed search
+exists.
+
+The predeclared primary endpoint is all-nine-seed probability-ensemble BACC.
+The primary center-level contrasts are `S-U` and `S-G`; `G-U`, `U-B`, `S-B`,
+and `S-P` are secondary or diagnostic. The 81 seed cells are technical repeats;
+inference uses the nine target centers. The sealed `H x e` matrix reports
+headroom and rank diagnostics only and cannot update an action.
+
+Run the registered diagnostic on the workstation with:
+
+```bash
+cd /home/stud/spark/cvae_experiments && env PYTHONPATH=.:src \
+  /home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_v2_consumed_validation_residual_topup_b_u_g_s_case_oof.v1
+```
+
+Canonical output:
+
+```text
+artifacts/midogpp/90_oracles_and_diagnostics/
+  uniform_b_v2_consumed_validation_residual_topup_b_u_g_s_case_oof/v1/
+```
+
+Regardless of outcome, this artifact cannot claim fresh evidence, successful
+target-specific routing, NELBO or utility prediction, promotion, or deployment,
+and it cannot feed Stage 60 or Stage 70.

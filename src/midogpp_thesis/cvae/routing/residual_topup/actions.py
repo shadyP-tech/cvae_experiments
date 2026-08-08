@@ -1,4 +1,10 @@
-"""Uniform and energy-directed additive residual top-up actions."""
+"""Fixed additive residual top-up actions.
+
+The Stage-90 calibrated-energy actions below are intentionally kept separate
+from the normalized-midrank/Borda policy actions.  A rank ballot is not a
+calibrated energy, even when both ultimately provide weights to the same
+Hamilton allocation primitive.
+"""
 
 from __future__ import annotations
 
@@ -24,11 +30,19 @@ from .hashing import canonical_sha256
 UNIFORM_ACTION_KIND = "exact_uniform_topup_control"
 ENERGY_ACTION_KIND = "fixed_calibrated_energy_rank_directed_topup"
 SOFTMAX_ENERGY_ACTION_KIND = "nondefault_softmax_energy_directed_topup"
+BORDA_ACTION_KIND = "fixed_normalized_midrank_borda_directed_topup"
+SINGLE_SOURCE_TAIL_ACTION_KIND = "fixed_single_source_tail_topup_diagnostic"
 UNIFORM_DIRECTION_SEMANTICS = "exact_equal_topup_weight"
 ENERGY_RANK_DIRECTION_SEMANTICS = (
     "lower_energy_first_canonical_source_ties_linear_k_minus_rank_plus_one"
 )
 SOFTMAX_DIRECTION_SEMANTICS = "nondefault_softmax_negative_energy"
+BORDA_DIRECTION_SEMANTICS = (
+    "lower_mean_normalized_midrank_higher_weight_explicit_one_minus_b"
+)
+SINGLE_SOURCE_TAIL_DIRECTION_SEMANTICS = (
+    "all_topup_weight_to_one_declared_source"
+)
 
 
 def build_uniform_topup_action(geometry: TopupGeometry) -> ResidualTopupAction:
@@ -147,6 +161,81 @@ def build_softmax_energy_topup_action(
         },
         calibrated_energy_by_source=energies,
         temperature=tau,
+    )
+
+
+def build_borda_directed_topup_action(
+    mean_normalized_midrank_by_source: Mapping[object, float],
+    *,
+    geometry: TopupGeometry,
+) -> ResidualTopupAction:
+    """Build a fixed Borda action from mean normalized-midrank ballots.
+
+    ``b=0`` is best and ``b=1`` is worst.  Hamilton therefore receives the
+    explicit nonnegative priority ``1-b``.  Equal ballot values remain equal
+    priorities; canonical source identifiers are used only by Hamilton when an
+    indivisible integer remainder must be assigned.
+
+    Ballot values are deliberately *not* written to
+    ``calibrated_energy_by_source``.  That field remains reserved for the
+    immutable Stage-90 energy actions.
+    """
+
+    midranks = _validated_mean_normalized_midranks(
+        mean_normalized_midrank_by_source,
+        geometry=geometry,
+    )
+    raw_priorities = {
+        source: 1.0 - midranks[source] for source in geometry.source_order
+    }
+    normalizer = sum(raw_priorities.values())
+    if not math.isfinite(normalizer) or normalizer <= 0.0:
+        raise ProtocolError(
+            "Mean normalized-midrank ballots must leave positive Borda weight."
+        )
+    direction_weights = {
+        source: raw_priorities[source] / normalizer
+        for source in geometry.source_order
+    }
+    return _build_action(
+        geometry=geometry,
+        action_kind=BORDA_ACTION_KIND,
+        direction_semantics=BORDA_DIRECTION_SEMANTICS,
+        direction_weights=direction_weights,
+        calibrated_energy_by_source={},
+        temperature=None,
+    )
+
+
+def build_single_source_tail_action(
+    selected_source: object,
+    *,
+    geometry: TopupGeometry,
+) -> ResidualTopupAction:
+    """Build one sealed diagnostic action that assigns the tail to one source."""
+
+    try:
+        source = str(selected_source)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ProtocolError("Single-source tail source is invalid.") from exc
+    if (
+        not source
+        or source.strip() != source
+        or source not in geometry.source_order
+    ):
+        raise ProtocolError(
+            "Single-source tail source must be present in the geometry."
+        )
+    return _build_action(
+        geometry=geometry,
+        action_kind=SINGLE_SOURCE_TAIL_ACTION_KIND,
+        direction_semantics=SINGLE_SOURCE_TAIL_DIRECTION_SEMANTICS,
+        direction_weights={
+            candidate: float(candidate == source)
+            for candidate in geometry.source_order
+        },
+        calibrated_energy_by_source={},
+        temperature=None,
     )
 
 
@@ -300,14 +389,59 @@ def _validated_energies(
     return energies, values
 
 
+def _validated_mean_normalized_midranks(
+    mean_normalized_midrank_by_source: Mapping[object, float],
+    *,
+    geometry: TopupGeometry,
+) -> dict[str, float]:
+    if not isinstance(mean_normalized_midrank_by_source, Mapping):
+        raise ProtocolError("Mean normalized-midrank ballots must be a mapping.")
+    midranks: dict[str, float] = {}
+    try:
+        for raw_source, raw_midrank in mean_normalized_midrank_by_source.items():
+            source = str(raw_source)
+            if not source or source.strip() != source or source in midranks:
+                raise ProtocolError(
+                    "Mean normalized-midrank ballot source keys are invalid."
+                )
+            if isinstance(raw_midrank, bool):
+                raise ProtocolError(
+                    "Mean normalized-midrank ballot values are invalid."
+                )
+            midranks[source] = float(raw_midrank)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ProtocolError(
+            "Mean normalized-midrank ballot values are invalid."
+        ) from exc
+    if set(midranks) != set(geometry.source_order):
+        raise ProtocolError(
+            "Mean normalized-midrank ballots must match the geometry exactly."
+        )
+    values = np.asarray(
+        [midranks[source] for source in geometry.source_order],
+        dtype=np.float64,
+    )
+    if not np.isfinite(values).all() or np.any(values < 0.0) or np.any(values > 1.0):
+        raise ProtocolError(
+            "Mean normalized-midrank ballot values must be finite in [0, 1]."
+        )
+    return midranks
+
+
 __all__ = (
+    "BORDA_ACTION_KIND",
+    "BORDA_DIRECTION_SEMANTICS",
     "ENERGY_ACTION_KIND",
     "ENERGY_RANK_DIRECTION_SEMANTICS",
+    "SINGLE_SOURCE_TAIL_ACTION_KIND",
+    "SINGLE_SOURCE_TAIL_DIRECTION_SEMANTICS",
     "SOFTMAX_DIRECTION_SEMANTICS",
     "SOFTMAX_ENERGY_ACTION_KIND",
     "UNIFORM_ACTION_KIND",
     "UNIFORM_DIRECTION_SEMANTICS",
+    "build_borda_directed_topup_action",
     "build_energy_directed_topup_action",
+    "build_single_source_tail_action",
     "build_softmax_energy_topup_action",
     "build_uniform_topup_action",
 )

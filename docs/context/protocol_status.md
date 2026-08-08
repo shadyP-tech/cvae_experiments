@@ -173,6 +173,19 @@ planned surfaces are:
 - all-candidate utility matrix for a clean bank
 - a separately authorized target-evaluation artifact
 - matched Stage-70 control-versus-metadata-versus-utility-router downstream utility
+- the planned fixed residual-top-up B/U/G/S Stage-60 lock and fresh Stage-70
+  decomposition, blocked until a new unconsumed case-disjoint
+  pseudoquery/support/evaluation surface exists
+
+The separately registered
+`midogpp.oracle.uniform_b_v2_consumed_validation_residual_topup_b_u_g_s_case_oof.v1`
+is runnable only as a terminal Stage-90 fallback on the existing MIDOG++
+validation bytes. It freezes two label-free support cases per center, excludes
+each of the other 26 whole cases from its own route, seals B/U/G/S/P and all
+`H x e` predictions before labels, and performs center-level `S-U`/`S-G`
+inference without a selector or fallback. It may diagnose whether the observed
+mechanism is global or target-conditioned, but it cannot supply fresh evidence
+or authorize routing, promotion, Stage 60, or Stage 70.
 
 Legacy source trees were retired rather than exposed as fallbacks. Any new
 implementation must use only the canonical dataset/cache lineage and must pass

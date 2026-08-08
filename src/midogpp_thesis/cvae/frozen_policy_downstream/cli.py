@@ -46,6 +46,23 @@ def main(argv: list[str] | None = None) -> int:
     )
     validation.add_argument("--artifact-root", required=True)
 
+    residual_topup_fresh = sub.add_parser(
+        "evaluate-residual-topup-fresh",
+        help=(
+            "Run the fresh fixed B/U/G/S residual-top-up evaluation after "
+            "all policy, reservation, cache, and manifest gates are active."
+        ),
+    )
+    residual_topup_fresh.add_argument("--config", required=True)
+    residual_topup_fresh.add_argument(
+        "--enable-local-scratch",
+        action="store_true",
+        help=(
+            "Use the predeclared workstation-local scratch for resumable source "
+            "blocks; canonical outputs remain hash-validated workspace artifacts."
+        ),
+    )
+
     args = parser.parse_args(argv)
     if args.surface == "reserve-consumed-test":
         from .authorization import (
@@ -95,6 +112,20 @@ def main(argv: list[str] | None = None) -> int:
 
         checks = validate_frozen_policy_downstream_bundle(args.artifact_root)
         print(json.dumps(checks, indent=2, sort_keys=True))
+        return 0
+    if args.surface == "evaluate-residual-topup-fresh":
+        from .residual_topup_fresh.config import (
+            load_residual_topup_fresh_config,
+        )
+        from .residual_topup_fresh.runner import run_residual_topup_fresh
+
+        config = load_residual_topup_fresh_config(args.config)
+        print(
+            run_residual_topup_fresh(
+                config,
+                enable_optional_local_scratch=args.enable_local_scratch,
+            )
+        )
         return 0
     raise AssertionError(f"Unknown Stage-70 surface: {args.surface}")
 

@@ -7,13 +7,19 @@ import pytest
 
 from midogpp_thesis.cvae.protocol import ProtocolError
 from midogpp_thesis.cvae.routing.residual_topup import (
+    BORDA_ACTION_KIND,
+    BORDA_DIRECTION_SEMANTICS,
     ENERGY_ACTION_KIND,
     ENERGY_RANK_DIRECTION_SEMANTICS,
+    SINGLE_SOURCE_TAIL_ACTION_KIND,
+    SINGLE_SOURCE_TAIL_DIRECTION_SEMANTICS,
     SOFTMAX_ENERGY_ACTION_KIND,
     SourceClassWindows,
+    build_borda_directed_topup_action,
     build_energy_directed_topup_action,
     build_hamilton_topup_allocation,
     build_softmax_energy_topup_action,
+    build_single_source_tail_action,
     build_topup_geometry,
     build_uniform_topup_action,
     compose_equal_union_base_blocks,
@@ -125,6 +131,91 @@ def test_rank_energy_action_is_parameter_free_canonical_and_deterministic() -> N
     json.dumps(first.to_payload(), sort_keys=True)
 
 
+def test_existing_stage90_action_hashes_remain_byte_stable() -> None:
+    geometry = target_topup_geometry(TARGET_SOURCES)
+    energies = {source: float(index) for index, source in enumerate(TARGET_SOURCES)}
+    assert (
+        build_uniform_topup_action(geometry).action_hash
+        == "87d543a558fa1e0042e220b6309367463829886eb9cb9790bed3f3323e4e8fb4"
+    )
+    assert (
+        build_energy_directed_topup_action(
+            energies, geometry=geometry
+        ).action_hash
+        == "218e19a3bec21beea69985ccde1b709b59380ee0b11eae3fd72d609228157b9a"
+    )
+    assert (
+        build_softmax_energy_topup_action(
+            energies, geometry=geometry, temperature=1.0
+        ).action_hash
+        == "981b5d14c96cb37b283583c5a26423cea514870cc7b54f92d646897ce0ea1199"
+    )
+
+
+def test_borda_action_uses_one_minus_midrank_and_preserves_true_ties() -> None:
+    geometry = target_topup_geometry(TARGET_SOURCES)
+    ballots = {
+        "7": 1.0,
+        "6": 0.75,
+        "5": 0.75,
+        "4": 0.5,
+        "3": 0.5,
+        "2": 0.25,
+        "1": 0.25,
+        "0": 0.0,
+    }
+    first = build_borda_directed_topup_action(ballots, geometry=geometry)
+    second = build_borda_directed_topup_action(
+        dict(reversed(tuple(ballots.items()))), geometry=geometry
+    )
+
+    assert first.action_kind == BORDA_ACTION_KIND
+    assert first.direction_semantics == BORDA_DIRECTION_SEMANTICS
+    assert first.temperature is None
+    assert dict(first.calibrated_energy_by_source) == {}
+    assert sum(first.direction_weights.values()) == pytest.approx(1.0)
+    assert first.direction_weights["0"] > first.direction_weights["1"]
+    assert first.direction_weights["1"] == first.direction_weights["2"]
+    assert first.direction_weights["3"] == first.direction_weights["4"]
+    assert first.direction_weights["5"] == first.direction_weights["6"]
+    assert first.direction_weights["6"] > first.direction_weights["7"]
+    assert first.action_hash == second.action_hash
+    assert first.allocation_hash == second.allocation_hash
+    assert first.window_hash == second.window_hash
+    assert first.action_hash != build_energy_directed_topup_action(
+        ballots, geometry=geometry
+    ).action_hash
+
+
+def test_single_source_tail_is_distinct_and_uses_shared_action_invariants() -> None:
+    geometry = target_topup_geometry(TARGET_SOURCES)
+    first = build_single_source_tail_action("3", geometry=geometry)
+    repeated = build_single_source_tail_action(3, geometry=geometry)
+    same_counts_energy = build_softmax_energy_topup_action(
+        {
+            source: (0.0 if source == "3" else 1000.0)
+            for source in TARGET_SOURCES
+        },
+        geometry=geometry,
+        temperature=1.0,
+    )
+
+    assert first.action_kind == SINGLE_SOURCE_TAIL_ACTION_KIND
+    assert first.direction_semantics == SINGLE_SOURCE_TAIL_DIRECTION_SEMANTICS
+    assert dict(first.calibrated_energy_by_source) == {}
+    assert dict(first.topup_counts) == {
+        source: (128 if source == "3" else 0) for source in TARGET_SOURCES
+    }
+    assert first.action_hash == repeated.action_hash
+    assert first.allocation_hash == same_counts_energy.allocation_hash
+    assert first.window_hash == same_counts_energy.window_hash
+    assert first.action_hash != same_counts_energy.action_hash
+    assert first.maximum_source_weight <= 0.25
+    assert all(
+        value >= 6.0 for value in first.effective_source_count_by_class.values()
+    )
+
+
 def test_softmax_helper_is_explicitly_nondefault_and_lower_energy_gets_more() -> None:
     geometry = target_topup_geometry(TARGET_SOURCES)
     energies = {source: float(index) for index, source in enumerate(TARGET_SOURCES)}
@@ -189,6 +280,35 @@ def test_invalid_fraction_temperature_energy_and_hamilton_fail_closed() -> None:
         )
     with pytest.raises(ProtocolError, match="eight sources"):
         target_topup_geometry(INNER_SOURCES)
+
+
+@pytest.mark.parametrize(
+    "invalid_ballots",
+    [
+        {source: 0.5 for source in TARGET_SOURCES[:-1]},
+        {**{source: 0.5 for source in TARGET_SOURCES}, "8": 0.5},
+        {**{source: 0.5 for source in TARGET_SOURCES}, "3": float("nan")},
+        {**{source: 0.5 for source in TARGET_SOURCES}, "3": -0.1},
+        {**{source: 0.5 for source in TARGET_SOURCES}, "3": 1.1},
+        {**{source: 0.5 for source in TARGET_SOURCES}, "3": True},
+        {source: 1.0 for source in TARGET_SOURCES},
+    ],
+)
+def test_borda_action_rejects_invalid_ballots(invalid_ballots) -> None:
+    with pytest.raises(ProtocolError, match="normalized-midrank|Borda"):
+        build_borda_directed_topup_action(
+            invalid_ballots,
+            geometry=target_topup_geometry(TARGET_SOURCES),
+        )
+
+
+@pytest.mark.parametrize("selected_source", ["", " 3", "missing", None])
+def test_single_source_tail_rejects_invalid_source(selected_source) -> None:
+    with pytest.raises(ProtocolError, match="Single-source tail source"):
+        build_single_source_tail_action(
+            selected_source,
+            geometry=target_topup_geometry(TARGET_SOURCES),
+        )
 
 
 def test_final_counts_balance_and_density_invariants_hold_without_projection() -> None:

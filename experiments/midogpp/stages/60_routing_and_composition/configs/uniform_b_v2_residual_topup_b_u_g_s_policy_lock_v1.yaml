@@ -1,0 +1,86 @@
+experiment:
+  id: midogpp.routing_and_composition.uniform_b_v2_residual_topup_b_u_g_s_policy_lock.v1
+  name: uniform_b_v2_residual_topup_b_u_g_s_policy_lock_v1
+  artifact_root: output://midogpp_output_uniform_b_v2_residual_topup_b_u_g_s_policy_lock_v1
+  status: BLOCKED_PENDING_FRESH_SURFACE
+inputs:
+  expert_bank_root: artifact://midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_root: artifact://midogpp_output_uniform_b_v2_generation_lock_v1
+  equal_union_policy_root: artifact://midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+  proxy_surface_root: artifact://midogpp_residual_topup_fresh_proxy_surface_v1
+  proxy_score_table_path: artifact://midogpp_residual_topup_fresh_proxy_surface_v1/tables/proxy_scores.csv
+  proxy_attestation_path: artifact://midogpp_residual_topup_fresh_proxy_surface_v1/manifests/fresh_surface_attestation.json
+  expert_bank_artifact_id: midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_artifact_id: midogpp_output_uniform_b_v2_generation_lock_v1
+  equal_union_policy_artifact_id: midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+  proxy_surface_artifact_id: midogpp_residual_topup_fresh_proxy_surface_v1
+  expected_bank_lock_hash: 9972a41dcd4814cd
+  expected_generation_lock_hash: 34e551425710362e
+  expected_equal_union_policy_lock_hash: 4b9ea514308b084f
+protocol:
+  dataset_family: MIDOG++
+  feature_backbone: Virchow2
+  feature_frame: annotation_jpeg_fixed_center_b_v3
+  stage: 60_routing_and_composition
+  centers: ['0', '1', '2', '3', '5', '6', '7', '8', '9']
+  training_seeds: [17, 42, 101]
+  query_to_decision_chain: query_to_proxy_compatibility_to_fixed_rank_action
+  proxy_semantics: class_marginalized_common_space_reconstruction_mse_plus_latent_dim_normalized_analytic_ps_kl
+  proxy_is_nelbo: false
+  proxy_is_utility: false
+  proxy_is_bacc_prediction: false
+  class_hypothesis_prior: [0.5, 0.5]
+  replica_aggregation: average_all_three_training_replicas_before_each_case_ballot
+  ballot: normalized_true_midrank_lower_is_better
+  global_rank_source: independently_reserved_unlabeled_pseudoqueries
+  global_outer_exclusion: exclude_target_H_and_pseudo_target_q_before_each_ballot
+  support_rank_source: unlabeled_target_support_only
+  support_evaluation_case_disjoint: true
+  target_labels_used: false
+  target_evaluation_used: false
+  source_experts_updated: false
+  hyperparameters_tuned: false
+actions:
+  family: immutable_equal_union_backbone_with_fixed_residual_topup_b_u_g_s_v1
+  main_action_ids:
+    - base_equal_union
+    - uniform_residual_topup
+    - global_rank_residual_topup
+    - support_rank_residual_topup
+  permutation_control_action_id: support_rank_permutation_control
+  single_source_tail_action_namespace: single_source_tail
+  base_per_source_per_class: 128
+  base_total_per_class: 1024
+  topup_total_per_class: 128
+  matched_total_per_class: 1152
+  topup_fraction_of_base: 0.125
+  rank_priority_transform: one_minus_mean_normalized_midrank
+  allocation: hamilton_largest_remainder_canonical_source_ties
+  freeze_all_H_by_e_single_source_tail_actions: true
+  freeze_permutation_control: true
+  permutation_scheme: canonical_source_order_nonzero_cyclic_rotation
+  permutation_index: 1
+  no_utility_selector: true
+  no_fallback_gate: true
+  no_empirical_bayes_shrinkage: true
+runtime:
+  workstation_profile: xeon_w2265_12c24t_125gb_2x_rtx_a5000_24gb
+  proxy_scoring_devices: ['cuda:0', 'cuda:1']
+  cuda_visible_devices: '0,1'
+  workers_per_device: 1
+  score_batch_rows: 2048
+  multiprocessing_start_method: spawn
+  tf32_disabled: true
+  amp_enabled: false
+  parent_cuda_context_forbidden: true
+  checkpoint_policy: hash_validated_case_score_checkpoints
+claim_boundary:
+  strict_claim_firewall: true
+  claim_scope: routing_and_composition
+  current_checkout_has_eligible_fresh_surface: false
+  policy_lock_may_materialize_only_after_fresh_surface_attestation: true
+  consumed_stage70_used: false
+  consumed_stage90_used: false
+  routing_quality_claimed: false
+  downstream_utility_claimed: false
+  may_feed_stage70_only_after_validation_pass: true

@@ -695,6 +695,32 @@ absent.
   evaluation artifact and matched Stage-70 evaluation follow. Routing quality
   and downstream utility remain unknown until that fresh evaluation is complete.
 
+- The fixed residual-top-up B/U/G/S decomposition is now implemented and
+  registered as two `planned` experiments:
+  `midogpp.routing_and_composition.uniform_b_v2_residual_topup_b_u_g_s_policy_lock.v1`
+  and
+  `midogpp.frozen_policy_downstream.uniform_b_v2_residual_topup_b_u_g_s_fresh.v1`.
+  The Stage-60 code freezes B/U/G/S, a fixed source-identity permutation
+  control, and the complete `H x e` single-source-tail diagnostic menu. The
+  Stage-70 code predeclares all-nine-seed probability-ensemble BACC and center-
+  level `S-U`, `S-G`, `G-U`, `U-B`, and `S-B` contrasts, with all predictions
+  sealed before labels. Both entries remain fail-closed and non-runnable: the
+  checkout has no independently reserved, unconsumed, case-disjoint
+  pseudoquery/support/evaluation surface. Consumed Stage-70 and Stage-90 bytes
+  cannot satisfy the new artifact identities.
+
+- A separate same-dataset fallback is implemented and registered as
+  `midogpp.oracle.uniform_b_v2_consumed_validation_residual_topup_b_u_g_s_case_oof.v1`.
+  It is a runnable terminal Stage-90 diagnostic over the already-consumed
+  MIDOG++ validation surface, not the planned fresh confirmation. Two fixed
+  label-free support cases per center define `S_H`; the other 26 cases are
+  scored exactly once as whole-case OOF folds. `G` excludes both `H` and `q`,
+  `S` uses only `S_H`, and B/U/G/S/P plus every `H x e` action are sealed for
+  all nine seed cells before labels open. Primary inference is over the nine
+  center-level probability-ensemble `S-U` and `S-G` contrasts. The artifact is
+  post-hoc, consumed-data, non-promotional, and forbidden from feeding Stage 60,
+  Stage 70, recipe selection, or deployment regardless of its result.
+
 ## Latest Uniform-B Nonlinear-Boundary Diagnostic
 
 Canonical target:
