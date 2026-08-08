@@ -9,7 +9,7 @@ from typing import Mapping, Sequence
 
 from ....common.hashing import stable_hash
 from ...protocol import ProtocolError
-from .artifact_io import assert_closed_world, read_json
+from .artifact_io import assert_closed_world, read_json, read_utf8_text_exact
 from .bundle import REQUIRED_FILES, validate_content_index
 from .config import ResidualTopupCaseOOFConfig, load_residual_topup_case_oof_config
 from .contracts import (
@@ -437,10 +437,7 @@ def _assert_csv(
         if set(row) != set(columns):
             raise ProtocolError("Case-OOF reconstructed CSV schema drifted.")
         writer.writerow(row)
-    try:
-        observed = path.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise ProtocolError(f"Cannot read case-OOF CSV: {path}.") from exc
+    observed = read_utf8_text_exact(path)
     if observed != expected_handle.getvalue():
         raise ProtocolError(f"Case-OOF derived CSV drifted: {path.name}.")
 

@@ -500,6 +500,14 @@ def _load_resumed_record(
         return None
 
 
+def load_resumable_source_checkpoint(
+    root: Path, key: SourceGenerationKey
+) -> SourceBlockRecord | None:
+    """Validate one optional source checkpoint for action-neutral reuse."""
+
+    return _load_resumed_record(root, key)
+
+
 def _record_from_payload(raw: object) -> SourceBlockRecord:
     if not isinstance(raw, Mapping) or raw.get("schema_version") != SOURCE_BLOCK_SCHEMA:
         raise ProtocolError("Fresh source-cache record is malformed.")
@@ -605,6 +613,7 @@ __all__ = (
     "SourceExpertTask",
     "SourceTaskExecutor",
     "load_source_cache",
+    "load_resumable_source_checkpoint",
     "load_validated_generation_lock",
     "materialize_source_cache",
 )

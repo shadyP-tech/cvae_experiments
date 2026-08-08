@@ -26,6 +26,18 @@ CLASSIFIER_THREADS_PER_WORKER = 3
 EXPECTED_PREDICTION_TASK_COUNT = (
     len(CENTERS) * len(TRAINING_SEEDS) * len(GENERATION_SEEDS)
 )
+_EVALUATION_SCRATCH_FOLD_FIELDS = frozenset(
+    {
+        "fold_ordinal",
+        "target_center",
+        "heldout_case_id",
+        "start",
+        "stop",
+        "sample_ids",
+        "row_identity_hash",
+        "fold_hash",
+    }
+)
 
 
 def write_evaluation_scratch(
@@ -103,6 +115,36 @@ def build_prediction_tasks(
     raw_folds = scratch.get("folds")
     if not isinstance(raw_folds, Mapping):
         raise ProtocolError("Case-OOF evaluation scratch lacks fold offsets.")
+    expected_fold_ids = tuple(
+        str(fold.fold_id) for fold in getattr(crossfit, "folds", ())
+    )
+    if (
+        len(expected_fold_ids) != EXPECTED_CASE_OOF_FOLD_COUNT
+        or set(raw_folds) != set(expected_fold_ids)
+        or len(raw_folds) != len(expected_fold_ids)
+    ):
+        raise ProtocolError("Case-OOF evaluation scratch fold coverage drifted.")
+    validated_folds: dict[str, dict[str, object]] = {}
+    scratch_cursor = 0
+    for fold in getattr(crossfit, "folds", ()):
+        raw_fold = raw_folds[fold.fold_id]
+        if not isinstance(raw_fold, Mapping):
+            raise ProtocolError("Case-OOF scratch lacks a planned fold.")
+        payload = _validated_scratch_fold(raw_fold, fold=fold)
+        if payload["start"] != scratch_cursor:
+            raise ProtocolError("Case-OOF evaluation scratch offsets drifted.")
+        scratch_cursor = int(payload["stop"])
+        validated_folds[str(fold.fold_id)] = payload
+    scratch_shape = scratch.get("shape")
+    if (
+        not isinstance(scratch_shape, list)
+        or len(scratch_shape) != 2
+        or type(scratch_shape[0]) is not int
+        or type(scratch_shape[1]) is not int
+        or scratch_shape[0] != scratch_cursor
+        or scratch_shape[1] <= 0
+    ):
+        raise ProtocolError("Case-OOF evaluation scratch shape drifted.")
     source_rows = json_ready(tuple(getattr(source_cache, "index_rows")))
     tasks: list[dict[str, object]] = []
     folds_by_target = getattr(crossfit, "folds_by_target", {})
@@ -113,20 +155,17 @@ def build_prediction_tasks(
             len(actions) != EXPECTED_ACTION_COUNT_PER_TARGET
             or tuple(str(action.action_id) for action in actions)
             != expected_action_ids(target)
-            or tuple(str(action.target_center) for action in actions)
+            or tuple(str(action.outer_target) for action in actions)
             != (target,) * len(actions)
         ):
             raise ProtocolError("Case-OOF task action library drifted.")
         action_payloads = tuple(json_ready(action.to_payload()) for action in actions)
         fold_payloads: list[object] = []
         for fold in folds_by_target[target]:
-            scratch_fold = raw_folds.get(fold.fold_id)
-            if not isinstance(scratch_fold, Mapping):
-                raise ProtocolError("Case-OOF scratch lacks a planned fold.")
             fold_actions = tuple(getattr(plan, "actions_by_fold")[fold.fold_id])
             if fold_actions != actions:
                 raise ProtocolError("Case-OOF fold actions are not target-frozen.")
-            fold_payloads.append(dict(scratch_fold))
+            fold_payloads.append(dict(validated_folds[fold.fold_id]))
         for training_seed in TRAINING_SEEDS:
             for generation_seed in GENERATION_SEEDS:
                 task_id = (
@@ -180,6 +219,34 @@ def build_prediction_tasks(
     if len(tasks) != EXPECTED_PREDICTION_TASK_COUNT:
         raise ProtocolError("Case-OOF prediction task count drifted.")
     return tuple(tasks)
+
+
+def _validated_scratch_fold(
+    raw: Mapping[str, object], *, fold: object
+) -> dict[str, object]:
+    payload = dict(raw)
+    sample_ids = [
+        str(row.sample_id) for row in getattr(fold, "heldout_rows", ())
+    ]
+    if (
+        set(payload) != _EVALUATION_SCRATCH_FOLD_FIELDS
+        or type(payload.get("fold_ordinal")) is not int
+        or payload["fold_ordinal"] != int(getattr(fold, "fold_ordinal", -1))
+        or payload.get("target_center")
+        != str(getattr(fold, "target_center", ""))
+        or payload.get("heldout_case_id")
+        != str(getattr(fold, "heldout_case_id", ""))
+        or type(payload.get("start")) is not int
+        or type(payload.get("stop")) is not int
+        or not 0 <= payload["start"] < payload["stop"]
+        or payload["stop"] - payload["start"] != len(sample_ids)
+        or payload.get("sample_ids") != sample_ids
+        or payload.get("row_identity_hash")
+        != str(getattr(fold, "heldout_row_identity_hash", ""))
+        or payload.get("fold_hash") != str(getattr(fold, "fold_hash", ""))
+    ):
+        raise ProtocolError("Case-OOF evaluation scratch fold binding drifted.")
+    return {**payload, "fold_id": str(getattr(fold, "fold_id", ""))}
 
 
 __all__ = (

@@ -4,6 +4,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from midogpp_thesis.cvae.diagnostics.residual_topup_case_oof.contracts import (
@@ -15,6 +16,7 @@ from midogpp_thesis.cvae.diagnostics.residual_topup_case_oof.contracts import (
     EXPECTED_PROXY_SCORE_COUNT,
     EXPECTED_SEALED_PREDICTION_CELL_COUNT,
     EXPECTED_UNIQUE_CLASSIFIER_FIT_COUNT,
+    GENERATION_SEEDS,
     GLOBAL_ACTION_ID,
     GLOBAL_QUERY_ROLE,
     PERMUTATION_ACTION_ID,
@@ -28,11 +30,22 @@ from midogpp_thesis.cvae.diagnostics.residual_topup_case_oof.contracts import (
     global_candidate_sources,
     tail_action_id,
 )
+from midogpp_thesis.cvae.diagnostics.residual_topup_case_oof.config import (
+    DOWNSTREAM_CLASSIFIER,
+)
 from midogpp_thesis.cvae.diagnostics.residual_topup_case_oof.partitions import (
     build_case_oof_surface,
 )
 from midogpp_thesis.cvae.diagnostics.residual_topup_case_oof.planning import (
     build_case_oof_plan,
+)
+from midogpp_thesis.cvae.diagnostics.residual_topup_case_oof.prediction_planning import (
+    EXPECTED_PREDICTION_TASK_COUNT,
+    build_prediction_tasks,
+    write_evaluation_scratch,
+)
+from midogpp_thesis.cvae.diagnostics.residual_topup_case_oof import (
+    prediction_worker,
 )
 from midogpp_thesis.cvae.diagnostics.residual_topup_case_oof.ranking import (
     build_rank_surface,
@@ -368,6 +381,128 @@ def test_action_and_plan_hashes_are_deterministic_and_tamper_evident(
     ).action_hash
     with pytest.raises(ProtocolError, match="hash"):
         replace(plan.action("0", SUPPORT_ACTION_ID), action_hash="0" * 64)
+
+
+def test_prediction_tasks_and_worker_bind_frozen_action_and_fold_contracts(
+    plan,
+    crossfit,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_array_path = tmp_path / "source.npy"
+    source_array = np.zeros(
+        (
+            len(CENTERS) * len(TRAINING_SEEDS) * len(GENERATION_SEEDS),
+            2 * prediction_worker.MAX_SOURCE_PREFIX_PER_CLASS,
+            1,
+        ),
+        dtype=np.float32,
+    )
+    np.save(source_array_path, source_array, allow_pickle=False)
+    source_index_rows = []
+    block_ordinal = 0
+    for source in CENTERS:
+        for training_seed in TRAINING_SEEDS:
+            for generation_seed in GENERATION_SEEDS:
+                source_index_rows.append(
+                    {
+                        "source_center": source,
+                        "training_seed": training_seed,
+                        "generation_seed": generation_seed,
+                        "block_ordinal": block_ordinal,
+                        "stream_id": (
+                            f"source-{source}-train-{training_seed}-"
+                            f"generation-{generation_seed}"
+                        ),
+                        "expert_lock_hash": source * 64,
+                    }
+                )
+                block_ordinal += 1
+    scratch = write_evaluation_scratch(
+        tmp_path / "evaluation.npy",
+        tmp_path / "evaluation.json",
+        frame=SimpleNamespace(
+            embeddings_for=lambda rows: np.zeros((len(rows), 1), dtype=np.float32)
+        ),
+        crossfit=crossfit,
+    )
+    config = SimpleNamespace(
+        contract_hash="b" * 16,
+        classifier=DOWNSTREAM_CLASSIFIER,
+    )
+    source_cache = SimpleNamespace(
+        array_path=source_array_path,
+        index_rows=tuple(source_index_rows),
+    )
+
+    tasks = build_prediction_tasks(
+        config,
+        "g" * 16,
+        source_cache,
+        plan,
+        crossfit,
+        source_cache_lock_hash="s" * 16,
+        scratch=scratch,
+        scratch_path=tmp_path / "evaluation.npy",
+        checkpoint_root=tmp_path / "checkpoints",
+    )
+
+    assert len(tasks) == EXPECTED_PREDICTION_TASK_COUNT == 81
+    for task in tasks:
+        target = task["target_center"]
+        assert tuple(fold["fold_id"] for fold in task["folds"]) == tuple(
+            fold.fold_id for fold in crossfit.folds_by_target[target]
+        )
+        assert all(
+            action["outer_target"] == target for action in task["actions"]
+        )
+
+    def _fake_fit(
+        spec,
+        train_embeddings,
+        train_labels,
+        eval_embeddings,
+        *,
+        threads,
+    ):
+        assert threads == 3
+        return {
+            "predictions": np.zeros(len(eval_embeddings), dtype=np.uint8),
+            "probabilities": np.full(
+                len(eval_embeddings), 0.25, dtype=np.float32
+            ),
+            "n_iter": (1,),
+            "converged": True,
+            "classifier_config_hash": spec.config_hash,
+            "scaler_state_hash": "f" * 64,
+        }
+
+    monkeypatch.setattr(prediction_worker, "COMMON_OUTPUT_DIM", 1)
+    monkeypatch.setattr(prediction_worker, "_fit_classifier", _fake_fit)
+    task = tasks[0]
+    prediction_worker.prediction_task(task)
+    checkpoint = prediction_worker.load_prediction_checkpoint(
+        Path(task["checkpoint_json_path"]),
+        Path(task["checkpoint_npz_path"]),
+        task=task,
+    )
+    expected_folds = tuple(crossfit.folds_by_target[task["target_center"]])
+    cells = tuple(checkpoint["cells"])
+    assert len(cells) == len(expected_folds) * EXPECTED_ACTION_COUNT_PER_TARGET
+    for fold in expected_folds:
+        fold_cells = tuple(
+            cell for cell in cells if cell["fold_id"] == fold.fold_id
+        )
+        assert len(fold_cells) == EXPECTED_ACTION_COUNT_PER_TARGET
+        for cell in fold_cells:
+            metadata = cell["metadata"]
+            assert metadata["fold_ordinal"] == fold.fold_ordinal
+            assert metadata["heldout_case_id"] == fold.heldout_case_id
+            assert (
+                metadata["evaluation_row_identity_hash"]
+                == fold.heldout_row_identity_hash
+            )
+            assert metadata["fold_hash"] == fold.fold_hash
 
 
 def test_core_has_no_dependency_on_prior_stage90_router_or_policy_runtime() -> None:

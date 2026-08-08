@@ -1,0 +1,48 @@
+schema_version: midogpp_utility_aligned_target_support_surface_config_v1
+experiment:
+  id: midogpp.routing_and_composition.uniform_b_v2_utility_aligned_target_support_surface.v1
+  artifact_root: output://midogpp_utility_aligned_target_support_surface_v1
+  output_artifact_id: midogpp_utility_aligned_target_support_surface_v1
+inputs:
+  artifact_ids:
+    - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+    - midogpp_output_uniform_b_v2_generation_lock_v1
+    - midogpp_utility_aligned_target_support_reservation_v1
+    - midogpp_utility_aligned_fresh_target_support_cache_v1
+    - midogpp_routing_metadata_profiles_v1
+  expert_bank_root: artifact://midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_root: artifact://midogpp_output_uniform_b_v2_generation_lock_v1
+  reservation_root: artifact://midogpp_utility_aligned_target_support_reservation_v1
+  support_cache_root: artifact://midogpp_utility_aligned_fresh_target_support_cache_v1
+  metadata_profile_root: artifact://midogpp_routing_metadata_profiles_v1
+protocol:
+  dataset_family: MIDOG++
+  stage: 60_routing_and_composition
+  fresh_support_status: planned
+  center_universe: ['0', '1', '2', '3', '5', '6', '7', '8', '9']
+  training_seeds: [17, 42, 101]
+  generation_seeds: [17, 42, 101]
+  minimum_independent_support_cases_per_target: 8
+  case_bootstrap_replicates: 32
+  case_bootstrap_unit: independent_support_case
+  target_expert_excluded: true
+  support_labels_used: false
+  target_evaluation_rows_opened: false
+runtime:
+  workstation_profile: xeon_w2265_12c24t_125gb_2x_rtx_a5000_24gb
+  generation_devices: [cuda:0, cuda:1]
+  persistent_workers_per_gpu: 1
+  source_prefix_rows_per_class: 256
+  feature_reference_rows_per_class: 270
+  parent_cuda_context_forbidden: true
+  multiprocessing_start_method: spawn
+  tf32_enabled: false
+  amp_enabled: false
+  launch_blas_threads: 1
+  scratch_preference: [/data/local, artifact_parent]
+claim_boundary:
+  claim_scope: routing_compatibility_only
+  label_free_feature_surface_only: true
+  routing_improvement_claimed: false
+  target_downstream_utility_claimed: false
+  stage90_artifacts_used: false

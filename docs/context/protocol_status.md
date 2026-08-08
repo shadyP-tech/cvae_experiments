@@ -1,6 +1,6 @@
 # Protocol Status
 
-Last updated: 2026-08-05
+Last updated: 2026-08-08
 
 ## Active MIDOG++ surfaces
 
@@ -45,6 +45,9 @@ The working tree contains active implementations for:
 - the completed Uniform-B v2 Stage-40 GenerationLock;
 - the completed Uniform-B v2 Stage-60 equal-union, metadata, source-inner
   utility, and uncertainty-gated utility/regret policy locks;
+- the runnable consumed-data Stage-90 utility-aligned exact-tail diagnostic,
+  whose fixed-two-case `R2` arm is always
+  `INSUFFICIENT_SUPPORT_FOR_POLICY` and cannot feed later stages;
 - a conditionally unlocked Stage-20 outer A/B/C/D preservation factorial.
 
 The first three runs are complete on `xai-master` and pass their full
@@ -176,6 +179,11 @@ planned surfaces are:
 - the planned fixed residual-top-up B/U/G/S Stage-60 lock and fresh Stage-70
   decomposition, blocked until a new unconsumed case-disjoint
   pseudoquery/support/evaluation surface exists
+- the planned utility-aligned exact-tail and label-free target-support Stage-60
+  producers, CPU-only policy lock, and fresh Stage-70 `B/U/G_delta/R/P`
+  confirmation, blocked until their separate fresh development, support-parent,
+  and target-evaluation artifacts exist; failed transfer/uncertainty gates are
+  valid and freeze exact `B` rather than authorizing a routed action
 
 The separately registered
 `midogpp.oracle.uniform_b_v2_consumed_validation_residual_topup_b_u_g_s_case_oof.v1`

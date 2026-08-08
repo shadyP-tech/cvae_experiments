@@ -1,0 +1,97 @@
+experiment:
+  id: midogpp.frozen_policy_downstream.uniform_b_v2_utility_aligned_residual_fresh.v1
+  name: uniform_b_v2_utility_aligned_residual_fresh_v1
+  artifact_root: output://midogpp_output_uniform_b_v2_utility_aligned_residual_fresh_v1
+  status: BLOCKED_PENDING_FRESH_SURFACE
+inputs:
+  expert_bank_root: artifact://midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_root: artifact://midogpp_output_uniform_b_v2_generation_lock_v1
+  policy_root: artifact://midogpp_output_uniform_b_v2_utility_aligned_residual_policy_lock_v1
+  fresh_reservation_path: artifact://midogpp_utility_aligned_fresh_target_reservation_v1/manifests/reservation.json
+  fresh_target_cache_root: artifact://midogpp_utility_aligned_fresh_target_cache_v1
+  fresh_scoring_manifest_path: artifact://midogpp_utility_aligned_fresh_target_manifest_v1/manifest.csv
+  expert_bank_artifact_id: midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_artifact_id: midogpp_output_uniform_b_v2_generation_lock_v1
+  policy_artifact_id: midogpp_output_uniform_b_v2_utility_aligned_residual_policy_lock_v1
+  reservation_artifact_id: midogpp_utility_aligned_fresh_target_reservation_v1
+  target_cache_artifact_id: midogpp_utility_aligned_fresh_target_cache_v1
+  scoring_manifest_artifact_id: midogpp_utility_aligned_fresh_target_manifest_v1
+  expected_bank_lock_hash: 9972a41dcd4814cd
+  expected_generation_lock_hash: 34e551425710362e
+protocol:
+  dataset_family: MIDOG++
+  feature_backbone: Virchow2
+  feature_frame: annotation_jpeg_fixed_center_b_v3
+  stage: 70_frozen_policy_downstream
+  centers: ['0', '1', '2', '3', '5', '6', '7', '8', '9']
+  training_seeds: [17, 42, 101]
+  generation_seeds: [17, 42, 101]
+  target_support_evaluation_case_disjoint: true
+  minimum_independent_support_cases_per_target: 8
+  target_expert_excluded: true
+  policy_and_reservation_frozen_before_target_cache: true
+  active_fresh_reservation_required_at_runtime: true
+  every_logical_action_target_seed_prediction_sealed: true
+  composition_aliases_deduplicated_before_classifier_fit: true
+  target_labels_available_to_generation_or_prediction: false
+  labels_opened_for_scoring_only_after_global_seal: true
+  policy_update_after_scoring_forbidden: true
+evaluation:
+  main_action_ids:
+    - base_equal_union
+    - uniform_residual_topup
+    - global_delta_single_source_tail
+    - utility_aligned_residual_tail
+  permutation_control_action_id: target_feature_permutation_control_tail
+  single_source_tail_action_namespace: single_source_tail
+  primary_endpoint: all_nine_seed_probability_ensemble_bacc
+  primary_threshold: 0.5
+  inference_unit: target_center
+  effective_sample_size: 9
+  primary_contrasts: [R-B, R-G_delta, R-U]
+  permutation_contrast: R-P
+  secondary_contrasts: [U-B, G_delta-B]
+  success_requires_positive_one_sided_lcb: [R-B, R-G_delta, R-U, R-P]
+  oracle_diagnostics_terminal_only: true
+classifier:
+  family: sklearn_logistic_regression
+  C: 0.01
+  penalty: l2
+  solver: lbfgs
+  max_iter: 3000
+  class_weight: null
+  random_state: 23
+  l1_ratio: null
+  threshold_policy: predict
+  scaler_fit: synthetic_train_only
+runtime:
+  workstation_profile: xeon_w2265_12c24t_125gb_2x_rtx_a5000_24gb
+  generation_devices: ['cuda:0', 'cuda:1']
+  cuda_visible_devices: '0,1'
+  generation_workers_per_device: 1
+  source_block_per_class: 256
+  classifier_workers: 4
+  classifier_threads_per_worker: 3
+  multiprocessing_start_method: spawn
+  tf32_disabled_in_gpu_workers: true
+  amp_enabled: false
+  parent_cuda_context_forbidden: true
+  gpu_and_cpu_phases_disjoint: true
+  source_cache_format: float32_npy_memmap
+  prediction_cache_format: float32_npy_memmap
+  persistent_cache_policy: hash_validated_resume
+  optional_local_scratch_root: /data/local
+  canonical_publication_requires_validated_atomic_copy: true
+  minimum_logical_cpu_count: 12
+  minimum_physical_ram_bytes: 107374182400
+  minimum_artifact_disk_free_bytes: 8589934592
+  minimum_gpu_free_mib_per_device: 18000
+claim_boundary:
+  claim_scope: synthetic_downstream_utility
+  fresh_confirmatory_only: true
+  consumed_test_used: false
+  consumed_validation_used: false
+  consumed_stage70_used: false
+  consumed_stage90_used: false
+  oracle_may_update_policy: false
+  negative_result_is_valid: true

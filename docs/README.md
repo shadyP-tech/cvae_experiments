@@ -45,6 +45,11 @@ does not make an unrun experiment claim-eligible.
   completed label-blind validation cache, non-selecting source-inner utility
   surface, uncertainty-gated utility/regret policy, exact equal-union fallback,
   and matched Stage-70 boundary.
+- `wiki/03-experiments/midogpp-uniform-b-v2-utility-aligned-residual-router.md`:
+  planned fresh exact-tail utility learnability surface, uncertainty-gated
+  target-specific residual policy, sealed Stage-70 confirmation, the separate
+  runnable consumed-data Stage-90 exact-tail diagnostic, and their
+  workstation-optimized execution contracts.
 - `wiki/03-experiments/midogpp-uniform-b-variant-diagnostics.md`: two
   completed workstation-only Variant-B Stage-90 diagnostics, their remote
   namespaces and artifact roots, negative tail-average stability result,

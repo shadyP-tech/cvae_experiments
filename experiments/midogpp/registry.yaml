@@ -145,6 +145,7 @@ stages:
       - generation_settings_and_frame_lock
       - routing_compatibility_only
       - routing_and_composition
+      - target_evaluation_authorization
     input_reuse_purposes:
       - routing_evidence
       - expert_selection_evidence
@@ -1497,6 +1498,48 @@ experiments:
       - Uses two persistent A5000 workers for 27 source-expert jobs, float32 memmaps, and four classifier workers with three BLAS threads each; hash-valid checkpoints support safe resume.
       - Primary evidence is center-level S-U and S-G under the all-nine-seed probability ensemble. No selector, fallback, expert update, policy update, routing-quality claim, promotion, or Stage-60/70 feed is permitted.
 
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_validation_utility_aligned_exact_tail_router.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_validation_utility_aligned_exact_tail_router_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_validation_utility_aligned_exact_tail_router_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+      - midogpp_stage90_utility_aligned_exact_tail_router_validation_cache_v1
+      - midogpp_stage90_utility_aligned_exact_tail_router_validation_manifest_v1
+      - midogpp_routing_metadata_profiles_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Protocol-reviewed Stage-90 diagnostic reuse of immutable source-local frames, samplers, the full seed Cartesian product, budgets, and classifier settings only; no Stage-60 or Stage-70 policy, utility, promotion, or deployment authority is inherited.
+      midogpp_routing_metadata_profiles_v1: Label-free immutable domain metadata are used only as one predeclared interaction feature in a terminal consumed-data diagnostic; no metadata-compatibility routing claim is inherited.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - utility-aligned-exact-tail-router-diagnostic
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_validation_utility_aligned_exact_tail_router_v1
+    notes:
+      - Runs an exact additive-tail utility learnability and fixed-two-case target-routing diagnostic on the already-consumed MIDOG++ validation surface.
+      - For each outer target H, supervised exact-tail responses use only q not equal H and candidate e outside H and q; R2_H uses exactly two fixed unlabeled support cases and is explicitly INSUFFICIENT_SUPPORT_FOR_POLICY.
+      - Materializes a dedicated 270-row-per-class source cache, seals all development predictions before development-label scoring, freezes B/U/G_delta/R2/P/Hxe, then seals every target prediction before target labels open.
+      - Uses one persistent worker per A5000 followed by a disjoint four-worker by three-BLAS-thread CPU phase with hash-valid atomic checkpoints.
+      - Output is terminal exploratory consumed-data evidence only and cannot feed Stage 60, Stage 70, policy updates, recipe selection, promotion, deployment, or a routing-quality claim.
+
   - experiment_id: midogpp.routing_and_composition.uniform_b_v2_residual_topup_b_u_g_s_policy_lock.v1
     stage: 60_routing_and_composition
     status: planned
@@ -1569,3 +1612,144 @@ experiments:
       - Seals every B/U/G/S, permutation-control, and H-by-e prediction before labels open. H-by-e utilities are terminal oracle diagnostics and cannot update the policy.
       - Predeclares all-nine-seed probability-ensemble BACC as the operational endpoint and target center as the inference unit; seed-cell means are descriptive technical repeats.
       - Uses one persistent spawned worker per RTX A5000 for 256-per-class source blocks, then four classifier workers with three BLAS threads each and hash-validated resume checkpoints.
+
+  - experiment_id: midogpp.routing_and_composition.uniform_b_v2_exact_tail_utility_surface.v1
+    stage: 60_routing_and_composition
+    status: planned
+    claim_scope: routing_and_composition
+    config_path: experiments/midogpp/stages/60_routing_and_composition/configs/uniform_b_v2_exact_tail_utility_surface_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_exact_tail_utility_surface_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_utility_aligned_router_development_reservation_v1
+      - midogpp_utility_aligned_router_development_cache_v1
+      - midogpp_utility_aligned_router_development_manifest_v1
+      - midogpp_routing_metadata_profiles_v1
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-routing
+        - uniform-b-v2-exact-tail-utility-surface
+        - --config
+        - "{resolved_config}"
+    notes:
+      - Planned and non-runnable until a new development reservation, closed-world label-blind cache, and scoring-only manifest are independently hash-bound and ready.
+      - Measures exact additive-tail minus exact-base BACC under strict outer-target, pseudoquery, and candidate-source exclusion; every prediction is sealed before development labels open.
+      - The seven-source 144-base plus 126-tail action preserves the final 12.5 percent residual geometry. Six-to-seven-source nested transfer is eligibility evidence only, never proof of target routing.
+      - Uses two persistent RTX A5000 workers and four CPU classifier workers with three BLAS threads each, float32 memmaps, and fail-closed hash-valid resume.
+
+  - experiment_id: midogpp.routing_and_composition.uniform_b_v2_utility_aligned_target_support_surface.v1
+    stage: 60_routing_and_composition
+    status: planned
+    claim_scope: routing_compatibility_only
+    config_path: experiments/midogpp/stages/60_routing_and_composition/configs/uniform_b_v2_utility_aligned_target_support_surface_v1.yaml
+    output_artifact_id: midogpp_utility_aligned_target_support_surface_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_utility_aligned_target_support_reservation_v1
+      - midogpp_utility_aligned_fresh_target_support_cache_v1
+      - midogpp_routing_metadata_profiles_v1
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-routing
+        - uniform-b-v2-utility-aligned-target-support-surface
+        - --config
+        - "{resolved_config}"
+    notes:
+      - Planned label-free producer for the eight-source target feature rows and at least 32 typed whole-case bootstrap surfaces per target.
+      - The dedicated support reservation/cache contain no target labels or target-evaluation embeddings and are distinct from the later Stage-70 reservation/cache.
+      - Uses one persistent spawned worker per RTX A5000, 256 samples per source/class, float32 memmaps, and hash-validated local-scratch publication.
+
+  - experiment_id: midogpp.routing_and_composition.uniform_b_v2_utility_aligned_residual_policy_lock.v1
+    stage: 60_routing_and_composition
+    status: planned
+    claim_scope: routing_and_composition
+    config_path: experiments/midogpp/stages/60_routing_and_composition/configs/uniform_b_v2_utility_aligned_residual_policy_lock_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_utility_aligned_residual_policy_lock_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_exact_tail_utility_surface_v1
+      - midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+      - midogpp_utility_aligned_target_support_surface_v1
+      - midogpp_utility_aligned_target_support_reservation_v1
+      - midogpp_utility_aligned_fresh_target_reservation_v1
+      - midogpp_routing_metadata_profiles_v1
+    runner:
+      environment:
+        CUDA_VISIBLE_DEVICES: ""
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-routing
+        - uniform-b-v2-utility-aligned-residual-policy-lock
+        - --config
+        - "{resolved_config}"
+    notes:
+      - Planned CPU-only policy lock. It reconstructs the exact-tail development reservation, requires its declared target-evaluation map to equal Stage 70, proves development cases are globally disjoint from fresh support/evaluation, and binds those maps and partition hashes into every downstream policy surface.
+      - Fits source-global and target-source interaction models with strict nested query/source exclusion. Query domains and support cases, never seed cells, are uncertainty units.
+      - Failed transfer, global-gain, support-count, bootstrap, or lower-bound gates return the exact immutable B action; no target label or terminal oracle may update the policy.
+
+  - experiment_id: midogpp.frozen_policy_downstream.uniform_b_v2_utility_aligned_residual_fresh.v1
+    stage: 70_frozen_policy_downstream
+    status: planned
+    claim_scope: synthetic_downstream_utility
+    config_path: experiments/midogpp/stages/70_frozen_policy_downstream/configs/uniform_b_v2_utility_aligned_residual_fresh_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_utility_aligned_residual_fresh_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_output_uniform_b_v2_utility_aligned_residual_policy_lock_v1
+      - midogpp_utility_aligned_fresh_target_reservation_v1
+      - midogpp_utility_aligned_fresh_target_cache_v1
+      - midogpp_utility_aligned_fresh_target_manifest_v1
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-frozen-policy-downstream
+        - evaluate-utility-aligned-residual-fresh
+        - --config
+        - "{resolved_config}"
+        - --enable-local-scratch
+    notes:
+      - Planned and non-runnable until the frozen policy, fresh reservation, label-blind cache, and scoring manifest are active, disjoint, and hash-complete.
+      - Seals all B, U, G-delta, R, permutation, and H-by-e predictions before labels open. H-by-e rows are terminal oracle diagnostics only.
+      - Confirmation requires positive center-level one-sided lower bounds for R-B, R-G-delta, R-U, and R-P under the all-nine-seed probability ensemble.
+      - Uses two persistent RTX A5000 workers, four classifier workers with three BLAS threads each, composition deduplication, float32 memmaps, and fail-closed resume.

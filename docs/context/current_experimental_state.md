@@ -1,6 +1,6 @@
 # Current Experimental State
 
-Last updated: 2026-08-05
+Last updated: 2026-08-08
 
 This page records verified evidence and canonical availability after the
 completed MIDOG++ repository migration. The canonical contract, feature
@@ -709,6 +709,22 @@ absent.
   pseudoquery/support/evaluation surface. Consumed Stage-70 and Stage-90 bytes
   cannot satisfy the new artifact identities.
 
+- A utility-aligned residual-router successor is implemented as a separate,
+  immutable experiment family. One Stage-60 producer learns the exact response
+  of the deployed additive action under strict `H/q/e` exclusion; a second,
+  independently reserved producer constructs only label-free target-support
+  point and whole-case-bootstrap features; and a CPU-only third job validates
+  both surfaces and the distinct support/Stage-70 reservations before freezing
+  the policy. The policy uses at least eight unlabeled support cases and 32
+  typed whole-case bootstrap resamples per target and falls back exactly to
+  `B` when uncertain. Fresh
+  Stage 70 seals `B/U/G_delta/R/P` plus all `H x e` actions and requires
+  positive center-level lower bounds for `R-B`, `R-G_delta`, `R-U`, and `R-P`.
+  This family remains `planned` and non-runnable until its entirely new
+  development, target-support, and target-evaluation artifacts exist. Its
+  six-to-seven-source diagnostic is an eligibility check, not evidence that
+  seven-to-eight-source target routing will improve.
+
 - A separate same-dataset fallback is implemented and registered as
   `midogpp.oracle.uniform_b_v2_consumed_validation_residual_topup_b_u_g_s_case_oof.v1`.
   It is a runnable terminal Stage-90 diagnostic over the already-consumed
@@ -720,6 +736,18 @@ absent.
   center-level probability-ensemble `S-U` and `S-G` contrasts. The artifact is
   post-hoc, consumed-data, non-promotional, and forbidden from feeding Stage 60,
   Stage 70, recipe selection, or deployment regardless of its result.
+
+- A sibling utility-aligned fallback is registered as
+  `midogpp.oracle.uniform_b_v2_consumed_validation_utility_aligned_exact_tail_router.v1`.
+  It replaces proxy ranking with outer-center cross-fitted exact-tail utility
+  responses under strict `H/q/e` exclusion. The all-center development-label
+  phase begins only after the complete inner prediction seal, and each
+  `plan_H` excludes all rows with `q=H`. Its target proposal `R2` sees exactly
+  two fixed unlabeled support cases and is permanently marked
+  `INSUFFICIENT_SUPPORT_FOR_POLICY`. Target actions are globally predicted
+  before terminal scoring. This runnable Stage-90 experiment cannot create
+  fresh evidence or feed a policy, Stage 60, Stage 70, promotion, or
+  deployment path.
 
 ## Latest Uniform-B Nonlinear-Boundary Diagnostic
 

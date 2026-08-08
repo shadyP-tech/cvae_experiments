@@ -60,6 +60,30 @@ def main(argv: list[str] | None = None) -> int:
     )
     residual_topup.add_argument("--config", required=True)
     residual_topup.add_argument("--artifact-root", default=None)
+    exact_tail = sub.add_parser(
+        "uniform-b-v2-exact-tail-utility-surface",
+        help=(
+            "Materialize the fresh source-inner exact additive-tail utility "
+            "surface used to test router learnability."
+        ),
+    )
+    exact_tail.add_argument("--config", required=True)
+    target_support = sub.add_parser(
+        "uniform-b-v2-utility-aligned-target-support-surface",
+        help=(
+            "Materialize the fresh label-free target-support point and "
+            "whole-case-bootstrap feature surfaces."
+        ),
+    )
+    target_support.add_argument("--config", required=True)
+    utility_aligned_policy = sub.add_parser(
+        "uniform-b-v2-utility-aligned-residual-policy-lock",
+        help=(
+            "Fit and freeze the uncertainty-gated utility-aligned residual-tail "
+            "policy from fresh exact-tail and target-support surfaces."
+        ),
+    )
+    utility_aligned_policy.add_argument("--config", required=True)
     args = parser.parse_args(argv)
     if args.surface == "uniform-b-v2-equal-union-policy-lock":
         from .config import load_equal_union_policy_config
@@ -176,6 +200,33 @@ def main(argv: list[str] | None = None) -> int:
                 "canonical workspace path."
             )
         print(run_residual_topup_policy_lock(config, artifact_root=requested))
+        return 0
+    if args.surface == "uniform-b-v2-exact-tail-utility-surface":
+        from .exact_tail_utility_surface import (
+            load_exact_tail_utility_surface_config,
+            run_exact_tail_utility_surface,
+        )
+
+        config = load_exact_tail_utility_surface_config(args.config)
+        print(run_exact_tail_utility_surface(config))
+        return 0
+    if args.surface == "uniform-b-v2-utility-aligned-target-support-surface":
+        from .utility_aligned_target_support_surface import (
+            load_utility_aligned_target_support_surface_config,
+            run_utility_aligned_target_support_surface,
+        )
+
+        config = load_utility_aligned_target_support_surface_config(args.config)
+        print(run_utility_aligned_target_support_surface(config))
+        return 0
+    if args.surface == "uniform-b-v2-utility-aligned-residual-policy-lock":
+        from .utility_aligned_residual_policy import (
+            load_utility_aligned_residual_policy_config,
+            run_utility_aligned_residual_policy_lock,
+        )
+
+        config = load_utility_aligned_residual_policy_config(args.config)
+        print(run_utility_aligned_residual_policy_lock(config))
         return 0
     raise AssertionError(f"Unknown routing surface: {args.surface}")
 

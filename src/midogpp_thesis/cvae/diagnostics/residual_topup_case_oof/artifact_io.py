@@ -119,6 +119,16 @@ def read_csv_rows(path: Path) -> tuple[dict[str, str], ...]:
         raise ProtocolError(f"Cannot read case-OOF CSV: {path}.") from exc
 
 
+def read_utf8_text_exact(path: Path) -> str:
+    """Read UTF-8 text without universal-newline translation."""
+
+    try:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            return handle.read()
+    except (OSError, UnicodeError) as exc:
+        raise ProtocolError(f"Cannot read case-OOF text: {path}.") from exc
+
+
 def persist_or_validate_json(path: Path, payload: Mapping[str, object]) -> None:
     """Create an immutable JSON member, or fail if a resumed copy drifted."""
 
@@ -140,10 +150,7 @@ def persist_or_validate_csv(
 
     expected = _render_csv(rows, columns=columns)
     if path.is_file():
-        try:
-            observed = path.read_text(encoding="utf-8")
-        except OSError as exc:
-            raise ProtocolError(f"Cannot read case-OOF CSV: {path}.") from exc
+        observed = read_utf8_text_exact(path)
         if observed != expected:
             raise ProtocolError(f"Case-OOF resumed CSV drifted: {path}.")
         return
@@ -235,5 +242,6 @@ __all__ = (
     "persist_or_validate_json",
     "read_csv_rows",
     "read_json",
+    "read_utf8_text_exact",
     "sha256_file",
 )

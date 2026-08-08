@@ -8,7 +8,11 @@ import pytest
 
 from midogpp_thesis.cvae.diagnostics.residual_topup_case_oof import runner
 from midogpp_thesis.cvae.diagnostics.residual_topup_case_oof.artifact_io import (
+    persist_or_validate_csv,
     read_json,
+)
+from midogpp_thesis.cvae.diagnostics.residual_topup_case_oof.validation import (
+    _assert_csv,
 )
 from midogpp_thesis.cvae.diagnostics.residual_topup_case_oof.contracts import (
     EXPECTED_SEALED_PREDICTION_CELL_COUNT,
@@ -136,6 +140,20 @@ def test_prediction_store_float32_npz_csv_roundtrip(tmp_path: Path) -> None:
         {key: str(value) for key, value in row.items()}
         for row in store.index_rows
     )
+
+
+def test_csv_resume_and_reconstructive_validation_preserve_crlf(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "resume.csv"
+    rows = ({"sample_id": "case-001", "value": 17},)
+    columns = ("sample_id", "value")
+
+    persist_or_validate_csv(path, rows, columns=columns)
+    assert path.read_bytes() == b"sample_id,value\r\ncase-001,17\r\n"
+
+    persist_or_validate_csv(path, rows, columns=columns)
+    _assert_csv(path, rows, columns=columns)
 
 
 def test_runner_globally_seals_before_label_capability_and_scoring(

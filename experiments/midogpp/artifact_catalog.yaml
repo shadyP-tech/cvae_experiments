@@ -1,6 +1,6 @@
 schema_version: 2
 catalog_kind: midogpp_artifact_catalog
-last_reviewed: 2026-08-06
+last_reviewed: 2026-08-08
 path_base: repository_root
 
 catalog_policy:
@@ -4324,6 +4324,112 @@ artifacts:
       - Primary evidence is center-level S-U and S-G under the all-nine-seed probability ensemble; no selector, fallback, policy update, or promotion path exists.
       - The output cannot train another router or feed Stage 60, Stage 70, recipe selection, promotion, deployment, or any deployable selection.
 
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_validation_utility_aligned_exact_tail_router_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_validation_utility_aligned_exact_tail_router/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: EXPLORATORY_CONSUMED_DATA_ONLY
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: EXPLORATORY_CONSUMED_DATA_ONLY
+      architecture_family: exact_additive_tail_utility_outer_center_crossfit_fixed_two_case_R2_v1
+      response: exact_tail_bacc_minus_exact_base_bacc
+      consumed_validation_data: 'true'
+      method_development_is_posthoc: 'true'
+      terminal_stage90_diagnostic: 'true'
+      fixed_support_case_count_per_center: '2'
+      fresh_policy_minimum_support_case_count: '8'
+      routing_status: INSUFFICIENT_SUPPORT_FOR_POLICY
+      outer_target_query_source_exclusion: 'true'
+      development_predictions_sealed_before_development_labels: 'true'
+      development_crossfit_labels_opened_before_target_action_lock: 'true'
+      outer_H_development_rows_excluded_from_plan_H: 'true'
+      target_predictions_sealed_before_terminal_target_scoring: 'true'
+      source_expert_updated: 'false'
+      previous_stage90_outputs_used: 'false'
+      stage60_or_stage70_policy_outputs_used: 'false'
+      fresh_evidence: 'false'
+      fresh_confirmation: 'false'
+      routing_quality_claimed: 'false'
+      target_performance_claimed: 'false'
+      target_specific_router_success_claimed: 'false'
+      label_free_features_are_downstream_utility: 'false'
+      proxy_is_nelbo: 'false'
+      cardinality_transfer_role: eligibility_diagnostic_only
+      promotion_eligible: 'false'
+      oracle_eligible: 'false'
+      may_feed_stage60: 'false'
+      may_feed_stage70: 'false'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - arrays/utility_aligned_source_prefixes.npy
+      - arrays/utility_aligned_support_components.npy
+      - arrays/utility_aligned_development_predictions.npz
+      - arrays/target_action_predictions.npz
+      - manifests/protocol_manifest.json
+      - manifests/support_partition_lock.json
+      - manifests/case_fold_lock.json
+      - manifests/utility_aligned_source_cache_lock.json
+      - manifests/feature_production_lock.json
+      - manifests/feature_surface_set.json
+      - manifests/utility_aligned_development_prediction_index.json
+      - manifests/utility_aligned_global_development_prediction_seal.json
+      - manifests/model_set.json
+      - manifests/r2_plan_set.json
+      - manifests/action_library.json
+      - manifests/target_prediction_cache.json
+      - manifests/global_target_prediction_seal.json
+      - manifests/content_index.json
+      - tables/support_partitions.csv
+      - tables/case_folds.csv
+      - tables/utility_aligned_source_streams.csv
+      - tables/utility_aligned_support_components.csv
+      - tables/inner_candidate_features.csv
+      - tables/target_candidate_features.csv
+      - tables/development_action_bindings.csv
+      - tables/exact_tail_development_utility.csv
+      - tables/model_summary.csv
+      - tables/r2_plans.csv
+      - tables/target_actions.csv
+      - tables/target_prediction_index.csv
+      - tables/target_seed_metrics.csv
+      - tables/target_ensemble_metrics.csv
+      - tables/center_contrasts.csv
+      - tables/contrast_inference.csv
+      - tables/oracle_hxe_diagnostics.csv
+      - reports/phase_01_source_cache_and_features_complete.json
+      - reports/phase_02_development_scoring_and_action_lock_complete.json
+      - reports/phase_03_global_target_prediction_seal_complete.json
+      - reports/phase_04_terminal_scoring_complete.json
+      - reports/development_label_access_report.json
+      - reports/target_label_access_report.json
+      - reports/leakage_report.json
+      - reports/scoring_summary.json
+      - reports/publication_decision.json
+      - reports/runtime_summary.json
+      - reports/run_state.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Terminal Stage-90 diagnostic on already-consumed MIDOG++ validation bytes; it creates no fresh routing evidence.
+      - Development labels are opened only after the complete inner B/Hxe prediction seal. For each outer H, only q not equal H rows enter model_H and plan_H; the all-center development label phase is disclosed rather than represented as first target-label access.
+      - R2 uses exactly two fixed unlabeled support cases per target and therefore remains INSUFFICIENT_SUPPORT_FOR_POLICY. B/U/G_delta/R2/P and all eight Hxe actions are frozen and globally predicted before terminal target scoring.
+      - Hxe is terminal oracle headroom only. No result can update a policy or feed Stage 60, Stage 70, recipe selection, promotion, deployment, or deployable selection.
+
   - artifact_id: midogpp_residual_topup_fresh_proxy_surface_v1
     stage: 60_routing_and_composition
     canonical_path: artifacts/midogpp/60_routing_and_composition/residual_topup_fresh_proxy_surface/v1
@@ -4487,3 +4593,444 @@ artifacts:
     notes:
       - A completed artifact may support only the predeclared B/U/G/S decomposition and its sealed oracle diagnostics under the fresh MIDOG++ evaluation contract.
       - The entry is planned; no current consumed surface can satisfy it.
+
+  - artifact_id: midogpp_utility_aligned_router_development_reservation_v1
+    stage: dataset_contract
+    canonical_path: datasets/midogpp/contract/utility_aligned_router_development_reservation_v1
+    availability: planned
+    migration: canonical_dataset_contract
+    evidence_label: PENDING_FRESH_DEVELOPMENT_SURFACE
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      split_role: fresh_source_inner_support_and_scoring_only_evaluation
+      whole_case_support_evaluation_disjoint: 'true'
+      development_target_evaluation_disjoint: 'true'
+      labels_persisted_in_reservation: 'false'
+      authorized_consumer_experiment_ids: midogpp.routing_and_composition.uniform_b_v2_exact_tail_utility_surface.v1
+    required_files:
+      - manifests/reservation.json
+      - manifests/fresh_surface_attestation.json
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+    notes:
+      - Must be newly reserved and hash-bound before the development cache is extracted; consumed Stage-60, Stage-70, or Stage-90 case identities cannot be repointed here.
+
+  - artifact_id: midogpp_utility_aligned_router_development_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/utility_aligned_router_development_cache_v1
+    availability: planned
+    migration: canonical_derived_feature_cache
+    evidence_label: PENDING_FRESH_DEVELOPMENT_SURFACE
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      representation_id: midogpp_virchow2_common_3840_float32_v1
+      split_role: fresh_source_inner_support_and_evaluation_label_blind_cache
+      labels_persisted: 'false'
+      closed_world_content_indexed: 'true'
+      authorized_consumer_experiment_ids: midogpp.routing_and_composition.uniform_b_v2_exact_tail_utility_surface.v1
+    required_files:
+      - manifests/cache_index.json
+      - manifests/content_index.json
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+
+  - artifact_id: midogpp_utility_aligned_router_development_manifest_v1
+    stage: dataset_contract
+    canonical_path: datasets/midogpp/contract/utility_aligned_router_development_evaluation_v1
+    availability: planned
+    migration: canonical_dataset_contract
+    evidence_label: PENDING_FRESH_DEVELOPMENT_SURFACE
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      split_role: fresh_source_inner_evaluation_scoring_only
+      contains_exactly_reserved_evaluation_rows: 'true'
+      labels_opened_before_global_prediction_seal: 'false'
+      authorized_consumer_experiment_ids: midogpp.routing_and_composition.uniform_b_v2_exact_tail_utility_surface.v1
+    required_files:
+      - manifest.csv
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+
+  - artifact_id: midogpp_output_uniform_b_v2_exact_tail_utility_surface_v1
+    stage: 60_routing_and_composition
+    canonical_path: artifacts/midogpp/60_routing_and_composition/uniform_b_v2_exact_tail_utility_surface/v1
+    availability: planned
+    migration: canonical_output
+    evidence_label: PENDING_FRESH_DEVELOPMENT_SURFACE
+    claim_scope: routing_and_composition
+    semantic_identities:
+      response: exact_additive_tail_bacc_minus_exact_base_bacc
+      inner_geometry: seven_by_144_base_plus_126_single_source_tail
+      outer_target_query_source_exclusion: 'true'
+      predictions_sealed_before_labels: 'true'
+      cardinality_transfer_role: eligibility_only
+      authorized_consumer_experiment_ids: midogpp.routing_and_composition.uniform_b_v2_utility_aligned_residual_policy_lock.v1
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/development_reservation.json
+      - manifests/protocol_manifest.json
+      - manifests/global_prediction_seal.json
+      - manifests/prediction_index.json
+      - manifests/exact_tail_utility_surface_lock.json
+      - manifests/content_index.json
+      - reports/leakage_report.json
+      - reports/run_state.json
+      - reports/validation_report.json
+      - tables/source_streams.csv
+      - tables/coarse_prediction_tasks.csv
+      - tables/evaluation_rows.csv
+      - tables/candidate_features.csv
+      - tables/exact_tail_utility.csv
+      - arrays/exact_tail_predictions.npz
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+    notes:
+      - This utility surface can feed only the predeclared utility-aligned policy family after independent reconstructive validation; it is not fresh target downstream evidence.
+
+  - artifact_id: midogpp_utility_aligned_target_support_reservation_v1
+    stage: dataset_contract
+    canonical_path: datasets/midogpp/contract/utility_aligned_target_support_reservation_v1
+    availability: planned
+    migration: canonical_dataset_contract
+    evidence_label: PENDING_FRESH_TARGET_SUPPORT
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      split_role: fresh_unlabeled_target_support_only
+      target_evaluation_embeddings_available: 'false'
+      labels_persisted: 'false'
+      authorized_consumer_experiment_ids: midogpp.routing_and_composition.uniform_b_v2_utility_aligned_target_support_surface.v1|midogpp.routing_and_composition.uniform_b_v2_utility_aligned_residual_policy_lock.v1
+    required_files:
+      - manifests/reservation.json
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+
+  - artifact_id: midogpp_utility_aligned_fresh_target_support_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/utility_aligned_fresh_target_support_cache_v1
+    availability: planned
+    migration: canonical_derived_feature_cache
+    evidence_label: PENDING_FRESH_TARGET_SUPPORT
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      representation_id: midogpp_virchow2_common_3840_float32_v1
+      split_role: fresh_target_support_label_blind_cache
+      labels_persisted: 'false'
+      minimum_independent_cases_per_target: '8'
+      authorized_consumer_experiment_ids: midogpp.routing_and_composition.uniform_b_v2_utility_aligned_target_support_surface.v1
+    required_files:
+      - manifests/cache_index.json
+      - manifests/content_index.json
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+
+  - artifact_id: midogpp_utility_aligned_target_support_surface_v1
+    stage: 60_routing_and_composition
+    canonical_path: artifacts/midogpp/60_routing_and_composition/uniform_b_v2_utility_aligned_target_support_surface/v1
+    availability: planned
+    migration: canonical_output
+    evidence_label: PENDING_FRESH_TARGET_SUPPORT
+    claim_scope: routing_compatibility_only
+    semantic_identities:
+      feature_role: label_free_eight_source_target_support
+      minimum_independent_cases_per_target: '8'
+      case_bootstrap_replicates_per_target: '32'
+      bootstrap_unit: independent_support_case
+      final_action_source_prefix_rows_per_class: '256'
+      label_free_feature_reference_rows_per_class: '270'
+      proxy_is_downstream_utility: 'false'
+      authorized_consumer_experiment_ids: midogpp.routing_and_composition.uniform_b_v2_utility_aligned_residual_policy_lock.v1
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/target_reservation.json
+      - manifests/target_support_cache_lock.json
+      - manifests/source_generation_lock.json
+      - manifests/case_bootstrap_plans.json
+      - manifests/target_support_surface_lock.json
+      - manifests/content_index.json
+      - tables/target_candidate_features.csv
+      - tables/target_candidate_feature_bootstraps.csv
+      - reports/leakage_report.json
+      - reports/run_state.json
+      - reports/validation_report.json
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+
+  - artifact_id: midogpp_output_uniform_b_v2_utility_aligned_residual_policy_lock_v1
+    stage: 60_routing_and_composition
+    canonical_path: artifacts/midogpp/60_routing_and_composition/uniform_b_v2_utility_aligned_residual_policy_lock/v1
+    availability: planned
+    migration: canonical_output
+    evidence_label: PENDING_FRESH_POLICY_LOCK
+    claim_scope: routing_and_composition
+    semantic_identities:
+      policy_family: exact_tail_delta_utility_aligned_residual_router_v1
+      fallback_policy: exact_immutable_equal_union_B
+      target_support_labels_used: 'false'
+      target_evaluation_labels_used: 'false'
+      cardinality_transfer_role: eligibility_only
+      development_case_manifest_bound: 'true'
+      development_cases_disjoint_from_fresh_target_cases: 'true'
+      development_declared_target_evaluation_equals_stage70: 'true'
+      policy_frozen_before_target_cache: 'true'
+      authorized_consumer_experiment_ids: midogpp.frozen_policy_downstream.uniform_b_v2_utility_aligned_residual_fresh.v1
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/model_lock.json
+      - manifests/global_ablation_lock.json
+      - manifests/cardinality_transfer_lock.json
+      - manifests/target_policy_lock.json
+      - manifests/action_library.json
+      - manifests/policy_lock.json
+      - manifests/content_index.json
+      - reports/leakage_report.json
+      - reports/run_state.json
+      - reports/validation_report.json
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+
+  - artifact_id: midogpp_utility_aligned_fresh_target_reservation_v1
+    stage: 70_frozen_policy_downstream
+    canonical_path: artifacts/midogpp/70_frozen_policy_downstream/utility_aligned_fresh_target_reservation/v1
+    availability: planned
+    migration: canonical_output
+    evidence_label: PENDING_FRESH_TARGET_EVALUATION
+    claim_scope: target_evaluation_authorization
+    semantic_identities:
+      split_role: fresh_case_disjoint_target_support_and_evaluation_reservation
+      reservation_precedes_policy_and_cache: 'true'
+      labels_opened: 'false'
+      authorized_consumer_experiment_ids: midogpp.routing_and_composition.uniform_b_v2_utility_aligned_residual_policy_lock.v1|midogpp.frozen_policy_downstream.uniform_b_v2_utility_aligned_residual_fresh.v1
+    required_files:
+      - manifests/reservation.json
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+
+  - artifact_id: midogpp_utility_aligned_fresh_target_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/utility_aligned_fresh_target_cache_v1
+    availability: planned
+    migration: canonical_derived_feature_cache
+    evidence_label: PENDING_FRESH_TARGET_EVALUATION
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split_role: fresh_target_support_and_evaluation_label_blind_cache
+      labels_persisted: 'false'
+      reservation_bound: 'true'
+      authorized_consumer_experiment_ids: midogpp.frozen_policy_downstream.uniform_b_v2_utility_aligned_residual_fresh.v1
+    required_files:
+      - manifests/cache_protocol.json
+      - manifests/content_index.json
+      - tables/row_index.csv
+      - embeddings/by_center/center_0.npy
+      - embeddings/by_center/center_1.npy
+      - embeddings/by_center/center_2.npy
+      - embeddings/by_center/center_3.npy
+      - embeddings/by_center/center_5.npy
+      - embeddings/by_center/center_6.npy
+      - embeddings/by_center/center_7.npy
+      - embeddings/by_center/center_8.npy
+      - embeddings/by_center/center_9.npy
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+
+  - artifact_id: midogpp_utility_aligned_fresh_target_manifest_v1
+    stage: dataset_contract
+    canonical_path: datasets/midogpp/contract/utility_aligned_fresh_target_evaluation_v1
+    availability: planned
+    migration: canonical_dataset_contract
+    evidence_label: PENDING_FRESH_TARGET_EVALUATION
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      split_role: fresh_target_evaluation_scoring_only
+      support_overlap_count: '0'
+      labels_available_before_prediction_seal: 'false'
+      authorized_consumer_experiment_ids: midogpp.frozen_policy_downstream.uniform_b_v2_utility_aligned_residual_fresh.v1
+    required_files:
+      - manifest.csv
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: true
+
+  - artifact_id: midogpp_output_uniform_b_v2_utility_aligned_residual_fresh_v1
+    stage: 70_frozen_policy_downstream
+    canonical_path: artifacts/midogpp/70_frozen_policy_downstream/uniform_b_v2_utility_aligned_residual_fresh/v1
+    availability: planned
+    migration: canonical_output
+    evidence_label: PENDING_FRESH_TARGET_EVALUATION
+    claim_scope: synthetic_downstream_utility
+    semantic_identities:
+      primary_endpoint: all_nine_seed_probability_ensemble_bacc
+      inference_unit: target_center
+      effective_sample_size: '9'
+      primary_contrasts: R-B|R-G_delta|R-U
+      permutation_gate: R-P
+      all_actions_sealed_before_labels: 'true'
+      oracle_updates_policy: 'false'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/protocol_manifest.json
+      - manifests/policy_binding.json
+      - manifests/evaluation_plan.json
+      - manifests/prediction_seal.json
+      - manifests/content_index.json
+      - checkpoints/source/source_cache.json
+      - checkpoints/predictions/prediction_cache.json
+      - reports/workstation_preflight.json
+      - reports/leakage_report.json
+      - reports/label_access.json
+      - reports/primary_result.json
+      - reports/run_state.json
+      - reports/validation_report.json
+      - tables/seed_cell_metrics.csv
+      - tables/ensemble_metrics.csv
+      - tables/center_contrasts.csv
+      - tables/contrast_inference.csv
+      - tables/oracle_diagnostics.csv
+      - tables/prediction_index.csv
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Fresh Stage-70 confirmation only. Promotion requires every predeclared R contrast lower bound to be positive; a valid negative result remains publishable.
+      - Terminal H-by-e oracle diagnostics cannot update the frozen policy, model, action library, or future artifact identities.
+
+  - artifact_id: midogpp_stage90_utility_aligned_exact_tail_router_validation_manifest_v1
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_STAGE90_UTILITY_ALIGNED_EXACT_TAIL_ROUTER_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      split_role: val_consumed_stage90_utility_aligned_exact_tail_router_only
+      policy_consumption_lock_hash: d7a2b4c8e19f0635
+      alias_of_artifact_id: midogpp_source_inner_validation_manifest_v1
+      consumption_status: CONSUMED_FOR_STAGE90_UTILITY_ALIGNED_EXACT_TAIL_ROUTER
+      fresh_evidence: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_validation_utility_aligned_exact_tail_router.v1
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias over the already-consumed hash-pinned validation manifest; it creates no fresh evidence.
+      - Only the utility-aligned exact-tail Stage-90 diagnostic may consume this alias, and only for terminal oracle-and-diagnostic evidence.
+      - It cannot reopen Stage 60 or Stage 70 or support policy updates, recipe selection, promotion, deployment, or deployable selection.
+
+  - artifact_id: midogpp_stage90_utility_aligned_exact_tail_router_validation_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_routing_validation_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_STAGE90_UTILITY_ALIGNED_EXACT_TAIL_ROUTER_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      cache_name: uniform_b_v2_routing_validation_cache_v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: val
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      labels_persisted: 'false'
+      policy_consumption_lock_hash: d7a2b4c8e19f0635
+      frozen_build_protocol_hash: f57aad1bf7f7efed
+      content_hash: e1d281d44e47c7b2
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_routing_validation_cache_seed42
+      consumption_status: CONSUMED_FOR_STAGE90_UTILITY_ALIGNED_EXACT_TAIL_ROUTER
+      fresh_evidence: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_validation_utility_aligned_exact_tail_router.v1
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - manifests/consumption_lock.json
+      - manifests/content_index.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    expected_file_hashes:
+      embeddings/by_center/center_0.pt:
+        algorithm: sha256
+        digest: 9173a27896d4da6b03e16a9ff74728e833c523c7f8c0e3133a326bd811157846
+      embeddings/by_center/center_1.pt:
+        algorithm: sha256
+        digest: afa13f0db6da02183c634708f324910f23b431a8ad27d397d519b828c05837e1
+      embeddings/by_center/center_2.pt:
+        algorithm: sha256
+        digest: 9dddfae085858c97fa8839029459f288e256e79c2d85ec4023e129fe09e9ca15
+      embeddings/by_center/center_3.pt:
+        algorithm: sha256
+        digest: 11e0168a2f86179af1ecd7bae3373fafa1d457e127c2b02fdc3bafa627286772
+      embeddings/by_center/center_5.pt:
+        algorithm: sha256
+        digest: f2389563717108f649249bbc1ef519f4690b5120899be0620479ac635d2856e4
+      embeddings/by_center/center_6.pt:
+        algorithm: sha256
+        digest: 801529fdb8b1075224963a39b08a2352c477a6d44e6993d0dfbfa81c7c1f39f9
+      embeddings/by_center/center_7.pt:
+        algorithm: sha256
+        digest: 3088737286a406c42a6188a9ae951ddbc29007afe90ece47abd074040d62780f
+      embeddings/by_center/center_8.pt:
+        algorithm: sha256
+        digest: dade7283a833b948344e9b60c83fda350ff7856b191451c0e31451ff444e4fba
+      embeddings/by_center/center_9.pt:
+        algorithm: sha256
+        digest: cdade0c468c5ad70cc51588ed6a0e195135eb7651fc80af758d2e992666f610d
+      manifests/frozen_build_protocol.json:
+        algorithm: sha256
+        digest: cda5e0c351b9f78ff2b8e469341a56e5b5fba2e7907be382d8422f2ce83c14e1
+      manifests/row_alignment.json:
+        algorithm: sha256
+        digest: 8e92e987d121efdaadf547c20996777ea924009443f40dadc664a4f271125f7b
+      manifests/consumption_lock.json:
+        algorithm: sha256
+        digest: 2cef95465c66c59a8d9cbff66c471a38dd30e83ff411246c8510487f3fd79b14
+      manifests/content_index.json:
+        algorithm: sha256
+        digest: 6b46a1777c90a838e67ba1892134c748529169c6034c6865fc8a616039ec5fe2
+      reports/cache_builder_report.json:
+        algorithm: sha256
+        digest: d51ff4bc588554289fa58e64b149f7c696df1ddb4b3a45a6fd3df5f2094234af
+      reports/validation_report.json:
+        algorithm: sha256
+        digest: 2698c5a4335cb209012f4e3f495d57b27f395f0c51fa556083bbab9c02f0872d
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias over the already-consumed label-free validation cache; it creates no fresh evidence.
+      - Only the utility-aligned exact-tail Stage-90 diagnostic may consume this alias, and only for terminal oracle-and-diagnostic evidence.
+      - It cannot reopen Stage 60 or Stage 70 or support policy updates, recipe selection, promotion, deployment, or deployable selection.

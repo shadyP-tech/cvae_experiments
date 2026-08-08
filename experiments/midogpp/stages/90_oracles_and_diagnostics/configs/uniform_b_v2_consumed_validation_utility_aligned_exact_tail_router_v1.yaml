@@ -1,0 +1,169 @@
+experiment:
+  id: midogpp.oracle.uniform_b_v2_consumed_validation_utility_aligned_exact_tail_router.v1
+  name: uniform_b_v2_consumed_validation_utility_aligned_exact_tail_router_v1
+  artifact_root: output://midogpp_output_uniform_b_v2_consumed_validation_utility_aligned_exact_tail_router_v1
+  claim_scope: diagnostic_only
+  status: EXPLORATORY_CONSUMED_DATA_ONLY
+inputs:
+  expert_bank_root: artifact://midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_root: artifact://midogpp_output_uniform_b_v2_generation_lock_v1
+  equal_union_policy_root: artifact://midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+  validation_cache_root: artifact://midogpp_stage90_utility_aligned_exact_tail_router_validation_cache_v1
+  validation_manifest_path: artifact://midogpp_stage90_utility_aligned_exact_tail_router_validation_manifest_v1/manifest.csv
+  metadata_profile_root: artifact://midogpp_routing_metadata_profiles_v1
+  expert_bank_artifact_id: midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_artifact_id: midogpp_output_uniform_b_v2_generation_lock_v1
+  equal_union_policy_artifact_id: midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+  validation_cache_artifact_id: midogpp_stage90_utility_aligned_exact_tail_router_validation_cache_v1
+  validation_manifest_artifact_id: midogpp_stage90_utility_aligned_exact_tail_router_validation_manifest_v1
+  metadata_profile_artifact_id: midogpp_routing_metadata_profiles_v1
+  expected_bank_lock_hash: 9972a41dcd4814cd
+  expected_generation_lock_hash: 34e551425710362e
+  expected_equal_union_policy_lock_hash: 4b9ea514308b084f
+  expected_validation_cache_semantic_id: uniform_b_v2_routing_validation_cache_v1
+  expected_validation_cache_representation_id: annotation_jpeg_fixed_center_b_v3
+  expected_manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+  expected_metadata_profile_sha256: 79d703ccf3085ae3968698c2ac44a3eabc2713b434762cc6b2fd2fa90126a211
+protocol:
+  dataset_family: MIDOG++
+  stage: 90_oracles_and_diagnostics
+  validation_split: val
+  centers: ['0', '1', '2', '3', '5', '6', '7', '8', '9']
+  excluded_center: '4'
+  training_seeds: [17, 42, 101]
+  generation_seeds: [17, 42, 101]
+  seed_pairing: cartesian_product_report_all_nine_no_seed_selection
+  total_case_count: 44
+  fixed_support_case_count_per_center: 2
+  fresh_policy_minimum_support_case_count: 8
+  fresh_policy_minimum_case_bootstrap_replicates: 32
+  low_support_status: INSUFFICIENT_SUPPORT_FOR_POLICY
+  expected_case_fold_count: 26
+  support_split_seed: 20260806
+  support_partition_namespace: midogpp_utility_aligned_exact_tail_router_support_v1
+  cross_fit_mode: outer_H_excluded_exact_tail_utility_then_fixed_two_case_R2
+  whole_case_support_evaluation_disjoint: true
+  each_evaluation_case_scored_exactly_once: true
+  outer_target_H_excluded_from_development_query_and_source_roles: true
+  pseudoquery_q_excluded_from_candidate_source_role: true
+  other_evaluation_embeddings_available_to_router: false
+  support_labels_used: false
+  development_predictions_sealed_before_development_labels: true
+  development_label_phase_contains_all_centers_but_outer_H_rows_excluded_per_model: true
+  target_actions_locked_from_outer_H_excluded_utility_rows_before_terminal_scoring: true
+  target_predictions_globally_sealed_before_terminal_target_scoring: true
+  source_expert_updated: false
+  target_expert_excluded: true
+  previous_stage90_outputs_used: false
+  stage60_policy_or_surface_inputs_used: false
+  stage70_target_or_scoring_inputs_used: false
+actions:
+  family: utility_aligned_exact_additive_tail_stage90_v1
+  action_ids: [B, U, G_delta, R2, P]
+  single_source_tail_prefix: 'Hxe::'
+  action_count_per_target: 13
+  frozen_action_count: 117
+  inner_source_count: 7
+  inner_base_per_source_per_class: 144
+  inner_topup_total_per_class: 126
+  inner_base_total_per_class: 1008
+  inner_matched_total_per_class: 1134
+  target_source_count: 8
+  target_base_per_source_per_class: 128
+  target_topup_total_per_class: 128
+  target_base_total_per_class: 1024
+  target_matched_total_per_class: 1152
+  source_cache_prefix_per_class: 270
+  B_role: immutable_equal_union_base
+  U_role: matched_uniform_additive_tail_control
+  G_delta_role: global_source_effect_exact_tail_diagnostic
+  R2_role: fixed_two_case_label_free_target_interaction_diagnostic
+  P_role: cyclic_interaction_permutation_control
+  Hxe_role: terminal_single_source_tail_oracle_diagnostic
+  R2_fallback_or_abstention_authorized: false
+  no_action_budget_temperature_strength_or_seed_search: true
+model:
+  family: cluster_weighted_ridge_exact_tail_utility_v1
+  ridge_alpha_grid: [0.01, 0.1, 1.0, 10.0]
+  inner_selection: strict_nested_leave_query_and_source_domain_out
+  target_or_query_identity_predictors_used: false
+  label_free_feature_family: source_effect_plus_reconstruction_KL_MMD_metadata_interactions
+  response: BACC_exact_additive_tail_minus_BACC_exact_base
+  permutation_seed: 90902026
+  all_nine_seed_cells_retained: true
+  technical_seed_cells_are_not_independent_units: true
+  query_domains_are_model_selection_units: true
+  R2_selected_by_mean_all_nine_interaction_predictions: true
+  G_delta_selected_by_mean_all_nine_global_predictions: true
+  P_selected_from_cyclically_permuted_interaction_features: true
+  cardinality_transfer_role: eligibility_diagnostic_only
+  eligibility_does_not_authorize_policy: true
+classifier:
+  family: sklearn_logistic_regression
+  C: 0.01
+  penalty: l2
+  solver: lbfgs
+  max_iter: 3000
+  class_weight: null
+  random_state: 23
+  l1_ratio: null
+  threshold_policy: predict
+  scaler_fit: synthetic_train_only
+evaluation:
+  primary_endpoint: all_nine_seed_probability_ensemble_bacc
+  secondary_endpoint: macro_f1_descriptive_only
+  primary_contrasts: [R2-B, R2-G_delta, R2-U, R2-P]
+  secondary_contrasts: [U-B, G_delta-B]
+  confidence_level: 0.95
+  inference_unit: target_center
+  inference_center_count: 9
+  technical_seed_repeats_are_not_independent_units: true
+  oracle_diagnostics: [R2_Hxe_top1_agreement, predicted_gain_utility_spearman, normalized_oracle_gap]
+  Hxe_oracle_role: terminal_only_no_policy_update
+  target_scoring_capability_requires_global_target_seal: true
+runtime:
+  workstation_profile: xeon_w2265_12c24t_125gb_2x_rtx_a5000_24gb
+  generation_devices: ['cuda:0', 'cuda:1']
+  cuda_visible_devices: '0,1'
+  generation_workers_per_device: 1
+  classifier_workers: 4
+  classifier_threads_per_worker: 3
+  multiprocessing_start_method: spawn
+  parent_cuda_context_forbidden: true
+  tf32_enabled: false
+  amp_enabled: false
+  launch_blas_threads: 1
+  generated_cache_format: float32_npy_memmap
+  phase_disjoint_gpu_and_cpu_pools: true
+  minimum_logical_cpu_count: 12
+  minimum_physical_ram_bytes: 107374182400
+  minimum_artifact_disk_free_bytes: 8589934592
+  minimum_gpu_free_mib_per_device: 18000
+  source_stream_count: 81
+  source_prefix_rows_per_class: 270
+  development_coarse_task_count: 648
+  development_classifier_fit_count: 5184
+  target_task_count: 81
+  target_action_identity_count: 1053
+  maximum_total_classifier_fit_count: 6237
+  scratch_preference: [/data/local, artifact_parent]
+  resume_policy: hash_validated_atomic_phase_and_task_checkpoints
+claim_boundary:
+  consumed_validation_data: true
+  method_development_is_posthoc: true
+  terminal_stage90_diagnostic: true
+  cross_fitted_fixed_support_diagnostic: true
+  fixed_two_case_R2_is_insufficient_for_policy: true
+  fresh_evidence: false
+  fresh_confirmation: false
+  routing_quality_claimed: false
+  target_performance_claimed: false
+  target_specific_router_success_claimed: false
+  proxy_is_nelbo: false
+  label_free_features_are_downstream_utility: false
+  promotion_eligible: false
+  may_update_policy: false
+  may_feed_stage60: false
+  may_feed_stage70: false
+  may_feed_recipe_selection: false
+  may_feed_deployable_selection: false

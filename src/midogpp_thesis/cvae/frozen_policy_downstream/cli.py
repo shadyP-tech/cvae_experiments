@@ -62,6 +62,22 @@ def main(argv: list[str] | None = None) -> int:
             "blocks; canonical outputs remain hash-validated workspace artifacts."
         ),
     )
+    utility_aligned_fresh = sub.add_parser(
+        "evaluate-utility-aligned-residual-fresh",
+        help=(
+            "Evaluate the frozen utility-aligned residual-tail policy on its "
+            "fresh, case-disjoint MIDOG++ target surface."
+        ),
+    )
+    utility_aligned_fresh.add_argument("--config", required=True)
+    utility_aligned_fresh.add_argument(
+        "--enable-local-scratch",
+        action="store_true",
+        help=(
+            "Use the predeclared workstation-local scratch for resumable caches; "
+            "canonical outputs remain hash-validated workspace artifacts."
+        ),
+    )
 
     args = parser.parse_args(argv)
     if args.surface == "reserve-consumed-test":
@@ -122,6 +138,20 @@ def main(argv: list[str] | None = None) -> int:
         config = load_residual_topup_fresh_config(args.config)
         print(
             run_residual_topup_fresh(
+                config,
+                enable_optional_local_scratch=args.enable_local_scratch,
+            )
+        )
+        return 0
+    if args.surface == "evaluate-utility-aligned-residual-fresh":
+        from .utility_aligned_residual_fresh import (
+            load_utility_aligned_residual_fresh_config,
+            run_utility_aligned_residual_fresh,
+        )
+
+        config = load_utility_aligned_residual_fresh_config(args.config)
+        print(
+            run_utility_aligned_residual_fresh(
                 config,
                 enable_optional_local_scratch=args.enable_local_scratch,
             )

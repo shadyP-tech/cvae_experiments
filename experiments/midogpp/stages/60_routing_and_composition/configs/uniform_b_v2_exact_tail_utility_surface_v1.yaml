@@ -1,0 +1,79 @@
+schema_version: midogpp_exact_tail_utility_surface_config_v1
+experiment:
+  id: midogpp.routing_and_composition.uniform_b_v2_exact_tail_utility_surface.v1
+  artifact_root: output://midogpp_output_uniform_b_v2_exact_tail_utility_surface_v1
+  output_artifact_id: midogpp_output_uniform_b_v2_exact_tail_utility_surface_v1
+inputs:
+  artifact_ids:
+    - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+    - midogpp_output_uniform_b_v2_generation_lock_v1
+    - midogpp_utility_aligned_router_development_reservation_v1
+    - midogpp_utility_aligned_router_development_cache_v1
+    - midogpp_utility_aligned_router_development_manifest_v1
+    - midogpp_routing_metadata_profiles_v1
+  expert_bank_root: artifact://midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_root: artifact://midogpp_output_uniform_b_v2_generation_lock_v1
+  development_reservation_root: artifact://midogpp_utility_aligned_router_development_reservation_v1
+  development_cache_root: artifact://midogpp_utility_aligned_router_development_cache_v1
+  development_manifest_path: artifact://midogpp_utility_aligned_router_development_manifest_v1/manifest.csv
+  metadata_profile_root: artifact://midogpp_routing_metadata_profiles_v1
+  reservation_attestation_path: artifact://midogpp_utility_aligned_router_development_reservation_v1/manifests/fresh_surface_attestation.json
+protocol:
+  dataset_family: MIDOG++
+  stage: 60_routing_and_composition
+  center_universe: ['0', '1', '2', '3', '5', '6', '7', '8', '9']
+  training_seeds: [17, 42, 101]
+  generation_seeds: [17, 42, 101]
+  inner_geometry: seven_by_144_base_plus_126_single_source_tail
+  source_prefix_rows_per_class: 270
+  source_stream_count: 81
+  coarse_task_count: 648
+  prediction_cell_count: 5184
+  utility_row_count: 4536
+  outer_target_excluded_from_query_and_source_roles: true
+  whole_case_support_evaluation_disjoint: true
+  minimum_independent_support_cases_per_query: 8
+  development_target_evaluation_disjoint: true
+  all_predictions_sealed_before_development_labels: true
+  development_labels_used_for_scoring_only: true
+  target_support_labels_used: false
+  target_evaluation_labels_used: false
+  source_experts_updated: false
+  seed_selection_performed: false
+  fresh_reservation_status: planned
+classifier:
+  family: sklearn_logistic_regression
+  C: 0.01
+  penalty: l2
+  solver: lbfgs
+  max_iter: 3000
+  class_weight: null
+  random_state: 23
+  l1_ratio: null
+  threshold_policy: predict
+  scaler_fit: synthetic_train_only
+runtime:
+  workstation_profile: xeon_w2265_12c24t_125gb_2x_rtx_a5000_24gb
+  generation_devices: ['cuda:0', 'cuda:1']
+  generation_workers_per_device: 1
+  classifier_workers: 4
+  classifier_threads_per_worker: 3
+  source_prefix_rows_per_class: 270
+  parent_cuda_context_forbidden: true
+  multiprocessing_start_method: spawn
+  generated_cache_storage: float32_memmap
+  coarse_checkpoint_scope: B_plus_seven_tails_atomic
+  tf32_enabled: false
+  amp_enabled: false
+  launch_blas_threads: 1
+  scratch_preference: [/data/local, artifact_root]
+  source_stream_count: 81
+  coarse_task_count: 648
+  classifier_fit_count: 5184
+claim_boundary:
+  claim_scope: routing_and_composition
+  utility_learnability_only: true
+  routing_improvement_claimed: false
+  target_downstream_utility_claimed: false
+  stage90_artifacts_used: false
+  may_feed_only_locked_utility_aligned_policy: true

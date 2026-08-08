@@ -95,6 +95,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     residual_topup_case_oof.add_argument("--config", required=True)
     residual_topup_case_oof.add_argument("--artifact-root", required=True)
+
+    utility_aligned_exact_tail = sub.add_parser(
+        "utility-aligned-exact-tail-router-diagnostic",
+        help=(
+            "Run the consumed-validation Stage-90 utility-aligned exact-tail "
+            "router diagnostic."
+        ),
+    )
+    utility_aligned_exact_tail.add_argument("--config", required=True)
+    utility_aligned_exact_tail.add_argument("--artifact-root", required=True)
     return parser
 
 
@@ -225,6 +235,20 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_residual_topup_case_oof_config(args.config)
         output = run_residual_topup_case_oof_diagnostic(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "utility-aligned-exact-tail-router-diagnostic":
+        from .utility_aligned_exact_tail_router import (
+            load_utility_aligned_exact_tail_router_config,
+            run_utility_aligned_exact_tail_router_diagnostic,
+        )
+
+        config = load_utility_aligned_exact_tail_router_config(args.config)
+        output = run_utility_aligned_exact_tail_router_diagnostic(
             config,
             artifact_root=artifact_root,
         )
