@@ -33,6 +33,7 @@ class ValidatedLedgerChain:
 def load_validated_ledger_chain(config: LedgerInputConfig) -> ValidatedLedgerChain:
     parent = _json(config.test_consumption_ledger_path)
     parent_sha = sha256_file(config.test_consumption_ledger_path)
+    descriptive_reuse = _descriptive_reuse_permission(parent)
     if (
         config.experiment_id != EXPERIMENT_ID
         or parent_sha != EXPECTED_TEST_CONSUMPTION_LEDGER_SHA256
@@ -40,7 +41,7 @@ def load_validated_ledger_chain(config: LedgerInputConfig) -> ValidatedLedgerCha
         or parent.get("status") != "CONSUMED_FOR_REPRESENTATION_ADOPTION"
         or parent.get("split") != "test"
         or parent.get("may_be_reused_as_fresh_representation_selection_evidence") is not False
-        or parent.get("may_be_reused_for_descriptive_locked_model_scoring") is not True
+        or descriptive_reuse is not True
     ):
         raise ProtocolError("Label-aware parent test-consumption ledger drifted.")
     amendment = _json(config.ledger_amendment_path)
@@ -64,6 +65,28 @@ def load_validated_ledger_chain(config: LedgerInputConfig) -> ValidatedLedgerCha
         parent=MappingProxyType(dict(parent)),
         amendment=MappingProxyType(dict(amendment)),
     )
+
+
+def _descriptive_reuse_permission(parent: Mapping[str, object]) -> object:
+    """Read the published ledger key while rejecting contradictory aliases."""
+
+    canonical_key = "may_be_reused_for_descriptive_locked_model_scoring"
+    published_key = "may_be_reused_for_descriptive_locked-model_scoring"
+    canonical_present = canonical_key in parent
+    published_present = published_key in parent
+    if (
+        canonical_present
+        and published_present
+        and parent[canonical_key] != parent[published_key]
+    ):
+        raise ProtocolError(
+            "Label-aware parent ledger has conflicting descriptive-use aliases."
+        )
+    if published_present:
+        return parent[published_key]
+    if canonical_present:
+        return parent[canonical_key]
+    return None
 
 
 def _json(path: Path) -> dict[str, object]:

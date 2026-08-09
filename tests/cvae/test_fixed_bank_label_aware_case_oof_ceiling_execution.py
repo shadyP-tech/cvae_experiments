@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import ast
+import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -26,10 +28,104 @@ from midogpp_thesis.cvae.runtime.frozen_source_streams import (
     SOURCE_ROWS_PER_CLASS,
     source_block_sha256,
 )
+from midogpp_thesis.cvae.diagnostics.fixed_bank_label_aware_case_oof_ceiling import (
+    ledger as ledger_contract,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_label_aware_case_oof_ceiling.experiment_contracts import (
+    EXPECTED_LEDGER_AMENDMENT_SHA256,
+    EXPECTED_TEST_CONSUMPTION_LEDGER_SHA256,
+    EXPERIMENT_ID,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_label_aware_case_oof_ceiling.ledger import (
+    load_validated_ledger_chain,
+)
 from midogpp_thesis.cvae.generation.contracts import COMMON_OUTPUT_DIM
 
 
 CENTERS = ("0", "1", "2", "3", "5", "6", "7", "8", "9")
+
+
+def test_published_parent_consumption_ledger_hash_chain_is_accepted(
+    tmp_path: Path,
+) -> None:
+    parent = tmp_path / "test_consumption_ledger.json"
+    parent.write_text(
+        json.dumps(_published_parent_ledger(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    amendment_source = (
+        Path(__file__).resolve().parents[2]
+        / "experiments/midogpp/stages/90_oracles_and_diagnostics/contracts"
+        / "uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_"
+        "ceiling_ledger_amendment_v1.json"
+    )
+    amendment = tmp_path / "amendment.json"
+    amendment.write_bytes(amendment_source.read_bytes())
+    assert sha256_file(parent) == EXPECTED_TEST_CONSUMPTION_LEDGER_SHA256
+    assert sha256_file(amendment) == EXPECTED_LEDGER_AMENDMENT_SHA256
+
+    chain = load_validated_ledger_chain(
+        SimpleNamespace(
+            experiment_id=EXPERIMENT_ID,
+            test_consumption_ledger_path=parent,
+            ledger_amendment_path=amendment,
+        )
+    )
+
+    assert chain.parent["may_be_reused_for_descriptive_locked-model_scoring"] is True
+    assert chain.amendment["parent_sha256"] == EXPECTED_TEST_CONSUMPTION_LEDGER_SHA256
+
+
+def test_parent_consumption_ledger_conflicting_aliases_fail_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = _published_parent_ledger()
+    payload["may_be_reused_for_descriptive_locked_model_scoring"] = False
+    parent = tmp_path / "test_consumption_ledger.json"
+    parent.write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setattr(
+        ledger_contract,
+        "sha256_file",
+        lambda _path: EXPECTED_TEST_CONSUMPTION_LEDGER_SHA256,
+    )
+
+    with pytest.raises(ProtocolError, match="conflicting descriptive-use aliases"):
+        load_validated_ledger_chain(
+            SimpleNamespace(
+                experiment_id=EXPERIMENT_ID,
+                test_consumption_ledger_path=parent,
+                ledger_amendment_path=tmp_path / "unreached-amendment.json",
+            )
+        )
+
+
+@pytest.mark.parametrize(
+    "reuse_key",
+    (
+        "may_be_reused_for_descriptive_locked_model_scoring",
+        "may_be_reused_for_descriptive_locked-model_scoring",
+    ),
+)
+def test_parent_consumption_ledger_compatible_reuse_aliases_are_recognized(
+    reuse_key: str,
+) -> None:
+    assert ledger_contract._descriptive_reuse_permission({reuse_key: True}) is True
+
+
+def _published_parent_ledger() -> dict[str, object]:
+    return {
+        "consumed_decision": "CONFIRMED_WITHIN_CENTER",
+        "external_dataset_uncertainty_covered": False,
+        "may_be_reused_as_fresh_representation_selection_evidence": False,
+        "may_be_reused_for_descriptive_locked-model_scoring": True,
+        "new_center_uncertainty_covered": False,
+        "observed_centers": 9,
+        "row_count": 9_928,
+        "schema_version": "midogpp_uniform_b_test_consumption_ledger_v1",
+        "split": "test",
+        "status": "CONSUMED_FOR_REPRESENTATION_ADOPTION",
+    }
 
 
 def test_direct_target_action_library_is_B_plus_eight_target_excluded_hxe() -> None:
