@@ -6110,3 +6110,317 @@ artifacts:
       - The known fixed-bank estimand retains legal candidate history but excludes held H and q from all training roles. It is not an unseen-expert-transfer or routing-quality claim.
       - Exact BACC alone controls exact models, R-G screening, and abstention. Smooth response models are isolated descriptive artifacts with no exact decision fields.
       - Regardless of result, this output cannot authorize or feed a policy, target action, promotion, deployment, Stage 60/70, recipe selection, or another Stage-90 experiment.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_label_aware_case_oof_ceiling_parent_v1
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: CONSUMED_TEST_LABEL_AWARE_CASE_OOF_CEILING_PARENT_LEDGER_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      split: test
+      row_count: '9928'
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      experiment_fenced: 'true'
+      fresh_evidence: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_ceiling.v1
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Experiment-fenced byte-exact alias of the immutable consumed-test ledger; it exposes no previous result or metric.
+      - It may be paired only with this experiment's hash-chained one-off amendment.
+      - It creates no fresh evidence and cannot authorize any other consumer, policy, action, promotion, or deployment.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_label_aware_case_oof_ceiling_amendment_v1
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_LABEL_AWARE_CASE_OOF_CEILING_AMENDMENT_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      amendment_sha256: 2225cec842ffa8e441fe66027cc0506a5aa0181afcebd390cb94d66108982aa3
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_ceiling.v1
+      authorization_scope: one_additional_terminal_label_aware_case_oof_ceiling
+      authorization_basis: explicit_user_request_to_reuse_consumed_test_set_for_this_diagnostic
+      candidate_generalization: known_fixed_bank_reuse
+      support_labels_used: 'true'
+      fresh_evidence: 'false'
+      permutation_plan_fixed_before_support_labels: 'true'
+      permutation_unit: candidate_source_label_derangement_within_H_fold_and_support_case
+      all_permutation_null_decisions_sealed_before_evaluation_labels: 'true'
+      generic_consumer_authorized: 'false'
+      may_feed_another_stage90_experiment: 'false'
+    required_files:
+      - uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_ceiling_ledger_amendment_v1.json
+    expected_file_hashes:
+      uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_ceiling_ledger_amendment_v1.json:
+        algorithm: sha256
+        digest: 2225cec842ffa8e441fe66027cc0506a5aa0181afcebd390cb94d66108982aa3
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Hash-chained amendment over the immutable original test-consumption ledger; the parent bytes and digest remain unchanged.
+      - It authorizes only the named terminal label-aware case-OOF ceiling over already-consumed MIDOG++ test cases.
+      - It cannot authorize a generic consumer, fresh evidence, policy/action selection, promotion, deployment, or any later experiment.
+
+  - artifact_id: midogpp_stage90_fixed_bank_label_aware_case_oof_ceiling_test_manifest_v1
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_LABEL_AWARE_CASE_OOF_CAPABILITY_GATED_LABELS
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      split: test
+      split_role: test_consumed_label_aware_case_oof_capability_gated_labels
+      alias_of_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_LABEL_AWARE_CASE_OOF_CEILING
+      fresh_evidence: 'false'
+      labels_present: 'true'
+      labels_available_before_global_prediction_seal: 'false'
+      support_labels_used: 'true'
+      support_labels_scope: same_H_nonheldout_folds_only
+      label_derived_LOCO_global_prior: 'true'
+      H_labels_used_in_G_H: 'false'
+      evaluation_role_labels_available_before_all_decision_seals: 'false'
+      smooth_metric_may_affect_fit_selection_gate_or_decision: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_ceiling.v1
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias of the consumed canonical test manifest with explicit role-scoped label capabilities.
+      - Other-center labels may build each LOCO G_H; same-center nonheldout labels may update only that H/fold posterior; evaluation-role labels remain closed until all 45 decisions are sealed.
+      - It cannot authorize a policy/action, routing-quality claim, promotion, deployment, or any later experiment.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_ceiling_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_ceiling/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: EXPLORATORY_CONSUMED_DATA_ONLY
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: EXPLORATORY_CONSUMED_DATA_ONLY
+      architecture_family: fixed_bank_label_aware_case_oof_ceiling_v1
+      evaluation_split: test
+      consumed_test_data: 'true'
+      ledger_amendment_required_and_hash_chained: 'true'
+      ledger_amendment_sha256: 2225cec842ffa8e441fe66027cc0506a5aa0181afcebd390cb94d66108982aa3
+      candidate_generalization: known_fixed_bank_reuse
+      unseen_expert_transfer_claim: 'false'
+      direct_target_geometry: B_plus_eight_Hxe
+      target_expert_used: 'false'
+      eligible_test_row_count: '9928'
+      evaluation_case_count: '218'
+      whole_case_oof_fold_count: '5'
+      partition_seed: '90902026'
+      partition_namespace: midogpp_fixed_bank_label_aware_case_oof_ceiling_test_folds_v1
+      each_case_evaluated_exactly_once: 'true'
+      heldout_fold_absent_from_own_support_and_decision: 'true'
+      all_fold_decision_count: '45'
+      target_action_identity_count: '81'
+      target_probability_cell_count: '729'
+      exact_seed_pair_count: '9'
+      probabilities_averaged_before_threshold: 'true'
+      probability_threshold: '0.5'
+      label_derived_LOCO_global_prior: 'true'
+      G_H_uses_other_consumed_test_centers: 'true'
+      H_labels_used_in_G_H: 'false'
+      G_H_shared_across_H: 'false'
+      G_H_hyperparameters_fixed_prelabel: 'true'
+      G_H_sealed_before_H_support_access: 'true'
+      G_H_other_center_contribution_unit: equal_weight_per_target_center
+      support_labels_used: 'true'
+      support_labels_scope: same_H_nonheldout_folds_only
+      support_observation: exact_support_bacc_gain_vs_G_H
+      support_labels_may_update_shared_model: 'false'
+      all_decisions_sealed_before_evaluation_role_labels: 'true'
+      primary_endpoint: whole_case_oof_exact_nine_probability_ensemble_bacc
+      global_prior_strength: '8.0'
+      posterior_prior_strength: '8.0'
+      confidence_multiplier: '1.96'
+      permutation_count: '10000'
+      permutation_unit: candidate_source_label_derangement_within_H_fold_and_support_case
+      permutation_baseline_B_fixed: 'true'
+      permutation_eight_Hxe_multiset_preserved: 'true'
+      permutation_evaluation_donors_used: 'false'
+      permutation_decision_tie_break: lexicographic_action_id_no_evaluation_utility_access
+      evaluation_utility_used_for_permutation_tie_break: 'false'
+      all_permutation_null_decisions_sealed_before_evaluation_labels: 'true'
+      action_selection_metric_row_count: '20'
+      exact_metric_only_may_enter_gates: 'true'
+      smooth_metric_role: descriptive_only_no_gate_fields
+      smooth_metric_may_affect_fit_selection_gate_or_decision: 'false'
+      source_expert_updated: 'false'
+      shared_model_updated_with_target_labels: 'false'
+      action_selection_authorized: 'false'
+      policy_update_authorized: 'false'
+      routing_quality_claimed: 'false'
+      fresh_evidence: 'false'
+      promotion_eligible: 'false'
+      stage50_outputs_used: 'false'
+      stage60_outputs_used: 'false'
+      stage70_outputs_used: 'false'
+      previous_stage90_outputs_used: 'false'
+      may_feed_another_stage90_experiment: 'false'
+      workstation_generation_devices: cuda:0|cuda:1
+      workstation_cpu_topology: 4_workers_x_3_blas_threads
+      workstation_gpu_cpu_phases_disjoint: 'true'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - arrays/frozen_source_streams.npy
+      - arrays/label_free_action_probabilities.npz
+      - arrays/permutation_null_actions.npy
+      - manifests/protocol_manifest.json
+      - manifests/case_oof_partition.json
+      - manifests/frozen_source_stream_index.json
+      - manifests/frozen_source_stream_lock.json
+      - manifests/label_free_prediction_index.json
+      - manifests/label_free_prediction_seal.json
+      - manifests/sealed_probability_surface.json
+      - manifests/loco_global_prior_seals.json
+      - manifests/fold_posterior_seals.json
+      - manifests/fold_decisions.json
+      - manifests/all_fold_decisions_seal.json
+      - manifests/permutation_null_decision_seal.json
+      - manifests/ceiling_evaluation.json
+      - manifests/content_index.json
+      - tables/case_oof_partitions.csv
+      - tables/seed_probability_rows.csv
+      - tables/aggregated_probability_rows.csv
+      - tables/loco_global_priors.csv
+      - tables/fold_posteriors.csv
+      - tables/fold_decisions.csv
+      - tables/oof_case_metrics.csv
+      - tables/oof_center_metrics.csv
+      - tables/action_selection_metrics.csv
+      - tables/permutation_null_summary.csv
+      - reports/workstation_preflight.json
+      - reports/phase_01_global_prediction_seal_complete.json
+      - reports/label_capability_report.json
+      - reports/leakage_report.json
+      - reports/publication_decision.json
+      - reports/runtime_summary.json
+      - reports/run_state.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Terminal label-aware information ceiling over consumed MIDOG++ test cases; it independently materializes the direct-target probability surface and consumes no previous Stage-90 result.
+      - Each G_H excludes H labels and is sealed before H support access. Each fold-local posterior uses only nonheldout same-center cases, and all 45 decisions are sealed before evaluation-role labels open.
+      - Exact probability-ensemble BACC alone controls priors, posteriors, decisions, and inferential gates. Smooth metrics are descriptive and dependency-disconnected.
+      - Regardless of outcome, the result cannot authorize or feed a policy, target action, expert/model update, promotion, deployment, recipe selection, any numbered stage, or another Stage-90 experiment.
+
+  - artifact_id: midogpp_stage90_fixed_bank_label_aware_case_oof_ceiling_test_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_TEST_LABEL_AWARE_CASE_OOF_LABEL_FREE_CACHE_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      cache_experiment_id: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_cache.v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: test
+      row_count: '9928'
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      backbone_identity_hash: 1b5071f2e605fa60
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_LABEL_AWARE_CASE_OOF_CEILING
+      fresh_evidence: 'false'
+      labels_persisted: 'false'
+      labels_absent: 'true'
+      sample_ids_persisted: 'false'
+      image_paths_persisted: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_ceiling.v1
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias over the validated label-free consumed-test embedding cache; it creates no fresh evidence.
+      - Only the named ceiling may consume this alias to rematerialize the globally sealed B and direct Hxe probability surface.
+      - It cannot authorize a policy/action, routing-quality claim, promotion, deployment, or any later experiment.

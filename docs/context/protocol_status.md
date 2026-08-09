@@ -318,3 +318,23 @@ The decision is `NO_CONSTRAINED_BPLUS_CANDIDATE_PASSES`; it does not authorize
 canonical-reference replacement, validation scoring, test scoring, recipe
 selection, or deployable selection. Seven centers use the exact-linear
 fallback and only two retain nonlinear capacity.
+
+## Consumed-test label-aware routing ceiling
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_ceiling.v1`
+is covered by its own hash-chained, single-consumer amendment after the user's
+explicit request to reuse the consumed test split. It implements direct-target
+`B/Hxe` geometry and five whole-case folds per center. Each `G_H` is derived
+only from other consumed-test centers and sealed before `H` support labels;
+those other centers are equally weighted, and each local posterior uses exact
+candidate-minus-`G_H` BACC from only same-center nonheldout folds; every case is
+evaluated once; and all decisions are sealed before evaluation-role labels
+open. Exact BACC alone may influence routing diagnostics. Smooth outputs are
+descriptive only. The implementation and config are registered, but no
+canonical workstation result exists until the complete bundle validates.
+This is a terminal label-aware information ceiling, not a
+fresh or deployable router, and all downstream/stage feed remains forbidden.
+The fixed null uses candidate-source label derangements within each
+`(H, fold, support case)` block, holds `B` and the eight-`Hxe` multiset fixed,
+never draws from evaluation cases, and seals all null actions before evaluation
+labels open.

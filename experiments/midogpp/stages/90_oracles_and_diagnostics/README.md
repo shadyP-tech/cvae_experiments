@@ -512,3 +512,35 @@ artifacts/midogpp/90_oracles_and_diagnostics/
 Regardless of outcome, this artifact cannot claim fresh evidence, successful
 target-specific routing, NELBO or utility prediction, promotion, or deployment,
 and it cannot feed Stage 60 or Stage 70.
+
+## Uniform-B v2 Consumed-Test Fixed-Bank Label-Aware Case-OOF Ceiling v1
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_ceiling.v1`
+is a terminal information-ceiling diagnostic. It rematerializes `B` and all
+legal direct `Hxe` actions for the frozen known bank, globally seals all 729
+seed-cell probabilities, and uses five deterministic whole-case folds per
+target. Every one of the 218 consumed test cases is evaluated exactly once.
+The implementation and configuration are registered, but no canonical
+workstation result exists until the complete closed-world bundle validates.
+
+The label-derived LOCO prior `G_H` uses only other-center labels, excludes all
+labels from `H`, is not shared across targets, and is sealed before `H` support
+labels open. A fold-local posterior uses exact candidate-minus-`G_H` BACC from
+only the other four folds of the same center; other centers are equally
+weighted in `G_H`. All 45 decisions are sealed before evaluation-role labels open.
+Exact-nine probability-ensemble BACC is the only decision/gate utility; smooth
+metrics are descriptive and dependency-disconnected. The 10,000 fixed null
+draws derange only the eight candidate-source labels inside each target/fold/
+support-case block; `B` is fixed, the candidate multiset is preserved, and no
+evaluation case supplies a donor. All null actions are durably sealed before
+evaluation-role labels open.
+
+The experiment has its own user-authorized, hash-chained consumed-test ledger
+amendment. Its result is never fresh evidence and cannot update a model,
+authorize a route/action/policy, feed Stage 50/60/70 or another Stage-90 run,
+select a recipe, promote a method, or support deployment.
+
+```bash
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_ceiling.v1
+```

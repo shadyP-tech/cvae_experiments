@@ -148,6 +148,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     fixed_bank_decision_audit.add_argument("--config", required=True)
     fixed_bank_decision_audit.add_argument("--artifact-root", required=True)
+
+    label_aware_case_oof_ceiling = sub.add_parser(
+        "fixed-bank-label-aware-case-oof-ceiling",
+        help=(
+            "Run the consumed-test terminal fixed-bank label-aware "
+            "case-OOF routing ceiling."
+        ),
+    )
+    label_aware_case_oof_ceiling.add_argument("--config", required=True)
+    label_aware_case_oof_ceiling.add_argument("--artifact-root", required=True)
     return parser
 
 
@@ -357,6 +367,20 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_fixed_bank_decision_audit_config(args.config)
         output = run_fixed_bank_decision_audit(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "fixed-bank-label-aware-case-oof-ceiling":
+        from .fixed_bank_label_aware_case_oof_ceiling import (
+            load_fixed_bank_label_aware_case_oof_ceiling_config,
+            run_fixed_bank_label_aware_case_oof_ceiling,
+        )
+
+        config = load_fixed_bank_label_aware_case_oof_ceiling_config(args.config)
+        output = run_fixed_bank_label_aware_case_oof_ceiling(
             config,
             artifact_root=artifact_root,
         )

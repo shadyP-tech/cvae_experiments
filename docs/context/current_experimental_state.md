@@ -897,3 +897,24 @@ frozen uniform class-direction constraints. No final B+ protocol is promoted.
 The result is post-hoc and diagnostic; validation and test remain untouched.
 The next work should examine why feasibility collapses across seven centers,
 rather than relaxing the constraint or changing the global threshold.
+
+## Consumed-test fixed-bank label-aware ceiling
+
+A third one-off consumed-test amendment authorizes only
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_ceiling.v1`.
+This sibling changes the information regime, not the frozen bank: direct
+target `B/Hxe` probabilities are globally sealed, each center uses five
+whole-case OOF folds, and fold-local exact-utility posteriors may use labels
+only from the other four folds of that same center, as exact
+candidate-minus-`G_H` BACC. The separate label-derived LOCO `G_H` equally
+weights the other centers and is sealed before
+any `H` support-label access. All 45 decisions precede evaluation-role label
+access. The implementation and config are registered; no canonical
+workstation result exists until its complete closed-world bundle validates.
+Once run, the result can diagnose whether target labels carry routing signal,
+but it is consumed-data ceiling evidence only and cannot authorize or feed
+any action, model, policy, promotion, stage, or later experiment. Its fixed
+null deranges candidate-source labels within each target/fold/support-case
+block while holding `B` and the eight-candidate multiset fixed; evaluation
+cases are never donors, and every null action is sealed before evaluation
+labels open.

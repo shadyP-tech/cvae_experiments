@@ -1709,6 +1709,50 @@ experiments:
       - Exactly eight whole label-free support cases per center are fixed before labels; the remaining 146 cases are evaluation-only. Prediction and feature seals precede all test-label access.
       - This is a terminal EXPLORATORY_CONSUMED_DATA_ONLY screen: no action, policy, unseen-expert transfer, routing-quality, promotion, deployment, Stage-60/70, or later Stage-90 authorization exists.
 
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_ceiling.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_ceiling_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_ceiling_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_fixed_bank_label_aware_case_oof_ceiling_test_cache_v1
+      - midogpp_stage90_fixed_bank_label_aware_case_oof_ceiling_test_manifest_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_label_aware_case_oof_ceiling_parent_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_label_aware_case_oof_ceiling_amendment_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Reuse of immutable generation geometry and classifier settings only; no routing, policy, promotion, or deployment authority is inherited.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_label_aware_case_oof_ceiling_parent_v1: Experiment-fenced byte-exact alias of the immutable original ledger, read only to verify the parent hash of this one-off amendment.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_label_aware_case_oof_ceiling_amendment_v1: Hash-chained authorization for exactly this additional terminal label-aware case-OOF ceiling; it creates no fresh evidence.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-label-aware-case-oof-ceiling
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_ceiling_v1
+    notes:
+      - User-authorized reuse of the already-consumed MIDOG++ test split for one terminal, label-aware, known-bank Stage-90 ceiling; it is never fresh evidence.
+      - All B and direct Hxe target probabilities are globally sealed first. Each target center uses five deterministic whole-case folds, evaluates every case exactly once, and excludes each held fold from its own support and decision fit.
+      - Each label-derived LOCO G_H uses only other consumed-test centers, is not shared across H, excludes all H labels, uses fixed predeclared hyperparameters, and is sealed before H support-label access. All 45 fold decisions are sealed before the evaluation-label capability opens.
+      - Exact-nine probability-ensemble BACC alone drives posterior utilities, decisions, and inferential gates. Smooth metrics are post-seal descriptive outputs with no dependency path into the router.
+      - The six-input fence contains only the fixed bank, GenerationLock, dedicated cache and manifest aliases, immutable parent ledger alias, and one-off amendment. No metadata, Stage-50/60/70 output, or prior Stage-90 output is consumed.
+      - The result cannot update an expert or shared model, authorize a policy or action, support a routing-quality claim, feed any other stage or experiment, select a recipe, promote a method, or support deployment.
+
   - experiment_id: midogpp.routing_and_composition.uniform_b_v2_residual_topup_b_u_g_s_policy_lock.v1
     stage: 60_routing_and_composition
     status: planned
