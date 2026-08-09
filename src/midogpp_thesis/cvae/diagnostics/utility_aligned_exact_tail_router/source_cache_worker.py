@@ -157,7 +157,10 @@ def generate_source_task(task: Mapping[str, object]) -> dict[str, object]:
             "amp_disabled": True,
             "float32_outputs": True,
         }
-        payload = {**unhashed, "checkpoint_hash": stable_hash(unhashed)}
+        payload = {
+            **unhashed,
+            "checkpoint_hash": stable_hash(_checkpoint_identity_payload(unhashed)),
+        }
         atomic_write_json(checkpoint_path, payload)
         return payload
     finally:
@@ -176,7 +179,7 @@ def load_generation_checkpoint(
     path: Path, *, task: Mapping[str, object]
 ) -> Mapping[str, object]:
     payload = read_json(path)
-    unhashed = {key: value for key, value in payload.items() if key != "checkpoint_hash"}
+    unhashed = _checkpoint_identity_payload(payload)
     expected_fields = {
         "schema_version", "status", "config_contract_hash", "generation_lock_hash",
         "support_scratch_hash", "task_ordinal", "source_center", "training_seed",
@@ -225,6 +228,51 @@ def load_generation_checkpoint(
     _validate_source_records(payload, task, source_values)
     _validate_component_records(payload, task, support_index)
     return payload
+
+
+def _checkpoint_identity_payload(payload: Mapping[str, object]) -> dict[str, object]:
+    """Restore typed generation-seed keys after their JSON object-key round trip."""
+
+    output = {
+        str(key): value
+        for key, value in payload.items()
+        if str(key) != "checkpoint_hash"
+    }
+    raw_records = output.get("component_records")
+    if not isinstance(raw_records, list):
+        raise ProtocolError("Stage-90 checkpoint component records are malformed.")
+    records: list[dict[str, object]] = []
+    for raw_record in raw_records:
+        if not isinstance(raw_record, Mapping):
+            raise ProtocolError("Stage-90 checkpoint component record is malformed.")
+        record = dict(raw_record)
+        raw_mmd = record.get("linear_kernel_mmd2_by_generation_seed")
+        if not isinstance(raw_mmd, Mapping):
+            raise ProtocolError("Stage-90 checkpoint MMD record is malformed.")
+        typed_mmd: dict[int, object] = {}
+        for raw_seed, value in raw_mmd.items():
+            if type(raw_seed) is int:
+                seed = raw_seed
+            elif type(raw_seed) is str:
+                try:
+                    seed = int(raw_seed)
+                except ValueError as exc:
+                    raise ProtocolError(
+                        "Stage-90 checkpoint MMD seed is malformed."
+                    ) from exc
+                if raw_seed != str(seed):
+                    raise ProtocolError(
+                        "Stage-90 checkpoint MMD seed is not canonical."
+                    )
+            else:
+                raise ProtocolError("Stage-90 checkpoint MMD seed is malformed.")
+            if seed in typed_mmd:
+                raise ProtocolError("Stage-90 checkpoint MMD seeds are duplicated.")
+            typed_mmd[seed] = value
+        record["linear_kernel_mmd2_by_generation_seed"] = typed_mmd
+        records.append(record)
+    output["component_records"] = records
+    return output
 
 
 def _validate_support_scratch(

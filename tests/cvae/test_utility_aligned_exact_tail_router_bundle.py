@@ -12,6 +12,9 @@ from midogpp_thesis.cvae.diagnostics.utility_aligned_exact_tail_router.bundle im
     validate_content_index,
     write_content_index,
 )
+from midogpp_thesis.cvae.diagnostics.utility_aligned_exact_tail_router.inputs import (
+    validate_workspace_provenance,
+)
 from midogpp_thesis.cvae.diagnostics.utility_aligned_exact_tail_router.reports import (
     leakage_report_payload,
     protocol_manifest_payload,
@@ -224,8 +227,43 @@ def test_reports_use_truthful_crossfit_then_terminal_scoring_boundary() -> None:
     assert "target_labels_opened_only_after_global_target_seal" not in leakage
 
 
+def test_workspace_provenance_accepts_workspace_lexical_order(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    _write_json(
+        tmp_path / "provenance/input_artifacts.json",
+        _provenance_payload(config, tuple(sorted(config.input_artifact_ids))),
+    )
+
+    observed = validate_workspace_provenance(tmp_path, config)
+
+    assert tuple(observed) == config.input_artifact_ids
+
+
+@pytest.mark.parametrize(
+    "order",
+    (
+        ("bank", "generation", "policy", "cache", "manifest", "metadata"),
+        ("bank", "cache", "generation", "manifest", "metadata", "metadata"),
+        ("bank", "cache", "generation", "manifest", "metadata", "undeclared"),
+    ),
+)
+def test_workspace_provenance_rejects_noncanonical_or_drifted_inputs(
+    tmp_path: Path,
+    order: tuple[str, ...],
+) -> None:
+    config = _config(tmp_path)
+    _write_json(
+        tmp_path / "provenance/input_artifacts.json",
+        _provenance_payload(config, order),
+    )
+
+    with pytest.raises(ProtocolError, match="provenance order drifted"):
+        validate_workspace_provenance(tmp_path, config)
+
+
 def _config(root: Path) -> SimpleNamespace:
     return SimpleNamespace(
+        experiment_id="experiment",
         artifact_root=root,
         expert_bank_root=root / "bank",
         generation_lock_root=root / "generation",
@@ -237,6 +275,38 @@ def _config(root: Path) -> SimpleNamespace:
         contract_hash="contract",
         runtime={},
     )
+
+
+def _provenance_payload(
+    config: SimpleNamespace,
+    order: tuple[str, ...],
+) -> dict[str, object]:
+    paths = {
+        "bank": config.expert_bank_root,
+        "generation": config.generation_lock_root,
+        "policy": config.equal_union_policy_root,
+        "cache": config.validation_cache_root,
+        "manifest": config.validation_manifest_path.parent,
+        "metadata": config.metadata_profile_root,
+        "undeclared": config.artifact_root / "undeclared",
+    }
+    return {
+        "schema_version": "midogpp_input_artifacts_v2",
+        "dataset_id": "midogpp",
+        "experiment_id": config.experiment_id,
+        "stage": "90_oracles_and_diagnostics",
+        "claim_scope": "diagnostic_only",
+        "input_artifacts": [
+            {
+                "artifact_id": artifact_id,
+                "resolved_path": str(paths[artifact_id]),
+                "exists": True,
+                "semantic_identities": {},
+                "file_integrity": {},
+            }
+            for artifact_id in order
+        ],
+    }
 
 
 def _write_launch_files(root: Path) -> None:

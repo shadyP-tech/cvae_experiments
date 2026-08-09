@@ -259,7 +259,8 @@ def validate_workspace_provenance(
     if not isinstance(raw_rows, list) or not all(isinstance(row, Mapping) for row in raw_rows):
         raise ProtocolError("Utility-aligned workspace provenance rows are malformed.")
     by_id = {str(row.get("artifact_id")): row for row in raw_rows}
-    if len(by_id) != len(raw_rows) or tuple(by_id) != tuple(config.input_artifact_ids):
+    canonical_workspace_order = tuple(sorted(config.input_artifact_ids))
+    if len(by_id) != len(raw_rows) or tuple(by_id) != canonical_workspace_order:
         raise ProtocolError("Utility-aligned workspace provenance order drifted.")
     expected_paths = (
         config.expert_bank_root,

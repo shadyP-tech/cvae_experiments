@@ -1,4 +1,4 @@
-schema_version: midogpp_utility_aligned_residual_policy_config_v1
+schema_version: midogpp_utility_aligned_residual_policy_config_v2
 experiment:
   id: midogpp.routing_and_composition.uniform_b_v2_utility_aligned_residual_policy_lock.v1
   artifact_root: output://midogpp_output_uniform_b_v2_utility_aligned_residual_policy_lock_v1
@@ -30,7 +30,8 @@ protocol:
   target_evaluation_labels_used: false
   policy_locked_before_target_cache_extraction: true
 model:
-  family: global_source_effect_plus_target_source_interaction_ridge
+  family: candidate_level_exact_nine_ensemble_m0_m1_ridge
+  target_local_scalar_name: mean_support_row_absolute_exact_nine_ensemble_probability_shift_v2
   alphas: [0.01, 0.1, 1.0, 10.0]
   permutation_seed: 60902026
   case_bootstrap_seed_base: 60920000

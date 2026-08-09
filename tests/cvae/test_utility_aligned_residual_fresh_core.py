@@ -71,12 +71,16 @@ from midogpp_thesis.cvae.protocol import ProtocolError
 from midogpp_thesis.common.hashing import stable_hash
 from midogpp_thesis.cvae.routing.residual_topup.hashing import canonical_sha256
 from midogpp_thesis.cvae.routing.utility_aligned.contracts import (
-    ABSTENTION_SEMANTICS,
     BASE_ACTION_ID as CORE_BASE_ACTION_ID,
     GLOBAL_ACTION_ID as CORE_GLOBAL_ACTION_ID,
     PERMUTATION_ACTION_ID as CORE_PERMUTATION_ACTION_ID,
     ROUTED_ACTION_ID as CORE_ROUTED_ACTION_ID,
     build_case_bootstrap_plan,
+)
+from midogpp_thesis.cvae.routing.utility_aligned import (
+    SUPPORT_ACTION_PROBABILITY_SHIFT_NAME,
+    SUPPORT_ACTION_PROBABILITY_SHIFT_SEMANTICS,
+    SUPPORT_ACTION_TECHNICAL_SEED_SPREAD_SEMANTICS,
 )
 from midogpp_thesis.cvae.frozen_policy_downstream.utility_aligned_residual_fresh.policy_loading import (
     ACTION_LIBRARY_SCHEMA,
@@ -84,6 +88,10 @@ from midogpp_thesis.cvae.frozen_policy_downstream.utility_aligned_residual_fresh
     POLICY_LOCK_SCHEMA,
     TARGET_POLICY_LOCK_SCHEMA,
     load_frozen_utility_aligned_policy,
+)
+from midogpp_thesis.cvae.frozen_policy_downstream.utility_aligned_residual_fresh.policy_schema import (
+    ENSEMBLE_POLICY_FAMILY,
+    ENSEMBLE_TARGET_POLICY_SCHEMA,
 )
 
 
@@ -613,7 +621,7 @@ def test_bundle_reconstructs_seal_and_rejects_dynamic_array_tamper(
         validate_utility_aligned_residual_fresh_bundle(artifact, config=config)
 
 
-def test_independent_policy_loader_binds_exact_reservation_and_case_grid(
+def test_independent_policy_loader_binds_ensemble_rejects_rehashed_legacy_and_case_grid(
     tmp_path: Path,
 ):
     policy_root = tmp_path / "policy"
@@ -706,7 +714,43 @@ def test_independent_policy_loader_binds_exact_reservation_and_case_grid(
         "global_ablation_lock_hash": "b" * 64,
         "cardinality_transfer_lock_hash": "c" * 64,
         "target_policy_lock_hash": "d" * 64,
+        "ensemble_endpoint_id": "all_nine_seed_probability_ensemble_bacc_delta_v1",
+        "ensemble_endpoint_lock_hash": "f" * 16,
+        "ensemble_endpoint_table_sha256": "a" * 64,
+        "ensemble_endpoint_response_hash": "b" * 64,
+        "ensemble_endpoint_row_hashes_hash": "c" * 64,
+        "ensemble_probability_cell_surface_hash": "d" * 64,
+        "ensemble_prediction_arrays_sha256": "e" * 64,
+        "ensemble_seed_pair_count": 9,
+        "ensemble_threshold": 0.5,
+        "ensemble_aggregation_semantics": "arithmetic_mean_of_exact_nine_float32_probability_vectors_then_threshold_once",
+        "ensemble_response_semantics": "bacc_of_all_nine_seed_probability_ensemble_exact_tail_minus_bacc_of_all_nine_seed_probability_ensemble_exact_base",
+        "ensemble_endpoint_role": "predeclared_all_nine_seed_probability_ensemble",
+        "source_inner_action_shift_lock_hash": "f" * 16,
+        "source_inner_action_shift_table_sha256": "4" * 64,
+        "source_inner_action_shift_row_hashes_hash": "e" * 16,
+        "source_inner_action_shift_row_count": 4536,
+        "source_inner_action_shift_scalar_name": SUPPORT_ACTION_PROBABILITY_SHIFT_NAME,
+        "source_inner_action_shift_row_semantics": SUPPORT_ACTION_TECHNICAL_SEED_SPREAD_SEMANTICS,
+        "source_inner_action_shift_aggregate_semantics": SUPPORT_ACTION_PROBABILITY_SHIFT_SEMANTICS,
+        "source_inner_action_shift_descriptive_seed_values_may_feed_model": False,
+        "model_capacity_reports_by_target": {
+            target: {"gate_passed": True, "report_hash": hashlib.sha256(target.encode()).hexdigest()}
+            for target in CENTERS
+        },
+        "target_local_scalar_name": SUPPORT_ACTION_PROBABILITY_SHIFT_NAME,
+        "target_local_scalar_semantics": SUPPORT_ACTION_PROBABILITY_SHIFT_SEMANTICS,
+        "target_local_scalar_row_semantics": SUPPORT_ACTION_TECHNICAL_SEED_SPREAD_SEMANTICS,
+        "target_support_action_shift_lock_hash": "1" * 64,
+        "target_support_action_shift_table_sha256": "2" * 64,
+        "target_support_action_shift_row_hashes_hash": "3" * 64,
+        "target_support_action_shift_row_count": 5184,
+        "target_support_action_shift_case_ensemble_group_count": 576,
+        "target_support_action_shift_descriptive_seed_values_may_feed_model": False,
     }
+    common["model_capacity_reports_hash"] = canonical_sha256(
+        common["model_capacity_reports_by_target"]
+    )
     target_feature_locks = []
     core_policies = []
     for target in CENTERS:
@@ -734,7 +778,8 @@ def test_independent_policy_loader_binds_exact_reservation_and_case_grid(
             "target_id": target,
             "case_bootstrap_plan": plan.to_payload(),
             "target_feature_surface_hash": feature_surface_hash,
-            "target_feature_row_count": 72,
+            "target_feature_row_count": 8,
+            "support_case_count": len(support[target]),
             "bootstrap_surface_hashes": bootstrap_hashes,
             "bootstrap_surface_hashes_hash": canonical_sha256(bootstrap_hashes),
             "candidate_sources": candidates,
@@ -749,94 +794,109 @@ def test_independent_policy_loader_binds_exact_reservation_and_case_grid(
                 "target_feature_lock_hash": canonical_sha256(feature_unhashed),
             }
         )
-        sorted_bootstrap_hashes = sorted(bootstrap_hashes)
-        sorted_replicate_hashes = sorted(
-            item.replicate_hash for item in plan.replicates
-        )
-        for proposed_action, router_kind, global_only, permutation_seed in (
-            (
-                CORE_GLOBAL_ACTION_ID,
-                "global_source_quality_only",
-                True,
-                None,
-            ),
-            (
-                CORE_ROUTED_ACTION_ID,
-                "target_source_interaction",
-                False,
-                None,
-            ),
-            (
-                CORE_PERMUTATION_ACTION_ID,
-                "cyclic_feature_permutation_control",
-                False,
-                23,
-            ),
-        ):
-            bootstrap_count = 0 if global_only else plan.replicate_count
-            used_fallback = proposed_action == CORE_PERMUTATION_ACTION_ID
-            selected_source = (
-                None
-                if used_fallback
-                else candidates[1]
-                if proposed_action == CORE_ROUTED_ACTION_ID
-                else candidates[0]
-            )
-            policy_unhashed = {
-                "schema_version": "midogpp_utility_aligned_policy_v1",
-                "target_id": target,
-                "candidate_sources": candidates,
-                "router_kind": router_kind,
-                "proposed_action_id": proposed_action,
-                "action_id": CORE_BASE_ACTION_ID if used_fallback else proposed_action,
-                "proposed_source": candidates[0],
-                "selected_source": selected_source,
-                "predicted_gain": 0.1,
-                "standard_error": 0.01,
-                "lower_confidence_bound": -0.01 if used_fallback else 0.08,
-                "confidence_multiplier": 1.96,
-                "minimum_gain": 0.0,
-                "support_case_count": len(support[target]),
-                "minimum_support_case_count": 8,
-                "seed_pair_count": 9,
-                "replicate_standard_deviation": 0.01,
-                "support_bootstrap_replicates": bootstrap_count,
-                "minimum_support_bootstrap_replicates": 32,
-                "support_bootstrap_standard_deviation": (
-                    0.0 if global_only else 0.01
-                ),
-                "support_bootstrap_surface_hashes": (
-                    [] if global_only else sorted_bootstrap_hashes
-                ),
-                "case_bootstrap_replicate_hashes": (
-                    [] if global_only else sorted_replicate_hashes
-                ),
-                "used_exact_base_fallback": used_fallback,
-                "fallback_reason": "negative_lcb" if used_fallback else None,
-                "global_only": global_only,
-                "permutation_seed": permutation_seed,
-                "model_hash": "a" * 64,
-                "feature_surface_hash": (
-                    canonical_sha256(
-                        {
-                            "schema_version": "test_permuted_surface_v1",
-                            "target": target,
-                        }
-                    )
-                    if proposed_action == CORE_PERMUTATION_ACTION_ID
-                    else feature_surface_hash
-                ),
-                "cardinality_eligibility_hash": "c" * 64,
-                "case_bootstrap_plan_hash": None if global_only else plan.plan_hash,
-                "target_support_labels_used": False,
-                "target_evaluation_used": False,
-                "seed_selection_performed": False,
-                "abstention_semantics": ABSTENTION_SEMANTICS,
+        role_source = {"G": candidates[0], "R": candidates[1], "P": candidates[0]}
+        role_predictions = {
+            role: {
+                source: (
+                    (0.01 if role == "P" else 0.10)
+                    if source == role_source[role]
+                    else 0.0
+                )
+                for source in candidates
             }
+            for role in ("G", "R", "P")
+        }
+        role_model_errors = {
+            role: {source: 0.006 for source in candidates}
+            for role in ("G", "R", "P")
+        }
+        role_bootstrap_errors = {
+            role: {source: 0.008 for source in candidates}
+            for role in ("G", "R", "P")
+        }
+        role_seed_diagnostics = {
+            role: {source: (0.0 if role == "G" else 0.02) for source in candidates}
+            for role in ("G", "R", "P")
+        }
+        role_combined_errors = {
+            role: {source: 0.01 for source in candidates}
+            for role in ("G", "R", "P")
+        }
+        role_lower_bounds = {
+            role: {
+                source: role_predictions[role][source] - 1.96 * 0.01
+                for source in candidates
+            }
+            for role in ("G", "R", "P")
+        }
+        role_selected_action = {"G": "G", "R": "R", "P": "B"}
+        role_selected_source = {
+            "G": candidates[0],
+            "R": candidates[1],
+            "P": None,
+        }
+        nested_unhashed = {
+            "schema_version": ENSEMBLE_TARGET_POLICY_SCHEMA,
+            "target_id": target,
+            "selected_action_role": "R",
+            "selected_source": candidates[1],
+            "exact_b_fallback": False,
+            "fallback_reason": None,
+            "role_selected_source": role_selected_source,
+            "role_selected_action": role_selected_action,
+            "role_prediction_by_source": role_predictions,
+            "role_model_standard_error_by_source": role_model_errors,
+            "role_bootstrap_standard_deviation_by_source": role_bootstrap_errors,
+            "role_target_scalar_seed_standard_deviation_by_source": role_seed_diagnostics,
+            "role_combined_standard_error_by_source": role_combined_errors,
+            "role_lower_confidence_bound_by_source": role_lower_bounds,
+            "gain_lcb_multiplier": 1.96,
+            "bootstrap_dispersion_divided_by_seed_repeat_sqrt": False,
+            "authorization_uncertainty_components": [
+                "model_covariance_and_residual",
+                "independent_whole_case_bootstrap",
+            ],
+            "target_scalar_seed_spread_role": "descriptive_only_non_decision",
+            "target_scalar_seed_spread_enters_combined_standard_error": False,
+            "routed_bootstrap_mean_by_source": role_predictions["R"],
+            "routed_bootstrap_standard_deviation_by_source": role_bootstrap_errors["R"],
+            "point_feature_surface_hash": feature_surface_hash,
+            "bootstrap_feature_surface_hashes": bootstrap_hashes,
+            "cardinality_transfer_hash": "c" * 64,
+        }
+        ensemble_policy = {
+            **nested_unhashed,
+            "policy_hash": canonical_sha256(nested_unhashed),
+        }
+        for proposed_action, role in (
+            (CORE_GLOBAL_ACTION_ID, "G"),
+            (CORE_ROUTED_ACTION_ID, "R"),
+            (CORE_PERMUTATION_ACTION_ID, "P"),
+        ):
+            used_fallback = role == "P"
+            proposed_source = role_source[role]
             core_policies.append(
                 {
-                    **policy_unhashed,
-                    "policy_hash": canonical_sha256(policy_unhashed),
+                    "schema_version": ENSEMBLE_TARGET_POLICY_SCHEMA,
+                    "target_id": target,
+                    "role": role,
+                    "candidate_sources": candidates,
+                    "proposed_action_id": proposed_action,
+                    "action_id": CORE_BASE_ACTION_ID if used_fallback else proposed_action,
+                    "proposed_source": proposed_source,
+                    "selected_source": role_selected_source[role],
+                    "predicted_gain": role_predictions[role][proposed_source],
+                    "standard_error": role_combined_errors[role][proposed_source],
+                    "lower_confidence_bound": role_lower_bounds[role][proposed_source],
+                    "support_case_count": len(support[target]),
+                    "support_bootstrap_replicates": plan.replicate_count,
+                    "used_exact_base_fallback": used_fallback,
+                    "fallback_reason": "negative_lcb" if used_fallback else None,
+                    "model_hash": canonical_sha256({"target": target, "role": role}),
+                    "feature_surface_hash": feature_surface_hash,
+                    "cardinality_eligibility_hash": "c" * 64,
+                    "policy_hash": ensemble_policy["policy_hash"],
+                    "ensemble_policy": ensemble_policy,
                 }
             )
     target_policy_unhashed = {
@@ -846,15 +906,15 @@ def test_independent_policy_loader_binds_exact_reservation_and_case_grid(
             for key, value in common.items()
             if key
             in {
-                    "experiment_id",
-                    "output_artifact_id",
-                    "exact_tail_surface_lock_hash",
-                    "development_case_manifest_hash",
-                    "development_support_case_ids_by_query",
-                    "development_evaluation_case_ids_by_query",
-                    "development_target_evaluation_case_ids_by_target",
-                    "development_partition_hashes_by_query",
-                    "target_support_surface_artifact_id",
+                "experiment_id",
+                "output_artifact_id",
+                "exact_tail_surface_lock_hash",
+                "development_case_manifest_hash",
+                "development_support_case_ids_by_query",
+                "development_evaluation_case_ids_by_query",
+                "development_target_evaluation_case_ids_by_target",
+                "development_partition_hashes_by_query",
+                "target_support_surface_artifact_id",
                 "target_support_surface_hash",
                 "target_support_parent_reservation_artifact_id",
                 "target_support_parent_reservation_hash",
@@ -864,6 +924,35 @@ def test_independent_policy_loader_binds_exact_reservation_and_case_grid(
                 "target_evaluation_case_ids_by_target",
                 "target_evaluation_binding_hash",
                 "metadata_profile_sha256",
+                "ensemble_endpoint_id",
+                "ensemble_endpoint_lock_hash",
+                "ensemble_endpoint_table_sha256",
+                "ensemble_endpoint_response_hash",
+                "ensemble_endpoint_row_hashes_hash",
+                "ensemble_probability_cell_surface_hash",
+                "ensemble_prediction_arrays_sha256",
+                "ensemble_seed_pair_count",
+                "ensemble_threshold",
+                "ensemble_aggregation_semantics",
+                "ensemble_response_semantics",
+                "ensemble_endpoint_role",
+                "source_inner_action_shift_lock_hash",
+                "source_inner_action_shift_table_sha256",
+                "source_inner_action_shift_row_hashes_hash",
+                "source_inner_action_shift_row_count",
+                "source_inner_action_shift_scalar_name",
+                "source_inner_action_shift_row_semantics",
+                "source_inner_action_shift_aggregate_semantics",
+                "source_inner_action_shift_descriptive_seed_values_may_feed_model",
+                "target_local_scalar_name",
+                "target_local_scalar_semantics",
+                "target_local_scalar_row_semantics",
+                "target_support_action_shift_lock_hash",
+                "target_support_action_shift_table_sha256",
+                "target_support_action_shift_row_hashes_hash",
+                "target_support_action_shift_row_count",
+                "target_support_action_shift_case_ensemble_group_count",
+                "target_support_action_shift_descriptive_seed_values_may_feed_model",
             }
         },
         "target_feature_locks": target_feature_locks,
@@ -899,7 +988,7 @@ def test_independent_policy_loader_binds_exact_reservation_and_case_grid(
             "R-U",
             "R-P",
         ],
-        "policy_family": "utility_aligned_exact_tail_delta",
+        "policy_family": ENSEMBLE_POLICY_FAMILY,
         "fallback_policy": "exact_B",
         "outer_target_excluded_from_fit": True,
         "target_support_labels_used": False,
@@ -942,6 +1031,58 @@ def test_independent_policy_loader_binds_exact_reservation_and_case_grid(
     assert loaded.policy_lock_hash == policy_payload["policy_lock_hash"]
     assert loaded.reservation_hash == "6" * 16
     assert all(len(loaded.support_case_ids_by_target[target]) == 8 for target in CENTERS)
+
+    # A legacy-family substitution remains forbidden even when the policy lock
+    # and completion authorization are both recomputed around the tampered value.
+    policy_payload["policy_family"] = "utility_aligned_exact_tail_delta"
+    policy_payload["policy_lock_hash"] = canonical_sha256(
+        {
+            key: value
+            for key, value in policy_payload.items()
+            if key != "policy_lock_hash"
+        }
+    )
+    (policy_root / "manifests/policy_lock.json").write_text(
+        json.dumps(policy_payload), encoding="utf-8"
+    )
+    (policy_root / "reports/validation_report.json").write_text(
+        json.dumps(
+            {
+                "status": "PASS",
+                "checks": {
+                    "status": "PASS",
+                    "policy_lock_hash": policy_payload["policy_lock_hash"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ProtocolError, match="only the ensemble policy family"):
+        load_frozen_utility_aligned_policy(SimpleNamespace(policy_root=policy_root))
+    policy_payload["policy_family"] = ENSEMBLE_POLICY_FAMILY
+    policy_payload["policy_lock_hash"] = canonical_sha256(
+        {
+            key: value
+            for key, value in policy_payload.items()
+            if key != "policy_lock_hash"
+        }
+    )
+    (policy_root / "manifests/policy_lock.json").write_text(
+        json.dumps(policy_payload), encoding="utf-8"
+    )
+    (policy_root / "reports/validation_report.json").write_text(
+        json.dumps(
+            {
+                "status": "PASS",
+                "checks": {
+                    "status": "PASS",
+                    "policy_lock_hash": policy_payload["policy_lock_hash"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    load_frozen_utility_aligned_policy(SimpleNamespace(policy_root=policy_root))
 
     def _rehash_and_write_bound_policy() -> None:
         manifest = {

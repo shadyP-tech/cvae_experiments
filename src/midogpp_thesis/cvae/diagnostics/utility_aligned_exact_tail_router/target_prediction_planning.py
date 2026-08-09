@@ -19,6 +19,8 @@ from .target_prediction_contracts import TARGET_CHECKPOINT_DIRECTORY
 
 
 EXPECTED_TARGET_TASK_COUNT = len(CENTERS) * len(TRAINING_SEEDS) * len(GENERATION_SEEDS)
+TARGET_EVALUATION_ARRAY_MEMBER = "checkpoints/target_evaluation_embeddings.npy"
+TARGET_EVALUATION_INDEX_MEMBER = "checkpoints/target_evaluation_index.json"
 
 
 def write_target_evaluation_scratch(
@@ -27,8 +29,8 @@ def write_target_evaluation_scratch(
     frame: LabelFreeValidationFrame,
     partitions: FixedPartitionSurface,
 ) -> Mapping[str, object]:
-    array_path = root / "checkpoints/target_evaluation_embeddings.npy"
-    index_path = root / "checkpoints/target_evaluation_index.json"
+    array_path = root / TARGET_EVALUATION_ARRAY_MEMBER
+    index_path = root / TARGET_EVALUATION_INDEX_MEMBER
     rows = [row for target in CENTERS for row in partitions.evaluation_rows_by_center[target]]
     embeddings = frame.embeddings_for(rows)
     offsets: dict[str, object] = {}
@@ -137,6 +139,8 @@ def build_target_prediction_tasks(
 
 __all__ = (
     "EXPECTED_TARGET_TASK_COUNT",
+    "TARGET_EVALUATION_ARRAY_MEMBER",
+    "TARGET_EVALUATION_INDEX_MEMBER",
     "build_target_prediction_tasks",
     "write_target_evaluation_scratch",
 )

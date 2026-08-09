@@ -18,8 +18,8 @@ from .source_contracts import SourceBlockRecord
 PREDICTION_ARRAY_MEMBER = "arrays/exact_tail_predictions.npz"
 PREDICTION_INDEX_MEMBER = "manifests/prediction_index.json"
 GLOBAL_SEAL_MEMBER = "manifests/global_prediction_seal.json"
-CHECKPOINT_SCHEMA = "midogpp_exact_tail_prediction_checkpoint_v1"
-PREDICTION_INDEX_SCHEMA = "midogpp_exact_tail_prediction_index_v1"
+CHECKPOINT_SCHEMA = "midogpp_exact_tail_prediction_checkpoint_v2"
+PREDICTION_INDEX_SCHEMA = "midogpp_exact_tail_prediction_index_v2"
 
 
 @dataclass(frozen=True)
@@ -82,6 +82,8 @@ class PredictionWorkerInput:
     source_cache_hash: str
     classifier_payload: Mapping[str, object]
     checkpoint_root: str
+    support_array_path: str = ""
+    support_row_identity_hash: str = ""
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -105,6 +107,8 @@ class PredictionWorkerInput:
                 self.source_cache_hash,
                 dict(self.classifier_payload),
                 self.checkpoint_root,
+                self.support_array_path,
+                self.support_row_identity_hash,
             ),
         )
 
@@ -112,6 +116,10 @@ class PredictionWorkerInput:
 @dataclass(frozen=True)
 class ConsolidatedPredictionArtifacts:
     predictions_by_key: Mapping[tuple[str, str, str, int, int], np.ndarray]
+    probabilities_by_key: Mapping[tuple[str, str, str, int, int], np.ndarray]
+    support_probabilities_by_key: Mapping[
+        tuple[str, str, str, int, int], np.ndarray
+    ]
     cells: tuple[PredictionCellSeal, ...]
     prediction_index_path: Path
     prediction_arrays_path: Path
@@ -123,6 +131,16 @@ class ConsolidatedPredictionArtifacts:
             self,
             "predictions_by_key",
             MappingProxyType(dict(self.predictions_by_key)),
+        )
+        object.__setattr__(
+            self,
+            "probabilities_by_key",
+            MappingProxyType(dict(self.probabilities_by_key)),
+        )
+        object.__setattr__(
+            self,
+            "support_probabilities_by_key",
+            MappingProxyType(dict(self.support_probabilities_by_key)),
         )
 
 

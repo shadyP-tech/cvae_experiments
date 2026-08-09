@@ -37,9 +37,9 @@ INPUT_ARTIFACT_IDS = (
     METADATA_PROFILE_ARTIFACT_ID,
 )
 
-ACTION_LIBRARY_SCHEMA = "midogpp_utility_aligned_residual_action_library_v1"
-POLICY_LOCK_SCHEMA = "midogpp_utility_aligned_residual_policy_lock_v1"
-TARGET_POLICY_LOCK_SCHEMA = "midogpp_utility_aligned_target_policy_lock_v1"
+ACTION_LIBRARY_SCHEMA = "midogpp_utility_aligned_residual_action_library_v2"
+POLICY_LOCK_SCHEMA = "midogpp_utility_aligned_residual_policy_lock_v2"
+TARGET_POLICY_LOCK_SCHEMA = "midogpp_utility_aligned_target_policy_lock_v2"
 TARGET_SUPPORT_SCHEMA = "midogpp_utility_aligned_target_support_surface_v1"
 
 BASE_LONG_ID = "base_equal_union"

@@ -12,10 +12,13 @@ from typing import Mapping
 import numpy as np
 
 from ...protocol import ProtocolError
-from ..residual_topup.hashing import array_sha256
-from ..utility_aligned import (
-    build_utility_aligned_policy, fit_utility_aligned_models,
-    nested_cardinality_transfer_evaluation,
+from .ensemble_model_adapter import (
+    EnsembleEndpointWorkerPayload,
+    aggregate_candidate_seed_features, build_ensemble_feature_surface,
+    build_ensemble_utility_policy, build_target_ensemble_feature_surfaces,
+    cyclically_permute_target_scalar, derive_label_free_global_source_control,
+    evaluate_ensemble_cardinality_transfer, fit_ensemble_utility_model,
+    make_endpoint_worker_payload, restore_endpoint_worker_payload,
 )
 from ..utility_aligned_identities import CENTERS
 from .config import UtilityAlignedResidualPolicyConfig
@@ -55,7 +58,11 @@ def fit_all_targets(
             futures = {
                 pool.submit(
                     _fit_target, target, inputs.inner_feature_surfaces[target],
-                    inputs.exact_utility, inputs.target_features_by_target[target],
+                    make_endpoint_worker_payload(
+                        inputs.ensemble_endpoint, outer_target_id=target
+                    ),
+                    inputs.target_features_by_target[target],
+                    inputs.target_action_shift_cases_by_target[target],
                     tuple(float(value) for value in config.model["alphas"]),
                     int(config.model["permutation_seed"]),
                     float(config.model["confidence_multiplier"]),
@@ -83,8 +90,11 @@ def _fit_target_from_config(
     return _fit_target(
         target,
         inputs.inner_feature_surfaces[target],
-        inputs.exact_utility,
+        make_endpoint_worker_payload(
+            inputs.ensemble_endpoint, outer_target_id=target
+        ),
         inputs.target_features_by_target[target],
+        inputs.target_action_shift_cases_by_target[target],
         tuple(float(value) for value in config.model["alphas"]),
         int(config.model["permutation_seed"]),
         float(config.model["confidence_multiplier"]),
@@ -93,46 +103,124 @@ def _fit_target_from_config(
     )
 
 
-def _fit_target(target: str, inner_features: object, exact_utility: object, target_features: TargetFeatureSet, alphas: tuple[float, ...], permutation_seed: int, confidence_multiplier: float, minimum_gain: float, threads: int) -> TargetFitResult:
+def _fit_target(target: str, inner_features: object, endpoint_payload: EnsembleEndpointWorkerPayload, target_features: TargetFeatureSet, target_shift_cases: object, alphas: tuple[float, ...], permutation_seed: int, confidence_multiplier: float, minimum_gain: float, threads: int) -> TargetFitResult:
     try: from threadpoolctl import threadpool_limits
     except ImportError as exc: raise ProtocolError("threadpoolctl is required for bounded policy fitting.") from exc
     with threadpool_limits(limits=threads):
-        models = fit_utility_aligned_models(inner_features, exact_utility, alphas=alphas)
-        permutation = fit_utility_aligned_models(inner_features, exact_utility, alphas=alphas, permutation_seed=permutation_seed)
-        transfer = nested_cardinality_transfer_evaluation(models, inner_features, exact_utility)
-        permutation_transfer = nested_cardinality_transfer_evaluation(permutation, inner_features, exact_utility)
-        global_policy = build_utility_aligned_policy(models, target_features.point_surface, transfer, global_only=True, confidence_multiplier=confidence_multiplier, minimum_gain=minimum_gain)
-        routed = build_utility_aligned_policy(models, target_features.point_surface, transfer, confidence_multiplier=confidence_multiplier, minimum_gain=minimum_gain, support_bootstrap_features=target_features.bootstrap_surfaces, case_bootstrap_plan=target_features.plan)
-        control = build_utility_aligned_policy(permutation, target_features.point_surface, permutation_transfer, confidence_multiplier=confidence_multiplier, minimum_gain=minimum_gain, support_bootstrap_features=target_features.bootstrap_surfaces, case_bootstrap_plan=target_features.plan)
+        if not hasattr(inner_features, "rows"):
+            raise ProtocolError("Ensemble policy worker received untyped inputs.")
+        utility_surface, support_shifts = restore_endpoint_worker_payload(
+            endpoint_payload, outer_target_id=target
+        )
+        global_control = derive_label_free_global_source_control(inner_features.rows)
+        source_rows = aggregate_candidate_seed_features(inner_features.rows)
+        shifted_rows = aggregate_candidate_seed_features(
+            inner_features.rows,
+            support_action_shift_by_candidate=support_shifts,
+        )
+        global_surface = build_ensemble_feature_surface(
+            source_rows,
+            global_source_control_by_source=global_control.value_by_source,
+            global_source_control_semantics=global_control.semantics,
+            global_source_control_provenance_hash=global_control.provenance_hash,
+        )
+        routed_surface = build_ensemble_feature_surface(
+            shifted_rows,
+            global_source_control_by_source=global_control.value_by_source,
+            global_source_control_semantics=global_control.semantics,
+            global_source_control_provenance_hash=global_control.provenance_hash,
+        )
+        permuted_surface = cyclically_permute_target_scalar(
+            routed_surface, permutation_seed=permutation_seed
+        )
+        global_model = fit_ensemble_utility_model(global_surface, utility_surface, alphas=alphas)
+        routed_model = fit_ensemble_utility_model(routed_surface, utility_surface, alphas=alphas)
+        permutation_model = fit_ensemble_utility_model(permuted_surface, utility_surface, alphas=alphas)
+        transfer = evaluate_ensemble_cardinality_transfer(
+            global_model, routed_model, permutation_model, utility_surface
+        )
+        target_production = build_target_ensemble_feature_surfaces(
+            target_features.point_surface.rows, target_shift_cases, target_features.plan,
+            global_source_control=global_control,
+        )
+        policy = build_ensemble_utility_policy(
+            global_model, routed_model, permutation_model,
+            target_production.point_surface, target_production.bootstrap_surfaces, transfer,
+        )
     # Cross the spawn boundary only with canonical dictionaries/lists/scalars.
     # Core model objects contain MappingProxyType fold audits and are not
     # standard-pickle safe.
     return TargetFitResult(
         target,
-        _model_payload(models),
-        _model_payload(permutation),
-        _transfer_payload(transfer),
-        _transfer_payload(permutation_transfer),
-        global_policy.to_payload(),
-        routed.to_payload(),
-        control.to_payload(),
+        _ensemble_models_payload(global_model, routed_model, permutation_model, global_control),
+        _ensemble_model_payload(permutation_model),
+        transfer.to_payload(),
+        transfer.to_payload(),
+        _ensemble_policy_payload(policy, "G", global_model, target_production),
+        _ensemble_policy_payload(policy, "R", routed_model, target_production),
+        _ensemble_policy_payload(policy, "P", permutation_model, target_production),
     )
 
 
-def _model_payload(models: object) -> dict[str, object]:
+def _ensemble_model_payload(model: object) -> dict[str, object]:
     return {
-        "outer_target_id": models.outer_target_id,
-        "candidate_sources": list(models.candidate_sources),
-        "global_model": _ridge_payload(models.global_model),
-        "interaction_model": _ridge_payload(models.interaction_model),
-        "global_crossfit_hash": models.global_crossfit.crossfit_hash,
-        "interaction_crossfit_hash": models.interaction_crossfit.crossfit_hash,
-        "global_crossfit_prediction_sha256": array_sha256(models.global_crossfit.predictions),
-        "interaction_crossfit_prediction_sha256": array_sha256(models.interaction_crossfit.predictions),
-        "feature_surface_hash": models.feature_surface_hash,
-        "utility_surface_hash": models.utility_surface_hash,
-        "permutation_seed": models.permutation_seed,
-        "model_hash": models.model_hash,
+        "outer_target_id": model.outer_target_id,
+        "feature_names": list(model.feature_names),
+        "selected_alpha": model.selected_alpha,
+        "routing_tuning_endpoint": model.routing_tuning_endpoint,
+        "routing_loss_by_alpha": {str(key): value for key, value in model.routing_loss_by_alpha.items()},
+        "selected_alpha_by_heldout_query": dict(model.selected_alpha_by_heldout_query),
+        "candidate_models": {source: _ridge_payload(value) for source, value in model.candidate_models.items()},
+        "candidate_capacity_reports": {source: value.to_payload() for source, value in model.candidate_capacity_reports.items()},
+        "crossfit_row_keys": [list(key) for key in model.crossfit_row_keys],
+        "crossfit_prediction_sha256": __import__("midogpp_thesis.cvae.routing.residual_topup.hashing", fromlist=["array_sha256"]).array_sha256(model.crossfit_predictions),
+        "feature_surface_hash": model.feature_surface_hash,
+        "utility_surface_hash": model.utility_surface_hash,
+        "permutation_seed": model.permutation_seed,
+        "model_hash": model.model_hash,
+    }
+
+
+def _ensemble_models_payload(global_model: object, routed_model: object, permutation_model: object, control: object) -> dict[str, object]:
+    routed = _ensemble_model_payload(routed_model)
+    reports = {
+        role: [report.to_payload() for report in model.candidate_capacity_reports.values()]
+        for role, model in {"G": global_model, "R": routed_model, "P": permutation_model}.items()
+    }
+    routed["global_model"] = _ensemble_model_payload(global_model)
+    routed["permutation_model"] = _ensemble_model_payload(permutation_model)
+    routed["global_source_control"] = control.to_payload()
+    routed["model_capacity_report"] = {
+        "gate_passed": all(item["gate_passed"] for values in reports.values() for item in values),
+        "reports_by_role": reports,
+        "report_hash": __import__("midogpp_thesis.cvae.routing.residual_topup.hashing", fromlist=["canonical_sha256"]).canonical_sha256(reports),
+    }
+    return routed
+
+
+def _ensemble_policy_payload(policy: object, role: str, model: object, target_production: object) -> dict[str, object]:
+    selected = policy.role_selected_source[role]
+    action = policy.role_selected_action[role]
+    candidates = tuple(model.candidate_models)
+    proposed = {"G": "G_delta", "R": "R", "P": "P"}[role]
+    candidate = min(policy.role_prediction_by_source[role], key=lambda source: (-policy.role_prediction_by_source[role][source], source))
+    fallback = action == "B"
+    return {
+        "schema_version": "midogpp_utility_aligned_ensemble_policy_v1",
+        "target_id": policy.target_id, "role": role, "candidate_sources": list(candidates),
+        "proposed_action_id": proposed, "action_id": "B" if fallback else proposed,
+        "proposed_source": candidate, "selected_source": selected,
+        "predicted_gain": policy.role_prediction_by_source[role][candidate],
+        "standard_error": policy.role_combined_standard_error_by_source[role][candidate],
+        "lower_confidence_bound": policy.role_lower_confidence_bound_by_source[role][candidate],
+        "support_case_count": target_production.point_surface.rows[0].support_case_count,
+        "support_bootstrap_replicates": len(target_production.bootstrap_surfaces),
+        "used_exact_base_fallback": fallback,
+        "fallback_reason": policy.fallback_reason if role == "R" else ("role_gain_lcb_not_positive" if fallback else None),
+        "model_hash": model.model_hash, "feature_surface_hash": target_production.point_surface.surface_hash,
+        "cardinality_eligibility_hash": policy.cardinality_transfer_hash,
+        "policy_hash": policy.policy_hash,
+        "ensemble_policy": policy.to_payload(),
     }
 
 

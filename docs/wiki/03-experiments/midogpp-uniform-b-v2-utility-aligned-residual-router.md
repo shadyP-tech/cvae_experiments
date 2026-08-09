@@ -17,35 +17,55 @@ does not tune Borda ranks or reinterpret compatibility energy as utility.
 ## Scientific contract
 
 For each outer target `H`, source-inner pseudoquery `q`, and legal source `e`,
-Stage 60 measures
+Stage 60 now measures the same probability-ensemble construction and BACC
+endpoint used by Stage 70, over a cardinality-matched inner action family. It
+does not pretend that a six-to-seven-source inner action is literally the same
+deployed action as a seven-to-eight-source target action:
 
 ```text
-delta(H,q,e) = BACC(B_q + exact_tail_e; E_q) - BACC(B_q; E_q)
+p_bar_a = (1/9) * sum_{training seed, generation seed} p_a(y=1)
+delta(H,q,e) = BACC(1[p_bar_tail >= 0.5]) - BACC(1[p_bar_B >= 0.5])
 ```
 
 with `H != q` and `e` excluded from both `H` and `q`. The inner action uses the
 cardinality-matched 12.5% residual geometry: seven sources at 144 samples per
-source/class plus one exact 126-sample/class tail. All nine fixed
-training/generation seed pairs are retained. Predictions are globally sealed
-before the dedicated development scoring labels open.
+source/class plus one exact 126-sample/class tail. The nine fixed
+training/generation seed pairs are aggregated into one candidate response;
+they are technical repeats, not nine independent utility observations. The
+legacy 4,536 seed-cell rows remain inspectable and descriptive, while only the
+504 `(H,q,e)` probability-ensemble rows may enter the model. Predictions and
+both evaluation and support probabilities are globally sealed before the
+dedicated development scoring labels open.
 
-The model is a low-dimensional, utility-aligned source-preference model. Its
-features are label-free reconstruction/KL components, technical-replica
-disagreement, linear-kernel MMD-squared, metadata similarity, and within-query
-rank features. Source and query exclusions are nested. Six-candidate training
-to seven-candidate validation is only an eligibility test for the later
-seven-to-eight transfer; it is not target-routing evidence.
+The model is deliberately limited to two predeclared predictors. `M0` contains
+one source-global, label-free metadata-similarity control derived only from
+the `H`-excluded source-inner feature surface. `M1` adds exactly one
+target-local, action-proximal scalar. On each unlabeled support row it first
+averages the canonical 3x3 seed-cell probabilities for exact `B` and the
+corresponding exact-tail action, then takes their absolute difference, and
+finally averages those row differences. The previous mean of nine per-seed
+absolute shifts is retained only as descriptive technical-seed spread and may
+not enter the model. `P` cyclically permutes only the ensemble-first local
+scalar. No
+source/query one-hot columns, broad proxy vector, target label, or utility
+value may enter the feature surface. Source and query exclusions are nested.
+Six-candidate training to seven-candidate validation is only an eligibility
+test for the later seven-to-eight transfer; it is not target-routing evidence.
 
 Activation is deliberately conservative:
 
-- query-domain bootstrap lower bounds must beat chance top-1, zero Spearman,
-  and zero selected gain;
-- normalized oracle gap must improve and remain below the frozen ceiling;
+- a deterministic 10,000-draw query-domain bootstrap must put routed top-1
+  above `1/7`, routed Spearman above zero, and the normalized-oracle-gap upper
+  bound below the frozen `0.46` ceiling;
+- paired bootstrap lower bounds must improve top-1, Spearman, and normalized
+  oracle gap over both `M0` and the permuted-local-scalar control;
 - the global `G_delta` source-quality control has its own positive-gain gate;
 - each target needs at least eight independent unlabeled support cases and at
   least 32 typed whole-case bootstrap resamples;
-- model covariance, held-out query-domain residual uncertainty, technical seed
-  spread, and support-bootstrap uncertainty all enter the decision;
+- model covariance/residual variance and independent whole-case support
+  bootstrap dispersion are the only target-decision uncertainty components;
+  descriptive technical-seed spread remains report-only and cannot change the
+  combined standard error, LCB, selected source/action, or fallback;
 - an uncertain or non-positive decision returns the exact base action `B`.
 
 The final action geometry is exact and non-negotiable: eight source blocks of
@@ -55,11 +75,15 @@ The final action geometry is exact and non-negotiable: eight source blocks of
 
 Stage 60 is deliberately three separate jobs rather than one mutable runner:
 
-1. the exact-tail development producer creates the sealed, label-scored
-   source-inner utility surface;
-2. the target-support producer creates only label-free eight-source point and
-   whole-case-bootstrap feature surfaces from its dedicated support-only
-   reservation/cache;
+1. the exact-tail development producer creates the sealed 504-row
+   probability-ensemble response, retains the 4,536 descriptive seed-cell
+   rows, and creates a separate 4,536-row label-free support-action-shift
+   component table from the same classifier fits;
+2. the target-support producer creates label-free eight-source features and
+   per-case action-shift components from its dedicated support-only
+   reservation/cache. It runs 81 resumable target/seed tasks and 729 exact
+   classifier fits, then reconstructs the point and all 32 whole-case
+   bootstrap feature surfaces;
 3. the CPU-only policy-lock producer independently validates both surfaces,
    the support-only parent reservation, and the distinct Stage-70 reservation
    before fitting models and freezing actions.
@@ -107,10 +131,14 @@ two 24 GiB RTX A5000 GPUs.
   only after validation.
 
 The exact-tail producer plans 81 source streams, 648 coarse prediction tasks,
-and 5,184 exact classifier fits. The target-support producer uses its own two
-persistent GPU workers; the policy-lock producer is CPU-only and uses four
-model workers with three BLAS threads each. Stage 70 seals 1,053 logical action
-cells while deduplicating identical compositions for compute only.
+and 5,184 exact classifier fits. Support probabilities are obtained by
+concatenating support and evaluation embeddings inside each existing fit, so
+the endpoint repair adds no classifier fits. The target-support producer uses
+its own two persistent GPU workers, followed by 81 CPU action-probe tasks and
+729 fits on four workers with three BLAS threads each. The policy-lock producer
+is CPU-only and uses four model workers with three BLAS threads each. Stage 70
+seals 1,053 logical action cells while deduplicating identical compositions
+for compute only.
 
 ## Activation order
 
@@ -171,3 +199,21 @@ persistent worker per A5000, and then switches to four CPU workers with three
 BLAS threads each. Hash-bound task checkpoints make interruption recoverable.
 Its output is terminal exploratory Stage-90 evidence and is forbidden from
 feeding Stage 60, Stage 70, recipe selection, promotion, or deployment.
+
+The completed diagnostic explains why the endpoint-aligned redesign is
+necessary. Equal-union `B` reached mean ensemble BACC `0.770276`, while `R2`
+reached `0.762182`; `R2-B` was `-0.008093` with 95% center-level interval
+`[-0.034655, 0.018468]`. The terminal single-source oracle reached
+`0.791928`, a descriptive `+0.021652` over `B`, but `R2` selected the exact
+best source only `1/9` times, had mean target-wise Spearman `-0.000860`, and a
+normalized oracle gap of `0.513228`. Moreover, the response used to fit the
+old router was the mean of seed-cell BACC deltas, whereas Stage 70 evaluates
+BACC after probability ensembling. The new family fixes both the response
+unit and the aggregation functional; it does not reinterpret the oracle as an
+attainable policy result.
+
+This is still the MIDOG++ dataset family, not a cross-dataset experiment. A
+fresh claim nevertheless requires new hash-bound MIDOG++ development,
+support, and evaluation aliases with whole-case disjointness. Repointing any
+of those aliases at the consumed Stage-90 rows would convert the run back into
+a terminal diagnostic and is rejected by the loaders.

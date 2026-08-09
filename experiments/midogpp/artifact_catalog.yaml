@@ -4324,6 +4324,120 @@ artifacts:
       - Primary evidence is center-level S-U and S-G under the all-nine-seed probability ensemble; no selector, fallback, policy update, or promotion path exists.
       - The output cannot train another router or feed Stage 60, Stage 70, recipe selection, promotion, deployment, or any deployable selection.
 
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_validation_utility_aligned_ensemble_endpoint_router_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_validation_utility_aligned_ensemble_endpoint_router/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: EXPLORATORY_CONSUMED_DATA_ONLY
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: EXPLORATORY_CONSUMED_DATA_ONLY
+      architecture_family: exact_nine_probability_ensemble_endpoint_outer_center_crossfit_fixed_two_case_diagnostic_v1
+      primary_utility_endpoint: all_nine_seed_probability_ensemble_bacc_delta
+      primary_response_row_count: '504'
+      descriptive_seed_row_count: '4536'
+      seed_rows_are_model_observations: 'false'
+      technical_seed_repeats_are_independent_units: 'false'
+      frozen_target_action_count: '117'
+      target_action_seed_identity_count: '1053'
+      target_action_seed_identities_are_descriptive_only: 'true'
+      consumed_validation_data: 'true'
+      method_development_is_posthoc: 'true'
+      terminal_stage90_diagnostic: 'true'
+      fixed_support_case_count_per_center: '2'
+      fresh_policy_minimum_support_case_count: '8'
+      routing_status: INSUFFICIENT_SUPPORT_FOR_POLICY
+      outer_target_query_source_exclusion: 'true'
+      development_predictions_sealed_before_development_labels: 'true'
+      target_predictions_sealed_before_terminal_target_scoring: 'true'
+      source_expert_updated: 'false'
+      previous_stage90_outputs_used: 'false'
+      stage60_outputs_used: 'false'
+      stage70_outputs_used: 'false'
+      fresh_evidence: 'false'
+      fresh_confirmation: 'false'
+      routing_quality_claimed: 'false'
+      target_performance_claimed: 'false'
+      target_specific_router_success_claimed: 'false'
+      label_free_features_are_downstream_utility: 'false'
+      proxy_is_nelbo: 'false'
+      promotion_eligible: 'false'
+      oracle_eligible: 'false'
+      may_feed_stage60: 'false'
+      may_feed_stage70: 'false'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - arrays/utility_aligned_source_prefixes.npy
+      - arrays/utility_aligned_support_components.npy
+      - arrays/ensemble_endpoint_development_predictions.npz
+      - arrays/ensemble_endpoint_target_predictions.npz
+      - manifests/protocol_manifest.json
+      - manifests/support_partition_lock.json
+      - manifests/case_fold_lock.json
+      - manifests/utility_aligned_source_cache_lock.json
+      - manifests/feature_surface_set.json
+      - manifests/source_inner_support_action_shift_lock.json
+      - manifests/ensemble_endpoint_development_prediction_index.json
+      - manifests/ensemble_endpoint_global_development_prediction_seal.json
+      - manifests/model_set.json
+      - manifests/diagnostic_plan_set.json
+      - manifests/action_library.json
+      - manifests/target_support_action_shift_lock.json
+      - manifests/ensemble_endpoint_target_probe_seal.json
+      - manifests/ensemble_endpoint_target_prediction_cache.json
+      - manifests/ensemble_endpoint_global_target_prediction_seal.json
+      - manifests/content_index.json
+      - tables/support_partitions.csv
+      - tables/case_folds.csv
+      - tables/utility_aligned_source_streams.csv
+      - tables/utility_aligned_support_components.csv
+      - tables/inner_ensemble_features.csv
+      - tables/target_ensemble_features.csv
+      - tables/source_inner_support_action_shifts.csv
+      - tables/target_support_action_shifts.csv
+      - tables/source_inner_ensemble_endpoints.csv
+      - tables/source_inner_seed_diagnostics.csv
+      - tables/model_summary.csv
+      - tables/diagnostic_plans.csv
+      - tables/target_actions.csv
+      - tables/target_prediction_index.csv
+      - tables/target_seed_diagnostics.csv
+      - tables/target_ensemble_metrics.csv
+      - tables/center_contrasts.csv
+      - tables/contrast_inference.csv
+      - tables/oracle_hxe_diagnostics.csv
+      - reports/phase_01_source_cache_and_features_complete.json
+      - reports/phase_02_development_scoring_and_action_lock_complete.json
+      - reports/phase_03_global_target_prediction_seal_complete.json
+      - reports/phase_04_terminal_scoring_complete.json
+      - reports/development_label_access_report.json
+      - reports/target_label_access_report.json
+      - reports/leakage_report.json
+      - reports/scoring_summary.json
+      - reports/publication_decision.json
+      - reports/runtime_summary.json
+      - reports/run_state.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Active terminal Stage-90 diagnostic over already-consumed validation data; 504 exact-nine ensemble endpoint rows are model observations and 4,536 seed rows are descriptive only.
+      - The fixed two-case unlabeled support surface is insufficient for policy authorization and cannot establish target-specific routing success.
+      - No Stage-60, Stage-70, or prior Stage-90 output is an input, and this output cannot train another router or update any policy.
+
   - artifact_id: midogpp_output_uniform_b_v2_consumed_validation_utility_aligned_exact_tail_router_v1
     stage: 90_oracles_and_diagnostics
     canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_validation_utility_aligned_exact_tail_router/v1
@@ -4562,6 +4676,8 @@ artifacts:
     claim_scope: synthetic_downstream_utility
     semantic_identities:
       primary_endpoint: all_nine_seed_probability_ensemble_bacc
+      ensemble_operation: arithmetic_mean_of_exact_canonical_3x3_positive_probabilities_then_threshold_once
+      seed_cell_bacc_role: descriptive_only
       inference_unit: target_center
       effective_sample_size: '9'
       all_actions_sealed_before_labels: 'true'
@@ -4659,7 +4775,19 @@ artifacts:
     evidence_label: PENDING_FRESH_DEVELOPMENT_SURFACE
     claim_scope: routing_and_composition
     semantic_identities:
-      response: exact_additive_tail_bacc_minus_exact_base_bacc
+      response: exact_additive_tail_probability_ensemble_bacc_minus_exact_base_probability_ensemble_bacc
+      primary_utility_endpoint: all_nine_seed_probability_ensemble_bacc_delta
+      ensemble_seed_pair_count: '9'
+      ensemble_threshold: '0.5'
+      ensemble_utility_row_count: '504'
+      per_seed_utility_role: descriptive_only
+      per_seed_rows_may_feed_model: 'false'
+      support_action_shift_scalar: mean_support_row_absolute_exact_nine_ensemble_probability_shift_v2
+      support_action_shift_semantics: ensemble_first_then_absolute_shift_then_support_row_mean
+      technical_seed_shift_role: descriptive_only
+      technical_seed_shift_values_may_feed_model: 'false'
+      support_action_shift_row_count: '4536'
+      support_action_shift_labels_used: 'false'
       inner_geometry: seven_by_144_base_plus_126_single_source_tail
       outer_target_query_source_exclusion: 'true'
       predictions_sealed_before_labels: 'true'
@@ -4673,6 +4801,8 @@ artifacts:
       - manifests/global_prediction_seal.json
       - manifests/prediction_index.json
       - manifests/exact_tail_utility_surface_lock.json
+      - manifests/exact_tail_ensemble_endpoints_lock.json
+      - manifests/exact_tail_support_action_shifts_lock.json
       - manifests/content_index.json
       - reports/leakage_report.json
       - reports/run_state.json
@@ -4682,6 +4812,8 @@ artifacts:
       - tables/evaluation_rows.csv
       - tables/candidate_features.csv
       - tables/exact_tail_utility.csv
+      - tables/exact_tail_ensemble_endpoints.csv
+      - tables/exact_tail_support_action_shifts.csv
       - arrays/exact_tail_predictions.npz
     may_feed_recipe_selection: false
     may_feed_deployable_selection: true
@@ -4738,6 +4870,14 @@ artifacts:
       bootstrap_unit: independent_support_case
       final_action_source_prefix_rows_per_class: '256'
       label_free_feature_reference_rows_per_class: '270'
+      target_local_scalar: mean_support_row_absolute_exact_nine_ensemble_probability_shift_v2
+      target_action_probe_task_count: '81'
+      target_action_probe_fit_count: '729'
+      target_action_probe_cpu_topology: four_workers_by_three_blas_threads
+      support_action_shift_unit: independent_case_exact_nine_probability_ensemble
+      technical_seed_shift_unit: independent_case_by_training_seed_by_generation_seed_descriptive_only
+      technical_seed_shift_values_may_feed_model: 'false'
+      support_action_shift_labels_used: 'false'
       proxy_is_downstream_utility: 'false'
       authorized_consumer_experiment_ids: midogpp.routing_and_composition.uniform_b_v2_utility_aligned_residual_policy_lock.v1
     required_files:
@@ -4748,9 +4888,11 @@ artifacts:
       - manifests/source_generation_lock.json
       - manifests/case_bootstrap_plans.json
       - manifests/target_support_surface_lock.json
+      - manifests/target_support_action_shifts_lock.json
       - manifests/content_index.json
       - tables/target_candidate_features.csv
       - tables/target_candidate_feature_bootstraps.csv
+      - tables/target_support_action_shifts.csv
       - reports/leakage_report.json
       - reports/run_state.json
       - reports/validation_report.json
@@ -4765,7 +4907,20 @@ artifacts:
     evidence_label: PENDING_FRESH_POLICY_LOCK
     claim_scope: routing_and_composition
     semantic_identities:
-      policy_family: exact_tail_delta_utility_aligned_residual_router_v1
+      policy_family: utility_aligned_candidate_level_exact_nine_ensemble_m0_m1_v1
+      primary_utility_endpoint: all_nine_seed_probability_ensemble_bacc_delta
+      primary_response_row_count: '504'
+      per_seed_utility_rows_may_feed_model: 'false'
+      global_source_control: label_free_mean_metadata_similarity_over_H_excluded_source_inner_pseudoqueries
+      target_local_scalar: mean_support_row_absolute_exact_nine_ensemble_probability_shift_v2
+      target_local_scalar_transfer: cardinality_matched_action_family_not_literal_same_action
+      predictor_capacity: one_global_source_control_plus_at_most_one_target_local_scalar
+      target_or_query_identity_features_used: 'false'
+      query_bootstrap_draw_count: '10000'
+      authorization_uncertainty_components: model_covariance_and_residual|independent_whole_case_bootstrap
+      technical_seed_spread_role: descriptive_only_non_decision
+      technical_seed_spread_enters_combined_standard_error: 'false'
+      support_case_bootstrap_unit: independent_support_case
       fallback_policy: exact_immutable_equal_union_B
       target_support_labels_used: 'false'
       target_evaluation_labels_used: 'false'
@@ -4863,6 +5018,9 @@ artifacts:
     claim_scope: synthetic_downstream_utility
     semantic_identities:
       primary_endpoint: all_nine_seed_probability_ensemble_bacc
+      accepted_policy_family: utility_aligned_candidate_level_exact_nine_ensemble_m0_m1_v1
+      accepted_target_policy_schema: midogpp_utility_aligned_ensemble_policy_v1
+      legacy_policy_family_accepted: 'false'
       inference_unit: target_center
       effective_sample_size: '9'
       primary_contrasts: R-B|R-G_delta|R-U
@@ -5034,3 +5192,141 @@ artifacts:
       - Byte-exact experiment-fenced alias over the already-consumed label-free validation cache; it creates no fresh evidence.
       - Only the utility-aligned exact-tail Stage-90 diagnostic may consume this alias, and only for terminal oracle-and-diagnostic evidence.
       - It cannot reopen Stage 60 or Stage 70 or support policy updates, recipe selection, promotion, deployment, or deployable selection.
+
+  - artifact_id: midogpp_stage90_utility_aligned_ensemble_endpoint_router_validation_manifest_v1
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_STAGE90_UTILITY_ALIGNED_ENSEMBLE_ENDPOINT_ROUTER_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      split_role: val_consumed_stage90_utility_aligned_ensemble_endpoint_router_only
+      policy_consumption_lock_hash: afca569b31caa90b
+      alias_of_artifact_id: midogpp_source_inner_validation_manifest_v1
+      consumption_status: CONSUMED_FOR_STAGE90_UTILITY_ALIGNED_ENSEMBLE_ENDPOINT_ROUTER
+      fresh_evidence: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_validation_utility_aligned_ensemble_endpoint_router.v1
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias over the already-consumed hash-pinned validation manifest; it creates no fresh evidence.
+      - Only the utility-aligned ensemble-endpoint Stage-90 diagnostic may consume this alias, and only for terminal oracle-and-diagnostic evidence.
+      - It cannot reopen Stage 60 or Stage 70, feed another Stage-90 output, or support policy updates, recipe selection, promotion, deployment, or deployable selection.
+
+  - artifact_id: midogpp_stage90_utility_aligned_ensemble_endpoint_router_validation_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_routing_validation_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_STAGE90_UTILITY_ALIGNED_ENSEMBLE_ENDPOINT_ROUTER_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      cache_name: uniform_b_v2_routing_validation_cache_v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: val
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      labels_persisted: 'false'
+      policy_consumption_lock_hash: afca569b31caa90b
+      frozen_build_protocol_hash: f57aad1bf7f7efed
+      content_hash: e1d281d44e47c7b2
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_routing_validation_cache_seed42
+      consumption_status: CONSUMED_FOR_STAGE90_UTILITY_ALIGNED_ENSEMBLE_ENDPOINT_ROUTER
+      fresh_evidence: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_validation_utility_aligned_ensemble_endpoint_router.v1
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - manifests/consumption_lock.json
+      - manifests/content_index.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    expected_file_hashes:
+      embeddings/by_center/center_0.pt:
+        algorithm: sha256
+        digest: 9173a27896d4da6b03e16a9ff74728e833c523c7f8c0e3133a326bd811157846
+      embeddings/by_center/center_1.pt:
+        algorithm: sha256
+        digest: afa13f0db6da02183c634708f324910f23b431a8ad27d397d519b828c05837e1
+      embeddings/by_center/center_2.pt:
+        algorithm: sha256
+        digest: 9dddfae085858c97fa8839029459f288e256e79c2d85ec4023e129fe09e9ca15
+      embeddings/by_center/center_3.pt:
+        algorithm: sha256
+        digest: 11e0168a2f86179af1ecd7bae3373fafa1d457e127c2b02fdc3bafa627286772
+      embeddings/by_center/center_5.pt:
+        algorithm: sha256
+        digest: f2389563717108f649249bbc1ef519f4690b5120899be0620479ac635d2856e4
+      embeddings/by_center/center_6.pt:
+        algorithm: sha256
+        digest: 801529fdb8b1075224963a39b08a2352c477a6d44e6993d0dfbfa81c7c1f39f9
+      embeddings/by_center/center_7.pt:
+        algorithm: sha256
+        digest: 3088737286a406c42a6188a9ae951ddbc29007afe90ece47abd074040d62780f
+      embeddings/by_center/center_8.pt:
+        algorithm: sha256
+        digest: dade7283a833b948344e9b60c83fda350ff7856b191451c0e31451ff444e4fba
+      embeddings/by_center/center_9.pt:
+        algorithm: sha256
+        digest: cdade0c468c5ad70cc51588ed6a0e195135eb7651fc80af758d2e992666f610d
+      manifests/frozen_build_protocol.json:
+        algorithm: sha256
+        digest: cda5e0c351b9f78ff2b8e469341a56e5b5fba2e7907be382d8422f2ce83c14e1
+      manifests/row_alignment.json:
+        algorithm: sha256
+        digest: 8e92e987d121efdaadf547c20996777ea924009443f40dadc664a4f271125f7b
+      manifests/consumption_lock.json:
+        algorithm: sha256
+        digest: 2cef95465c66c59a8d9cbff66c471a38dd30e83ff411246c8510487f3fd79b14
+      manifests/content_index.json:
+        algorithm: sha256
+        digest: 6b46a1777c90a838e67ba1892134c748529169c6034c6865fc8a616039ec5fe2
+      reports/cache_builder_report.json:
+        algorithm: sha256
+        digest: d51ff4bc588554289fa58e64b149f7c696df1ddb4b3a45a6fd3df5f2094234af
+      reports/validation_report.json:
+        algorithm: sha256
+        digest: 2698c5a4335cb209012f4e3f495d57b27f395f0c51fa556083bbab9c02f0872d
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias over the already-consumed label-free validation cache; it creates no fresh evidence.
+      - Only the utility-aligned ensemble-endpoint Stage-90 diagnostic may consume this alias, and only for terminal oracle-and-diagnostic evidence.
+      - It cannot reopen Stage 60 or Stage 70, feed another Stage-90 output, or support policy updates, recipe selection, promotion, deployment, or deployable selection.

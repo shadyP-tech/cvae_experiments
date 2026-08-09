@@ -27,7 +27,18 @@ from .contracts import (
     expected_prediction_keys,
     expected_utility_keys,
 )
+from .ensemble_artifact_io import (
+    load_ensemble_endpoint_rows,
+    load_support_shift_rows,
+)
 from .features import validate_aligned_candidate_features
+from .ensemble_scoring import (
+    ENSEMBLE_ENDPOINT_LOCK_MEMBER,
+    ENSEMBLE_ENDPOINT_TABLE_MEMBER,
+    build_ensemble_endpoint_lock,
+    load_ensemble_endpoint_lock,
+    score_exact_tail_ensemble_endpoints,
+)
 from .label_access import open_globally_sealed_development_labels
 from .production_inputs import parse_development_partition
 from .scoring import (
@@ -37,6 +48,13 @@ from .scoring import (
     score_exact_tail_utility_surface,
 )
 from .seals import PredictionCellSeal, build_global_prediction_seal
+from .support_shift_surface import (
+    SUPPORT_SHIFT_LOCK_MEMBER,
+    SUPPORT_SHIFT_TABLE_MEMBER,
+    build_support_action_shift_lock,
+    build_support_action_shift_rows,
+    load_support_action_shift_lock,
+)
 
 
 def reconstruct_surface_bundle(
@@ -58,7 +76,38 @@ def reconstruct_surface_bundle(
     _validate_provenance(root, effective)
     partitions, reservation = _load_partitions(root)
     seal, predictions = _reconstruct_predictions(root, effective, partitions, lock)
+
+    # Reconstruct the label-free support surface before opening either the
+    # scoring manifest or a persisted label-derived utility table.
+    support_shift_rows = load_support_shift_rows(
+        root / SUPPORT_SHIFT_TABLE_MEMBER
+    )
+    reconstructed_support_shifts = build_support_action_shift_rows(
+        predictions, partitions
+    )
+    if [row.to_payload() for row in support_shift_rows] != [
+        row.to_payload() for row in reconstructed_support_shifts
+    ]:
+        raise ProtocolError(
+            "Exact-tail support action-shift table drifted from sealed probabilities."
+        )
+    support_shift_lock = load_support_action_shift_lock(
+        root / SUPPORT_SHIFT_LOCK_MEMBER
+    )
+    rebuilt_support_shift_lock = build_support_action_shift_lock(
+        seal=seal,
+        rows=support_shift_rows,
+        shift_table_sha256=sha256_file(root / SUPPORT_SHIFT_TABLE_MEMBER),
+    )
+    if rebuilt_support_shift_lock.to_payload() != support_shift_lock.to_payload():
+        raise ProtocolError(
+            "Exact-tail support action-shift lock drifted from reconstruction."
+        )
+
     utility_rows = _load_utility_rows(root / "tables/exact_tail_utility.csv")
+    endpoint_rows = load_ensemble_endpoint_rows(
+        root / ENSEMBLE_ENDPOINT_TABLE_MEMBER
+    )
     feature_rows = _load_feature_rows(root / "tables/candidate_features.csv")
     validate_aligned_candidate_features(feature_rows, utility_rows)
 
@@ -75,12 +124,40 @@ def reconstruct_surface_bundle(
         row.to_payload() for row in rescored
     ]:
         raise ProtocolError("Exact-tail utility table drifted from sealed rescoring.")
+    rescored_endpoints = score_exact_tail_ensemble_endpoints(
+        predictions, labels, partitions
+    )
+    if [row.to_payload() for row in endpoint_rows] != [
+        row.to_payload() for row in rescored_endpoints
+    ]:
+        raise ProtocolError(
+            "Exact-tail ensemble endpoint table drifted from sealed rescoring."
+        )
+
+    endpoint_lock = load_ensemble_endpoint_lock(
+        root / ENSEMBLE_ENDPOINT_LOCK_MEMBER
+    )
+    rebuilt_endpoint_lock = build_ensemble_endpoint_lock(
+        seal=seal,
+        rows=endpoint_rows,
+        endpoint_table_sha256=sha256_file(root / ENSEMBLE_ENDPOINT_TABLE_MEMBER),
+    )
+    if rebuilt_endpoint_lock.to_payload() != endpoint_lock.to_payload():
+        raise ProtocolError(
+            "Exact-tail ensemble endpoint lock drifted from reconstruction."
+        )
 
     rebuilt = build_surface_lock(
         seal=seal,
         rows=utility_rows,
         feature_rows=feature_rows,
         utility_table_sha256=sha256_file(root / "tables/exact_tail_utility.csv"),
+        ensemble_endpoint_lock=endpoint_lock,
+        ensemble_endpoint_lock_sha256=sha256_file(
+            root / ENSEMBLE_ENDPOINT_LOCK_MEMBER
+        ),
+        support_shift_lock=support_shift_lock,
+        support_shift_lock_sha256=sha256_file(root / SUPPORT_SHIFT_LOCK_MEMBER),
         feature_table_sha256=sha256_file(root / "tables/candidate_features.csv"),
         member_sha256=lock.member_sha256,
     )
@@ -141,22 +218,28 @@ def _reconstruct_predictions(
     expected_index = {
         "schema_version", "array_member", "array_file_sha256",
         "allowed_array_keys", "prediction_dtype", "probability_dtype",
-        "offset_dtype", "cell_count", "cells", "labels_stored",
+        "support_probability_dtype", "offset_dtype", "support_offset_dtype",
+        "cell_count", "cells", "labels_stored", "support_labels_stored",
         "all_predictions_materialized_before_development_labels",
+        "all_support_probabilities_materialized_before_development_labels",
         "prediction_index_hash",
     }
     unhashed = {key: value for key, value in index.items() if key != "prediction_index_hash"}
     if (
         set(index) != expected_index
-        or index.get("schema_version") != "midogpp_exact_tail_prediction_index_v1"
+        or index.get("schema_version") != "midogpp_exact_tail_prediction_index_v2"
         or index.get("array_member") != "arrays/exact_tail_predictions.npz"
         or index.get("array_file_sha256") != sha256_file(arrays_path)
-        or index.get("allowed_array_keys") != ["predictions", "probabilities", "offsets"]
+        or index.get("allowed_array_keys") != ["predictions", "probabilities", "support_probabilities", "offsets", "support_offsets"]
         or index.get("prediction_dtype") != "uint8"
         or index.get("probability_dtype") != "float32"
+        or index.get("support_probability_dtype") != "float32"
         or index.get("offset_dtype") != "int64"
+        or index.get("support_offset_dtype") != "int64"
         or index.get("labels_stored") is not False
+        or index.get("support_labels_stored") is not False
         or index.get("all_predictions_materialized_before_development_labels") is not True
+        or index.get("all_support_probabilities_materialized_before_development_labels") is not True
         or index.get("prediction_index_hash") != stable_hash(unhashed)
     ):
         raise ProtocolError("Exact-tail prediction index drifted.")
@@ -167,11 +250,13 @@ def _reconstruct_predictions(
     if len(raw_cells) != len(expected_keys) or index.get("cell_count") != len(expected_keys):
         raise ProtocolError("Exact-tail prediction cell count drifted.")
     with np.load(arrays_path, allow_pickle=False) as payload:
-        if set(payload.files) != {"predictions", "probabilities", "offsets"}:
+        if set(payload.files) != {"predictions", "probabilities", "support_probabilities", "offsets", "support_offsets"}:
             raise ProtocolError("Exact-tail prediction NPZ schema drifted.")
         flat_predictions = np.asarray(payload["predictions"])
         flat_probabilities = np.asarray(payload["probabilities"])
+        flat_support_probabilities = np.asarray(payload["support_probabilities"])
         offsets = np.asarray(payload["offsets"])
+        support_offsets = np.asarray(payload["support_offsets"])
     if (
         flat_predictions.ndim != 1 or flat_predictions.dtype != np.uint8
         or not np.isin(flat_predictions, (0, 1)).all()
@@ -182,27 +267,51 @@ def _reconstruct_predictions(
         or offsets[0] != 0 or offsets[-1] != len(flat_predictions)
         or len(flat_probabilities) != len(flat_predictions)
         or np.any(np.diff(offsets) <= 0)
+        or flat_support_probabilities.ndim != 1
+        or flat_support_probabilities.dtype != np.float32
+        or not np.isfinite(flat_support_probabilities).all()
+        or np.any((flat_support_probabilities < 0.0) | (flat_support_probabilities > 1.0))
+        or support_offsets.dtype != np.int64
+        or support_offsets.shape != (len(expected_keys) + 1,)
+        or support_offsets[0] != 0
+        or support_offsets[-1] != len(flat_support_probabilities)
+        or np.any(np.diff(support_offsets) <= 0)
     ):
         raise ProtocolError("Exact-tail prediction arrays drifted.")
     cells: list[PredictionCellSeal] = []
     prediction_map: dict[tuple[str, str, str, int, int], np.ndarray] = {}
+    probability_map: dict[tuple[str, str, str, int, int], np.ndarray] = {}
+    support_probability_map: dict[
+        tuple[str, str, str, int, int], np.ndarray
+    ] = {}
     cell_keys = {
         "cell_ordinal", "outer_target", "pseudo_query", "action_id",
         "training_seed", "generation_seed", "action_hash",
         "evaluation_row_identity_hash", "prediction_sha256", "probability_sha256",
+        "support_row_identity_hash", "support_probability_sha256",
         "composition_sha256", "classifier_config_hash",
         "evaluation_labels_available_to_fit_or_predict", "support_labels_used",
         "target_labels_used", "seed_selection_performed", "array_start",
         "array_stop", "scaler_state_hash", "labels_stored",
+        "support_array_start", "support_array_stop", "support_labels_stored",
+        "support_probabilities_are_label_free",
     }
     for ordinal, (expected_key, raw) in enumerate(zip(expected_keys, raw_cells, strict=True)):
         if not isinstance(raw, Mapping) or set(raw) != cell_keys:
             raise ProtocolError("Exact-tail prediction cell schema drifted.")
         start, stop = int(raw["array_start"]), int(raw["array_stop"])
+        support_start = int(raw["support_array_start"])
+        support_stop = int(raw["support_array_stop"])
         if (
             raw.get("cell_ordinal") != ordinal
             or start != int(offsets[ordinal]) or stop != int(offsets[ordinal + 1])
+            or support_start != int(support_offsets[ordinal])
+            or support_stop != int(support_offsets[ordinal + 1])
+            or support_stop - support_start
+            != len(partitions[str(raw["pseudo_query"])].support_rows)
             or raw.get("labels_stored") is not False
+            or raw.get("support_labels_stored") is not False
+            or raw.get("support_probabilities_are_label_free") is not True
             or raw.get("evaluation_labels_available_to_fit_or_predict") is not False
             or raw.get("support_labels_used") is not False
             or raw.get("target_labels_used") is not False
@@ -214,17 +323,24 @@ def _reconstruct_predictions(
             action_id=str(raw["action_id"]), training_seed=int(raw["training_seed"]),
             generation_seed=int(raw["generation_seed"]), action_hash=str(raw["action_hash"]),
             evaluation_row_identity_hash=str(raw["evaluation_row_identity_hash"]),
+            support_row_identity_hash=str(raw["support_row_identity_hash"]),
             prediction_sha256=str(raw["prediction_sha256"]),
             probability_sha256=str(raw["probability_sha256"]),
+            support_probability_sha256=str(raw["support_probability_sha256"]),
             composition_sha256=str(raw["composition_sha256"]),
             classifier_config_hash=str(raw["classifier_config_hash"]),
         )
         pred = np.ascontiguousarray(flat_predictions[start:stop])
         prob = np.ascontiguousarray(flat_probabilities[start:stop])
-        if cell.key != expected_key or array_sha256(pred) != cell.prediction_sha256 or array_sha256(prob) != cell.probability_sha256:
+        support_prob = np.ascontiguousarray(
+            flat_support_probabilities[support_start:support_stop]
+        )
+        if cell.key != expected_key or array_sha256(pred) != cell.prediction_sha256 or array_sha256(prob) != cell.probability_sha256 or array_sha256(support_prob) != cell.support_probability_sha256:
             raise ProtocolError("Exact-tail indexed prediction bytes drifted.")
         cells.append(cell)
         prediction_map[cell.key] = pred
+        probability_map[cell.key] = prob
+        support_probability_map[cell.key] = support_prob
     seal = build_global_prediction_seal(
         config_contract_hash=config.contract_hash,
         reservation_index_hash=lock.reservation_index_hash,
@@ -239,7 +355,12 @@ def _reconstruct_predictions(
     persisted = _json(root / "manifests/global_prediction_seal.json")
     if persisted != seal.to_payload() or seal.seal_hash != lock.prediction_seal_hash:
         raise ProtocolError("Exact-tail global seal drifted from arrays/index/partitions.")
-    return seal, SealedPredictionSurface(prediction_map, seal)
+    return seal, SealedPredictionSurface(
+        predictions_by_key=prediction_map,
+        probabilities_by_key=probability_map,
+        support_probabilities_by_key=support_probability_map,
+        seal=seal,
+    )
 
 
 def _load_utility_rows(path: Path) -> tuple[ScoredExactTailUtilityRow, ...]:
@@ -347,26 +468,30 @@ def _validate_provenance(root: Path, config: ExactTailUtilitySurfaceConfig) -> N
 
 def _validate_protocol_and_reports(root: Path, config: ExactTailUtilitySurfaceConfig, reservation: Mapping[str, object], seal: object, lock: object) -> None:
     protocol = _json(root / "manifests/protocol_manifest.json")
-    required_protocol = {"schema_version", "experiment_id", "output_artifact_id", "config_contract_hash", "reservation_hash", "generated_source_cache_hash", "generation_lock_hash", "bank_lock_hash", "metadata_profile_sha256", "prediction_seal_hash", "inner_geometry", "distribution_mmd_semantics", "minimum_independent_support_cases_per_query", "uncertainty_units", "seed_cells_are_uncertainty_units", "all_predictions_sealed_before_development_labels", "dedicated_scoring_manifest_contains_exactly_sealed_rows", "target_support_labels_used", "target_evaluation_labels_used", "source_experts_updated", "seed_selection_performed"}
-    if set(protocol) != required_protocol or protocol.get("schema_version") != "midogpp_exact_tail_protocol_manifest_v1" or protocol.get("experiment_id") != EXPERIMENT_ID or protocol.get("output_artifact_id") != OUTPUT_ARTIFACT_ID or protocol.get("config_contract_hash") != config.contract_hash or protocol.get("reservation_hash") != reservation["reservation_hash"] or protocol.get("prediction_seal_hash") != seal.seal_hash or protocol.get("inner_geometry") != "seven_by_144_base_plus_126_single_source_tail" or protocol.get("distribution_mmd_semantics") != "linear_kernel_mmd_squared" or protocol.get("minimum_independent_support_cases_per_query") != 8 or protocol.get("uncertainty_units") != ["query_cluster", "case_cluster"] or protocol.get("seed_cells_are_uncertainty_units") is not False or any(protocol.get(key) is not False for key in ("target_support_labels_used", "target_evaluation_labels_used", "source_experts_updated", "seed_selection_performed")) or protocol.get("all_predictions_sealed_before_development_labels") is not True or protocol.get("dedicated_scoring_manifest_contains_exactly_sealed_rows") is not True:
+    required_protocol = {"schema_version", "experiment_id", "output_artifact_id", "config_contract_hash", "reservation_hash", "generated_source_cache_hash", "generation_lock_hash", "bank_lock_hash", "metadata_profile_sha256", "prediction_seal_hash", "inner_geometry", "distribution_mmd_semantics", "minimum_independent_support_cases_per_query", "uncertainty_units", "seed_cells_are_uncertainty_units", "per_seed_utility_rows_are_descriptive_only", "per_seed_rows_may_feed_model", "operational_endpoint", "probability_ensemble_threshold", "probability_ensemble_seed_cell_count", "support_probability_outputs_materialized", "support_action_shift_row_count", "support_action_shift_scalar_name", "support_action_shift_scalar_semantics", "support_action_shift_seed_values_may_feed_model", "support_action_shift_labels_used", "classifier_fit_count_unchanged", "all_predictions_sealed_before_development_labels", "dedicated_scoring_manifest_contains_exactly_sealed_rows", "target_support_labels_used", "target_evaluation_labels_used", "source_experts_updated", "seed_selection_performed"}
+    if set(protocol) != required_protocol or protocol.get("schema_version") != "midogpp_exact_tail_protocol_manifest_v2" or protocol.get("experiment_id") != EXPERIMENT_ID or protocol.get("output_artifact_id") != OUTPUT_ARTIFACT_ID or protocol.get("config_contract_hash") != config.contract_hash or protocol.get("reservation_hash") != reservation["reservation_hash"] or protocol.get("prediction_seal_hash") != seal.seal_hash or protocol.get("inner_geometry") != "seven_by_144_base_plus_126_single_source_tail" or protocol.get("distribution_mmd_semantics") != "linear_kernel_mmd_squared" or protocol.get("minimum_independent_support_cases_per_query") != 8 or protocol.get("uncertainty_units") != ["query_cluster", "case_cluster"] or protocol.get("seed_cells_are_uncertainty_units") is not False or protocol.get("per_seed_utility_rows_are_descriptive_only") is not True or protocol.get("per_seed_rows_may_feed_model") is not False or protocol.get("operational_endpoint") != "all_nine_seed_probability_ensemble_bacc_delta" or protocol.get("probability_ensemble_threshold") != 0.5 or protocol.get("probability_ensemble_seed_cell_count") != 9 or protocol.get("support_probability_outputs_materialized") is not True or protocol.get("support_action_shift_row_count") != 4536 or protocol.get("support_action_shift_scalar_name") != config.protocol["support_action_shift_scalar_name"] or protocol.get("support_action_shift_scalar_semantics") != config.protocol["support_action_shift_scalar_semantics"] or protocol.get("support_action_shift_seed_values_may_feed_model") is not False or protocol.get("support_action_shift_labels_used") is not False or protocol.get("classifier_fit_count_unchanged") is not True or any(protocol.get(key) is not False for key in ("target_support_labels_used", "target_evaluation_labels_used", "source_experts_updated", "seed_selection_performed")) or protocol.get("all_predictions_sealed_before_development_labels") is not True or protocol.get("dedicated_scoring_manifest_contains_exactly_sealed_rows") is not True:
         raise ProtocolError("Exact-tail protocol manifest drifted.")
     leakage = _json(root / "reports/leakage_report.json")
     if leakage.get("status") != "PASS" or leakage.get("surface_lock_hash") != lock.surface_lock_hash or leakage.get("target_support_labels_used") is not False or leakage.get("target_evaluation_labels_used") is not False:
         raise ProtocolError("Exact-tail leakage report drifted.")
     state = _json(root / "reports/run_state.json")
-    if state.get("status") != "COMPLETE" or state.get("surface_lock_hash") != lock.surface_lock_hash or state.get("prediction_cell_count") != 5184 or state.get("utility_row_count") != 4536 or state.get("feature_row_count") != 4536:
+    if state.get("schema_version") != "midogpp_exact_tail_run_state_v2" or state.get("status") != "COMPLETE" or state.get("surface_lock_hash") != lock.surface_lock_hash or state.get("prediction_cell_count") != 5184 or state.get("utility_row_count") != 4536 or state.get("utility_row_role") != "descriptive_technical_repeats" or state.get("ensemble_endpoint_row_count") != 504 or state.get("ensemble_endpoint_lock_hash") != lock.ensemble_endpoint_lock_hash or state.get("ensemble_endpoint_role") != "operational_source_inner_all_nine_seed_probability_ensemble" or state.get("support_shift_row_count") != 4536 or state.get("support_shift_lock_hash") != lock.support_shift_lock_hash or state.get("support_shift_labels_used") is not False or state.get("feature_row_count") != 4536:
         raise ProtocolError("Exact-tail run-state report drifted.")
 
 
 def validation_report_payload(surface_lock_hash: str) -> dict[str, object]:
     return {
-        "schema_version": "midogpp_exact_tail_validation_report_v1",
+        "schema_version": "midogpp_exact_tail_validation_report_v2",
         "status": "PASS",
         "surface_lock_hash": surface_lock_hash,
         "bundle_member_hashes_validated": True,
         "config_and_input_bindings_validated": True,
         "prediction_npz_index_and_global_seal_reconstructed": True,
         "utility_rows_rescored_from_sealed_predictions": True,
+        "ensemble_endpoints_reconstructed_from_exact_nine_sealed_probabilities": True,
+        "ensemble_endpoint_table_and_lock_reconstructed": True,
+        "support_probability_surface_and_shift_lock_reconstructed": True,
+        "per_seed_utility_rows_retained_as_descriptive": True,
         "candidate_feature_rows_reconstructed": True,
         "utility_feature_key_alignment_validated": True,
         "predictions_sealed_before_labels": True,

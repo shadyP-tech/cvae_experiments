@@ -1,6 +1,6 @@
 # Current Experimental State
 
-Last updated: 2026-08-08
+Last updated: 2026-08-09
 
 This page records verified evidence and canonical availability after the
 completed MIDOG++ repository migration. The canonical contract, feature
@@ -51,6 +51,21 @@ establish routing quality or frozen-policy downstream utility.
   target-evaluation artifact, followed by matched scoring of the frozen
   equal-union, metadata max-tie, and utility/regret arms; target labels remain
   scoring-only after predictions.
+- The completed consumed-validation utility-aligned exact-tail Stage-90
+  diagnostic is a protocol-clean negative routing result. Probability-ensemble
+  BACC is `0.770276` for `B` and `0.762182` for `R2`; the center-paired `R2-B`
+  estimate is `-0.008093` with 95% interval `[-0.034655, 0.018468]`. A
+  terminal-label single-source oracle reaches `0.791928`, but `R2` has exact
+  top-1 `1/9`, mean rank correlation `-0.000860`, and normalized oracle gap
+  `0.513228`. This establishes descriptive composition headroom and failed
+  source identification, not an attainable policy gain.
+- The planned successor now aligns its Stage-60 response with the Stage-70
+  endpoint: one `(H,q,e)` observation is BACC after averaging all nine positive
+  probability vectors and thresholding once. The old 4,536 seed cells are
+  descriptive; the 504 candidate responses are model inputs. Its predeclared
+  `M0/M1` model admits one label-free global metadata control and one unlabeled
+  exact-action probability-shift scalar, with query- and case-level uncertainty
+  gates and exact-`B` fallback.
 - The Stage-10 matched-reference v2, Stage-10 conditional-logit alignment
   diagnostic, Stage-20 scalar source-inner prior-recovery/Task-Fisher run, and
   bounded Stage-20 training-seed stability run are complete on `xai-master`

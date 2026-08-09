@@ -11,10 +11,18 @@ import yaml
 
 from ...protocol import ProtocolError
 from ..residual_topup.hashing import canonical_sha256
+from ..utility_aligned.ensemble_contracts import (
+    SUPPORT_ACTION_PROBABILITY_SHIFT_NAME,
+    SUPPORT_ACTION_PROBABILITY_SHIFT_SEMANTICS,
+)
+from .action_probe_contracts import (
+    ActionProbeRuntime,
+    action_probe_runtime_from_config,
+)
 from .contracts import EXPERIMENT_ID, INPUT_ARTIFACT_IDS, OUTPUT_ARTIFACT_ID
 
 
-CONFIG_SCHEMA = "midogpp_utility_aligned_target_support_surface_config_v1"
+CONFIG_SCHEMA = "midogpp_utility_aligned_target_support_surface_config_v2"
 
 
 @dataclass(frozen=True)
@@ -46,6 +54,12 @@ class TargetSupportSurfaceConfig:
             "protocol": dict(self.protocol), "runtime": dict(self.runtime),
             "claim_boundary": dict(self.claim_boundary),
         })
+
+    @property
+    def action_probe_runtime(self) -> ActionProbeRuntime:
+        """Validated operational action-probe topology, not display metadata."""
+
+        return action_probe_runtime_from_config(self.runtime)
 
 
 def load_utility_aligned_target_support_surface_config(path: str | Path) -> TargetSupportSurfaceConfig:
@@ -105,6 +119,11 @@ def _validate(config: TargetSupportSurfaceConfig) -> None:
         "case_bootstrap_replicates": 32, "case_bootstrap_unit": "independent_support_case",
         "target_expert_excluded": True, "support_labels_used": False,
         "target_evaluation_rows_opened": False,
+        "target_local_scalar_name": SUPPORT_ACTION_PROBABILITY_SHIFT_NAME,
+        "target_local_scalar_semantics": (
+            SUPPORT_ACTION_PROBABILITY_SHIFT_SEMANTICS
+        ),
+        "technical_seed_shift_values_may_feed_model": False,
     }
     if config.protocol.get("fresh_support_status") not in {"planned", "ready"} or dict(config.protocol) != expected_protocol:
         raise ProtocolError("Target-support protocol drifted.")
@@ -116,8 +135,24 @@ def _validate(config: TargetSupportSurfaceConfig) -> None:
         "parent_cuda_context_forbidden": True,
         "multiprocessing_start_method": "spawn", "tf32_enabled": False, "amp_enabled": False,
         "launch_blas_threads": 1, "scratch_preference": ["/data/local", "artifact_parent"],
+        "action_probe_classifier_workers": 4,
+        "action_probe_threads_per_worker": 3,
+        "action_probe_task_count": 81,
+        "action_probe_fit_count": 729,
+        "target_local_scalar_name": (
+            SUPPORT_ACTION_PROBABILITY_SHIFT_NAME
+        ),
     }:
         raise ProtocolError("Target-support workstation runtime drifted.")
+    runtime = config.action_probe_runtime
+    if (
+        runtime.classifier_workers != 4
+        or runtime.threads_per_worker != 3
+        or runtime.task_count != 81
+        or runtime.fit_count != 729
+        or runtime.fits_per_task != 9
+    ):
+        raise ProtocolError("Target-support action-probe topology drifted.")
     if dict(config.claim_boundary) != {
         "claim_scope": "routing_compatibility_only", "label_free_feature_surface_only": True,
         "routing_improvement_claimed": False, "target_downstream_utility_claimed": False,

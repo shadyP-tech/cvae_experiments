@@ -18,6 +18,7 @@ from .input_contracts import FixedPartitionSurface
 from .partitions import CaseFoldSurface
 from .source_cache_contracts import SourceCache
 from .target_prediction_contracts import (
+    TARGET_CHECKPOINT_DIRECTORY,
     TARGET_PREDICTION_ARRAY_MEMBER,
     TARGET_PREDICTION_CACHE_MEMBER,
     TARGET_PREDICTION_INDEX_COLUMNS,
@@ -28,6 +29,8 @@ from .target_prediction_contracts import (
     canonical_target_cell_keys,
 )
 from .target_prediction_planning import (
+    TARGET_EVALUATION_ARRAY_MEMBER,
+    TARGET_EVALUATION_INDEX_MEMBER,
     build_target_prediction_tasks,
     write_target_evaluation_scratch,
 )
@@ -51,12 +54,14 @@ def materialize_target_predictions(
         root / TARGET_PREDICTION_CACHE_MEMBER,
     )
     if all(path.is_file() for path in final_members):
-        return read_target_prediction_store(
+        verified = read_target_prediction_store(
             root,
             library=library,
             source_cache_lock_hash=source_cache_lock_hash,
             case_fold_lock_hash=case_folds.lock_hash,
         )
+        _remove_verified_target_working_files(root)
+        return verified
     scratch = write_target_evaluation_scratch(
         root, frame=frame, partitions=partitions
     )
@@ -85,8 +90,26 @@ def materialize_target_predictions(
         source_cache_lock_hash=source_cache_lock_hash,
         case_fold_lock_hash=case_folds.lock_hash,
     )
-    shutil.rmtree(root / "checkpoints/target_predictions", ignore_errors=True)
+    _remove_verified_target_working_files(root)
     return verified
+
+
+def _remove_verified_target_working_files(root: Path) -> None:
+    """Remove resumable worker files only after the canonical store validates."""
+
+    task_checkpoint_root = root / TARGET_CHECKPOINT_DIRECTORY
+    try:
+        if task_checkpoint_root.exists():
+            shutil.rmtree(task_checkpoint_root)
+        for member in (
+            TARGET_EVALUATION_ARRAY_MEMBER,
+            TARGET_EVALUATION_INDEX_MEMBER,
+        ):
+            (root / member).unlink(missing_ok=True)
+    except OSError as exc:
+        raise ProtocolError(
+            "Verified target prediction working files could not be removed."
+        ) from exc
 
 
 def _execute_or_resume(

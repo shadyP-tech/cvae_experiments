@@ -1,4 +1,4 @@
-schema_version: midogpp_utility_aligned_target_support_surface_config_v1
+schema_version: midogpp_utility_aligned_target_support_surface_config_v2
 experiment:
   id: midogpp.routing_and_composition.uniform_b_v2_utility_aligned_target_support_surface.v1
   artifact_root: output://midogpp_utility_aligned_target_support_surface_v1
@@ -28,6 +28,9 @@ protocol:
   target_expert_excluded: true
   support_labels_used: false
   target_evaluation_rows_opened: false
+  target_local_scalar_name: mean_support_row_absolute_exact_nine_ensemble_probability_shift_v2
+  target_local_scalar_semantics: label_free_mean_over_support_rows_of_absolute_difference_between_exact_nine_seed_cell_mean_tail_and_base_positive_class_probabilities_v2
+  technical_seed_shift_values_may_feed_model: false
 runtime:
   workstation_profile: xeon_w2265_12c24t_125gb_2x_rtx_a5000_24gb
   generation_devices: [cuda:0, cuda:1]
@@ -40,6 +43,11 @@ runtime:
   amp_enabled: false
   launch_blas_threads: 1
   scratch_preference: [/data/local, artifact_parent]
+  action_probe_classifier_workers: 4
+  action_probe_threads_per_worker: 3
+  action_probe_task_count: 81
+  action_probe_fit_count: 729
+  target_local_scalar_name: mean_support_row_absolute_exact_nine_ensemble_probability_shift_v2
 claim_boundary:
   claim_scope: routing_compatibility_only
   label_free_feature_surface_only: true

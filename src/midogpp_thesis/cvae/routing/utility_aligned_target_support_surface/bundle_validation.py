@@ -10,12 +10,23 @@ from typing import Mapping, Sequence
 from ...protocol import ProtocolError
 from ..residual_topup.hashing import canonical_sha256
 from ..utility_aligned.target_features import target_feature_production_from_payload
+from ..utility_aligned.ensemble_contracts import (
+    SUPPORT_ACTION_PROBABILITY_SHIFT_NAME,
+)
 from ..utility_aligned_identities import (
     CENTERS,
     METADATA_PROFILE_SHA256,
     POLICY_EXPERIMENT_ID,
 )
 from .artifact_writer import sha256_file
+from .action_probe_contracts import (
+    ACTION_SHIFT_LOCK_MEMBER,
+    ACTION_SHIFT_TABLE_MEMBER,
+)
+from .action_probe_surface import (
+    action_shift_row_from_payload,
+    validate_action_shift_surface,
+)
 from .config import load_utility_aligned_target_support_surface_config
 from .contracts import (
     CACHE_ARTIFACT_ID,
@@ -40,6 +51,10 @@ SURFACE_KEYS = {
     "feature_reference_rows_per_class",
     "final_action_source_prefix_rows_per_class",
     "final_action_geometry_executed_by_this_artifact",
+    "target_local_scalar_name", "target_support_action_shift_lock_hash",
+    "target_support_action_shift_table_sha256",
+    "target_support_action_shift_row_hashes_hash",
+    "target_support_action_shift_row_count",
     "support_case_ids_by_target", "target_features", "labels_persisted",
     "target_evaluation_rows_opened", "surface_hash",
 }
@@ -60,9 +75,15 @@ def validate_target_support_surface_bundle(root: str | Path) -> Mapping[str, obj
     reservation = _validate_reservation(path)
     cache = _validate_cache_lock(path, reservation)
     generation = _validate_generation_lock(path)
+    shifts = _validate_action_shifts(
+        path,
+        reservation=reservation,
+        cache=cache,
+        generation=generation,
+    )
     surface = _json(path / "manifests/target_support_surface_lock.json")
     surface_unhashed = {key: value for key, value in surface.items() if key != "surface_hash"}
-    if set(surface) != SURFACE_KEYS or surface.get("schema_version") != "midogpp_utility_aligned_target_support_surface_v1" or surface.get("artifact_id") != OUTPUT_ARTIFACT_ID or surface.get("surface_hash") != canonical_sha256(surface_unhashed) or surface.get("status") != "COMPLETE" or surface.get("claim_scope") != "routing_compatibility_only" or surface.get("target_support_parent_reservation_artifact_id") != RESERVATION_ARTIFACT_ID or surface.get("target_support_parent_reservation_hash") != reservation["reservation_hash"] or surface.get("metadata_profile_sha256") != METADATA_PROFILE_SHA256 or surface.get("config_contract_hash") != config.contract_hash or surface.get("input_artifact_ids") != list(INPUT_ARTIFACT_IDS) or surface.get("target_support_cache_binding_hash") != cache["cache_binding_hash"] or surface.get("target_support_cache_lock_hash") != cache["target_support_cache_lock_hash"] or surface.get("expert_bank_lock_hash") != generation["bank_lock_hash"] or surface.get("generation_lock_hash") != generation["generation_lock_hash"] or surface.get("source_generation_lock_hash") != generation["source_generation_lock_hash"] or surface.get("generated_cache_hash") != generation["generated_cache_hash"] or surface.get("feature_reference_rows_per_class") != 270 or surface.get("final_action_source_prefix_rows_per_class") != 256 or surface.get("final_action_geometry_executed_by_this_artifact") is not False or surface.get("labels_persisted") is not False or surface.get("target_evaluation_rows_opened") is not False:
+    if set(surface) != SURFACE_KEYS or surface.get("schema_version") != "midogpp_utility_aligned_target_support_surface_v1" or surface.get("artifact_id") != OUTPUT_ARTIFACT_ID or surface.get("surface_hash") != canonical_sha256(surface_unhashed) or surface.get("status") != "COMPLETE" or surface.get("claim_scope") != "routing_compatibility_only" or surface.get("target_support_parent_reservation_artifact_id") != RESERVATION_ARTIFACT_ID or surface.get("target_support_parent_reservation_hash") != reservation["reservation_hash"] or surface.get("metadata_profile_sha256") != METADATA_PROFILE_SHA256 or surface.get("config_contract_hash") != config.contract_hash or surface.get("input_artifact_ids") != list(INPUT_ARTIFACT_IDS) or surface.get("target_support_cache_binding_hash") != cache["cache_binding_hash"] or surface.get("target_support_cache_lock_hash") != cache["target_support_cache_lock_hash"] or surface.get("expert_bank_lock_hash") != generation["bank_lock_hash"] or surface.get("generation_lock_hash") != generation["generation_lock_hash"] or surface.get("source_generation_lock_hash") != generation["source_generation_lock_hash"] or surface.get("generated_cache_hash") != generation["generated_cache_hash"] or surface.get("feature_reference_rows_per_class") != 270 or surface.get("final_action_source_prefix_rows_per_class") != 256 or surface.get("final_action_geometry_executed_by_this_artifact") is not True or surface.get("target_local_scalar_name") != SUPPORT_ACTION_PROBABILITY_SHIFT_NAME or surface.get("target_support_action_shift_lock_hash") != shifts["shift_lock_hash"] or surface.get("target_support_action_shift_table_sha256") != shifts["table_sha256"] or surface.get("target_support_action_shift_row_hashes_hash") != shifts["ordered_row_hashes_hash"] or surface.get("target_support_action_shift_row_count") != shifts["row_count"] or surface.get("labels_persisted") is not False or surface.get("target_evaluation_rows_opened") is not False:
         raise ProtocolError("Target-support surface lock drifted.")
     raw_features = surface.get("target_features")
     if not isinstance(raw_features, Sequence) or isinstance(raw_features, (str, bytes)) or len(raw_features) != len(CENTERS):
@@ -79,9 +100,9 @@ def validate_target_support_surface_bundle(root: str | Path) -> Mapping[str, obj
     state = _json(path / "reports/run_state.json")
     validation = _json(path / "reports/validation_report.json")
     leakage = _json(path / "reports/leakage_report.json")
-    if set(leakage) != {"schema_version", "status", "surface_hash", "support_labels_used", "target_evaluation_rows_opened", "target_expert_excluded", "case_level_resampling"} or leakage.get("schema_version") != "midogpp_utility_aligned_target_support_leakage_report_v1" or leakage.get("status") != "PASS" or leakage.get("surface_hash") != surface["surface_hash"] or leakage.get("support_labels_used") is not False or leakage.get("target_evaluation_rows_opened") is not False or leakage.get("target_expert_excluded") is not True or leakage.get("case_level_resampling") is not True:
+    if set(leakage) != {"schema_version", "status", "surface_hash", "support_labels_used", "target_evaluation_rows_opened", "target_expert_excluded", "case_level_resampling", "action_probe_labels_used"} or leakage.get("schema_version") != "midogpp_utility_aligned_target_support_leakage_report_v1" or leakage.get("status") != "PASS" or leakage.get("surface_hash") != surface["surface_hash"] or leakage.get("support_labels_used") is not False or leakage.get("target_evaluation_rows_opened") is not False or leakage.get("target_expert_excluded") is not True or leakage.get("case_level_resampling") is not True or leakage.get("action_probe_labels_used") is not False:
         raise ProtocolError("Target-support leakage report drifted.")
-    if set(state) != {"schema_version", "status", "surface_hash", "point_feature_row_count", "bootstrap_feature_row_count", "target_count"} or state.get("schema_version") != "midogpp_utility_aligned_target_support_run_state_v1" or state.get("status") != "COMPLETE" or state.get("surface_hash") != surface["surface_hash"] or state.get("point_feature_row_count") != 648 or state.get("bootstrap_feature_row_count") != 20_736 or state.get("target_count") != 9 or set(validation) != {"schema_version", "status", "surface_hash", "closed_world_cache_validated", "typed_bootstrap_plans_reconstructed", "label_free_target_features_reconstructed"} or validation.get("schema_version") != "midogpp_utility_aligned_target_support_validation_report_v1" or validation.get("status") != "PASS" or validation.get("surface_hash") != surface["surface_hash"] or any(validation.get(key) is not True for key in ("closed_world_cache_validated", "typed_bootstrap_plans_reconstructed", "label_free_target_features_reconstructed")):
+    if set(state) != {"schema_version", "status", "surface_hash", "point_feature_row_count", "bootstrap_feature_row_count", "target_count", "action_shift_row_count"} or state.get("schema_version") != "midogpp_utility_aligned_target_support_run_state_v1" or state.get("status") != "COMPLETE" or state.get("surface_hash") != surface["surface_hash"] or state.get("point_feature_row_count") != 648 or state.get("bootstrap_feature_row_count") != 20_736 or state.get("target_count") != 9 or state.get("action_shift_row_count") != shifts["row_count"] or set(validation) != {"schema_version", "status", "surface_hash", "closed_world_cache_validated", "typed_bootstrap_plans_reconstructed", "label_free_target_features_reconstructed", "label_free_action_shifts_reconstructed"} or validation.get("schema_version") != "midogpp_utility_aligned_target_support_validation_report_v1" or validation.get("status") != "PASS" or validation.get("surface_hash") != surface["surface_hash"] or any(validation.get(key) is not True for key in ("closed_world_cache_validated", "typed_bootstrap_plans_reconstructed", "label_free_target_features_reconstructed", "label_free_action_shifts_reconstructed")):
         raise ProtocolError("Target-support completion reports drifted.")
     if content.get("surface_hash") != surface["surface_hash"]:
         raise ProtocolError("Target-support content index escaped its surface.")
@@ -139,9 +160,108 @@ def _validate_cache_lock(path: Path, reservation: Mapping[str, object]) -> Mappi
 def _validate_generation_lock(path: Path) -> Mapping[str, object]:
     raw = _json(path / "manifests/source_generation_lock.json")
     required = {"schema_version", "expert_bank_artifact_id", "generation_lock_artifact_id", "generation_lock_hash", "bank_lock_hash", "generated_cache_hash", "source_stream_count", "feature_component_count", "feature_reference_rows_per_class", "final_action_source_prefix_rows_per_class", "final_action_geometry_executed_by_this_artifact", "generation_devices", "tf32_enabled", "amp_enabled", "support_labels_used", "source_generation_lock_hash"}
-    if set(raw) != required or raw.get("schema_version") != "midogpp_utility_aligned_target_feature_generation_lock_v1" or raw.get("expert_bank_artifact_id") != EXPERT_BANK_ARTIFACT_ID or raw.get("generation_lock_artifact_id") != GENERATION_LOCK_ARTIFACT_ID or any(not _digest(raw.get(key)) for key in ("generation_lock_hash", "bank_lock_hash", "generated_cache_hash")) or raw.get("source_stream_count") != 81 or raw.get("feature_component_count") != 216 or raw.get("feature_reference_rows_per_class") != 270 or raw.get("final_action_source_prefix_rows_per_class") != 256 or raw.get("final_action_geometry_executed_by_this_artifact") is not False or raw.get("generation_devices") != ["cuda:0", "cuda:1"] or raw.get("tf32_enabled") is not False or raw.get("amp_enabled") is not False or raw.get("support_labels_used") is not False or raw.get("source_generation_lock_hash") != canonical_sha256({key: value for key, value in raw.items() if key != "source_generation_lock_hash"}):
+    if set(raw) != required or raw.get("schema_version") != "midogpp_utility_aligned_target_feature_generation_lock_v1" or raw.get("expert_bank_artifact_id") != EXPERT_BANK_ARTIFACT_ID or raw.get("generation_lock_artifact_id") != GENERATION_LOCK_ARTIFACT_ID or any(not _digest(raw.get(key)) for key in ("generation_lock_hash", "bank_lock_hash", "generated_cache_hash")) or raw.get("source_stream_count") != 81 or raw.get("feature_component_count") != 216 or raw.get("feature_reference_rows_per_class") != 270 or raw.get("final_action_source_prefix_rows_per_class") != 256 or raw.get("final_action_geometry_executed_by_this_artifact") is not True or raw.get("generation_devices") != ["cuda:0", "cuda:1"] or raw.get("tf32_enabled") is not False or raw.get("amp_enabled") is not False or raw.get("support_labels_used") is not False or raw.get("source_generation_lock_hash") != canonical_sha256({key: value for key, value in raw.items() if key != "source_generation_lock_hash"}):
         raise ProtocolError("Target-support persisted generation lock drifted.")
     return raw
+
+
+def _validate_action_shifts(
+    path: Path,
+    *,
+    reservation: Mapping[str, object],
+    cache: Mapping[str, object],
+    generation: Mapping[str, object],
+) -> Mapping[str, object]:
+    raw_rows = _csv(path / ACTION_SHIFT_TABLE_MEMBER)
+    rows = tuple(action_shift_row_from_payload(raw) for raw in raw_rows)
+    lock = _json(path / ACTION_SHIFT_LOCK_MEMBER)
+    validated = validate_action_shift_surface(
+        rows=rows,
+        lock=lock,
+        table_path=path / ACTION_SHIFT_TABLE_MEMBER,
+    )
+    generated_binding = canonical_sha256(
+        {
+            "schema_version": "midogpp_target_support_generated_cache_binding_v1",
+            "upstream_cache_hash": generation["generated_cache_hash"],
+        }
+    )
+    if (
+        lock.get("support_reservation_hash") != reservation["reservation_hash"]
+        or lock.get("target_support_cache_binding_hash") != cache["cache_binding_hash"]
+        or lock.get("source_generation_lock_hash")
+        != generation["source_generation_lock_hash"]
+        or lock.get("generated_cache_hash") != generated_binding
+    ):
+        raise ProtocolError("Target-support action-shift provenance drifted.")
+    cases = reservation.get("support_case_ids_by_center")
+    raw_support_rows = reservation.get("support_rows_by_center")
+    if not isinstance(cases, Mapping) or not isinstance(raw_support_rows, Mapping):
+        raise ProtocolError("Target-support action-shift reservation is malformed.")
+    expected_keys: list[tuple[str, str, int, int, str]] = []
+    partition_hash_by_target: dict[str, str] = {}
+    case_hash_by_target_case: dict[tuple[str, str], str] = {}
+    case_row_count_by_target_case: dict[tuple[str, str], int] = {}
+    for target in CENTERS:
+        target_rows = raw_support_rows[target]
+        if not isinstance(target_rows, Sequence) or isinstance(
+            target_rows, (str, bytes)
+        ):
+            raise ProtocolError("Target-support action-shift rows are malformed.")
+        partition_hash_by_target[target] = canonical_sha256(
+            {
+                "schema_version": "midogpp_target_support_partition_bridge_v1",
+                "parent_reservation_hash": reservation["reservation_hash"],
+                "target": target,
+                "case_ids": sorted(str(value) for value in cases[target]),
+                "ordered_sample_ids": [str(value["sample_id"]) for value in target_rows],
+                "ordered_case_ids": [str(value["case_id"]) for value in target_rows],
+            }
+        )
+        for case_id in sorted(str(value) for value in cases[target]):
+            sample_ids = [
+                str(value["sample_id"])
+                for value in target_rows
+                if str(value["case_id"]) == case_id
+            ]
+            case_hash_by_target_case[(target, case_id)] = canonical_sha256(
+                {
+                    "schema_version": (
+                        "midogpp_utility_aligned_target_support_case_rows_v1"
+                    ),
+                    "outer_target_id": target,
+                    "case_id": case_id,
+                    "ordered_sample_ids": sample_ids,
+                }
+            )
+            case_row_count_by_target_case[(target, case_id)] = len(sample_ids)
+            for source in CENTERS:
+                if source == target:
+                    continue
+                for training_seed in (17, 42, 101):
+                    for generation_seed in (17, 42, 101):
+                        expected_keys.append(
+                            (
+                                target,
+                                source,
+                                training_seed,
+                                generation_seed,
+                                case_id,
+                            )
+                        )
+    expected_keys.sort()
+    if tuple(row.row_key for row in rows) != tuple(expected_keys):
+        raise ProtocolError("Target-support action-shift exact row grid drifted.")
+    if any(
+        row.support_partition_hash != partition_hash_by_target[row.outer_target_id]
+        or row.case_row_identity_hash
+        != case_hash_by_target_case[(row.outer_target_id, row.case_id)]
+        or row.support_row_count
+        != case_row_count_by_target_case[(row.outer_target_id, row.case_id)]
+        for row in rows
+    ):
+        raise ProtocolError("Target-support action-shift case binding drifted.")
+    return validated.lock_payload
 
 
 def _sha(value: object) -> bool:

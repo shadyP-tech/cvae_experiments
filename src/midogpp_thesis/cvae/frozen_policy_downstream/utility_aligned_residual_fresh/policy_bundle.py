@@ -8,7 +8,15 @@ from types import MappingProxyType
 from typing import Mapping, Sequence
 
 from ...protocol import ProtocolError
+from ...routing.exact_tail_utility_surface.support_shift_surface import (
+    SUPPORT_SHIFT_ROW_SCALAR_SEMANTICS,
+)
 from ...routing.residual_topup.hashing import canonical_sha256
+from ...routing.utility_aligned import (
+    SUPPORT_ACTION_PROBABILITY_SHIFT_NAME,
+    SUPPORT_ACTION_PROBABILITY_SHIFT_SEMANTICS,
+    SUPPORT_ACTION_TECHNICAL_SEED_SPREAD_SEMANTICS,
+)
 from .config import POLICY_ARTIFACT_ID, RESERVATION_ARTIFACT_ID, UtilityAlignedResidualFreshConfig
 from .contracts import CENTERS, FrozenActionPayload, expected_action_ids, legal_sources
 from .planning import build_evaluation_plan
@@ -25,6 +33,7 @@ from .policy_schema import (
     ACTION_LIBRARY_SCHEMA,
     LIBRARY_KEYS,
     POLICY_EXPERIMENT_ID,
+    ENSEMBLE_POLICY_FAMILY,
     POLICY_KEYS,
     POLICY_LOCK_SCHEMA,
     SHARED_BINDING_KEYS,
@@ -109,6 +118,10 @@ def _validate_library_identity(library: Mapping[str, object]) -> None:
         or library.get("target_support_parent_reservation_artifact_id")
         != TARGET_SUPPORT_RESERVATION_ARTIFACT_ID
         or library.get("target_reservation_artifact_id") != RESERVATION_ARTIFACT_ID
+        or not _valid_ensemble_endpoint_binding(library)
+        or not _valid_source_inner_action_shift_binding(library)
+        or not _valid_capacity_reports(library)
+        or not _valid_target_action_shift_binding(library)
     ):
         raise ProtocolError("Utility-aligned action-library identity drifted.")
     for key in LIBRARY_KEYS:
@@ -272,6 +285,10 @@ def _class_counts(value: object) -> Mapping[object, Mapping[object, object]]:
 def _validate_final_policy(
     policy: Mapping[str, object], library: Mapping[str, object]
 ) -> None:
+    if policy.get("policy_family") != ENSEMBLE_POLICY_FAMILY:
+        raise ProtocolError(
+            "Stage-70 utility-aligned residual fresh accepts only the ensemble policy family."
+        )
     if (
         set(policy) != set(POLICY_KEYS)
         or policy.get("schema_version") != POLICY_LOCK_SCHEMA
@@ -284,8 +301,6 @@ def _validate_final_policy(
         or policy.get("permutation_contrast") != "R-P"
         or policy.get("success_requires_positive_one_sided_lcb")
         != ["R-B", "R-G_delta", "R-U", "R-P"]
-        or not isinstance(policy.get("policy_family"), str)
-        or not policy.get("policy_family")
         or policy.get("fallback_policy") != "exact_B"
         or policy.get("outer_target_excluded_from_fit") is not True
         or policy.get("target_support_labels_used") is not False
@@ -294,8 +309,112 @@ def _validate_final_policy(
         or policy.get("minimum_independent_support_cases_per_target") != 8
         or not isinstance(policy.get("support_bootstrap_count"), int)
         or int(policy["support_bootstrap_count"]) < 32
+        or not _valid_ensemble_endpoint_binding(policy)
+        or not _valid_source_inner_action_shift_binding(policy)
+        or not _valid_capacity_reports(policy)
+        or not _valid_target_action_shift_binding(policy)
     ):
         raise ProtocolError("Utility-aligned Stage-60 policy-lock identity drifted.")
+
+
+def _valid_ensemble_endpoint_binding(payload: Mapping[str, object]) -> bool:
+    return (
+        payload.get("ensemble_endpoint_id")
+        == "all_nine_seed_probability_ensemble_bacc_delta_v1"
+        and upstream_hash_like(payload.get("ensemble_endpoint_lock_hash"))
+        and all(
+            sha256_like(payload.get(key))
+            for key in (
+                "ensemble_endpoint_table_sha256",
+                "ensemble_endpoint_response_hash",
+                "ensemble_prediction_arrays_sha256",
+            )
+        )
+        and upstream_hash_like(payload.get("ensemble_endpoint_row_hashes_hash"))
+        and upstream_hash_like(payload.get("ensemble_probability_cell_surface_hash"))
+        and payload.get("ensemble_seed_pair_count") == 9
+        and payload.get("ensemble_threshold") == 0.5
+        and payload.get("ensemble_aggregation_semantics")
+        == "arithmetic_mean_of_exact_nine_float32_probability_vectors_then_threshold_once"
+        and payload.get("ensemble_response_semantics")
+        == "bacc_of_all_nine_seed_probability_ensemble_exact_tail_minus_bacc_of_all_nine_seed_probability_ensemble_exact_base"
+        and payload.get("ensemble_endpoint_role")
+        == "predeclared_all_nine_seed_probability_ensemble"
+    )
+
+
+def _valid_source_inner_action_shift_binding(
+    payload: Mapping[str, object],
+) -> bool:
+    return (
+        upstream_hash_like(payload.get("source_inner_action_shift_lock_hash"))
+        and sha256_like(payload.get("source_inner_action_shift_table_sha256"))
+        and upstream_hash_like(
+            payload.get("source_inner_action_shift_row_hashes_hash")
+        )
+        and payload.get("source_inner_action_shift_row_count") == 4536
+        and payload.get("source_inner_action_shift_scalar_name")
+        == SUPPORT_ACTION_PROBABILITY_SHIFT_NAME
+        and payload.get("source_inner_action_shift_row_semantics")
+        == SUPPORT_SHIFT_ROW_SCALAR_SEMANTICS
+        and payload.get("source_inner_action_shift_aggregate_semantics")
+        == SUPPORT_ACTION_PROBABILITY_SHIFT_SEMANTICS
+        and payload.get(
+            "source_inner_action_shift_descriptive_seed_values_may_feed_model"
+        )
+        is False
+    )
+
+
+def _valid_capacity_reports(payload: Mapping[str, object]) -> bool:
+    reports = payload.get("model_capacity_reports_by_target")
+    if not isinstance(reports, Mapping) or set(str(key) for key in reports) != set(CENTERS):
+        return False
+    if not sha256_like(payload.get("model_capacity_reports_hash")):
+        return False
+    return all(
+        isinstance(reports.get(target), Mapping)
+        and reports[target].get("gate_passed") is True
+        and sha256_like(reports[target].get("report_hash"))
+        for target in CENTERS
+    )
+
+
+def _valid_target_action_shift_binding(payload: Mapping[str, object]) -> bool:
+    return (
+        payload.get("target_local_scalar_name")
+        == SUPPORT_ACTION_PROBABILITY_SHIFT_NAME
+        and payload.get("target_local_scalar_semantics")
+        == SUPPORT_ACTION_PROBABILITY_SHIFT_SEMANTICS
+        and payload.get("target_local_scalar_row_semantics")
+        == SUPPORT_ACTION_TECHNICAL_SEED_SPREAD_SEMANTICS
+        and all(
+            sha256_like(payload.get(key))
+            for key in (
+                "target_support_action_shift_lock_hash",
+                "target_support_action_shift_table_sha256",
+                "target_support_action_shift_row_hashes_hash",
+            )
+        )
+        and isinstance(payload.get("target_support_action_shift_row_count"), int)
+        and int(payload["target_support_action_shift_row_count"]) >= 5184
+        and isinstance(
+            payload.get("target_support_action_shift_case_ensemble_group_count"),
+            int,
+        )
+        and int(payload["target_support_action_shift_case_ensemble_group_count"])
+        >= 576
+        and int(payload["target_support_action_shift_case_ensemble_group_count"])
+        % 8
+        == 0
+        and int(payload["target_support_action_shift_row_count"])
+        == 9
+        * int(payload["target_support_action_shift_case_ensemble_group_count"])
+        and payload.get(
+            "target_support_action_shift_descriptive_seed_values_may_feed_model"
+        )
+        is False
+    )
 
 
 def _validate_completion(root: Path, *, policy_lock_hash: str) -> None:

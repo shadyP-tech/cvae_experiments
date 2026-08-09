@@ -41,6 +41,12 @@ def build_prediction_worker_inputs(
                 evaluation_row_identity_hash=row_identity_hash(
                     partition.evaluation_rows
                 ),
+                support_array_path=str(
+                    inputs.support_array_path_by_center[
+                        task.pseudo_query
+                    ].resolve()
+                ),
+                support_row_identity_hash=row_identity_hash(partition.support_rows),
                 partition_hash=partition.reservation_hash,
                 source_cache_hash=generated.cache_hash,
                 classifier_payload=MappingProxyType(config.classifier.to_payload()),

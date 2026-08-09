@@ -70,6 +70,7 @@ from midogpp_thesis.cvae.diagnostics.utility_aligned_exact_tail_router.source_ca
     write_support_scratch,
 )
 from midogpp_thesis.cvae.diagnostics.utility_aligned_exact_tail_router.target_prediction_contracts import (
+    TARGET_CHECKPOINT_DIRECTORY,
     TARGET_PREDICTION_CACHE_MEMBER,
     TARGET_PREDICTION_INDEX_COLUMNS,
     TARGET_PREDICTION_INDEX_MEMBER,
@@ -78,7 +79,12 @@ from midogpp_thesis.cvae.diagnostics.utility_aligned_exact_tail_router.target_pr
     array_sha256 as target_array_sha256,
     canonical_target_cell_keys,
 )
+from midogpp_thesis.cvae.diagnostics.utility_aligned_exact_tail_router.target_prediction_planning import (
+    TARGET_EVALUATION_ARRAY_MEMBER,
+    TARGET_EVALUATION_INDEX_MEMBER,
+)
 from midogpp_thesis.cvae.diagnostics.utility_aligned_exact_tail_router.target_prediction_store import (
+    materialize_target_predictions,
     read_target_prediction_store,
     write_target_prediction_store,
 )
@@ -307,6 +313,78 @@ def test_target_store_rejects_action_hash_not_bound_to_frozen_library(
             source_cache_lock_hash="source-lock",
             case_fold_lock_hash="fold-lock",
         )
+
+
+def test_verified_target_store_fast_path_removes_only_target_working_files(
+    tmp_path: Path,
+) -> None:
+    library = _test_target_library()
+    store = _test_target_store(library)
+    write_target_prediction_store(tmp_path, store)
+    scratch_members = (
+        tmp_path / TARGET_EVALUATION_ARRAY_MEMBER,
+        tmp_path / TARGET_EVALUATION_INDEX_MEMBER,
+    )
+    for member in scratch_members:
+        member.parent.mkdir(parents=True, exist_ok=True)
+        member.write_bytes(b"scratch")
+    task_checkpoint = tmp_path / TARGET_CHECKPOINT_DIRECTORY / "completed.json"
+    task_checkpoint.parent.mkdir(parents=True, exist_ok=True)
+    task_checkpoint.write_text("{}\n", encoding="utf-8")
+    unrelated = tmp_path / "checkpoints/source_resume/keep.json"
+    unrelated.parent.mkdir(parents=True, exist_ok=True)
+    unrelated.write_text("{}\n", encoding="utf-8")
+
+    observed = materialize_target_predictions(
+        SimpleNamespace(),
+        SimpleNamespace(),  # type: ignore[arg-type]
+        library,
+        SimpleNamespace(),
+        SimpleNamespace(),  # type: ignore[arg-type]
+        SimpleNamespace(lock_hash="fold-lock"),  # type: ignore[arg-type]
+        source_cache_lock_hash="source-lock",
+        root=tmp_path,
+    )
+
+    assert observed.store_hash == store.store_hash
+    assert all(not member.exists() for member in scratch_members)
+    assert not task_checkpoint.parent.exists()
+    assert unrelated.is_file()
+
+
+def test_invalid_final_target_store_retains_resume_working_files(
+    tmp_path: Path,
+) -> None:
+    library = _test_target_library()
+    write_target_prediction_store(tmp_path, _test_target_store(library))
+    scratch_members = (
+        tmp_path / TARGET_EVALUATION_ARRAY_MEMBER,
+        tmp_path / TARGET_EVALUATION_INDEX_MEMBER,
+    )
+    for member in scratch_members:
+        member.parent.mkdir(parents=True, exist_ok=True)
+        member.write_bytes(b"scratch")
+    task_checkpoint = tmp_path / TARGET_CHECKPOINT_DIRECTORY / "completed.json"
+    task_checkpoint.parent.mkdir(parents=True, exist_ok=True)
+    task_checkpoint.write_text("{}\n", encoding="utf-8")
+    metadata = read_json(tmp_path / TARGET_PREDICTION_CACHE_MEMBER)
+    metadata["source_cache_lock_hash"] = "tampered"
+    atomic_json(tmp_path / TARGET_PREDICTION_CACHE_MEMBER, metadata)
+
+    with pytest.raises(ProtocolError, match="cache binding"):
+        materialize_target_predictions(
+            SimpleNamespace(),
+            SimpleNamespace(),  # type: ignore[arg-type]
+            library,
+            SimpleNamespace(),
+            SimpleNamespace(),  # type: ignore[arg-type]
+            SimpleNamespace(lock_hash="fold-lock"),  # type: ignore[arg-type]
+            source_cache_lock_hash="source-lock",
+            root=tmp_path,
+        )
+
+    assert all(member.is_file() for member in scratch_members)
+    assert task_checkpoint.is_file()
 
 
 def _worker_input(tmp_path: Path) -> PredictionWorkerInput:

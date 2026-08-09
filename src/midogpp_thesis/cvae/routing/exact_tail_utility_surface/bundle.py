@@ -14,6 +14,7 @@ from ...protocol import ProtocolError
 from ..utility_aligned import CandidateFeatureRow
 from .contracts import (
     CLAIM_SCOPE,
+    EXPECTED_ENSEMBLE_ENDPOINT_ROW_COUNT,
     EXPECTED_UTILITY_ROW_COUNT,
     EXPERIMENT_ID,
     OUTPUT_ARTIFACT_ID,
@@ -21,9 +22,24 @@ from .contracts import (
     SURFACE_SCHEMA_VERSION,
     expected_utility_keys,
 )
+from .ensemble_scoring import (
+    ENSEMBLE_AGGREGATION,
+    ENSEMBLE_ENDPOINT_LOCK_MEMBER,
+    ENSEMBLE_ENDPOINT_TABLE_MEMBER,
+    ENSEMBLE_RESPONSE_SEMANTICS,
+    PRIMARY_UTILITY_ENDPOINT,
+    ExactTailEnsembleEndpointLock,
+    load_ensemble_endpoint_lock,
+)
 from .scoring import ScoredExactTailUtilityRow
 from .features import validate_aligned_candidate_features
 from .seals import GlobalPredictionSeal
+from .support_shift_surface import (
+    SUPPORT_SHIFT_LOCK_MEMBER,
+    SUPPORT_SHIFT_TABLE_MEMBER,
+    ExactTailSupportActionShiftLock,
+    load_support_action_shift_lock,
+)
 from .config import ExactTailUtilitySurfaceConfig
 
 
@@ -35,6 +51,8 @@ REQUIRED_FILES = (
     "manifests/global_prediction_seal.json",
     "manifests/prediction_index.json",
     "manifests/exact_tail_utility_surface_lock.json",
+    ENSEMBLE_ENDPOINT_LOCK_MEMBER,
+    SUPPORT_SHIFT_LOCK_MEMBER,
     "manifests/content_index.json",
     "reports/leakage_report.json",
     "reports/run_state.json",
@@ -44,6 +62,8 @@ REQUIRED_FILES = (
     "tables/evaluation_rows.csv",
     "tables/candidate_features.csv",
     "tables/exact_tail_utility.csv",
+    ENSEMBLE_ENDPOINT_TABLE_MEMBER,
+    SUPPORT_SHIFT_TABLE_MEMBER,
     "arrays/exact_tail_predictions.npz",
 )
 CONTENT_INDEX_MEMBERS = tuple(
@@ -69,10 +89,20 @@ class ExactTailUtilitySurfaceLock:
     target_evaluation_binding_hash: str
     prediction_seal_hash: str
     utility_table_sha256: str
+    ensemble_endpoint_table_sha256: str
+    ensemble_endpoint_lock_sha256: str
+    ensemble_endpoint_lock_hash: str
+    support_shift_table_sha256: str
+    support_shift_lock_sha256: str
+    support_shift_lock_hash: str
     feature_table_sha256: str
     utility_row_hashes_hash: str
+    ensemble_endpoint_row_hashes_hash: str
+    support_shift_row_hashes_hash: str
     feature_row_hashes_hash: str
     utility_row_count: int
+    ensemble_endpoint_row_count: int
+    support_shift_row_count: int
     feature_row_count: int
     member_sha256: Mapping[str, str]
     surface_lock_hash: str
@@ -83,6 +113,10 @@ class ExactTailUtilitySurfaceLock:
             raise ProtocolError("Exact-tail surface-lock schema drifted.")
         if self.utility_row_count != EXPECTED_UTILITY_ROW_COUNT:
             raise ProtocolError("Exact-tail surface-lock utility count drifted.")
+        if self.ensemble_endpoint_row_count != EXPECTED_ENSEMBLE_ENDPOINT_ROW_COUNT:
+            raise ProtocolError("Exact-tail surface-lock ensemble count drifted.")
+        if self.support_shift_row_count != EXPECTED_UTILITY_ROW_COUNT:
+            raise ProtocolError("Exact-tail surface-lock support shift count drifted.")
         if self.feature_row_count != EXPECTED_UTILITY_ROW_COUNT:
             raise ProtocolError("Exact-tail surface-lock feature count drifted.")
         for value, role, lengths in (
@@ -93,8 +127,32 @@ class ExactTailUtilitySurfaceLock:
             (self.target_evaluation_binding_hash, "target-eval hash", {16, 64}),
             (self.prediction_seal_hash, "prediction-seal hash", {16}),
             (self.utility_table_sha256, "utility-table SHA-256", {64}),
+            (
+                self.ensemble_endpoint_table_sha256,
+                "ensemble-endpoint table SHA-256",
+                {64},
+            ),
+            (
+                self.ensemble_endpoint_lock_sha256,
+                "ensemble-endpoint lock SHA-256",
+                {64},
+            ),
+            (
+                self.ensemble_endpoint_lock_hash,
+                "ensemble-endpoint lock hash",
+                {16},
+            ),
+            (self.support_shift_table_sha256, "support shift-table SHA-256", {64}),
+            (self.support_shift_lock_sha256, "support shift-lock SHA-256", {64}),
+            (self.support_shift_lock_hash, "support shift-lock hash", {16}),
             (self.feature_table_sha256, "feature-table SHA-256", {64}),
             (self.utility_row_hashes_hash, "utility-row hash", {16}),
+            (
+                self.ensemble_endpoint_row_hashes_hash,
+                "ensemble-endpoint row hash",
+                {16},
+            ),
+            (self.support_shift_row_hashes_hash, "support shift-row hash", {16}),
             (self.feature_row_hashes_hash, "feature-row hash", {16}),
             (self.surface_lock_hash, "surface-lock hash", {16}),
         ):
@@ -121,13 +179,32 @@ class ExactTailUtilitySurfaceLock:
             "target_evaluation_binding_hash": self.target_evaluation_binding_hash,
             "prediction_seal_hash": self.prediction_seal_hash,
             "utility_table_sha256": self.utility_table_sha256,
+            "ensemble_endpoint_table_sha256": self.ensemble_endpoint_table_sha256,
+            "ensemble_endpoint_lock_sha256": self.ensemble_endpoint_lock_sha256,
+            "ensemble_endpoint_lock_hash": self.ensemble_endpoint_lock_hash,
+            "support_shift_table_sha256": self.support_shift_table_sha256,
+            "support_shift_lock_sha256": self.support_shift_lock_sha256,
+            "support_shift_lock_hash": self.support_shift_lock_hash,
             "feature_table_sha256": self.feature_table_sha256,
             "utility_row_hashes_hash": self.utility_row_hashes_hash,
+            "ensemble_endpoint_row_hashes_hash": (
+                self.ensemble_endpoint_row_hashes_hash
+            ),
+            "support_shift_row_hashes_hash": self.support_shift_row_hashes_hash,
             "feature_row_hashes_hash": self.feature_row_hashes_hash,
             "utility_row_count": self.utility_row_count,
+            "ensemble_endpoint_row_count": self.ensemble_endpoint_row_count,
+            "support_shift_row_count": self.support_shift_row_count,
             "feature_row_count": self.feature_row_count,
             "member_sha256": dict(self.member_sha256),
             "response_semantics": RESPONSE_SEMANTICS,
+            "primary_utility_endpoint": PRIMARY_UTILITY_ENDPOINT,
+            "ensemble_response_semantics": ENSEMBLE_RESPONSE_SEMANTICS,
+            "ensemble_aggregation_semantics": ENSEMBLE_AGGREGATION,
+            "per_seed_utility_table_role": "descriptive_technical_repeats",
+            "per_seed_rows_may_feed_model": False,
+            "ensemble_endpoint_table_role": "operational_source_inner_endpoint",
+            "support_shift_table_role": "label_free_descriptive_seed_cells",
             "inner_geometry": "seven_by_144_base_plus_126_single_source_tail",
             "all_predictions_sealed_before_development_labels": True,
             "development_labels_used_for_scoring_only": True,
@@ -148,6 +225,10 @@ def build_surface_lock(
     rows: Sequence[ScoredExactTailUtilityRow],
     feature_rows: Sequence[CandidateFeatureRow],
     utility_table_sha256: str,
+    ensemble_endpoint_lock: ExactTailEnsembleEndpointLock,
+    ensemble_endpoint_lock_sha256: str,
+    support_shift_lock: ExactTailSupportActionShiftLock,
+    support_shift_lock_sha256: str,
     feature_table_sha256: str,
     member_sha256: Mapping[str, str],
 ) -> ExactTailUtilitySurfaceLock:
@@ -166,6 +247,16 @@ def build_surface_lock(
         raise ProtocolError("Exact-tail utility rows are not complete and canonical.")
     if any(row.prediction_seal_hash != seal.seal_hash for row in utility_rows):
         raise ProtocolError("Exact-tail utility rows mix prediction seals.")
+    if (
+        ensemble_endpoint_lock.prediction_seal_hash != seal.seal_hash
+        or ensemble_endpoint_lock.config_contract_hash != seal.config_contract_hash
+    ):
+        raise ProtocolError("Exact-tail ensemble endpoint lock escaped the surface seal.")
+    if (
+        support_shift_lock.prediction_seal_hash != seal.seal_hash
+        or support_shift_lock.config_contract_hash != seal.config_contract_hash
+    ):
+        raise ProtocolError("Exact-tail support shift lock escaped the surface seal.")
     aligned_features, feature_surface_hash = validate_aligned_candidate_features(
         feature_rows, utility_rows
     )
@@ -177,11 +268,25 @@ def build_surface_lock(
         "target_evaluation_binding_hash": seal.target_evaluation_binding_hash,
         "prediction_seal_hash": seal.seal_hash,
         "utility_table_sha256": str(utility_table_sha256),
+        "ensemble_endpoint_table_sha256": (
+            ensemble_endpoint_lock.endpoint_table_sha256
+        ),
+        "ensemble_endpoint_lock_sha256": str(ensemble_endpoint_lock_sha256),
+        "ensemble_endpoint_lock_hash": ensemble_endpoint_lock.endpoint_lock_hash,
+        "support_shift_table_sha256": support_shift_lock.shift_table_sha256,
+        "support_shift_lock_sha256": str(support_shift_lock_sha256),
+        "support_shift_lock_hash": support_shift_lock.shift_lock_hash,
         "feature_table_sha256": str(feature_table_sha256),
         "utility_row_hashes_hash": stable_hash(
             [row.utility_row_hash for row in utility_rows]
         ),
+        "ensemble_endpoint_row_hashes_hash": (
+            ensemble_endpoint_lock.endpoint_row_hashes_hash
+        ),
+        "support_shift_row_hashes_hash": support_shift_lock.shift_row_hashes_hash,
         "utility_row_count": len(utility_rows),
+        "ensemble_endpoint_row_count": ensemble_endpoint_lock.endpoint_row_count,
+        "support_shift_row_count": support_shift_lock.shift_row_count,
         "feature_row_hashes_hash": feature_surface_hash,
         "feature_row_count": len(aligned_features),
         "member_sha256": dict(member_sha256),
@@ -212,13 +317,30 @@ def load_surface_lock(path: str | Path) -> ExactTailUtilitySurfaceLock:
         "target_evaluation_binding_hash",
         "prediction_seal_hash",
         "utility_table_sha256",
+        "ensemble_endpoint_table_sha256",
+        "ensemble_endpoint_lock_sha256",
+        "ensemble_endpoint_lock_hash",
+        "support_shift_table_sha256",
+        "support_shift_lock_sha256",
+        "support_shift_lock_hash",
         "feature_table_sha256",
         "utility_row_hashes_hash",
+        "ensemble_endpoint_row_hashes_hash",
+        "support_shift_row_hashes_hash",
         "feature_row_hashes_hash",
         "utility_row_count",
+        "ensemble_endpoint_row_count",
+        "support_shift_row_count",
         "feature_row_count",
         "member_sha256",
         "response_semantics",
+        "primary_utility_endpoint",
+        "ensemble_response_semantics",
+        "ensemble_aggregation_semantics",
+        "per_seed_utility_table_role",
+        "per_seed_rows_may_feed_model",
+        "ensemble_endpoint_table_role",
+        "support_shift_table_role",
         "inner_geometry",
         "all_predictions_sealed_before_development_labels",
         "development_labels_used_for_scoring_only",
@@ -235,6 +357,16 @@ def load_surface_lock(path: str | Path) -> ExactTailUtilitySurfaceLock:
             raw.get("output_artifact_id") != OUTPUT_ARTIFACT_ID,
             raw.get("claim_scope") != CLAIM_SCOPE,
             raw.get("response_semantics") != RESPONSE_SEMANTICS,
+            raw.get("primary_utility_endpoint") != PRIMARY_UTILITY_ENDPOINT,
+            raw.get("ensemble_response_semantics") != ENSEMBLE_RESPONSE_SEMANTICS,
+            raw.get("ensemble_aggregation_semantics") != ENSEMBLE_AGGREGATION,
+            raw.get("per_seed_utility_table_role")
+            != "descriptive_technical_repeats",
+            raw.get("per_seed_rows_may_feed_model") is not False,
+            raw.get("ensemble_endpoint_table_role")
+            != "operational_source_inner_endpoint",
+            raw.get("support_shift_table_role")
+            != "label_free_descriptive_seed_cells",
             raw.get("inner_geometry")
             != "seven_by_144_base_plus_126_single_source_tail",
             raw.get("all_predictions_sealed_before_development_labels") is not True,
@@ -255,10 +387,24 @@ def load_surface_lock(path: str | Path) -> ExactTailUtilitySurfaceLock:
         target_evaluation_binding_hash=str(raw["target_evaluation_binding_hash"]),
         prediction_seal_hash=str(raw["prediction_seal_hash"]),
         utility_table_sha256=str(raw["utility_table_sha256"]),
+        ensemble_endpoint_table_sha256=str(
+            raw["ensemble_endpoint_table_sha256"]
+        ),
+        ensemble_endpoint_lock_sha256=str(raw["ensemble_endpoint_lock_sha256"]),
+        ensemble_endpoint_lock_hash=str(raw["ensemble_endpoint_lock_hash"]),
+        support_shift_table_sha256=str(raw["support_shift_table_sha256"]),
+        support_shift_lock_sha256=str(raw["support_shift_lock_sha256"]),
+        support_shift_lock_hash=str(raw["support_shift_lock_hash"]),
         feature_table_sha256=str(raw["feature_table_sha256"]),
         utility_row_hashes_hash=str(raw["utility_row_hashes_hash"]),
+        ensemble_endpoint_row_hashes_hash=str(
+            raw["ensemble_endpoint_row_hashes_hash"]
+        ),
+        support_shift_row_hashes_hash=str(raw["support_shift_row_hashes_hash"]),
         feature_row_hashes_hash=str(raw["feature_row_hashes_hash"]),
         utility_row_count=int(raw["utility_row_count"]),
+        ensemble_endpoint_row_count=int(raw["ensemble_endpoint_row_count"]),
+        support_shift_row_count=int(raw["support_shift_row_count"]),
         feature_row_count=int(raw["feature_row_count"]),
         member_sha256=dict(raw["member_sha256"]),
         surface_lock_hash=str(raw["surface_lock_hash"]),
@@ -303,6 +449,41 @@ def validate_surface_bundle(
         raise ProtocolError("Exact-tail surface bundle member bytes drifted.")
     if observed["tables/exact_tail_utility.csv"] != lock.utility_table_sha256:
         raise ProtocolError("Exact-tail utility table escaped its lock.")
+    if (
+        observed[ENSEMBLE_ENDPOINT_TABLE_MEMBER]
+        != lock.ensemble_endpoint_table_sha256
+    ):
+        raise ProtocolError("Exact-tail ensemble endpoint table escaped its lock.")
+    if (
+        observed[ENSEMBLE_ENDPOINT_LOCK_MEMBER]
+        != lock.ensemble_endpoint_lock_sha256
+    ):
+        raise ProtocolError("Exact-tail ensemble endpoint lock bytes drifted.")
+    endpoint_lock = load_ensemble_endpoint_lock(path / ENSEMBLE_ENDPOINT_LOCK_MEMBER)
+    if (
+        endpoint_lock.endpoint_lock_hash != lock.ensemble_endpoint_lock_hash
+        or endpoint_lock.endpoint_table_sha256
+        != lock.ensemble_endpoint_table_sha256
+        or endpoint_lock.endpoint_row_hashes_hash
+        != lock.ensemble_endpoint_row_hashes_hash
+        or endpoint_lock.endpoint_row_count != lock.ensemble_endpoint_row_count
+    ):
+        raise ProtocolError("Exact-tail ensemble endpoint identity escaped surface lock.")
+    if observed[SUPPORT_SHIFT_TABLE_MEMBER] != lock.support_shift_table_sha256:
+        raise ProtocolError("Exact-tail support shift table escaped its lock.")
+    if observed[SUPPORT_SHIFT_LOCK_MEMBER] != lock.support_shift_lock_sha256:
+        raise ProtocolError("Exact-tail support shift lock bytes drifted.")
+    support_shift_lock = load_support_action_shift_lock(
+        path / SUPPORT_SHIFT_LOCK_MEMBER
+    )
+    if (
+        support_shift_lock.shift_lock_hash != lock.support_shift_lock_hash
+        or support_shift_lock.shift_table_sha256 != lock.support_shift_table_sha256
+        or support_shift_lock.shift_row_hashes_hash
+        != lock.support_shift_row_hashes_hash
+        or support_shift_lock.shift_row_count != lock.support_shift_row_count
+    ):
+        raise ProtocolError("Exact-tail support shift identity escaped surface lock.")
     if observed["tables/candidate_features.csv"] != lock.feature_table_sha256:
         raise ProtocolError("Exact-tail candidate feature table escaped its lock.")
     try:
@@ -312,7 +493,7 @@ def validate_surface_bundle(
     except (OSError, json.JSONDecodeError) as exc:
         raise ProtocolError("Exact-tail content index is unreadable.") from exc
     if content_index != {
-        "schema_version": "midogpp_exact_tail_content_index_v1",
+        "schema_version": "midogpp_exact_tail_content_index_v2",
         "member_sha256": observed,
         "surface_lock_hash": lock.surface_lock_hash,
     }:
@@ -337,7 +518,7 @@ def validate_surface_bundle(
 
 def leakage_report_payload(lock: ExactTailUtilitySurfaceLock) -> dict[str, object]:
     return {
-        "schema_version": "midogpp_exact_tail_utility_leakage_report_v1",
+        "schema_version": "midogpp_exact_tail_utility_leakage_report_v2",
         "status": "PASS",
         "surface_lock_hash": lock.surface_lock_hash,
         "whole_case_support_evaluation_disjoint": True,
@@ -350,6 +531,10 @@ def leakage_report_payload(lock: ExactTailUtilitySurfaceLock) -> dict[str, objec
         "target_evaluation_labels_used": False,
         "source_experts_updated": False,
         "seed_selection_performed": False,
+        "per_seed_utility_rows_descriptive_only": True,
+        "ensemble_endpoint_scored_after_global_seal": True,
+        "support_probabilities_sealed_before_development_labels": True,
+        "support_action_shifts_label_free": True,
         "stage90_artifacts_used": False,
     }
 

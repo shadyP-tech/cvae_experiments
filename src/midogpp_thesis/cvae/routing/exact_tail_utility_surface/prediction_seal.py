@@ -44,6 +44,8 @@ def seal_consolidated_predictions(
     # Constructing this view re-hashes every prediction vector against the seal.
     surface = SealedPredictionSurface(
         predictions_by_key=consolidated.predictions_by_key,
+        probabilities_by_key=consolidated.probabilities_by_key,
+        support_probabilities_by_key=consolidated.support_probabilities_by_key,
         seal=seal,
     )
     by_task = {record.task.key: record for record in records}

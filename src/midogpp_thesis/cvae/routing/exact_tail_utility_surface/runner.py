@@ -15,6 +15,10 @@ from .config import (
     validate_fresh_inputs_ready,
 )
 from .contracts import DevelopmentPartition
+from .ensemble_scoring import (
+    ScoredExactTailEnsembleEndpointRow,
+    score_exact_tail_ensemble_endpoints,
+)
 from .label_access import open_globally_sealed_development_labels
 from .runtime import WorkstationSnapshot, validate_workstation_snapshot
 from .scoring import (
@@ -23,6 +27,7 @@ from .scoring import (
     score_exact_tail_utility_surface,
 )
 from .seals import GlobalPredictionSeal
+from .support_shift_surface import ExactTailSupportActionShiftRow
 from .workspace_binding import validate_production_workspace_binding
 
 
@@ -37,10 +42,13 @@ class PreparedPredictionCapability:
     prediction_index_path: Path
     prediction_arrays_path: Path
     feature_rows: tuple[CandidateFeatureRow, ...]
+    support_shift_rows: tuple[ExactTailSupportActionShiftRow, ...]
 
     def __post_init__(self) -> None:
         if self.predictions.seal.seal_hash != self.seal.seal_hash:
             raise ProtocolError("Exact-tail adapter mixed prediction capabilities.")
+        if not self.support_shift_rows:
+            raise ProtocolError("Exact-tail adapter omitted label-free support shifts.")
 
 
 class ExactTailExecutionAdapter(Protocol):
@@ -61,6 +69,7 @@ class ExactTailExecutionAdapter(Protocol):
         config: ExactTailUtilitySurfaceConfig,
         capability: PreparedPredictionCapability,
         rows: Sequence[ScoredExactTailUtilityRow],
+        ensemble_rows: Sequence[ScoredExactTailEnsembleEndpointRow],
     ) -> Path: ...
 
 
@@ -130,7 +139,12 @@ def run_exact_tail_utility_surface(
     rows = score_exact_tail_utility_surface(
         capability.predictions, labels, capability.partitions
     )
-    bundle_root = adapter.persist_scored_bundle(config, capability, rows)
+    ensemble_rows = score_exact_tail_ensemble_endpoints(
+        capability.predictions, labels, capability.partitions
+    )
+    bundle_root = adapter.persist_scored_bundle(
+        config, capability, rows, ensemble_rows
+    )
     if Path(bundle_root).resolve() != config.artifact_root.resolve():
         raise ProtocolError("Exact-tail adapter published outside the workspace output.")
     return validate_surface_bundle(bundle_root, config=config)

@@ -1,4 +1,4 @@
-schema_version: midogpp_exact_tail_utility_surface_config_v1
+schema_version: midogpp_exact_tail_utility_surface_config_v2
 experiment:
   id: midogpp.routing_and_composition.uniform_b_v2_exact_tail_utility_surface.v1
   artifact_root: output://midogpp_output_uniform_b_v2_exact_tail_utility_surface_v1
@@ -30,6 +30,15 @@ protocol:
   coarse_task_count: 648
   prediction_cell_count: 5184
   utility_row_count: 4536
+  primary_utility_endpoint: all_nine_seed_probability_ensemble_bacc_delta
+  ensemble_seed_pair_count: 9
+  ensemble_threshold: 0.5
+  ensemble_utility_row_count: 504
+  per_seed_utility_role: descriptive_only
+  per_seed_rows_may_feed_model: false
+  support_action_shift_scalar_name: mean_support_row_absolute_exact_nine_ensemble_probability_shift_v2
+  support_action_shift_scalar_semantics: label_free_mean_over_support_rows_of_absolute_difference_between_exact_nine_seed_cell_mean_tail_and_base_positive_class_probabilities_v2
+  support_action_shift_seed_values_may_feed_model: false
   outer_target_excluded_from_query_and_source_roles: true
   whole_case_support_evaluation_disjoint: true
   minimum_independent_support_cases_per_query: 8

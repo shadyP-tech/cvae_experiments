@@ -1540,6 +1540,47 @@ experiments:
       - Uses one persistent worker per A5000 followed by a disjoint four-worker by three-BLAS-thread CPU phase with hash-valid atomic checkpoints.
       - Output is terminal exploratory consumed-data evidence only and cannot feed Stage 60, Stage 70, policy updates, recipe selection, promotion, deployment, or a routing-quality claim.
 
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_validation_utility_aligned_ensemble_endpoint_router.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_validation_utility_aligned_ensemble_endpoint_router_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_validation_utility_aligned_ensemble_endpoint_router_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_utility_aligned_ensemble_endpoint_router_validation_cache_v1
+      - midogpp_stage90_utility_aligned_ensemble_endpoint_router_validation_manifest_v1
+      - midogpp_routing_metadata_profiles_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Protocol-reviewed Stage-90 diagnostic reuse of immutable source-local frames, samplers, the full seed Cartesian product, budgets, and classifier settings only; no Stage-60 or Stage-70 policy, utility, promotion, or deployment authority is inherited.
+      midogpp_routing_metadata_profiles_v1: Label-free immutable domain metadata are used only as the predeclared source-global control in a terminal consumed-data diagnostic; no metadata-compatibility routing claim is inherited.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - utility-aligned-ensemble-endpoint-router-diagnostic
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_validation_utility_aligned_ensemble_endpoint_router_v1
+    notes:
+      - Runs the exact-nine probability-ensemble endpoint utility diagnostic on the already-consumed MIDOG++ validation surface; 504 source-inner ensemble responses are the only model observations and 4,536 seed-cell rows remain descriptive.
+      - For each outer target H, fitted development rows exclude H and target routing uses exactly two fixed unlabeled support cases, which is explicitly INSUFFICIENT_SUPPORT_FOR_POLICY.
+      - No Stage-60, Stage-70, prior Stage-90 output, target label, target utility, or target expert may enter model fitting or action selection.
+      - Mirrors the reviewed two-A5000 then four-worker-by-three-BLAS-thread execution topology with globally sealed predictions before either development or terminal labels open.
+      - Output is active terminal consumed-data diagnostic evidence only and cannot update policy, feed Stage 60/70, support recipe selection, promotion, deployment, or establish routing quality.
+
   - experiment_id: midogpp.routing_and_composition.uniform_b_v2_residual_topup_b_u_g_s_policy_lock.v1
     stage: 60_routing_and_composition
     status: planned
@@ -1645,7 +1686,8 @@ experiments:
         - "{resolved_config}"
     notes:
       - Planned and non-runnable until a new development reservation, closed-world label-blind cache, and scoring-only manifest are independently hash-bound and ready.
-      - Measures exact additive-tail minus exact-base BACC under strict outer-target, pseudoquery, and candidate-source exclusion; every prediction is sealed before development labels open.
+      - Measures exact additive-tail minus exact-base BACC only after averaging the fixed 3x3 positive-probability vectors and thresholding once; the 4,536 seed rows remain descriptive and cannot feed the model.
+      - Persists a separate 504-row ensemble endpoint lock and a 4,536-row label-free support action-probability-shift lock. Each candidate scalar averages the exact nine probabilities before taking the absolute support-row shift; per-seed absolute shifts are descriptive only. Every evaluation and support probability is sealed before development labels open.
       - The seven-source 144-base plus 126-tail action preserves the final 12.5 percent residual geometry. Six-to-seven-source nested transfer is eligibility evidence only, never proof of target routing.
       - Uses two persistent RTX A5000 workers and four CPU classifier workers with three BLAS threads each, float32 memmaps, and fail-closed hash-valid resume.
 
@@ -1679,9 +1721,9 @@ experiments:
         - --config
         - "{resolved_config}"
     notes:
-      - Planned label-free producer for the eight-source target feature rows and at least 32 typed whole-case bootstrap surfaces per target.
+      - Planned label-free producer for the eight-source target feature rows, per-case exact-nine-ensemble B-versus-exact-tail positive-probability shifts, and at least 32 typed whole-case bootstrap surfaces per target. Per-seed absolute shifts remain descriptive and cannot feed the router.
       - The dedicated support reservation/cache contain no target labels or target-evaluation embeddings and are distinct from the later Stage-70 reservation/cache.
-      - Uses one persistent spawned worker per RTX A5000, 256 samples per source/class, float32 memmaps, and hash-validated local-scratch publication.
+      - Uses one persistent spawned generation worker per RTX A5000, then 81 resumable CPU action-probe tasks on four workers with three BLAS threads each; all support probabilities remain label-free.
 
   - experiment_id: midogpp.routing_and_composition.uniform_b_v2_utility_aligned_residual_policy_lock.v1
     stage: 60_routing_and_composition
@@ -1714,7 +1756,7 @@ experiments:
         - "{resolved_config}"
     notes:
       - Planned CPU-only policy lock. It reconstructs the exact-tail development reservation, requires its declared target-evaluation map to equal Stage 70, proves development cases are globally disjoint from fresh support/evaluation, and binds those maps and partition hashes into every downstream policy surface.
-      - Fits source-global and target-source interaction models with strict nested query/source exclusion. Query domains and support cases, never seed cells, are uncertainty units.
+      - Fits the locked low-capacity M0/M1 family with one label-free global metadata control and at most one ensemble-first action-proximal support probability-shift scalar under strict nested query/source exclusion. Inner-to-target transfer is between cardinality-matched action families, not a claim that both roles deploy a literally identical action. Query domains and support cases, never seed cells, are uncertainty units.
       - Failed transfer, global-gain, support-count, bootstrap, or lower-bound gates return the exact immutable B action; no target label or terminal oracle may update the policy.
 
   - experiment_id: midogpp.frozen_policy_downstream.uniform_b_v2_utility_aligned_residual_fresh.v1

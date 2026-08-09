@@ -19,6 +19,10 @@ from ..metadata_compatibility.contracts import (
     DOMAIN_MAPPING_SHA256,
     INPUT_ARTIFACT_ID as METADATA_PROFILE_ARTIFACT_ID,
 )
+from ..utility_aligned.ensemble_contracts import (
+    SUPPORT_ACTION_PROBABILITY_SHIFT_NAME,
+    SUPPORT_ACTION_PROBABILITY_SHIFT_SEMANTICS,
+)
 from .contracts import (
     CENTERS,
     CLAIM_SCOPE,
@@ -26,6 +30,7 @@ from .contracts import (
     DEVELOPMENT_MANIFEST_ARTIFACT_ID,
     DEVELOPMENT_RESERVATION_ARTIFACT_ID,
     EXPECTED_COARSE_TASK_COUNT,
+    EXPECTED_ENSEMBLE_ENDPOINT_ROW_COUNT,
     EXPECTED_PREDICTION_CELL_COUNT,
     EXPECTED_SOURCE_STREAM_COUNT,
     EXPECTED_UTILITY_ROW_COUNT,
@@ -40,7 +45,7 @@ from .runtime import WorkstationRuntimePlan
 
 
 STAGE_ID = "60_routing_and_composition"
-CONFIG_SCHEMA_VERSION = "midogpp_exact_tail_utility_surface_config_v1"
+CONFIG_SCHEMA_VERSION = "midogpp_exact_tail_utility_surface_config_v2"
 FRESH_ATTESTATION_SCHEMA = "midogpp_utility_aligned_fresh_reservation_v1"
 # Freeze this experiment family's graph locally.  Source-inner orchestration is
 # a design reference, never an artifact-identity dependency.
@@ -301,6 +306,21 @@ def _validate_config(
         "coarse_task_count": EXPECTED_COARSE_TASK_COUNT,
         "prediction_cell_count": EXPECTED_PREDICTION_CELL_COUNT,
         "utility_row_count": EXPECTED_UTILITY_ROW_COUNT,
+        "primary_utility_endpoint": (
+            "all_nine_seed_probability_ensemble_bacc_delta"
+        ),
+        "ensemble_seed_pair_count": len(TRAINING_SEEDS) * len(GENERATION_SEEDS),
+        "ensemble_threshold": 0.5,
+        "ensemble_utility_row_count": EXPECTED_ENSEMBLE_ENDPOINT_ROW_COUNT,
+        "per_seed_utility_role": "descriptive_only",
+        "per_seed_rows_may_feed_model": False,
+        "support_action_shift_scalar_name": (
+            SUPPORT_ACTION_PROBABILITY_SHIFT_NAME
+        ),
+        "support_action_shift_scalar_semantics": (
+            SUPPORT_ACTION_PROBABILITY_SHIFT_SEMANTICS
+        ),
+        "support_action_shift_seed_values_may_feed_model": False,
         "outer_target_excluded_from_query_and_source_roles": True,
         "whole_case_support_evaluation_disjoint": True,
         "minimum_independent_support_cases_per_query": MINIMUM_SUPPORT_CASE_COUNT,

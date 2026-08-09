@@ -18,7 +18,6 @@ from ..exact_tail_utility_surface.source_generation import (
     materialize_generated_development_cache,
 )
 from ..metadata_compatibility import derive_compatibility_scores, derive_metadata_profiles
-from ..residual_topup.hashing import canonical_sha256
 from ..utility_aligned.target_features import (
     TargetCandidateComponents,
     TargetFeatureProduction,
@@ -32,6 +31,7 @@ from ..utility_aligned_identities import (
 )
 from .config import TargetSupportSurfaceConfig
 from .inputs import TargetSupportInputs, load_target_support_inputs
+from .action_probe_planning import support_partition_hash
 
 
 def build_all_target_features(
@@ -44,12 +44,7 @@ def build_all_target_features(
     execution_root = execution_root_for(config)
     inputs = load_target_support_inputs(config, execution_root=execution_root)
     partition_hashes = {
-        center: canonical_sha256({
-            "schema_version": "midogpp_target_support_partition_bridge_v1",
-            "parent_reservation_hash": inputs.reservation_hash,
-            "target": center,
-            "case_ids": sorted(set(inputs.case_ids_by_target[center])),
-        }) for center in CENTERS
+        center: support_partition_hash(inputs, center) for center in CENTERS
     }
     generated = materialize_generated_development_cache(
         SourceGenerationConfig(config.expert_bank_root, config.generation_lock_root, CLASSIFIER),

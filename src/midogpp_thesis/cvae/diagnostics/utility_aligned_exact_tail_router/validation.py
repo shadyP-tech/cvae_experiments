@@ -8,7 +8,7 @@ from typing import Mapping, Sequence
 from ....common.hashing import stable_hash
 from ...protocol import ProtocolError
 from .actions import build_exact_tail_action_library
-from .artifact_io import read_json, render_csv
+from .artifact_io import json_ready, read_json, render_csv
 from .bundle import assert_closed_world, validate_content_index
 from .config import (
     UtilityAlignedExactTailRouterConfig,
@@ -556,12 +556,12 @@ def _validate_final_state(
             "validator": "validate_utility_aligned_exact_tail_router_bundle",
             "checks": dict(expected_checks),
         }
-        if report != expected:
+        if report != json_ready(expected):
             raise ProtocolError("Utility-aligned validation report drifted.")
 
 
 def _assert_json(path: Path, expected: Mapping[str, object]) -> None:
-    if read_json(path) != dict(expected):
+    if read_json(path) != json_ready(expected):
         raise ProtocolError(f"Utility-aligned derived JSON drifted: {path.name}.")
 
 

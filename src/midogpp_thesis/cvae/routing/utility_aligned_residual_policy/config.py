@@ -11,10 +11,11 @@ import yaml
 
 from ...protocol import ProtocolError
 from ..residual_topup.hashing import canonical_sha256
+from ..utility_aligned import SUPPORT_ACTION_PROBABILITY_SHIFT_NAME
 from .contracts import EXPERIMENT_ID, INPUT_ARTIFACT_IDS, OUTPUT_ARTIFACT_ID
 
 
-CONFIG_SCHEMA = "midogpp_utility_aligned_residual_policy_config_v1"
+CONFIG_SCHEMA = "midogpp_utility_aligned_residual_policy_config_v2"
 STAGE_ID = "60_routing_and_composition"
 PERMUTATION_SEED = 60_902_026
 CASE_BOOTSTRAP_SEED_BASE = 60_920_000
@@ -138,12 +139,13 @@ def _validate(config: UtilityAlignedResidualPolicyConfig) -> None:
     } or config.protocol.get("fresh_target_status") not in {"planned", "ready"}:
         raise ProtocolError("Utility-aligned policy protocol drifted.")
     if dict(config.model) != {
-        "family": "global_source_effect_plus_target_source_interaction_ridge",
+        "family": "candidate_level_exact_nine_ensemble_m0_m1_ridge",
         "alphas": [0.01, 0.1, 1.0, 10.0],
         "permutation_seed": PERMUTATION_SEED,
         "case_bootstrap_seed_base": CASE_BOOTSTRAP_SEED_BASE,
         "confidence_multiplier": 1.96,
         "minimum_gain": 0.0,
+        "target_local_scalar_name": SUPPORT_ACTION_PROBABILITY_SHIFT_NAME,
         "strict_nested_query_source_exclusion": True,
         "uncertainty_units": ["query_cluster", "case_cluster"],
         "seed_cells_are_uncertainty_units": False,

@@ -234,6 +234,7 @@ class CoarseTaskCheckpoint:
     task_hash: str
     action_prediction_sha256: Mapping[str, str]
     action_probability_sha256: Mapping[str, str]
+    action_support_probability_sha256: Mapping[str, str]
     checkpoint_hash: str
 
     def __post_init__(self) -> None:
@@ -247,11 +248,21 @@ class CoarseTaskCheckpoint:
         probabilities = _hash_mapping(
             self.action_probability_sha256, expected.action_ids, "probability"
         )
+        support_probabilities = _hash_mapping(
+            self.action_support_probability_sha256,
+            expected.action_ids,
+            "support probability",
+        )
         object.__setattr__(
             self, "action_prediction_sha256", MappingProxyType(predictions)
         )
         object.__setattr__(
             self, "action_probability_sha256", MappingProxyType(probabilities)
+        )
+        object.__setattr__(
+            self,
+            "action_support_probability_sha256",
+            MappingProxyType(support_probabilities),
         )
         expected_hash = stable_hash(self._unhashed_payload())
         if self.checkpoint_hash != expected_hash:
@@ -259,11 +270,14 @@ class CoarseTaskCheckpoint:
 
     def _unhashed_payload(self) -> dict[str, object]:
         return {
-            "schema_version": "midogpp_exact_tail_coarse_checkpoint_v1",
+            "schema_version": "midogpp_exact_tail_coarse_checkpoint_v2",
             "task_key": list(self.task_key),
             "task_hash": self.task_hash,
             "action_prediction_sha256": dict(self.action_prediction_sha256),
             "action_probability_sha256": dict(self.action_probability_sha256),
+            "action_support_probability_sha256": dict(
+                self.action_support_probability_sha256
+            ),
             "all_eight_actions_materialized": True,
         }
 
@@ -276,12 +290,16 @@ def build_coarse_task_checkpoint(
     task: CoarsePredictionTask,
     action_prediction_sha256: Mapping[str, str],
     action_probability_sha256: Mapping[str, str],
+    action_support_probability_sha256: Mapping[str, str],
 ) -> CoarseTaskCheckpoint:
     values: dict[str, object] = {
         "task_key": task.key,
         "task_hash": task.task_hash,
         "action_prediction_sha256": dict(action_prediction_sha256),
         "action_probability_sha256": dict(action_probability_sha256),
+        "action_support_probability_sha256": dict(
+            action_support_probability_sha256
+        ),
         "checkpoint_hash": "",
     }
     provisional = CoarseTaskCheckpoint.__new__(CoarseTaskCheckpoint)

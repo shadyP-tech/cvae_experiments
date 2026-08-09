@@ -25,22 +25,39 @@ def write_checkpoint(
     classifier_config_hash: str,
     predictions: np.ndarray,
     probabilities: np.ndarray,
+    support_probabilities: np.ndarray | None = None,
     action_prediction_sha256: Mapping[str, str],
     action_probability_sha256: Mapping[str, str],
+    action_support_probability_sha256: Mapping[str, str] | None = None,
     action_composition_sha256: Mapping[str, str],
     action_scaler_state_hash: Mapping[str, str],
     evaluation_row_count: int,
+    support_row_count: int = 0,
 ) -> CoarsePredictionRecord:
+    if support_probabilities is None:
+        support_probabilities = np.empty(
+            (len(item.task.action_ids), 0), dtype=np.float32
+        )
+    support_probabilities = np.ascontiguousarray(
+        support_probabilities, dtype=np.float32
+    )
+    if action_support_probability_sha256 is None:
+        action_support_probability_sha256 = {
+            action_id: array_sha256(support_probabilities[index])
+            for index, action_id in enumerate(item.task.action_ids)
+        }
     checkpoint = build_coarse_task_checkpoint(
         task=item.task,
         action_prediction_sha256=action_prediction_sha256,
         action_probability_sha256=action_probability_sha256,
+        action_support_probability_sha256=action_support_probability_sha256,
     )
     path = checkpoint_path(item)
     atomic_save_npz(
         path,
         predictions=predictions,
         probabilities=probabilities,
+        support_probabilities=support_probabilities,
     )
     file_sha = sha256_file(path)
     metadata = {
@@ -51,18 +68,30 @@ def write_checkpoint(
         "partition_hash": item.partition_hash,
         "evaluation_row_identity_hash": item.evaluation_row_identity_hash,
         "evaluation_array_sha256": sha256_file(Path(item.evaluation_array_path)),
+        "support_row_identity_hash": item.support_row_identity_hash or None,
+        "support_array_present": bool(item.support_array_path),
+        "support_array_sha256": (
+            sha256_file(Path(item.support_array_path))
+            if item.support_array_path
+            else None
+        ),
         "source_cache_hash": item.source_cache_hash,
         "classifier_config_hash": classifier_config_hash,
         "action_ids": list(item.task.action_ids),
         "action_prediction_sha256": dict(action_prediction_sha256),
         "action_probability_sha256": dict(action_probability_sha256),
+        "action_support_probability_sha256": dict(
+            action_support_probability_sha256
+        ),
         "action_composition_sha256": dict(action_composition_sha256),
         "action_scaler_state_hash": dict(action_scaler_state_hash),
         "array_member": path.name,
         "array_file_sha256": file_sha,
         "evaluation_row_count": evaluation_row_count,
+        "support_row_count": support_row_count,
         "checkpoint_hash": checkpoint.checkpoint_hash,
         "labels_available_to_fit_or_predict": False,
+        "support_labels_available_to_fit_or_predict": False,
         "all_eight_actions_materialized": True,
     }
     atomic_json(checkpoint_metadata_path(item), metadata)
@@ -94,18 +123,24 @@ def load_checkpoint(item: PredictionWorkerInput) -> CoarsePredictionRecord | Non
         "partition_hash",
         "evaluation_row_identity_hash",
         "evaluation_array_sha256",
+        "support_row_identity_hash",
+        "support_array_present",
+        "support_array_sha256",
         "source_cache_hash",
         "classifier_config_hash",
         "action_ids",
         "action_prediction_sha256",
         "action_probability_sha256",
+        "action_support_probability_sha256",
         "action_composition_sha256",
         "action_scaler_state_hash",
         "array_member",
         "array_file_sha256",
         "evaluation_row_count",
+        "support_row_count",
         "checkpoint_hash",
         "labels_available_to_fit_or_predict",
+        "support_labels_available_to_fit_or_predict",
         "all_eight_actions_materialized",
     }
     if set(raw) != expected_keys:
@@ -124,6 +159,15 @@ def load_checkpoint(item: PredictionWorkerInput) -> CoarsePredictionRecord | Non
         != item.evaluation_row_identity_hash
         or raw.get("evaluation_array_sha256")
         != sha256_file(Path(item.evaluation_array_path))
+        or raw.get("support_row_identity_hash")
+        != (item.support_row_identity_hash or None)
+        or raw.get("support_array_present") is not bool(item.support_array_path)
+        or raw.get("support_array_sha256")
+        != (
+            sha256_file(Path(item.support_array_path))
+            if item.support_array_path
+            else None
+        )
         or raw.get("source_cache_hash") != item.source_cache_hash
         or raw.get("classifier_config_hash")
         != classifier_from_payload(item.classifier_payload).config_hash
@@ -131,6 +175,7 @@ def load_checkpoint(item: PredictionWorkerInput) -> CoarsePredictionRecord | Non
         or raw.get("array_member") != array_path.name
         or raw.get("array_file_sha256") != sha256_file(array_path)
         or raw.get("labels_available_to_fit_or_predict") is not False
+        or raw.get("support_labels_available_to_fit_or_predict") is not False
         or raw.get("all_eight_actions_materialized") is not True
     ):
         raise ProtocolError("Exact-tail COMPLETE checkpoint binding drifted.")
@@ -141,32 +186,52 @@ def record_from_metadata(
     item: PredictionWorkerInput, raw: Mapping[str, object], array_path: Path
 ) -> CoarsePredictionRecord:
     with np.load(array_path, allow_pickle=False) as payload:
-        if set(payload.files) != {"predictions", "probabilities"}:
+        if set(payload.files) != {
+            "predictions",
+            "probabilities",
+            "support_probabilities",
+        }:
             raise ProtocolError("Exact-tail checkpoint array schema drifted.")
         predictions = np.asarray(payload["predictions"])
         probabilities = np.asarray(payload["probabilities"])
+        support_probabilities = np.asarray(payload["support_probabilities"])
     row_count = int(raw["evaluation_row_count"])
+    support_row_count = int(raw["support_row_count"])
     if (
         predictions.shape != (8, row_count)
         or predictions.dtype != np.uint8
         or probabilities.shape != (8, row_count)
         or probabilities.dtype != np.float32
+        or support_probabilities.shape != (8, support_row_count)
+        or support_probabilities.dtype != np.float32
         or not np.isin(predictions, (0, 1)).all()
         or not np.isfinite(probabilities).all()
+        or np.any((probabilities < 0.0) | (probabilities > 1.0))
+        or not np.isfinite(support_probabilities).all()
+        or np.any(
+            (support_probabilities < 0.0) | (support_probabilities > 1.0)
+        )
+        or (bool(item.support_array_path) != (support_row_count > 0))
     ):
         raise ProtocolError("Exact-tail checkpoint arrays drifted.")
     pred_hashes = action_hash_map(raw["action_prediction_sha256"], item.task)
     prob_hashes = action_hash_map(raw["action_probability_sha256"], item.task)
+    support_prob_hashes = action_hash_map(
+        raw["action_support_probability_sha256"], item.task
+    )
     for index, action_id in enumerate(item.task.action_ids):
         if (
             array_sha256(predictions[index]) != pred_hashes[action_id]
             or array_sha256(probabilities[index]) != prob_hashes[action_id]
+            or array_sha256(support_probabilities[index])
+            != support_prob_hashes[action_id]
         ):
             raise ProtocolError("Exact-tail checkpoint action bytes drifted.")
     checkpoint = build_coarse_task_checkpoint(
         task=item.task,
         action_prediction_sha256=pred_hashes,
         action_probability_sha256=prob_hashes,
+        action_support_probability_sha256=support_prob_hashes,
     )
     if raw.get("checkpoint_hash") != checkpoint.checkpoint_hash:
         raise ProtocolError("Exact-tail checkpoint semantic hash drifted.")

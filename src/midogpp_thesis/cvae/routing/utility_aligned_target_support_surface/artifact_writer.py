@@ -11,9 +11,18 @@ from typing import Mapping, Sequence
 from ...protocol import ProtocolError
 from ..exact_tail_utility_surface.source_generation import GeneratedDevelopmentCache
 from ..residual_topup.hashing import canonical_sha256
+from ..utility_aligned.ensemble_contracts import (
+    SUPPORT_ACTION_PROBABILITY_SHIFT_NAME,
+)
 from ..utility_aligned.target_features import TargetFeatureProduction
 from ..utility_aligned_identities import CENTERS, METADATA_PROFILE_SHA256
 from .config import TargetSupportSurfaceConfig
+from .action_probe_contracts import (
+    ACTION_SHIFT_LOCK_MEMBER,
+    ACTION_SHIFT_TABLE_MEMBER,
+    TargetSupportActionShiftRow,
+)
+from .action_probe_surface import build_action_shift_lock
 from .contracts import (
     CACHE_ARTIFACT_ID,
     EXPERT_BANK_ARTIFACT_ID,
@@ -30,6 +39,7 @@ def persist_target_support_artifact(
     inputs: TargetSupportInputs,
     generated: GeneratedDevelopmentCache,
     productions: Sequence[TargetFeatureProduction],
+    action_shift_rows: Sequence[TargetSupportActionShiftRow],
 ) -> Path:
     root = config.artifact_root; root.mkdir(parents=True, exist_ok=True)
     for member in ("config.resolved.yaml", "provenance/input_artifacts.json"):
@@ -51,7 +61,7 @@ def persist_target_support_artifact(
         "feature_component_count": len(generated.component_records),
         "feature_reference_rows_per_class": 270,
         "final_action_source_prefix_rows_per_class": 256,
-        "final_action_geometry_executed_by_this_artifact": False,
+        "final_action_geometry_executed_by_this_artifact": True,
         "generation_devices": ["cuda:0", "cuda:1"], "tf32_enabled": False,
         "amp_enabled": False, "support_labels_used": False,
     }, "source_generation_lock_hash")
@@ -64,6 +74,28 @@ def persist_target_support_artifact(
     }, "case_bootstrap_plans_hash")
     write_json(root / "manifests/case_bootstrap_plans.json", plans)
     features = [feature_payload(value) for value in productions]
+    shift_rows = tuple(action_shift_rows)
+    write_csv(
+        root / ACTION_SHIFT_TABLE_MEMBER,
+        [row.to_payload() for row in shift_rows],
+    )
+    shift_lock = build_action_shift_lock(
+        rows=shift_rows,
+        table_path=root / ACTION_SHIFT_TABLE_MEMBER,
+        support_reservation_hash=inputs.reservation_hash,
+        target_support_cache_binding_hash=inputs.cache_binding_hash,
+        source_generation_lock_hash=str(generation["source_generation_lock_hash"]),
+        generated_cache_hash=canonical_sha256(
+            {
+                "schema_version": (
+                    "midogpp_target_support_generated_cache_binding_v1"
+                ),
+                "upstream_cache_hash": generated.cache_hash,
+            }
+        ),
+        runtime=config.action_probe_runtime,
+    )
+    write_json(root / ACTION_SHIFT_LOCK_MEMBER, shift_lock)
     surface = hashed({
         "schema_version": "midogpp_utility_aligned_target_support_surface_v1",
         "artifact_id": OUTPUT_ARTIFACT_ID, "claim_scope": "routing_compatibility_only",
@@ -81,7 +113,12 @@ def persist_target_support_artifact(
         "generated_cache_hash": generated.cache_hash,
         "feature_reference_rows_per_class": 270,
         "final_action_source_prefix_rows_per_class": 256,
-        "final_action_geometry_executed_by_this_artifact": False,
+        "final_action_geometry_executed_by_this_artifact": True,
+        "target_local_scalar_name": SUPPORT_ACTION_PROBABILITY_SHIFT_NAME,
+        "target_support_action_shift_lock_hash": shift_lock["shift_lock_hash"],
+        "target_support_action_shift_table_sha256": shift_lock["table_sha256"],
+        "target_support_action_shift_row_hashes_hash": shift_lock["ordered_row_hashes_hash"],
+        "target_support_action_shift_row_count": len(shift_rows),
         "support_case_ids_by_target": {target: sorted(set(inputs.case_ids_by_target[target])) for target in CENTERS},
         "target_features": features, "labels_persisted": False,
         "target_evaluation_rows_opened": False,
@@ -98,19 +135,20 @@ def persist_target_support_artifact(
         "schema_version": "midogpp_utility_aligned_target_support_leakage_report_v1",
         "status": "PASS", "surface_hash": surface["surface_hash"], "support_labels_used": False,
         "target_evaluation_rows_opened": False, "target_expert_excluded": True,
-        "case_level_resampling": True,
+        "case_level_resampling": True, "action_probe_labels_used": False,
     })
     write_json(root / "reports/run_state.json", {
         "schema_version": "midogpp_utility_aligned_target_support_run_state_v1",
         "status": "COMPLETE", "surface_hash": surface["surface_hash"],
         "point_feature_row_count": len(point), "bootstrap_feature_row_count": len(bootstraps),
-        "target_count": len(productions),
+        "target_count": len(productions), "action_shift_row_count": len(shift_rows),
     })
     write_json(root / "reports/validation_report.json", {
         "schema_version": "midogpp_utility_aligned_target_support_validation_report_v1",
         "status": "PASS", "surface_hash": surface["surface_hash"],
         "closed_world_cache_validated": True, "typed_bootstrap_plans_reconstructed": True,
         "label_free_target_features_reconstructed": True,
+        "label_free_action_shifts_reconstructed": True,
     })
     member_sha = {member: sha256_file(root / member) for member in REQUIRED_FILES if member != "manifests/content_index.json"}
     write_json(root / "manifests/content_index.json", hashed({

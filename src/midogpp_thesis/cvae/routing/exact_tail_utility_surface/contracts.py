@@ -51,7 +51,7 @@ BASE_ACTION_ID = "inner_base_equal_union"
 TAIL_ACTION_PREFIX = "inner_single_source_tail::"
 PRIMARY_METRIC = "balanced_accuracy"
 RESPONSE_SEMANTICS = "bacc_exact_additive_tail_minus_bacc_exact_base"
-SURFACE_SCHEMA_VERSION = "midogpp_exact_additive_tail_utility_surface_v1"
+SURFACE_SCHEMA_VERSION = "midogpp_exact_additive_tail_utility_surface_v2"
 MINIMUM_SUPPORT_CASE_COUNT = 8
 
 SOURCE_PREFIX_ROWS_PER_CLASS = (
@@ -70,6 +70,9 @@ EXPECTED_PREDICTION_CELL_COUNT = EXPECTED_COARSE_TASK_COUNT * (
     1 + INNER_SOURCE_COUNT
 )
 EXPECTED_UTILITY_ROW_COUNT = EXPECTED_COARSE_TASK_COUNT * INNER_SOURCE_COUNT
+EXPECTED_ENSEMBLE_ENDPOINT_ROW_COUNT = (
+    len(CENTERS) * (len(CENTERS) - 1) * INNER_SOURCE_COUNT
+)
 
 
 def development_queries(outer_target: object) -> tuple[str, ...]:
@@ -269,6 +272,17 @@ def expected_utility_keys() -> tuple[tuple[str, str, str, int, int], ...]:
     )
 
 
+def expected_ensemble_endpoint_keys() -> tuple[tuple[str, str, str], ...]:
+    """Canonical one-row-per-(H,q,e) all-nine-seed endpoint grid."""
+
+    return tuple(
+        (outer, query, source)
+        for outer in CENTERS
+        for query in development_queries(outer)
+        for source in legal_sources(outer_target=outer, pseudo_query=query)
+    )
+
+
 @dataclass(frozen=True)
 class EvaluationRowIdentity:
     """Label-free identity of one whole-case development evaluation row."""
@@ -441,6 +455,7 @@ __all__ = (
     "DEVELOPMENT_MANIFEST_ARTIFACT_ID",
     "DEVELOPMENT_RESERVATION_ARTIFACT_ID",
     "EXPECTED_COARSE_TASK_COUNT",
+    "EXPECTED_ENSEMBLE_ENDPOINT_ROW_COUNT",
     "EXPECTED_PREDICTION_CELL_COUNT",
     "EXPECTED_SOURCE_STREAM_COUNT",
     "EXPECTED_UTILITY_ROW_COUNT",
@@ -462,6 +477,7 @@ __all__ = (
     "build_development_partition",
     "development_queries",
     "expected_coarse_task_keys",
+    "expected_ensemble_endpoint_keys",
     "expected_prediction_keys",
     "expected_utility_keys",
     "legal_sources",

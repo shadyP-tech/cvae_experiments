@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import hashlib
 import math
 from types import MappingProxyType
 from typing import Mapping, Sequence
@@ -25,6 +24,11 @@ from .contracts import (
     tail_action_id,
 )
 from .label_access import OpenedDevelopmentLabels
+from .probability_surface import (
+    SealedProbabilitySurface,
+    SealedSupportProbabilitySurface,
+    array_sha256,
+)
 from .seals import GlobalPredictionSeal
 
 
@@ -36,6 +40,8 @@ class SealedPredictionSurface:
     """In-memory view whose bytes are bound by a complete global seal."""
 
     predictions_by_key: Mapping[PredictionKey, np.ndarray]
+    probabilities_by_key: Mapping[PredictionKey, np.ndarray]
+    support_probabilities_by_key: Mapping[PredictionKey, np.ndarray]
     seal: GlobalPredictionSeal
 
     def __post_init__(self) -> None:
@@ -57,6 +63,29 @@ class SealedPredictionSurface:
             values.setflags(write=False)
             normalized[key] = values
         object.__setattr__(self, "predictions_by_key", MappingProxyType(normalized))
+        probability_surface = SealedProbabilitySurface(
+            probabilities_by_key=self.probabilities_by_key,
+            seal=self.seal,
+        )
+        for key in expected:
+            if normalized[key].shape != probability_surface.probabilities_by_key[key].shape:
+                raise ProtocolError(
+                    "Exact-tail prediction/probability row geometry drifted."
+                )
+        object.__setattr__(
+            self,
+            "probabilities_by_key",
+            probability_surface.probabilities_by_key,
+        )
+        support_surface = SealedSupportProbabilitySurface(
+            probabilities_by_key=self.support_probabilities_by_key,
+            seal=self.seal,
+        )
+        object.__setattr__(
+            self,
+            "support_probabilities_by_key",
+            support_surface.probabilities_by_key,
+        )
 
 
 @dataclass(frozen=True)
@@ -220,15 +249,6 @@ def score_exact_tail_utility_surface(
     if len(rows) != EXPECTED_UTILITY_ROW_COUNT:
         raise ProtocolError("Exact-tail scored utility coverage drifted.")
     return tuple(rows)
-
-
-def array_sha256(values: np.ndarray) -> str:
-    array = np.ascontiguousarray(values)
-    digest = hashlib.sha256()
-    digest.update(str(array.dtype).encode("utf-8"))
-    digest.update(repr(tuple(array.shape)).encode("utf-8"))
-    digest.update(array.tobytes(order="C"))
-    return digest.hexdigest()
 
 
 def to_core_exact_tail_utility_rows(

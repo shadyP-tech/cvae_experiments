@@ -22,6 +22,12 @@ from .bundle import (
 )
 from .config import ExactTailUtilitySurfaceConfig, FreshInputAttestation
 from .contracts import CENTERS, DevelopmentPartition
+from .ensemble_scoring import (
+    ENSEMBLE_ENDPOINT_LOCK_MEMBER,
+    ENSEMBLE_ENDPOINT_TABLE_MEMBER,
+    ScoredExactTailEnsembleEndpointRow,
+    build_ensemble_endpoint_lock,
+)
 from .features import materialize_candidate_feature_rows
 from .prediction_execution import (
     CoarsePredictionRecord,
@@ -38,6 +44,12 @@ from .scoring import ScoredExactTailUtilityRow
 from .source_generation import (
     GeneratedDevelopmentCache,
     materialize_generated_development_cache,
+)
+from .support_shift_surface import (
+    SUPPORT_SHIFT_LOCK_MEMBER,
+    SUPPORT_SHIFT_TABLE_MEMBER,
+    build_support_action_shift_lock,
+    build_support_action_shift_rows,
 )
 
 
@@ -99,6 +111,9 @@ class ProductionExactTailAdapter:
             root=config.artifact_root,
             checkpoint_root=execution_root / "prediction_checkpoints",
         )
+        support_shift_rows = build_support_action_shift_rows(
+            execution.predictions, reservation.partitions
+        )
         self._reservation = reservation
         self._generated = generated
         self._task_records = execution.task_records
@@ -110,6 +125,7 @@ class ProductionExactTailAdapter:
             prediction_index_path=execution.prediction_index_path,
             prediction_arrays_path=execution.prediction_arrays_path,
             feature_rows=features,
+            support_shift_rows=support_shift_rows,
         )
 
     def persist_scored_bundle(
@@ -117,6 +133,7 @@ class ProductionExactTailAdapter:
         config: ExactTailUtilitySurfaceConfig,
         capability: PreparedPredictionCapability,
         rows: Sequence[ScoredExactTailUtilityRow],
+        ensemble_rows: Sequence[ScoredExactTailEnsembleEndpointRow],
     ) -> Path:
         if self._reservation is None or self._generated is None or not self._task_records:
             raise ProtocolError("Exact-tail production adapter lacks its sealed execution state.")
@@ -171,8 +188,40 @@ class ProductionExactTailAdapter:
             root / "tables/exact_tail_utility.csv",
             [row.to_payload() for row in utility_rows],
         )
+        endpoint_rows = tuple(ensemble_rows)
+        _write_csv(
+            root / ENSEMBLE_ENDPOINT_TABLE_MEMBER,
+            [row.to_payload() for row in endpoint_rows],
+        )
+        support_shift_rows = tuple(capability.support_shift_rows)
+        _write_csv(
+            root / SUPPORT_SHIFT_TABLE_MEMBER,
+            [row.to_payload() for row in support_shift_rows],
+        )
 
         utility_sha = sha256_file(root / "tables/exact_tail_utility.csv")
+        endpoint_table_sha = sha256_file(root / ENSEMBLE_ENDPOINT_TABLE_MEMBER)
+        endpoint_lock = build_ensemble_endpoint_lock(
+            seal=capability.seal,
+            rows=endpoint_rows,
+            endpoint_table_sha256=endpoint_table_sha,
+        )
+        _atomic_json(
+            root / ENSEMBLE_ENDPOINT_LOCK_MEMBER,
+            endpoint_lock.to_payload(),
+        )
+        endpoint_lock_sha = sha256_file(root / ENSEMBLE_ENDPOINT_LOCK_MEMBER)
+        support_shift_table_sha = sha256_file(root / SUPPORT_SHIFT_TABLE_MEMBER)
+        support_shift_lock = build_support_action_shift_lock(
+            seal=capability.seal,
+            rows=support_shift_rows,
+            shift_table_sha256=support_shift_table_sha,
+        )
+        _atomic_json(
+            root / SUPPORT_SHIFT_LOCK_MEMBER,
+            support_shift_lock.to_payload(),
+        )
+        support_shift_lock_sha = sha256_file(root / SUPPORT_SHIFT_LOCK_MEMBER)
         feature_sha = sha256_file(root / "tables/candidate_features.csv")
         member_sha = {
             member: sha256_file(root / member) for member in CONTENT_INDEX_MEMBERS
@@ -182,6 +231,10 @@ class ProductionExactTailAdapter:
             rows=utility_rows,
             feature_rows=capability.feature_rows,
             utility_table_sha256=utility_sha,
+            ensemble_endpoint_lock=endpoint_lock,
+            ensemble_endpoint_lock_sha256=endpoint_lock_sha,
+            support_shift_lock=support_shift_lock,
+            support_shift_lock_sha256=support_shift_lock_sha,
             feature_table_sha256=feature_sha,
             member_sha256=member_sha,
         )
@@ -192,7 +245,7 @@ class ProductionExactTailAdapter:
         _atomic_json(
             root / "manifests/content_index.json",
             {
-                "schema_version": "midogpp_exact_tail_content_index_v1",
+                "schema_version": "midogpp_exact_tail_content_index_v2",
                 "member_sha256": member_sha,
                 "surface_lock_hash": lock.surface_lock_hash,
             },
@@ -201,13 +254,22 @@ class ProductionExactTailAdapter:
         _atomic_json(
             root / "reports/run_state.json",
             {
-                "schema_version": "midogpp_exact_tail_run_state_v1",
+                "schema_version": "midogpp_exact_tail_run_state_v2",
                 "status": "COMPLETE",
                 "surface_lock_hash": lock.surface_lock_hash,
                 "source_stream_count": len(self._generated.source_records),
                 "coarse_task_count": len(self._task_records),
                 "prediction_cell_count": len(capability.seal.cells),
                 "utility_row_count": len(utility_rows),
+                "utility_row_role": "descriptive_technical_repeats",
+                "ensemble_endpoint_row_count": len(endpoint_rows),
+                "ensemble_endpoint_lock_hash": endpoint_lock.endpoint_lock_hash,
+                "ensemble_endpoint_role": (
+                    "operational_source_inner_all_nine_seed_probability_ensemble"
+                ),
+                "support_shift_row_count": len(support_shift_rows),
+                "support_shift_lock_hash": support_shift_lock.shift_lock_hash,
+                "support_shift_labels_used": False,
                 "feature_row_count": len(capability.feature_rows),
                 "resumed_checkpoints_hash_validated": True,
             },
@@ -236,7 +298,7 @@ def _protocol_manifest(
     generated: GeneratedDevelopmentCache,
 ) -> dict[str, object]:
     return {
-        "schema_version": "midogpp_exact_tail_protocol_manifest_v1",
+        "schema_version": "midogpp_exact_tail_protocol_manifest_v2",
         "experiment_id": config.experiment_id,
         "output_artifact_id": config.output_artifact_id,
         "config_contract_hash": config.contract_hash,
@@ -253,6 +315,24 @@ def _protocol_manifest(
         "minimum_independent_support_cases_per_query": 8,
         "uncertainty_units": ["query_cluster", "case_cluster"],
         "seed_cells_are_uncertainty_units": False,
+        "per_seed_utility_rows_are_descriptive_only": True,
+        "per_seed_rows_may_feed_model": False,
+        "operational_endpoint": (
+            "all_nine_seed_probability_ensemble_bacc_delta"
+        ),
+        "probability_ensemble_threshold": 0.5,
+        "probability_ensemble_seed_cell_count": 9,
+        "support_probability_outputs_materialized": True,
+        "support_action_shift_row_count": 4536,
+        "support_action_shift_scalar_name": config.protocol[
+            "support_action_shift_scalar_name"
+        ],
+        "support_action_shift_scalar_semantics": config.protocol[
+            "support_action_shift_scalar_semantics"
+        ],
+        "support_action_shift_seed_values_may_feed_model": False,
+        "support_action_shift_labels_used": False,
+        "classifier_fit_count_unchanged": True,
         "all_predictions_sealed_before_development_labels": True,
         "dedicated_scoring_manifest_contains_exactly_sealed_rows": True,
         "target_support_labels_used": False,

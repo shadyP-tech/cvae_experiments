@@ -1,6 +1,6 @@
 # Protocol Status
 
-Last updated: 2026-08-08
+Last updated: 2026-08-09
 
 ## Active MIDOG++ surfaces
 
@@ -48,6 +48,10 @@ The working tree contains active implementations for:
 - the runnable consumed-data Stage-90 utility-aligned exact-tail diagnostic,
   whose fixed-two-case `R2` arm is always
   `INSUFFICIENT_SUPPORT_FOR_POLICY` and cannot feed later stages;
+- the endpoint-aligned successor implementation, whose primary Stage-60
+  response is one all-nine probability-ensemble BACC delta per `(H,q,e)`, not
+  nine seed-cell BACC deltas, and whose only target-local predictor is a
+  label-free exact-action support probability shift;
 - a conditionally unlocked Stage-20 outer A/B/C/D preservation factorial.
 
 The first three runs are complete on `xai-master` and pass their full
@@ -182,8 +186,13 @@ planned surfaces are:
 - the planned utility-aligned exact-tail and label-free target-support Stage-60
   producers, CPU-only policy lock, and fresh Stage-70 `B/U/G_delta/R/P`
   confirmation, blocked until their separate fresh development, support-parent,
-  and target-evaluation artifacts exist; failed transfer/uncertainty gates are
-  valid and freeze exact `B` rather than authorizing a routed action
+  and target-evaluation MIDOG++ artifacts exist; their aliases must be newly
+  hash-bound and whole-case disjoint even though the dataset family remains
+  MIDOG++. The exact-tail producer seals a 504-row candidate endpoint and keeps
+  4,536 seed rows descriptive. The target-support producer runs 81 resumable
+  label-free action-probe tasks (729 fits) and builds 32 whole-case bootstrap
+  surfaces. Failed transfer/uncertainty gates are valid and freeze exact `B`
+  rather than authorizing a routed action
 
 The separately registered
 `midogpp.oracle.uniform_b_v2_consumed_validation_residual_topup_b_u_g_s_case_oof.v1`

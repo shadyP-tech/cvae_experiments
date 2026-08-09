@@ -105,6 +105,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     utility_aligned_exact_tail.add_argument("--config", required=True)
     utility_aligned_exact_tail.add_argument("--artifact-root", required=True)
+
+    utility_aligned_ensemble_endpoint = sub.add_parser(
+        "utility-aligned-ensemble-endpoint-router-diagnostic",
+        help=(
+            "Run the consumed-validation Stage-90 utility-aligned exact-nine "
+            "ensemble-endpoint router diagnostic."
+        ),
+    )
+    utility_aligned_ensemble_endpoint.add_argument("--config", required=True)
+    utility_aligned_ensemble_endpoint.add_argument(
+        "--artifact-root", required=True
+    )
     return parser
 
 
@@ -249,6 +261,20 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_utility_aligned_exact_tail_router_config(args.config)
         output = run_utility_aligned_exact_tail_router_diagnostic(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "utility-aligned-ensemble-endpoint-router-diagnostic":
+        from .utility_aligned_ensemble_endpoint_router import (
+            load_utility_aligned_ensemble_endpoint_router_config,
+            run_utility_aligned_ensemble_endpoint_router_diagnostic,
+        )
+
+        config = load_utility_aligned_ensemble_endpoint_router_config(args.config)
+        output = run_utility_aligned_ensemble_endpoint_router_diagnostic(
             config,
             artifact_root=artifact_root,
         )

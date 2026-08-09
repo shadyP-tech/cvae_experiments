@@ -30,8 +30,10 @@ class PredictionCellSeal:
     generation_seed: int
     action_hash: str
     evaluation_row_identity_hash: str
+    support_row_identity_hash: str
     prediction_sha256: str
     probability_sha256: str
+    support_probability_sha256: str
     composition_sha256: str
     classifier_config_hash: str
 
@@ -47,9 +49,15 @@ class PredictionCellSeal:
             raise ProtocolError("Exact-tail prediction cell action binding drifted.")
         for value, role, lengths in (
             (self.evaluation_row_identity_hash, "evaluation-row hash", {16}),
+            (self.support_row_identity_hash, "support-row hash", {16}),
             (self.action_hash, "action hash", {16}),
             (self.prediction_sha256, "prediction SHA-256", {64}),
             (self.probability_sha256, "probability SHA-256", {64}),
+            (
+                self.support_probability_sha256,
+                "support-probability SHA-256",
+                {64},
+            ),
             (self.composition_sha256, "composition SHA-256", {64}),
             (self.classifier_config_hash, "classifier hash", {16, 64}),
         ):
@@ -74,12 +82,15 @@ class PredictionCellSeal:
             "generation_seed": self.generation_seed,
             "action_hash": self.action_hash,
             "evaluation_row_identity_hash": self.evaluation_row_identity_hash,
+            "support_row_identity_hash": self.support_row_identity_hash,
             "prediction_sha256": self.prediction_sha256,
             "probability_sha256": self.probability_sha256,
+            "support_probability_sha256": self.support_probability_sha256,
             "composition_sha256": self.composition_sha256,
             "classifier_config_hash": self.classifier_config_hash,
             "evaluation_labels_available_to_fit_or_predict": False,
             "support_labels_used": False,
+            "support_probabilities_are_label_free": True,
             "target_labels_used": False,
             "seed_selection_performed": False,
         }
@@ -96,6 +107,7 @@ class GlobalPredictionSeal:
     prediction_arrays_sha256: str
     partition_hash_by_center: Mapping[str, str]
     evaluation_row_hash_by_center: Mapping[str, str]
+    support_row_hash_by_center: Mapping[str, str]
     cells: tuple[PredictionCellSeal, ...]
     seal_hash: str
     status: str = GLOBAL_SEAL_STATUS
@@ -110,6 +122,11 @@ class GlobalPredictionSeal:
             self,
             "evaluation_row_hash_by_center",
             MappingProxyType(dict(self.evaluation_row_hash_by_center)),
+        )
+        object.__setattr__(
+            self,
+            "support_row_hash_by_center",
+            MappingProxyType(dict(self.support_row_hash_by_center)),
         )
         object.__setattr__(self, "cells", tuple(self.cells))
         self.verify_complete()
@@ -129,11 +146,12 @@ class GlobalPredictionSeal:
             _require_hash(value, role, lengths)
         if tuple(self.partition_hash_by_center) != CENTERS or tuple(
             self.evaluation_row_hash_by_center
-        ) != CENTERS:
+        ) != CENTERS or tuple(self.support_row_hash_by_center) != CENTERS:
             raise ProtocolError("Exact-tail global seal lacks canonical center coverage.")
         for value in (
             *self.partition_hash_by_center.values(),
             *self.evaluation_row_hash_by_center.values(),
+            *self.support_row_hash_by_center.values(),
         ):
             _require_hash(value, "partition identity", {16})
         expected = expected_prediction_keys()
@@ -150,12 +168,16 @@ class GlobalPredictionSeal:
                 cell.pseudo_query
             ]:
                 raise ProtocolError("Exact-tail cell escaped its sealed query rows.")
+            if cell.support_row_identity_hash != self.support_row_hash_by_center[
+                cell.pseudo_query
+            ]:
+                raise ProtocolError("Exact-tail cell escaped its sealed support rows.")
         if self.seal_hash != stable_hash(self._unhashed_payload()):
             raise ProtocolError("Exact-tail global prediction seal hash drifted.")
 
     def _unhashed_payload(self) -> dict[str, object]:
         return {
-            "schema_version": "midogpp_exact_tail_global_prediction_seal_v1",
+            "schema_version": "midogpp_exact_tail_global_prediction_seal_v2",
             "status": self.status,
             "config_contract_hash": self.config_contract_hash,
             "reservation_index_hash": self.reservation_index_hash,
@@ -166,12 +188,14 @@ class GlobalPredictionSeal:
             "prediction_arrays_sha256": self.prediction_arrays_sha256,
             "partition_hash_by_center": dict(self.partition_hash_by_center),
             "evaluation_row_hash_by_center": dict(self.evaluation_row_hash_by_center),
+            "support_row_hash_by_center": dict(self.support_row_hash_by_center),
             "prediction_cell_count": len(self.cells),
             "cells": [cell.to_payload() for cell in self.cells],
             "all_predictions_materialized": True,
             "development_evaluation_labels_opened": False,
             "target_support_labels_opened": False,
             "target_evaluation_labels_opened": False,
+            "label_free_support_probabilities_materialized": True,
         }
 
     def to_payload(self) -> dict[str, object]:
@@ -240,6 +264,10 @@ def build_global_prediction_seal(
         },
         "evaluation_row_hash_by_center": {
             center: row_identity_hash(normalized[center].evaluation_rows)
+            for center in CENTERS
+        },
+        "support_row_hash_by_center": {
+            center: row_identity_hash(normalized[center].support_rows)
             for center in CENTERS
         },
         "cells": ordered,

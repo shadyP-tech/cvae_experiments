@@ -50,6 +50,10 @@ does not make an unrun experiment claim-eligible.
   target-specific residual policy, sealed Stage-70 confirmation, the separate
   runnable consumed-data Stage-90 exact-tail diagnostic, and their
   workstation-optimized execution contracts.
+- `wiki/03-experiments/midogpp-uniform-b-v2-utility-aligned-ensemble-endpoint-router.md`:
+  active terminal consumed-validation Stage-90 exact-nine ensemble-endpoint
+  diagnostic, descriptive-only seed rows, experiment-fenced inputs, and its
+  fixed two-case insufficient-support boundary.
 - `wiki/03-experiments/midogpp-uniform-b-variant-diagnostics.md`: two
   completed workstation-only Variant-B Stage-90 diagnostics, their remote
   namespaces and artifact roots, negative tail-average stability result,

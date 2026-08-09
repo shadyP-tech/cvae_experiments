@@ -13,6 +13,9 @@ from midogpp_thesis.cvae.routing.utility_aligned_residual_policy.bundle import R
 from midogpp_thesis.cvae.routing.utility_aligned_residual_policy.model_workers import (
     TargetFitResult,
 )
+from midogpp_thesis.cvae.routing.utility_aligned import (
+    SUPPORT_ACTION_PROBABILITY_SHIFT_NAME,
+)
 
 
 CENTERS = ("0", "1", "2", "3", "5", "6", "7", "8", "9")
@@ -56,13 +59,24 @@ def _fake_loaders(monkeypatch, *, overlap: bool = False, target_eval_drift: bool
         support_case_ids_by_target=target_support,
         evaluation_case_ids_by_target=target_evaluation,
         feature_sets={},
+        action_shift_bindings={
+            "target_local_scalar_name": SUPPORT_ACTION_PROBABILITY_SHIFT_NAME
+        },
+        action_shift_cases_by_target={center: () for center in CENTERS},
     )
     monkeypatch.setattr(
         policy_inputs,
-        "load_exact_inputs",
-        lambda _config: (SimpleNamespace(), SimpleNamespace(), {}, development),
+        "load_exact_ensemble_policy_inputs",
+        lambda _config: SimpleNamespace(
+            lock=SimpleNamespace(),
+            inner_feature_surfaces={},
+            development_manifest=development,
+        ),
     )
     monkeypatch.setattr(policy_inputs, "load_target_inputs", lambda **_kwargs: target)
+    monkeypatch.setattr(
+        policy_inputs, "load_ensemble_endpoint_inputs", lambda _root: SimpleNamespace()
+    )
     monkeypatch.setattr(policy_inputs, "load_equal_union", lambda _root: "equal")
 
 
@@ -74,6 +88,7 @@ def test_policy_rejects_cross_reservation_case_overlap(monkeypatch) -> None:
         target_support_surface_root=Path("support"),
         target_support_parent_reservation_root=Path("parent"),
         target_reservation_root=Path("target"),
+        model={"target_local_scalar_name": SUPPORT_ACTION_PROBABILITY_SHIFT_NAME},
     )
     with pytest.raises(ProtocolError, match="overlap fresh target"):
         policy_inputs.load_policy_inputs(config)
@@ -87,6 +102,7 @@ def test_policy_requires_exact_declared_target_eval_map(monkeypatch) -> None:
         target_support_surface_root=Path("support"),
         target_support_parent_reservation_root=Path("parent"),
         target_reservation_root=Path("target"),
+        model={"target_local_scalar_name": SUPPORT_ACTION_PROBABILITY_SHIFT_NAME},
     )
     with pytest.raises(ProtocolError, match="differ from Stage-70"):
         policy_inputs.load_policy_inputs(config)

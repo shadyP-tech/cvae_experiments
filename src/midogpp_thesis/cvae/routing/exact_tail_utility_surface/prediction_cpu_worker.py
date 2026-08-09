@@ -36,6 +36,11 @@ def prediction_worker(item: PredictionWorkerInput) -> CoarsePredictionRecord:
     eval_embeddings = np.load(
         item.evaluation_array_path, mmap_mode="r", allow_pickle=False
     )
+    if not item.support_array_path:
+        raise ProtocolError("Exact-tail support memmap path is absent.")
+    support_embeddings = np.load(
+        item.support_array_path, mmap_mode="r", allow_pickle=False
+    )
     if (
         eval_embeddings.ndim != 2
         or eval_embeddings.shape[1] != COMMON_OUTPUT_DIM
@@ -43,6 +48,18 @@ def prediction_worker(item: PredictionWorkerInput) -> CoarsePredictionRecord:
         or not np.isfinite(eval_embeddings).all()
     ):
         raise ProtocolError("Exact-tail evaluation memmap geometry drifted.")
+    if (
+        support_embeddings.ndim != 2
+        or support_embeddings.shape[1] != COMMON_OUTPUT_DIM
+        or len(support_embeddings) == 0
+        or support_embeddings.dtype != np.float32
+        or not np.isfinite(support_embeddings).all()
+    ):
+        raise ProtocolError("Exact-tail support memmap geometry drifted.")
+    prediction_embeddings = np.ascontiguousarray(
+        np.concatenate((eval_embeddings, support_embeddings), axis=0),
+        dtype=np.float32,
+    )
     source_arrays: dict[str, np.ndarray] = {}
     for record in item.source_records:
         path = safe_source_member(Path(item.cache_root), record.relative_path)
@@ -59,10 +76,12 @@ def prediction_worker(item: PredictionWorkerInput) -> CoarsePredictionRecord:
     )
     predictions: list[np.ndarray] = []
     probabilities: list[np.ndarray] = []
+    support_probabilities: list[np.ndarray] = []
     compositions: dict[str, str] = {}
     scaler_hashes: dict[str, str] = {}
     prediction_hashes: dict[str, str] = {}
     probability_hashes: dict[str, str] = {}
+    support_probability_hashes: dict[str, str] = {}
     with threadpool_limits(limits=CLASSIFIER_THREADS_PER_WORKER):
         for action in actions:
             train_embeddings, train_labels = compose_action(
@@ -71,16 +90,16 @@ def prediction_worker(item: PredictionWorkerInput) -> CoarsePredictionRecord:
             fitted = fit_logistic_classifier(
                 train_embeddings,
                 train_labels,
-                eval_embeddings,
+                prediction_embeddings,
                 spec=spec,
             )
-            y_pred = np.asarray(fitted.predictions)
+            all_predictions = np.asarray(fitted.predictions)
             all_probabilities = np.asarray(fitted.probabilities, dtype=np.float64)
             if (
                 tuple(int(value) for value in fitted.classes) != (0, 1)
-                or y_pred.shape != (len(eval_embeddings),)
-                or all_probabilities.shape != (len(eval_embeddings), 2)
-                or not np.isin(y_pred, (0, 1)).all()
+                or all_predictions.shape != (len(prediction_embeddings),)
+                or all_probabilities.shape != (len(prediction_embeddings), 2)
+                or not np.isin(all_predictions, (0, 1)).all()
                 or not np.isfinite(all_probabilities).all()
                 or not np.allclose(
                     all_probabilities.sum(axis=1), 1.0, rtol=0.0, atol=1e-7
@@ -90,12 +109,23 @@ def prediction_worker(item: PredictionWorkerInput) -> CoarsePredictionRecord:
                 or not fitted.scaler_state_hash
             ):
                 raise ProtocolError("Exact-tail classifier fit drifted.")
-            pred = y_pred.astype(np.uint8, copy=False)
-            prob = all_probabilities[:, 1].astype(np.float32, copy=False)
+            pred = all_predictions[: len(eval_embeddings)].astype(
+                np.uint8, copy=False
+            )
+            prob = all_probabilities[: len(eval_embeddings), 1].astype(
+                np.float32, copy=False
+            )
+            support_prob = all_probabilities[len(eval_embeddings) :, 1].astype(
+                np.float32, copy=False
+            )
             prediction_hashes[action.action_id] = array_sha256(pred)
             probability_hashes[action.action_id] = array_sha256(prob)
+            support_probability_hashes[action.action_id] = array_sha256(
+                support_prob
+            )
             predictions.append(pred)
             probabilities.append(prob)
+            support_probabilities.append(support_prob)
             compositions[action.action_id] = composition_sha256(
                 action.to_payload(), item.source_records
             )
@@ -105,16 +135,22 @@ def prediction_worker(item: PredictionWorkerInput) -> CoarsePredictionRecord:
     probability_payload = np.ascontiguousarray(
         np.stack(probabilities), dtype=np.float32
     )
+    support_probability_payload = np.ascontiguousarray(
+        np.stack(support_probabilities), dtype=np.float32
+    )
     return write_checkpoint(
         item,
         classifier_config_hash=spec.config_hash,
         predictions=array_payload,
         probabilities=probability_payload,
+        support_probabilities=support_probability_payload,
         action_prediction_sha256=prediction_hashes,
         action_probability_sha256=probability_hashes,
+        action_support_probability_sha256=support_probability_hashes,
         action_composition_sha256=compositions,
         action_scaler_state_hash=scaler_hashes,
         evaluation_row_count=len(eval_embeddings),
+        support_row_count=len(support_embeddings),
     )
 
 

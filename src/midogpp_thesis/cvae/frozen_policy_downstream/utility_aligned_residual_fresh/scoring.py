@@ -20,6 +20,7 @@ from .contracts import (
     SeedCellMetric,
     expected_action_ids,
 )
+from .ensemble_adapter import mean_exact_nine_probabilities
 from .prediction_seal import (
     PredictionSealCapability,
     read_sealed_prediction_snapshot,
@@ -80,12 +81,8 @@ def score_sealed_predictions(
                 or any(cell.evaluation_row_ids != expected_rows for cell in cells)
             ):
                 raise ProtocolError("Utility-aligned ensemble seed coverage drifted.")
-            mean_probability = np.mean(
-                np.stack(
-                    [np.asarray(cell.probabilities, dtype=np.float64) for cell in cells],
-                    axis=0,
-                ),
-                axis=0,
+            mean_probability = mean_exact_nine_probabilities(
+                tuple(np.asarray(cell.probabilities, dtype=np.float64) for cell in cells)
             )
             prediction = (mean_probability >= PROBABILITY_THRESHOLD).astype(np.int64)
             ensemble_rows.append(

@@ -72,58 +72,35 @@ def build_policy_artifacts(
         transfer_by_target[target] = transfer
         permutation_transfer_by_target[target] = permutation_transfer
 
-    feature_schema_hash = canonical_sha256(
-        {
-            "schema_version": "midogpp_utility_aligned_feature_schema_lock_v1",
-            "inner_global_feature_names": list(
-                inputs.inner_feature_surfaces[CENTERS[0]].global_feature_names
-            ),
-            "inner_interaction_feature_names": list(
-                inputs.inner_feature_surfaces[CENTERS[0]].interaction_feature_names
-            ),
-            "target_global_feature_names_by_target": {
-                target: list(
-                    inputs.target_features_by_target[target].point_surface.global_feature_names
-                )
-                for target in CENTERS
-            },
-            "target_interaction_feature_names_by_target": {
-                target: list(
-                    inputs.target_features_by_target[
-                        target
-                    ].point_surface.interaction_feature_names
-                )
-                for target in CENTERS
-            },
-            "labels_used": False,
-        }
-    )
+    capacity_reports = {
+        target: _required_capacity_report(models_by_target[target], target=target)
+        for target in CENTERS
+    }
+
+    feature_schema_hash = canonical_sha256({
+        "schema_version": "midogpp_utility_aligned_ensemble_feature_schema_lock_v1",
+        "inner_feature_names_by_target": {
+            target: list(models_by_target[target]["feature_names"]) for target in CENTERS
+        },
+        "target_local_scalar_name": inputs.target_action_shift_bindings["target_local_scalar_name"],
+        "labels_used": False,
+    })
     feature_surface_hash = canonical_sha256(
         {
             "schema_version": "midogpp_utility_aligned_feature_surface_set_v1",
-            "inner": {
-                target: inputs.inner_feature_surfaces[target].surface_hash
-                for target in CENTERS
-            },
-            "target_point": {
-                target: inputs.target_features_by_target[target].point_surface.surface_hash
-                for target in CENTERS
-            },
-            "target_bootstrap": {
-                target: [
-                    surface.surface_hash
-                    for surface in inputs.target_features_by_target[
-                        target
-                    ].bootstrap_surfaces
-                ]
-                for target in CENTERS
-            },
+            "inner": {target: models_by_target[target]["feature_surface_hash"] for target in CENTERS},
+            "target_point": {target: policies[(target, "R")]["ensemble_policy"]["point_feature_surface_hash"] for target in CENTERS},
+            "target_bootstrap": {target: policies[(target, "R")]["ensemble_policy"]["bootstrap_feature_surface_hashes"] for target in CENTERS},
         }
     )
     model_lock = _hashed(
         {
             "schema_version": "midogpp_utility_aligned_model_lock_v1",
             "exact_tail_surface_lock_hash": inputs.exact_lock.surface_lock_hash,
+            **dict(inputs.ensemble_endpoint.endpoint_bindings),
+            **dict(inputs.target_action_shift_bindings),
+            "model_capacity_reports_by_target": capacity_reports,
+            "model_capacity_reports_hash": canonical_sha256(capacity_reports),
             "development_case_manifest_hash": inputs.development_case_manifest_hash,
             "development_support_case_ids_by_query": {
                 target: list(inputs.development_support_case_ids_by_query[target])
@@ -166,7 +143,7 @@ def build_policy_artifacts(
                 dict(policies[(target, "G_delta")]) for target in CENTERS
             ],
             "global_gate_passed_by_target": {
-                target: bool(transfer_by_target[target]["global_gate_passed"])
+                target: bool(transfer_by_target[target]["all_capacity_gates_passed"])
                 for target in CENTERS
             },
             "target_bootstrap_features_used": False,
@@ -205,6 +182,7 @@ def build_policy_artifacts(
             transfer_lock["cardinality_transfer_lock_hash"]
         ),
         target_policy_lock_hash=str(target_policy_lock["target_policy_lock_hash"]),
+        model_capacity_reports=capacity_reports,
     )
     action_library = _hashed(
         {
@@ -234,7 +212,7 @@ def build_policy_artifacts(
                 "R-B", "R-G_delta", "R-U", "R-P"
             ],
             "policy_family": (
-                "utility_aligned_exact_additive_tail_with_global_and_permutation_controls_v1"
+                "utility_aligned_candidate_level_exact_nine_ensemble_m0_m1_v1"
             ),
             "fallback_policy": "exact_B",
             "outer_target_excluded_from_fit": True,
@@ -264,14 +242,16 @@ def _target_policy_lock(
     feature_locks = []
     for target in CENTERS:
         features = inputs.target_features_by_target[target]
-        bootstrap_hashes = [surface.surface_hash for surface in features.bootstrap_surfaces]
+        ensemble_policy = policies[(target, "R")]["ensemble_policy"]
+        bootstrap_hashes = list(ensemble_policy["bootstrap_feature_surface_hashes"])
         feature_locks.append(
             _hashed(
                 {
                     "target_id": target,
                     "case_bootstrap_plan": features.plan.to_payload(),
-                    "target_feature_surface_hash": features.point_surface.surface_hash,
-                    "target_feature_row_count": len(features.point_surface.rows),
+                    "target_feature_surface_hash": ensemble_policy["point_feature_surface_hash"],
+                    "target_feature_row_count": 8,
+                    "support_case_count": len(features.plan.support_case_ids),
                     "bootstrap_surface_hashes": bootstrap_hashes,
                     "bootstrap_surface_hashes_hash": canonical_sha256(
                         bootstrap_hashes
@@ -291,6 +271,8 @@ def _target_policy_lock(
             "experiment_id": EXPERIMENT_ID,
             "output_artifact_id": OUTPUT_ARTIFACT_ID,
             "exact_tail_surface_lock_hash": inputs.exact_lock.surface_lock_hash,
+            **dict(inputs.ensemble_endpoint.endpoint_bindings),
+            **dict(inputs.target_action_shift_bindings),
             "target_support_surface_artifact_id": TARGET_SUPPORT_SURFACE_ARTIFACT_ID,
             "target_support_surface_hash": inputs.target_support_surface_hash,
             "target_support_parent_reservation_artifact_id": inputs.target_support_parent_reservation_artifact_id,
@@ -369,9 +351,16 @@ def _shared_bindings(
     global_ablation_lock_hash: str,
     cardinality_transfer_lock_hash: str,
     target_policy_lock_hash: str,
+    model_capacity_reports: Mapping[str, Mapping[str, object]],
 ) -> dict[str, object]:
     return {
         "exact_tail_surface_lock_hash": inputs.exact_lock.surface_lock_hash,
+        **dict(inputs.ensemble_endpoint.endpoint_bindings),
+        **dict(inputs.target_action_shift_bindings),
+        "model_capacity_reports_by_target": {
+            target: dict(model_capacity_reports[target]) for target in CENTERS
+        },
+        "model_capacity_reports_hash": canonical_sha256(model_capacity_reports),
         "equal_union_policy_lock_hash": inputs.equal_union_lock_hash,
         "metadata_profile_sha256": METADATA_PROFILE_SHA256,
         "development_reservation_artifact_id": DEVELOPMENT_RESERVATION_ARTIFACT_ID,
@@ -420,6 +409,22 @@ def _shared_bindings(
 def _hashed(payload: Mapping[str, object], key: str) -> Mapping[str, object]:
     values = dict(payload)
     values[key] = canonical_sha256(values)
+    return values
+
+
+def _required_capacity_report(
+    model: Mapping[str, object], *, target: str
+) -> Mapping[str, object]:
+    """Refuse a policy action when the low-capacity M1 gate was not recorded."""
+
+    report = model.get("model_capacity_report")
+    if not isinstance(report, Mapping):
+        raise ProtocolError("Ensemble model capacity report is absent.")
+    values = {str(key): value for key, value in report.items()}
+    if values.get("gate_passed") is not True or not isinstance(
+        values.get("report_hash"), str
+    ):
+        raise ProtocolError(f"Ensemble M1 capacity gate failed for outer target {target}.")
     return values
 
 
