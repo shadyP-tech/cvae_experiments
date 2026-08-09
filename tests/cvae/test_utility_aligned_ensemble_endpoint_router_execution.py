@@ -10,7 +10,12 @@ import pytest
 from midogpp_thesis.common.hashing import stable_hash
 from midogpp_thesis.cvae.diagnostics.utility_aligned_ensemble_endpoint_router import partitions as partition_module
 from midogpp_thesis.cvae.diagnostics.utility_aligned_ensemble_endpoint_router.artifact_io import atomic_json, atomic_npz, sha256_file
-from midogpp_thesis.cvae.diagnostics.utility_aligned_ensemble_endpoint_router.combined_prediction_io import read_combined_store, write_combined_store
+from midogpp_thesis.cvae.diagnostics.utility_aligned_ensemble_endpoint_router.combined_prediction_io import (
+    load_task_checkpoint,
+    read_combined_store,
+    write_combined_store,
+    write_task_checkpoint,
+)
 from midogpp_thesis.cvae.diagnostics.utility_aligned_ensemble_endpoint_router.actions import inner_action_library_for
 from midogpp_thesis.cvae.diagnostics.utility_aligned_ensemble_endpoint_router.contracts import (
     CENTERS, GENERATION_SEEDS, SUPPORT_PARTITION_NAMESPACE, TRAINING_SEEDS,
@@ -19,7 +24,11 @@ from midogpp_thesis.cvae.diagnostics.utility_aligned_ensemble_endpoint_router.co
 from midogpp_thesis.cvae.diagnostics.utility_aligned_ensemble_endpoint_router.development_prediction_execution import validate_development_prediction_store
 from midogpp_thesis.cvae.diagnostics.utility_aligned_ensemble_endpoint_router.input_contracts import LabelFreeValidationFrame, ValidationRowIdentity
 from midogpp_thesis.cvae.diagnostics.utility_aligned_ensemble_endpoint_router.inputs import _assert_input_fence
-from midogpp_thesis.cvae.diagnostics.utility_aligned_ensemble_endpoint_router.prediction_contracts import CombinedPredictionCell, build_store
+from midogpp_thesis.cvae.diagnostics.utility_aligned_ensemble_endpoint_router.prediction_contracts import (
+    CombinedPredictionCell,
+    array_sha256,
+    build_store,
+)
 from midogpp_thesis.cvae.diagnostics.utility_aligned_ensemble_endpoint_router.target_prediction_execution import (
     TARGET_ARRAY_MEMBER, TARGET_INDEX_MEMBER, _persist_probe_seal, _probe_actions,
     _probe_library_hash, _write_target_index_table, materialize_target_probe_predictions,
@@ -94,6 +103,91 @@ def test_combined_store_rejects_offset_tamper_even_when_outer_hashes_match(tmp_p
     atomic_json(index, payload)
     with pytest.raises(ProtocolError, match="layout"):
         read_combined_store(arrays, index)
+
+
+@pytest.mark.parametrize(
+    "tampered_member",
+    (
+        "support_predictions",
+        "support_probabilities",
+        "evaluation_predictions",
+        "evaluation_probabilities",
+    ),
+)
+def test_task_checkpoint_round_trip_loads_all_arrays_and_rejects_tamper(
+    tmp_path: Path, tampered_member: str
+) -> None:
+    json_path = tmp_path / "task.json"
+    npz_path = tmp_path / "task.npz"
+    task = {
+        "task_id": "development-H0-q1-train17-gen17",
+        "task_hash": "t" * 64,
+        "task_role": "development",
+        "config_contract_hash": "c" * 64,
+        "source_cache_lock_hash": "s" * 64,
+        "partition_lock_hash": "p" * 64,
+        "support_row_identity_hash": "u" * 64,
+        "evaluation_row_identity_hash": "e" * 64,
+        "support_row_count": 2,
+        "evaluation_row_count": 3,
+        "checkpoint_json_path": str(json_path),
+        "checkpoint_npz_path": str(npz_path),
+    }
+    expected = {
+        "support_predictions": np.asarray([[0, 1], [1, 0]], dtype=np.uint8),
+        "support_probabilities": np.asarray(
+            [[0.25, 0.75], [0.8, 0.2]], dtype=np.float32
+        ),
+        "evaluation_predictions": np.asarray(
+            [[1, 0, 1], [0, 1, 0]], dtype=np.uint8
+        ),
+        "evaluation_probabilities": np.asarray(
+            [[0.7, 0.3, 0.9], [0.1, 0.6, 0.4]], dtype=np.float32
+        ),
+    }
+    action_rows = tuple(
+        {
+            "action_id": action_id,
+            "support_prediction_sha256": array_sha256(
+                expected["support_predictions"][ordinal]
+            ),
+            "support_probability_sha256": array_sha256(
+                expected["support_probabilities"][ordinal]
+            ),
+            "evaluation_prediction_sha256": array_sha256(
+                expected["evaluation_predictions"][ordinal]
+            ),
+            "evaluation_probability_sha256": array_sha256(
+                expected["evaluation_probabilities"][ordinal]
+            ),
+        }
+        for ordinal, action_id in enumerate(("B", "T"))
+    )
+    write_task_checkpoint(task, action_rows=action_rows, **expected)
+
+    loaded = load_task_checkpoint(task)
+    assert loaded is not None
+    for member_name, values in expected.items():
+        np.testing.assert_array_equal(loaded[member_name], values)
+
+    with np.load(npz_path, allow_pickle=False) as arrays:
+        tampered = {
+            member_name: np.asarray(arrays[member_name]).copy()
+            for member_name in arrays.files
+        }
+    if tampered_member.endswith("predictions"):
+        tampered[tampered_member][0, 0] = 1 - tampered[tampered_member][0, 0]
+    else:
+        tampered[tampered_member][0, 0] += np.float32(0.125)
+    atomic_npz(npz_path, **tampered)
+    payload = json.loads(json_path.read_text(encoding="utf-8"))
+    payload["checkpoint_npz_sha256"] = sha256_file(npz_path)
+    unhashed = {key: value for key, value in payload.items() if key != "checkpoint_hash"}
+    payload["checkpoint_hash"] = stable_hash(unhashed)
+    atomic_json(json_path, payload)
+
+    with pytest.raises(ProtocolError, match="vector bytes drifted"):
+        load_task_checkpoint(task)
 
 
 def test_target_probe_seal_is_reconstructively_validated(tmp_path: Path) -> None:

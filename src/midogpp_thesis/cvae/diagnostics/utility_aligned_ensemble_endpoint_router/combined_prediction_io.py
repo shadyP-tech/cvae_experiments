@@ -18,6 +18,14 @@ from .prediction_contracts import (
 )
 
 
+_CHECKPOINT_ARRAY_HASH_FIELDS = (
+    ("support_predictions", "support_prediction_sha256"),
+    ("support_probabilities", "support_probability_sha256"),
+    ("evaluation_predictions", "evaluation_prediction_sha256"),
+    ("evaluation_probabilities", "evaluation_probability_sha256"),
+)
+
+
 def write_task_checkpoint(
     task: Mapping[str, object],
     *,
@@ -112,23 +120,41 @@ def load_task_checkpoint(task: Mapping[str, object]) -> Mapping[str, object] | N
         raise ProtocolError("Combined checkpoint binding drifted.")
     try:
         with np.load(npz_path, allow_pickle=False) as arrays:
-            loaded = {name: np.asarray(arrays[name]) for name in (
-                "support_predictions", "support_probabilities",
-                "evaluation_predictions", "evaluation_probabilities",
-            )}
+            expected_members = {
+                member_name for member_name, _ in _CHECKPOINT_ARRAY_HASH_FIELDS
+            }
+            if set(arrays.files) != expected_members:
+                raise ProtocolError("Combined checkpoint NPZ member set drifted.")
+            loaded = {
+                member_name: np.asarray(arrays[member_name])
+                for member_name, _ in _CHECKPOINT_ARRAY_HASH_FIELDS
+            }
     except (OSError, ValueError, KeyError) as exc:
         raise ProtocolError("Combined checkpoint arrays are unreadable.") from exc
     actions = payload.get("actions")
     if not isinstance(actions, list):
         raise ProtocolError("Combined checkpoint action rows are malformed.")
+    action_count = len(actions)
+    support_count = int(task["support_row_count"])
+    evaluation_count = int(task["evaluation_row_count"])
+    expected_layouts = {
+        "support_predictions": ((action_count, support_count), np.dtype(np.uint8)),
+        "support_probabilities": ((action_count, support_count), np.dtype(np.float32)),
+        "evaluation_predictions": ((action_count, evaluation_count), np.dtype(np.uint8)),
+        "evaluation_probabilities": ((action_count, evaluation_count), np.dtype(np.float32)),
+    }
+    if any(
+        loaded[member_name].shape != expected_shape
+        or loaded[member_name].dtype != expected_dtype
+        for member_name, (expected_shape, expected_dtype) in expected_layouts.items()
+    ):
+        raise ProtocolError("Combined checkpoint array geometry drifted.")
     for ordinal, row in enumerate(actions):
         if not isinstance(row, Mapping):
             raise ProtocolError("Combined checkpoint action row is malformed.")
-        for role in ("support", "evaluation"):
-            for kind in ("prediction", "probability"):
-                values = loaded[f"{role}_{kind}s"][ordinal]
-                if row.get(f"{role}_{kind}_sha256") != array_sha256(values):
-                    raise ProtocolError("Combined checkpoint vector bytes drifted.")
+        for member_name, hash_field in _CHECKPOINT_ARRAY_HASH_FIELDS:
+            if row.get(hash_field) != array_sha256(loaded[member_name][ordinal]):
+                raise ProtocolError("Combined checkpoint vector bytes drifted.")
     return {**payload, **loaded}
 
 
