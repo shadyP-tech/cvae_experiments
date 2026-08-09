@@ -790,6 +790,21 @@ absent.
   not fresh evidence and cannot feed policy or target actions, Stage 60/70,
   recipe/deployable selection, or another Stage-90 experiment.
 
+- A second, separately ledger-amended terminal diagnostic is implemented as
+  `midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_decision_audit.v1`.
+  It corrects the estimand for the known immutable expert bank: one common
+  210-row model is fit per held-out `H/q`, all rows containing `H` or `q` in
+  any role are excluded, and legal response history for candidate `e` is
+  retained. It compares a tied null, faithful global source prior, rich/shift/
+  boundary local arms, and blocked permutations. `case_balanced_rich_exact` is
+  the predeclared primary arm; smooth-BACC models are isolated descriptive
+  outputs and cannot affect an exact fit, gate, abstention, or publication
+  decision. The same consumed test bytes remain non-fresh, and the new
+  hash-chained ledger amendment authorizes only this terminal screen. No
+  policy/action, unseen-expert-transfer, routing-quality, promotion, Stage-60/
+  70, or later Stage-90 authority can result. No canonical result exists until
+  the workstation bundle completes and validates.
+
 ## Latest Uniform-B Nonlinear-Boundary Diagnostic
 
 Canonical target:

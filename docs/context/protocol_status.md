@@ -228,6 +228,19 @@ The audit consumes no Stage-60/70 output or earlier Stage-90 output and can
 never authorize a policy, target action, recipe, promotion, deployment, or
 further experimental feed.
 
+The follow-up
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_decision_audit.v1`
+has a separate hash-chained ledger amendment for exactly one additional
+terminal look at the same consumed test bytes. Its estimand is explicitly
+`known_fixed_bank_reuse`, not unseen-expert transfer: for each held-out `H/q`,
+one shared 210-row training surface excludes `H` and `q` from all row roles
+while retaining legal history for fixed candidate `e`. Exact BACC alone may
+fit and screen the predeclared exact arms. Smooth-BACC fits are isolated
+descriptive tables whose mutation must leave exact predictions, `R-G`, gates,
+abstention, and publication bytes unchanged. This diagnostic can never emit
+an action/policy capability or establish fresh routing evidence, and all Stage
+60/70/later-Stage-90 feeds remain forbidden.
+
 Legacy source trees were retired rather than exposed as fallbacks. Any new
 implementation must use only the canonical dataset/cache lineage and must pass
 target-leakage, expert-isolation, candidate-exclusion, and proxy-versus-utility

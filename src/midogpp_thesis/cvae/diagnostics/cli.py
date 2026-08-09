@@ -139,6 +139,15 @@ def build_parser() -> argparse.ArgumentParser:
     case_aware_proxy_information_audit.add_argument(
         "--artifact-root", required=True
     )
+
+    fixed_bank_decision_audit = sub.add_parser(
+        "fixed-bank-decision-audit",
+        help=(
+            "Run the consumed-test terminal fixed-bank decision diagnostic."
+        ),
+    )
+    fixed_bank_decision_audit.add_argument("--config", required=True)
+    fixed_bank_decision_audit.add_argument("--artifact-root", required=True)
     return parser
 
 
@@ -334,6 +343,20 @@ def main(argv: list[str] | None = None) -> int:
             args.config
         )
         output = run_utility_aligned_case_aware_proxy_information_audit(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "fixed-bank-decision-audit":
+        from .fixed_bank_decision_audit import (
+            load_fixed_bank_decision_audit_config,
+            run_fixed_bank_decision_audit,
+        )
+
+        config = load_fixed_bank_decision_audit_config(args.config)
+        output = run_fixed_bank_decision_audit(
             config,
             artifact_root=artifact_root,
         )

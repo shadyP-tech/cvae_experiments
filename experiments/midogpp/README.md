@@ -33,6 +33,11 @@ be authorized for matched Stage-70 evaluation; no Stage-60 lock establishes
 routing quality or downstream utility, and removed legacy runners are not
 compatibility fallbacks.
 
+The consumed-test fixed-bank decision audit is a separately ledger-amended
+Stage-90 experiment. It estimates only a bank-specific post-hoc screening
+quantity with exact-B abstention; it is not fresh evidence, unseen-expert
+transfer, a policy/action artifact, or an input to any later stage.
+
 Core workspace files:
 
 - `registry.yaml`: experiment stage, status, dependencies, runners, and claim scope.

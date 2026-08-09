@@ -1664,6 +1664,51 @@ experiments:
       - The six-input fence contains only the bank, generation lock, experiment-fenced test cache and post-seal response-manifest aliases, immutable metadata, and explicit test-consumption ledger. No Stage-60/70 output or earlier Stage-90 output is consumed.
       - Any positive screen remains EXPLORATORY_CONSUMED_DATA_ONLY and cannot authorize policy or target actions, feed Stage 60/70 or another Stage-90 experiment, select a recipe, promote a method, or support deployment.
 
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_decision_audit.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_decision_audit_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_decision_audit_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_fixed_bank_decision_audit_test_cache_v1
+      - midogpp_stage90_fixed_bank_decision_audit_test_manifest_v1
+      - midogpp_routing_metadata_profiles_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_decision_audit_parent_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_decision_audit_amendment_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Reuse of immutable generation geometry and classifier settings only; no routing, policy, promotion, or deployment authority is inherited.
+      midogpp_routing_metadata_profiles_v1: Immutable label-free metadata are a declared control only and cannot establish a metadata-routing claim.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_decision_audit_parent_v1: Experiment-fenced byte-exact alias of the immutable original ledger, read only to verify the parent hash of the amendment.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_decision_audit_amendment_v1: Hash-chained authorization for exactly one additional terminal post-hoc fixed-bank diagnostic; it creates no fresh evidence.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-decision-audit
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_decision_audit_v1
+    notes:
+      - Independently rematerializes the frozen-bank exact-nine prediction surface over an experiment-fenced alias of the already-consumed MIDOG++ test split; it never reads any prior Stage-90 output.
+      - The estimand is known_fixed_bank_reuse. Each held-out H/q fit uses one common 210-row training surface that excludes H and q from every outer-target, pseudoquery, and candidate-source role while retaining legal fixed-candidate history.
+      - Exact BACC alone fits and screens the diagnostic B/G/R methods. Smooth BACC is isolated in separate descriptive models and cannot affect exact coefficients, family choice, gates, abstention, or publication.
+      - Exactly eight whole label-free support cases per center are fixed before labels; the remaining 146 cases are evaluation-only. Prediction and feature seals precede all test-label access.
+      - This is a terminal EXPLORATORY_CONSUMED_DATA_ONLY screen: no action, policy, unseen-expert transfer, routing-quality, promotion, deployment, Stage-60/70, or later Stage-90 authorization exists.
+
   - experiment_id: midogpp.routing_and_composition.uniform_b_v2_residual_topup_b_u_g_s_policy_lock.v1
     stage: 60_routing_and_composition
     status: planned

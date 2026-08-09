@@ -5814,3 +5814,299 @@ artifacts:
       - Byte-exact experiment-fenced alias over the validated label-free consumed-test cache; labels, sample identifiers, and image paths are absent.
       - Only the named case-aware Stage-90 audit may consume this alias. Its support features remain label-free and whole-case balanced.
       - It cannot authorize a policy or target action, feed Stage 60/70 or another Stage-90 experiment, select a recipe, promote a method, or support deployment.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_decision_audit_parent_v1
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: CONSUMED_TEST_FIXED_BANK_DECISION_AUDIT_PARENT_LEDGER_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      split: test
+      row_count: '9928'
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      experiment_fenced: 'true'
+      fresh_evidence: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_decision_audit.v1
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Experiment-fenced byte-exact alias of the immutable consumed-test ledger; it exposes no prior metrics or Stage-90 result.
+      - It may be paired only with the hash-chained amendment in the named terminal fixed-bank audit.
+      - It creates no fresh evidence and cannot authorize any other consumer, policy, action, promotion, or deployment.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_decision_audit_amendment_v1
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_SECOND_TERMINAL_DIAGNOSTIC_AMENDMENT_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      amendment_sha256: 12403964b009a8ee2b6819740f34656ae2b98333541cc51bc11d4ad7b12b574c
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_decision_audit.v1
+      authorization_scope: one_additional_terminal_posthoc_fixed_bank_diagnostic
+      candidate_generalization: known_fixed_bank_reuse
+      unseen_expert_transfer_claim: 'false'
+      fresh_evidence: 'false'
+      generic_consumer_authorized: 'false'
+      may_feed_another_stage90_experiment: 'false'
+    required_files:
+      - uniform_b_v2_consumed_test_fixed_bank_decision_audit_ledger_amendment_v1.json
+    expected_file_hashes:
+      uniform_b_v2_consumed_test_fixed_bank_decision_audit_ledger_amendment_v1.json:
+        algorithm: sha256
+        digest: 12403964b009a8ee2b6819740f34656ae2b98333541cc51bc11d4ad7b12b574c
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Hash-chained amendment over the immutable original test-consumption ledger; the parent bytes and digest remain unchanged.
+      - It authorizes exactly the named fixed-bank audit as one additional terminal post-hoc analysis over already-consumed MIDOG++ test cases.
+      - It cannot authorize a generic consumer, fresh evidence, policy/action selection, promotion, deployment, Stage 60/70, or another Stage-90 experiment.
+
+  - artifact_id: midogpp_stage90_fixed_bank_decision_audit_test_manifest_v1
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_FIXED_BANK_DECISION_AUDIT_POSTSEAL_RESPONSE_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      split: test
+      split_role: test_consumed_fixed_bank_decision_audit_postseal_response_only
+      alias_of_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_FIXED_BANK_DECISION_AUDIT
+      fresh_evidence: 'false'
+      labels_present: 'true'
+      labels_available_before_prediction_and_feature_seals: 'false'
+      support_labels_used: 'false'
+      exact_labels_construct_postseal_response_rows: 'true'
+      smooth_response_is_isolated_descriptive_only: 'true'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_decision_audit.v1
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias of the consumed canonical test manifest.
+      - The named audit may open evaluation labels only after global prediction and feature seals; exact BACC is primary and smooth BACC remains an isolated descriptive response.
+      - It cannot expose support labels or authorize a policy, target action, routing claim, Stage 60/70, another Stage-90 experiment, promotion, or deployment.
+
+  - artifact_id: midogpp_stage90_fixed_bank_decision_audit_test_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_TEST_FIXED_BANK_DECISION_AUDIT_LABEL_FREE_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      cache_experiment_id: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_cache.v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: test
+      row_count: '9928'
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      backbone_identity_hash: 1b5071f2e605fa60
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_FIXED_BANK_DECISION_AUDIT
+      fresh_evidence: 'false'
+      labels_persisted: 'false'
+      labels_absent: 'true'
+      sample_ids_persisted: 'false'
+      image_paths_persisted: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_decision_audit.v1
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias over the validated label-free consumed-test cache; it creates no fresh evidence.
+      - Only the named fixed-bank audit may consume this alias for its sealed eight-case support feature surface and evaluation predictions.
+      - It cannot authorize a policy/action, routing-quality claim, promotion, deployment, Stage 60/70, or another Stage-90 experiment.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_decision_audit_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_decision_audit/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: EXPLORATORY_CONSUMED_DATA_ONLY
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: EXPLORATORY_CONSUMED_DATA_ONLY
+      architecture_family: known_fixed_bank_shared_H_q_exact_decision_audit_v1
+      evaluation_split: test
+      consumed_test_data: 'true'
+      ledger_amendment_required_and_hash_chained: 'true'
+      ledger_amendment_sha256: 12403964b009a8ee2b6819740f34656ae2b98333541cc51bc11d4ad7b12b574c
+      candidate_generalization: known_fixed_bank_reuse
+      unseen_expert_transfer_claim: 'false'
+      eligible_test_row_count: '9928'
+      eligible_test_case_count: '218'
+      fixed_support_case_count_per_center: '8'
+      support_case_count_total: '72'
+      evaluation_case_count_total: '146'
+      support_split_seed: '20260809'
+      support_partition_namespace: midogpp_fixed_bank_decision_audit_test_support_v1
+      primary_endpoint: exact_nine_probability_ensemble_bacc_delta
+      primary_response_row_count: '504'
+      descriptive_seed_row_count: '4536'
+      seed_rows_are_model_observations: 'false'
+      feature_row_count: '504'
+      metadata_similarity_role: persisted_descriptive_only_not_used_by_any_exact_or_smooth_family
+      exact_family_count: '9'
+      exact_prediction_row_count: '4536'
+      exact_fold_audit_row_count: '648'
+      primary_r_family_id: case_balanced_rich_exact
+      global_control_family_id: global_source_exact_control
+      smooth_family_count: '3'
+      smooth_prediction_row_count: '1512'
+      smooth_fold_audit_row_count: '216'
+      smooth_response_is_isolated_descriptive_only: 'true'
+      smooth_may_affect_exact_fit_selection_gate_or_decision: 'false'
+      fit_unit: one_model_per_heldout_outer_target_query
+      strict_H_q_all_role_exclusion: 'true'
+      candidate_e_history_retained_when_H_q_absent: 'true'
+      strict_crossfit_training_row_count: '210'
+      candidate_count_per_query: '7'
+      whole_case_support_evaluation_disjoint: 'true'
+      support_labels_used: 'false'
+      evaluation_probabilities_used_as_features: 'false'
+      prediction_and_feature_seals_before_test_labels: 'true'
+      method_rows_are_posthoc_diagnostic_screen: 'true'
+      target_actions_built: 'false'
+      action_selection_authorized: 'false'
+      policy_update_authorized: 'false'
+      routing_quality_claimed: 'false'
+      fresh_evidence: 'false'
+      promotion_eligible: 'false'
+      stage60_outputs_used: 'false'
+      stage70_outputs_used: 'false'
+      previous_stage90_outputs_used: 'false'
+      may_feed_another_stage90_experiment: 'false'
+      workstation_generation_devices: cuda:0|cuda:1
+      workstation_cpu_topology: 4_workers_x_3_blas_threads
+      workstation_gpu_cpu_phases_disjoint: 'true'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - arrays/utility_aligned_source_prefixes.npy
+      - arrays/utility_aligned_support_components.npy
+      - arrays/ensemble_endpoint_development_predictions.npz
+      - manifests/protocol_manifest.json
+      - manifests/support_partition_lock.json
+      - manifests/utility_aligned_source_cache_lock.json
+      - manifests/ensemble_endpoint_development_prediction_index.json
+      - manifests/ensemble_endpoint_global_development_prediction_seal.json
+      - manifests/fixed_bank_feature_lock.json
+      - manifests/fixed_bank_response_lock.json
+      - manifests/exact_crossfit_lock.json
+      - manifests/smooth_descriptive_crossfit_lock.json
+      - manifests/audit_result.json
+      - manifests/content_index.json
+      - tables/support_partitions.csv
+      - tables/utility_aligned_source_streams.csv
+      - tables/utility_aligned_support_components.csv
+      - tables/fixed_bank_feature_rows.csv
+      - tables/fixed_bank_response_rows.csv
+      - tables/source_inner_seed_diagnostics.csv
+      - tables/exact_crossfit_predictions.csv
+      - tables/exact_crossfit_fold_audits.csv
+      - tables/exact_query_metrics.csv
+      - tables/exact_outer_metrics.csv
+      - tables/exact_family_summary.csv
+      - tables/abstention_decisions.csv
+      - tables/abstention_summary.csv
+      - tables/smooth_descriptive_crossfit_predictions.csv
+      - tables/smooth_descriptive_crossfit_fold_audits.csv
+      - reports/phase_01_prelabel_surfaces_complete.json
+      - reports/development_label_access_report.json
+      - reports/leakage_report.json
+      - reports/publication_decision.json
+      - reports/runtime_summary.json
+      - reports/run_state.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Terminal post-hoc audit over consumed MIDOG++ test data; it independently rematerializes prediction and feature surfaces and consumes no prior Stage-90 output.
+      - The known fixed-bank estimand retains legal candidate history but excludes held H and q from all training roles. It is not an unseen-expert-transfer or routing-quality claim.
+      - Exact BACC alone controls exact models, R-G screening, and abstention. Smooth response models are isolated descriptive artifacts with no exact decision fields.
+      - Regardless of result, this output cannot authorize or feed a policy, target action, promotion, deployment, Stage 60/70, recipe selection, or another Stage-90 experiment.

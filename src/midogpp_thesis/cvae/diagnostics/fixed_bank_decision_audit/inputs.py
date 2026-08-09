@@ -1,0 +1,382 @@
+"""Independent closed-world inputs for the fixed-bank decision audit."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+import hashlib
+import json
+from pathlib import Path
+from types import MappingProxyType
+from typing import Mapping, Protocol, Sequence
+
+import numpy as np
+
+from ....data.contract.stage70_target_evaluation.contracts import (
+    CANONICAL_MANIFEST_SHA256,
+    EXPECTED_TEST_ROWS,
+    EXPECTED_TEST_ROWS_BY_CENTER,
+)
+from ....data.features.stage70_test_cache.contracts import (
+    CACHE_ARTIFACT_ID as UNDERLYING_TEST_CACHE_ARTIFACT_ID,
+    CACHE_NAME as UNDERLYING_TEST_CACHE_NAME,
+    REPRESENTATION_ID,
+)
+from ....data.features.stage70_test_cache.validation import (
+    load_validated_stage70_test_cache,
+)
+from ...expert_bank.uniform_b_v2_promotion import (
+    load_promotion_config,
+    validate_promoted_bank,
+)
+from ...generation import (
+    load_generation_lock_config,
+    read_generation_lock,
+    validate_generation_bundle,
+)
+from ...generation.contracts import (
+    COMMON_OUTPUT_DIM,
+    EXPECTED_BANK_LOCK_HASH,
+    EXPECTED_GENERATION_LOCK_HASH,
+    GenerationLock,
+)
+from ...protocol import ProtocolError
+from ...routing.metadata_compatibility import (
+    derive_compatibility_scores,
+    derive_metadata_profiles,
+)
+from ...routing.metadata_compatibility.contracts import (
+    DOMAIN_MAPPING_MEMBER,
+    DOMAIN_MAPPING_SHA256,
+)
+from .experiment_contracts import (
+    CENTERS,
+    EXPERIMENT_ID,
+    INPUT_ARTIFACT_IDS,
+    TEST_CACHE_ARTIFACT_ID,
+    TEST_MANIFEST_ARTIFACT_ID,
+    EXPECTED_LEDGER_AMENDMENT_SHA256,
+    EXPECTED_MANIFEST_SHA256,
+    EXPECTED_TEST_CACHE_CONTENT_HASH,
+    EXPECTED_TEST_CACHE_REPRESENTATION_ID,
+    EXPECTED_TEST_CACHE_ROW_ORDER_HASH,
+    EXPECTED_TEST_CACHE_SEMANTIC_ID,
+    EXPECTED_TEST_CONSUMPTION_LEDGER_SHA256,
+)
+from .input_contracts import LabelFreeTestFrame, TestRowIdentity
+from .ledger import load_validated_ledger_chain
+from .workspace_inputs import (
+    validate_active_diagnostic_workspace_binding as _validate_workspace_binding,
+    validate_workspace_provenance as _validate_workspace_provenance,
+)
+
+
+_FORBIDDEN_INPUT_FRAGMENTS = (
+    "50_all_candidate_utility_matrix",
+    "60_routing_and_composition",
+    "70_frozen_policy_downstream",
+    "frozen_policy_downstream",
+    "utility_aligned_case_aware_proxy_information_audit",
+    "utility_aligned_ensemble_endpoint_proxy_information_audit",
+    "utility_aligned_exact_tail_router_v1",
+    "residual_topup",
+    "consumed_validation",
+    "historical",
+    "quarantine",
+)
+
+
+class DiagnosticInputConfig(Protocol):
+    experiment_id: str
+    output_artifact_id: str
+    input_artifact_ids: Sequence[str]
+    expert_bank_root: Path
+    generation_lock_root: Path
+    test_consumption_ledger_path: Path
+    ledger_amendment_path: Path
+    test_cache_root: Path
+    test_manifest_path: Path
+    metadata_profile_root: Path
+    expected_manifest_sha256: str
+
+
+@dataclass(frozen=True)
+class ValidatedLocks:
+    generation: GenerationLock
+    test_consumption_ledger: Mapping[str, object]
+    ledger_amendment: Mapping[str, object]
+
+
+def assert_input_fence(config: DiagnosticInputConfig) -> None:
+    values = (
+        *(str(value) for value in config.input_artifact_ids),
+        str(config.expert_bank_root),
+        str(config.generation_lock_root),
+        str(config.test_consumption_ledger_path),
+        str(config.ledger_amendment_path),
+        str(config.test_cache_root),
+        str(config.test_manifest_path),
+        str(config.metadata_profile_root),
+    )
+    forbidden: list[str] = []
+    for value in values:
+        lowered = value.lower()
+        if any(fragment in lowered for fragment in _FORBIDDEN_INPUT_FRAGMENTS):
+            # The new cache alias resolves to the old label-free cache bytes;
+            # only this exact configured root is admitted.  Its workspace
+            # identity remains the new dedicated alias and is checked below.
+            if value == str(config.test_cache_root) and (
+                EXPECTED_TEST_CACHE_SEMANTIC_ID in value
+            ):
+                continue
+            forbidden.append(value)
+    if forbidden:
+        raise ProtocolError(
+            "Fixed-bank audit cannot consume Stage-50/60/70 products, prior "
+            "Stage-90 packages, or historical inputs: " + ", ".join(forbidden)
+        )
+    if tuple(config.input_artifact_ids) != INPUT_ARTIFACT_IDS:
+        raise ProtocolError("Fixed-bank audit requires its exact seven fenced inputs.")
+    if config.experiment_id != EXPERIMENT_ID:
+        raise ProtocolError("Ledger amendment cannot authorize another experiment.")
+    if config.output_artifact_id in config.input_artifact_ids:
+        raise ProtocolError("Fixed-bank audit cannot consume its own output.")
+
+
+def load_label_free_test_frame(config: DiagnosticInputConfig) -> LabelFreeTestFrame:
+    """Validate the dedicated alias and load cache bytes without labels."""
+
+    assert_input_fence(config)
+    cache = load_validated_stage70_test_cache(config.test_cache_root)
+    summary = dict(cache.summary)
+    expected_counts = dict(EXPECTED_TEST_ROWS_BY_CENTER)
+    if (
+        summary.get("status") != "PASS"
+        or summary.get("manifest_sha256") != CANONICAL_MANIFEST_SHA256
+        or summary.get("row_count") != EXPECTED_TEST_ROWS
+        or summary.get("rows_by_center") != expected_counts
+        or summary.get("content_hash") != EXPECTED_TEST_CACHE_CONTENT_HASH
+        or summary.get("row_order_hash") != EXPECTED_TEST_CACHE_ROW_ORDER_HASH
+        or EXPECTED_TEST_CACHE_SEMANTIC_ID != UNDERLYING_TEST_CACHE_NAME
+        or EXPECTED_TEST_CACHE_REPRESENTATION_ID != REPRESENTATION_ID
+        or summary.get("fresh_evidence") is not False
+    ):
+        raise ProtocolError("Fixed-bank consumed-test cache failed validation.")
+    arrays: list[np.ndarray] = []
+    rows: list[TestRowIdentity] = []
+    by_center: dict[str, tuple[TestRowIdentity, ...]] = {}
+    shard_hashes: dict[str, str] = {}
+    ordinal = 0
+    for center in CENTERS:
+        shard = cache.load_center(center)
+        center_rows: list[TestRowIdentity] = []
+        for row_id, manifest_index, case_id in zip(
+            shard.evaluation_row_ids,
+            shard.contract_row_indices,
+            shard.case_ids,
+            strict=True,
+        ):
+            row = TestRowIdentity(
+                row_ordinal=ordinal,
+                manifest_row_index=int(manifest_index),
+                evaluation_row_id=str(row_id),
+                case_id=str(case_id),
+                center=center,
+            )
+            rows.append(row)
+            center_rows.append(row)
+            ordinal += 1
+        arrays.append(np.asarray(shard.embeddings, dtype=np.float32))
+        by_center[center] = tuple(center_rows)
+        shard_hashes[center] = shard.shard_sha256
+    binding = {
+        "schema_version": "midogpp_stage90_fixed_bank_consumed_test_cache_binding_v1",
+        "cache_alias_artifact_id": TEST_CACHE_ARTIFACT_ID,
+        "manifest_alias_artifact_id": TEST_MANIFEST_ARTIFACT_ID,
+        "underlying_cache_artifact_id": UNDERLYING_TEST_CACHE_ARTIFACT_ID,
+        "underlying_cache_name": UNDERLYING_TEST_CACHE_NAME,
+        "representation_id": REPRESENTATION_ID,
+        "split": "test",
+        "manifest_sha256": CANONICAL_MANIFEST_SHA256,
+        "row_count": len(rows),
+        "rows_by_center": expected_counts,
+        "feature_dim": COMMON_OUTPUT_DIM,
+        "cache_content_hash": summary.get("content_hash"),
+        "row_order_hash": summary.get("row_order_hash"),
+        "shard_sha256_by_center": shard_hashes,
+        "labels_persisted": False,
+        "sample_paths_persisted": False,
+        "manifest_opened": False,
+        "test_split_previously_consumed": True,
+        "repurposed_for_terminal_stage90_diagnostic": True,
+        "fresh_evidence": False,
+        "dedicated_alias_only": True,
+        "prior_stage90_output_consumed": False,
+        "stage70_prediction_or_scoring_output_consumed": False,
+    }
+    return LabelFreeTestFrame(
+        embeddings=np.ascontiguousarray(np.concatenate(arrays), dtype=np.float32),
+        rows=tuple(rows),
+        rows_by_center=by_center,
+        cache_binding=binding,
+    )
+
+
+def load_validated_locks(config: DiagnosticInputConfig) -> ValidatedLocks:
+    assert_input_fence(config)
+    generation_config = load_generation_lock_config(
+        config.generation_lock_root / "config.resolved.yaml"
+    )
+    validate_generation_bundle(config.generation_lock_root, config=generation_config)
+    generation = read_generation_lock(
+        config.generation_lock_root / "manifests/generation_lock.json"
+    )
+    if (
+        generation.bank_lock_hash != EXPECTED_BANK_LOCK_HASH
+        or generation.generation_lock_hash != EXPECTED_GENERATION_LOCK_HASH
+    ):
+        raise ProtocolError("Fixed-bank frozen generation lineage drifted.")
+    ledger = load_validated_ledger_chain(config)
+    return ValidatedLocks(
+        generation=generation,
+        test_consumption_ledger=ledger.parent,
+        ledger_amendment=ledger.amendment,
+    )
+
+
+def load_metadata_similarity(
+    config: DiagnosticInputConfig,
+) -> Mapping[str, Mapping[str, float]]:
+    assert_input_fence(config)
+    profiles = derive_metadata_profiles(
+        config.metadata_profile_root / DOMAIN_MAPPING_MEMBER,
+        expected_sha256=DOMAIN_MAPPING_SHA256,
+    )
+    result: dict[str, dict[str, float]] = {center: {} for center in CENTERS}
+    for score in derive_compatibility_scores(profiles):
+        result[score.target_center][score.source_center] = (
+            float(score.exact_match_count) / 3.0
+        )
+    if any(
+        set(result[center]) != set(CENTERS).difference({center})
+        for center in CENTERS
+    ):
+        raise ProtocolError("Fixed-bank metadata surface coverage drifted.")
+    return MappingProxyType(
+        {center: MappingProxyType(dict(result[center])) for center in CENTERS}
+    )
+
+
+def validate_pre_gpu_firewall(
+    config: DiagnosticInputConfig,
+    frame: LabelFreeTestFrame,
+    locks: ValidatedLocks | None = None,
+) -> Mapping[str, object]:
+    assert_input_fence(config)
+    validated_locks = locks or load_validated_locks(config)
+    promotion_config = load_promotion_config(
+        config.expert_bank_root / "config.resolved.yaml"
+    )
+    checks = validate_promoted_bank(
+        config.expert_bank_root, config=promotion_config, allow_pending=False
+    )
+    bank_index = _json(config.expert_bank_root / "manifests/expert_bank_index.json")
+    leakage = _json(config.expert_bank_root / "reports/leakage_report.json")
+    source_evidence = _json(
+        config.expert_bank_root / "manifests/source_evidence_lock.json"
+    )
+    records = bank_index.get("records")
+    if (
+        checks.get("status") != "PASS"
+        or checks.get("all_experts_source_only") is not True
+        or not isinstance(records, list)
+        or len(records) != 27
+        or any(
+            not isinstance(row, Mapping)
+            or row.get("fresh_source_only_training") is not True
+            or row.get("parent_checkpoint_used") is not False
+            for row in records
+        )
+        or leakage.get("status") != "PASS"
+        or int(leakage.get("identity_overlap_failures", -1)) != 0
+        or int(source_evidence.get("identity_overlap_failures", -1)) != 0
+        or frame.cache_binding.get("split") != "test"
+        or frame.cache_binding.get("manifest_sha256") != CANONICAL_MANIFEST_SHA256
+        or frame.cache_binding.get("labels_persisted") is not False
+        or frame.cache_binding.get("manifest_opened") is not False
+        or frame.cache_binding.get("dedicated_alias_only") is not True
+        or frame.cache_binding.get("prior_stage90_output_consumed") is not False
+        or _sha256_file(config.test_manifest_path) != EXPECTED_MANIFEST_SHA256
+        or validated_locks.ledger_amendment.get("parent_sha256")
+        != EXPECTED_TEST_CONSUMPTION_LEDGER_SHA256
+    ):
+        raise ProtocolError("Fixed-bank pre-GPU firewall failed.")
+    return {
+        "status": "PASS",
+        "bank_lock_hash": str(bank_index.get("bank_lock_hash")),
+        "expert_count": len(records),
+        "fresh_source_only_training": True,
+        "bank_identity_overlap_failures": 0,
+        "evaluation_split": "test",
+        "manifest_sha256": EXPECTED_MANIFEST_SHA256,
+        "test_cache_label_fields_absent": True,
+        "test_split_previously_consumed": True,
+        "ledger_parent_sha256": EXPECTED_TEST_CONSUMPTION_LEDGER_SHA256,
+        "ledger_amendment_sha256": EXPECTED_LEDGER_AMENDMENT_SHA256,
+        "ledger_authorized_experiment_id": config.experiment_id,
+        "fresh_evidence": False,
+        "prior_stage90_output_consumed": False,
+        "stage50_output_consumed": False,
+        "stage60_output_consumed": False,
+        "stage70_prediction_or_scoring_output_consumed": False,
+        "target_labels_opened": False,
+        "gpu_work_authorized": True,
+    }
+
+
+def validate_workspace_provenance(
+    root: Path,
+    config: DiagnosticInputConfig,
+) -> dict[str, Mapping[str, object]]:
+    assert_input_fence(config)
+    return _validate_workspace_provenance(root, config)
+
+
+def validate_active_diagnostic_workspace_binding(
+    config: DiagnosticInputConfig,
+) -> Mapping[str, object]:
+    assert_input_fence(config)
+    return _validate_workspace_binding(config)
+
+
+def _json(path: Path) -> dict[str, object]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ProtocolError(f"Cannot read fixed-bank JSON input: {path}.") from exc
+    if not isinstance(value, dict):
+        raise ProtocolError(f"Fixed-bank JSON input must be an object: {path}.")
+    return value
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError as exc:
+        raise ProtocolError(f"Cannot hash fixed-bank input: {path}.") from exc
+    return digest.hexdigest()
+
+
+__all__ = (
+    "DiagnosticInputConfig",
+    "ValidatedLocks",
+    "assert_input_fence",
+    "load_label_free_test_frame",
+    "load_metadata_similarity",
+    "load_validated_locks",
+    "validate_active_diagnostic_workspace_binding",
+    "validate_pre_gpu_firewall",
+    "validate_workspace_provenance",
+)
