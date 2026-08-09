@@ -8,6 +8,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Mapping, Sequence
 
+from ....data.contract.stage70_target_evaluation.contracts import evaluation_row_id
 from ...protocol import ProtocolError
 from ...runtime.artifact_io import sha256_file
 from .core_contracts import BinaryLabelRow
@@ -63,7 +64,8 @@ class LabelCapabilityManager:
         global_prediction_seal_hash: str,
     ) -> None:
         require_sha256(global_prediction_seal_hash, "global_prediction_seal_hash")
-        if sha256_file(manifest_path) != EXPECTED_MANIFEST_SHA256:
+        manifest_sha256 = sha256_file(manifest_path)
+        if manifest_sha256 != EXPECTED_MANIFEST_SHA256:
             raise ProtocolError("Pooled-BACC label-capability manifest hash drifted.")
         frame_keys = {(row.center, row.case_id, row.evaluation_row_id) for row in frame.rows}
         partition_keys = {
@@ -73,6 +75,7 @@ class LabelCapabilityManager:
         if frame_keys != partition_keys:
             raise ProtocolError("Pooled-BACC partition differs from the sealed frame.")
         self._manifest_path = Path(manifest_path)
+        self._manifest_sha256 = manifest_sha256
         self._frame = frame
         self._partition = partition
         self._prediction_seal_hash = global_prediction_seal_hash
@@ -270,7 +273,7 @@ class LabelCapabilityManager:
             raise ProtocolError("Cannot open scoped pooled-BACC label manifest.") from exc
         with handle:
             reader = csv.DictReader(handle)
-            required = {"sample_id", "case_id", "center", "split", "label"}
+            required = {"case_id", "center", "split", "label"}
             if reader.fieldnames is None or not required.issubset(reader.fieldnames):
                 raise ProtocolError("Scoped pooled-BACC manifest fields drifted.")
             for index, raw in enumerate(reader):
@@ -278,7 +281,8 @@ class LabelCapabilityManager:
                 if wanted is None:
                     continue
                 if (
-                    str(raw["sample_id"]) != wanted.evaluation_row_id
+                    evaluation_row_id(EXPECTED_MANIFEST_SHA256, index)
+                    != wanted.evaluation_row_id
                     or str(raw["case_id"]) != wanted.case_id
                     or str(raw["center"]) != wanted.center
                     or str(raw["split"]) != wanted.split
@@ -292,6 +296,10 @@ class LabelCapabilityManager:
                         label=_binary(raw["label"]),
                     )
                 )
+        if sha256_file(self._manifest_path) != self._manifest_sha256:
+            raise ProtocolError(
+                "Scoped pooled-BACC manifest changed while labels were opened."
+            )
         if len(labels) != len(requested) or {row.sample_id for row in labels} != {
             row.evaluation_row_id for row in rows
         }:

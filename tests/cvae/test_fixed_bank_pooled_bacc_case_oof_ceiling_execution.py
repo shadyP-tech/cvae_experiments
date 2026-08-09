@@ -8,12 +8,18 @@ from types import SimpleNamespace
 
 import pytest
 
+from midogpp_thesis.data.contract.stage70_target_evaluation.contracts import (
+    evaluation_row_id,
+)
 from midogpp_thesis.cvae.diagnostics.fixed_bank_pooled_bacc_case_oof_ceiling import (
     execution_adapter,
+    label_capabilities as label_capabilities_module,
     ledger as ledger_module,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_pooled_bacc_case_oof_ceiling.experiment_contracts import (
     EXPERIMENT_ID,
+    EXPECTED_CASE_COUNTS_BY_CENTER,
+    EXPECTED_MANIFEST_SHA256,
     INPUT_ARTIFACT_IDS,
     OUTPUT_ARTIFACT_ID,
 )
@@ -35,10 +41,11 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_pooled_bacc_case_oof_ceiling.cas
     build_case_oof_partition,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_pooled_bacc_case_oof_ceiling.label_capabilities import (
+    LabelCapabilityManager,
     audit_manifest_case_class_topology,
 )
-from midogpp_thesis.cvae.diagnostics.fixed_bank_pooled_bacc_case_oof_ceiling.experiment_contracts import (
-    EXPECTED_CASE_COUNTS_BY_CENTER,
+from midogpp_thesis.cvae.diagnostics.fixed_bank_pooled_bacc_case_oof_ceiling.input_contracts import (
+    TestRowIdentity as PooledTestRowIdentity,
 )
 from midogpp_thesis.cvae.runtime.artifact_io import sha256_file
 from midogpp_thesis.cvae.runtime.preflight import run_label_free_workstation_preflight
@@ -198,6 +205,91 @@ def test_neutral_preflight_default_remains_v1_backward_compatible() -> None:
         "expected_scratch_root"
     ].default
     assert default == "/data/local/fixed_bank_label_aware_case_oof_ceiling_v1"
+
+
+def test_scoped_labels_align_by_manifest_hash_and_row_index_not_raw_sample_id(
+    tmp_path: Path,
+) -> None:
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text(
+        "sample_id,case_id,center,split,label\n"
+        "raw-source-y1-identity,case-0,0,test,1\n",
+        encoding="utf-8",
+    )
+    manager = object.__new__(LabelCapabilityManager)
+    manager._manifest_path = manifest
+    manager._manifest_sha256 = sha256_file(manifest)
+    manager._events = []
+    identity = PooledTestRowIdentity(
+        row_ordinal=0,
+        manifest_row_index=0,
+        evaluation_row_id=evaluation_row_id(EXPECTED_MANIFEST_SHA256, 0),
+        case_id="case-0",
+        center="0",
+    )
+
+    labels = manager._open_rows(
+        (identity,), role="test_scope", target="0", fold=None
+    )
+
+    assert labels[0].sample_id == identity.evaluation_row_id
+    assert labels[0].label == 1
+    assert labels[0].sample_id != "raw-source-y1-identity"
+
+
+def test_scoped_labels_reject_noncanonical_opaque_row_identity(tmp_path: Path) -> None:
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text(
+        "case_id,center,split,label\ncase-0,0,test,1\n",
+        encoding="utf-8",
+    )
+    manager = object.__new__(LabelCapabilityManager)
+    manager._manifest_path = manifest
+    manager._manifest_sha256 = sha256_file(manifest)
+    manager._events = []
+    drifted = PooledTestRowIdentity(
+        row_ordinal=0,
+        manifest_row_index=0,
+        evaluation_row_id="eval_" + "0" * 64,
+        case_id="case-0",
+        center="0",
+    )
+
+    with pytest.raises(ProtocolError, match="manifest identity drifted"):
+        manager._open_rows(
+            (drifted,), role="test_scope", target="0", fold=None
+        )
+
+
+def test_scoped_labels_rehash_manifest_after_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text(
+        "case_id,center,split,label\ncase-0,0,test,1\n",
+        encoding="utf-8",
+    )
+    manager = object.__new__(LabelCapabilityManager)
+    manager._manifest_path = manifest
+    manager._manifest_sha256 = sha256_file(manifest)
+    manager._events = []
+    identity = PooledTestRowIdentity(
+        row_ordinal=0,
+        manifest_row_index=0,
+        evaluation_row_id=evaluation_row_id(EXPECTED_MANIFEST_SHA256, 0),
+        case_id="case-0",
+        center="0",
+    )
+    monkeypatch.setattr(
+        label_capabilities_module,
+        "sha256_file",
+        lambda _path: "0" * 64,
+    )
+
+    with pytest.raises(ProtocolError, match="changed while labels were opened"):
+        manager._open_rows(
+            (identity,), role="test_scope", target="0", fold=None
+        )
 
 
 def test_declared_prior_tie_tolerance_is_explicit_and_fail_closed() -> None:
