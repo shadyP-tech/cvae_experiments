@@ -211,20 +211,34 @@ def build_case_aware_feature_surface(
                 outer, query
             ):
                 raise ProtocolError("Feature candidate ordering drifted.")
-            # Base probabilities and whole support partitions are shared by all
-            # candidate tails for one H/q query.
-            provenance = {
+            # Whole support partitions and base probabilities are shared by
+            # all candidate tails for one H/q query.  Candidate provenance is
+            # deliberately excluded: it binds the source-specific tail,
+            # generated streams, components, and proxy summaries.
+            shared_support_identity = {
                 (
                     row.support_partition_hash,
+                    row.support_case_count,
+                    row.support_row_count,
                     row.support_case_hashes,
                     row.support_row_hashes,
-                    row.support_provenance_hashes,
                     row.base_vector_hashes_by_case,
                 )
                 for row in group
             }
-            if len(provenance) != 1:
-                raise ProtocolError("Within-query support provenance drifted.")
+            if len(shared_support_identity) != 1:
+                raise ProtocolError("Within-query shared support identity drifted.")
+            candidate_lineage = {
+                (
+                    row.support_provenance_hashes,
+                    row.tail_vector_hashes_by_case,
+                )
+                for row in group
+            }
+            if len(candidate_lineage) != len(group):
+                raise ProtocolError(
+                    "Within-query candidate support lineage collapsed."
+                )
     for query in CENTERS:
         partition_identities = {
             (
@@ -241,6 +255,28 @@ def build_case_aware_feature_surface(
             raise ProtocolError(
                 "Support whole-case partition identity drifted across outer folds."
             )
+        for source in (center for center in CENTERS if center != query):
+            group = tuple(
+                row
+                for row in ordered
+                if row.query_id == query and row.candidate_source == source
+            )
+            expected_outers = tuple(
+                center for center in CENTERS if center not in {query, source}
+            )
+            if tuple(row.outer_target_id for row in group) != expected_outers:
+                raise ProtocolError("Query/source outer-fold coverage drifted.")
+            candidate_static_identity = {
+                (
+                    row.metadata_similarity,
+                    row.case_balanced_reconstruction,
+                    row.case_balanced_kl,
+                    row.case_balanced_log_mmd,
+                )
+                for row in group
+            }
+            if len(candidate_static_identity) != 1:
+                raise ProtocolError("Query/source proxy identity drifted.")
     unhashed = {
         "schema_version": "midogpp_stage90_case_aware_feature_surface_v1",
         "ordered_feature_row_hashes": [row.feature_row_hash for row in ordered],

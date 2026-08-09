@@ -130,10 +130,6 @@ def _complete_surfaces():
                 _hash(f"support-rows::{query}::{index}")
                 for index in range(MIN_SUPPORT_CASE_COUNT_PER_CENTER)
             )
-            provenance = tuple(
-                _hash(f"support-provenance::{outer}::{query}::{index}")
-                for index in range(MIN_SUPPORT_CASE_COUNT_PER_CENTER)
-            )
             base_hashes = tuple(
                 tuple(
                     _hash(f"base::{outer}::{query}::{case}::{seed}")
@@ -154,7 +150,13 @@ def _complete_surfaces():
                         support_row_count=32,
                         support_case_hashes=case_hashes,
                         support_row_hashes=row_hashes,
-                        support_provenance_hashes=provenance,
+                        support_provenance_hashes=tuple(
+                            _hash(
+                                "support-provenance::"
+                                f"{outer}::{query}::{source}::{index}"
+                            )
+                            for index in range(MIN_SUPPORT_CASE_COUNT_PER_CENTER)
+                        ),
                         base_vector_hashes_by_case=base_hashes,
                         tail_vector_hashes_by_case=tuple(
                             tuple(
@@ -181,11 +183,13 @@ def _complete_surfaces():
                             -0.02 * z[source_index]
                         ),
                         case_balanced_reconstruction=float(
-                            0.5 + z[source_index]
+                            0.5 + 0.05 * center_position[source]
                         ),
-                        case_balanced_kl=float(0.7 - z[source_index]),
+                        case_balanced_kl=float(
+                            0.7 + 0.03 * center_position[source]
+                        ),
                         case_balanced_log_mmd=float(
-                            0.4 + 0.5 * z[source_index]
+                            0.4 + 0.04 * center_position[source]
                         ),
                     )
                 )
@@ -370,6 +374,70 @@ def test_feature_schema_is_label_free_hash_bound_and_deterministic() -> None:
         feature_row_from_payload({**payload, "labels": [0, 1]})
     with pytest.raises(ProtocolError, match="hash drifted"):
         feature_row_from_payload({**payload, "equal_case_abs_shift": 0.0})
+
+
+def test_feature_surface_allows_candidate_provenance_but_pins_shared_base() -> None:
+    features, _responses = _complete_surfaces()
+    first = features.rows[0]
+    group = tuple(
+        row
+        for row in features.rows
+        if row.outer_target_id == first.outer_target_id
+        and row.query_id == first.query_id
+    )
+    assert len({row.support_provenance_hashes for row in group}) == len(group)
+    tampered_base = tuple(
+        (_hash("tampered-shared-base"), *case_hashes[1:])
+        if index == 0
+        else case_hashes
+        for index, case_hashes in enumerate(first.base_vector_hashes_by_case)
+    )
+    with pytest.raises(ProtocolError, match="shared support identity drifted"):
+        build_case_aware_feature_surface(
+            (
+                replace(first, base_vector_hashes_by_case=tampered_base),
+                *features.rows[1:],
+            )
+        )
+    tampered_support_rows = (
+        _hash("tampered-support-row"),
+        *first.support_row_hashes[1:],
+    )
+    with pytest.raises(ProtocolError, match="shared support identity drifted"):
+        build_case_aware_feature_surface(
+            (
+                replace(first, support_row_hashes=tampered_support_rows),
+                *features.rows[1:],
+            )
+        )
+    second = features.rows[1]
+    collapsed_rows = list(features.rows)
+    collapsed_rows[1] = replace(
+        second,
+        support_provenance_hashes=first.support_provenance_hashes,
+        tail_vector_hashes_by_case=first.tail_vector_hashes_by_case,
+    )
+    with pytest.raises(ProtocolError, match="candidate support lineage collapsed"):
+        build_case_aware_feature_surface(collapsed_rows)
+
+    changed_partition = _hash("changed-query-partition")
+    partition_rows = tuple(
+        replace(row, support_partition_hash=changed_partition)
+        if row.outer_target_id == first.outer_target_id
+        and row.query_id == first.query_id
+        else row
+        for row in features.rows
+    )
+    with pytest.raises(ProtocolError, match="partition identity drifted across outer"):
+        build_case_aware_feature_surface(partition_rows)
+
+    static_rows = list(features.rows)
+    static_rows[0] = replace(
+        first,
+        case_balanced_reconstruction=first.case_balanced_reconstruction + 0.1,
+    )
+    with pytest.raises(ProtocolError, match="Query/source proxy identity drifted"):
+        build_case_aware_feature_surface(static_rows)
 
 
 def test_family_designs_include_fixed_capacity_and_cyclic_donor(audited_surfaces) -> None:
