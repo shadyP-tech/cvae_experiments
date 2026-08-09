@@ -214,6 +214,20 @@ with `H/q/e` excluded from outer, query, and source roles. Two support cases rem
 inference units, no target actions or labels exist, and even a positive screen
 cannot authorize policy construction or downstream confirmation.
 
+The separately registered
+`midogpp.oracle.uniform_b_v2_consumed_test_utility_aligned_case_aware_proxy_information_audit.v1`
+is an explicitly user-authorized repurposing of the already-consumed test
+split for a terminal, post-hoc diagnostic. Its dedicated aliases expose a
+label-free cache and post-seal response manifest, while the consumption ledger is an
+explicit sixth input. Eight whole support cases per center leave 146
+evaluation cases from 218 eligible cases. Exact-nine BACC is primary;
+label-derived exact and softBACC responses feed separate strict cross-fits,
+and softBACC cannot affect the primary gate. Fixed alpha-1,
+at-most-three-predictor families use strict 120-row all-role `H/q/e` holdout.
+The audit consumes no Stage-60/70 output or earlier Stage-90 output and can
+never authorize a policy, target action, recipe, promotion, deployment, or
+further experimental feed.
+
 Legacy source trees were retired rather than exposed as fallbacks. Any new
 implementation must use only the canonical dataset/cache lineage and must pass
 target-leakage, expert-isolation, candidate-exclusion, and proxy-versus-utility

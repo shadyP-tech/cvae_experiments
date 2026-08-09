@@ -48,14 +48,24 @@ def build_source_cache_lock(
     partitions: object,
     source_cache: SourceCache,
 ) -> dict[str, object]:
-    validate_source_cache_inventory(source_cache)
+    support_case_count = _support_case_count(partitions)
+    expected_support_case_count = _support_case_count_from_config(config)
+    if support_case_count != expected_support_case_count:
+        raise ProtocolError("Stage-90 source-cache support geometry drifted.")
+    validate_source_cache_inventory(
+        source_cache, expected_support_case_count=support_case_count
+    )
     support_by_center = getattr(partitions, "support_rows_by_center", {})
     support_hashes = {
         center: row_identity_hash(tuple(support_by_center[center])) for center in CENTERS
     }
     unhashed: dict[str, object] = {
         "schema_version": "midogpp_stage90_utility_aligned_source_cache_lock_v1",
-        "status": "COMPLETE_LABEL_FREE_FIXED_TWO_CASE_SUPPORT_CACHE",
+        "status": (
+            "COMPLETE_LABEL_FREE_FIXED_TWO_CASE_SUPPORT_CACHE"
+            if support_case_count == 2
+            else "COMPLETE_LABEL_FREE_FIXED_SUPPORT_CACHE"
+        ),
         "config_contract_hash": str(config.contract_hash),
         "generation_lock_hash": generation_lock.generation_lock_hash,
         "validation_cache_binding_hash": str(
@@ -79,8 +89,11 @@ def build_source_cache_lock(
         "tf32_disabled": True,
         "amp_disabled": True,
         "float32_memmaps": True,
-        "fixed_support_case_count_per_center": 2,
-        "fresh_policy_eight_case_floor_satisfied": False,
+        "fixed_support_case_count_per_center": support_case_count,
+        "fresh_policy_eight_case_floor_satisfied": (
+            support_case_count >= 8
+            and bool(getattr(config, "fresh_evidence", False))
+        ),
         "labels_consumed": False,
         "evaluation_embeddings_consumed": False,
         "source_experts_updated": False,
@@ -112,7 +125,9 @@ def validate_source_cache_lock(
     return observed
 
 
-def validate_source_cache_inventory(cache: SourceCache) -> None:
+def validate_source_cache_inventory(
+    cache: SourceCache, *, expected_support_case_count: int | None = None
+) -> None:
     try:
         sources = np.load(cache.source_array_path, mmap_mode="r", allow_pickle=False)
         components = np.load(
@@ -171,6 +186,20 @@ def validate_source_cache_inventory(cache: SourceCache) -> None:
         != expected_component_keys
     ):
         raise ProtocolError("Stage-90 component record coverage drifted.")
+    observed_support_case_counts = {
+        record.support_case_count for record in cache.component_records
+    }
+    if (
+        len(observed_support_case_counts) != 1
+        or next(iter(observed_support_case_counts)) < 2
+    ):
+        raise ProtocolError("Stage-90 component support-case counts drifted.")
+    observed_support_case_count = next(iter(observed_support_case_counts))
+    if (
+        expected_support_case_count is not None
+        and observed_support_case_count != expected_support_case_count
+    ):
+        raise ProtocolError("Stage-90 component support-case count drifted.")
     offsets_by_query: dict[str, tuple[int, int, str]] = {}
     for ordinal, record in enumerate(cache.component_records):
         numeric = np.asarray(
@@ -188,7 +217,7 @@ def validate_source_cache_inventory(cache: SourceCache) -> None:
             or record.query_center not in CENTERS
             or record.source_center not in CENTERS
             or record.training_seed not in TRAINING_SEEDS
-            or record.support_case_count != 2
+            or record.support_case_count != observed_support_case_count
             or record.support_row_count != record.support_stop - record.support_start
             or not 0 <= record.support_start < record.support_stop <= components.shape[2]
             or previous != offset
@@ -204,6 +233,32 @@ def validate_source_cache_inventory(cache: SourceCache) -> None:
         cursor = stop
     if cursor != components.shape[2]:
         raise ProtocolError("Stage-90 support component coverage drifted.")
+
+
+def _support_case_count(partitions: object) -> int:
+    by_center = getattr(partitions, "support_rows_by_center", None)
+    if not isinstance(by_center, dict) and not hasattr(by_center, "items"):
+        raise ProtocolError("Stage-90 source-cache support surface is absent.")
+    counts = {
+        len({str(row.case_id) for row in tuple(rows)})
+        for rows in by_center.values()
+    }
+    if len(counts) != 1:
+        raise ProtocolError("Stage-90 source-cache support counts differ by center.")
+    count = next(iter(counts))
+    if count < 2:
+        raise ProtocolError("Stage-90 source-cache support count is too small.")
+    return count
+
+
+def _support_case_count_from_config(config: object) -> int:
+    direct = getattr(config, "fixed_support_case_count_per_center", None)
+    if direct is not None:
+        return int(direct)
+    protocol = getattr(config, "protocol", {})
+    if isinstance(protocol, dict) or hasattr(protocol, "get"):
+        return int(protocol.get("fixed_support_case_count_per_center", 2))
+    return 2
 
 
 def _array_bundle_sha256(embeddings: np.ndarray, labels: np.ndarray) -> str:

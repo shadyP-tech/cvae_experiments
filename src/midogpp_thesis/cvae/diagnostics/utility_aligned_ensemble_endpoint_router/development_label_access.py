@@ -106,8 +106,15 @@ def _stream_labels(path: Path, rows: tuple[object, ...]) -> dict[int, int]:
             wanted = expected.get(index)
             if wanted is None:
                 continue
-            if (raw["sample_id"], raw["case_id"], raw["center"], raw["split"]) != (
-                wanted.sample_id, wanted.case_id, wanted.center, wanted.split
+            observed = (raw["case_id"], raw["center"], raw["split"])
+            expected_identity = (wanted.case_id, wanted.center, wanted.split)
+            opaque_test_identity = hasattr(wanted, "evaluation_row_id")
+            if (
+                observed != expected_identity
+                or (
+                    not opaque_test_identity
+                    and raw["sample_id"] != wanted.sample_id
+                )
             ):
                 raise ProtocolError("Development manifest identity drifted.")
             labels[index] = _binary(raw["label"])

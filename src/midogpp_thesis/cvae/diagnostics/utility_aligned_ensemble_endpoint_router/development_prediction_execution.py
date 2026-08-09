@@ -69,7 +69,13 @@ def materialize_development_predictions(
         )
         _remove_working_directory(root)
         return store
-    scratch = _write_combined_scratch(root, frame=frame, partitions=partitions, role="development")
+    scratch = _write_combined_scratch(
+        root,
+        frame=frame,
+        partitions=partitions,
+        role="development",
+        expected_support_case_count=_support_case_count(config),
+    )
     tasks = _build_tasks(
         config,
         source_cache,
@@ -112,7 +118,12 @@ def materialize_development_predictions(
 
 
 def _write_combined_scratch(
-    root: Path, *, frame: object, partitions: object, role: str
+    root: Path,
+    *,
+    frame: object,
+    partitions: object,
+    role: str,
+    expected_support_case_count: int = 2,
 ) -> Mapping[str, object]:
     checkpoint_root = root / DEVELOPMENT_CHECKPOINT_DIRECTORY
     checkpoint_root.mkdir(parents=True, exist_ok=True)
@@ -122,7 +133,11 @@ def _write_combined_scratch(
     for center in CENTERS:
         support = tuple(partitions.support_rows_by_center[center])
         evaluation = tuple(partitions.evaluation_rows_by_center[center])
-        if len({row.case_id for row in support}) != 2 or {row.case_id for row in support} & {row.case_id for row in evaluation}:
+        if (
+            len({row.case_id for row in support}) != expected_support_case_count
+            or {row.case_id for row in support}
+            & {row.case_id for row in evaluation}
+        ):
             raise ProtocolError("Development combined scratch partition drifted.")
         selected = (*support, *evaluation)
         rows.extend(selected)
@@ -449,6 +464,16 @@ def _remove_working_directory(root: Path) -> None:
     path = root / DEVELOPMENT_CHECKPOINT_DIRECTORY
     if path.exists():
         shutil.rmtree(path)
+
+
+def _support_case_count(config: object) -> int:
+    direct = getattr(config, "fixed_support_case_count_per_center", None)
+    if direct is not None:
+        return int(direct)
+    protocol = getattr(config, "protocol", {})
+    if isinstance(protocol, Mapping):
+        return int(protocol.get("fixed_support_case_count_per_center", 2))
+    return 2
 
 
 __all__ = (

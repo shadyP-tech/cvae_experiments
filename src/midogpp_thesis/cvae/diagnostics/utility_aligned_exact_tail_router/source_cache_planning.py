@@ -39,6 +39,7 @@ def write_support_scratch(
     *,
     frame: object,
     partitions: object,
+    expected_support_case_count: int = 2,
 ) -> Mapping[str, object]:
     by_center = getattr(partitions, "support_rows_by_center", None)
     if not isinstance(by_center, Mapping) or tuple(by_center) != CENTERS:
@@ -52,9 +53,12 @@ def write_support_scratch(
     for center in CENTERS:
         center_rows = tuple(by_center[center])
         case_ids = tuple(sorted({str(row.case_id) for row in center_rows}))
-        if len(case_ids) != 2:
+        if (
+            expected_support_case_count < 2
+            or len(case_ids) != expected_support_case_count
+        ):
             raise ProtocolError(
-                "Consumed Stage-90 support must contain exactly two cases per center."
+                "Stage-90 support-case geometry differs from the configured count."
             )
         stop = cursor + len(center_rows)
         offsets[center] = {
@@ -76,7 +80,7 @@ def write_support_scratch(
             getattr(frame, "cache_binding_hash", "")
         ),
         "support_partition_lock_hash": str(getattr(partitions, "lock_hash", "")),
-        "fixed_support_case_count_per_center": 2,
+        "fixed_support_case_count_per_center": expected_support_case_count,
         "labels_consumed": False,
         "evaluation_embeddings_consumed": False,
     }
@@ -104,33 +108,36 @@ def build_source_tasks(
     if set(key_map) != expected:
         raise ProtocolError("Stage-90 GenerationLock source grid drifted.")
     tasks: list[Mapping[str, object]] = []
+    support_case_count = _support_case_count_from_config(config)
     for ordinal, (source, training_seed) in enumerate(product(CENTERS, TRAINING_SEEDS)):
         stem = f"source_{source}_train_{training_seed}"
-        tasks.append(
-            {
-                "schema_version": "midogpp_stage90_utility_aligned_source_task_v1",
-                "task_ordinal": ordinal,
-                "source_center": source,
-                "training_seed": training_seed,
-                "generation_keys": tuple(
-                    key_map[(source, training_seed, seed)] for seed in GENERATION_SEEDS
-                ),
-                "device": GENERATION_DEVICES[ordinal % len(GENERATION_DEVICES)],
-                "expert_bank_root": str(config.expert_bank_root),
-                "support_array_path": str(support_array_path),
-                "support_index_path": str(support_index_path),
-                "checkpoint_path": str(checkpoint_root / f"{stem}.json"),
-                "source_array_path": str(checkpoint_root / f"{stem}_streams.npy"),
-                "component_array_path": str(
-                    checkpoint_root / f"{stem}_components.npy"
-                ),
-                "config_contract_hash": str(config.contract_hash),
-                "generation_lock_hash": generation_lock.generation_lock_hash,
-                "support_scratch_hash": str(support_scratch_hash),
-                "labels_available": False,
-                "amp_enabled": False,
-            }
-        )
+        task: dict[str, object] = {
+            "schema_version": "midogpp_stage90_utility_aligned_source_task_v1",
+            "task_ordinal": ordinal,
+            "source_center": source,
+            "training_seed": training_seed,
+            "generation_keys": tuple(
+                key_map[(source, training_seed, seed)] for seed in GENERATION_SEEDS
+            ),
+            "device": GENERATION_DEVICES[ordinal % len(GENERATION_DEVICES)],
+            "expert_bank_root": str(config.expert_bank_root),
+            "support_array_path": str(support_array_path),
+            "support_index_path": str(support_index_path),
+            "checkpoint_path": str(checkpoint_root / f"{stem}.json"),
+            "source_array_path": str(checkpoint_root / f"{stem}_streams.npy"),
+            "component_array_path": str(checkpoint_root / f"{stem}_components.npy"),
+            "config_contract_hash": str(config.contract_hash),
+            "generation_lock_hash": generation_lock.generation_lock_hash,
+            "support_scratch_hash": str(support_scratch_hash),
+            "labels_available": False,
+            "amp_enabled": False,
+        }
+        # Keep the historical two-case task payload byte-identical.  A
+        # non-legacy support geometry is explicit so its checkpoint identity
+        # can never collide with the omitted-field legacy value of two.
+        if support_case_count != 2:
+            task["fixed_support_case_count_per_center"] = support_case_count
+        tasks.append(task)
     if len(tasks) != EXPECTED_SOURCE_TASK_COUNT:
         raise ProtocolError("Stage-90 source task count drifted.")
     return tuple(tasks), key_map
@@ -161,6 +168,16 @@ def execute_pending_tasks(
 
 def source_task_key(task: Mapping[str, object]) -> tuple[str, int]:
     return str(task["source_center"]), int(task["training_seed"])
+
+
+def _support_case_count_from_config(config: object) -> int:
+    direct = getattr(config, "fixed_support_case_count_per_center", None)
+    if direct is not None:
+        return int(direct)
+    protocol = getattr(config, "protocol", {})
+    if isinstance(protocol, Mapping):
+        return int(protocol.get("fixed_support_case_count_per_center", 2))
+    return 2
 
 
 __all__ = (

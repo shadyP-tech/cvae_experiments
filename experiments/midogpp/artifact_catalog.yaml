@@ -1,6 +1,6 @@
 schema_version: 2
 catalog_kind: midogpp_artifact_catalog
-last_reviewed: 2026-08-08
+last_reviewed: 2026-08-09
 path_base: repository_root
 
 catalog_policy:
@@ -134,7 +134,7 @@ artifacts:
       row_count: "9928"
       consumption_status: CONSUMED_FOR_REPRESENTATION_ADOPTION
       fresh_evidence: "false"
-      authorized_consumer_experiment_ids: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_reservation.v1
+      authorized_consumer_experiment_ids: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_reservation.v1|midogpp.oracle.uniform_b_v2_consumed_test_utility_aligned_case_aware_proxy_information_audit.v1
     required_files:
       - reports/test_consumption_ledger.json
     expected_file_hashes:
@@ -145,8 +145,8 @@ artifacts:
     may_feed_deployable_selection: false
     notes:
       - Narrow alias for the canonical Uniform-B test-consumption ledger; it does not expose representation-confirmation metrics or any Stage-90 result artifact.
-      - The 9,928 eligible test rows are already consumed and may support descriptive scoring of already locked systems only.
-      - This alias may authorize only the named Stage-70 reservation and can never establish fresh confirmation, policy selection, promotion, or deployment utility.
+      - The 9,928 eligible test rows are already consumed. The user explicitly authorizes their separate repurposing for the named terminal case-aware Stage-90 audit, which remains post-hoc and non-promotional.
+      - This alias may authorize only the named Stage-70 reservation and case-aware Stage-90 audit; neither use can establish fresh confirmation, policy selection, promotion, or deployment utility.
 
   - artifact_id: midogpp_frozen_policy_test_scoring_manifest_v1
     stage: dataset_contract
@@ -2532,7 +2532,7 @@ artifacts:
       labels_persisted: "false"
       sample_ids_persisted: "false"
       image_paths_persisted: "false"
-      authorized_consumer_experiment_ids: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_final_authorization.v1|midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_frozen_policy_comparison.v1
+      authorized_consumer_experiment_ids: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_final_authorization.v1|midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_frozen_policy_comparison.v1|midogpp.oracle.uniform_b_v2_consumed_test_utility_aligned_case_aware_proxy_information_audit.v1
     required_files:
       - embeddings/by_center/center_0.pt
       - embeddings/by_center/center_1.pt
@@ -2564,6 +2564,7 @@ artifacts:
       - Catalog-only derived feature cache; there is deliberately no registry experiment output for this cache identity.
       - The cache can be built only from the exact validated reservation, contains neutral identities and embeddings only, and cannot establish fresh evidence.
       - Independent validation passed for all 9,928 rows with the pinned Virchow2 identity; content and row-order hashes are frozen above.
+      - The named case-aware Stage-90 audit may reach these bytes only through its experiment-fenced alias; the original cache remains forbidden as a generic oracle or diagnostic input.
 
   - artifact_id: midogpp_output_uniform_b_v2_descriptive_test_final_authorization_v1
     stage: 70_frozen_policy_downstream
@@ -4548,6 +4549,136 @@ artifacts:
       - Every learned fold contains 120 rows after H/q/e are excluded from outer-target, query, and candidate-source roles before scaling, fitting, and prediction. The current seven-candidate label-free proxy list may be standardized transductively without utility or evaluation labels.
       - No target action, target prediction, target label, target performance, policy update, promotion path, or Stage-50/60/70/prior-Stage-90 feed exists.
 
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_utility_aligned_case_aware_proxy_information_audit_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_utility_aligned_case_aware_proxy_information_audit/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: EXPLORATORY_CONSUMED_DATA_ONLY
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: EXPLORATORY_CONSUMED_DATA_ONLY
+      architecture_family: exact_nine_case_aware_proxy_information_outer_center_crossfit_v1
+      evaluation_split: test
+      consumed_test_data: 'true'
+      user_authorized_consumed_test_repurposing: 'true'
+      test_consumption_ledger_acknowledged: 'true'
+      eligible_test_row_count: '9928'
+      eligible_test_case_count: '218'
+      fixed_support_case_count_per_center: '8'
+      support_case_count_total: '72'
+      evaluation_case_count_total: '146'
+      support_split_seed: '20260809'
+      support_partition_namespace: midogpp_utility_aligned_case_aware_proxy_information_audit_test_support_v1
+      primary_utility_endpoint: exact_nine_probability_ensemble_bacc_delta
+      primary_response_name: exact_bacc_delta
+      primary_response_unit: candidate_H_q_e
+      primary_response_row_count: '504'
+      diagnostic_response_name: smooth_bacc_delta
+      diagnostic_response_is_post_seal_only: 'true'
+      diagnostic_response_crossfit_role: separately_fit_descriptive_models_only
+      diagnostic_response_may_feed_fit_selection_or_gate: 'false'
+      descriptive_seed_row_count: '4536'
+      seed_rows_are_model_observations: 'false'
+      proxy_feature_row_count: '504'
+      proxy_family_count: '7'
+      maximum_predictors_per_family: '3'
+      fixed_ridge_alpha: '1.0'
+      ridge_cluster_unit: outer_target_query
+      hyperparameter_selection_used: 'false'
+      outer_inference_unit: target_center
+      outer_inference_unit_count: '9'
+      query_metric_row_count: '72'
+      query_metrics_are_nested_descriptive: 'true'
+      strict_H_q_e_exclusion_in_fit_scaling_and_prediction: 'true'
+      strict_H_q_e_exclusion_applies_to_all_three_row_roles: 'true'
+      strict_crossfit_training_row_count: '120'
+      crossfit_fold_audit_row_count: '7056'
+      whole_case_support_evaluation_disjoint: 'true'
+      support_labels_used: 'false'
+      evaluation_probabilities_used_as_features: 'false'
+      development_predictions_sealed_before_test_labels: 'true'
+      test_labels_opened_only_after_global_prediction_seal: 'true'
+      test_labels_construct_postseal_response_rows: 'true'
+      label_derived_responses_feed_strict_crossfit_diagnostic_models: 'true'
+      test_labels_used_for_feature_construction: 'false'
+      test_labels_used_for_policy_or_action_fit: 'false'
+      target_actions_built: 'false'
+      source_expert_updated: 'false'
+      stage50_outputs_used: 'false'
+      stage60_outputs_used: 'false'
+      stage70_prediction_scoring_or_policy_outputs_used: 'false'
+      previous_stage90_outputs_used: 'false'
+      historical_or_quarantined_inputs_used: 'false'
+      method_development_is_posthoc: 'true'
+      terminal_stage90_diagnostic: 'true'
+      screening_gate_may_authorize_policy: 'false'
+      policy_update_authorized: 'false'
+      action_selection_authorized: 'false'
+      fresh_evidence: 'false'
+      fresh_confirmation: 'false'
+      routing_quality_claimed: 'false'
+      target_performance_claimed: 'false'
+      target_specific_router_success_claimed: 'false'
+      proxy_is_nelbo: 'false'
+      proxy_is_downstream_utility: 'false'
+      promotion_eligible: 'false'
+      oracle_eligible: 'false'
+      may_feed_stage60: 'false'
+      may_feed_stage70: 'false'
+      may_feed_another_stage90_experiment: 'false'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - arrays/utility_aligned_source_prefixes.npy
+      - arrays/utility_aligned_support_components.npy
+      - arrays/ensemble_endpoint_development_predictions.npz
+      - manifests/protocol_manifest.json
+      - manifests/support_partition_lock.json
+      - manifests/utility_aligned_source_cache_lock.json
+      - manifests/ensemble_endpoint_development_prediction_index.json
+      - manifests/ensemble_endpoint_global_development_prediction_seal.json
+      - manifests/proxy_feature_lock.json
+      - manifests/crossfit_fold_lock.json
+      - manifests/audit_result.json
+      - manifests/content_index.json
+      - tables/support_partitions.csv
+      - tables/utility_aligned_source_streams.csv
+      - tables/utility_aligned_support_components.csv
+      - tables/proxy_feature_rows.csv
+      - tables/source_inner_ensemble_endpoints.csv
+      - tables/source_inner_seed_diagnostics.csv
+      - tables/crossfit_predictions.csv
+      - tables/crossfit_fold_audits.csv
+      - tables/query_metrics.csv
+      - tables/outer_metrics.csv
+      - tables/family_summary.csv
+      - reports/phase_01_prelabel_surfaces_complete.json
+      - reports/development_label_access_report.json
+      - reports/leakage_report.json
+      - reports/publication_decision.json
+      - reports/runtime_summary.json
+      - reports/run_state.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Terminal information audit over the user-authorized already-consumed MIDOG++ test split; the exact six inputs exclude every Stage-60/70 output and every prior Stage-90 output.
+      - Eight whole support cases per center leave 146 evaluation cases. Case-balanced features are label-free; exact-nine BACC is primary and softBACC is post-seal descriptive only.
+      - Every learned fold contains 120 rows after H, q, and e are excluded from all three roles. Alpha is fixed at 1.0, each family has at most three predictors, and no tuning is permitted.
+      - The artifact cannot create fresh evidence, update or authorize a policy or target action, feed another experiment, select a recipe, support promotion, or establish deployable utility.
+
   - artifact_id: midogpp_output_uniform_b_v2_consumed_validation_utility_aligned_exact_tail_router_v1
     stage: 90_oracles_and_diagnostics
     canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_validation_utility_aligned_exact_tail_router/v1
@@ -5578,3 +5709,108 @@ artifacts:
       - Byte-exact experiment-fenced alias over the already-consumed label-free validation cache; it creates no fresh evidence.
       - Only the utility-aligned ensemble-endpoint proxy-information Stage-90 audit may consume this alias, and only for terminal oracle-and-diagnostic evidence.
       - It cannot reopen Stage 50, Stage 60, or Stage 70, feed another Stage-90 output, or support policy updates, recipe selection, promotion, deployment, or deployable selection.
+
+  - artifact_id: midogpp_stage90_utility_aligned_case_aware_proxy_information_audit_test_manifest_v1
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_STAGE90_CASE_AWARE_PROXY_INFORMATION_AUDIT_RESPONSE_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      split: test
+      split_role: test_consumed_stage90_case_aware_proxy_information_audit_postseal_response_and_diagnostic_crossfit
+      alias_of_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_UTILITY_ALIGNED_CASE_AWARE_PROXY_INFORMATION_AUDIT
+      fresh_evidence: 'false'
+      labels_present: 'true'
+      labels_available_before_global_prediction_seal: 'false'
+      labels_construct_postseal_response_rows: 'true'
+      label_derived_responses_feed_strict_crossfit_diagnostic_models: 'true'
+      labels_used_for_feature_construction: 'false'
+      labels_used_for_policy_or_action_fit: 'false'
+      support_labels_used: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_utility_aligned_case_aware_proxy_information_audit.v1
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias of the canonical full MIDOG++ manifest; the test labels are already consumed and create no fresh evidence.
+      - The named case-aware audit may open test labels only after its complete primary prediction seal. Labels construct exact-BACC and softBACC response rows; those outcomes feed separate strict diagnostic cross-fits, while softBACC cannot affect the primary model or gate.
+      - It cannot expose support labels, authorize a policy or target action, feed Stage 60/70 or another Stage-90 experiment, select a recipe, promote a method, or support deployment.
+
+  - artifact_id: midogpp_stage90_utility_aligned_case_aware_proxy_information_audit_test_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_TEST_STAGE90_CASE_AWARE_PROXY_INFORMATION_AUDIT_LABEL_FREE_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      cache_experiment_id: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_cache.v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: test
+      row_count: '9928'
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      backbone_identity_hash: 1b5071f2e605fa60
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_UTILITY_ALIGNED_CASE_AWARE_PROXY_INFORMATION_AUDIT
+      fresh_evidence: 'false'
+      labels_persisted: 'false'
+      labels_absent: 'true'
+      sample_ids_persisted: 'false'
+      image_paths_persisted: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_utility_aligned_case_aware_proxy_information_audit.v1
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias over the validated label-free consumed-test cache; labels, sample identifiers, and image paths are absent.
+      - Only the named case-aware Stage-90 audit may consume this alias. Its support features remain label-free and whole-case balanced.
+      - It cannot authorize a policy or target action, feed Stage 60/70 or another Stage-90 experiment, select a recipe, promote a method, or support deployment.

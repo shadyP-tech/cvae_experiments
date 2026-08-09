@@ -111,6 +111,7 @@ def materialize_source_cache(
         support_index_path,
         frame=frame,
         partitions=partitions,
+        expected_support_case_count=_support_case_count(config),
     )
     tasks, key_map = build_source_tasks(
         config,
@@ -182,6 +183,7 @@ def stage_source_cache_for_cpu(
     *,
     scratch_root: Path,
     canonical_root: Path,
+    local_stage_directory: str = LOCAL_STAGE_DIRECTORY,
 ) -> SourceCache:
     """Atomically stage the finalized cache on experiment-scoped local storage.
 
@@ -194,7 +196,7 @@ def stage_source_cache_for_cpu(
     if cache.root.resolve() != canonical:
         raise ProtocolError("Stage-90 local staging received another canonical root.")
     canonical_lock = _validate_self_contained_cache(cache, canonical)
-    destination = Path(scratch_root).resolve() / LOCAL_STAGE_DIRECTORY
+    destination = Path(scratch_root).resolve() / local_stage_directory
     if destination == canonical:
         print("[utility-exact-tail] source cache already on CPU scratch", flush=True)
         return cache
@@ -263,8 +265,10 @@ def _validate_self_contained_cache(
     if (
         lock.get("schema_version")
         != "midogpp_stage90_utility_aligned_source_cache_lock_v1"
-        or lock.get("status")
-        != "COMPLETE_LABEL_FREE_FIXED_TWO_CASE_SUPPORT_CACHE"
+        or lock.get("status") not in {
+            "COMPLETE_LABEL_FREE_FIXED_TWO_CASE_SUPPORT_CACHE",
+            "COMPLETE_LABEL_FREE_FIXED_SUPPORT_CACHE",
+        }
         or lock.get("source_cache_hash") != cache.source_cache_hash
         or lock.get("support_scratch_hash") != cache.support_scratch_hash
         or lock.get("source_stream_count") != EXPECTED_SOURCE_STREAM_COUNT
@@ -278,7 +282,12 @@ def _validate_self_contained_cache(
         if not path.is_file() or sha256_file(path) != lock.get(field):
             raise ProtocolError("Stage-90 staged source-cache member hash drifted.")
     if validate_inventory:
-        validate_source_cache_inventory(cache)
+        validate_source_cache_inventory(
+            cache,
+            expected_support_case_count=int(
+                lock.get("fixed_support_case_count_per_center", -1)
+            ),
+        )
     return lock
 
 
@@ -293,6 +302,16 @@ def _atomic_copy(
     if sha256_file(temporary) != expected_sha256:
         raise ProtocolError("Stage-90 local source-cache copy changed bytes.")
     os.replace(temporary, destination)
+
+
+def _support_case_count(config: object) -> int:
+    direct = getattr(config, "fixed_support_case_count_per_center", None)
+    if direct is not None:
+        return int(direct)
+    protocol = getattr(config, "protocol", {})
+    if isinstance(protocol, Mapping):
+        return int(protocol.get("fixed_support_case_count_per_center", 2))
+    return 2
 
 
 __all__ = (

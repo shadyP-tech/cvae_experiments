@@ -58,6 +58,9 @@ does not make an unrun experiment claim-eligible.
   implemented independent Stage-90 replay that screens compact label-free
   proxy families against the sealed exact-nine candidate endpoint without
   consuming the prior diagnostic or authorizing a routing policy.
+- `wiki/03-experiments/midogpp-uniform-b-v2-consumed-test-case-aware-proxy-information-audit.md`:
+  user-authorized terminal consumed-test audit with support-8 whole-case
+  features, exact-BACC primary scoring, and a post-seal softBACC diagnostic.
 - `wiki/03-experiments/midogpp-uniform-b-variant-diagnostics.md`: two
   completed workstation-only Variant-B Stage-90 diagnostics, their remote
   namespaces and artifact roots, negative tail-average stability result,

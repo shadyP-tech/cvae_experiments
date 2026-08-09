@@ -776,6 +776,20 @@ absent.
   A positive proxy screen remains consumed-data exploratory evidence and
   cannot update a policy or feed Stage 60, Stage 70, or another Stage-90 run.
 
+- A better-powered terminal sibling is registered as
+  `midogpp.oracle.uniform_b_v2_consumed_test_utility_aligned_case_aware_proxy_information_audit.v1`.
+  The user explicitly authorizes repurposing the already-consumed MIDOG++ test
+  split for this post-hoc diagnostic. Its hash-pinned 218 eligible cases are
+  partitioned under seed `20260809` into eight whole support cases per center
+  and 146 evaluation cases. Case-aware features are label-free; test labels
+  open only after the prediction seal to construct response rows. Exact-nine
+  BACC is primary and softBACC is fitted only in separate post-seal descriptive
+  cross-fits. The seven fixed alpha-1 families use at most
+  three predictors and strict 120-row `H/q/e` holdout. No canonical result
+  exists until its workstation bundle completes. Regardless of result, it is
+  not fresh evidence and cannot feed policy or target actions, Stage 60/70,
+  recipe/deployable selection, or another Stage-90 experiment.
+
 ## Latest Uniform-B Nonlinear-Boundary Diagnostic
 
 Canonical target:

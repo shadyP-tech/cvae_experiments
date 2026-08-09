@@ -287,6 +287,8 @@ def _validate_support_scratch(
         or index.get("array_sha256") != sha256_array(support)
         or index.get("labels_consumed") is not False
         or index.get("evaluation_embeddings_consumed") is not False
+        or int(index.get("fixed_support_case_count_per_center", -1))
+        != int(task.get("fixed_support_case_count_per_center", 2))
     ):
         raise ProtocolError("Stage-90 support scratch failed validation.")
 
@@ -349,7 +351,8 @@ def _validate_component_records(
             or int(record.get("support_start", -1)) != int(raw_offset["start"])
             or int(record.get("support_stop", -1)) != int(raw_offset["stop"])
             or int(record.get("support_row_count", -1)) != int(raw_offset["stop"]) - int(raw_offset["start"])
-            or int(record.get("support_case_count", -1)) != 2
+            or int(record.get("support_case_count", -1))
+            != int(support_index.get("fixed_support_case_count_per_center", -2))
             or record.get("support_partition_hash") != raw_offset["support_partition_hash"]
             or {int(key) for key in mmd} != {key.generation_seed for key in task["generation_keys"]}
             or not np.isfinite(numeric).all()
