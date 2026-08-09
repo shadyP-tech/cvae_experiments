@@ -4,10 +4,16 @@ from __future__ import annotations
 
 from dataclasses import replace
 import hashlib
+from itertools import product
 
 import numpy as np
 import pytest
 
+from midogpp_thesis.common.hashing import stable_hash
+from midogpp_thesis.cvae.diagnostics.utility_aligned_ensemble_endpoint_proxy_information_audit.input_contracts import (
+    ValidationRowIdentity,
+    row_identity_hash,
+)
 from midogpp_thesis.cvae.diagnostics.utility_aligned_ensemble_endpoint_proxy_information_audit.contracts import (
     CENTERS,
     CYCLIC_DIRECTIONAL_PERMUTATION_CONTROL,
@@ -18,6 +24,8 @@ from midogpp_thesis.cvae.diagnostics.utility_aligned_ensemble_endpoint_proxy_inf
     HYBRID_COMPACT,
     INPUT_ARTIFACT_IDS,
     RIDGE_ALPHA,
+    GENERATION_SEEDS,
+    TRAINING_SEEDS,
     ProxyFeatureRow,
     ProxyUtilityRow,
     candidate_sources,
@@ -35,6 +43,14 @@ from midogpp_thesis.cvae.diagnostics.utility_aligned_ensemble_endpoint_proxy_inf
     proxy_feature_row_from_payload,
 )
 from midogpp_thesis.cvae.protocol import ProtocolError
+from midogpp_thesis.cvae.routing.residual_topup.hashing import canonical_sha256
+from midogpp_thesis.cvae.routing.utility_aligned.row_contracts import INNER_ROLE
+from midogpp_thesis.cvae.routing.utility_aligned.ensemble_endpoint_contracts import (
+    SeedProbabilityVector,
+)
+from midogpp_thesis.cvae.routing.utility_aligned.surface_contracts import (
+    CandidateFeatureRow,
+)
 
 
 def _hash(value: str) -> str:
@@ -45,7 +61,7 @@ def _surfaces() -> tuple[tuple[ProxyFeatureRow, ...], tuple[ProxyUtilityRow, ...
     features: list[ProxyFeatureRow] = []
     utility: list[ProxyUtilityRow] = []
     center_position = {center: index for index, center in enumerate(CENTERS)}
-    seal = _hash("development-seal")
+    seal = stable_hash({"role": "development-seal"})
     for outer in CENTERS:
         for query in CENTERS:
             if query == outer:
@@ -59,7 +75,7 @@ def _surfaces() -> tuple[tuple[ProxyFeatureRow, ...], tuple[ProxyUtilityRow, ...
             )
             query_effect = 0.01 * float(center_position[query] - 4)
             for candidate_index, source in enumerate(sources):
-                support_hash = _hash(f"support::{outer}::{query}")
+                support_hash = stable_hash({"role": "support", "query": query})
                 signed = float(np.clip(0.08 * source_z[candidate_index], -0.9, 0.9))
                 flip = float(0.05 + 0.02 * candidate_index)
                 entropy = float(-0.03 * source_z[candidate_index])
@@ -141,6 +157,153 @@ def test_frozen_contract_uses_candidate_responses_not_seed_observations() -> Non
         "log_distribution_mmd_within_query_z",
         "signed_margin_projection",
     )
+
+
+def test_proxy_hash_roles_match_the_real_producer_contracts_and_fail_closed() -> None:
+    support_rows = tuple(
+        ValidationRowIdentity(
+            row_ordinal=index,
+            manifest_row_index=100 + index,
+            sample_id=f"support-sample-{index}",
+            case_id=f"support-case-{index % 2}",
+            center="1",
+            partition_role="support",
+        )
+        for index in range(4)
+    )
+    support_hash = row_identity_hash(support_rows)
+    prediction_provenance_hash = stable_hash(
+        {"role": "development_prediction_seal", "version": 1}
+    )
+    seed_feature_rows = tuple(
+        CandidateFeatureRow(
+            role=INNER_ROLE,
+            outer_target_id="0",
+            query_id="1",
+            candidate_source="2",
+            training_seed=training_seed,
+            generation_seed=generation_seed,
+            candidate_source_count=7,
+            support_partition_hash=support_hash,
+            support_case_count=2,
+            reconstruction_mean=0.2,
+            reconstruction_std=0.01,
+            reconstruction_q25=0.1,
+            reconstruction_q50=0.2,
+            reconstruction_q75=0.3,
+            kl_mean=0.4,
+            kl_std=0.02,
+            kl_q25=0.3,
+            kl_q50=0.4,
+            kl_q75=0.5,
+            replica_disagreement=0.03,
+            distribution_mmd=0.04,
+            metadata_similarity=0.5,
+        )
+        for training_seed, generation_seed in product(
+            TRAINING_SEEDS, GENERATION_SEEDS
+        )
+    )
+    base_vectors = tuple(
+        SeedProbabilityVector(
+            training_seed=training_seed,
+            generation_seed=generation_seed,
+            row_identity_hash=support_hash,
+            prediction_provenance_hash=prediction_provenance_hash,
+            positive_class_probabilities=np.asarray(
+                [0.1 + 0.01 * index, 0.8], dtype=np.float64
+            ),
+        )
+        for index, (training_seed, generation_seed) in enumerate(
+            product(TRAINING_SEEDS, GENERATION_SEEDS)
+        )
+    )
+    tail_vectors = tuple(
+        SeedProbabilityVector(
+            training_seed=training_seed,
+            generation_seed=generation_seed,
+            row_identity_hash=support_hash,
+            prediction_provenance_hash=prediction_provenance_hash,
+            positive_class_probabilities=np.asarray(
+                [0.2 + 0.01 * index, 0.7], dtype=np.float64
+            ),
+        )
+        for index, (training_seed, generation_seed) in enumerate(
+            product(TRAINING_SEEDS, GENERATION_SEEDS)
+        )
+    )
+    row = ProxyFeatureRow(
+        outer_target_id="0",
+        query_id="1",
+        candidate_source="2",
+        candidate_source_count=7,
+        support_partition_hash=support_hash,
+        support_case_count=2,
+        support_row_count=len(support_rows),
+        seed_pair_count=9,
+        seed_feature_row_hashes=tuple(item.row_hash for item in seed_feature_rows),
+        base_support_vector_hashes=tuple(item.vector_hash for item in base_vectors),
+        tail_support_vector_hashes=tuple(item.vector_hash for item in tail_vectors),
+        metadata_similarity=0.5,
+        absolute_ensemble_shift=0.1,
+        reconstruction_mean_within_query_z=0.0,
+        kl_mean_within_query_z=0.0,
+        log_distribution_mmd_within_query_z=0.0,
+        signed_margin_projection=0.0,
+        threshold_flip_rate=0.0,
+        mean_entropy_change=0.0,
+        development_prediction_seal_hash=prediction_provenance_hash,
+    )
+
+    assert len(row.support_partition_hash) == 16
+    assert len(row.development_prediction_seal_hash) == 16
+    assert all(len(value) == 64 for value in row.seed_feature_row_hashes)
+    assert all(len(value) == 64 for value in row.base_support_vector_hashes)
+    assert all(len(value) == 64 for value in row.tail_support_vector_hashes)
+    assert len(row.proxy_feature_row_hash) == 64
+    assert proxy_feature_row_from_payload(row.to_payload()) == row
+
+    with pytest.raises(ProtocolError, match="16-hex semantic hash"):
+        replace(
+            row,
+            support_partition_hash=canonical_sha256({"wrong": "support role"}),
+        )
+    with pytest.raises(ProtocolError, match="16-hex semantic hash"):
+        replace(
+            row,
+            development_prediction_seal_hash=canonical_sha256(
+                {"wrong": "seal role"}
+            ),
+        )
+    for field_name in (
+        "seed_feature_row_hashes",
+        "base_support_vector_hashes",
+        "tail_support_vector_hashes",
+    ):
+        with pytest.raises(ProtocolError, match="canonical lowercase SHA-256"):
+            replace(
+                row,
+                **{
+                    field_name: tuple(
+                        stable_hash({"wrong": field_name, "index": index})
+                        for index in range(9)
+                    )
+                },
+            )
+
+    utility = ProxyUtilityRow(
+        outer_target_id="0",
+        query_id="1",
+        candidate_source="2",
+        candidate_source_count=7,
+        support_partition_hash=support_hash,
+        utility_delta=0.1,
+        response_hash=canonical_sha256({"role": "ensemble_utility_response"}),
+    )
+    assert len(utility.support_partition_hash) == 16
+    assert len(utility.response_hash) == 64
+    with pytest.raises(ProtocolError, match="canonical lowercase SHA-256"):
+        replace(utility, response_hash=stable_hash({"wrong": "response role"}))
 
 
 def test_strict_label_free_payload_parser_is_hash_bound() -> None:

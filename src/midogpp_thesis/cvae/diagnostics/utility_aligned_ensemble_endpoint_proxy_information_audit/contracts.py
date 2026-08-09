@@ -123,6 +123,7 @@ CONTROL_FAMILY_IDS = (
     CYCLIC_DIRECTIONAL_PERMUTATION_CONTROL,
 )
 
+_SEMANTIC_HASH = re.compile(r"[0-9a-f]{16}")
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _ENTROPY_LIMIT = float(np.log(2.0))
 _TOLERANCE = 1.0e-12
@@ -182,18 +183,20 @@ class ProxyFeatureRow:
             raise ProtocolError("Proxy feature support row count must be positive.")
         if type(self.seed_pair_count) is not int or self.seed_pair_count != 9:
             raise ProtocolError("Proxy feature row requires exact-nine seed provenance.")
-        support_hash = _hash(self.support_partition_hash, "support_partition_hash")
-        seal_hash = _hash(
+        support_hash = _semantic_hash(
+            self.support_partition_hash, "support_partition_hash"
+        )
+        seal_hash = _semantic_hash(
             self.development_prediction_seal_hash,
             "development_prediction_seal_hash",
         )
-        seed_hashes = _exact_nine_hashes(
+        seed_hashes = _exact_nine_sha256_hashes(
             self.seed_feature_row_hashes, "seed_feature_row_hashes"
         )
-        base_hashes = _exact_nine_hashes(
+        base_hashes = _exact_nine_sha256_hashes(
             self.base_support_vector_hashes, "base_support_vector_hashes"
         )
-        tail_hashes = _exact_nine_hashes(
+        tail_hashes = _exact_nine_sha256_hashes(
             self.tail_support_vector_hashes, "tail_support_vector_hashes"
         )
         values = {
@@ -335,8 +338,10 @@ class ProxyUtilityRow:
             raise ProtocolError("Proxy utility row requires distinct H/q/e domains.")
         if type(self.candidate_source_count) is not int or self.candidate_source_count != 7:
             raise ProtocolError("Proxy utility response cardinality drifted.")
-        support_hash = _hash(self.support_partition_hash, "support_partition_hash")
-        response_hash = _hash(self.response_hash, "response_hash")
+        support_hash = _semantic_hash(
+            self.support_partition_hash, "support_partition_hash"
+        )
+        response_hash = _sha256(self.response_hash, "response_hash")
         utility = _bounded(self.utility_delta, "utility_delta", -1.0, 1.0)
         if (
             self.support_eval_disjoint is not True
@@ -743,16 +748,24 @@ def _center(value: object, name: str) -> str:
     return value
 
 
-def _hash(value: object, name: str) -> str:
+def _semantic_hash(value: object, name: str) -> str:
+    if type(value) is not str or _SEMANTIC_HASH.fullmatch(value) is None:
+        raise ProtocolError(
+            f"{name} must be a canonical lowercase 16-hex semantic hash."
+        )
+    return value
+
+
+def _sha256(value: object, name: str) -> str:
     if type(value) is not str or _SHA256.fullmatch(value) is None:
         raise ProtocolError(f"{name} must be a canonical lowercase SHA-256.")
     return value
 
 
-def _exact_nine_hashes(values: object, name: str) -> tuple[str, ...]:
+def _exact_nine_sha256_hashes(values: object, name: str) -> tuple[str, ...]:
     if not isinstance(values, (tuple, list)):
         raise ProtocolError(f"{name} must be an exact-nine sequence.")
-    result = tuple(_hash(value, name) for value in values)
+    result = tuple(_sha256(value, name) for value in values)
     if len(result) != 9 or len(set(result)) != 9:
         raise ProtocolError(f"{name} must contain nine unique hashes.")
     return result
