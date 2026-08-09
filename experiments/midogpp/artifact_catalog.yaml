@@ -6424,3 +6424,370 @@ artifacts:
       - Byte-exact experiment-fenced alias over the validated label-free consumed-test embedding cache; it creates no fresh evidence.
       - Only the named ceiling may consume this alias to rematerialize the globally sealed B and direct Hxe probability surface.
       - It cannot authorize a policy/action, routing-quality claim, promotion, deployment, or any later experiment.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_pooled_bacc_case_oof_ceiling_parent_v2
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: CONSUMED_TEST_POOLED_BACC_CASE_OOF_CEILING_PARENT_LEDGER_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      split: test
+      row_count: '9928'
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      experiment_fenced: 'true'
+      fresh_evidence: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_pooled_bacc_case_oof_ceiling.v2
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Experiment-fenced byte-exact alias of the immutable original consumed-test ledger; it exposes no result or metric from v1.
+      - It may be paired only with the new v2 hash-chained one-off amendment.
+      - It creates no fresh evidence and cannot authorize another consumer, policy, action, promotion, or deployment.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_pooled_bacc_case_oof_ceiling_amendment_v2
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_POOLED_BACC_CASE_OOF_CEILING_AMENDMENT_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      amendment_sha256: 4fa46736c08641d5df6cde1cdd0acb10ef09a4b18adf7b44c872f5ec651288da
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_pooled_bacc_case_oof_ceiling.v2
+      authorization_scope: one_additional_terminal_label_aware_pooled_bacc_case_oof_ceiling_v2
+      authorization_basis: explicit_user_authorization_for_one_additional_terminal_midogpp_consumed_test_v2_diagnostic
+      support_utility: pooled_exact_bacc
+      uncertainty_unit: paired_whole_case_cluster
+      zero_headroom_normalized_regret: '0.0'
+      zero_headroom_tolerance: '1e-12'
+      zero_headroom_interpretation: no_routing_opportunity
+      permutation_primary_statistic: equal_center_R_minus_G_H
+      permutation_upper_tail_output_field: one_sided_p_value
+      permutation_lower_tail_output_field: lower_tail_p_value
+      permutation_two_sided_output_field: two_sided_p_value
+      permutation_upper_tail_p_value_formula: '(1+count(null>=observed))/(K+1)'
+      permutation_lower_tail_p_value_formula: '(1+count(null<=observed))/(K+1)'
+      permutation_two_sided_p_value_formula: 'min(1,2*min(upper,lower))'
+      permutation_derangement_family: case_sha256_candidate_order_counter_splitmix64_nonzero_cyclic_shift_1_to_7_v1
+      permutation_candidate_order: case_specific_sha256_of_seed_fold_id_case_id_action_then_action
+      permutation_shift_generator: independent_counter_splitmix64_per_fold_case_permutation_index
+      permutation_shift_range_inclusive: '1|7'
+      permutation_zero_shift_allowed: 'false'
+      uniform_over_all_derangements: 'false'
+      support_labels_used: 'true'
+      fresh_evidence: 'false'
+      all_observed_and_null_actions_sealed_before_evaluation_labels: 'true'
+      v1_output_used: 'false'
+      v1_scratch_or_checkpoint_used: 'false'
+      generic_consumer_authorized: 'false'
+      may_feed_another_stage90_experiment: 'false'
+    required_files:
+      - uniform_b_v2_consumed_test_fixed_bank_pooled_bacc_case_oof_ceiling_ledger_amendment_v2.json
+    expected_file_hashes:
+      uniform_b_v2_consumed_test_fixed_bank_pooled_bacc_case_oof_ceiling_ledger_amendment_v2.json:
+        algorithm: sha256
+        digest: 4fa46736c08641d5df6cde1cdd0acb10ef09a4b18adf7b44c872f5ec651288da
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Hash-chained amendment over the immutable original test-consumption ledger; the parent bytes and digest remain unchanged.
+      - It records the user's explicit authorization for only the named additional terminal v2 diagnostic over already-consumed MIDOG++ test cases.
+      - It cannot authorize a generic consumer, fresh evidence, policy/action selection, promotion, deployment, or a later experiment.
+
+  - artifact_id: midogpp_stage90_fixed_bank_pooled_bacc_case_oof_ceiling_test_manifest_v2
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_POOLED_BACC_CASE_OOF_CAPABILITY_GATED_LABELS
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      split: test
+      split_role: test_consumed_pooled_bacc_case_oof_capability_gated_labels
+      alias_of_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_POOLED_BACC_CASE_OOF_CEILING_V2
+      fresh_evidence: 'false'
+      labels_present: 'true'
+      labels_available_before_global_prediction_seal: 'false'
+      support_labels_used: 'true'
+      support_labels_scope: same_H_nonheldout_folds_only
+      support_utility: pooled_exact_bacc
+      uncertainty_unit: paired_whole_case_cluster
+      single_class_cases_retained: 'true'
+      mixed_class_case_count: '213'
+      negative_only_case_count: '4'
+      positive_only_case_count: '1'
+      label_derived_LOCO_global_prior: 'true'
+      H_labels_used_in_G_H: 'false'
+      G_H_and_pairwise_priors_sealed_before_H_support_access: 'true'
+      evaluation_role_labels_available_before_all_observed_and_null_action_seals: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_pooled_bacc_case_oof_ceiling.v2
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias of the consumed canonical test manifest with v2 role-scoped label capabilities.
+      - Other-center labels may build each LOCO G_H and pairwise prior; same-center nonheldout labels may update only that H/fold posterior; evaluation labels remain closed until all observed and null action seals exist.
+      - All 218 cases remain in scope, including four negative-only and one positive-only case; class adequacy is checked after sufficient statistics are pooled over each legal scope.
+
+  - artifact_id: midogpp_stage90_fixed_bank_pooled_bacc_case_oof_ceiling_test_cache_v2
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_TEST_POOLED_BACC_CASE_OOF_LABEL_FREE_CACHE_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      cache_experiment_id: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_cache.v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: test
+      row_count: '9928'
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      backbone_identity_hash: 1b5071f2e605fa60
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_POOLED_BACC_CASE_OOF_CEILING_V2
+      fresh_evidence: 'false'
+      labels_persisted: 'false'
+      labels_absent: 'true'
+      sample_ids_persisted: 'false'
+      image_paths_persisted: 'false'
+      v1_prediction_or_checkpoint_reuse: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_pooled_bacc_case_oof_ceiling.v2
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias over the validated label-free consumed-test embedding cache; it creates no fresh evidence.
+      - Only the named v2 ceiling may consume this alias to recompute the globally sealed B and direct Hxe probability surface under its new contract and root.
+      - It does not authorize reuse of any v1 prediction, prior, decision, label-capability state, scratch file, or checkpoint.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_pooled_bacc_case_oof_ceiling_v2
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_pooled_bacc_case_oof_ceiling/v2
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: EXPLORATORY_CONSUMED_DATA_ONLY
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: EXPLORATORY_CONSUMED_DATA_ONLY
+      terminal_decision: DO_NOT_PROMOTE
+      architecture_family: fixed_bank_pooled_bacc_case_oof_ceiling_v2
+      evaluation_split: test
+      consumed_test_data: 'true'
+      ledger_amendment_required_and_hash_chained: 'true'
+      ledger_amendment_sha256: 4fa46736c08641d5df6cde1cdd0acb10ef09a4b18adf7b44c872f5ec651288da
+      candidate_generalization: known_fixed_bank_reuse
+      unseen_expert_transfer_claim: 'false'
+      eligible_test_row_count: '9928'
+      evaluation_case_count: '218'
+      mixed_class_case_count: '213'
+      negative_only_case_count: '4'
+      positive_only_case_count: '1'
+      single_class_cases_retained: 'true'
+      case_sufficient_statistic_fields: n_positive|true_positive|n_negative|true_negative
+      per_case_bacc_stored_or_used: 'false'
+      support_utility: pooled_exact_bacc
+      uncertainty_unit: paired_whole_case_cluster
+      whole_case_oof_fold_count: '5'
+      partition_seed: '90902026'
+      partition_namespace: midogpp_fixed_bank_pooled_bacc_case_oof_ceiling_test_folds_v2
+      each_case_evaluated_exactly_once: 'true'
+      heldout_fold_absent_from_own_support_and_decision: 'true'
+      all_fold_decision_count: '45'
+      permutation_count: '10000'
+      all_permutation_null_action_count: '450000'
+      target_action_identity_count: '81'
+      target_probability_cell_count: '729'
+      exact_seed_pair_count: '9'
+      probabilities_averaged_before_threshold: 'true'
+      probability_threshold: '0.5'
+      label_derived_LOCO_global_prior: 'true'
+      G_H_uses_other_consumed_test_centers: 'true'
+      H_labels_used_in_G_H: 'false'
+      G_H_shared_across_H: 'false'
+      G_H_loco_donor_count_per_candidate: '7'
+      G_H_and_pairwise_priors_sealed_before_H_support_access: 'true'
+      pairwise_alternative_count_when_G_H_is_B: '8'
+      pairwise_alternative_count_when_G_H_is_source: '7'
+      pairwise_donor_count_when_G_H_is_B: '7'
+      pairwise_donor_count_when_G_H_is_source: '6'
+      prior_variance_estimator: sample_variance_divided_by_legal_donor_count_with_floor
+      cluster_variance_estimator: paired_whole_case_influence_m_over_m_minus_1_sum_psi_squared_with_floor
+      posterior_family: normal_normal_pooled_bacc_whole_case_cluster_v2
+      variance_floor: '1e-06'
+      confidence_multiplier: '1.96'
+      minimum_gain: '0.0'
+      all_observed_and_null_actions_sealed_before_evaluation_labels: 'true'
+      primary_endpoint: center_pooled_exact_bacc_over_whole_case_oof_predictions
+      primary_aggregation: equal_weight_per_target_center
+      zero_headroom_normalized_regret: '0.0'
+      zero_headroom_tolerance: '1e-12'
+      zero_headroom_interpretation: no_routing_opportunity
+      permutation_unit: complete_candidate_sufficient_statistic_block_derangement_within_H_fold_and_support_case
+      permutation_primary_statistic: equal_center_R_minus_G_H
+      permutation_upper_tail_output_field: one_sided_p_value
+      permutation_lower_tail_output_field: lower_tail_p_value
+      permutation_two_sided_output_field: two_sided_p_value
+      permutation_upper_tail_p_value_formula: '(1+count(null>=observed))/(K+1)'
+      permutation_lower_tail_p_value_formula: '(1+count(null<=observed))/(K+1)'
+      permutation_two_sided_p_value_formula: 'min(1,2*min(upper,lower))'
+      permutation_derangement_family: case_sha256_candidate_order_counter_splitmix64_nonzero_cyclic_shift_1_to_7_v1
+      permutation_candidate_order: case_specific_sha256_of_seed_fold_id_case_id_action_then_action
+      permutation_shift_generator: independent_counter_splitmix64_per_fold_case_permutation_index
+      permutation_shift_range_inclusive: '1|7'
+      permutation_zero_shift_allowed: 'false'
+      uniform_over_all_derangements: 'false'
+      permutation_baseline_B_fixed: 'true'
+      permutation_eight_Hxe_multiset_preserved: 'true'
+      permutation_uses_same_pooled_bacc_cluster_posterior: 'true'
+      permutation_evaluation_donors_used: 'false'
+      action_selection_authorized: 'false'
+      policy_update_authorized: 'false'
+      routing_quality_claimed: 'false'
+      fresh_evidence: 'false'
+      promotion_eligible: 'false'
+      stage50_outputs_used: 'false'
+      stage60_outputs_used: 'false'
+      stage70_prediction_scoring_or_policy_outputs_used: 'false'
+      label_free_cache_lineage: stage70_derived_feature_cache_alias_only
+      previous_stage90_outputs_used: 'false'
+      quarantined_v1_output_used: 'false'
+      quarantined_v1_scratch_or_checkpoint_used: 'false'
+      may_feed_another_stage90_experiment: 'false'
+      workstation_generation_devices: cuda:0|cuda:1
+      workstation_cpu_topology: 4_workers_x_3_blas_threads
+      workstation_gpu_cpu_phases_disjoint: 'true'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - arrays/frozen_source_streams.npy
+      - arrays/label_free_action_probabilities.npz
+      - arrays/permutation_null_actions.npy
+      - manifests/protocol_manifest.json
+      - manifests/case_oof_partition.json
+      - manifests/frozen_source_stream_index.json
+      - manifests/frozen_source_stream_lock.json
+      - manifests/label_free_prediction_index.json
+      - manifests/label_free_prediction_seal.json
+      - manifests/sealed_probability_surface.json
+      - manifests/loco_sufficient_statistic_surfaces.json
+      - manifests/loco_global_and_pairwise_prior_seals.json
+      - manifests/fold_support_sufficient_statistic_surfaces.json
+      - manifests/fold_posterior_seals.json
+      - manifests/fold_decisions.json
+      - manifests/all_fold_decisions_seal.json
+      - manifests/permutation_null_decision_seal.json
+      - manifests/evaluation_sufficient_statistic_surface.json
+      - manifests/ceiling_evaluation.json
+      - manifests/content_index.json
+      - tables/case_oof_partitions.csv
+      - tables/seed_probability_rows.csv
+      - tables/aggregated_probability_rows.csv
+      - tables/loco_case_action_sufficient_statistics.csv
+      - tables/loco_global_and_pairwise_priors.csv
+      - tables/fold_support_case_action_sufficient_statistics.csv
+      - tables/fold_posteriors.csv
+      - tables/fold_decisions.csv
+      - tables/oof_evaluation_case_action_sufficient_statistics.csv
+      - tables/pooled_oof_fold_metrics.csv
+      - tables/pooled_oof_center_metrics.csv
+      - tables/equal_center_inference.csv
+      - tables/action_selection_metrics.csv
+      - tables/permutation_null_summary.csv
+      - reports/workstation_preflight.json
+      - reports/phase_01_global_prediction_seal_complete.json
+      - reports/label_capability_report.json
+      - reports/leakage_report.json
+      - reports/publication_decision.json
+      - reports/runtime_summary.json
+      - reports/run_state.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Terminal additional consumed-test diagnostic; the complete probability surface is recomputed under v2 and no failed-v1 output, state, scratch, or checkpoint is consumed.
+      - Pooled exact BACC over aggregated confusion counts is the only utility. Whole cases define paired uncertainty clusters, while single-class cases contribute their available class counts instead of being dropped or scored separately.
+      - Every LOCO G_H and pairwise candidate prior is sealed before same-H support access; all 45 observed actions and 450000 null actions are sealed before evaluation labels open.
+      - Regardless of outcome, this output cannot authorize or feed a policy, target action, expert/model update, promotion, deployment, recipe selection, any numbered stage, or another Stage-90 experiment.

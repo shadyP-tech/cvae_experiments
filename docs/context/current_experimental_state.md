@@ -898,23 +898,46 @@ The result is post-hoc and diagnostic; validation and test remain untouched.
 The next work should examine why feasibility collapses across seven centers,
 rather than relaxing the constraint or changing the global threshold.
 
-## Consumed-test fixed-bank label-aware ceiling
+## Consumed-test fixed-bank pooled-BACC ceiling v2
 
-A third one-off consumed-test amendment authorizes only
-`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_ceiling.v1`.
-This sibling changes the information regime, not the frozen bank: direct
-target `B/Hxe` probabilities are globally sealed, each center uses five
-whole-case OOF folds, and fold-local exact-utility posteriors may use labels
-only from the other four folds of that same center, as exact
-candidate-minus-`G_H` BACC. The separate label-derived LOCO `G_H` equally
-weights the other centers and is sealed before
-any `H` support-label access. All 45 decisions precede evaluation-role label
-access. The implementation and config are registered; no canonical
-workstation result exists until its complete closed-world bundle validates.
-Once run, the result can diagnose whether target labels carry routing signal,
-but it is consumed-data ceiling evidence only and cannot authorize or feed
-any action, model, policy, promotion, stage, or later experiment. Its fixed
-null deranges candidate-source labels within each target/fold/support-case
-block while holding `B` and the eight-candidate multiset fixed; evaluation
-cases are never donors, and every null action is sealed before evaluation
-labels open.
+The workstation sealed all 729 v1 prediction cells, then v1 failed before any
+fold decision because it required both classes within each case. MIDOG++ has
+213 mixed cases, four negative-only cases, and one positive-only case. The v1
+output, partial capability state, scratch, and checkpoints are quarantined and
+cannot be resumed or consumed.
+
+The user explicitly authorized exactly one additional terminal diagnostic:
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_pooled_bacc_case_oof_ceiling.v2`.
+Its new amendment chains directly to the immutable original ledger, whitelists
+only v2, and its six-input fence excludes v1, Stage-50/60 results, Stage-70
+prediction/scoring/policy outputs, and every other Stage-90 result. The
+dedicated cache alias transparently retains its Stage-70-derived label-free
+feature-cache lineage. V2 recomputes the direct `B/Hxe` probability surface
+under a new root and contract hash.
+
+V2 stores per-case `n+`, `TP`, `n-`, and `TN` and computes exact BACC only
+after aggregating those counts over a legal support, donor, or evaluation
+scope. Thus all 218 cases remain, while whole cases—not rows or per-case
+BACC—are the paired uncertainty clusters. Each LOCO `G_H` uses seven legal
+other-center donors; every candidate-versus-selected-`G_H` pairwise prior uses
+six or seven shared legal donors. All global choices and pairwise priors are
+sealed before `H` support access. The fold update uses the predeclared
+whole-case influence variance and normal-normal posterior.
+
+All 45 observed actions and all 450,000 null actions must be sealed before
+evaluation labels open. Each null orders the eight candidates separately for
+each support case by SHA-256 over seed/fold/case/action, then uses an independent
+counter-SplitMix64 nonzero cyclic shift in `{1,...,7}` for each case and null
+index. This preserves complete candidate sufficient-statistic blocks and the
+candidate multiset, holds `B` fixed, and recomputes the same estimator; it is a
+restricted cyclic-shift family, not a uniform draw over all derangements. The
+primary permutation statistic is equal-center `R-G_H`. Its upper tail is
+`(1 + #null >= observed)/(K + 1)`, its lower tail is
+`(1 + #null <= observed)/(K + 1)`, and its reported two-sided value is
+`min(1, 2*min(upper, lower))`. When oracle headroom over `B` is at most `1e-12`,
+normalized regret is predeclared as `0.0` because that fold has no routing
+opportunity. No canonical v2 result exists until
+the complete bundle validates. Regardless of outcome, it is consumed-data
+ceiling evidence only and cannot authorize or feed an action, model, policy,
+routing-quality claim, recipe, promotion, stage, later experiment, or
+deployment.

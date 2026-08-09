@@ -158,6 +158,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     label_aware_case_oof_ceiling.add_argument("--config", required=True)
     label_aware_case_oof_ceiling.add_argument("--artifact-root", required=True)
+
+    pooled_bacc_case_oof_ceiling = sub.add_parser(
+        "fixed-bank-pooled-bacc-case-oof-ceiling",
+        help=(
+            "Run the additionally authorized consumed-test terminal fixed-bank "
+            "pooled-BACC case-OOF routing ceiling."
+        ),
+    )
+    pooled_bacc_case_oof_ceiling.add_argument("--config", required=True)
+    pooled_bacc_case_oof_ceiling.add_argument("--artifact-root", required=True)
     return parser
 
 
@@ -381,6 +391,20 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_fixed_bank_label_aware_case_oof_ceiling_config(args.config)
         output = run_fixed_bank_label_aware_case_oof_ceiling(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "fixed-bank-pooled-bacc-case-oof-ceiling":
+        from .fixed_bank_pooled_bacc_case_oof_ceiling import (
+            load_fixed_bank_pooled_bacc_case_oof_ceiling_config,
+            run_fixed_bank_pooled_bacc_case_oof_ceiling,
+        )
+
+        config = load_fixed_bank_pooled_bacc_case_oof_ceiling_config(args.config)
+        output = run_fixed_bank_pooled_bacc_case_oof_ceiling(
             config,
             artifact_root=artifact_root,
         )

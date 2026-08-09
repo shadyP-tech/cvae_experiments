@@ -3,8 +3,12 @@
 Experiment:
 `midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_ceiling.v1`
 
-Status: implemented terminal Stage-90 diagnostic. This checkout claims no
-canonical result until the workstation bundle completes and validates.
+Status: quarantined failed terminal Stage-90 diagnostic. The workstation sealed
+the full probability surface but stopped before any fold decision because v1
+required both binary classes inside every individual case. MIDOG++ contains
+four negative-only and one positive-only case. No canonical closed-world v1
+result exists, and its output, partial label-capability history, scratch, and
+checkpoints must not be resumed or reused.
 
 ## Question
 

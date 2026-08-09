@@ -319,22 +319,42 @@ canonical-reference replacement, validation scoring, test scoring, recipe
 selection, or deployable selection. Seven centers use the exact-linear
 fallback and only two retain nonlinear capacity.
 
-## Consumed-test label-aware routing ceiling
+## Consumed-test pooled-BACC routing ceiling v2
 
-`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_ceiling.v1`
-is covered by its own hash-chained, single-consumer amendment after the user's
-explicit request to reuse the consumed test split. It implements direct-target
-`B/Hxe` geometry and five whole-case folds per center. Each `G_H` is derived
-only from other consumed-test centers and sealed before `H` support labels;
-those other centers are equally weighted, and each local posterior uses exact
-candidate-minus-`G_H` BACC from only same-center nonheldout folds; every case is
-evaluated once; and all decisions are sealed before evaluation-role labels
-open. Exact BACC alone may influence routing diagnostics. Smooth outputs are
-descriptive only. The implementation and config are registered, but no
-canonical workstation result exists until the complete bundle validates.
-This is a terminal label-aware information ceiling, not a
-fresh or deployable router, and all downstream/stage feed remains forbidden.
-The fixed null uses candidate-source label derangements within each
-`(H, fold, support case)` block, holds `B` and the eight-`Hxe` multiset fixed,
-never draws from evaluation cases, and seals all null actions before evaluation
-labels open.
+The v1 label-aware ceiling is quarantined. It sealed the probability surface
+but failed before fold decisions because its per-case BACC required both
+binary classes inside every case; five MIDOG++ cases are single-class. No v1
+output, partial label-capability history, scratch, or checkpoint may feed v2.
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_pooled_bacc_case_oof_ceiling.v2`
+has a new hash-chained single-consumer amendment recording the user's explicit
+authorization for one additional terminal diagnostic. It recomputes from the
+original six inputs under a new output and scratch namespace. The dedicated
+test-cache alias preserves its declared Stage-70-derived label-free feature-
+cache lineage; no Stage-70 prediction, scoring, or policy result is an input.
+Per-case records contain only additive confusion sufficient statistics. Exact BACC is defined
+after pooling them over the legal scope; single-class cases are retained, and
+every support, donor, and evaluation scope must contain both classes.
+
+Each `G_H` and candidate-versus-`G_H` prior is LOCO, target-expert-excluding,
+and sealed before same-`H` support access. Support uncertainty uses paired
+whole-case cluster influences with the frozen variance floor, while the
+utility remains row-pooled. All 45 observed and 450,000 null actions precede
+evaluation-label access. Per support case, the null uses a case-specific
+SHA-256 candidate order and an independent counter-SplitMix64 nonzero cyclic
+shift in `{1,...,7}` for each null index. It therefore deranges complete
+candidate sufficient-statistic blocks, fixes `B`, preserves the source
+multiset, and recomputes the same pooled estimator, but is not uniform over all
+derangements. The primary statistic is equal-center `R-G_H`; upper and lower
+tails are respectively `(1 + #null >= observed)/(K + 1)` and
+`(1 + #null <= observed)/(K + 1)`, with two-sided
+`min(1, 2*min(upper, lower))`. Normalized regret is exactly `0.0` when
+oracle-minus-`B` headroom is at most `1e-12`, the frozen
+no-routing-opportunity convention.
+
+The implementation, configuration, and dedicated aliases are registered; no
+canonical v2 result exists until its closed-world bundle validates. This is
+always a terminal consumed-data information ceiling, not fresh evidence or a
+deployable router. Action/policy authorization, model update, routing-quality
+claims, promotion, deployment, and every numbered-stage or later-experiment
+feed remain forbidden.

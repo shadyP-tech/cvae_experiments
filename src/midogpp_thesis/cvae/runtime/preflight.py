@@ -32,7 +32,12 @@ REQUIRED_DISTRIBUTIONS = (
 
 
 def run_label_free_workstation_preflight(
-    root: Path, *, runtime: Mapping[str, object]
+    root: Path,
+    *,
+    runtime: Mapping[str, object],
+    expected_scratch_root: str = (
+        "/data/local/fixed_bank_label_aware_case_oof_ceiling_v1"
+    ),
 ) -> Mapping[str, object]:
     devices = tuple(str(value) for value in runtime.get("generation_devices", ()))
     scratch = tuple(str(value) for value in runtime.get("scratch_preference", ()))
@@ -62,11 +67,7 @@ def run_label_free_workstation_preflight(
         or int(runtime.get("maximum_total_classifier_fit_count", -1)) != 729
         or runtime.get("resume_policy")
         != "hash_validated_atomic_phase_and_task_checkpoints"
-        or scratch
-        != (
-            "/data/local/fixed_bank_label_aware_case_oof_ceiling_v1",
-            "artifact_parent",
-        )
+        or scratch != (str(expected_scratch_root), "artifact_parent")
     ):
         raise ProtocolError("Label-free workstation topology drifted.")
     if "spawn" not in mp.get_all_start_methods():

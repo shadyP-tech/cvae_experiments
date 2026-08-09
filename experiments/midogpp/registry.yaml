@@ -1753,6 +1753,51 @@ experiments:
       - The six-input fence contains only the fixed bank, GenerationLock, dedicated cache and manifest aliases, immutable parent ledger alias, and one-off amendment. No metadata, Stage-50/60/70 output, or prior Stage-90 output is consumed.
       - The result cannot update an expert or shared model, authorize a policy or action, support a routing-quality claim, feed any other stage or experiment, select a recipe, promote a method, or support deployment.
 
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_pooled_bacc_case_oof_ceiling.v2
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_pooled_bacc_case_oof_ceiling_v2.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_pooled_bacc_case_oof_ceiling_v2
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_fixed_bank_pooled_bacc_case_oof_ceiling_test_cache_v2
+      - midogpp_stage90_fixed_bank_pooled_bacc_case_oof_ceiling_test_manifest_v2
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_pooled_bacc_case_oof_ceiling_parent_v2
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_pooled_bacc_case_oof_ceiling_amendment_v2
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Reuse of immutable generation geometry and classifier settings only; no routing, policy, promotion, or deployment authority is inherited.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_pooled_bacc_case_oof_ceiling_parent_v2: Experiment-fenced byte-exact alias of the immutable original ledger, read only to verify the parent hash of this newly authorized one-off amendment.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_pooled_bacc_case_oof_ceiling_amendment_v2: Hash-chained authorization for exactly this additional terminal pooled-BACC whole-case-cluster diagnostic; it creates no fresh evidence.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-pooled-bacc-case-oof-ceiling
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_pooled_bacc_case_oof_ceiling_v2
+    notes:
+      - Explicitly authorized reuse of the already-consumed MIDOG++ test split for one additional terminal v2 diagnostic; it is never fresh evidence.
+      - The failed v1 output, scratch, checkpoints, priors, decisions, and partial label-access state are quarantined. V2 recomputes from the original six fenced inputs under a new root and contract hash.
+      - Pooled exact BACC is computed only after TP, TN, n-positive, and n-negative are summed over the full scope. All 218 cases remain, including four negative-only and one positive-only case; no per-case BACC enters the method.
+      - Each G_H and every candidate-versus-G_H pairwise prior uses only legal other-center donor effects and is sealed before H support-label access. Fold uncertainty is paired at the whole-case cluster while the utility itself remains pooled over rows.
+      - All 45 observed actions and all 450000 fixed-null actions are sealed before evaluation labels open. The null deranges complete candidate sufficient-statistic blocks within support cases, fixes B, preserves the candidate multiset, and uses the same pooled-BACC posterior estimator.
+      - The six-input fence contains only the fixed bank, GenerationLock, dedicated cache and manifest aliases, immutable parent ledger alias, and the new one-off amendment. The cache alias preserves its Stage-70-derived label-free feature-cache lineage, but no Stage-50/60 result, Stage-70 prediction/scoring/policy output, or prior Stage-90 output is consumed.
+      - Regardless of result, this terminal consumed-data-only output cannot update a model, authorize a route/action/policy, establish routing quality, feed another experiment, select a recipe, promote a method, or support deployment.
+
   - experiment_id: midogpp.routing_and_composition.uniform_b_v2_residual_topup_b_u_g_s_policy_lock.v1
     stage: 60_routing_and_composition
     status: planned

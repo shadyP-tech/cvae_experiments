@@ -544,3 +544,79 @@ select a recipe, promote a method, or support deployment.
 /home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
   midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_label_aware_case_oof_ceiling.v1
 ```
+
+The workstation completed and sealed the full v1 probability surface, then
+stopped before any fold decision was created: its per-case BACC implementation
+incorrectly required both classes inside each individual case. MIDOG++ has 213
+mixed cases, four negative-only cases, and one positive-only case. The v1 root,
+partial capability history, scratch, and checkpoints are therefore quarantined;
+v1 must not be resumed or used as input.
+
+## Uniform-B v2 Consumed-Test Fixed-Bank Pooled-BACC Case-OOF Ceiling v2
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_pooled_bacc_case_oof_ceiling.v2`
+is the separately authorized terminal replacement diagnostic. It recomputes
+`B` and all legal direct `Hxe` probabilities from the original six fenced
+inputs under a new contract hash, scratch namespace, output root, and
+hash-chained amendment. It consumes no v1 output, prediction store, prior,
+decision, label-capability state, scratch, or checkpoint.
+
+The dedicated test-cache alias retains its explicit Stage-70-derived label-free
+feature-cache lineage. It is not a Stage-70 prediction, scoring, or policy
+result; none of those outputs is consumed.
+
+V2 retains all 218 cases. For each case/action it stores only `n+`, `TP`, `n-`,
+and `TN`; a case may lack one class. Exact BACC is computed only after those
+counts are pooled over the full legal support, donor, or evaluation scope,
+which must contain both classes. Whole cases are paired uncertainty clusters,
+not equal-weight utility observations. Thus the utility is row-pooled while
+the uncertainty respects within-case dependence.
+
+For target `H` and source `e`, each LOCO effect uses the seven legal donor
+centers `H'` outside `{H,e}`. `G_H` takes the candidate with maximum prior mean
+only when its 95% lower bound versus `B` is strictly positive; otherwise it is
+`B`. Candidate-versus-selected-`G_H` pairwise priors use the same shared legal
+donors—seven when `G_H=B`, six when it is a source—and all `G_H` and pairwise
+prior seals precede any `H` support-label access. Fold support updates use the
+predeclared paired whole-case influence variance and normal-normal posterior.
+The router takes the candidate with maximum posterior lower bound only when it
+is strictly positive; otherwise it abstains to `G_H`.
+
+All 45 observed actions and all `10,000 x 45 = 450,000` null actions are sealed
+before evaluation labels open. For each support case, the null orders the eight
+candidates by SHA-256 over seed/fold/case/action and applies an independent
+counter-SplitMix64 nonzero cyclic shift in `{1,...,7}` for each null index. It
+therefore deranges complete candidate sufficient-statistic blocks, fixes `B`,
+preserves the candidate multiset, and recomputes the same pooled-BACC cluster
+posterior. This is the predeclared restricted cyclic-shift family, not a uniform
+sample from all eight-action derangements. Evaluation reports pooled exact BACC
+per center and uses the nine target centers as equal-weight inference units.
+The permutation primary statistic is equal-center `R-G_H`; its upper-tail field
+`one_sided_p_value` is `(1 + #null >= observed)/(K + 1)`, its
+`lower_tail_p_value` is `(1 + #null <= observed)/(K + 1)`, and
+`two_sided_p_value` is `min(1, 2*min(upper, lower))`.
+
+Normalized regret is fixed to `0.0` when oracle headroom over `B` is at most
+`1e-12`: that fold has no routing opportunity, and the predeclared convention
+avoids an undefined numerical-zero denominator.
+
+The workstation schedule remains two persistent A5000 workers with a CUDA-free
+parent, followed by four CPU workers with three BLAS threads each. V2 scratch is
+`/data/local/fixed_bank_pooled_bacc_case_oof_ceiling_v2`.
+
+```bash
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_pooled_bacc_case_oof_ceiling.v2
+```
+
+Canonical output:
+
+```text
+artifacts/midogpp/90_oracles_and_diagnostics/
+  uniform_b_v2_consumed_test_fixed_bank_pooled_bacc_case_oof_ceiling/v2/
+```
+
+This remains `EXPLORATORY_CONSUMED_DATA_ONLY` and `DO_NOT_PROMOTE` regardless
+of outcome. It cannot authorize a route, action, policy, model or expert update,
+routing-quality claim, recipe, promotion, deployment, or feed to Stage 50/60/70
+or any later Stage-90 experiment.
