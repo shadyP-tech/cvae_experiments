@@ -764,6 +764,18 @@ absent.
   fresh evidence or feed a policy, Stage 60, Stage 70, promotion, or
   deployment path.
 
+- The follow-up proxy-information audit is implemented and registered as
+  `midogpp.oracle.uniform_b_v2_consumed_validation_utility_aligned_ensemble_endpoint_proxy_information_audit.v1`.
+  It does not consume the completed ensemble-router output. It independently
+  regenerates and seals support/evaluation probabilities, freezes 504
+  support-only candidate feature rows, and only then opens development labels
+  to compare rich-distributional, directional, hybrid, metadata, absolute-
+  shift, null, and cyclic-permutation families. All fits use fixed alpha and
+  120-row folds with `H/q/e` excluded from all three row roles; inference remains over nine outer
+  centers. No canonical result exists until the workstation bundle completes.
+  A positive proxy screen remains consumed-data exploratory evidence and
+  cannot update a policy or feed Stage 60, Stage 70, or another Stage-90 run.
+
 ## Latest Uniform-B Nonlinear-Boundary Diagnostic
 
 Canonical target:

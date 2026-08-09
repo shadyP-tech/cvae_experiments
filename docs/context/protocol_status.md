@@ -204,6 +204,16 @@ inference without a selector or fallback. It may diagnose whether the observed
 mechanism is global or target-conditioned, but it cannot supply fresh evidence
 or authorize routing, promotion, Stage 60, or Stage 70.
 
+The independent
+`midogpp.oracle.uniform_b_v2_consumed_validation_utility_aligned_ensemble_endpoint_proxy_information_audit.v1`
+is implemented but has no canonical result yet. It cannot read the earlier
+Stage-90 router bundle. Its own experiment-fenced aliases regenerate and seal
+the development probability surface before labels, after which 504 exact-nine
+candidate responses screen fixed compact proxy families using 120-row folds
+with `H/q/e` excluded from outer, query, and source roles. Two support cases remain diagnostic-only, seed cells are not
+inference units, no target actions or labels exist, and even a positive screen
+cannot authorize policy construction or downstream confirmation.
+
 Legacy source trees were retired rather than exposed as fallbacks. Any new
 implementation must use only the canonical dataset/cache lineage and must pass
 target-leakage, expert-isolation, candidate-exclusion, and proxy-versus-utility

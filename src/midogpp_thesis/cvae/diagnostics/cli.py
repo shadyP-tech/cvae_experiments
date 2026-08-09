@@ -117,6 +117,16 @@ def build_parser() -> argparse.ArgumentParser:
     utility_aligned_ensemble_endpoint.add_argument(
         "--artifact-root", required=True
     )
+
+    proxy_information_audit = sub.add_parser(
+        "utility-aligned-ensemble-endpoint-proxy-information-audit",
+        help=(
+            "Run the independent consumed-validation Stage-90 exact-nine "
+            "ensemble-endpoint proxy-information audit."
+        ),
+    )
+    proxy_information_audit.add_argument("--config", required=True)
+    proxy_information_audit.add_argument("--artifact-root", required=True)
     return parser
 
 
@@ -275,6 +285,27 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_utility_aligned_ensemble_endpoint_router_config(args.config)
         output = run_utility_aligned_ensemble_endpoint_router_diagnostic(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if (
+        args.surface
+        == "utility-aligned-ensemble-endpoint-proxy-information-audit"
+    ):
+        from .utility_aligned_ensemble_endpoint_proxy_information_audit import (
+            load_utility_aligned_ensemble_endpoint_proxy_information_audit_config,
+            run_utility_aligned_ensemble_endpoint_proxy_information_audit,
+        )
+
+        config = (
+            load_utility_aligned_ensemble_endpoint_proxy_information_audit_config(
+                args.config
+            )
+        )
+        output = run_utility_aligned_ensemble_endpoint_proxy_information_audit(
             config,
             artifact_root=artifact_root,
         )

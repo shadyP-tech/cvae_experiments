@@ -1581,6 +1581,47 @@ experiments:
       - Mirrors the reviewed two-A5000 then four-worker-by-three-BLAS-thread execution topology with globally sealed predictions before either development or terminal labels open.
       - Output is active terminal consumed-data diagnostic evidence only and cannot update policy, feed Stage 60/70, support recipe selection, promotion, deployment, or establish routing quality.
 
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_validation_utility_aligned_ensemble_endpoint_proxy_information_audit.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_validation_utility_aligned_ensemble_endpoint_proxy_information_audit_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_validation_utility_aligned_ensemble_endpoint_proxy_information_audit_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_utility_aligned_ensemble_endpoint_proxy_information_audit_validation_cache_v1
+      - midogpp_stage90_utility_aligned_ensemble_endpoint_proxy_information_audit_validation_manifest_v1
+      - midogpp_routing_metadata_profiles_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Protocol-reviewed Stage-90 diagnostic reuse of immutable source-local frames, samplers, the exact seed Cartesian product, budgets, and classifier settings only; no Stage-50, Stage-60, Stage-70, prior Stage-90, policy, utility, promotion, or deployment authority is inherited.
+      midogpp_routing_metadata_profiles_v1: Label-free immutable domain metadata are used only as one predeclared proxy primitive in a terminal consumed-data information audit; no metadata-compatibility routing claim is inherited.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - utility-aligned-ensemble-endpoint-proxy-information-audit
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_validation_utility_aligned_ensemble_endpoint_proxy_information_audit_v1
+    notes:
+      - Independently rematerializes the reviewed source-inner exact-nine probability-ensemble surface over an experiment-fenced alias of already-consumed MIDOG++ validation bytes; it never reads the prior ensemble-endpoint Stage-90 output.
+      - The 504 H/q/e ensemble responses are the only modeled observations. All 4,536 seed-cell rows are descriptive; each learned fold has 120 rows and excludes H, q, and e from outer-target, query, and candidate-source roles before scaling, fitting, and prediction.
+      - Uses exactly two fixed label-free support cases per center to screen compact proxy families; support labels, target actions, target predictions, target labels, and terminal target scoring do not exist in this audit.
+      - Runs only 81 persistent source streams on two A5000 GPUs followed by 648 development tasks and 5,184 fits on four CPU workers with three BLAS threads each.
+      - Any information gate is exploratory screening only and cannot authorize policy, promotion, another Stage-90 consumer, recipe selection, deployment, or Stage-60/70 feed.
+
   - experiment_id: midogpp.routing_and_composition.uniform_b_v2_residual_topup_b_u_g_s_policy_lock.v1
     stage: 60_routing_and_composition
     status: planned

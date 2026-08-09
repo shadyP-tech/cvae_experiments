@@ -54,6 +54,10 @@ does not make an unrun experiment claim-eligible.
   active terminal consumed-validation Stage-90 exact-nine ensemble-endpoint
   diagnostic, descriptive-only seed rows, experiment-fenced inputs, and its
   fixed two-case insufficient-support boundary.
+- `wiki/03-experiments/midogpp-uniform-b-v2-utility-aligned-ensemble-endpoint-proxy-information-audit.md`:
+  implemented independent Stage-90 replay that screens compact label-free
+  proxy families against the sealed exact-nine candidate endpoint without
+  consuming the prior diagnostic or authorizing a routing policy.
 - `wiki/03-experiments/midogpp-uniform-b-variant-diagnostics.md`: two
   completed workstation-only Variant-B Stage-90 diagnostics, their remote
   namespaces and artifact roots, negative tail-average stability result,
