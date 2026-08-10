@@ -69,8 +69,8 @@ does not make an unrun experiment claim-eligible.
   modular successor implementation that predicts one signed sample correction
   from label-blind fixed-bank disagreement features, with strict donor-center
   OOF gradients, separate raw/safe seals, and a consumed-test diagnostic-only
-  sealed evaluation boundary. It is an unregistered scientific core, not a new
-  authorized rerun or result.
+  sealed evaluation boundary. It is independently registered and runnable but
+  remains unrun; it is not fresh routing evidence or a promoted result.
 - `wiki/03-experiments/midogpp-uniform-b-variant-diagnostics.md`: two
   completed workstation-only Variant-B Stage-90 diagnostics, their remote
   namespaces and artifact roots, negative tail-average stability result,

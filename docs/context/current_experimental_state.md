@@ -1008,9 +1008,12 @@ coded as `EXPLORATORY_CONSUMED_DATA_ONLY`, `fresh_evidence=false`, with no route
 promotion, or later-experiment feed. A fresh success claim still requires a new
 predeclared whole-case/patient/slide-disjoint reservation.
 
-No signed-error experiment registration, consumption-ledger amendment, runner,
-or canonical result bundle exists. The existing residual-stacker authorization
-does not transfer to this successor. The code is therefore an isolated,
-currently unrun mechanism core; applying it to the consumed test set requires a
-separate explicit diagnostic authorization and still cannot create fresh
-routing evidence.
+The signed-error successor now has a separate registration, direct-parent
+single-consumer ledger amendment, signed-only input aliases, runnable config,
+workstation runner, and independently replayed closed-world result bundle under
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_signed_error_gate.v1`.
+The existing residual-stacker authorization does not transfer and is neither a
+parent nor an input. The new diagnostic is still **unrun**, so no canonical
+signed-error result exists yet. When run, its result remains
+`EXPLORATORY_CONSUMED_DATA_ONLY` / `DO_NOT_PROMOTE` and cannot create fresh
+routing evidence or feed another experiment.

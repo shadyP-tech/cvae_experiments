@@ -186,6 +186,16 @@ def build_parser() -> argparse.ArgumentParser:
             "closed-world validator failure."
         ),
     )
+
+    signed_error_gate = sub.add_parser(
+        "fixed-bank-signed-error-gate",
+        help=(
+            "Run the independently authorized consumed-test terminal fixed-bank "
+            "signed-error mechanism diagnostic."
+        ),
+    )
+    signed_error_gate.add_argument("--config", required=True)
+    signed_error_gate.add_argument("--artifact-root", required=True)
     return parser
 
 
@@ -453,6 +463,20 @@ def main(argv: list[str] | None = None) -> int:
                 config,
                 artifact_root=artifact_root,
             )
+        print(output)
+        return 0
+
+    if args.surface == "fixed-bank-signed-error-gate":
+        from .fixed_bank_signed_error_gate import (
+            load_fixed_bank_signed_error_gate_config,
+            run_fixed_bank_signed_error_gate,
+        )
+
+        config = load_fixed_bank_signed_error_gate_config(args.config)
+        output = run_fixed_bank_signed_error_gate(
+            config,
+            artifact_root=artifact_root,
+        )
         print(output)
         return 0
 

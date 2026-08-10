@@ -37,7 +37,7 @@ class SignedErrorGateProtocol:
     bootstrap_replicates: int
     bootstrap_seed: int
     multiprocessing_start_method: str
-    probability_generation_devices: tuple[str, ...]
+    source_generation_devices: tuple[str, ...]
     scientific_reduction_dtype: str
     surface_storage_dtype: str
     contract_hash: str
@@ -79,9 +79,11 @@ class SignedErrorGateProtocol:
             },
             "workstation": {
                 "profile": self.workstation_profile,
-                "probability_generation_devices": list(
-                    self.probability_generation_devices
+                "source_generation_devices": list(
+                    self.source_generation_devices
                 ),
+                "probability_materialization_device": "cpu",
+                "probability_materialization_workers": 4,
                 "gpu_workers": 2,
                 "cpu_workers": self.cpu_workers,
                 "threads_per_worker": self.threads_per_worker,
@@ -90,10 +92,11 @@ class SignedErrorGateProtocol:
                 "parent_cuda_context_forbidden_during_cpu_phase": True,
                 "scientific_reduction_dtype": self.scientific_reduction_dtype,
                 "surface_storage_dtype": self.surface_storage_dtype,
-                "probability_generation_phase_owned_by_parent_runtime": True,
+                "source_generation_phase_owned_by_parent_runtime": True,
                 "bounded_process_local_probability_surface_copy_count": 4,
-                "context_features_streamed_and_hash_revalidated_per_target": True,
-                "duplicate_full_context_feature_matrix_forbidden": True,
+                "context_features_rebuilt_and_hash_revalidated_per_target": True,
+                "maximum_concurrent_target_context_builds": 4,
+                "cross_target_context_cache_forbidden": True,
             },
         }
 
@@ -115,10 +118,10 @@ def canonical_consumed_test_protocol() -> SignedErrorGateProtocol:
         bootstrap_replicates=BOOTSTRAP_REPLICATES,
         bootstrap_seed=BOOTSTRAP_SEED,
         multiprocessing_start_method="spawn",
-        probability_generation_devices=("cuda:0", "cuda:1"),
+        source_generation_devices=("cuda:0", "cuda:1"),
         scientific_reduction_dtype="float64",
         surface_storage_dtype=(
-            "sealed_probability_float32_memmap_context_features_streamed_float64"
+            "sealed_probability_float32_npz_context_features_process_local_float64"
         ),
         contract_hash="",
     )

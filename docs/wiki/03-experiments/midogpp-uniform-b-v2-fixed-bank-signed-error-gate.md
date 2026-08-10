@@ -11,9 +11,13 @@ routing, promotion, a policy update, another experiment, or deployment. A
 fresh claim requires a new predeclared whole-case/patient/slide-disjoint
 support/evaluation reservation with predictions sealed before label access.
 
-This is an unrun scientific core. It has no registry activation, consumption-
-ledger amendment, runnable config, or canonical artifact bundle, and it cannot
-inherit the hierarchical residual stacker's consumed-test authorization.
+The diagnostic is now independently registered and runnable as
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_signed_error_gate.v1`.
+It has its own direct-parent consumption-ledger amendment, signed-only cache and
+manifest aliases, config contract, runner, and closed-world bundle validator;
+it does not inherit or consume the hierarchical residual stacker's amendment or
+output. It remains **unrun** until the workstation command completes, so no
+canonical signed-error result is claimed here.
 
 ## Why the class branch was removed
 
@@ -77,18 +81,41 @@ with an explicit reason. The LCB is not relaxed.
 
 ## Workstation profile
 
-The implementation keeps the existing two-A5000 exact-nine probability phase
-and reuses that sealed in-run surface. GPU and CPU phases remain disjoint. The
-small signed models run as four spawned CPU workers with three BLAS threads each
-on the Xeon W-2265; sealed probability storage is float32 and scientific
-reductions are float64. Context features are streamed and hash-revalidated per
-target instead of retaining all 81 contexts; the process-local probability
-input is bounded to four concurrent worker copies. The parent process must not
-retain a CUDA context during CPU fitting.
+The implementation uses the two A5000s only to generate the frozen source
+streams. After the parent drops CUDA visibility, four spawned CPU workers with
+three BLAS threads each materialize the 729 classifier probability cells and
+fit the small signed models; GPU and CPU phases remain disjoint. The models run
+on the Xeon W-2265; the shared runtime stores sealed probabilities as compressed
+float32 NPZ and scientific reductions are float64. Each worker rebuilds and
+hash-revalidates only its current target family's float64 outer/nested contexts;
+there is no cross-target context cache, and probability input is bounded to four
+concurrent process-local copies. The parent process must not retain a CUDA
+context during CPU fitting.
 
 The core is split into protocol, contracts, features, gradients, model,
 composition, calibration, execution, sealing, terminal, and evaluation modules.
 The terminal adapter verifies the partition, per-method prediction and decision
 seals, label-capability report, and runtime bounds before emitting a provenance-
-bound diagnostic envelope. The same mathematics can later be bound to a fresh-
-data runner without changing the consumed-test claim boundary.
+bound diagnostic envelope. A future fresh-data study may reuse the mathematics
+only under a separate predeclared authorization; it cannot consume this output.
+
+## Running the registered diagnostic
+
+From the repository root on the canonical workstation and in the thesis Conda
+environment:
+
+```bash
+python -m midogpp_thesis workspace run midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_signed_error_gate.v1
+```
+
+The workspace launcher resolves and records the exact six inputs before the
+runner starts. The runner performs the two-GPU frozen-source phase, enters a
+CUDA-free four-worker-by-three-thread probability/model phase, durably seals all nine LOCO
+model families and 270 fold-method decisions, and only then opens terminal
+labels. Its validator reloads the arrays, recomputes the exact-nine surface and
+feature contexts, refits the signed models from legal donor labels, recomputes
+all support decisions, reopens terminal labels only after resealing, recomputes
+terminal metrics, and rejects any unexpected bundle member. Interrupted source
+and prediction tasks resume only from hash-valid checkpoints; later phases are
+deterministically replayed against immutable artifacts. A committed terminal
+phase resumes through validation only, without reopening the scientific phases.

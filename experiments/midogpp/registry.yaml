@@ -1843,6 +1843,51 @@ experiments:
       - The workstation schedule uses two persistent A5000 workers for one probability-materialization phase and four spawned CPU workers with three threads for bounded vectorized modeling and case-cluster bootstrap phases.
       - Regardless of result, the output cannot update an expert or shared model with target labels, authorize a route/action/policy, establish routing quality, feed any numbered stage or later experiment, select a recipe, promote a method, or support deployment.
 
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_signed_error_gate.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_signed_error_gate_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_signed_error_gate_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_fixed_bank_signed_error_gate_test_cache_v1
+      - midogpp_stage90_fixed_bank_signed_error_gate_test_manifest_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_signed_error_gate_parent_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_signed_error_gate_amendment_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Reuse of immutable generation geometry and classifier settings only; no routing, policy, promotion, or deployment authority is inherited.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_signed_error_gate_parent_v1: Experiment-fenced byte-exact alias of the immutable original ledger, read only to verify the direct parent hash of this independently authorized one-off amendment.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_signed_error_gate_amendment_v1: Direct hash-chained authorization for only this terminal consumed-test signed-error mechanism diagnostic; it creates no fresh evidence.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-signed-error-gate
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_signed_error_gate_v1
+    notes:
+      - Independently authorized reuse of the already-consumed MIDOG++ test split for one terminal signed-error mechanism diagnostic; it is never fresh evidence.
+      - The six-input fence contains the promoted bank, GenerationLock, dedicated signed-only cache and manifest aliases, byte-exact original-ledger alias, and a direct hash-chained single-consumer amendment. No hierarchical output or amendment, prior Stage-90 output, or Stage-50, Stage-60, or Stage-70 result is consumed.
+      - The runner recomputes and globally seals all 729 B and direct-Hxe probability cells before any label opens. Label-free sample features never branch on the baseline pseudo-class.
+      - Signed-gradient models use strict outer-target-H and nested-query-q exclusion. Same-H support may select only the B-calibration intercept and one common bounded lambda; target labels never update a shared model.
+      - B, B_cal, intercept-only G, R_raw, uncertainty-gated R_safe, and separately refit feature-permutation P are all sealed before evaluation labels open. Exact pooled BACC over all 218 whole cases is the terminal endpoint.
+      - The workstation schedule uses two persistent A5000 workers for frozen source-stream generation, then four spawned CPU workers with three threads each for the 729 classifier probability cells, modeling, and whole-case bootstrap phases.
+      - Regardless of result, the output cannot update an expert or shared model with target labels, authorize routing or a policy/action, establish routing quality, feed any numbered stage or later experiment, select a recipe, promote a method, or support deployment.
+
   - experiment_id: midogpp.routing_and_composition.uniform_b_v2_residual_topup_b_u_g_s_policy_lock.v1
     stage: 60_routing_and_composition
     status: planned

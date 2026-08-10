@@ -404,7 +404,12 @@ evidence. Any result obtained by applying it to those cases must remain
 validate routing. Only a new predeclared whole-case/patient/slide-disjoint
 reservation can support a routing-success claim.
 
-There is deliberately no signed-error registry entry, consumption-ledger
-amendment, runnable config, or canonical artifact bundle. The implementation is
-an unrun scientific core and cannot inherit the hierarchical residual stacker's
-authorization.
+The signed-error mechanism now has an independent Stage-90 registry entry,
+direct-parent single-consumer consumption-ledger amendment, signed-only cache
+and manifest aliases, runnable config, and closed-world replay validator under
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_signed_error_gate.v1`.
+It does not inherit or consume the hierarchical residual stacker's amendment or
+output. The registered experiment is still unrun, so there is no canonical
+result yet. Any future completed bundle remains
+`EXPLORATORY_CONSUMED_DATA_ONLY` / `DO_NOT_PROMOTE` and cannot authorize routing,
+promotion, policy updates, or another experiment.

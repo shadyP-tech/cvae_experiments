@@ -47,8 +47,34 @@ from .sealing import record_durable_fold_seals, record_durable_model_seals
 from .terminal import SealedSignedGateEvaluationResult, evaluate_sealed_fold_products
 
 
+def __getattr__(name: str) -> object:
+    """Keep config/runner imports lazy at the package boundary."""
+
+    if name in {
+        "FixedBankSignedErrorGateConfig",
+        "load_fixed_bank_signed_error_gate_config",
+    }:
+        from .config import (  # noqa: PLC0415
+            FixedBankSignedErrorGateConfig,
+            load_fixed_bank_signed_error_gate_config,
+        )
+
+        return {
+            "FixedBankSignedErrorGateConfig": FixedBankSignedErrorGateConfig,
+            "load_fixed_bank_signed_error_gate_config": (
+                load_fixed_bank_signed_error_gate_config
+            ),
+        }[name]
+    if name == "run_fixed_bank_signed_error_gate":
+        from .runner import run_fixed_bank_signed_error_gate  # noqa: PLC0415
+
+        return run_fixed_bank_signed_error_gate
+    raise AttributeError(name)
+
+
 __all__ = (
     "CorrectionRow",
+    "FixedBankSignedErrorGateConfig",
     "GradientTargetRow",
     "LambdaPathRow",
     "NestedSignedGateModel",
@@ -80,8 +106,10 @@ __all__ = (
     "fit_signed_gate_decision",
     "fit_target_families",
     "margin_gate",
+    "load_fixed_bank_signed_error_gate_config",
     "permute_feature_alignment",
     "predict_corrections",
     "record_durable_fold_seals",
     "record_durable_model_seals",
+    "run_fixed_bank_signed_error_gate",
 )
