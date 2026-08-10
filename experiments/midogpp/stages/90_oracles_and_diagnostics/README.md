@@ -620,3 +620,42 @@ This remains `EXPLORATORY_CONSUMED_DATA_ONLY` and `DO_NOT_PROMOTE` regardless
 of outcome. It cannot authorize a route, action, policy, model or expert update,
 routing-quality claim, recipe, promotion, deployment, or feed to Stage 50/60/70
 or any later Stage-90 experiment.
+
+## Uniform-B v2 Consumed-Test Fixed-Bank Hierarchical Residual Stacker v1
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_hierarchical_residual_stacker.v1`
+is the terminal mechanism diagnostic motivated by the pooled-BACC ceiling's
+retrospective headroom and unstable hard actions. It does not consume that
+ceiling. A dedicated six-input fence and a new direct-to-original-ledger
+single-consumer amendment require a full probability recomputation under a new
+root and scratch namespace.
+
+The architecture remains anchored to `B`. Whole-case residual-logit features
+and a probability-only source descriptor feed separate positive- and
+negative-class ridge effect models under strict `H/q/e` exclusion. `B_cal`
+isolates support-only threshold calibration, `G` is a case-independent stack,
+`R` is case-conditional, and `P` permutes whole local-feature blocks before both
+fit and inference and refits the same capacity. A soft `B_cal` class gate avoids
+hard pseudo-class reversal. Only two positive-score sources per class may enter,
+lambda is at most `0.25`, and lambda zero is an exact `B_cal` fallback.
+
+Five deterministic whole-case folds evaluate every case once. Support selects
+only `b` and one common lambda by fixed class-balanced log loss; exact pooled
+BACC supplies the paired whole-case lower-bound gate and terminal endpoint. The
+primary equal-center contrasts are `R-B_cal`, `R-G`, and `R-P`. All method
+actions are sealed before evaluation labels open.
+
+The workstation uses one two-A5000 probability phase followed by four spawned
+CPU workers with three threads over shared float32 memmaps. Config contract hash
+is `cb7050fcdaac86ac`; the amendment SHA-256 is
+`e915134fc15901f1d5c43fb5fb974f1693282ca4622a2ade169eaa7487566b1b`.
+
+```bash
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_hierarchical_residual_stacker.v1
+```
+
+No result exists until the 39-file bundle validates. Regardless of outcome,
+the artifact remains terminal `EXPLORATORY_CONSUMED_DATA_ONLY` evidence and may
+not feed another experiment, numbered stage, action, policy, recipe, promotion,
+or deployment.

@@ -1,6 +1,6 @@
 schema_version: 2
 catalog_kind: midogpp_artifact_catalog
-last_reviewed: 2026-08-09
+last_reviewed: 2026-08-10
 path_base: repository_root
 
 catalog_policy:
@@ -6791,3 +6791,339 @@ artifacts:
       - Pooled exact BACC over aggregated confusion counts is the only utility. Whole cases define paired uncertainty clusters, while single-class cases contribute their available class counts instead of being dropped or scored separately.
       - Every LOCO G_H and pairwise candidate prior is sealed before same-H support access; all 45 observed actions and 450000 null actions are sealed before evaluation labels open.
       - Regardless of outcome, this output cannot authorize or feed a policy, target action, expert/model update, promotion, deployment, recipe selection, any numbered stage, or another Stage-90 experiment.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_hierarchical_residual_stacker_parent_v1
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: CONSUMED_TEST_HIERARCHICAL_RESIDUAL_STACKER_PARENT_LEDGER_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      split: test
+      row_count: '9928'
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      experiment_fenced: 'true'
+      fresh_evidence: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_hierarchical_residual_stacker.v1
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Experiment-fenced byte-exact alias of the immutable original consumed-test ledger; no prior diagnostic result or metric is exposed.
+      - It may be paired only with the named residual-stacker v1 amendment.
+      - It creates no fresh evidence and cannot authorize another consumer, policy, action, promotion, deployment, or later experiment.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_hierarchical_residual_stacker_amendment_v1
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_HIERARCHICAL_RESIDUAL_STACKER_AMENDMENT_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      amendment_sha256: e915134fc15901f1d5c43fb5fb974f1693282ca4622a2ade169eaa7487566b1b
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_hierarchical_residual_stacker.v1
+      authorization_scope: one_terminal_consumed_test_fixed_bank_hierarchical_residual_stacker_v1
+      authorization_basis: explicit_user_instruction_to_implement_the_terminal_consumed_test_residual_stacker_diagnostic
+      claim_role: known_fixed_bank_label_aware_case_oof_stacking_mechanism_diagnostic
+      strict_inner_H_q_e_exclusion: 'true'
+      support_selection_surrogate: fixed_class_balanced_log_loss_only
+      exact_pooled_bacc_terminal_endpoint: 'true'
+      uncertainty_unit: paired_whole_case_cluster
+      feature_permutation_refits_same_capacity_model: 'true'
+      soft_class_gate: 'true'
+      fresh_evidence: 'false'
+      previous_stage90_outputs_used: 'false'
+      generic_consumer_authorized: 'false'
+      may_feed_another_stage90_experiment: 'false'
+    required_files:
+      - uniform_b_v2_consumed_test_fixed_bank_hierarchical_residual_stacker_ledger_amendment_v1.json
+    expected_file_hashes:
+      uniform_b_v2_consumed_test_fixed_bank_hierarchical_residual_stacker_ledger_amendment_v1.json:
+        algorithm: sha256
+        digest: e915134fc15901f1d5c43fb5fb974f1693282ca4622a2ade169eaa7487566b1b
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Direct hash-chained amendment over the immutable original test-consumption ledger; no prior amendment is its parent.
+      - It records authorization for only the named terminal, post-hoc, known-bank stacking-mechanism diagnostic over already-consumed MIDOG++ test cases.
+      - It cannot authorize fresh evidence, action/policy selection, model promotion, deployment, a generic consumer, or a later experiment.
+
+  - artifact_id: midogpp_stage90_fixed_bank_hierarchical_residual_stacker_test_manifest_v1
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_HIERARCHICAL_RESIDUAL_STACKER_CAPABILITY_GATED_LABELS
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      split: test
+      split_role: test_consumed_hierarchical_residual_stacker_capability_gated_labels
+      alias_of_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_HIERARCHICAL_RESIDUAL_STACKER_V1
+      fresh_evidence: 'false'
+      labels_present: 'true'
+      labels_available_before_global_probability_seal: 'false'
+      strict_inner_H_q_e_exclusion: 'true'
+      target_support_scope: same_H_nonheldout_whole_cases_only
+      target_support_shared_model_update: 'false'
+      target_support_parameter_scope: B_cal_intercept_then_common_lambda_only
+      support_selection_surrogate: fixed_class_balanced_log_loss_only
+      evaluation_labels_available_before_all_action_seals: 'false'
+      exact_pooled_bacc_terminal_endpoint: 'true'
+      uncertainty_unit: paired_whole_case_cluster
+      single_class_cases_retained: 'true'
+      mixed_class_case_count: '213'
+      negative_only_case_count: '4'
+      positive_only_case_count: '1'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_hierarchical_residual_stacker.v1
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias of the consumed canonical test manifest with residual-stacker role-scoped label capabilities.
+      - Legal other-center labels may fit strict H/q/e-cross-fitted class-effect models; same-H nonheldout labels may select only b and lambda; evaluation labels remain closed until every B, B_cal, G, R, and P action is sealed.
+      - All 218 cases remain in scope, including four negative-only and one positive-only case. No per-case BACC is defined or persisted.
+
+  - artifact_id: midogpp_stage90_fixed_bank_hierarchical_residual_stacker_test_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_TEST_HIERARCHICAL_RESIDUAL_STACKER_LABEL_FREE_CACHE_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      cache_experiment_id: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_cache.v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: test
+      row_count: '9928'
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      backbone_identity_hash: 1b5071f2e605fa60
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_HIERARCHICAL_RESIDUAL_STACKER_V1
+      fresh_evidence: 'false'
+      labels_persisted: 'false'
+      labels_absent: 'true'
+      sample_ids_persisted: 'false'
+      image_paths_persisted: 'false'
+      metadata_artifact_used: 'false'
+      prior_prediction_or_checkpoint_reuse: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_hierarchical_residual_stacker.v1
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias over the validated label-free consumed-test embedding cache; it creates no fresh evidence.
+      - Only the named residual-stacker v1 may consume this alias to recompute the globally sealed B and direct Hxe probability surface under its own contract and root.
+      - The probability-derived global source control is created inside the new run; this alias adds no metadata or previous routing artifact.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_hierarchical_residual_stacker_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_hierarchical_residual_stacker/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: EXPLORATORY_CONSUMED_DATA_ONLY
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: EXPLORATORY_CONSUMED_DATA_ONLY
+      terminal_decision: DO_NOT_PROMOTE
+      claim_role: known_fixed_bank_label_aware_case_oof_stacking_mechanism_diagnostic
+      architecture_family: fixed_bank_hierarchical_residual_stacker_v1
+      config_contract_hash: cb7050fcdaac86ac
+      evaluation_split: test
+      consumed_test_data: 'true'
+      ledger_amendment_required_and_hash_chained: 'true'
+      ledger_amendment_sha256: e915134fc15901f1d5c43fb5fb974f1693282ca4622a2ade169eaa7487566b1b
+      candidate_generalization: known_fixed_bank_reuse
+      unseen_expert_transfer_claim: 'false'
+      eligible_test_row_count: '9928'
+      evaluation_case_count: '218'
+      mixed_class_case_count: '213'
+      negative_only_case_count: '4'
+      positive_only_case_count: '1'
+      single_class_cases_retained: 'true'
+      per_case_bacc_stored_or_used: 'false'
+      primary_utility: pooled_exact_bacc
+      uncertainty_unit: paired_whole_case_cluster
+      whole_case_oof_fold_count: '5'
+      partition_seed: '90902027'
+      partition_namespace: midogpp_fixed_bank_hierarchical_residual_stacker_test_folds_v1
+      each_case_evaluated_exactly_once: 'true'
+      target_action_identity_count: '81'
+      target_probability_cell_count: '729'
+      target_case_action_feature_count: '1744'
+      exact_seed_pair_count: '9'
+      probabilities_averaged_before_feature_or_threshold_use: 'true'
+      probability_threshold: '0.5'
+      logit_clip_epsilon: '0.0001'
+      global_source_control_input: sealed_probabilities_only
+      metadata_artifact_used: 'false'
+      strict_inner_H_q_e_exclusion: 'true'
+      primary_interaction_rank: '1'
+      learned_candidate_identity_factor_used: 'false'
+      model_feature_count_including_intercept: '10'
+      ridge_alpha_grid: 0.1|1.0|10.0
+      B_cal_intercept_grid: -0.1|-0.05|0.0|0.05|0.1
+      residual_lambda_grid: 0.0|0.05|0.1|0.2|0.25
+      residual_lambda_maximum: '0.25'
+      mixture_temperature: '0.01'
+      maximum_sources_per_class: '2'
+      variance_floor: '1e-06'
+      confidence_multiplier: '1.96'
+      support_selection_surrogate: fixed_class_balanced_log_loss_only
+      exact_pooled_bacc_used_for_grid_selection: 'false'
+      exact_pooled_bacc_used_for_safety_gate: 'true'
+      soft_class_gate: 'true'
+      diagnostic_method_ids: B|B_cal|G|R|P
+      feature_permutation_seed: '90912027'
+      feature_permutation_applied_before_donor_fit: 'true'
+      feature_permutation_applied_before_target_inference: 'true'
+      feature_permutation_refits_same_capacity_model: 'true'
+      whole_case_cluster_bootstrap_replicates: '10000'
+      whole_case_cluster_bootstrap_seed: '90912028'
+      primary_endpoint: center_pooled_exact_bacc_over_whole_case_oof_predictions
+      primary_contrasts: R-B_cal|R-G|R-P
+      all_observed_and_control_actions_sealed_before_evaluation_labels: 'true'
+      action_selection_authorized: 'false'
+      policy_update_authorized: 'false'
+      routing_quality_claimed: 'false'
+      fresh_evidence: 'false'
+      promotion_eligible: 'false'
+      stage50_outputs_used: 'false'
+      stage60_outputs_used: 'false'
+      stage70_prediction_scoring_or_policy_outputs_used: 'false'
+      label_free_cache_lineage: stage70_derived_feature_cache_alias_only
+      previous_stage90_outputs_used: 'false'
+      previous_prediction_surface_used: 'false'
+      previous_stage90_scratch_or_checkpoint_used: 'false'
+      may_feed_another_stage90_experiment: 'false'
+      workstation_generation_devices: cuda:0|cuda:1
+      workstation_cpu_topology: 4_workers_x_3_threads
+      workstation_gpu_cpu_phases_disjoint: 'true'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - arrays/frozen_source_streams.npy
+      - arrays/label_free_action_probabilities.npz
+      - manifests/protocol_manifest.json
+      - manifests/case_oof_partition.json
+      - manifests/frozen_source_stream_index.json
+      - manifests/frozen_source_stream_lock.json
+      - manifests/label_free_prediction_index.json
+      - manifests/label_free_prediction_seal.json
+      - manifests/sealed_probability_surface.json
+      - manifests/label_free_case_feature_surface.json
+      - manifests/label_free_source_control_surface.json
+      - manifests/loco_hierarchical_model_seals.json
+      - manifests/fold_calibrations_and_method_decisions.json
+      - manifests/all_fold_method_decisions_seal.json
+      - manifests/permutation_provenance_seal.json
+      - manifests/terminal_pooled_bacc_evaluation.json
+      - manifests/content_index.json
+      - tables/case_oof_partitions.csv
+      - tables/seed_probability_rows.csv
+      - tables/aggregated_probability_rows.csv
+      - tables/label_free_case_features.csv
+      - tables/label_free_source_controls.csv
+      - tables/loco_donor_responses.csv
+      - tables/loco_model_components.csv
+      - tables/fold_calibrations.csv
+      - tables/fold_method_decisions.csv
+      - tables/oof_case_confusion_sufficient_statistics.csv
+      - tables/oof_pooled_exact_bacc.csv
+      - tables/paired_whole_case_cluster_contrasts.csv
+      - reports/workstation_preflight.json
+      - reports/phase_01_prediction_and_feature_seal_complete.json
+      - reports/label_capability_report.json
+      - reports/leakage_report.json
+      - reports/publication_decision.json
+      - reports/runtime_summary.json
+      - reports/run_state.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Terminal consumed-test stacking-mechanism diagnostic. All probabilities and feature/control/model products are produced under this new root; no prior Stage-90 output, array, state, scratch, or checkpoint is consumed.
+      - The architecture combines only bounded residual logits around B. B_cal isolates support-only calibration, G controls case-independent stacking, and separately fitted P controls case-feature alignment.
+      - Strict H/q/e masks bind every shared-effect training row, probability-only source descriptor, standardization product, and P donor. Same-H support may select only b and a common bounded lambda; exact pooled BACC supplies the safety gate and terminal endpoint.
+      - Regardless of outcome, this output cannot authorize or feed a policy, target action, expert/model update, routing-quality claim, promotion, deployment, recipe selection, any numbered stage, or another experiment.

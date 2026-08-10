@@ -168,6 +168,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pooled_bacc_case_oof_ceiling.add_argument("--config", required=True)
     pooled_bacc_case_oof_ceiling.add_argument("--artifact-root", required=True)
+
+    hierarchical_residual_stacker = sub.add_parser(
+        "fixed-bank-hierarchical-residual-stacker",
+        help=(
+            "Run the separately authorized consumed-test terminal fixed-bank "
+            "hierarchical residual-stacker diagnostic."
+        ),
+    )
+    hierarchical_residual_stacker.add_argument("--config", required=True)
+    hierarchical_residual_stacker.add_argument("--artifact-root", required=True)
     return parser
 
 
@@ -405,6 +415,20 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_fixed_bank_pooled_bacc_case_oof_ceiling_config(args.config)
         output = run_fixed_bank_pooled_bacc_case_oof_ceiling(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "fixed-bank-hierarchical-residual-stacker":
+        from .fixed_bank_hierarchical_residual_stacker import (
+            load_fixed_bank_hierarchical_residual_stacker_config,
+            run_fixed_bank_hierarchical_residual_stacker,
+        )
+
+        config = load_fixed_bank_hierarchical_residual_stacker_config(args.config)
+        output = run_fixed_bank_hierarchical_residual_stacker(
             config,
             artifact_root=artifact_root,
         )

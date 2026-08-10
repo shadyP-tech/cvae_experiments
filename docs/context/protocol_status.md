@@ -352,9 +352,34 @@ tails are respectively `(1 + #null >= observed)/(K + 1)` and
 oracle-minus-`B` headroom is at most `1e-12`, the frozen
 no-routing-opportunity convention.
 
-The implementation, configuration, and dedicated aliases are registered; no
-canonical v2 result exists until its closed-world bundle validates. This is
-always a terminal consumed-data information ceiling, not fresh evidence or a
-deployable router. Action/policy authorization, model update, routing-quality
-claims, promotion, deployment, and every numbered-stage or later-experiment
-feed remain forbidden.
+The closed-world v2 bundle is complete and validates `PASS`. `B` and `G_H` are
+both `0.800896`; `R` is `0.801230`, and the nine-center interval for
+`R-G_H=+0.000335` crosses zero. The sole nonbaseline route covers four cases in
+one center/fold. This is terminal consumed-data information-ceiling evidence,
+not fresh evidence or a deployable router. Action/policy authorization, model
+update, routing-quality claims, promotion, deployment, and every numbered-stage
+or later-experiment feed remain forbidden.
+
+## Consumed-test hierarchical residual stacker v1
+
+The registered experiment
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_hierarchical_residual_stacker.v1`
+is protocol-limited to a post-hoc known-bank stacking-mechanism diagnostic. Its
+new amendment chains directly to the original immutable ledger and whitelists
+only this experiment. Its six inputs exclude every prior Stage-90 result,
+prediction surface, scratch or checkpoint, all Stage-50/60 results, all Stage-70
+prediction/scoring/policy results, and metadata artifacts.
+
+All `B/Hxe` probabilities and label-free residual features are sealed before
+labels. Shared class-effect models obey strict `H/q/e` exclusion; same-target
+support labels may choose only a fixed-grid `B_cal` intercept and a common
+bounded residual lambda. Proper class-balanced log loss selects those local
+parameters; exact pooled BACC is restricted to the safety gate and terminal
+evaluation. Controls `B_cal`, case-independent `G`, and separately fitted
+feature-permutation `P` are mandatory before interpreting `R`.
+
+Status: implementation registered and local workspace contracts passing; no
+workstation result yet. Claim role is
+`known_fixed_bank_label_aware_case_oof_stacking_mechanism_diagnostic`. Even a
+positive `R-B_cal`, `R-G`, and `R-P` screen cannot create fresh routing evidence
+or authorize any feed, policy, action, promotion, recipe, or deployment.

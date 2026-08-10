@@ -61,6 +61,10 @@ does not make an unrun experiment claim-eligible.
 - `wiki/03-experiments/midogpp-uniform-b-v2-consumed-test-case-aware-proxy-information-audit.md`:
   user-authorized terminal consumed-test audit with support-8 whole-case
   features, exact-BACC primary scoring, and a post-seal softBACC diagnostic.
+- `wiki/03-experiments/midogpp-uniform-b-v2-consumed-test-fixed-bank-hierarchical-residual-stacker.md`:
+  registered terminal consumed-test mechanism diagnostic with a baseline-anchored
+  class-conditional residual stack, strict H/q/e exclusion, calibration/global/
+  permutation controls, and whole-case pooled-BACC inference.
 - `wiki/03-experiments/midogpp-uniform-b-variant-diagnostics.md`: two
   completed workstation-only Variant-B Stage-90 diagnostics, their remote
   namespaces and artifact roots, negative tail-average stability result,

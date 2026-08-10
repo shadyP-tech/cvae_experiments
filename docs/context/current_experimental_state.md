@@ -936,8 +936,44 @@ primary permutation statistic is equal-center `R-G_H`. Its upper tail is
 `(1 + #null <= observed)/(K + 1)`, and its reported two-sided value is
 `min(1, 2*min(upper, lower))`. When oracle headroom over `B` is at most `1e-12`,
 normalized regret is predeclared as `0.0` because that fold has no routing
-opportunity. No canonical v2 result exists until
-the complete bundle validates. Regardless of outcome, it is consumed-data
-ceiling evidence only and cannot authorize or feed an action, model, policy,
-routing-quality claim, recipe, promotion, stage, later experiment, or
-deployment.
+opportunity. The completed closed-world v2 bundle validates `PASS`. Equal-center
+pooled BACC is `0.800896` for both `B` and `G_H`, and `0.801230` for `R`;
+`R-G_H=+0.000335` with a nine-center 95% interval of
+`[-0.000437,+0.001106]`. Only four of 218 cases route, all in one center/fold.
+This remains consumed-data ceiling evidence only and cannot authorize or feed
+an action, model, policy, routing-quality claim, recipe, promotion, stage,
+later experiment, or deployment.
+
+## Consumed-test fixed-bank hierarchical residual stacker v1
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_hierarchical_residual_stacker.v1`
+is implemented and registered as the terminal mechanism diagnostic motivated by
+the v2 result. It does not consume v2. A new single-consumer amendment chains
+directly to the immutable original ledger, and the exact six-input fence admits
+only the fixed bank, GenerationLock, dedicated cache and manifest aliases, the
+original-ledger alias, and that amendment. No metadata artifact, prior Stage-90
+output or array, Stage-50/60 result, or Stage-70 prediction/scoring/policy
+result is an input.
+
+The diagnostic recomputes and seals all 729 `B/Hxe` probability cells. It fits
+separate class-direction rank-one ridge effect models with strict outer-`H`,
+nested-query-`q`, and deployed-source-`e` exclusions. Its sole source descriptor
+is a label-free mean absolute residual-logit quantity derived from the new
+sealed probabilities. It learns no source identity factor. Case features are
+four whole-case residual summaries plus the descriptor and four interactions.
+
+The five methods are `B`, support-intercept `B_cal`, case-independent stack
+`G`, case-conditional stack `R`, and separately fitted case-feature permutation
+control `P`. Support may select only `b` and one common bounded lambda using
+fixed class-balanced log loss; an exact pooled-BACC paired whole-case lower-bound
+gate otherwise forces lambda to zero. The terminal contrasts are `R-B_cal`,
+`R-G`, and `R-P` over nine equal-weight centers. All single-class cases remain
+through additive confusion sufficient statistics.
+
+The implementation and workspace contracts pass locally, with config contract
+hash `cb7050fcdaac86ac` and amendment SHA-256
+`e915134fc15901f1d5c43fb5fb974f1693282ca4622a2ade169eaa7487566b1b`.
+No scientific result exists until the workstation closes and independently
+validates the 39-file bundle. Regardless of outcome, it is
+`EXPLORATORY_CONSUMED_DATA_ONLY` and `DO_NOT_PROMOTE`; it cannot feed another
+experiment or numbered stage.
