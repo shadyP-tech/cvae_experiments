@@ -404,12 +404,41 @@ evidence. Any result obtained by applying it to those cases must remain
 validate routing. Only a new predeclared whole-case/patient/slide-disjoint
 reservation can support a routing-success claim.
 
-The signed-error mechanism now has an independent Stage-90 registry entry,
+The signed-error mechanism has an independent Stage-90 registry entry,
 direct-parent single-consumer consumption-ledger amendment, signed-only cache
 and manifest aliases, runnable config, and closed-world replay validator under
 `midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_signed_error_gate.v1`.
 It does not inherit or consume the hierarchical residual stacker's amendment or
-output. The registered experiment is still unrun, so there is no canonical
-result yet. Any future completed bundle remains
-`EXPLORATORY_CONSUMED_DATA_ONLY` / `DO_NOT_PROMOTE` and cannot authorize routing,
-promotion, policy updates, or another experiment.
+output. The canonical bundle is `COMPLETE` and validates `PASS`, but all 45
+folds selected `lambda=0`; the routed methods are therefore structural
+identities of `B_cal`. This remains `EXPLORATORY_CONSUMED_DATA_ONLY` /
+`DO_NOT_PROMOTE` and cannot authorize routing, promotion, policy updates, or
+another experiment.
+
+## Fixed-bank actionability/recoverability diagnostic
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_actionability_recoverability.v1`
+is registered as a new direct-parent, single-consumer Stage-90 diagnostic. It
+reuses the already-consumed MIDOG++ test bytes only under a dedicated cache and
+manifest alias and recomputes its own source/action probabilities. No earlier
+Stage-90 output, amendment, prediction surface, scratch, or checkpoint is an
+input.
+
+The two predeclared action geometries are parallel diagnostic surfaces. `A0`
+changes source row allocation; `A1` reuses the exact `A0` rows and changes only
+frozen logistic-fit weights while preserving the per-class effective budget.
+There is no geometry selection. Strict outer-`H`/nested-`q`/candidate-`e`
+`G/R/P` fits test whether utility ranking is label-blind recoverable;
+evaluation-disjoint same-`H` support `S_y` tests whether a static action ranking
+is support-recoverable. Terminal `O_static`, `O_case`, complementarity, and rank
+stability measure whether useful action headroom exists in the first place.
+
+All 1,458 action probability cells and label-free features precede label
+access; 54 model-family seals precede target support; all 495 fold-method
+decision seals precede evaluation labels. The workstation contract is two
+persistent A5000 source-generation workers followed by a CUDA-free `4 x 3`
+spawned CPU phase, float32 array storage, float64 reductions, and 10,000
+whole-case bootstrap replicates. The experiment is implemented but unrun. Its
+output is terminal `EXPLORATORY_CONSUMED_DATA_ONLY` and may not authorize an
+action, geometry, recipe, router, promotion, numbered-stage feed, or later
+experiment.

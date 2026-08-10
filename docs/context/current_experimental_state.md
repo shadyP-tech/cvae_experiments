@@ -1008,12 +1008,59 @@ coded as `EXPLORATORY_CONSUMED_DATA_ONLY`, `fresh_evidence=false`, with no route
 promotion, or later-experiment feed. A fresh success claim still requires a new
 predeclared whole-case/patient/slide-disjoint reservation.
 
-The signed-error successor now has a separate registration, direct-parent
+The signed-error successor has a separate registration, direct-parent
 single-consumer ledger amendment, signed-only input aliases, runnable config,
 workstation runner, and independently replayed closed-world result bundle under
 `midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_signed_error_gate.v1`.
-The existing residual-stacker authorization does not transfer and is neither a
-parent nor an input. The new diagnostic is still **unrun**, so no canonical
-signed-error result exists yet. When run, its result remains
-`EXPLORATORY_CONSUMED_DATA_ONLY` / `DO_NOT_PROMOTE` and cannot create fresh
-routing evidence or feed another experiment.
+The existing residual-stacker authorization did not transfer and is neither a
+parent nor an input. Its canonical workstation bundle is now `COMPLETE` with
+validation `PASS`. All 45 final decisions selected `lambda=0`: 24 support
+proper-loss proposals were already zero and the 21 nonzero proposals failed the
+unchanged exact-BACC lower-confidence gate. Consequently `B_cal`, `G`,
+`R_raw`, `R_safe`, and `P` are terminally identical at equal-center BACC
+`0.800935`, versus `0.800896` for `B`. `B_cal-B=+0.0000397` with 95% interval
+`[-0.003022,+0.003102]`.
+
+The signed-error donor fit did not recover the earlier smooth-response result:
+mean nested MSE was `0.148202` for `R`, `0.147442` for `P`, and `0.147427` for
+`G`, with `R` worse than `P` in all nine outer centers. This localizes the next
+question upstream of another correction gate: whether the fixed bank supplies
+useful, sufficiently complementary actions at all, and whether their utility
+ranking is recoverable from label-blind or support-only evidence. The result
+remains `EXPLORATORY_CONSUMED_DATA_ONLY` / `DO_NOT_PROMOTE` and cannot create
+fresh routing evidence or feed another experiment.
+
+## Fixed-bank actionability/recoverability diagnostic implementation
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_actionability_recoverability.v1`
+is the separately authorized terminal diagnostic for that upstream question.
+It does not consume the signed-error output, amendment, prediction surface,
+scratch, or checkpoint. Its direct amendment chains to the original immutable
+test-consumption ledger, and its exact six inputs are the promoted fixed bank,
+GenerationLock, dedicated single-consumer test-cache and manifest aliases, the
+original-ledger alias, and this experiment's amendment.
+
+The action library is frozen before labels. `B` uses 128 rows per
+source/class; the shared `U` uses 144. For each non-target source, `A0` uses
+256 selected-source and 128 other-source rows per class. `A1` reuses exactly
+the same physical rows but gives the selected source weight `23/16` and every
+other source weight `7/8`, preserving effective mass 1152 per class. There is
+no strength sweep, source pair, class-specific action, or cross-geometry
+selector.
+
+For each geometry, `G`, `R`, and separately refit permutation `P` predict
+class-balanced proper-loss gain versus `U` under strict outer-`H`, nested-`q`,
+and candidate-`e` exclusions; nonpositive predicted gain falls back to `U`.
+`S_y` may select only `U` or one of eight same-geometry source actions from the
+other four whole-case folds of the same target. Terminal `O_static` and
+`O_case` expose static and case-conditional action headroom only after all 495
+pre-evaluation method decisions are durable.
+
+The result reports `O_static-U` and `O_case-O_static` actionability,
+`R-U`, `R-G`, `R-P`, and `S_y-U` recoverability, action complementarity,
+support/evaluation rank stability, normalized oracle gaps, equal-center exact
+BACC, and paired whole-case uncertainty. The implementation is registered and
+runnable but remains **unrun**. Reusing all 218 test cases is explicitly
+terminal descriptive analysis: regardless of its numerical outcome, it cannot
+select an action geometry or recipe, authorize routing or promotion, update a
+model or expert, or feed another experiment.

@@ -196,6 +196,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     signed_error_gate.add_argument("--config", required=True)
     signed_error_gate.add_argument("--artifact-root", required=True)
+
+    actionability_recoverability = sub.add_parser(
+        "fixed-bank-actionability-recoverability",
+        help=(
+            "Run the explicitly authorized consumed-test terminal fixed-bank "
+            "actionability/recoverability mechanism diagnostic."
+        ),
+    )
+    actionability_recoverability.add_argument("--config", required=True)
+    actionability_recoverability.add_argument("--artifact-root", required=True)
     return parser
 
 
@@ -474,6 +484,20 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_fixed_bank_signed_error_gate_config(args.config)
         output = run_fixed_bank_signed_error_gate(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "fixed-bank-actionability-recoverability":
+        from .fixed_bank_actionability_recoverability import (
+            load_fixed_bank_actionability_recoverability_config,
+            run_fixed_bank_actionability_recoverability,
+        )
+
+        config = load_fixed_bank_actionability_recoverability_config(args.config)
+        output = run_fixed_bank_actionability_recoverability(
             config,
             artifact_root=artifact_root,
         )

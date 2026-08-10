@@ -69,8 +69,12 @@ does not make an unrun experiment claim-eligible.
   modular successor implementation that predicts one signed sample correction
   from label-blind fixed-bank disagreement features, with strict donor-center
   OOF gradients, separate raw/safe seals, and a consumed-test diagnostic-only
-  sealed evaluation boundary. It is independently registered and runnable but
-  remains unrun; it is not fresh routing evidence or a promoted result.
+  sealed evaluation boundary. Its completed result selected zero residual scale
+  in every fold; it is not fresh routing evidence or a promoted result.
+- `wiki/03-experiments/midogpp-uniform-b-v2-fixed-bank-actionability-recoverability.md`:
+  implemented terminal diagnostic that separates fixed-bank action headroom,
+  case complementarity, donor-model recoverability, and same-target support
+  rank stability across two frozen budget-controlled action geometries.
 - `wiki/03-experiments/midogpp-uniform-b-variant-diagnostics.md`: two
   completed workstation-only Variant-B Stage-90 diagnostics, their remote
   namespaces and artifact roots, negative tail-average stability result,

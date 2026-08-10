@@ -11,13 +11,23 @@ routing, promotion, a policy update, another experiment, or deployment. A
 fresh claim requires a new predeclared whole-case/patient/slide-disjoint
 support/evaluation reservation with predictions sealed before label access.
 
-The diagnostic is now independently registered and runnable as
+The diagnostic is independently registered and has completed as
 `midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_signed_error_gate.v1`.
 It has its own direct-parent consumption-ledger amendment, signed-only cache and
 manifest aliases, config contract, runner, and closed-world bundle validator;
 it does not inherit or consume the hierarchical residual stacker's amendment or
-output. It remains **unrun** until the workstation command completes, so no
-canonical signed-error result is claimed here.
+output. The canonical workstation bundle is `COMPLETE` and independently
+validates `PASS`.
+
+All 45 folds selected final `lambda=0`. Twenty-four support proper-loss
+proposals were already zero, and the 21 nonzero proposals failed the unchanged
+exact-BACC lower-confidence gate. `B_cal`, `G`, `R_raw`, `R_safe`, and `P` are
+therefore terminally identical at equal-center BACC `0.800935`; `B` is
+`0.800896`. The `B_cal-B` contrast is `+0.0000397` with 95% interval
+`[-0.003022,+0.003102]`. Nested MSE was `0.148202` for `R`, `0.147442` for
+`P`, and `0.147427` for `G`; `R` was worse than `P` in all nine outer centers.
+The result motivates an upstream actionability/recoverability audit, not more
+gate capacity or a relaxed safety threshold.
 
 ## Why the class branch was removed
 

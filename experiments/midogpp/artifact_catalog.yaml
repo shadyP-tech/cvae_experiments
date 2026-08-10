@@ -7460,3 +7460,366 @@ artifacts:
       - Exact pooled BACC over all 218 whole cases is terminal. All six method predictions are sealed before evaluation labels open; single-class cases contribute sufficient statistics and never receive per-case BACC.
       - The six-input fence contains only the promoted bank, GenerationLock, signed-only cache and manifest aliases, byte-exact original-ledger parent alias, and this diagnostic's direct amendment. No hierarchical output or amendment, prior Stage-90 output, or Stage-50, Stage-60, or Stage-70 result is consumed.
       - Regardless of outcome, this output cannot update an expert or shared model with target labels, authorize routing, action, or policy, establish routing quality, feed any numbered stage or later experiment, select a recipe, promote a method, support deployment, or authorize a generic consumer.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_actionability_recoverability_parent_v1
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: CONSUMED_TEST_ACTIONABILITY_RECOVERABILITY_PARENT_LEDGER_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      split: test
+      row_count: '9928'
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      experiment_fenced: 'true'
+      fresh_evidence: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_actionability_recoverability.v1
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Experiment-fenced byte-exact alias of the immutable original consumed-test ledger; no prior diagnostic result, amendment, prediction, score, or metric is exposed.
+      - It may be paired only with the independently authorized actionability/recoverability v1 amendment.
+      - It creates no fresh evidence and cannot authorize another consumer, policy, action, geometry, model, expert, promotion, deployment, or later experiment.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_actionability_recoverability_amendment_v1
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_ACTIONABILITY_RECOVERABILITY_AMENDMENT_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      amendment_sha256: 66a345f6ee31717fcc7eb9fdba76f76e52bb032de987eabbf55b7ffdf5a66f09
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_actionability_recoverability.v1
+      authorization_scope: one_terminal_consumed_test_actionability_recoverability_diagnostic_v1
+      authorization_basis: explicit_user_instruction_to_implement_one_terminal_consumed_test_actionability_recoverability_mechanism_diagnostic
+      claim_role: posthoc_actionability_recoverability_mechanism_diagnostic
+      action_geometry_ids: A0|A1
+      A1_reuses_exact_A0_rows: 'true'
+      A1_selected_row_weight: '23/16'
+      A1_other_row_weight: '7/8'
+      geometry_selection_used: 'false'
+      strict_outer_H_and_nested_q_exclusion: 'true'
+      shared_model_response: class_balanced_proper_loss_gain_vs_u
+      target_support_candidate_set: U_plus_eight_source_actions_within_geometry
+      exact_pooled_bacc_terminal_endpoint: 'true'
+      uncertainty_unit: paired_whole_case_cluster
+      terminal_oracles_pre_evaluation_methods: 'false'
+      fresh_evidence: 'false'
+      previous_stage90_outputs_used: 'false'
+      signed_error_output_or_amendment_used: 'false'
+      generic_consumer_authorized: 'false'
+      may_feed_another_stage90_experiment: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - uniform_b_v2_consumed_test_fixed_bank_actionability_recoverability_ledger_amendment_v1.json
+    expected_file_hashes:
+      uniform_b_v2_consumed_test_fixed_bank_actionability_recoverability_ledger_amendment_v1.json:
+        algorithm: sha256
+        digest: 66a345f6ee31717fcc7eb9fdba76f76e52bb032de987eabbf55b7ffdf5a66f09
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Direct hash-chained amendment over the immutable original test-consumption ledger; no prior amendment, including the signed-error amendment, is its parent.
+      - It authorizes only the named terminal, post-hoc actionability/recoverability mechanism diagnostic over already-consumed MIDOG++ test cases.
+      - It cannot authorize fresh evidence, routing success, an action or geometry, a model or expert update, promotion, deployment, a generic consumer, a numbered stage, or a later experiment.
+
+  - artifact_id: midogpp_stage90_fixed_bank_actionability_recoverability_test_manifest_v1
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_ACTIONABILITY_RECOVERABILITY_CAPABILITY_GATED_LABELS
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      split: test
+      split_role: test_consumed_actionability_recoverability_capability_gated_labels
+      alias_of_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_ACTIONABILITY_RECOVERABILITY_V1
+      fresh_evidence: 'false'
+      labels_present: 'true'
+      labels_available_before_global_action_prediction_seal: 'false'
+      strict_outer_H_and_nested_q_exclusion: 'true'
+      other_center_labels_shared_model_scope: class_balanced_proper_loss_gain_vs_u
+      target_support_scope: same_H_nonheldout_whole_cases_only
+      target_support_shared_model_update: 'false'
+      target_support_candidate_set: U_plus_eight_source_actions_within_geometry
+      target_support_geometry_selection: 'false'
+      evaluation_labels_available_before_all_method_seals: 'false'
+      terminal_oracles_available_before_evaluation_labels: 'false'
+      exact_pooled_bacc_terminal_endpoint: 'true'
+      uncertainty_unit: paired_whole_case_cluster
+      single_class_cases_retained: 'true'
+      mixed_class_case_count: '213'
+      negative_only_case_count: '4'
+      positive_only_case_count: '1'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_actionability_recoverability.v1
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias of the consumed canonical test manifest with actionability/recoverability role-scoped label capabilities.
+      - Legal other-center labels may fit only strict outer-H and nested-query-q gain models. Same-H nonheldout labels may select only U or one of eight source actions inside one frozen geometry; evaluation labels remain closed until B, U, G, R, P, and S_y decisions are sealed.
+      - O_static and O_case can be computed only after the terminal label opening. All 218 cases remain in scope and no per-case BACC is defined or persisted.
+
+  - artifact_id: midogpp_stage90_fixed_bank_actionability_recoverability_test_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_TEST_ACTIONABILITY_RECOVERABILITY_LABEL_FREE_CACHE_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      cache_experiment_id: midogpp.frozen_policy_downstream.uniform_b_v2_descriptive_test_cache.v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: test
+      row_count: '9928'
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      backbone_identity_hash: 1b5071f2e605fa60
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_ACTIONABILITY_RECOVERABILITY_V1
+      fresh_evidence: 'false'
+      labels_persisted: 'false'
+      labels_absent: 'true'
+      sample_ids_persisted: 'false'
+      image_paths_persisted: 'false'
+      metadata_artifact_used: 'false'
+      prior_prediction_or_checkpoint_reuse: 'false'
+      previous_stage90_output_used: 'false'
+      signed_error_output_or_amendment_used: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_actionability_recoverability.v1
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias over the validated label-free consumed-test embedding cache; it creates no fresh evidence.
+      - Only the named actionability/recoverability v1 experiment may consume this alias to recompute and globally seal B, the shared U control, and the frozen A0/A1 source-action probability surfaces under its own root.
+      - The alias imports no prior Stage-90 or signed-error output, amendment, prediction surface, scratch, checkpoint, or Stage-50, Stage-60, or Stage-70 result.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_actionability_recoverability_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_actionability_recoverability/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: EXPLORATORY_CONSUMED_DATA_ONLY
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: EXPLORATORY_CONSUMED_DATA_ONLY
+      terminal_decision: DO_NOT_PROMOTE
+      claim_role: posthoc_actionability_recoverability_mechanism_diagnostic
+      architecture_family: fixed_bank_actionability_recoverability_v1
+      config_contract_hash: 8ca6c33e73144719
+      protocol_contract_hash: 49f2038901cf4e3aa40fa8c6c1cc0b2abfa5fc6bba224246b08ea2fb8df0ff8d
+      evaluation_split: test
+      consumed_test_data: 'true'
+      ledger_amendment_required_and_hash_chained: 'true'
+      ledger_amendment_sha256: 66a345f6ee31717fcc7eb9fdba76f76e52bb032de987eabbf55b7ffdf5a66f09
+      candidate_generalization: known_fixed_bank_reuse
+      unseen_expert_transfer_claim: 'false'
+      eligible_test_row_count: '9928'
+      evaluation_case_count: '218'
+      mixed_class_case_count: '213'
+      negative_only_case_count: '4'
+      positive_only_case_count: '1'
+      single_class_cases_retained: 'true'
+      per_case_bacc_stored_or_used: 'false'
+      whole_case_oof_fold_count: '5'
+      partition_seed: '90902029'
+      partition_namespace: midogpp_fixed_bank_actionability_recoverability_test_folds_v1
+      each_case_evaluated_exactly_once: 'true'
+      geometry_ids: A0|A1
+      geometry_selection_used: 'false'
+      action_strength_sweep_used: 'false'
+      class_conditional_action_variant_used: 'false'
+      source_pair_action_used: 'false'
+      A0_selected_rows_per_class: '256'
+      A0_other_rows_per_class: '128'
+      A1_reuses_exact_A0_rows: 'true'
+      A1_selected_row_weight: '23/16'
+      A1_other_row_weight: '7/8'
+      shared_uniform_rows_per_source_class: '144'
+      global_B_physical_fit_required: 'true'
+      shared_U_physical_fit_required: 'true'
+      logical_action_count_per_target: '19'
+      physical_action_count_per_target: '18'
+      target_probability_cell_count: '1458'
+      exact_seed_pair_count: '9'
+      strict_outer_H_exclusion: 'true'
+      strict_nested_query_q_exclusion: 'true'
+      ridge_alpha: '1.0'
+      shared_model_response: class_balanced_proper_loss_gain_vs_u
+      G_R_P_fallback_action: U
+      pre_evaluation_method_ids: B|U|G|R|P|S_y
+      method_rows_carry_geometry_id: 'true'
+      global_B_is_scored_but_never_selectable: 'true'
+      target_support_candidate_set: U_plus_eight_source_actions_within_geometry
+      terminal_oracle_ids: O_static|O_case
+      terminal_oracles_are_pre_evaluation_methods: 'false'
+      whole_case_cluster_bootstrap_replicates: '10000'
+      whole_case_cluster_bootstrap_seed: '90912028'
+      primary_endpoint: center_pooled_exact_bacc_over_whole_case_oof_predictions
+      actionability_contrasts: O_static-U|O_case-O_static
+      recoverability_contrasts: R-U|R-G|R-P|S_y-U
+      action_selection_authorized: 'false'
+      action_geometry_update_authorized: 'false'
+      model_update_authorized: 'false'
+      expert_update_authorized: 'false'
+      policy_update_authorized: 'false'
+      routing_success_claimed: 'false'
+      routing_quality_claimed: 'false'
+      fresh_evidence: 'false'
+      promotion_eligible: 'false'
+      stage50_outputs_used: 'false'
+      stage60_outputs_used: 'false'
+      stage70_prediction_scoring_or_policy_outputs_used: 'false'
+      label_free_cache_lineage: stage70_derived_feature_cache_alias_only
+      previous_stage90_outputs_used: 'false'
+      previous_prediction_surface_used: 'false'
+      previous_stage90_scratch_or_checkpoint_used: 'false'
+      signed_error_output_or_amendment_used: 'false'
+      may_feed_another_stage90_experiment: 'false'
+      may_feed_another_experiment: 'false'
+      workstation_generation_devices: cuda:0|cuda:1
+      workstation_generation_workers_per_device: '1'
+      workstation_cpu_topology: 4_workers_x_3_threads
+      workstation_parent_cuda_context_forbidden: 'true'
+      workstation_gpu_cpu_phases_disjoint: 'true'
+      source_and_probability_storage_dtype: float32
+      scientific_reductions_dtype: float64
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - arrays/frozen_source_streams.npy
+      - arrays/actionability_action_probabilities.npz
+      - manifests/protocol_manifest.json
+      - manifests/action_library.json
+      - manifests/case_oof_partition.json
+      - manifests/frozen_source_stream_index.json
+      - manifests/frozen_source_stream_lock.json
+      - manifests/actionability_prediction_index.json
+      - manifests/actionability_prediction_seal.json
+      - manifests/sealed_probability_surface.json
+      - manifests/prelabel_feature_seal.json
+      - manifests/loco_utility_seals.json
+      - manifests/model_seals.json
+      - manifests/pre_support_decisions_seal.json
+      - manifests/all_method_decisions_seal.json
+      - manifests/permutation_provenance_seal.json
+      - manifests/sealed_terminal_evaluation.json
+      - manifests/content_index.json
+      - tables/action_library.csv
+      - tables/case_oof_partitions.csv
+      - tables/seed_probability_rows.csv
+      - tables/aggregated_probability_rows.csv
+      - tables/case_action_features.csv
+      - tables/loco_utility_targets.csv
+      - tables/model_fits.csv
+      - tables/model_predictions.csv
+      - tables/method_decisions.csv
+      - tables/terminal_case_confusions.csv
+      - tables/terminal_center_metrics.csv
+      - tables/terminal_method_summary.csv
+      - tables/terminal_contrasts.csv
+      - tables/oracle_rank_metrics.csv
+      - tables/complementarity.csv
+      - tables/rank_stability.csv
+      - tables/permutation_metrics.csv
+      - reports/workstation_preflight.json
+      - reports/phase_01_prelabel_seal_complete.json
+      - reports/label_capability_report.json
+      - reports/leakage_report.json
+      - reports/publication_decision.json
+      - reports/runtime_summary.json
+      - reports/run_state.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Explicitly authorized terminal consumed-test actionability/recoverability mechanism diagnostic. It recomputes every source/action probability and feature, model, support decision, control, and terminal bound under its own root from exactly six fenced inputs.
+      - B is global and never selectable. U is physically shared across geometries. A0 and A1 use exactly the same sampled rows; A1 changes only the frozen 23/16 selected-source and 7/8 other-source weights, preserving an effective 1,152 rows per class.
+      - G, R, and matched-permutation P model dense proper-loss gain relative to U under strict outer-H and nested-query-q exclusion, use fixed ridge alpha 1.0, and return to U for nonpositive predicted gain. Same-H support S_y may select only U or one of eight same-geometry source actions.
+      - B, U, G, R, P, and S_y decisions are sealed before evaluation labels open. O_static and O_case are terminal label-informed bounds and never enter a pre-evaluation feature, fit, action, method, or seal.
+      - Exact pooled BACC over all 218 whole cases is terminal. Single-class cases contribute sufficient statistics, technical seeds are not inference units, and the 10,000-replicate bootstrap resamples whole cases within centers before equal-center aggregation.
+      - The six-input fence contains only the promoted bank, GenerationLock, dedicated cache and manifest aliases, byte-exact original-ledger parent alias, and this direct amendment. No prior Stage-90 or signed-error output, amendment, prediction, scratch, checkpoint, or Stage-50, Stage-60, or Stage-70 result is consumed.
+      - Regardless of outcome, this output cannot authorize routing success, an action, geometry, policy, model, or expert update, promotion, deployment, recipe selection, any numbered stage, another Stage-90 diagnostic, another experiment, or a generic consumer.

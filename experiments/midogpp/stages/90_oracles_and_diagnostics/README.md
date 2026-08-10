@@ -659,3 +659,35 @@ No result exists until the 39-file bundle validates. Regardless of outcome,
 the artifact remains terminal `EXPLORATORY_CONSUMED_DATA_ONLY` evidence and may
 not feed another experiment, numbered stage, action, policy, recipe, promotion,
 or deployment.
+
+## Uniform-B v2 consumed-test fixed-bank actionability/recoverability v1
+
+This registered diagnostic asks two questions left unresolved by the failed
+signed correction gate: whether the fixed bank contains useful complementary
+actions, and whether their utility ordering is recoverable. It does not consume
+that gate or any other Stage-90 output. A direct-to-original-ledger amendment
+authorizes only this one reused-test terminal analysis.
+
+`B` and shared `U` are recomputed. Each geometry has eight source actions:
+`A0` uses a 256/128 selected/other row allocation, while `A1` reuses exactly
+those rows with fixed selected/other weights `23/16` and `7/8`. The two
+geometries are reported independently; no strength, class, source-pair, or
+geometry search is legal. Per-geometry `G/R/P` models use strict `H/q/e`
+exclusions, and same-target support may choose only the static `S_y` action
+within that already-frozen geometry. `O_static` and `O_case` are terminal
+label-informed bounds, never routing methods.
+
+The canonical workstation schedule uses two persistent A5000 workers for the
+frozen source streams, then clears CUDA visibility and uses four spawned CPU
+workers with three threads each for 1,458 classifier cells, the small ridge
+models, and paired whole-case inference.
+
+```bash
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_actionability_recoverability.v1
+```
+
+The result remains `EXPLORATORY_CONSUMED_DATA_ONLY` and `DO_NOT_PROMOTE` even
+if an oracle or learned method improves BACC. It cannot select an action or
+geometry, authorize routing, update a model or expert, feed another experiment,
+or establish fresh evidence.
