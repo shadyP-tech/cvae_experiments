@@ -973,7 +973,44 @@ through additive confusion sufficient statistics.
 The implementation and workspace contracts pass locally, with config contract
 hash `cb7050fcdaac86ac` and amendment SHA-256
 `e915134fc15901f1d5c43fb5fb974f1693282ca4622a2ade169eaa7487566b1b`.
-No scientific result exists until the workstation closes and independently
-validates the 39-file bundle. Regardless of outcome, it is
-`EXPLORATORY_CONSUMED_DATA_ONLY` and `DO_NOT_PROMOTE`; it cannot feed another
-experiment or numbered stage.
+The canonical workstation bundle is now reported `COMPLETE` with validation
+`PASS`. Equal-center pooled BACC is `0.800896` for `B` and `0.800843` for each
+of `B_cal`, `G`, `R`, and `P`. All 45 folds chose `lambda=0`, so `R-B_cal`,
+`R-G`, and `R-P` are structural zero identities rather than equivalence
+evidence. `B_cal-B=-0.000052` with center-level 95% interval
+`[-0.002894,+0.002790]`; 40/45 intercepts hit `+-0.1` grid boundaries.
+
+The positive mechanism result is restricted to donor smooth-response fitting:
+nested MSE was `0.000404` for `R`, `0.000573` for `G`, and `0.000585` for `P`;
+`R` beat `P` in all 72 `(H,e)` comparisons. Oracle-only branch probes point to
+confirmation feedback from the `B_cal` class gate: the true branch improved all
+45 folds, branch swapping improved 42, and residual negation improved all 45.
+These post-hoc probes motivate a direct signed-error architecture but cannot
+validate it. The v1 result remains `EXPLORATORY_CONSUMED_DATA_ONLY` and
+`DO_NOT_PROMOTE`; it cannot feed another experiment or numbered stage.
+
+## Fixed-bank signed sample-level error gate implementation
+
+The modular package `fixed_bank_signed_error_gate` implements the mathematical
+successor without changing the immutable v1 experiment. It constructs one
+sample-level label-blind vector from baseline margin, aggregate expert residuals,
+dispersion, signed residual mass, and disagreement; it never selects a class
+branch from `B_cal`. Strict outer-center and nested-query ridge fits learn the
+class-balanced negative proper-loss logit gradient. Same-target labels remain
+limited to the fixed `B_cal` intercept and common lambda grids.
+
+The package exposes `B`, `B_cal`, intercept-only `G`, aligned `R_raw`,
+directional-uncertainty-gated `R_safe`, and separately refit permutation `P`.
+It preserves the unchanged exact-BACC LCB fallback, records the complete lambda
+path, support loss deltas, threshold crossings, and fallback reason, and seals
+raw and safe correction surfaces separately. Its canonical protocol is hard
+coded as `EXPLORATORY_CONSUMED_DATA_ONLY`, `fresh_evidence=false`, with no route,
+promotion, or later-experiment feed. A fresh success claim still requires a new
+predeclared whole-case/patient/slide-disjoint reservation.
+
+No signed-error experiment registration, consumption-ledger amendment, runner,
+or canonical result bundle exists. The existing residual-stacker authorization
+does not transfer to this successor. The code is therefore an isolated,
+currently unrun mechanism core; applying it to the consumed test set requires a
+separate explicit diagnostic authorization and still cannot create fresh
+routing evidence.

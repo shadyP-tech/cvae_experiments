@@ -378,8 +378,33 @@ parameters; exact pooled BACC is restricted to the safety gate and terminal
 evaluation. Controls `B_cal`, case-independent `G`, and separately fitted
 feature-permutation `P` are mandatory before interpreting `R`.
 
-Status: implementation registered and local workspace contracts passing; no
-workstation result yet. Claim role is
-`known_fixed_bank_label_aware_case_oof_stacking_mechanism_diagnostic`. Even a
-positive `R-B_cal`, `R-G`, and `R-P` screen cannot create fresh routing evidence
-or authorize any feed, policy, action, promotion, recipe, or deployment.
+Status: canonical workstation bundle `COMPLETE`, independent bundle validation
+`PASS`, terminal decision `DO_NOT_PROMOTE`. All 45 folds selected `lambda=0`,
+making `R`, `G`, and `P` bit-identical to `B_cal`; the structural `[0,0]`
+contrasts are not equivalence evidence. Claim role remains
+`known_fixed_bank_label_aware_case_oof_stacking_mechanism_diagnostic`. The
+positive donor smooth-response fit and oracle-only class-branch probes are
+mechanism clues only. They cannot create fresh routing evidence or authorize any
+feed, policy, action, promotion, recipe, or deployment.
+
+## Fixed-bank signed sample-level error gate
+
+The successor scientific package is implemented as a consumed-test diagnostic
+core with a fail-closed protocol payload. It replaces the `B_cal` pseudo-class
+branch with one directly predicted signed sample correction trained on strict
+outer-center/nested-query class-balanced proper-loss gradients. Target support
+may still choose only the frozen `B_cal` intercept and common lambda; evaluation
+labels stay outside every fit and decision. `R_raw` and uncertainty-gated
+`R_safe` are separate sealed surfaces, with intercept-only `G` and separately
+fit feature-permutation `P` controls. The exact-BACC LCB is unchanged.
+
+This implementation does not convert the consumed test split into fresh
+evidence. Any result obtained by applying it to those cases must remain
+`EXPLORATORY_CONSUMED_DATA_ONLY`, cannot feed another experiment, and cannot
+validate routing. Only a new predeclared whole-case/patient/slide-disjoint
+reservation can support a routing-success claim.
+
+There is deliberately no signed-error registry entry, consumption-ledger
+amendment, runnable config, or canonical artifact bundle. The implementation is
+an unrun scientific core and cannot inherit the hierarchical residual stacker's
+authorization.

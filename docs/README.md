@@ -65,6 +65,12 @@ does not make an unrun experiment claim-eligible.
   registered terminal consumed-test mechanism diagnostic with a baseline-anchored
   class-conditional residual stack, strict H/q/e exclusion, calibration/global/
   permutation controls, and whole-case pooled-BACC inference.
+- `wiki/03-experiments/midogpp-uniform-b-v2-fixed-bank-signed-error-gate.md`:
+  modular successor implementation that predicts one signed sample correction
+  from label-blind fixed-bank disagreement features, with strict donor-center
+  OOF gradients, separate raw/safe seals, and a consumed-test diagnostic-only
+  sealed evaluation boundary. It is an unregistered scientific core, not a new
+  authorized rerun or result.
 - `wiki/03-experiments/midogpp-uniform-b-variant-diagnostics.md`: two
   completed workstation-only Variant-B Stage-90 diagnostics, their remote
   namespaces and artifact roots, negative tail-average stability result,

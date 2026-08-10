@@ -56,6 +56,7 @@ class LabelCapabilityManager:
         *,
         global_prediction_seal_hash: str,
         label_free_feature_seal_hash: str,
+        method_ids: Sequence[str] = METHOD_IDS,
     ) -> None:
         _require_sha256(global_prediction_seal_hash, "global_prediction_seal_hash")
         _require_sha256(label_free_feature_seal_hash, "label_free_feature_seal_hash")
@@ -74,6 +75,10 @@ class LabelCapabilityManager:
         self._partition = partition
         self._prediction_seal_hash = global_prediction_seal_hash
         self._feature_seal_hash = label_free_feature_seal_hash
+        methods = tuple(str(value) for value in method_ids)
+        if not methods or len(set(methods)) != len(methods):
+            raise ProtocolError("Label capability method IDs must be unique and non-empty.")
+        self._method_ids = methods
         self._loco_opened: set[str] = set()
         self._model_seals: dict[str, tuple[str, str, str]] = {}
         self._support_opened: set[tuple[str, int]] = set()
@@ -167,10 +172,11 @@ class LabelCapabilityManager:
         key = (str(target_center), int(fold_ordinal))
         method = str(method_id)
         full = (*key, method)
+        configured_methods = getattr(self, "_method_ids", METHOD_IDS)
         _require_sha256(decision_hash, "decision_hash")
         if (
             key not in self._support_opened
-            or method not in METHOD_IDS
+            or method not in configured_methods
             or full in self._method_decisions
             or self._all_decisions_seal_hash is not None
             or self._evaluation_opened
@@ -187,20 +193,21 @@ class LabelCapabilityManager:
     ) -> None:
         _require_sha256(decision_seal_hash, "decision_seal_hash")
         _require_sha256(permutation_provenance_hash, "permutation_provenance_hash")
+        configured_methods = getattr(self, "_method_ids", METHOD_IDS)
         expected = {
             (center, fold, method)
             for center in CENTERS
             for fold in range(OOF_FOLD_COUNT)
-            for method in METHOD_IDS
+            for method in configured_methods
         }
         if (
             set(self._method_decisions) != expected
-            or decision_count != EXPECTED_CENTER_FOLD_COUNT * len(METHOD_IDS)
+            or decision_count != EXPECTED_CENTER_FOLD_COUNT * len(configured_methods)
             or self._all_decisions_seal_hash is not None
             or self._evaluation_opened
         ):
             raise ProtocolError(
-                "Evaluation requires all 225 method decisions and permutation provenance."
+                "Evaluation requires every configured method decision and permutation provenance."
             )
         self._all_decisions_seal_hash = decision_seal_hash
         self._permutation_provenance_hash = permutation_provenance_hash
@@ -239,6 +246,7 @@ class LabelCapabilityManager:
             },
             "fold_support_capability_count": len(self._support_opened),
             "fold_method_decision_count": len(self._method_decisions),
+            "diagnostic_method_ids": list(getattr(self, "_method_ids", METHOD_IDS)),
             "all_decisions_seal_hash": self._all_decisions_seal_hash,
             "permutation_provenance_hash": self._permutation_provenance_hash,
             "evaluation_labels_opened": self._evaluation_opened,
