@@ -17,6 +17,50 @@ from .reports import publication_decision_payload, run_state_payload
 from .scientific_constants import METHOD_IDS, candidate_sources
 
 
+_POOLED_METRIC_TABLE_COLUMNS = (
+    "scope",
+    "target_center",
+    "schema_version",
+    "method_id",
+    "case_count",
+    "n_positive",
+    "true_positive",
+    "n_negative",
+    "true_negative",
+    "sensitivity",
+    "specificity",
+    "exact_bacc",
+    "per_case_bacc_used",
+    "smooth_response_used",
+    "metric_hash",
+)
+_CASE_CONFUSION_TABLE_COLUMNS = (
+    "method_id",
+    "target_center",
+    "case_id",
+    "n_positive",
+    "true_positive",
+    "n_negative",
+    "true_negative",
+    "per_case_bacc_stored",
+)
+_WHOLE_CASE_CONTRAST_TABLE_COLUMNS = (
+    "contrast_id",
+    "challenger_method",
+    "reference_method",
+    "center_count",
+    "center_differences",
+    "equal_center_difference",
+    "center_t_ci95_lower",
+    "center_t_ci95_upper",
+    "bootstrap_replicate_count",
+    "bootstrap_ci95_lower",
+    "bootstrap_ci95_upper",
+    "bootstrap_invalid_draw_count",
+    "uncertainty_unit",
+)
+
+
 def validate_fixed_bank_hierarchical_residual_stacker_bundle(
     root: str | Path, *, config: object
 ) -> Mapping[str, object]:
@@ -172,6 +216,11 @@ def validate_fixed_bank_hierarchical_residual_stacker_bundle(
         },
         role="evaluation result",
     )
+    _validate_per_case_bacc_table_policy(
+        metric_path=root / "tables/oof_pooled_exact_bacc.csv",
+        contrast_path=root / "tables/paired_whole_case_cluster_contrasts.csv",
+        confusion_path=root / "tables/oof_case_confusion_sufficient_statistics.csv",
+    )
     _semantic_replay_counts(
         root,
         config=config,
@@ -186,11 +235,6 @@ def validate_fixed_bank_hierarchical_residual_stacker_bundle(
         expected_leakage=leakage,
         prediction_seal_hash=predictions.seal_hash,
         feature_seal_hash=str(features["feature_surface_hash"]),
-    )
-    _assert_no_per_case_bacc_columns(
-        root / "tables/oof_pooled_exact_bacc.csv",
-        root / "tables/paired_whole_case_cluster_contrasts.csv",
-        root / "tables/oof_case_confusion_sufficient_statistics.csv",
     )
     result = {
         "schema_version": "midogpp_hierarchical_residual_stacker_validation_v1",
@@ -693,7 +737,11 @@ def _semantic_replay_counts(
             "true_positive": int(row["true_positive"]),
             "n_negative": int(row["n_negative"]),
             "true_negative": int(row["true_negative"]),
-            "per_case_bacc_stored": row["per_case_bacc_stored"] == "True",
+            "per_case_bacc_stored": _require_literal_false(
+                row.get("per_case_bacc_stored"),
+                table_role="case-confusion sufficient-statistics table",
+                field="per_case_bacc_stored",
+            ),
         }
         for row in observed
     ]
@@ -784,12 +832,85 @@ def _rebuild_prelabel_surfaces(
     return rebuilt
 
 
-def _assert_no_per_case_bacc_columns(*paths: Path) -> None:
-    for path in paths:
-        with path.open(newline="", encoding="utf-8") as handle:
-            fields = csv.DictReader(handle).fieldnames or []
-        if any("case_bacc" in value.lower() for value in fields):
-            raise ProtocolError("Residual-stacker bundle persisted per-case BACC.")
+def _validate_per_case_bacc_table_policy(
+    *, metric_path: Path, contrast_path: Path, confusion_path: Path
+) -> None:
+    """Enforce the closed pooled-BACC CSV contract without rejecting audit flags."""
+
+    metric_rows = _read_closed_csv(
+        metric_path,
+        expected_columns=_POOLED_METRIC_TABLE_COLUMNS,
+        table_role="pooled exact-BACC table",
+        allowed_per_case_fields={"per_case_bacc_used"},
+    )
+    for row in metric_rows:
+        _require_literal_false(
+            row.get("per_case_bacc_used"),
+            table_role="pooled exact-BACC table",
+            field="per_case_bacc_used",
+        )
+
+    confusion_rows = _read_closed_csv(
+        confusion_path,
+        expected_columns=_CASE_CONFUSION_TABLE_COLUMNS,
+        table_role="case-confusion sufficient-statistics table",
+        allowed_per_case_fields={"per_case_bacc_stored"},
+    )
+    for row in confusion_rows:
+        _require_literal_false(
+            row.get("per_case_bacc_stored"),
+            table_role="case-confusion sufficient-statistics table",
+            field="per_case_bacc_stored",
+        )
+
+    _read_closed_csv(
+        contrast_path,
+        expected_columns=_WHOLE_CASE_CONTRAST_TABLE_COLUMNS,
+        table_role="paired whole-case contrast table",
+        allowed_per_case_fields=set(),
+    )
+
+
+def _read_closed_csv(
+    path: Path,
+    *,
+    expected_columns: tuple[str, ...],
+    table_role: str,
+    allowed_per_case_fields: set[str],
+) -> list[dict[str, str | None]]:
+    with path.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        fields = tuple(reader.fieldnames or ())
+        rows = list(reader)
+    unexpected_per_case_fields = {
+        field
+        for field in fields
+        if _is_per_case_bacc_field(field) and field not in allowed_per_case_fields
+    }
+    if unexpected_per_case_fields:
+        raise ProtocolError(
+            f"Residual-stacker {table_role} persisted an actual per-case BACC field."
+        )
+    if fields != expected_columns or not rows or any(None in row for row in rows):
+        raise ProtocolError(f"Residual-stacker {table_role} schema drifted.")
+    return rows
+
+
+def _is_per_case_bacc_field(field: str) -> bool:
+    compact = "".join(character for character in field.lower() if character.isalnum())
+    return "case" in compact and (
+        "bacc" in compact or "balancedaccuracy" in compact
+    )
+
+
+def _require_literal_false(
+    value: object, *, table_role: str, field: str
+) -> bool:
+    if value != "False":
+        raise ProtocolError(
+            f"Residual-stacker {table_role} {field} must be literal CSV False."
+        )
+    return False
 
 
 def _require_closed_hashed_payload(

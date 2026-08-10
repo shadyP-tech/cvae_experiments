@@ -36,7 +36,12 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_hierarchical_residual_stacker.sc
     METHOD_IDS,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_hierarchical_residual_stacker.validation import (
+    _CASE_CONFUSION_TABLE_COLUMNS,
+    _POOLED_METRIC_TABLE_COLUMNS,
+    _WHOLE_CASE_CONTRAST_TABLE_COLUMNS,
     _require_closed_hashed_payload,
+    _require_literal_false,
+    _validate_per_case_bacc_table_policy,
 )
 from midogpp_thesis.cvae.protocol import ProtocolError
 
@@ -46,6 +51,95 @@ def test_bundle_persists_whole_case_sufficient_statistics_without_case_bacc() ->
     assert "tables/oof_pooled_exact_bacc.csv" in REQUIRED_FILES
     assert "tables/oof_case_bacc.csv" not in REQUIRED_FILES
     assert "arrays/permutation_null_actions.npy" not in REQUIRED_FILES
+
+
+def test_pooled_bacc_table_policy_accepts_only_literal_false_audit_flags(
+    tmp_path: Path,
+) -> None:
+    metric_path, contrast_path, confusion_path = _write_bacc_policy_tables(tmp_path)
+
+    _validate_per_case_bacc_table_policy(
+        metric_path=metric_path,
+        contrast_path=contrast_path,
+        confusion_path=confusion_path,
+    )
+
+
+@pytest.mark.parametrize(
+    ("table", "field", "value"),
+    (
+        ("metric", "per_case_bacc_used", "True"),
+        ("metric", "per_case_bacc_used", "false"),
+        ("confusion", "per_case_bacc_stored", "malformed"),
+    ),
+)
+def test_pooled_bacc_table_policy_rejects_enabled_or_malformed_audit_flags(
+    tmp_path: Path, table: str, field: str, value: str
+) -> None:
+    overrides = {table: {field: value}}
+    metric_path, contrast_path, confusion_path = _write_bacc_policy_tables(
+        tmp_path, overrides=overrides
+    )
+
+    with pytest.raises(ProtocolError, match="must be literal CSV False"):
+        _validate_per_case_bacc_table_policy(
+            metric_path=metric_path,
+            contrast_path=contrast_path,
+            confusion_path=confusion_path,
+        )
+
+
+@pytest.mark.parametrize(
+    ("table", "field"),
+    (
+        ("metric", "case_level_balanced_accuracy"),
+        ("confusion", "per_case_bacc"),
+        ("contrast", "case_bacc"),
+    ),
+)
+def test_pooled_bacc_table_policy_rejects_actual_per_case_bacc_columns(
+    tmp_path: Path, table: str, field: str
+) -> None:
+    metric_path, contrast_path, confusion_path = _write_bacc_policy_tables(
+        tmp_path, extra_columns={table: (field,)}
+    )
+
+    with pytest.raises(ProtocolError, match="actual per-case BACC field"):
+        _validate_per_case_bacc_table_policy(
+            metric_path=metric_path,
+            contrast_path=contrast_path,
+            confusion_path=confusion_path,
+        )
+
+
+def test_pooled_bacc_table_policy_rejects_exact_schema_drift(tmp_path: Path) -> None:
+    metric_path, contrast_path, confusion_path = _write_bacc_policy_tables(
+        tmp_path, omitted_columns={"metric": ("metric_hash",)}
+    )
+
+    with pytest.raises(ProtocolError, match="pooled exact-BACC table schema drifted"):
+        _validate_per_case_bacc_table_policy(
+            metric_path=metric_path,
+            contrast_path=contrast_path,
+            confusion_path=confusion_path,
+        )
+
+
+def test_semantic_confusion_flag_parser_does_not_coerce_malformed_to_false() -> None:
+    assert (
+        _require_literal_false(
+            "False",
+            table_role="case-confusion sufficient-statistics table",
+            field="per_case_bacc_stored",
+        )
+        is False
+    )
+    with pytest.raises(ProtocolError, match="must be literal CSV False"):
+        _require_literal_false(
+            "not-a-boolean",
+            table_role="case-confusion sufficient-statistics table",
+            field="per_case_bacc_stored",
+        )
 
 
 def test_content_index_is_terminal_and_has_no_deployable_capability(
@@ -280,3 +374,48 @@ def _real_metric_rows() -> list[dict[str, object]]:
             }
         )
     return rows
+
+
+def _write_bacc_policy_tables(
+    root: Path,
+    *,
+    overrides: dict[str, dict[str, str]] | None = None,
+    extra_columns: dict[str, tuple[str, ...]] | None = None,
+    omitted_columns: dict[str, tuple[str, ...]] | None = None,
+) -> tuple[Path, Path, Path]:
+    overrides = overrides or {}
+    extra_columns = extra_columns or {}
+    omitted_columns = omitted_columns or {}
+    specifications = {
+        "metric": (
+            root / "oof_pooled_exact_bacc.csv",
+            _POOLED_METRIC_TABLE_COLUMNS,
+            {"per_case_bacc_used": "False"},
+        ),
+        "confusion": (
+            root / "oof_case_confusion_sufficient_statistics.csv",
+            _CASE_CONFUSION_TABLE_COLUMNS,
+            {"per_case_bacc_stored": "False"},
+        ),
+        "contrast": (
+            root / "paired_whole_case_cluster_contrasts.csv",
+            _WHOLE_CASE_CONTRAST_TABLE_COLUMNS,
+            {},
+        ),
+    }
+    paths: dict[str, Path] = {}
+    for table, (path, base_columns, base_row) in specifications.items():
+        omitted = set(omitted_columns.get(table, ()))
+        columns = tuple(column for column in base_columns if column not in omitted)
+        columns += extra_columns.get(table, ())
+        row = {
+            **{column: "0" for column in columns},
+            **base_row,
+            **overrides.get(table, {}),
+        }
+        with path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=columns)
+            writer.writeheader()
+            writer.writerow({column: row[column] for column in columns})
+        paths[table] = path
+    return paths["metric"], paths["contrast"], paths["confusion"]

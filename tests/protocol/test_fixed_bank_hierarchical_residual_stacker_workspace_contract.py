@@ -264,6 +264,21 @@ def test_cli_parser_exposes_residual_stacker_surface() -> None:
         )
     )
     assert parsed.surface == "fixed-bank-hierarchical-residual-stacker"
+    assert parsed.recover_validation_only is False
+
+
+def test_cli_parser_exposes_validation_only_recovery_flag() -> None:
+    parsed = cli.build_parser().parse_args(
+        (
+            "fixed-bank-hierarchical-residual-stacker",
+            "--config",
+            "/tmp/artifact/config.resolved.yaml",
+            "--artifact-root",
+            "/tmp/artifact",
+            "--recover-validation-only",
+        )
+    )
+    assert parsed.recover_validation_only is True
 
 
 def test_cli_lazy_dispatches_to_residual_stacker_runner(
@@ -299,6 +314,45 @@ def test_cli_lazy_dispatches_to_residual_stacker_runner(
     ]
     assert capsys.readouterr().out.strip() == (
         "/tmp/fixed-bank-hierarchical-residual-stacker-result-v1"
+    )
+
+
+def test_cli_lazy_dispatches_to_validation_only_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    import midogpp_thesis.cvae.diagnostics.fixed_bank_hierarchical_residual_stacker as surface
+
+    sentinel = object()
+    calls: list[tuple[object, Path]] = []
+    monkeypatch.setattr(
+        surface,
+        "load_fixed_bank_hierarchical_residual_stacker_config",
+        lambda _: sentinel,
+    )
+
+    def _recover(config: object, *, artifact_root: Path) -> Path:
+        calls.append((config, artifact_root))
+        return Path("/tmp/fixed-bank-hierarchical-residual-stacker-recovered-v1")
+
+    monkeypatch.setattr(
+        surface,
+        "recover_fixed_bank_hierarchical_residual_stacker_validation",
+        _recover,
+    )
+    assert cli.main(
+        [
+            "fixed-bank-hierarchical-residual-stacker",
+            "--config",
+            "/tmp/artifact/config.resolved.yaml",
+            "--artifact-root",
+            "/tmp/artifact",
+            "--recover-validation-only",
+        ]
+    ) == 0
+    assert calls == [(sentinel, Path("/tmp/artifact"))]
+    assert capsys.readouterr().out.strip() == (
+        "/tmp/fixed-bank-hierarchical-residual-stacker-recovered-v1"
     )
 
 

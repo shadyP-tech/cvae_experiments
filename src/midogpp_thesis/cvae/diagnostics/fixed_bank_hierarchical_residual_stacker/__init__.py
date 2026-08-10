@@ -27,11 +27,18 @@ def __getattr__(name: str) -> object:
         )
 
         return run_fixed_bank_hierarchical_residual_stacker
+    if name == "recover_fixed_bank_hierarchical_residual_stacker_validation":
+        from .validation_recovery import (  # noqa: PLC0415
+            recover_fixed_bank_hierarchical_residual_stacker_validation,
+        )
+
+        return recover_fixed_bank_hierarchical_residual_stacker_validation
     raise AttributeError(name)
 
 
 __all__ = (
     "FixedBankHierarchicalResidualStackerConfig",
     "load_fixed_bank_hierarchical_residual_stacker_config",
+    "recover_fixed_bank_hierarchical_residual_stacker_validation",
     "run_fixed_bank_hierarchical_residual_stacker",
 )

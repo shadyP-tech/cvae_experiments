@@ -178,6 +178,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     hierarchical_residual_stacker.add_argument("--config", required=True)
     hierarchical_residual_stacker.add_argument("--artifact-root", required=True)
+    hierarchical_residual_stacker.add_argument(
+        "--recover-validation-only",
+        action="store_true",
+        help=(
+            "Recover only the excluded validation controls of the exact known "
+            "closed-world validator failure."
+        ),
+    )
     return parser
 
 
@@ -424,14 +432,27 @@ def main(argv: list[str] | None = None) -> int:
     if args.surface == "fixed-bank-hierarchical-residual-stacker":
         from .fixed_bank_hierarchical_residual_stacker import (
             load_fixed_bank_hierarchical_residual_stacker_config,
-            run_fixed_bank_hierarchical_residual_stacker,
         )
 
         config = load_fixed_bank_hierarchical_residual_stacker_config(args.config)
-        output = run_fixed_bank_hierarchical_residual_stacker(
-            config,
-            artifact_root=artifact_root,
-        )
+        if args.recover_validation_only:
+            from .fixed_bank_hierarchical_residual_stacker import (
+                recover_fixed_bank_hierarchical_residual_stacker_validation,
+            )
+
+            output = recover_fixed_bank_hierarchical_residual_stacker_validation(
+                config,
+                artifact_root=artifact_root,
+            )
+        else:
+            from .fixed_bank_hierarchical_residual_stacker import (
+                run_fixed_bank_hierarchical_residual_stacker,
+            )
+
+            output = run_fixed_bank_hierarchical_residual_stacker(
+                config,
+                artifact_root=artifact_root,
+            )
         print(output)
         return 0
 
