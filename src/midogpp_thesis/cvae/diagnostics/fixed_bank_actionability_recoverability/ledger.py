@@ -176,7 +176,12 @@ def load_validated_ledger_chain(
 
 def _descriptive_reuse_permission(parent: Mapping[str, object]) -> object:
     canonical = "may_be_reused_for_descriptive_locked_model_scoring"
-    published = "may_be_reused_for_descriptive_locked-model-scoring"
+    published = "may_be_reused_for_descriptive_locked-model_scoring"
+    if canonical not in parent and published not in parent:
+        raise ProtocolError(
+            "Actionability/recoverability parent ledger descriptive-reuse "
+            "field is absent."
+        )
     if (
         canonical in parent
         and published in parent
@@ -186,7 +191,7 @@ def _descriptive_reuse_permission(parent: Mapping[str, object]) -> object:
             "Actionability/recoverability parent ledger has conflicting reuse "
             "aliases."
         )
-    return parent[published] if published in parent else parent.get(canonical)
+    return parent[published] if published in parent else parent[canonical]
 
 
 def _json(path: Path) -> dict[str, object]:

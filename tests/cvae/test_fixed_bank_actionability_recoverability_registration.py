@@ -199,7 +199,7 @@ def test_ledger_chain_accepts_only_its_direct_original_parent(
                 "status": "CONSUMED_FOR_REPRESENTATION_ADOPTION",
                 "split": "test",
                 "may_be_reused_as_fresh_representation_selection_evidence": False,
-                "may_be_reused_for_descriptive_locked-model-scoring": True,
+                "may_be_reused_for_descriptive_locked-model_scoring": True,
             },
             sort_keys=True,
         )
@@ -233,6 +233,22 @@ def test_ledger_chain_accepts_only_its_direct_original_parent(
 
     assert chain.amendment["parent_sha256"] == parent_sha
     assert chain.amendment["authorized_consumer_experiment_ids"] == [EXPERIMENT_ID]
+
+
+def test_ledger_reuse_permission_matches_immutable_parent_schema() -> None:
+    published = "may_be_reused_for_descriptive_locked-model_scoring"
+    canonical = "may_be_reused_for_descriptive_locked_model_scoring"
+
+    assert ledger_module._descriptive_reuse_permission({published: True}) is True
+    assert ledger_module._descriptive_reuse_permission({canonical: True}) is True
+    with pytest.raises(ProtocolError, match="descriptive-reuse field is absent"):
+        ledger_module._descriptive_reuse_permission(
+            {"may_be_reused_for_descriptive_locked-model-scoring": True}
+        )
+    with pytest.raises(ProtocolError, match="conflicting reuse aliases"):
+        ledger_module._descriptive_reuse_permission(
+            {published: True, canonical: False}
+        )
 
 
 def test_config_rejects_action_sweep_geometry_selection_and_wrong_amendment(
