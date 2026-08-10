@@ -19,6 +19,10 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_actionability_recoverability imp
     execution_adapter,
     runner_runtime,
 )
+from midogpp_thesis.cvae.diagnostics.fixed_bank_actionability_recoverability.persistence import (
+    persist_all_decisions,
+)
+from midogpp_thesis.cvae.runtime.artifact_io import read_json
 from midogpp_thesis.cvae.protocol import ProtocolError
 
 
@@ -275,6 +279,45 @@ def test_runner_refuses_automatic_replay_after_terminal_labels_were_opened(
         run_fixed_bank_actionability_recoverability(
             _config(root, tmp_path), artifact_root=root.resolve()
         )
+
+
+def test_decision_persistence_round_trips_support_hash_keys_idempotently(
+    tmp_path: Path,
+) -> None:
+    decision = SimpleNamespace(
+        target_center="0",
+        case_id="case-0",
+        method_id="B",
+        action_id="B",
+        geometry_id=None,
+        predicted_gain=0.0,
+        decision_source="global_baseline",
+        evaluation_labels_used=False,
+    )
+    support_score = SimpleNamespace(
+        target_center="0",
+        fold_ordinal=0,
+        geometry_id="A0",
+        action_id="U",
+        support_exact_bacc=0.5,
+    )
+    products = SimpleNamespace(
+        decisions=(decision,),
+        all_decision_hashes={("0", 0, "B", None): _HASH},
+        support_action_scores=(support_score,),
+        support_product_hashes=(("0", 0, _HASH),),
+        pre_support_seal_hash=_HASH,
+        all_decisions_seal_hash=_HASH,
+        permutation_provenance_hash=_HASH,
+        partition_hash=_HASH,
+        protocol_contract_hash=_HASH,
+    )
+
+    persist_all_decisions(tmp_path, products=products)
+    persist_all_decisions(tmp_path, products=products)
+
+    manifest = read_json(tmp_path / "manifests/all_method_decisions_seal.json")
+    assert manifest["support_product_hashes"] == [["0", 0, _HASH]]
 
 
 def test_terminal_marker_recovers_only_index_and_validation(

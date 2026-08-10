@@ -474,9 +474,9 @@ def persist_all_decisions(root: Path, *, products: object) -> tuple[Mapping[str,
         "support_action_scores": [
             payload(row) for row in getattr(products, "support_action_scores")
         ],
-        "support_product_hashes": list(
-            getattr(products, "support_product_hashes")
-        ),
+        "support_product_hashes": [
+            list(row) for row in getattr(products, "support_product_hashes")
+        ],
         "pre_support_seal_hash": str(getattr(products, "pre_support_seal_hash")),
         "all_decisions_seal_hash": str(
             getattr(products, "all_decisions_seal_hash")
