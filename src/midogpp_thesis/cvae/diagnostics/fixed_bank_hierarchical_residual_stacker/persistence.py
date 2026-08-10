@@ -15,6 +15,31 @@ from .reports import protocol_manifest_payload, publication_decision_payload, ru
 from .scientific_constants import METHOD_IDS
 
 
+_METRIC_TABLE_COLUMNS = (
+    "scope",
+    "target_center",
+    "schema_version",
+    "method_id",
+    "case_count",
+    "n_positive",
+    "true_positive",
+    "n_negative",
+    "true_negative",
+    "sensitivity",
+    "specificity",
+    "exact_bacc",
+    "per_case_bacc_used",
+    "smooth_response_used",
+    "metric_hash",
+)
+_CENTER_METRIC_SCHEMA_VERSION = (
+    "fixed_bank_hierarchical_residual_stacker_pooled_exact_bacc_v1"
+)
+_EQUAL_CENTER_METRIC_SCHEMA_VERSION = (
+    "fixed_bank_hierarchical_residual_stacker_equal_center_exact_bacc_v1"
+)
+
+
 def persist_initial_surfaces(
     root: Path,
     *,
@@ -293,7 +318,10 @@ def persist_postseal_results(
         root / "tables/oof_case_confusion_sufficient_statistics.csv",
         confusion_rows,
     )
-    _persist_rows(root / "tables/oof_pooled_exact_bacc.csv", metric_rows)
+    _persist_rows(
+        root / "tables/oof_pooled_exact_bacc.csv",
+        _metric_table_rows(metric_rows),
+    )
     _persist_rows(root / "tables/paired_whole_case_cluster_contrasts.csv", contrast_rows)
     persist_or_validate_json(root / "reports/label_capability_report.json", capability_report)
     persist_or_validate_json(root / "reports/leakage_report.json", leakage_report)
@@ -374,6 +402,44 @@ def _persist_rows(path: Path, rows: Sequence[Mapping[str, object]]) -> None:
         for row in canonical
     )
     persist_or_validate_csv(path, normalized, columns)
+
+
+def _metric_table_rows(
+    rows: Sequence[Mapping[str, object]],
+) -> tuple[dict[str, object], ...]:
+    """Project heterogeneous metric scopes onto one fixed CSV-only schema."""
+
+    projected: list[dict[str, object]] = []
+    center_keys = set(_METRIC_TABLE_COLUMNS)
+    equal_center_keys = center_keys - {"schema_version"}
+    for row in rows:
+        payload = {
+            str(key): _json_value(value)
+            for key, value in row.items()
+        }
+        scope = payload.get("scope")
+        if scope == "center":
+            if (
+                set(payload) != center_keys
+                or payload.get("schema_version") != _CENTER_METRIC_SCHEMA_VERSION
+            ):
+                raise ProtocolError(
+                    "Residual-stacker center metric CSV schema drifted."
+                )
+        elif scope == "equal_center":
+            if set(payload) != equal_center_keys:
+                raise ProtocolError(
+                    "Residual-stacker equal-center metric CSV schema drifted."
+                )
+            # This discriminator exists only in the CSV projection.  The sealed
+            # evaluation mapping and its scientific_result_hash remain unchanged.
+            payload["schema_version"] = _EQUAL_CENTER_METRIC_SCHEMA_VERSION
+        else:
+            raise ProtocolError("Residual-stacker metric CSV scope drifted.")
+        projected.append(
+            {column: payload[column] for column in _METRIC_TABLE_COLUMNS}
+        )
+    return tuple(projected)
 
 
 __all__ = (
