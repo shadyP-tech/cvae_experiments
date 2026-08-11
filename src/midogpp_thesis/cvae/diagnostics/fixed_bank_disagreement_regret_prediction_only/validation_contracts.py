@@ -410,16 +410,13 @@ def validate_source_identity_topology(source_store: object) -> dict[str, object]
         query for query in CENTERS for _row in rows_by_query[query]
     )
     source_cases_by_query: dict[str, tuple[str, ...]] = {}
-    source_sample_counts: dict[tuple[str, str], int] = {}
+    source_query_sample_counts: dict[str, int] = {}
     for query in CENTERS:
         if len(rows_by_query[query]) != len(cases_by_query[query]):
             raise ProtocolError("Strict source-OOF query row alignment drifted.")
         cases = tuple(sorted(set(cases_by_query[query])))
         source_cases_by_query[query] = cases
-        for case in cases:
-            source_sample_counts[(query, case)] = tuple(
-                cases_by_query[query]
-            ).count(case)
+        source_query_sample_counts[query] = len(rows_by_query[query])
     if (
         len(source_rows) != EXPECTED_SOURCE_ROWS
         or len(set(source_rows)) != EXPECTED_SOURCE_ROWS
@@ -434,7 +431,7 @@ def validate_source_identity_topology(source_store: object) -> dict[str, object]
         "source_rows": source_rows,
         "source_cases": source_cases,
         "source_cases_by_query": source_cases_by_query,
-        "source_sample_counts": source_sample_counts,
+        "source_query_sample_counts": source_query_sample_counts,
     }
 
 
@@ -480,7 +477,7 @@ def validate_identity_topology(source_store: object, test_store: object) -> dict
         raise ProtocolError("Prediction-only train/test identity overlap detected.")
     return {
         "source_cases_by_query": source["source_cases_by_query"],
-        "source_sample_counts": source["source_sample_counts"],
+        "source_query_sample_counts": source["source_query_sample_counts"],
         "test_cases_by_query": test["test_cases_by_query"],
     }
 
@@ -494,14 +491,18 @@ def validate_test_prediction_chain(
     store = getattr(test_predictions, "test_store", None)
     admission = getattr(test_predictions, "admission", None)
     bank_by_key = getattr(target_classifier_bank, "by_key", {})
+    target_bank_seal_hash = getattr(target_classifier_bank, "seal_hash", None)
+    test_bank_seal_hash = getattr(
+        getattr(test_predictions, "classifier_bank", None), "seal_hash", None
+    )
     if (
         store is None
-        or getattr(test_predictions, "classifier_bank", None)
-        is not target_classifier_bank
+        or not is_sha256(target_bank_seal_hash)
+        or test_bank_seal_hash != target_bank_seal_hash
         or getattr(admission, "source_prediction_seal_hash", None)
         != composite_prediction_seal_hash
         or getattr(admission, "action_classifier_bank_seal_hash", None)
-        != getattr(target_classifier_bank, "seal_hash", None)
+        != target_bank_seal_hash
     ):
         raise ProtocolError("Prediction-only test admission lineage drifted.")
     for cell in store.cells:

@@ -371,7 +371,7 @@ def validate_response_table(
     path: Path,
     *,
     source_features: Sequence[Mapping[str, str]],
-    source_sample_counts: Mapping[tuple[str, str], int],
+    source_query_sample_counts: Mapping[str, int],
     replayed_response_surfaces: Mapping[tuple[str, str], object] | None = None,
 ) -> tuple[Mapping[str, str], ...]:
     rows = read_csv(path, fields=SOURCE_RESPONSE_FIELDS)
@@ -422,11 +422,16 @@ def validate_response_table(
             or raw["query_id"] == raw["outer_target_id"]
             or typed.response_hash != raw["response_hash"]
             or typed.disagreement_count != integer(feature["disagreement_count"])
-            or typed.positive_class_count + typed.negative_class_count
-            != source_sample_counts[(typed.query_id, typed.case_id)]
             or not is_sha256(raw["response_surface_hash"])
         ):
             raise ProtocolError("Prediction-only source response row drifted.")
+        if (
+            typed.positive_class_count + typed.negative_class_count
+            != source_query_sample_counts.get(typed.query_id)
+        ):
+            raise ProtocolError(
+                "Prediction-only source response query class-count total drifted."
+            )
         observed[key] = typed
         blocks[key[:4]].append(typed)
         surface_hashes[key[:2]].add(raw["response_surface_hash"])

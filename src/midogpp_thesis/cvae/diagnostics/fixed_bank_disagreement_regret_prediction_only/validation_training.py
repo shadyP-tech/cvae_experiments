@@ -49,7 +49,7 @@ def validate_source_training_replay(
     source_surfaces: Mapping[tuple[str, str, str], object],
     source_contexts: Mapping[tuple[str, str], object],
     source_features: Sequence[Mapping[str, str]],
-    source_sample_counts: Mapping[tuple[str, str], int],
+    source_query_sample_counts: Mapping[str, int],
     persisted_capability_report: Mapping[str, object],
     persisted_model_records: Sequence[object],
     persisted_model_collection_hash: str,
@@ -89,7 +89,7 @@ def validate_source_training_replay(
     response_rows = validate_response_table(
         root / "tables/source_regret_responses.csv",
         source_features=source_features,
-        source_sample_counts=source_sample_counts,
+        source_query_sample_counts=source_query_sample_counts,
         replayed_response_surfaces=response_surfaces,
     )
 

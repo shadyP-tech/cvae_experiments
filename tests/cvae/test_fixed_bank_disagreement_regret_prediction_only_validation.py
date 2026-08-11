@@ -38,8 +38,12 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_o
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_only import (
     validation,
+    validation_surfaces,
 )
 from midogpp_thesis.cvae.protocol import ProtocolError
+from midogpp_thesis.cvae.routing.disagreement_regret_core import (
+    CaseActionResponseRow,
+)
 
 
 def _write_json(path: Path, payload: object) -> None:
@@ -127,6 +131,97 @@ def test_forbidden_scan_rejects_target_metric_columns_and_unapproved_source_metr
     with pytest.raises(ProtocolError, match="forbidden target/outcome column"):
         validation._reject_forbidden_persisted_fields(tmp_path)
 
+
+def test_source_response_class_counts_are_query_wide_across_multiple_cases(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "tables/source_regret_responses.csv"
+    typed_rows = tuple(
+        CaseActionResponseRow(
+            query_id="1",
+            case_id=case_id,
+            action_id="A0::source=2",
+            source_id="2",
+            exact_bacc_gain_vs_control=0.0,
+            exact_regret_from_case_best=0.0,
+            disagreement_count=0,
+            positive_class_count=2,
+            negative_class_count=3,
+        )
+        for case_id in ("case-a", "case-b")
+    )
+    surface_hash = "f" * 64
+
+    def response_rows(rows: tuple[CaseActionResponseRow, ...]) -> list[dict[str, object]]:
+        return [
+            {
+                "outer_target_id": "0",
+                "geometry_id": "A0",
+                "query_id": row.query_id,
+                "case_id": row.case_id,
+                "action_id": row.action_id,
+                "source_id": row.source_id,
+                "source_exact_bacc_gain_vs_control": row.exact_bacc_gain_vs_control,
+                "source_exact_regret_from_case_best": row.exact_regret_from_case_best,
+                "disagreement_count": row.disagreement_count,
+                "positive_class_count": row.positive_class_count,
+                "negative_class_count": row.negative_class_count,
+                "response_hash": row.response_hash,
+                "response_surface_hash": surface_hash,
+            }
+            for row in rows
+        ]
+
+    source_features = [
+        {
+            "outer_target_id": "0",
+            "geometry_id": "A0",
+            "family": "R",
+            "query_id": "1",
+            "case_id": row.case_id,
+            "action_id": row.action_id,
+            "disagreement_count": "0",
+        }
+        for row in typed_rows
+    ]
+    query_sample_counts = {"1": 5}
+    monkeypatch.setattr(validation_surfaces, "EXPECTED_SOURCE_RESPONSE_ROWS", 2)
+    _write_csv(
+        path,
+        validation_surfaces.SOURCE_RESPONSE_FIELDS,
+        response_rows(typed_rows),
+    )
+
+    validated = validation_surfaces.validate_response_table(
+        path,
+        source_features=source_features,
+        source_query_sample_counts=query_sample_counts,
+    )
+    assert len(validated) == 2
+
+    drifted = CaseActionResponseRow(
+        query_id="1",
+        case_id="case-a",
+        action_id="A0::source=2",
+        source_id="2",
+        exact_bacc_gain_vs_control=0.0,
+        exact_regret_from_case_best=0.0,
+        disagreement_count=0,
+        positive_class_count=1,
+        negative_class_count=3,
+    )
+    _write_csv(
+        path,
+        validation_surfaces.SOURCE_RESPONSE_FIELDS,
+        response_rows((drifted, typed_rows[1])),
+    )
+    with pytest.raises(ProtocolError, match="query class-count total drifted"):
+        validation_surfaces.validate_response_table(
+            path,
+            source_features=source_features,
+            source_query_sample_counts=query_sample_counts,
+        )
 
 def test_source_capability_is_exact_hashed_and_fail_closed(tmp_path: Path) -> None:
     source_seal = "1" * 64
@@ -282,6 +377,7 @@ def test_identity_replay_requires_all_9648_source_and_9928_test_rows() -> None:
     result = validation._validate_identity_topology(source, test)
 
     assert sum(len(value) for value in result["source_cases_by_query"].values()) == 216
+    assert result["source_query_sample_counts"] == EXPECTED_SOURCE_ROWS_BY_CENTER
     assert sum(len(value) for value in result["test_cases_by_query"].values()) == 218
     assert EXPECTED_CLASSIFIER_FIT_COUNT == 1_458
 
@@ -343,6 +439,9 @@ def test_test_prediction_cells_replay_frozen_classifier_parameters() -> None:
         parameter_sha256="2" * 64,
     )
     bank = SimpleNamespace(by_key={key: classifier}, seal_hash="3" * 64)
+    reloaded_bank = SimpleNamespace(
+        by_key={key: classifier}, seal_hash=bank.seal_hash
+    )
     cell = SimpleNamespace(
         key=key,
         target_center="0",
@@ -354,7 +453,7 @@ def test_test_prediction_cells_replay_frozen_classifier_parameters() -> None:
         test_store=SimpleNamespace(
             cells=(cell,), rows_by_outer_target={"0": (row_id,)}
         ),
-        classifier_bank=bank,
+        classifier_bank=reloaded_bank,
         admission=SimpleNamespace(
             source_prediction_seal_hash="4" * 64,
             action_classifier_bank_seal_hash=bank.seal_hash,
@@ -366,6 +465,30 @@ def test_test_prediction_cells_replay_frozen_classifier_parameters() -> None:
         target_classifier_bank=bank,
         composite_prediction_seal_hash="4" * 64,
     )
+    assert prediction.classifier_bank is not bank
+
+    reloaded_bank.seal_hash = "6" * 64
+    with pytest.raises(ProtocolError, match="test admission lineage drifted"):
+        validation._validate_test_prediction_chain(
+            prediction,
+            target_classifier_bank=bank,
+            composite_prediction_seal_hash="4" * 64,
+        )
+    reloaded_bank.seal_hash = bank.seal_hash
+
+    with pytest.raises(ProtocolError, match="test admission lineage drifted"):
+        validation._validate_test_prediction_chain(
+            SimpleNamespace(
+                test_store=prediction.test_store,
+                classifier_bank=SimpleNamespace(),
+                admission=SimpleNamespace(
+                    source_prediction_seal_hash="4" * 64,
+                    action_classifier_bank_seal_hash=None,
+                ),
+            ),
+            target_classifier_bank=SimpleNamespace(by_key={}),
+            composite_prediction_seal_hash="4" * 64,
+        )
 
     cell.classifier_parameter_sha256 = "5" * 64
     with pytest.raises(ProtocolError, match="escaped its frozen target classifier"):

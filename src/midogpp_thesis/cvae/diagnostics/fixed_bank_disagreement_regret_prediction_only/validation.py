@@ -202,7 +202,7 @@ def validate_fixed_bank_disagreement_regret_prediction_only_bundle(
         source_surfaces=source_surfaces,
         source_contexts=_source_contexts,
         source_features=source_features,
-        source_sample_counts=source_identity["source_sample_counts"],
+        source_query_sample_counts=source_identity["source_query_sample_counts"],
         persisted_capability_report=capability,
         persisted_model_records=model_records,
         persisted_model_collection_hash=model_collection_hash,

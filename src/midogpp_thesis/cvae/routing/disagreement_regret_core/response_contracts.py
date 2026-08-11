@@ -22,6 +22,7 @@ class CaseActionResponseRow:
     exact_bacc_gain_vs_control: float
     exact_regret_from_case_best: float
     disagreement_count: int
+    # Query-wide class totals used by exact BACC, repeated on each case/action row.
     positive_class_count: int
     negative_class_count: int
     response_semantics: str = RESPONSE_SEMANTICS

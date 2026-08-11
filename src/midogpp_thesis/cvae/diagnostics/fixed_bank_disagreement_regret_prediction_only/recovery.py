@@ -179,7 +179,7 @@ def load_post_test_seal_recovery(
     responses = validate_response_table(
         root / "tables/source_regret_responses.csv",
         source_features=source_features,
-        source_sample_counts=source_identity["source_sample_counts"],
+        source_query_sample_counts=source_identity["source_query_sample_counts"],
     )
     validate_model_training_lineage(
         model_records,
