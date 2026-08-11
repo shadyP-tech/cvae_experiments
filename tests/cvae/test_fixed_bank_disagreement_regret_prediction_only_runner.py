@@ -3,6 +3,20 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
+from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_only.constants import (
+    CENTERS,
+    EXPECTED_CLASSIFIER_FIT_COUNT,
+    EXPECTED_SOURCE_ROWS,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_only.development_actions import (
+    DEVELOPMENT_CLASSIFIER_FIT_COUNT,
+    DEVELOPMENT_LOGICAL_PREDICTION_CELL_COUNT,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_only.hashing import (
+    canonical_hash,
+)
 from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_only.runner import (
     run_fixed_bank_disagreement_regret_prediction_only,
 )
@@ -13,16 +27,21 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_o
     assert_closed_world,
     cleanup_owned_atomic_temps,
 )
-from midogpp_thesis.cvae.runtime.artifact_io import atomic_json
+from midogpp_thesis.cvae.runtime.artifact_io import atomic_json, read_json
 
 
-def test_runner_freezes_source_models_before_loading_whole_test(tmp_path: Path) -> None:
+@pytest.mark.parametrize("fit_fails", (False, True), ids=("complete", "fit-failure"))
+def test_runner_freezes_source_models_before_loading_whole_test(
+    tmp_path: Path, fit_fails: bool
+) -> None:
     root = tmp_path / "bundle"
     (root / "provenance").mkdir(parents=True)
     (root / "config.resolved.yaml").write_text("resolved: true\n", encoding="utf-8")
     (root / "provenance/input_artifacts.json").write_text("{}\n", encoding="utf-8")
     phases: list[str] = []
     model_seal_written = False
+    test_admission_calls = 0
+    test_load_calls = 0
 
     source_rows = tuple(
         SimpleNamespace(
@@ -67,14 +86,48 @@ def test_runner_freezes_source_models_before_loading_whole_test(tmp_path: Path) 
             return (SimpleNamespace(query_id=f"donor-{target}"),)
 
         def access_report(self) -> dict[str, object]:
-            return {
+            payload = {
+                "schema_version": (
+                    "midogpp_prediction_only_source_label_capability_v1"
+                ),
                 "status": "OPEN_SOURCE_ONLY",
+                "source_prediction_seal_hash": "a" * 64,
+                "source_oof_classifier_bank_seal_hash": "8" * 64,
+                "target_classifier_bank_seal_hash": "9" * 64,
                 "source_labels_opened": True,
                 "source_labels_opened_after_complete_prediction_seal": True,
+                "source_row_count": EXPECTED_SOURCE_ROWS,
+                "outer_targets_accessed": list(CENTERS),
+                "outer_target_label_excluded": True,
+                "query_excluded_from_every_source_action_composition": True,
+                "source_oof_physical_classifier_fit_count": (
+                    DEVELOPMENT_CLASSIFIER_FIT_COUNT
+                ),
+                "source_oof_oriented_prediction_cell_count": (
+                    DEVELOPMENT_LOGICAL_PREDICTION_CELL_COUNT
+                ),
+                "target_compatible_classifier_fit_count": (
+                    EXPECTED_CLASSIFIER_FIT_COUNT
+                ),
                 "raw_source_labels_persisted": False,
+                "raw_sample_ids_persisted": False,
+                "test_manifest_opened": False,
                 "test_labels_opened": False,
                 "test_labels_available": False,
             }
+            return {**payload, "access_report_hash": canonical_hash(payload)}
+
+    def fit_development(*_args: object, **_kwargs: object) -> object:
+        persisted = read_json(
+            root / "manifests/source_label_capability_report.json"
+        )
+        assert persisted["source_labels_opened"] is True
+        assert persisted["test_manifest_opened"] is False
+        assert persisted["test_labels_opened"] is False
+        phases.append("model_fit_started")
+        if fit_fails:
+            raise RuntimeError("synthetic model fit failure")
+        return development
 
     def persist_development(path: Path, _products: object) -> None:
         nonlocal model_seal_written
@@ -92,10 +145,17 @@ def test_runner_freezes_source_models_before_loading_whole_test(tmp_path: Path) 
         phases.append("model_bank_sealed")
 
     def load_test(_config: object, *, admission: object) -> object:
+        nonlocal test_load_calls
+        test_load_calls += 1
         assert model_seal_written
         assert admission == "admission"
         phases.append("whole_test_loaded")
         return test_frame
+
+    def issue_test_admission(*_args: object) -> str:
+        nonlocal test_admission_calls
+        test_admission_calls += 1
+        return "admission"
 
     config = SimpleNamespace(
         artifact_root=root,
@@ -136,9 +196,9 @@ def test_runner_freezes_source_models_before_loading_whole_test(tmp_path: Path) 
         build_prelabel=lambda *_args, **_kwargs: object(),
         persist_prelabel=lambda *_args, **_kwargs: None,
         build_source_label_capability=Capability,
-        fit_development=lambda *_args, **_kwargs: development,
+        fit_development=fit_development,
         persist_development=persist_development,
-        issue_test_admission=lambda *_args: "admission",
+        issue_test_admission=issue_test_admission,
         load_test_frame=load_test,
         materialize_test_predictions=lambda *_args, **_kwargs: test_predictions,
         aggregate_test_probabilities=lambda *_args, **_kwargs: (object(),),
@@ -152,6 +212,25 @@ def test_runner_freezes_source_models_before_loading_whole_test(tmp_path: Path) 
         write_state=lambda *_args, **_kwargs: None,
         phase_observer=phases.append,
     )
+
+    if fit_fails:
+        with pytest.raises(RuntimeError, match="synthetic model fit failure"):
+            run_fixed_bank_disagreement_regret_prediction_only(
+                config, artifact_root=root, dependencies=dependencies
+            )
+        capability_report = read_json(
+            root / "manifests/source_label_capability_report.json"
+        )
+        assert capability_report["source_labels_opened"] is True
+        assert capability_report["raw_source_labels_persisted"] is False
+        assert capability_report["raw_sample_ids_persisted"] is False
+        assert capability_report["test_manifest_opened"] is False
+        assert capability_report["test_labels_opened"] is False
+        assert capability_report["test_labels_available"] is False
+        assert "model_bank_sealed" not in phases
+        assert test_admission_calls == 0
+        assert test_load_calls == 0
+        return
 
     result = run_fixed_bank_disagreement_regret_prediction_only(
         config, artifact_root=root, dependencies=dependencies
@@ -171,6 +250,8 @@ def test_runner_freezes_source_models_before_loading_whole_test(tmp_path: Path) 
         "source_labels_opened"
     )
     assert phases.index("model_bank_sealed") < phases.index("whole_test_loaded")
+    assert test_admission_calls == 1
+    assert test_load_calls == 1
     assert "test_labels" not in " ".join(phases)
 
 

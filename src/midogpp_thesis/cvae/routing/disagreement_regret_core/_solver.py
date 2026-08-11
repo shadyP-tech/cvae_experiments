@@ -12,6 +12,7 @@ MAX_NEWTON_ITERATIONS = 100
 GRADIENT_TOLERANCE = 1.0e-8
 STEP_TOLERANCE = 1.0e-10
 BACKTRACK_STEPS = 24
+OBJECTIVE_RESOLUTION_FACTOR = 8.0
 
 
 def _sigmoid(values: np.ndarray) -> np.ndarray:
@@ -94,6 +95,23 @@ def solve_pairwise_logit(
             if float(np.linalg.norm(step, ord=np.inf)) <= STEP_TOLERANCE:
                 converged = True
                 break
+            newton_decrement = float(np.dot(gradient, step))
+            objective_resolution = (
+                OBJECTIVE_RESOLUTION_FACTOR
+                * np.finfo(np.float64).eps
+                * max(1.0, abs(current))
+            )
+            if (
+                np.isfinite(current)
+                and np.isfinite(newton_decrement)
+                and 0.0 < newton_decrement <= objective_resolution
+            ):
+                # A strictly smaller binary64 objective need not exist this close
+                # to the optimum.  Keep the last improving coefficients rather
+                # than changing the fit tolerance or accepting a non-improving
+                # Newton proposal.
+                converged = True
+                break
             raise ProtocolError("Pairwise Newton backtracking failed to improve the objective.")
         if float(np.linalg.norm(scale * step, ord=np.inf)) <= STEP_TOLERANCE:
             converged = True
@@ -127,6 +145,7 @@ __all__ = (
     "BACKTRACK_STEPS",
     "GRADIENT_TOLERANCE",
     "MAX_NEWTON_ITERATIONS",
+    "OBJECTIVE_RESOLUTION_FACTOR",
     "STEP_TOLERANCE",
     "solve_pairwise_logit",
 )

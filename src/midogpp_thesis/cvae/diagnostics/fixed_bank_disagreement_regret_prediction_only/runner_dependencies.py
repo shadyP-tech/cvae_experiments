@@ -26,6 +26,7 @@ class PredictionOnlyDependencies:
     build_prelabel: Callable[..., object] | None = None
     persist_prelabel: Callable[..., object] | None = None
     build_source_label_capability: Callable[..., object] | None = None
+    persist_source_capability: Callable[..., object] | None = None
     fit_development: Callable[..., object] | None = None
     persist_development: Callable[..., object] | None = None
     issue_test_admission: Callable[..., object] | None = None

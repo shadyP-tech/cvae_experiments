@@ -42,6 +42,7 @@ from .persistence import (
     persist_initial_manifest,
     persist_prelabel_products,
     persist_reports,
+    persist_source_label_capability_report,
     persist_validation_report,
 )
 from .prediction_runtime import (
@@ -213,6 +214,10 @@ def run_fixed_bank_disagreement_regret_prediction_only(
                 for target in CENTERS
             }
             capability_report = dict(capability.access_report())
+            (
+                deps.persist_source_capability
+                or persist_source_label_capability_report
+            )(root, capability_report)
             development = (deps.fit_development or fit_source_development_products)(
                 prelabel,
                 labels_by_outer_target=labels_by_target,

@@ -16,6 +16,11 @@ from .artifact_io import (
     persist_or_validate_json,
     persist_or_validate_npz,
 )
+from .constants import CENTERS, EXPECTED_CLASSIFIER_FIT_COUNT, EXPECTED_SOURCE_ROWS
+from .development_actions import (
+    DEVELOPMENT_CLASSIFIER_FIT_COUNT,
+    DEVELOPMENT_LOGICAL_PREDICTION_CELL_COUNT,
+)
 from .experiment_contracts import GEOMETRY_IDS, MODEL_FAMILY_IDS
 from .hashing import canonical_hash
 from .products import DevelopmentProducts, InferenceProducts, ModelBankRecord, PrelabelProducts
@@ -116,14 +121,8 @@ def persist_prelabel_products(root: Path, products: PrelabelProducts) -> None:
 
 
 def persist_development_products(root: Path, products: DevelopmentProducts) -> None:
-    capability = dict(products.source_label_capability_report)
-    if (
-        capability.get("raw_source_labels_persisted") is not False
-        or capability.get("test_labels_opened") is not False
-    ):
-        raise ProtocolError("Cannot persist an unsafe source-label capability report.")
-    persist_or_validate_json(
-        root / "manifests/source_label_capability_report.json", capability
+    persist_source_label_capability_report(
+        root, products.source_label_capability_report
     )
     response_rows: list[dict[str, object]] = []
     for record in sorted(products.response_surfaces, key=lambda value: value.key):
@@ -151,6 +150,66 @@ def persist_development_products(root: Path, products: DevelopmentProducts) -> N
         rows=response_rows,
     )
     _persist_model_banks(root, products.model_banks, products.model_bank_hash)
+
+
+def persist_source_label_capability_report(
+    root: Path, report: Mapping[str, object]
+) -> None:
+    """Durably record the bounded source-label opening before model fitting.
+
+    The report has a closed schema so the early audit checkpoint cannot become
+    an accidental serialization surface for labels, sample identifiers, or
+    target/test data. Existing evidence is accepted only when byte-equivalent
+    at the JSON-value level.
+    """
+
+    observed = dict(report)
+    unhashed = {
+        key: value for key, value in observed.items() if key != "access_report_hash"
+    }
+    expected = {
+        "schema_version": "midogpp_prediction_only_source_label_capability_v1",
+        "status": "OPEN_SOURCE_ONLY",
+        "source_prediction_seal_hash": observed.get("source_prediction_seal_hash"),
+        "source_oof_classifier_bank_seal_hash": observed.get(
+            "source_oof_classifier_bank_seal_hash"
+        ),
+        "target_classifier_bank_seal_hash": observed.get(
+            "target_classifier_bank_seal_hash"
+        ),
+        "source_labels_opened": True,
+        "source_labels_opened_after_complete_prediction_seal": True,
+        "source_row_count": EXPECTED_SOURCE_ROWS,
+        "outer_targets_accessed": list(CENTERS),
+        "outer_target_label_excluded": True,
+        "query_excluded_from_every_source_action_composition": True,
+        "source_oof_physical_classifier_fit_count": (
+            DEVELOPMENT_CLASSIFIER_FIT_COUNT
+        ),
+        "source_oof_oriented_prediction_cell_count": (
+            DEVELOPMENT_LOGICAL_PREDICTION_CELL_COUNT
+        ),
+        "target_compatible_classifier_fit_count": EXPECTED_CLASSIFIER_FIT_COUNT,
+        "raw_source_labels_persisted": False,
+        "raw_sample_ids_persisted": False,
+        "test_manifest_opened": False,
+        "test_labels_opened": False,
+        "test_labels_available": False,
+    }
+    seal_fields = (
+        "source_prediction_seal_hash",
+        "source_oof_classifier_bank_seal_hash",
+        "target_classifier_bank_seal_hash",
+    )
+    if (
+        unhashed != expected
+        or any(not _is_sha256(expected[field]) for field in seal_fields)
+        or observed.get("access_report_hash") != canonical_hash(unhashed)
+    ):
+        raise ProtocolError("Cannot persist an unsafe source-label capability report.")
+    persist_or_validate_json(
+        root / "manifests/source_label_capability_report.json", observed
+    )
 
 
 def _persist_model_banks(
@@ -557,6 +616,14 @@ def persist_validation_report(root: Path, checks: Mapping[str, object]) -> None:
     )
 
 
+def _is_sha256(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
 __all__ = (
     "load_model_bank_records",
     "persist_development_products",
@@ -564,6 +631,7 @@ __all__ = (
     "persist_initial_manifest",
     "persist_prelabel_products",
     "persist_reports",
+    "persist_source_label_capability_report",
     "persist_validation_report",
     "write_run_state",
 )
