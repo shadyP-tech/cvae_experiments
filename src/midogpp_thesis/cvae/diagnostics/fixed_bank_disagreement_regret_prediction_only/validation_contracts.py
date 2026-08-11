@@ -63,12 +63,32 @@ def validate_provenance(
 ) -> dict[str, Mapping[str, object]]:
     payload = read_object(root / "provenance/input_artifacts.json")
     rows = payload.get("input_artifacts")
+    expected_keys = {
+        "schema_version",
+        "dataset_id",
+        "experiment_id",
+        "stage",
+        "claim_scope",
+        "selection_used_target_eval_artifacts",
+        "input_artifacts",
+        "repository_revision",
+        "repository_dirty",
+        "repository_status_hash",
+    }
+    revision = payload.get("repository_revision")
     if (
-        payload.get("schema_version") != "midogpp_input_artifacts_v2"
+        set(payload) != expected_keys
+        or payload.get("schema_version") != "midogpp_input_artifacts_v2"
         or payload.get("dataset_id") != "midogpp"
         or payload.get("experiment_id") != EXPERIMENT_ID
         or payload.get("stage") != "90_oracles_and_diagnostics"
         or payload.get("claim_scope") != "diagnostic_only"
+        or payload.get("selection_used_target_eval_artifacts") is not False
+        or not isinstance(revision, str)
+        or len(revision) != 40
+        or any(character not in "0123456789abcdef" for character in revision)
+        or not isinstance(payload.get("repository_dirty"), bool)
+        or not is_sha256(payload.get("repository_status_hash"))
         or not isinstance(rows, list)
         or not all(isinstance(row, Mapping) for row in rows)
     ):

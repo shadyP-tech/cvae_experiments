@@ -1952,6 +1952,7 @@ experiments:
       midogpp_uniform_b_test_consumption_ledger_fixed_bank_disagreement_regret_prediction_only_parent_v1: Experiment-fenced byte-exact alias of the immutable original ledger, read only to verify the direct parent hash of this one-off prediction-only amendment.
       midogpp_uniform_b_test_consumption_ledger_fixed_bank_disagreement_regret_prediction_only_amendment_v1: Direct hash-chained authorization only for label-free prediction over the whole already-consumed test cache after source-only model sealing; it creates no fresh evidence.
     runner:
+      run_recovery_strategy: exact_existing_snapshot_disagreement_regret_prediction_only_v1
       environment:
         CUBLAS_WORKSPACE_CONFIG: ":4096:8"
         CUDA_VISIBLE_DEVICES: "0,1"

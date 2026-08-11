@@ -11,6 +11,7 @@ from .development_actions import (
     DEVELOPMENT_CLASSIFIER_FIT_COUNT,
     DEVELOPMENT_LOGICAL_PREDICTION_CELL_COUNT,
 )
+from .recovery_provenance import validate_recovery_audit_payload
 from .reports import leakage_report_payload, publication_decision_payload
 from .validation_common import (
     expected_disjointness_report,
@@ -45,6 +46,17 @@ def validate_claim_reports(
     )
     if read_object(root / "reports/publication_decision.json") != expected_publication:
         raise ProtocolError("Prediction-only publication boundary differs from replay.")
+    observed_runtime = read_object(root / "reports/runtime_summary.json")
+    model_bank_seal_hash = str(
+        read_object(root / "manifests/model_bank_seal.json")[
+            "regret_model_bank_seal_hash"
+        ]
+    )
+    recovery_audit = validate_recovery_audit_payload(
+        observed_runtime.get("post_test_seal_recovery"),
+        model_bank_seal_hash=model_bank_seal_hash,
+        test_prediction_seal_hash=test_prediction_seal_hash,
+    )
     expected_runtime = {
         "schema_version": "midogpp_prediction_only_runtime_summary_v1",
         "status": "PASS",
@@ -56,9 +68,7 @@ def validate_claim_reports(
             target_classifier_bank_seal_hash
         ),
         "source_prediction_seal_hash": source_prediction_seal_hash,
-        "regret_model_bank_seal_hash": read_object(
-            root / "manifests/model_bank_seal.json"
-        )["regret_model_bank_seal_hash"],
+        "regret_model_bank_seal_hash": model_bank_seal_hash,
         "test_prediction_seal_hash": test_prediction_seal_hash,
         "source_stream_count": 81,
         "source_oof_physical_classifier_fit_count": (
@@ -87,8 +97,9 @@ def validate_claim_reports(
             root / "reports/workstation_preflight.json"
         ),
         "train_test_disjointness": expected_disjointness_report(),
+        "post_test_seal_recovery": dict(recovery_audit),
     }
-    if read_object(root / "reports/runtime_summary.json") != expected_runtime:
+    if observed_runtime != expected_runtime:
         raise ProtocolError("Prediction-only runtime lineage report drifted.")
 
 

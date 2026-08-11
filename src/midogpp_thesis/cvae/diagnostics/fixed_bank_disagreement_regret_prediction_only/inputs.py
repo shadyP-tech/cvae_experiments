@@ -342,7 +342,7 @@ def load_label_free_source_frame(
         ),
         "representation_id": "annotation_jpeg_fixed_center_b_v3",
         "split": "train",
-        "row_count": len(rows),
+        "row_count": EXPECTED_SOURCE_ROWS,
         "rows_by_center": counts,
         "feature_dim": FEATURE_DIM,
         "cache_sha256": EXPECTED_TRAIN_CACHE_SHA256,
@@ -414,7 +414,94 @@ def load_label_free_test_frame(
         arrays.append(np.asarray(shard.embeddings, dtype=np.float32))
         rows_by_center[center] = tuple(center_rows)
         shard_hashes[center] = shard.shard_sha256
-    binding = {
+    binding = _test_cache_binding(
+        admission=admission,
+        cache_content_hash=str(summary.get("content_hash")),
+        row_order_hash=str(summary.get("row_order_hash")),
+        shard_hashes=shard_hashes,
+    )
+    return LabelFreeTestFrame(
+        embeddings=np.ascontiguousarray(np.concatenate(arrays, axis=0), dtype=np.float32),
+        rows=tuple(rows),
+        rows_by_center=rows_by_center,
+        cache_binding=binding,
+        admission=admission,
+    )
+
+
+def expected_test_cache_binding_hash_from_provenance(
+    config: PredictionOnlyInputConfig,
+    *,
+    admission: TestInferenceAdmission,
+    provenance: Mapping[str, Mapping[str, object]],
+) -> str:
+    """Rebuild the label-free test binding without reopening the test cache."""
+
+    _assert_input_constants(config)
+    row = provenance.get(TEST_CACHE_ARTIFACT_ID)
+    if not isinstance(row, Mapping):
+        raise ProtocolError("Prediction-only test-cache provenance is absent.")
+    identities = row.get("semantic_identities")
+    integrity = row.get("file_integrity")
+    files = integrity.get("files") if isinstance(integrity, Mapping) else None
+    if (
+        not isinstance(identities, Mapping)
+        or identities.get("cache_name") != EXPECTED_TEST_CACHE_SEMANTIC_ID
+        or identities.get("content_hash") != EXPECTED_TEST_CACHE_CONTENT_HASH
+        or identities.get("row_order_hash") != EXPECTED_TEST_CACHE_ROW_ORDER_HASH
+        or identities.get("row_count") != str(EXPECTED_TEST_ROWS)
+        or identities.get("feature_dim") != str(FEATURE_DIM)
+        or identities.get("manifest_sha256") != EXPECTED_MANIFEST_SHA256
+        or identities.get("representation_id")
+        != EXPECTED_TEST_CACHE_REPRESENTATION_ID
+        or identities.get("split") != "test"
+        or identities.get("experiment_fenced") != "true"
+        or identities.get("fresh_evidence") != "false"
+        or identities.get("labels_persisted") != "false"
+        or identities.get("labels_absent") != "true"
+        or identities.get("sample_ids_persisted") != "false"
+        or identities.get("image_paths_persisted") != "false"
+        or identities.get("metadata_artifact_used") != "false"
+        or identities.get("previous_stage90_output_used") != "false"
+        or identities.get("authorized_consumer_experiment_ids") != EXPERIMENT_ID
+        or not isinstance(files, list)
+        or not all(isinstance(value, Mapping) for value in files)
+    ):
+        raise ProtocolError("Prediction-only test-cache provenance drifted.")
+    by_path = {str(value.get("path")): value for value in files}
+    shard_hashes: dict[str, str] = {}
+    for center in CENTERS:
+        member = f"embeddings/by_center/center_{center}.pt"
+        file_row = by_path.get(member)
+        computed = file_row.get("computed") if isinstance(file_row, Mapping) else None
+        digest = computed.get("sha256") if isinstance(computed, Mapping) else None
+        if (
+            not isinstance(digest, str)
+            or len(digest) != 64
+            or any(character not in "0123456789abcdef" for character in digest)
+            or file_row.get("exists") is not True
+        ):
+            raise ProtocolError(
+                "Prediction-only test-cache shard provenance drifted."
+            )
+        shard_hashes[center] = digest
+    binding = _test_cache_binding(
+        admission=admission,
+        cache_content_hash=EXPECTED_TEST_CACHE_CONTENT_HASH,
+        row_order_hash=EXPECTED_TEST_CACHE_ROW_ORDER_HASH,
+        shard_hashes=shard_hashes,
+    )
+    return canonical_hash(binding)
+
+
+def _test_cache_binding(
+    *,
+    admission: TestInferenceAdmission,
+    cache_content_hash: str,
+    row_order_hash: str,
+    shard_hashes: Mapping[str, str],
+) -> dict[str, object]:
+    return {
         "schema_version": "midogpp_prediction_only_consumed_test_binding_v1",
         "cache_alias_artifact_id": TEST_CACHE_ARTIFACT_ID,
         "underlying_cache_artifact_id": UNDERLYING_TEST_CACHE_ARTIFACT_ID,
@@ -422,12 +509,12 @@ def load_label_free_test_frame(
         "representation_id": REPRESENTATION_ID,
         "split": "test",
         "manifest_sha256": CANONICAL_MANIFEST_SHA256,
-        "row_count": len(rows),
+        "row_count": EXPECTED_TEST_ROWS,
         "rows_by_center": dict(EXPECTED_TEST_ROWS_BY_CENTER),
         "feature_dim": FEATURE_DIM,
-        "cache_content_hash": summary.get("content_hash"),
-        "row_order_hash": summary.get("row_order_hash"),
-        "shard_sha256_by_center": shard_hashes,
+        "cache_content_hash": cache_content_hash,
+        "row_order_hash": row_order_hash,
+        "shard_sha256_by_center": dict(shard_hashes),
         "test_inference_admission_hash": admission.admission_hash,
         "source_prediction_seal_hash": admission.source_prediction_seal_hash,
         "action_classifier_bank_seal_hash": admission.action_classifier_bank_seal_hash,
@@ -441,13 +528,6 @@ def load_label_free_test_frame(
         "fresh_evidence": False,
         "single_consumer_alias_only": True,
     }
-    return LabelFreeTestFrame(
-        embeddings=np.ascontiguousarray(np.concatenate(arrays, axis=0), dtype=np.float32),
-        rows=tuple(rows),
-        rows_by_center=rows_by_center,
-        cache_binding=binding,
-        admission=admission,
-    )
 
 
 def assert_train_test_disjoint(
@@ -553,6 +633,7 @@ __all__ = (
     "ValidatedLocks",
     "assert_input_fence",
     "assert_train_test_disjoint",
+    "expected_test_cache_binding_hash_from_provenance",
     "load_label_free_source_frame",
     "load_label_free_test_frame",
     "load_validated_locks",

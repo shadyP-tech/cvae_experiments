@@ -19,6 +19,14 @@ from typing import Any, Mapping, Sequence
 
 import yaml
 
+from .recovery import (
+    RecoveryContractError,
+    SnapshotBytesGuard,
+    detect_registered_exact_recovery,
+    registration_errors,
+    validate_preserved_snapshots,
+)
+
 
 ARTIFACT_URI_RE = re.compile(r"^(artifact|output)://([^/]+)(?:/(.*))?$")
 RUNNABLE_STATUSES = {"active", "diagnostic"}
@@ -76,6 +84,7 @@ class ExperimentEntry:
     config_path: str | None
     runner_argv: tuple[str, ...]
     runner_env: Mapping[str, str]
+    run_recovery_strategy: str | None
     input_artifact_ids: tuple[str, ...]
     input_claim_scope_exceptions: Mapping[str, str]
     notes: tuple[str, ...]
@@ -93,6 +102,14 @@ class PreparedRun:
     input_manifest_path: Path
     argv: tuple[str, ...]
     env: Mapping[str, str]
+
+
+@dataclass(frozen=True)
+class _RenderedRun:
+    prepared: PreparedRun
+    resolved_config_content: str
+    input_manifest_content: str
+    input_manifest: Mapping[str, Any]
 
 
 class MidogppWorkspace:
@@ -352,6 +369,22 @@ class MidogppWorkspace:
                     errors.append(f"{experiment.experiment_id}: config is outside repository")
             if not experiment.runner_argv:
                 errors.append(f"{experiment.experiment_id}: runner argv is empty")
+            output_canonical_path = None if output is None else output.canonical_path
+            errors.extend(
+                registration_errors(
+                    experiment.run_recovery_strategy,
+                    experiment_id=experiment.experiment_id,
+                    stage=experiment.stage,
+                    status=experiment.status,
+                    claim_scope=experiment.claim_scope,
+                    config_path=experiment.config_path,
+                    output_artifact_id=experiment.output_artifact_id,
+                    output_canonical_path=output_canonical_path,
+                    input_artifact_ids=experiment.input_artifact_ids,
+                    runner_argv=experiment.runner_argv,
+                    runner_env=experiment.runner_env,
+                )
+            )
 
         if errors:
             raise WorkspaceError("Invalid MIDOG++ workspace:\n- " + "\n- ".join(errors))
@@ -445,13 +478,49 @@ class MidogppWorkspace:
         require_inputs: bool = True,
         force: bool = False,
     ) -> PreparedRun:
-        self.validate()
+        rendered = self._render_run(
+            experiment_id,
+            require_inputs=require_inputs,
+            validate_workspace=True,
+            include_all_declared_inputs=False,
+        )
+        prepared = rendered.prepared
+        for relative in ("manifests", "provenance", "reports", "tables"):
+            (prepared.artifact_root / relative).mkdir(parents=True, exist_ok=True)
+        _write_checked(
+            prepared.resolved_config_path,
+            rendered.resolved_config_content,
+            force=force,
+        )
+        _write_checked(
+            prepared.input_manifest_path,
+            rendered.input_manifest_content,
+            force=force,
+        )
+        return prepared
+
+    def _render_run(
+        self,
+        experiment_id: str,
+        *,
+        require_inputs: bool,
+        validate_workspace: bool,
+        include_all_declared_inputs: bool,
+    ) -> _RenderedRun:
+        """Resolve and serialize a run without creating or changing any file."""
+
+        if validate_workspace:
+            self.validate()
         experiment = self.get_experiment(experiment_id)
         if not experiment.runnable:
             raise WorkspaceError(
                 f"Experiment {experiment_id} is status={experiment.status!r} and cannot be launched"
             )
-        artifact_root = self.resolve_artifact(experiment.output_artifact_id, for_output=True, require_exists=False)
+        artifact_root = self.resolve_artifact(
+            experiment.output_artifact_id,
+            for_output=True,
+            require_exists=False,
+        )
 
         used_inputs: set[str] = set()
         resolved_config_path = artifact_root / "config.resolved.yaml"
@@ -484,13 +553,16 @@ class MidogppWorkspace:
             raise WorkspaceError(
                 f"{experiment_id}: config or runner uses undeclared input artifacts: {sorted(undeclared)}"
             )
+        manifest_artifact_ids = (
+            set(experiment.input_artifact_ids)
+            if include_all_declared_inputs
+            else used_inputs or set(experiment.input_artifact_ids)
+        )
         input_manifest = self._input_manifest(
             experiment,
-            used_inputs or set(experiment.input_artifact_ids),
+            manifest_artifact_ids,
             require_inputs,
         )
-        for relative in ("manifests", "provenance", "reports", "tables"):
-            (artifact_root / relative).mkdir(parents=True, exist_ok=True)
         if resolved_payload is None:
             resolved_payload = {
                 "schema_version": "midogpp_resolved_command_v1",
@@ -503,37 +575,102 @@ class MidogppWorkspace:
                 "inputs": {"artifact_ids": list(experiment.input_artifact_ids)},
                 "runner": {"environment": env, "argv": argv},
             }
-        _write_checked(
-            resolved_config_path,
-            yaml.safe_dump(resolved_payload, sort_keys=False),
-            force=force,
-        )
         input_manifest_path = artifact_root / "provenance" / "input_artifacts.json"
-        _write_checked(
-            input_manifest_path,
-            json.dumps(input_manifest, indent=2, sort_keys=True) + "\n",
-            force=force,
-        )
-        return PreparedRun(
-            experiment=experiment,
-            artifact_root=artifact_root,
-            resolved_config_path=resolved_config_path,
-            input_manifest_path=input_manifest_path,
-            argv=tuple(argv),
-            env=env,
+        return _RenderedRun(
+            prepared=PreparedRun(
+                experiment=experiment,
+                artifact_root=artifact_root,
+                resolved_config_path=resolved_config_path,
+                input_manifest_path=input_manifest_path,
+                argv=tuple(argv),
+                env=env,
+            ),
+            resolved_config_content=yaml.safe_dump(resolved_payload, sort_keys=False),
+            input_manifest_content=json.dumps(input_manifest, indent=2, sort_keys=True) + "\n",
+            input_manifest=input_manifest,
         )
 
     def run(self, experiment_id: str, *, force: bool = False, extra_args: Sequence[str] = ()) -> int:
+        self.validate()
+        experiment = self.get_experiment(experiment_id)
+        if not experiment.runnable:
+            raise WorkspaceError(
+                f"Experiment {experiment_id} is status={experiment.status!r} and cannot be launched"
+            )
+        artifact_root = self.resolve_artifact(
+            experiment.output_artifact_id,
+            for_output=True,
+            require_exists=False,
+        )
+        strategy = experiment.run_recovery_strategy
+        if strategy is not None and detect_registered_exact_recovery(strategy, artifact_root):
+            if force:
+                raise WorkspaceError(
+                    "Registered exact-existing-snapshot recovery rejects --force."
+                )
+            if extra_args:
+                raise WorkspaceError(
+                    "Registered exact-existing-snapshot recovery rejects extra runner arguments."
+                )
+            rendered = self._render_run(
+                experiment_id,
+                require_inputs=True,
+                validate_workspace=False,
+                include_all_declared_inputs=True,
+            )
+            prepared = rendered.prepared
+            try:
+                guard = SnapshotBytesGuard.capture(
+                    prepared.resolved_config_path,
+                    prepared.input_manifest_path,
+                )
+                validate_preserved_snapshots(
+                    guard,
+                    current_resolved_config_bytes=rendered.resolved_config_content.encode(
+                        "utf-8"
+                    ),
+                    current_input_manifest=rendered.input_manifest,
+                )
+                guard.assert_unchanged()
+            except RecoveryContractError as exc:
+                raise WorkspaceError(str(exc)) from exc
+            return self._execute(prepared, extra_args=(), recovery_guard=guard)
+
         prepared = self.prepare(experiment_id, require_inputs=True, force=force)
+        return self._execute(prepared, extra_args=extra_args)
+
+    def _execute(
+        self,
+        prepared: PreparedRun,
+        *,
+        extra_args: Sequence[str],
+        recovery_guard: SnapshotBytesGuard | None = None,
+    ) -> int:
         env = os.environ.copy()
         env.update(prepared.env)
-        completed = subprocess.run(
-            [*prepared.argv, *extra_args],
-            cwd=self.repo_root,
-            env=env,
-            check=False,
-        )
+        try:
+            if recovery_guard is not None:
+                self._assert_recovery_snapshots_unchanged(recovery_guard)
+            completed = subprocess.run(
+                [*prepared.argv, *extra_args],
+                cwd=self.repo_root,
+                env=env,
+                check=False,
+            )
+        except BaseException:
+            if recovery_guard is not None:
+                self._assert_recovery_snapshots_unchanged(recovery_guard)
+            raise
+        if recovery_guard is not None:
+            self._assert_recovery_snapshots_unchanged(recovery_guard)
         return int(completed.returncode)
+
+    @staticmethod
+    def _assert_recovery_snapshots_unchanged(guard: SnapshotBytesGuard) -> None:
+        try:
+            guard.assert_unchanged()
+        except RecoveryContractError as exc:
+            raise WorkspaceError(str(exc)) from exc
 
     def get_experiment(self, experiment_id: str) -> ExperimentEntry:
         try:
@@ -801,6 +938,14 @@ class MidogppWorkspace:
             environment = runner.get("environment", {}) or {}
             if not isinstance(environment, Mapping):
                 raise WorkspaceError(f"{experiment_id}: runner.environment must be a mapping")
+            raw_recovery_strategy = runner.get("run_recovery_strategy")
+            if raw_recovery_strategy is not None and (
+                not isinstance(raw_recovery_strategy, str)
+                or not raw_recovery_strategy.strip()
+            ):
+                raise WorkspaceError(
+                    f"{experiment_id}: runner.run_recovery_strategy must be a non-empty string"
+                )
             exceptions = raw.get("input_claim_scope_exceptions", {}) or {}
             if not isinstance(exceptions, Mapping):
                 raise WorkspaceError(
@@ -816,6 +961,7 @@ class MidogppWorkspace:
                 config_path=None if raw.get("config_path") in (None, "") else str(raw["config_path"]),
                 runner_argv=tuple(str(value) for value in runner.get("argv", ())),
                 runner_env={str(key): str(value) for key, value in environment.items()},
+                run_recovery_strategy=raw_recovery_strategy,
                 input_artifact_ids=tuple(str(value) for value in raw.get("input_artifact_ids", ())),
                 input_claim_scope_exceptions={
                     str(key): str(value) for key, value in exceptions.items()

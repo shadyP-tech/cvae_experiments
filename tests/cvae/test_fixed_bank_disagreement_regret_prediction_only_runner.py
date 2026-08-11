@@ -42,6 +42,7 @@ def test_runner_freezes_source_models_before_loading_whole_test(
     model_seal_written = False
     test_admission_calls = 0
     test_load_calls = 0
+    runtime_summaries: list[dict[str, object]] = []
 
     source_rows = tuple(
         SimpleNamespace(
@@ -157,7 +158,18 @@ def test_runner_freezes_source_models_before_loading_whole_test(
         test_admission_calls += 1
         return "admission"
 
+    def persist_reports(
+        _root: Path,
+        *,
+        leakage: object,
+        publication: object,
+        runtime_summary: object,
+    ) -> None:
+        assert leakage is not None and publication is not None
+        runtime_summaries.append(dict(runtime_summary))  # type: ignore[arg-type]
+
     config = SimpleNamespace(
+        source_path=root / "config.resolved.yaml",
         artifact_root=root,
         expert_bank_root=tmp_path / "bank",
         generation_lock_root=tmp_path / "generation",
@@ -205,7 +217,7 @@ def test_runner_freezes_source_models_before_loading_whole_test(
         build_inference=lambda *_args, **_kwargs: inference,
         persist_inference=lambda *_args, **_kwargs: None,
         build_runtime_summary=lambda **_kwargs: {"status": "PASS"},
-        persist_reports=lambda *_args, **_kwargs: None,
+        persist_reports=persist_reports,
         write_content_index=lambda *_args, **_kwargs: None,
         validate_bundle=lambda *_args, **_kwargs: {"status": "PASS"},
         persist_validation=lambda *_args, **_kwargs: None,
@@ -252,6 +264,7 @@ def test_runner_freezes_source_models_before_loading_whole_test(
     assert phases.index("model_bank_sealed") < phases.index("whole_test_loaded")
     assert test_admission_calls == 1
     assert test_load_calls == 1
+    assert runtime_summaries[0]["post_test_seal_recovery"]["recovery_used"] is False  # type: ignore[index]
     assert "test_labels" not in " ".join(phases)
 
 

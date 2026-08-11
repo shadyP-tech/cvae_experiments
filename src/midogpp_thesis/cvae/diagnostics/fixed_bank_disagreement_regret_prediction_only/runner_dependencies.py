@@ -40,6 +40,9 @@ class PredictionOnlyDependencies:
     write_content_index: Callable[..., object] | None = None
     validate_bundle: Callable[..., object] | None = None
     persist_validation: Callable[..., object] | None = None
+    load_post_test_recovery: Callable[..., object] | None = None
+    validate_recovery_checkout: Callable[..., object] | None = None
+    validate_terminal_completion: Callable[..., object] | None = None
     write_state: Callable[..., object] | None = None
     cleanup_staging: Callable[..., object] | None = None
     phase_observer: Callable[[str], None] | None = None

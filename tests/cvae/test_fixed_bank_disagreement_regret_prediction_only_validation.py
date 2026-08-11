@@ -16,6 +16,26 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_o
 from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_only.hashing import (
     canonical_hash,
 )
+from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_only.input_contracts import (
+    TestInferenceAdmission as _TestInferenceAdmission,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_only.inputs import (
+    expected_test_cache_binding_hash_from_provenance,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_only.experiment_contracts import (
+    EXPERIMENT_ID,
+    EXPECTED_MANIFEST_SHA256,
+    EXPECTED_TEST_CACHE_CONTENT_HASH,
+    EXPECTED_TEST_CACHE_REPRESENTATION_ID,
+    EXPECTED_TEST_CACHE_ROW_ORDER_HASH,
+    EXPECTED_TEST_CACHE_SEMANTIC_ID,
+    EXPECTED_TRAIN_CACHE_SHA256,
+    INPUT_ARTIFACT_IDS,
+    TEST_CACHE_ARTIFACT_ID,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_only.validation_contracts import (
+    validate_provenance,
+)
 from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_only import (
     validation,
 )
@@ -159,6 +179,38 @@ def test_source_capability_is_exact_hashed_and_fail_closed(tmp_path: Path) -> No
             source_oof_classifier_bank_seal_hash=source_classifier_seal,
             target_classifier_bank_seal_hash=target_classifier_seal,
         )
+
+
+def test_provenance_requires_exact_repository_state_schema(tmp_path: Path) -> None:
+    path = tmp_path / "provenance/input_artifacts.json"
+    payload = {
+        "schema_version": "midogpp_input_artifacts_v2",
+        "dataset_id": "midogpp",
+        "experiment_id": (
+            "midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_"
+            "disagreement_regret_prediction_only.v1"
+        ),
+        "stage": "90_oracles_and_diagnostics",
+        "claim_scope": "diagnostic_only",
+        "selection_used_target_eval_artifacts": False,
+        "input_artifacts": [
+            {"artifact_id": artifact_id}
+            for artifact_id in sorted(INPUT_ARTIFACT_IDS)
+        ],
+        "repository_revision": "1" * 40,
+        "repository_dirty": False,
+        "repository_status_hash": "2" * 64,
+    }
+    _write_json(path, payload)
+    config = SimpleNamespace(input_artifact_ids=INPUT_ARTIFACT_IDS)
+
+    assert set(validate_provenance(tmp_path, config=config)) == set(
+        INPUT_ARTIFACT_IDS
+    )
+
+    _write_json(path, {**payload, "unexpected": True})
+    with pytest.raises(ProtocolError, match="provenance header drifted"):
+        validate_provenance(tmp_path, config=config)
 
 
 def _repeat_cases(prefix: str, count: int, row_count: int) -> tuple[str, ...]:
@@ -321,6 +373,108 @@ def test_test_prediction_cells_replay_frozen_classifier_parameters() -> None:
             prediction,
             target_classifier_bank=bank,
             composite_prediction_seal_hash="4" * 64,
+        )
+
+
+def test_test_cache_binding_is_rebuilt_from_preserved_input_provenance() -> None:
+    admission_unhashed = {
+        "schema_version": "midogpp_prediction_only_test_inference_admission_v1",
+        "source_prediction_seal_hash": "1" * 64,
+        "action_classifier_bank_seal_hash": "2" * 64,
+        "regret_model_bank_seal_hash": "3" * 64,
+        "regret_model_bank_status": "SEALED_SOURCE_ONLY_BEFORE_TEST_ADMISSION",
+        "target_labels_available": False,
+        "test_scoring_permitted": False,
+        "classifier_refit_permitted": False,
+    }
+    admission = _TestInferenceAdmission(
+        source_prediction_seal_hash="1" * 64,
+        action_classifier_bank_seal_hash="2" * 64,
+        regret_model_bank_seal_hash="3" * 64,
+        regret_model_bank_status="SEALED_SOURCE_ONLY_BEFORE_TEST_ADMISSION",
+        target_labels_available=False,
+        test_scoring_permitted=False,
+        admission_hash=canonical_hash(admission_unhashed),
+    )
+    files = [
+        {
+            "path": f"embeddings/by_center/center_{center}.pt",
+            "exists": True,
+            "computed": {"sha256": f"{index + 1:064x}"},
+        }
+        for index, center in enumerate(CENTERS)
+    ]
+    provenance = {
+        TEST_CACHE_ARTIFACT_ID: {
+            "semantic_identities": {
+                "cache_name": EXPECTED_TEST_CACHE_SEMANTIC_ID,
+                "content_hash": EXPECTED_TEST_CACHE_CONTENT_HASH,
+                "row_order_hash": EXPECTED_TEST_CACHE_ROW_ORDER_HASH,
+                "row_count": "9928",
+                "feature_dim": "3840",
+                "manifest_sha256": EXPECTED_MANIFEST_SHA256,
+                "representation_id": EXPECTED_TEST_CACHE_REPRESENTATION_ID,
+                "split": "test",
+                "experiment_fenced": "true",
+                "fresh_evidence": "false",
+                "labels_persisted": "false",
+                "labels_absent": "true",
+                "sample_ids_persisted": "false",
+                "image_paths_persisted": "false",
+                "metadata_artifact_used": "false",
+                "previous_stage90_output_used": "false",
+                "authorized_consumer_experiment_ids": EXPERIMENT_ID,
+            },
+            "file_integrity": {"files": files},
+        }
+    }
+    config = SimpleNamespace(
+        expected_train_cache_sha256=EXPECTED_TRAIN_CACHE_SHA256,
+        expected_manifest_sha256=EXPECTED_MANIFEST_SHA256,
+        expected_test_cache_semantic_id=EXPECTED_TEST_CACHE_SEMANTIC_ID,
+        expected_test_cache_representation_id=(
+            EXPECTED_TEST_CACHE_REPRESENTATION_ID
+        ),
+        expected_test_cache_content_hash=EXPECTED_TEST_CACHE_CONTENT_HASH,
+        expected_test_cache_row_order_hash=EXPECTED_TEST_CACHE_ROW_ORDER_HASH,
+    )
+
+    expected = expected_test_cache_binding_hash_from_provenance(
+        config, admission=admission, provenance=provenance
+    )
+    changed_files = [dict(row) for row in files]
+    changed_files[0] = {
+        **changed_files[0],
+        "computed": {"sha256": "f" * 64},
+    }
+    changed = expected_test_cache_binding_hash_from_provenance(
+        config,
+        admission=admission,
+        provenance={
+            TEST_CACHE_ARTIFACT_ID: {
+                **provenance[TEST_CACHE_ARTIFACT_ID],
+                "file_integrity": {"files": changed_files},
+            }
+        },
+    )
+
+    assert len(expected) == 64
+    assert changed != expected
+
+    drifted_identities = dict(
+        provenance[TEST_CACHE_ARTIFACT_ID]["semantic_identities"]
+    )
+    drifted_identities["manifest_sha256"] = "0" * 64
+    with pytest.raises(ProtocolError, match="test-cache provenance drifted"):
+        expected_test_cache_binding_hash_from_provenance(
+            config,
+            admission=admission,
+            provenance={
+                TEST_CACHE_ARTIFACT_ID: {
+                    **provenance[TEST_CACHE_ARTIFACT_ID],
+                    "semantic_identities": drifted_identities,
+                }
+            },
         )
 
 

@@ -28,6 +28,7 @@ from .development_prediction_store import (
 )
 from .experiment_contracts import EXPECTED_GENERATION_LOCK_HASH
 from .hashing import canonical_hash
+from .inputs import expected_test_cache_binding_hash_from_provenance
 from .prediction_contracts import expected_action_library_hash
 from .prediction_runtime import issue_test_inference_admission
 from .prediction_store import (
@@ -219,10 +220,18 @@ def validate_fixed_bank_disagreement_regret_prediction_only_bundle(
     # Only after the independent source-only refit agrees may target/test
     # prediction artifacts be admitted for label-free replay.
     admission = issue_test_inference_admission(source_predictions, model_seal)
+    expected_test_binding_hash = (
+        expected_test_cache_binding_hash_from_provenance(
+            config,
+            admission=admission,
+            provenance=provenance,
+        )
+    )
     test_predictions = load_global_test_prediction_seal(
         path,
         admission=admission,
         expected_config_hash=str(getattr(config, "contract_hash")),
+        expected_test_cache_binding_hash=expected_test_binding_hash,
     )
     if (
         test_predictions.action_library_hash != library["action_library_hash"]

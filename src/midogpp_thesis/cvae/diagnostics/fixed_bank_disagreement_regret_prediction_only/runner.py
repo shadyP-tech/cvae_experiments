@@ -4,13 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ...protocol import ProtocolError
 from ...routing.disagreement_regret_core import canonical_workstation_runtime
 from ...runtime.artifact_io import read_json
 from .bundle import (
     assert_closed_world,
     cleanup_owned_atomic_temps,
-    write_content_index,
 )
 from .development import (
     build_posthoc_source_contexts,
@@ -21,15 +19,15 @@ from .execution_adapter import (
     aggregate_probability_rows,
     aggregate_source_oof_probability_rows,
     materialize_sources,
+    probability_views,
     run_label_free_workstation_preflight,
-    runtime_summary_payload,
     stage_sources_for_cpu,
 )
 from .development_prediction_runtime import (
     materialize_composite_prelabel_prediction_seal,
     materialize_development_source_action_predictions,
 )
-from .experiment_contracts import CENTERS, GEOMETRY_IDS
+from .experiment_contracts import CENTERS
 from .inference import build_test_inference_products
 from .inputs import (
     assert_train_test_disjoint,
@@ -41,9 +39,7 @@ from .persistence import (
     persist_inference_products,
     persist_initial_manifest,
     persist_prelabel_products,
-    persist_reports,
     persist_source_label_capability_report,
-    persist_validation_report,
 )
 from .prediction_runtime import (
     issue_test_inference_admission,
@@ -54,7 +50,9 @@ from .protocol import (
     assert_prediction_only_diagnostic,
     canonical_prediction_only_protocol,
 )
-from .reports import leakage_report_payload, publication_decision_payload
+from .recovery import load_post_test_seal_recovery
+from .recovery_provenance import fresh_recovery_audit_payload
+from .recovery_runtime import resume_post_test_seal
 from .runner_dependencies import PredictionOnlyDependencies
 from .runner_runtime import (
     assert_launch_files,
@@ -66,6 +64,7 @@ from .runner_runtime import (
     write_state,
 )
 from .source_capability import SourceOOFLabelCapability
+from .terminal_runtime import finalize_prediction_only_bundle
 
 
 def run_fixed_bank_disagreement_regret_prediction_only(
@@ -98,6 +97,21 @@ def run_fixed_bank_disagreement_regret_prediction_only(
     )
 
     with exclusive_run_lock(root):
+        state_path = root / "reports/run_state.json"
+        existing_state = read_json(state_path) if state_path.is_file() else {}
+        if existing_state.get("status") != "COMPLETE":
+            post_test_recovery = (
+                deps.load_post_test_recovery or load_post_test_seal_recovery
+            )(root, config=config)
+            if post_test_recovery is not None:
+                return resume_post_test_seal(
+                    root,
+                    config=config,
+                    protocol=protocol,
+                    recovery=post_test_recovery,
+                    dependencies=deps,
+                    default_validator=_validate_bundle,
+                )
         cleanup_owned_atomic_temps(root)
         assert_closed_world(root, allow_incomplete=True)
         recovered = recover_complete(root, config=config, dependencies=deps)
@@ -179,7 +193,7 @@ def run_fixed_bank_disagreement_regret_prediction_only(
                 target_classifier_bank,
                 root=root,
             )
-            source_views = _probability_views(
+            source_views = probability_views(
                 deps.aggregate_source_probabilities
                 or aggregate_source_oof_probability_rows,
                 source_predictions,
@@ -245,7 +259,7 @@ def run_fixed_bank_disagreement_regret_prediction_only(
                 deps.materialize_test_predictions
                 or materialize_test_action_predictions
             )(config, source_predictions, test_frame, root=root)
-            test_views = _probability_views(
+            test_views = probability_views(
                 deps.aggregate_test_probabilities or aggregate_probability_rows,
                 test_predictions,
                 frame_role="test",
@@ -264,43 +278,24 @@ def run_fixed_bank_disagreement_regret_prediction_only(
             (deps.persist_inference or persist_inference_products)(root, inference)
 
             phase = "CLOSED_WORLD_PREDICTION_ONLY_VALIDATION"
-            write_state(deps, root, status="RUNNING", phase=phase)
-            leakage = leakage_report_payload(
-                source_prediction_seal_hash=source_predictions.seal_hash,
-                test_prediction_seal_hash=test_predictions.seal_hash,
+            finalize_prediction_only_bundle(
+                root,
+                config=config,
+                protocol=protocol,
+                dependencies=deps,
+                default_validator=_validate_bundle,
+                generated_sources=canonical_sources,
+                source_predictions=source_predictions,
+                test_predictions=test_predictions,
                 source_label_capability_report=capability_report,
                 model_bank_hash=development.model_bank_hash,
-                frozen_test_prediction_hash=inference.frozen_prediction_hash,
+                inference=inference,
+                preflight=preflight,
+                disjointness=disjointness,
+                recovery_audit=fresh_recovery_audit_payload(),
+                validation_phase=phase,
+                revalidate_complete=True,
             )
-            publication = publication_decision_payload(
-                frozen_test_prediction_hash=inference.frozen_prediction_hash
-            )
-            runtime_summary = dict(
-                (deps.build_runtime_summary or runtime_summary_payload)(
-                    generated_sources=canonical_sources,
-                    source_predictions=source_predictions,
-                    test_predictions=test_predictions,
-                    runtime=getattr(config, "runtime"),
-                )
-            )
-            runtime_summary["workstation_preflight"] = dict(preflight)
-            runtime_summary["train_test_disjointness"] = dict(disjointness)
-            (deps.persist_reports or persist_reports)(
-                root,
-                leakage=leakage,
-                publication=publication,
-                runtime_summary=runtime_summary,
-            )
-            (deps.write_content_index or write_content_index)(
-                root,
-                config_contract_hash=str(getattr(config, "contract_hash")),
-                protocol_contract_hash=protocol.contract_hash,
-            )
-            validator = deps.validate_bundle or _validate_bundle
-            checks = validator(root, config=config)
-            (deps.persist_validation or persist_validation_report)(root, checks)
-            write_state(deps, root, status="COMPLETE", phase="COMPLETE")
-            validator(root, config=config)
             if deps.cleanup_staging is not None:
                 deps.cleanup_staging(source_for_cpu, canonical_sources)
             return root
@@ -313,28 +308,6 @@ def run_fixed_bank_disagreement_regret_prediction_only(
                 error=f"{type(exc).__name__}: {exc}",
             )
             raise
-
-
-def _probability_views(
-    aggregate: object,
-    capability: object,
-    *,
-    frame_role: str,
-) -> dict[tuple[str, str], tuple[object, ...]]:
-    if not callable(aggregate):
-        raise ProtocolError("Probability aggregation dependency is not callable.")
-    return {
-        (target, geometry): tuple(
-            aggregate(
-                capability,
-                frame_role=frame_role,
-                geometry_id=geometry,
-                outer_target_id=target,
-            )
-        )
-        for target in CENTERS
-        for geometry in GEOMETRY_IDS
-    }
 
 
 def _sealed_test_input_binding(config: object) -> dict[str, object]:

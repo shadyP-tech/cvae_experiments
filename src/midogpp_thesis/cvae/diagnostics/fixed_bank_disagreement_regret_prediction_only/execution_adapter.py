@@ -397,6 +397,30 @@ def runtime_summary_payload(
     }
 
 
+def probability_views(
+    aggregate: object,
+    capability: object,
+    *,
+    frame_role: str,
+) -> dict[tuple[str, str], tuple[object, ...]]:
+    """Build every target/geometry probability view in canonical order."""
+
+    if not callable(aggregate):
+        raise ProtocolError("Probability aggregation dependency is not callable.")
+    return {
+        (target, geometry): tuple(
+            aggregate(
+                capability,
+                frame_role=frame_role,
+                geometry_id=geometry,
+                outer_target_id=target,
+            )
+        )
+        for target in CENTERS
+        for geometry in GEOMETRY_IDS
+    }
+
+
 __all__ = (
     "GlobalSourcePredictionSeal",
     "GlobalTestPredictionSeal",
@@ -408,6 +432,7 @@ __all__ = (
     "materialize_source_action_predictions",
     "materialize_sources",
     "materialize_test_action_predictions",
+    "probability_views",
     "run_label_free_workstation_preflight",
     "runtime_summary_payload",
     "stage_sources_for_cpu",

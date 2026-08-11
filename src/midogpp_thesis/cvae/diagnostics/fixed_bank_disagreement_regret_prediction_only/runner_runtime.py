@@ -66,10 +66,18 @@ def assert_workspace_resolved_paths(config: object, *, root: Path) -> None:
         "ledger_amendment_path",
     )
     unresolved = [name for name in names if not Path(getattr(config, name)).is_absolute()]
-    if unresolved or root.resolve() != Path(getattr(config, "artifact_root")).resolve():
+    resolved_root = root.resolve()
+    expected_config = resolved_root / "config.resolved.yaml"
+    source_path = Path(getattr(config, "source_path")).resolve()
+    if (
+        unresolved
+        or resolved_root != Path(getattr(config, "artifact_root")).resolve()
+        or source_path != expected_config
+    ):
         raise ProtocolError(
             "Prediction-only runner requires workspace-resolved paths; "
-            f"unresolved={unresolved}."
+            f"unresolved={unresolved}, config_snapshot_matches="
+            f"{source_path == expected_config}."
         )
 
 

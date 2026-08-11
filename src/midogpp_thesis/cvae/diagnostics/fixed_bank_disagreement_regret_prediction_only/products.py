@@ -235,23 +235,52 @@ class InferenceProducts:
         feature_records = tuple(self.feature_surfaces)
         contrasts = tuple(self.contrasts)
         selections = tuple(self.selections)
-        expected_contrast_keys = {
-            (
-                record.geometry_id,
-                record.family,
-                record.outer_target_id,
-                row.case_id,
-                row.action_id,
+        expected_contrast_keys: set[tuple[str, str, str, str, str]] = set()
+        expected_selection_keys: set[tuple[str, str, str, str]] = set()
+        feature_row_topology_valid = True
+        for record in feature_records:
+            surface = record.surface
+            candidate_action_ids = tuple(surface.candidate_source_by_action)
+            case_ids = tuple(sorted({row.case_id for row in surface.rows}))
+            observed_feature_keys = tuple(
+                (row.case_id, row.action_id) for row in surface.rows
             )
-            for record in feature_records
-            for row in record.surface.rows
-        }
-        expected_selection_keys = {
-            key[:4] for key in expected_contrast_keys
-        }
+            expected_feature_keys = {
+                (case_id, action_id)
+                for case_id in case_ids
+                for action_id in (surface.baseline_action_id, *candidate_action_ids)
+            }
+            if (
+                not case_ids
+                or not candidate_action_ids
+                or len(observed_feature_keys) != len(set(observed_feature_keys))
+                or set(observed_feature_keys) != expected_feature_keys
+            ):
+                feature_row_topology_valid = False
+            expected_contrast_keys.update(
+                (
+                    record.geometry_id,
+                    record.family,
+                    record.outer_target_id,
+                    case_id,
+                    action_id,
+                )
+                for case_id in case_ids
+                for action_id in candidate_action_ids
+            )
+            expected_selection_keys.update(
+                (
+                    record.geometry_id,
+                    record.family,
+                    record.outer_target_id,
+                    case_id,
+                )
+                for case_id in case_ids
+            )
         if (
             {row.key for row in feature_records} != expected
             or len(feature_records) != len(expected)
+            or not feature_row_topology_valid
             or {row.key for row in contrasts} != expected_contrast_keys
             or len(contrasts) != len(expected_contrast_keys)
             or {row.key for row in selections} != expected_selection_keys
