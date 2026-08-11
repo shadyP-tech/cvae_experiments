@@ -70,6 +70,22 @@ def _sha256(value: object, role: str) -> str:
     return text
 
 
+def _short_sha256(value: object, role: str) -> str:
+    """Validate a repository ``stable_hash`` identity.
+
+    Frozen source streams use the repository-wide canonical 16-hex SHA-256
+    prefix, not a full file/content SHA-256 digest.  Keeping this validator
+    separate prevents accidentally relaxing any of the full-digest fields.
+    """
+
+    text = str(value)
+    if len(text) != 16 or any(
+        character not in "0123456789abcdef" for character in text
+    ):
+        raise ProtocolError(f"{role} must be a lowercase 16-hex stable hash.")
+    return text
+
+
 @lru_cache(maxsize=1)
 def canonical_physical_cell_keys() -> tuple[PhysicalCellKey, ...]:
     return tuple(
@@ -218,8 +234,8 @@ class DevelopmentClassifierBank:
             or len({cell.fit_provenance_hash for cell in cells}) != len(cells)
         ):
             raise ProtocolError("Strict source-OOF classifier-bank topology drifted.")
+        _short_sha256(self.source_stream_lock_hash, "source stream lock hash")
         for value, role in (
-            (self.source_stream_lock_hash, "source stream lock hash"),
             (self.action_library_hash, "action library hash"),
             (self.source_cache_binding_hash, "source cache binding hash"),
             (self.bank_hash, "classifier bank hash"),
@@ -253,6 +269,12 @@ class DevelopmentClassifierBank:
             != canonical_hash(unhashed)
             or payload.get("status") != DEVELOPMENT_CLASSIFIER_STATUS
             or payload.get("classifier_bank_hash") != self.bank_hash
+            or payload.get("source_stream_lock_hash")
+            != self.source_stream_lock_hash
+            or payload.get("action_library_hash") != self.action_library_hash
+            or payload.get("source_cache_binding_hash")
+            != self.source_cache_binding_hash
+            or payload.get("config_contract_hash") != self.config_contract_hash
             or payload.get("physical_fit_count") != DEVELOPMENT_CLASSIFIER_FIT_COUNT
             or payload.get("source_labels_available_during_fit") is not False
             or payload.get("test_cache_admitted") is not False

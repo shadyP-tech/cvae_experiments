@@ -3,8 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
+from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_only import (
+    development_prediction_contracts as development_contracts,
+)
 from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_only.constants import (
     CENTERS,
     GENERATION_SEEDS,
@@ -326,4 +330,93 @@ def test_strict_source_seal_rejects_rehashed_config_drift(tmp_path: Path) -> Non
             arrays_path=arrays_path,
             index_path=index_path,
             seal_path=seal_path,
+        )
+
+
+def test_source_stream_stable_hash_is_exact_and_seal_bound(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        development_contracts, "DEVELOPMENT_CLASSIFIER_FIT_COUNT", 0
+    )
+    monkeypatch.setattr(development_contracts, "FEATURE_DIM", 1)
+    monkeypatch.setattr(
+        development_contracts, "canonical_physical_cell_keys", lambda: ()
+    )
+    for member, values in (
+        (development_contracts.DEVELOPMENT_CLASSIFIER_MEAN_MEMBER, np.empty((0, 1))),
+        (development_contracts.DEVELOPMENT_CLASSIFIER_SCALE_MEMBER, np.empty((0, 1))),
+        (
+            development_contracts.DEVELOPMENT_CLASSIFIER_COEFFICIENT_MEMBER,
+            np.empty((0, 1)),
+        ),
+        (development_contracts.DEVELOPMENT_CLASSIFIER_INTERCEPT_MEMBER, np.empty((0,))),
+    ):
+        path = tmp_path / member
+        path.parent.mkdir(parents=True, exist_ok=True)
+        np.save(path, values.astype(np.float64), allow_pickle=False)
+
+    source_stream_lock_hash = "1" * 16
+    action_library_hash = "2" * 64
+    source_cache_binding_hash = "3" * 64
+    config_contract_hash = "4" * 64
+    bank_hash = "5" * 64
+    paths = tuple(
+        tmp_path / member
+        for member in (
+            development_contracts.DEVELOPMENT_CLASSIFIER_MEAN_MEMBER,
+            development_contracts.DEVELOPMENT_CLASSIFIER_SCALE_MEMBER,
+            development_contracts.DEVELOPMENT_CLASSIFIER_COEFFICIENT_MEMBER,
+            development_contracts.DEVELOPMENT_CLASSIFIER_INTERCEPT_MEMBER,
+        )
+    )
+    seal_unhashed = {
+        "schema_version": "midogpp_strict_source_oof_classifier_bank_seal_v1",
+        "status": development_contracts.DEVELOPMENT_CLASSIFIER_STATUS,
+        "config_contract_hash": config_contract_hash,
+        "classifier_bank_hash": bank_hash,
+        "source_stream_lock_hash": source_stream_lock_hash,
+        "action_library_hash": action_library_hash,
+        "source_cache_binding_hash": source_cache_binding_hash,
+        "physical_fit_count": 0,
+        "source_labels_available_during_fit": False,
+        "test_cache_admitted": False,
+        "scaler_mean_file_sha256": sha256_file(paths[0]),
+        "scaler_scale_file_sha256": sha256_file(paths[1]),
+        "coefficient_file_sha256": sha256_file(paths[2]),
+        "intercept_file_sha256": sha256_file(paths[3]),
+    }
+    seal = {
+        **seal_unhashed,
+        "development_classifier_bank_seal_hash": canonical_hash(seal_unhashed),
+    }
+    bank_kwargs = {
+        "root": tmp_path,
+        "cells": (),
+        "source_stream_lock_hash": source_stream_lock_hash,
+        "action_library_hash": action_library_hash,
+        "source_cache_binding_hash": source_cache_binding_hash,
+        "config_contract_hash": config_contract_hash,
+        "bank_hash": bank_hash,
+        "seal_payload": seal,
+    }
+    observed = development_contracts.DevelopmentClassifierBank(**bank_kwargs)
+    assert observed.source_stream_lock_hash == source_stream_lock_hash
+
+    with pytest.raises(ProtocolError):
+        development_contracts.DevelopmentClassifierBank(
+            **{**bank_kwargs, "source_stream_lock_hash": "1" * 64}
+        )
+
+    drifted_unhashed = {
+        **seal_unhashed,
+        "source_stream_lock_hash": "6" * 16,
+    }
+    drifted_seal = {
+        **drifted_unhashed,
+        "development_classifier_bank_seal_hash": canonical_hash(drifted_unhashed),
+    }
+    with pytest.raises(ProtocolError):
+        development_contracts.DevelopmentClassifierBank(
+            **{**bank_kwargs, "seal_payload": drifted_seal}
         )

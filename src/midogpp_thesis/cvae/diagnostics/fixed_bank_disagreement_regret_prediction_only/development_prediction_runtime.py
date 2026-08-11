@@ -71,6 +71,7 @@ def materialize_development_source_action_predictions(
         result = load_development_source_prediction_seal(
             root,
             expected_config_hash=config.contract_hash,
+            expected_source_stream_lock_hash=generated_sources.lock_hash,
             expected_source_cache_binding_hash=source_frame.cache_binding_hash,
         )
         if result.action_library_hash != library_hash:

@@ -356,6 +356,7 @@ def write_development_classifier_bank(
     return load_development_classifier_bank(
         root,
         expected_config_hash=config_contract_hash,
+        expected_source_stream_lock_hash=source_stream_lock_hash,
         expected_source_cache_binding_hash=source_cache_binding_hash,
     )
 
@@ -364,6 +365,7 @@ def load_development_classifier_bank(
     root: Path,
     *,
     expected_config_hash: str | None = None,
+    expected_source_stream_lock_hash: str | None = None,
     expected_source_cache_binding_hash: str | None = None,
 ) -> DevelopmentClassifierBank:
     index_path = root / DEVELOPMENT_CLASSIFIER_INDEX_MEMBER
@@ -374,9 +376,21 @@ def load_development_classifier_bank(
     if (
         index.get("classifier_bank_hash") != canonical_hash(index_unhashed)
         or seal.get("classifier_bank_index_sha256") != sha256_file(index_path)
+        or seal.get("classifier_bank_hash") != index.get("classifier_bank_hash")
+        or seal.get("source_stream_lock_hash")
+        != index.get("source_stream_lock_hash")
+        or seal.get("action_library_hash") != index.get("action_library_hash")
+        or seal.get("source_cache_binding_hash")
+        != index.get("source_cache_binding_hash")
+        or seal.get("config_contract_hash") != index.get("config_contract_hash")
         or not isinstance(raw_cells, list)
         or len(raw_cells) != DEVELOPMENT_CLASSIFIER_FIT_COUNT
         or (expected_config_hash is not None and index.get("config_contract_hash") != expected_config_hash)
+        or (
+            expected_source_stream_lock_hash is not None
+            and index.get("source_stream_lock_hash")
+            != expected_source_stream_lock_hash
+        )
         or (
             expected_source_cache_binding_hash is not None
             and index.get("source_cache_binding_hash") != expected_source_cache_binding_hash
@@ -571,6 +585,7 @@ def write_development_source_prediction_seal(
     return load_development_source_prediction_seal(
         root,
         expected_config_hash=config_contract_hash,
+        expected_source_stream_lock_hash=classifier_bank.source_stream_lock_hash,
         expected_source_cache_binding_hash=source_store.frame_cache_binding_hash,
     )
 
@@ -579,11 +594,13 @@ def load_development_source_prediction_seal(
     root: Path,
     *,
     expected_config_hash: str | None = None,
+    expected_source_stream_lock_hash: str | None = None,
     expected_source_cache_binding_hash: str | None = None,
 ) -> DevelopmentSourcePredictionSeal:
     bank = load_development_classifier_bank(
         root,
         expected_config_hash=expected_config_hash,
+        expected_source_stream_lock_hash=expected_source_stream_lock_hash,
         expected_source_cache_binding_hash=expected_source_cache_binding_hash,
     )
     store = load_development_prediction_store(
