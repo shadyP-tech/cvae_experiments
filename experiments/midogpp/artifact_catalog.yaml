@@ -7823,3 +7823,315 @@ artifacts:
       - Exact pooled BACC over all 218 whole cases is terminal. Single-class cases contribute sufficient statistics, technical seeds are not inference units, and the 10,000-replicate bootstrap resamples whole cases within centers before equal-center aggregation.
       - The six-input fence contains only the promoted bank, GenerationLock, dedicated cache and manifest aliases, byte-exact original-ledger parent alias, and this direct amendment. No prior Stage-90 or signed-error output, amendment, prediction, scratch, checkpoint, or Stage-50, Stage-60, or Stage-70 result is consumed.
       - Regardless of outcome, this output cannot authorize routing success, an action, geometry, policy, model, or expert update, promotion, deployment, recipe selection, any numbered stage, another Stage-90 diagnostic, another experiment, or a generic consumer.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_disagreement_regret_prediction_only_parent_v1
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: CONSUMED_TEST_DISAGREEMENT_REGRET_PREDICTION_ONLY_PARENT_LEDGER
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      split: test
+      row_count: '9928'
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      experiment_fenced: 'true'
+      fresh_evidence: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_disagreement_regret_prediction_only.v1
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Experiment-fenced byte-exact alias of the immutable original consumed-test ledger. It exposes no prior diagnostic result, prediction, score, or metric.
+      - It may be paired only with the direct prediction-only disagreement-regret v1 amendment and creates no fresh evidence.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_disagreement_regret_prediction_only_amendment_v1
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_DISAGREEMENT_REGRET_PREDICTION_ONLY_AMENDMENT
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      amendment_sha256: a1a254bcfd6e5a6643e9a5e25b6f81f7b4fe38270efc47443415f066191c4533
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_disagreement_regret_prediction_only.v1
+      authorization_scope: one_posthoc_source_oof_trained_full_consumed_test_prediction_only_diagnostic_v1
+      authorization_basis: explicit_user_instruction_to_run_one_posthoc_source_oof_trained_prediction_only_diagnostic_over_the_whole_consumed_midogpp_test_cache
+      claim_role: posthoc_source_oof_trained_full_consumed_test_prediction_only_diagnostic
+      source_labels_previously_available: 'true'
+      source_labels_fresh_or_unused: 'false'
+      whole_consumed_test_prediction_only: 'true'
+      target_label_capability_created: 'false'
+      target_scoring_permitted: 'false'
+      fresh_evidence: 'false'
+      previous_stage90_outputs_used: 'false'
+      generic_consumer_authorized: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - uniform_b_v2_consumed_test_fixed_bank_disagreement_regret_prediction_only_ledger_amendment_v1.json
+    expected_file_hashes:
+      uniform_b_v2_consumed_test_fixed_bank_disagreement_regret_prediction_only_ledger_amendment_v1.json:
+        algorithm: sha256
+        digest: a1a254bcfd6e5a6643e9a5e25b6f81f7b4fe38270efc47443415f066191c4533
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Direct hash-chained amendment over the immutable original ledger; no previous Stage-90 amendment is its parent.
+      - It authorizes only label-free inference over all 9,928 already-consumed test rows after the source-trained model bank is sealed. Test labels and all test scores remain inaccessible.
+
+  - artifact_id: midogpp_stage90_fixed_bank_disagreement_regret_prediction_only_train_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_canonical_reference_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: POSTHOC_SOURCE_TRAIN_CACHE_SINGLE_CONSUMER
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_canonical_train_cache_seed42
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: train
+      row_count: '9648'
+      feature_dim: '3840'
+      train_tensor_sha256: 1ed7602f225c592a6f8103b24ebfc93f72dc6d5d0c27565566a8b2260783d1dc
+      labels_persisted_in_source_metadata: 'true'
+      label_access_requires_source_capability: 'true'
+      sole_source_label_input: 'true'
+      canonical_manifest_input_used: 'false'
+      test_rows_present: 'false'
+      source_labels_previously_available: 'true'
+      source_labels_fresh_or_unused: 'false'
+      experiment_fenced: 'true'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_disagreement_regret_prediction_only.v1
+    required_files:
+      - embeddings/train.pt
+      - manifests/frozen_cache_protocol.json
+      - manifests/content_index.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    expected_file_hashes:
+      embeddings/train.pt:
+        algorithm: sha256
+        digest: 1ed7602f225c592a6f8103b24ebfc93f72dc6d5d0c27565566a8b2260783d1dc
+      manifests/frozen_cache_protocol.json:
+        algorithm: sha256
+        digest: a4faf27a427cfb424789e5592048aa748a057f37124566d46b8b6c557e2bfe69
+      manifests/content_index.json:
+        algorithm: sha256
+        digest: 307991668f11454da69e3798feb23a2e899e1a00c2ee5132b031e7f7fb9ab82e
+      reports/cache_builder_report.json:
+        algorithm: sha256
+        digest: 3e3c40449196dc6db9fe0ab982defa86afb1094e3d958e944875396bc363b0ec
+      reports/validation_report.json:
+        algorithm: sha256
+        digest: e8b69f557ea92ac8e70a20e504150aba1c947f2b47f735b34e3ca7147efcf6b7
+    forbidden_reuse:
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Single-consumer alias of the validated canonical 3,840-D train-only cache. It is the sole source-label input and carries those labels in metadata behind the post-seal capability; no canonical manifest alias is admitted.
+      - Source action predictions must be sealed OOF before labels open. No test row, prior prediction surface, or previous Stage-90 output is admitted.
+
+  - artifact_id: midogpp_stage90_fixed_bank_disagreement_regret_prediction_only_test_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_TEST_LABEL_FREE_PREDICTION_ONLY_CACHE
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: test
+      row_count: '9928'
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_DISAGREEMENT_REGRET_PREDICTION_ONLY_V1
+      fresh_evidence: 'false'
+      labels_persisted: 'false'
+      labels_absent: 'true'
+      sample_ids_persisted: 'false'
+      image_paths_persisted: 'false'
+      metadata_artifact_used: 'false'
+      previous_stage90_output_used: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_disagreement_regret_prediction_only.v1
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - synthetic_downstream_utility_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias of the validated label-free consumed-test cache. All 9,928 rows are retained.
+      - The model bank must be sealed before this cache is admitted. The alias exposes no test label, score, oracle, prior prediction, or previous Stage-90 output.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_disagreement_regret_prediction_only_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_disagreement_regret_prediction_only/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: EXPLORATORY_CONSUMED_DATA_ONLY
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: EXPLORATORY_CONSUMED_DATA_ONLY
+      terminal_decision: UNSCORED_DIAGNOSTIC_ONLY
+      claim_role: posthoc_source_oof_trained_full_consumed_test_prediction_only_diagnostic
+      architecture_family: fixed_bank_disagreement_regret_prediction_only_v1
+      config_contract_hash: 4d68570f3be01805
+      protocol_contract_hash: 052ba6148f3fb03ed25ad4ff8ba304ab0f9b1fdc3ef90394316e0d1fc777776d
+      source_split: train
+      source_row_count: '9648'
+      source_labels_previously_available: 'true'
+      source_labels_fresh_or_unused: 'false'
+      source_oof_training_is_posthoc: 'true'
+      target_split: test
+      target_row_count: '9928'
+      consumed_test_data: 'true'
+      target_labels_available: 'false'
+      target_scoring_permitted: 'false'
+      target_metric_or_oracle_table_exists: 'false'
+      geometry_ids: A0|A1
+      geometry_selection_used: 'false'
+      model_family_ids: G|R|P
+      prediction_surfaces: R_raw|R_safe
+      strict_outer_target_H_exclusion: 'true'
+      source_oof_query_q_excluded_from_all_action_compositions: 'true'
+      source_oof_unordered_excluded_pair_fit_reuse: 'true'
+      source_oof_physical_classifier_fit_count: '5184'
+      source_oof_oriented_prediction_cell_count: '10368'
+      target_compatible_classifier_fit_count: '1458'
+      total_physical_classifier_fit_count_before_test_admission: '6642'
+      test_phase_classifier_fit_count: '0'
+      nested_query_q_models_used: 'false'
+      candidate_source_e_response_query_excluded: 'true'
+      test_actions_exclude_target_H: 'true'
+      test_target_expert_used: 'false'
+      model_bank_sealed_before_test_cache_admission: 'true'
+      action_strength_sweep_used: 'false'
+      hyperparameter_search_used: 'false'
+      prediction_output_is_policy: 'false'
+      routing_success_claimed: 'false'
+      fresh_evidence: 'false'
+      promotion_eligible: 'false'
+      previous_stage90_outputs_used: 'false'
+      stage50_stage60_or_stage70_result_used: 'false'
+      may_feed_another_experiment: 'false'
+      workstation_generation_devices: cuda:0|cuda:1
+      workstation_cpu_topology: 4_workers_x_3_threads
+      maximum_dense_fit_bytes: '536870912'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - arrays/frozen_source_streams.npy
+      - arrays/action_classifier_scaler_mean.npy
+      - arrays/action_classifier_scaler_scale.npy
+      - arrays/action_classifier_coefficients.npy
+      - arrays/action_classifier_intercepts.npy
+      - arrays/source_oof_classifier_scaler_mean.npy
+      - arrays/source_oof_classifier_scaler_scale.npy
+      - arrays/source_oof_classifier_coefficients.npy
+      - arrays/source_oof_classifier_intercepts.npy
+      - arrays/source_oof_action_probabilities.npz
+      - arrays/test_action_probabilities.npz
+      - arrays/model_bank.npz
+      - manifests/protocol_manifest.json
+      - manifests/action_library.json
+      - manifests/source_oof_action_library.json
+      - manifests/frozen_source_stream_index.json
+      - manifests/frozen_source_stream_lock.json
+      - manifests/action_classifier_bank_index.json
+      - manifests/action_classifier_bank_seal.json
+      - manifests/source_oof_classifier_bank_index.json
+      - manifests/source_oof_classifier_bank_seal.json
+      - manifests/source_oof_prediction_index.json
+      - manifests/source_oof_prediction_seal.json
+      - manifests/prelabel_prediction_composite_seal.json
+      - manifests/test_prediction_index.json
+      - manifests/test_prediction_seal.json
+      - manifests/prelabel_feature_seal.json
+      - manifests/source_label_capability_report.json
+      - manifests/model_bank_index.json
+      - manifests/model_bank_seal.json
+      - manifests/frozen_test_prediction_seal.json
+      - manifests/content_index.json
+      - tables/source_case_features.csv
+      - tables/source_regret_responses.csv
+      - tables/model_index.csv
+      - tables/test_case_features.csv
+      - tables/test_candidate_contrasts.csv
+      - tables/test_selection_diagnostics.csv
+      - tables/test_prediction_summary.csv
+      - reports/workstation_preflight.json
+      - reports/leakage_report.json
+      - reports/publication_decision.json
+      - reports/runtime_summary.json
+      - reports/run_state.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Trains fixed G, R, and P disagreement-regret models only from post-hoc source-train OOF predictions and previously available train labels, then seals the entire model bank before admitting the target test cache.
+      - Produces label-free R_raw and simultaneous-uncertainty-gated R_safe route suggestions over all 9,928 consumed test rows. It computes no test label, BACC, accuracy, regret, utility, oracle, NELBO, or downstream metric.
+      - The output is not a policy, does not establish routing success, and cannot authorize action selection, model or expert updates, promotion, deployment, or another experiment.

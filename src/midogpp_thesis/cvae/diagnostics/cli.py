@@ -206,6 +206,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     actionability_recoverability.add_argument("--config", required=True)
     actionability_recoverability.add_argument("--artifact-root", required=True)
+
+    disagreement_regret_prediction_only = sub.add_parser(
+        "fixed-bank-disagreement-regret-prediction-only",
+        help=(
+            "Run the source-OOF-trained, whole consumed-test label-free "
+            "disagreement-regret prediction diagnostic."
+        ),
+    )
+    disagreement_regret_prediction_only.add_argument("--config", required=True)
+    disagreement_regret_prediction_only.add_argument(
+        "--artifact-root", required=True
+    )
     return parser
 
 
@@ -498,6 +510,22 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_fixed_bank_actionability_recoverability_config(args.config)
         output = run_fixed_bank_actionability_recoverability(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "fixed-bank-disagreement-regret-prediction-only":
+        from .fixed_bank_disagreement_regret_prediction_only import (
+            load_fixed_bank_disagreement_regret_prediction_only_config,
+            run_fixed_bank_disagreement_regret_prediction_only,
+        )
+
+        config = load_fixed_bank_disagreement_regret_prediction_only_config(
+            args.config
+        )
+        output = run_fixed_bank_disagreement_regret_prediction_only(
             config,
             artifact_root=artifact_root,
         )
