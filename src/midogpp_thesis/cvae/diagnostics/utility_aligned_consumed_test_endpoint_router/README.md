@@ -54,7 +54,9 @@ experiment, or feed Stage 50, 60, 70, or another Stage-90 run.
   a live or remote lock.
 - `recovery.py` is the registered recovery façade. Pre-label boundaries remain
   in `initialization_recovery.py`; the terminal validation-only boundary lives
-  separately in `finalization_recovery.py`.
+  separately in `finalization_recovery.py`. The same module also admits only
+  the exact 42-member COMPLETE bundle for canonical validation-only replay;
+  it does not reopen labels or recompute scientific products.
 
 The validator reconstructs all persisted scientific rows and formula/hash
 lineage. Target bootstrap productions are cross-bound by their persisted
