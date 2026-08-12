@@ -44,6 +44,38 @@ from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_rout
 )
 
 
+def test_embedding_slice_accepts_derived_role_but_rejects_physical_identity_drift(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_router.input_contracts as input_contracts
+    from dataclasses import replace
+    from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_router.partitions import (
+        LabelFreeCaseRow,
+    )
+
+    monkeypatch.setattr(input_contracts, "EXPECTED_TEST_ROW_COUNT", 2)
+    monkeypatch.setattr(input_contracts, "FEATURE_DIM", 3)
+    monkeypatch.setattr(input_contracts, "CENTERS", ("0",))
+    rows = (
+        LabelFreeCaseRow(0, 10, "eval-a", "case-a", "0"),
+        LabelFreeCaseRow(1, 11, "eval-b", "case-b", "0"),
+    )
+    values = np.asarray([[1, 2, 3], [4, 5, 6]], dtype=np.float32)
+    frame = input_contracts.LabelFreeTestFrame(
+        embeddings=values,
+        rows=rows,
+        rows_by_center={"0": rows},
+        cache_binding={},
+    )
+
+    support_row = replace(rows[1], partition_role="support")
+    np.testing.assert_array_equal(
+        frame.embeddings_for((support_row,)), values[[1]]
+    )
+    with pytest.raises(ProtocolError, match="embedding row identity drifted"):
+        frame.embeddings_for((replace(support_row, case_id="wrong-case"),))
+
+
 def test_cache_identity_uses_builder_representation_when_frozen_schema_omits_it() -> None:
     config = SimpleNamespace(
         expected_test_cache_semantic_id="uniform_b_v2_descriptive_test_cache_v1",
@@ -128,6 +160,26 @@ def test_initialization_recovery_requires_exact_failed_inventory(tmp_path: Path)
 
     (root / "unexpected.json").write_text("{}\n", encoding="utf-8")
     with pytest.raises(ProtocolError, match="recovery boundary drifted"):
+        initialization_recovery.detect_initializing_cache_identity_recovery(root)
+
+
+def test_source_feature_recovery_requires_exact_prelabel_inventory(tmp_path: Path) -> None:
+    root = tmp_path.resolve()
+    for relative in initialization_recovery.SOURCE_FEATURE_RECOVERY_FILES:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if relative == "reports/run_state.json":
+            state = {
+                **initialization_recovery.FAILED_EMBEDDING_IDENTITY_STATE,
+                "updated_at_utc": "2026-08-12T10:16:36+00:00",
+            }
+            path.write_text(json.dumps(state), encoding="utf-8")
+        else:
+            path.write_bytes(b"sealed")
+    assert initialization_recovery.detect_initializing_cache_identity_recovery(root)
+
+    (root / "tables/unexpected.csv").write_text("unsafe\n", encoding="utf-8")
+    with pytest.raises(ProtocolError, match="source-feature recovery boundary drifted"):
         initialization_recovery.detect_initializing_cache_identity_recovery(root)
 
 

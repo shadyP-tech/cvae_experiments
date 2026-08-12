@@ -74,8 +74,11 @@ class LabelFreeTestFrame:
         if (
             np.any(ordinals < 0)
             or np.any(ordinals >= len(self.rows))
-            or tuple(self.rows[int(index)].row_hash for index in ordinals)
-            != tuple(row.row_hash for row in selected)
+            or len(set(map(int, ordinals))) != len(ordinals)
+            or tuple(
+                self.rows[int(index)].cache_identity_payload() for index in ordinals
+            )
+            != tuple(row.cache_identity_payload() for row in selected)
         ):
             raise ProtocolError("Consumed-test embedding row identity drifted.")
         return np.ascontiguousarray(self.embeddings[ordinals], dtype=np.float32)

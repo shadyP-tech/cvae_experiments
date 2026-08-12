@@ -79,7 +79,12 @@ closed-world validation.
 The original pre-compute failure `Endpoint-router test-cache identity drifted`
 was caused by expecting `representation_id` at the frozen protocol's top level;
 the canonical producer stores it in the nested extractor protocol, builder
-report, and shard extractors. The registered exact-snapshot retry recognizes
-only that `FAILED/INITIALIZING` three-file boundary, preserves the original
-resolved config and input provenance, and rejects `--force`, extra arguments,
-or any inventory/input drift.
+report, and shard extractors. A second pre-label bug compared the partition-
+aware row hash (`support`) with the physical cache row hash (`unassigned`);
+physical embedding lookup now checks every immutable row field while partition
+seals remain role-aware. The registered exact-snapshot retry recognizes only
+those two failures: the original `FAILED/INITIALIZING` three-file boundary or
+the exact 11-file `FAILED/SOURCE_AND_LABEL_FREE_FEATURES` boundary with its
+sealed 81-stream source cache. It preserves the original resolved config and
+input provenance and rejects `--force`, extra arguments, or any inventory/input
+drift.

@@ -70,7 +70,9 @@ class LabelFreeCaseRow:
     def sample_id(self) -> str:
         return self.evaluation_row_id
 
-    def identity_payload(self) -> dict[str, object]:
+    def cache_identity_payload(self) -> dict[str, object]:
+        """Physical cache identity, deliberately independent of partition role."""
+
         return {
             "row_ordinal": self.row_ordinal,
             "manifest_row_index": self.manifest_row_index,
@@ -78,6 +80,11 @@ class LabelFreeCaseRow:
             "case_id": self.case_id,
             "center": self.center,
             "split": self.split,
+        }
+
+    def identity_payload(self) -> dict[str, object]:
+        return {
+            **self.cache_identity_payload(),
             "partition_role": self.partition_role,
         }
 
