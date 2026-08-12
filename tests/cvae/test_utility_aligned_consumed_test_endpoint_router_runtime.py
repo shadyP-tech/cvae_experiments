@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import multiprocessing as mp
+from multiprocessing.reduction import ForkingPickler
 from pathlib import Path
+import pickle
 import socket
 from types import SimpleNamespace
 
@@ -19,10 +22,15 @@ from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_rout
 )
 from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_router.prediction_contracts import (
     DEVELOPMENT_ROLE,
+    PlannedPhysicalAction,
     PredictionCell,
     PredictionStore,
+    PredictionTask,
     TARGET_ROLE,
     prediction_store_hash,
+)
+from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_router.checkpoint_store import (
+    PredictionCheckpoint,
 )
 from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_router.runner_dependencies import (
     ConsumedTestEndpointRouterRunnerDependencies,
@@ -42,6 +50,94 @@ from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_rout
 from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_router.inputs import (
     _validate_cache_identity,
 )
+
+
+def _spawn_echo(value: object) -> object:
+    return value
+
+
+def _prediction_task(tmp_path: Path) -> PredictionTask:
+    sha = "a" * 64
+    sources = ("2", "3", "5", "6", "7", "8", "9")
+    actions = []
+    for action_id in ("B", *(f"Hxe::{source}" for source in sources)):
+        selected = action_id.removeprefix("Hxe::") if action_id != "B" else None
+        counts = {
+            source: 270 if source == selected else 144 for source in sources
+        }
+        action_unhashed = {
+            "schema_version": "midogpp_endpoint_router_physical_action_v1",
+            "phase": DEVELOPMENT_ROLE,
+            "outer_target": "0",
+            "query_center": "1",
+            "action_id": action_id,
+            "sources": list(sources),
+            "rows_per_class_by_source": counts,
+            "labels_used": False,
+            "source_prefix_only": True,
+        }
+        actions.append(
+            PlannedPhysicalAction(
+                phase=DEVELOPMENT_ROLE,
+                outer_target="0",
+                query_center="1",
+                action_id=action_id,
+                sources=sources,
+                rows_per_class_by_source=counts,
+                action_hash=canonical_sha256(action_unhashed),
+            )
+        )
+    values = {
+        "phase": DEVELOPMENT_ROLE,
+        "task_ordinal": 0,
+        "outer_target": "0",
+        "query_center": "1",
+        "training_seed": 17,
+        "generation_seed": 17,
+        "actions": tuple(actions),
+        "source_array_path": str(tmp_path / "source.npy"),
+        "target_array_path": str(tmp_path / "target.npy"),
+        "target_array_sha256": sha,
+        "support_row_ordinals": (0,),
+        "evaluation_row_ordinals": (1,),
+        "support_row_ids": ("support",),
+        "evaluation_row_ids": ("evaluation",),
+        "support_case_ids": ("support-case",),
+        "evaluation_case_ids": ("evaluation-case",),
+        "support_row_identity_hash": sha,
+        "evaluation_row_identity_hash": sha,
+        "config_contract_hash": "b" * 16,
+        "source_stream_lock_hash": "c" * 16,
+        "partition_lock_hash": sha,
+        "cache_binding_hash": sha,
+        "classifier_payload": {
+            "family": "sklearn_logistic_regression",
+            "C": 0.01,
+            "penalty": "l2",
+            "solver": "lbfgs",
+            "max_iter": 3000,
+            "class_weight": None,
+            "random_state": 23,
+            "l1_ratio": None,
+            "threshold_policy": "predict",
+            "scaler_fit": "synthetic_train_only",
+        },
+        "checkpoint_npz_path": str(tmp_path / "development_predictions" / "development_H0_q1_train17_gen17.npz"),
+        "checkpoint_json_path": str(tmp_path / "development_predictions" / "development_H0_q1_train17_gen17.json"),
+    }
+    unhashed = {
+        "schema_version": "midogpp_endpoint_router_prediction_task_v1",
+        **{
+            key: [item.to_payload() for item in value]
+            if key == "actions"
+            else list(value)
+            if isinstance(value, tuple)
+            else value
+            for key, value in values.items()
+        },
+        "labels_available": False,
+    }
+    return PredictionTask(**values, task_hash=canonical_sha256(unhashed))
 
 
 def test_embedding_slice_accepts_derived_role_but_rejects_physical_identity_drift(
@@ -74,6 +170,52 @@ def test_embedding_slice_accepts_derived_role_but_rejects_physical_identity_drif
     )
     with pytest.raises(ProtocolError, match="embedding row identity drifted"):
         frame.embeddings_for((replace(support_row, case_id="wrong-case"),))
+
+
+def test_spawn_boundary_round_trips_prediction_task_and_checkpoint(
+    tmp_path: Path,
+) -> None:
+    task = _prediction_task(tmp_path)
+    restored_task = pickle.loads(pickle.dumps(task))
+    assert restored_task.task_hash == task.task_hash
+    assert dict(restored_task.classifier_payload) == dict(task.classifier_payload)
+    assert dict(restored_task.actions[0].rows_per_class_by_source) == dict(
+        task.actions[0].rows_per_class_by_source
+    )
+    with pytest.raises(TypeError):
+        restored_task.classifier_payload["C"] = 1.0  # type: ignore[index]
+    with pytest.raises(TypeError):
+        restored_task.actions[0].rows_per_class_by_source["2"] = 1  # type: ignore[index]
+
+    checkpoint = PredictionCheckpoint(
+        task_hash=task.task_hash,
+        task_key=task.key,
+        probabilities=np.asarray([[0.25, 0.75]], dtype=np.float32),
+        action_records=({"action_id": "B", "converged": True},),
+        checkpoint_hash="d" * 64,
+        npz_path=Path(task.checkpoint_npz_path),
+        json_path=Path(task.checkpoint_json_path),
+    )
+    restored_checkpoint = pickle.loads(pickle.dumps(checkpoint))
+    assert restored_checkpoint.checkpoint_hash == checkpoint.checkpoint_hash
+    assert dict(restored_checkpoint.action_records[0]) == dict(
+        checkpoint.action_records[0]
+    )
+    with pytest.raises(TypeError):
+        restored_checkpoint.action_records[0]["converged"] = False  # type: ignore[index]
+    assert ForkingPickler.loads(ForkingPickler.dumps(task)).task_hash == task.task_hash
+    assert (
+        ForkingPickler.loads(ForkingPickler.dumps(checkpoint)).checkpoint_hash
+        == checkpoint.checkpoint_hash
+    )
+
+    context = mp.get_context("spawn")
+    with context.Pool(processes=1) as pool:
+        spawned_task, spawned_checkpoint = pool.map(
+            _spawn_echo, (task, checkpoint)
+        )
+    assert spawned_task.task_hash == task.task_hash
+    assert spawned_checkpoint.checkpoint_hash == checkpoint.checkpoint_hash
 
 
 def test_cache_identity_uses_builder_representation_when_frozen_schema_omits_it() -> None:
@@ -203,6 +345,29 @@ def test_feature_task_recovery_requires_exact_staged_support_inventory(
     support = root / "checkpoints/feature_runtime/support_q0.npy"
     support.unlink()
     with pytest.raises(ProtocolError, match="feature-task recovery boundary drifted"):
+        initialization_recovery.detect_initializing_cache_identity_recovery(root)
+
+
+def test_prediction_pickle_recovery_requires_complete_feature_inventory(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path.resolve()
+    for relative in initialization_recovery.COMPLETE_FEATURE_RECOVERY_FILES:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if relative == "reports/run_state.json":
+            state = {
+                **initialization_recovery.FAILED_PREDICTION_PICKLE_STATE,
+                "updated_at_utc": "2026-08-12T12:02:01+00:00",
+            }
+            path.write_text(json.dumps(state), encoding="utf-8")
+        else:
+            path.write_bytes(b"sealed")
+    assert initialization_recovery.detect_initializing_cache_identity_recovery(root)
+
+    component = root / "checkpoints/feature_runtime/feature_e0_train17.json"
+    component.unlink()
+    with pytest.raises(ProtocolError, match="prediction-pickle recovery boundary drifted"):
         initialization_recovery.detect_initializing_cache_identity_recovery(root)
 
 

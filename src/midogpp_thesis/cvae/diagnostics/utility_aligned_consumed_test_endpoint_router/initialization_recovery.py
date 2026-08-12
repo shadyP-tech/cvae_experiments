@@ -66,6 +66,27 @@ FEATURE_TASK_RECOVERY_FILES = frozenset(
         ),
     }
 )
+FAILED_PREDICTION_PICKLE_STATE = {
+    "schema_version": "midogpp_consumed_test_endpoint_router_run_state_v1",
+    "status": "FAILED",
+    "phase": "GLOBAL_DEVELOPMENT_PREDICTION_SEAL",
+    "promotion_eligible": False,
+    "terminal_consumed_test_diagnostic_only": True,
+    "automatic_resume_requires_hash_validation": True,
+    "error": "TypeError: cannot pickle 'mappingproxy' object",
+}
+COMPLETE_FEATURE_RECOVERY_FILES = frozenset(
+    {
+        *FEATURE_TASK_RECOVERY_FILES,
+        "checkpoints/feature_runtime/feature_input_seal.json",
+        *(
+            f"checkpoints/feature_runtime/feature_e{center}_train{training_seed}.{suffix}"
+            for center in ("0", "1", "2", "3", "5", "6", "7", "8", "9")
+            for training_seed in (17, 42, 101)
+            for suffix in ("json", "npz")
+        ),
+    }
+)
 
 
 def detect_initializing_cache_identity_recovery(root: Path) -> bool:
@@ -98,6 +119,13 @@ def detect_initializing_cache_identity_recovery(root: Path) -> bool:
         expected_state = FAILED_FEATURE_TASK_STATE
         expected_files = FEATURE_TASK_RECOVERY_FILES
         boundary = "feature-task"
+    elif (
+        state.get("phase") == FAILED_PREDICTION_PICKLE_STATE["phase"]
+        and state.get("error") == FAILED_PREDICTION_PICKLE_STATE["error"]
+    ):
+        expected_state = FAILED_PREDICTION_PICKLE_STATE
+        expected_files = COMPLETE_FEATURE_RECOVERY_FILES
+        boundary = "prediction-pickle"
     else:
         return False
     observed = frozenset(
@@ -129,6 +157,8 @@ __all__ = (
     "FAILED_CACHE_IDENTITY_STATE",
     "FAILED_EMBEDDING_IDENTITY_STATE",
     "FAILED_FEATURE_TASK_STATE",
+    "FAILED_PREDICTION_PICKLE_STATE",
+    "COMPLETE_FEATURE_RECOVERY_FILES",
     "FEATURE_TASK_RECOVERY_FILES",
     "INITIALIZING_RECOVERY_FILES",
     "SOURCE_FEATURE_RECOVERY_FILES",

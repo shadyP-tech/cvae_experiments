@@ -115,6 +115,22 @@ class PlannedPhysicalAction:
     def to_payload(self) -> dict[str, object]:
         return {**self.unhashed_payload(), "action_hash": self.action_hash}
 
+    def __reduce__(self) -> tuple[object, tuple[object, ...]]:
+        """Cross a spawned worker boundary without serializing mappingproxy."""
+
+        return (
+            type(self),
+            (
+                self.phase,
+                self.outer_target,
+                self.query_center,
+                self.action_id,
+                self.sources,
+                dict(self.rows_per_class_by_source),
+                self.action_hash,
+            ),
+        )
+
 
 @dataclass(frozen=True)
 class PredictionTask:
@@ -225,6 +241,41 @@ class PredictionTask:
             "checkpoint_json_path": self.checkpoint_json_path,
             "labels_available": False,
         }
+
+    def __reduce__(self) -> tuple[object, tuple[object, ...]]:
+        """Serialize the complete validated task graph using plain mappings."""
+
+        return (
+            type(self),
+            (
+                self.phase,
+                self.task_ordinal,
+                self.outer_target,
+                self.query_center,
+                self.training_seed,
+                self.generation_seed,
+                self.actions,
+                self.source_array_path,
+                self.target_array_path,
+                self.target_array_sha256,
+                self.support_row_ordinals,
+                self.evaluation_row_ordinals,
+                self.support_row_ids,
+                self.evaluation_row_ids,
+                self.support_case_ids,
+                self.evaluation_case_ids,
+                self.support_row_identity_hash,
+                self.evaluation_row_identity_hash,
+                self.config_contract_hash,
+                self.source_stream_lock_hash,
+                self.partition_lock_hash,
+                self.cache_binding_hash,
+                dict(self.classifier_payload),
+                self.checkpoint_npz_path,
+                self.checkpoint_json_path,
+                self.task_hash,
+            ),
+        )
 
 
 @dataclass(frozen=True)

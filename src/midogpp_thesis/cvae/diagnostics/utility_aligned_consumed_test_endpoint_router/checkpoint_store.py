@@ -40,6 +40,22 @@ class PredictionCheckpoint:
         object.__setattr__(self, "probabilities", values)
         object.__setattr__(self, "action_records", records)
 
+    def __reduce__(self) -> tuple[object, tuple[object, ...]]:
+        """Return worker results through spawn using plain record mappings."""
+
+        return (
+            type(self),
+            (
+                self.task_hash,
+                self.task_key,
+                self.probabilities,
+                tuple(dict(row) for row in self.action_records),
+                self.checkpoint_hash,
+                self.npz_path,
+                self.json_path,
+            ),
+        )
+
 
 def write_task_checkpoint(
     task: PredictionTask,
