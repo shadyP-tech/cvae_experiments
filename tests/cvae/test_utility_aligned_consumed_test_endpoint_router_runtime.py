@@ -973,5 +973,19 @@ def test_closed_world_phase_resume_finalizes_without_restarting_compute(
         runner, "run_endpoint_router_workstation_preflight",
         lambda *args, **kwargs: pytest.fail("preflight reran during finalization resume"),
     )
+    monkeypatch.setattr(
+        runner,
+        "run_prelabel_science",
+        lambda *args, **kwargs: pytest.fail(
+            "development labels or model fitting reran during finalization resume"
+        ),
+    )
+    monkeypatch.setattr(
+        runner,
+        "run_terminal_science",
+        lambda *args, **kwargs: pytest.fail(
+            "terminal labels or scoring reran during finalization resume"
+        ),
+    )
     assert runner.run_utility_aligned_consumed_test_endpoint_router(config) == root
     assert events == ["workspace", "provenance", "finalize"]

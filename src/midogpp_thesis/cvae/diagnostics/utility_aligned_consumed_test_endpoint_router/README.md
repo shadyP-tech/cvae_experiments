@@ -52,6 +52,9 @@ experiment, or feed Stage 50, 60, 70, or another Stage-90 run.
 - `run_lock.py` records a tokenized PID/host owner and may recover only a dead
   same-host owner, so a killed workstation process can resume without stealing
   a live or remote lock.
+- `recovery.py` is the registered recovery façade. Pre-label boundaries remain
+  in `initialization_recovery.py`; the terminal validation-only boundary lives
+  separately in `finalization_recovery.py`.
 
 The validator reconstructs all persisted scientific rows and formula/hash
 lineage. Target bootstrap productions are cross-bound by their persisted
@@ -87,8 +90,9 @@ seals remain role-aware. A third pre-label task-contract bug classified the
 file digests. The contract now keeps those hash families distinct and binds
 each source block's semantic SHA-256 into the GPU task before scoring.
 
-The registered exact-snapshot retry recognizes only these four failures: the
-original `FAILED/INITIALIZING` three-file boundary, the exact 11-file
+The registered exact-snapshot retry recognizes only explicitly enumerated
+failures. These include the original `FAILED/INITIALIZING` three-file boundary,
+the exact 11-file
 `FAILED/SOURCE_AND_LABEL_FREE_FEATURES` embedding-identity boundary with its
 sealed 81-stream source cache, or the feature-task boundary containing those
 11 files plus exactly nine hash-validated staged support arrays. It preserves
@@ -114,3 +118,12 @@ development JSON/NPZ pairs (1,371 files total), with no development final seal,
 target checkpoint, label, policy, or terminal member. The normal development
 runtime then reconstructs the immutable plan and revalidates every checkpoint
 binding before assembling the sealed probability store.
+
+The post-label `Candidate feature partition binding drifted` failure was a
+reconstructive-validator role mix-up: source-inner feature rows are joined to
+development responses by ordered support-row identity, while target feature
+rows are bound to the whole-case bootstrap partition. The validator now checks
+those two contracts separately. Its recovery is finalization-only and accepts
+exactly the 41-member closed-world bundle missing only
+`reports/validation_report.json`; it never reruns feature production, fitting,
+planning, prediction, label access, or terminal scoring.

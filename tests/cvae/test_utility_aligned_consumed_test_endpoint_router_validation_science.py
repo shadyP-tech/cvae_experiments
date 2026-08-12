@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import csv
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import json
 from pathlib import Path
 
@@ -25,6 +25,9 @@ from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_rout
     _validate_logical_endpoint_aliases,
     validate_development_science,
     validate_terminal_science,
+)
+from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_router.validation_science_features import (
+    _validate_feature_partition_bindings,
 )
 
 
@@ -56,6 +59,65 @@ def test_flat_csv_decoder_is_lossless_and_feature_hash_bound() -> None:
     raw["target_local_scalar"] = "0.03"
     with pytest.raises(ProtocolError, match="row hash drifted"):
         _feature_row(raw)
+
+
+def test_feature_partition_binding_is_role_specific() -> None:
+    row_identity_hash = "1" * 64
+    bootstrap_feature_hash = "2" * 64
+    source = EnsembleCandidateFeatureRow(
+        role="source_inner_exact_tail",
+        outer_target_id="0",
+        query_id="1",
+        candidate_source="2",
+        candidate_source_count=7,
+        support_partition_hash=row_identity_hash,
+        support_case_count=8,
+        seed_row_hashes=tuple(f"source-seed-{index}" for index in range(9)),
+        feature_mean_by_name=_feature_values(0.1),
+        feature_seed_standard_deviation_by_name=_feature_values(0.01),
+        target_local_scalar=None,
+        target_local_scalar_name=None,
+        target_local_scalar_semantics=None,
+        target_local_scalar_seed_standard_deviation=None,
+        target_local_scalar_provenance_hash=None,
+    )
+    target = EnsembleCandidateFeatureRow(
+        role="fresh_target_support",
+        outer_target_id="0",
+        query_id="0",
+        candidate_source="1",
+        candidate_source_count=8,
+        support_partition_hash=bootstrap_feature_hash,
+        support_case_count=8,
+        seed_row_hashes=tuple(f"target-seed-{index}" for index in range(9)),
+        feature_mean_by_name=_feature_values(0.1),
+        feature_seed_standard_deviation_by_name=_feature_values(0.01),
+        target_local_scalar=None,
+        target_local_scalar_name=None,
+        target_local_scalar_semantics=None,
+        target_local_scalar_seed_standard_deviation=None,
+        target_local_scalar_provenance_hash=None,
+    )
+
+    _validate_feature_partition_bindings(
+        (source,), expected_by_center={"1": row_identity_hash}
+    )
+    _validate_feature_partition_bindings(
+        (target,), expected_by_center={"0": bootstrap_feature_hash}
+    )
+    with pytest.raises(ProtocolError, match="partition binding drifted"):
+        _validate_feature_partition_bindings(
+            (source,), expected_by_center={"1": bootstrap_feature_hash}
+        )
+    with pytest.raises(ProtocolError, match="partition binding drifted"):
+        _validate_feature_partition_bindings(
+            (target,), expected_by_center={"0": row_identity_hash}
+        )
+    with pytest.raises(ProtocolError, match="partition binding drifted"):
+        _validate_feature_partition_bindings(
+            (replace(target, support_case_count=7),),
+            expected_by_center={"0": bootstrap_feature_hash},
+        )
 
 
 def test_model_hash_tamper_is_rejected() -> None:

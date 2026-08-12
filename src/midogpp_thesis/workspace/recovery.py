@@ -289,11 +289,11 @@ def detect_registered_exact_recovery(strategy_id: str, artifact_root: Path) -> b
 
         return bool(detect_post_test_seal_recovery(artifact_root))
     if strategy_id == EXACT_EXISTING_SNAPSHOT_UTILITY_ALIGNED_CONSUMED_TEST_ENDPOINT_ROUTER_V1:
-        from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_router.initialization_recovery import (  # noqa: E501
-            detect_initializing_cache_identity_recovery,
+        from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_router.recovery import (  # noqa: E501
+            detect_registered_endpoint_router_recovery,
         )
 
-        return bool(detect_initializing_cache_identity_recovery(artifact_root))
+        return bool(detect_registered_endpoint_router_recovery(artifact_root))
     raise RecoveryContractError(f"Unknown workspace recovery strategy: {strategy_id!r}")
 
 

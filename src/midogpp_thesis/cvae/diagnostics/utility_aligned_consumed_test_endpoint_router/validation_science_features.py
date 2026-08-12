@@ -76,13 +76,14 @@ def validate_feature_science(
         or {row.row_key for row in target_rows} != expected_target_keys
     ):
         raise ProtocolError("Candidate feature key geometry drifted.")
-    for row in (*source_rows, *target_rows):
-        if (
-            row.support_partition_hash
-            != partitions.support_feature_hash_by_center[row.query_id]
-            or row.support_case_count != 8
-        ):
-            raise ProtocolError("Candidate feature partition binding drifted.")
+    _validate_feature_partition_bindings(
+        source_rows,
+        expected_by_center=partitions.support_row_identity_hash_by_center,
+    )
+    _validate_feature_partition_bindings(
+        target_rows,
+        expected_by_center=partitions.support_feature_hash_by_center,
+    )
 
     manifest = read_json(base / "manifests/feature_surface_set.json")
     source_payloads = mapping_field(manifest, "source_surfaces_by_target")
@@ -234,6 +235,27 @@ def validate_feature_science(
         ),
         source_surface_set=source_set,
     )
+
+
+def _validate_feature_partition_bindings(
+    rows: tuple[EnsembleCandidateFeatureRow, ...],
+    *,
+    expected_by_center: Mapping[str, str],
+) -> None:
+    """Validate the role-specific support identity carried by feature rows.
+
+    Source-inner features must join exactly to development utility responses,
+    which are bound to the ordered support-row identity. Target features have
+    no utility-response join and instead bind the whole-case bootstrap plan.
+    """
+
+    for row in rows:
+        if (
+            row.query_id not in expected_by_center
+            or row.support_partition_hash != expected_by_center[row.query_id]
+            or row.support_case_count != 8
+        ):
+            raise ProtocolError("Candidate feature partition binding drifted.")
 
 
 def feature_row(raw: Mapping[str, str]) -> EnsembleCandidateFeatureRow:
