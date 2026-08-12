@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Mapping
 
 import pytest
 import yaml
@@ -15,6 +16,11 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_o
 )
 from midogpp_thesis.cvae.protocol import ProtocolError
 from midogpp_thesis.workspace import runtime as workspace_runtime
+from midogpp_thesis.workspace.recovery import (
+    EXACT_EXISTING_SNAPSHOT_UTILITY_ALIGNED_CONSUMED_TEST_ENDPOINT_ROUTER_V1,
+    RecoveryContractError,
+    registered_recovery_state_status,
+)
 from midogpp_thesis.workspace.runtime import MidogppWorkspace, WorkspaceError
 
 
@@ -278,6 +284,194 @@ def test_non_recovery_state_uses_normal_prepare(
 
     assert prepared.resolved_config_path.read_bytes() == config_before
     assert prepared.input_manifest_path.read_bytes() == manifest_before
+
+
+@pytest.mark.parametrize(
+    ("status", "force"),
+    (
+        ("FAILED", False),
+        ("FAILED", True),
+        ("RUNNING", False),
+        ("RUNNING", True),
+    ),
+)
+def test_registered_recovery_refuses_unrecognized_active_state_before_prepare(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    status: str,
+    force: bool,
+) -> None:
+    workspace, state, _inputs = _build_exact_workspace(tmp_path, monkeypatch)
+    prepared = workspace.prepare(EXPERIMENT_ID)
+    state_path = prepared.artifact_root / "reports/run_state.json"
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(
+        json.dumps(
+            {
+                "schema_version": (
+                    "midogpp_disagreement_regret_prediction_only_run_state_v1"
+                ),
+                "status": status,
+                "phase": "UNREGISTERED_FAILURE_BOUNDARY",
+                "error": "RuntimeError: unregistered boundary",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    before = (
+        prepared.resolved_config_path.read_bytes(),
+        prepared.input_manifest_path.read_bytes(),
+    )
+    state.update(REVISION_B)
+
+    with pytest.raises(WorkspaceError, match="recovery state is unrecognized"):
+        workspace.run(EXPERIMENT_ID, force=force)
+
+    assert prepared.resolved_config_path.read_bytes() == before[0]
+    assert prepared.input_manifest_path.read_bytes() == before[1]
+
+
+def test_registered_recovery_refuses_broken_state_symlink_before_prepare(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace, _state, _inputs = _build_exact_workspace(tmp_path, monkeypatch)
+    prepared = workspace.prepare(EXPERIMENT_ID)
+    state_path = prepared.artifact_root / "reports/run_state.json"
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.symlink_to(state_path.parent / "missing-run-state.json")
+    before = (
+        prepared.resolved_config_path.read_bytes(),
+        prepared.input_manifest_path.read_bytes(),
+    )
+
+    with pytest.raises(WorkspaceError, match="recovery state is unsafe"):
+        workspace.run(EXPERIMENT_ID)
+
+    assert prepared.resolved_config_path.read_bytes() == before[0]
+    assert prepared.input_manifest_path.read_bytes() == before[1]
+
+
+def test_registered_recovery_refuses_recognized_state_symlink_before_dispatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace, state, _inputs = _build_exact_workspace(tmp_path, monkeypatch)
+    prepared = workspace.prepare(EXPERIMENT_ID)
+    _write_exact_failed_inventory(prepared.artifact_root)
+    state_path = prepared.artifact_root / "reports/run_state.json"
+    external_state = tmp_path / "external-run-state.json"
+    external_state.write_bytes(state_path.read_bytes())
+    state_path.unlink()
+    state_path.symlink_to(external_state)
+    before = (
+        prepared.resolved_config_path.read_bytes(),
+        prepared.input_manifest_path.read_bytes(),
+    )
+    state.update(REVISION_B)
+
+    with pytest.raises(WorkspaceError, match="recovery state is unsafe"):
+        workspace.run(EXPERIMENT_ID)
+
+    assert prepared.resolved_config_path.read_bytes() == before[0]
+    assert prepared.input_manifest_path.read_bytes() == before[1]
+
+
+@pytest.mark.parametrize(
+    "state_payload",
+    (
+        {"status": "COMPLETE"},
+        {
+            "schema_version": (
+                "midogpp_disagreement_regret_prediction_only_run_state_v1"
+            ),
+            "status": "COMPLETE",
+            "phase": "NOT_COMPLETE",
+        },
+        {
+            "schema_version": (
+                "midogpp_disagreement_regret_prediction_only_run_state_v1"
+            ),
+            "status": "COMPLETE",
+            "phase": "COMPLETE",
+            "error": "RuntimeError: contradictory complete state",
+        },
+    ),
+)
+@pytest.mark.parametrize("force", [False, True])
+def test_registered_recovery_refuses_malformed_complete_state_before_prepare(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    state_payload: Mapping[str, object],
+    force: bool,
+) -> None:
+    workspace, _state, _inputs = _build_exact_workspace(tmp_path, monkeypatch)
+    prepared = workspace.prepare(EXPERIMENT_ID)
+    state_path = prepared.artifact_root / "reports/run_state.json"
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(
+        json.dumps(state_payload, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    before = (
+        prepared.resolved_config_path.read_bytes(),
+        prepared.input_manifest_path.read_bytes(),
+    )
+
+    with pytest.raises(WorkspaceError, match="recovery state is malformed"):
+        workspace.run(EXPERIMENT_ID, force=force)
+
+    assert prepared.resolved_config_path.read_bytes() == before[0]
+    assert prepared.input_manifest_path.read_bytes() == before[1]
+
+
+def test_registered_endpoint_recovery_status_uses_endpoint_schema(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "endpoint-root"
+    state_path = root / "reports/run_state.json"
+    state_path.parent.mkdir(parents=True)
+    state_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "midogpp_consumed_test_endpoint_router_run_state_v1",
+                "status": "FAILED",
+                "phase": "UNREGISTERED_ENDPOINT_FAILURE",
+                "error": "RuntimeError: endpoint boundary",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert (
+        registered_recovery_state_status(
+            EXACT_EXISTING_SNAPSHOT_UTILITY_ALIGNED_CONSUMED_TEST_ENDPOINT_ROUTER_V1,
+            root,
+        )
+        == "FAILED"
+    )
+
+    state_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "midogpp_consumed_test_endpoint_router_run_state_v1",
+                "status": [],
+                "phase": "UNREGISTERED_ENDPOINT_FAILURE",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(RecoveryContractError, match="recovery state is malformed"):
+        registered_recovery_state_status(
+            EXACT_EXISTING_SNAPSHOT_UTILITY_ALIGNED_CONSUMED_TEST_ENDPOINT_ROUTER_V1,
+            root,
+        )
 
 
 def test_exact_recovery_rehashes_every_current_input_and_rejects_drift(

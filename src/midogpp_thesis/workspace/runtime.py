@@ -23,6 +23,7 @@ from .recovery import (
     RecoveryContractError,
     SnapshotBytesGuard,
     detect_registered_exact_recovery,
+    registered_recovery_state_status,
     registration_errors,
     validate_preserved_snapshots,
 )
@@ -603,7 +604,18 @@ class MidogppWorkspace:
             require_exists=False,
         )
         strategy = experiment.run_recovery_strategy
-        if strategy is not None and detect_registered_exact_recovery(strategy, artifact_root):
+        try:
+            recovery_state_status = (
+                registered_recovery_state_status(strategy, artifact_root)
+                if strategy is not None
+                else None
+            )
+        except RecoveryContractError as exc:
+            raise WorkspaceError(str(exc)) from exc
+        recovery_detected = strategy is not None and detect_registered_exact_recovery(
+            strategy, artifact_root
+        )
+        if recovery_detected:
             if force:
                 raise WorkspaceError(
                     "Registered exact-existing-snapshot recovery rejects --force."
@@ -635,6 +647,12 @@ class MidogppWorkspace:
             except RecoveryContractError as exc:
                 raise WorkspaceError(str(exc)) from exc
             return self._execute(prepared, extra_args=(), recovery_guard=guard)
+
+        if strategy is not None and recovery_state_status in {"FAILED", "RUNNING"}:
+            raise WorkspaceError(
+                "Registered exact-existing-snapshot recovery state is unrecognized; "
+                f"refusing normal preparation for strategy {strategy!r}."
+            )
 
         prepared = self.prepare(experiment_id, require_inputs=True, force=force)
         return self._execute(prepared, extra_args=extra_args)

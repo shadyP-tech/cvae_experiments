@@ -22,6 +22,15 @@ EXACT_EXISTING_SNAPSHOT_UTILITY_ALIGNED_CONSUMED_TEST_ENDPOINT_ROUTER_V1 = (
     "exact_existing_snapshot_utility_aligned_consumed_test_endpoint_router_v1"
 )
 
+_RUN_STATE_SCHEMA_BY_STRATEGY = {
+    EXACT_EXISTING_SNAPSHOT_DISAGREEMENT_REGRET_PREDICTION_ONLY_V1: (
+        "midogpp_disagreement_regret_prediction_only_run_state_v1"
+    ),
+    EXACT_EXISTING_SNAPSHOT_UTILITY_ALIGNED_CONSUMED_TEST_ENDPOINT_ROUTER_V1: (
+        "midogpp_consumed_test_endpoint_router_run_state_v1"
+    ),
+}
+
 _EXPERIMENT_ID = (
     "midogpp.oracle."
     "uniform_b_v2_consumed_test_fixed_bank_disagreement_regret_prediction_only.v1"
@@ -288,6 +297,54 @@ def detect_registered_exact_recovery(strategy_id: str, artifact_root: Path) -> b
     raise RecoveryContractError(f"Unknown workspace recovery strategy: {strategy_id!r}")
 
 
+def registered_recovery_state_status(
+    strategy_id: str,
+    artifact_root: Path,
+) -> str | None:
+    """Read a registered run state without following unsafe filesystem aliases."""
+
+    state_path = artifact_root / "reports/run_state.json"
+    try:
+        state_path.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise RecoveryContractError(
+            "Registered exact-existing-snapshot recovery state is unreadable."
+        ) from exc
+    if not state_path.is_file() or state_path.is_symlink():
+        raise RecoveryContractError(
+            "Registered exact-existing-snapshot recovery state is unsafe."
+        )
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RecoveryContractError(
+            "Registered exact-existing-snapshot recovery state is unreadable."
+        ) from exc
+    if not isinstance(state, Mapping):
+        raise RecoveryContractError(
+            "Registered exact-existing-snapshot recovery state is malformed."
+        )
+    expected_schema = _RUN_STATE_SCHEMA_BY_STRATEGY.get(strategy_id)
+    if expected_schema is None:
+        raise RecoveryContractError(
+            f"Unknown workspace recovery strategy: {strategy_id!r}"
+        )
+    status = state.get("status")
+    if (
+        state.get("schema_version") != expected_schema
+        or not isinstance(status, str)
+        or status not in {"FAILED", "RUNNING", "COMPLETE"}
+        or (status == "COMPLETE" and state.get("phase") != "COMPLETE")
+        or (status == "COMPLETE" and state.get("error") is not None)
+    ):
+        raise RecoveryContractError(
+            "Registered exact-existing-snapshot recovery state is malformed."
+        )
+    return str(status)
+
+
 def validate_preserved_snapshots(
     guard: SnapshotBytesGuard,
     *,
@@ -342,6 +399,7 @@ __all__ = (
     "RecoveryContractError",
     "SnapshotBytesGuard",
     "detect_registered_exact_recovery",
+    "registered_recovery_state_status",
     "registration_errors",
     "required_strategy_for_experiment",
     "validate_preserved_snapshots",
