@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -37,6 +38,25 @@ def _write_completed_neutral_source_tree(root: Path) -> None:
     # The neutral runtime removes checkpoints/frozen_source_streams after it
     # seals the trio, but deliberately leaves this experiment-owned parent.
     (root / "checkpoints").mkdir()
+
+
+def _write_completed_neutral_prediction_scratch(root: Path) -> None:
+    """Mirror scratch left after the neutral A1 runtime seals predictions."""
+
+    # The neutral runtime removes its owned
+    # checkpoints/fixed_bank_a1_action_predictions subtree after sealing the
+    # canonical prediction trio, leaving this package-owned empty parent.
+    (root / execution_adapter.LOCAL_PREDICTION_DIRECTORY / "checkpoints").mkdir(
+        parents=True
+    )
+
+
+def _scratch_cleanup_config(root: Path, artifact_root: Path) -> SimpleNamespace:
+    return SimpleNamespace(
+        runtime={"scratch_preference": [str(root), "artifact_parent"]},
+        artifact_root=artifact_root,
+        contract_hash="c" * 64,
+    )
 
 
 def test_exact_source_inventory_accepts_completed_neutral_runtime_tree(
@@ -117,6 +137,104 @@ def test_source_checkpoint_parent_normalization_rejects_unsafe_types(
 
     with pytest.raises(ProtocolError, match="checkpoint parent is unsafe"):
         execution_adapter._remove_empty_owned_source_checkpoint_parent(root)
+
+
+def test_cleanup_accepts_completed_neutral_prediction_scratch_topology(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scratch = tmp_path / "scratch"
+    _write_completed_neutral_prediction_scratch(scratch)
+    config = _scratch_cleanup_config(scratch, tmp_path / "artifact")
+    monkeypatch.setattr(execution_adapter, "SCRATCH_ROOT", str(scratch))
+
+    execution_adapter.cleanup_validated_local_stage(config)
+
+    assert not scratch.exists()
+
+
+@pytest.mark.parametrize(
+    ("drift", "error"),
+    (
+        ("checkpoint_parent_symlink", "prediction checkpoint parent is unsafe"),
+        ("checkpoint_parent_file", "prediction checkpoint parent is unsafe"),
+        (
+            "checkpoint_parent_nonempty",
+            "completed prediction checkpoint parent is not empty",
+        ),
+        (
+            "checkpoint_parent_nested_directory",
+            "completed prediction checkpoint parent is not empty",
+        ),
+        ("foreign_prediction_member", "nonempty/unsafe prediction scratch root"),
+    ),
+)
+def test_cleanup_rejects_unsafe_completed_prediction_scratch_topology(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    drift: str,
+    error: str,
+) -> None:
+    scratch = tmp_path / "scratch"
+    prediction = scratch / execution_adapter.LOCAL_PREDICTION_DIRECTORY
+    prediction.mkdir(parents=True)
+    checkpoints = prediction / "checkpoints"
+    external = tmp_path / "external"
+    external.mkdir()
+    if drift == "checkpoint_parent_symlink":
+        checkpoints.symlink_to(external, target_is_directory=True)
+    elif drift == "checkpoint_parent_file":
+        checkpoints.write_bytes(b"foreign")
+    elif drift == "checkpoint_parent_nonempty":
+        checkpoints.mkdir()
+        (checkpoints / "foreign.bin").write_bytes(b"foreign")
+    elif drift == "checkpoint_parent_nested_directory":
+        (checkpoints / "foreign").mkdir(parents=True)
+    else:
+        (prediction / "foreign.bin").write_bytes(b"foreign")
+    config = _scratch_cleanup_config(scratch, tmp_path / "artifact")
+    monkeypatch.setattr(execution_adapter, "SCRATCH_ROOT", str(scratch))
+
+    with pytest.raises(ProtocolError, match=error):
+        execution_adapter.cleanup_validated_local_stage(config)
+
+    assert prediction.exists()
+    assert external.exists()
+
+
+def test_completed_recovery_cleans_neutral_prediction_scratch_without_recompute(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "artifact"
+    root.mkdir()
+    scratch = tmp_path / "scratch"
+    _write_completed_neutral_prediction_scratch(scratch)
+    config = _scratch_cleanup_config(scratch, root)
+    events: list[str] = []
+    monkeypatch.setattr(execution_adapter, "SCRATCH_ROOT", str(scratch))
+    monkeypatch.setattr(runner, "assert_launch_files", lambda *_args: None)
+    monkeypatch.setattr(
+        runner, "assert_workspace_resolved_paths", lambda *_args, **_kwargs: None
+    )
+
+    @contextmanager
+    def lock(_root: Path):
+        events.append("lock")
+        yield
+
+    monkeypatch.setattr(runner, "exclusive_run_lock", lock)
+    monkeypatch.setattr(
+        runner,
+        "recover_if_possible",
+        lambda *_args, **_kwargs: (events.append("recover"), root)[1],
+    )
+
+    assert runner._run(
+        config, artifact_root=root, deps=FlipRouterDependencies()
+    ) == root
+    assert events == ["lock", "recover"]
+    assert not scratch.exists()
 
 
 def test_dependency_injected_runner_preserves_phase_and_validation_order(

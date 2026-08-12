@@ -322,7 +322,10 @@ def cleanup_validated_local_stage(
         _require_exact_source_inventory(source_path)
         shutil.rmtree(source_path)
     if prediction_path.exists():
-        if prediction_path.is_symlink() or not prediction_path.is_dir() or any(prediction_path.iterdir()):
+        if prediction_path.is_symlink() or not prediction_path.is_dir():
+            raise ProtocolError("Refusing to clean nonempty/unsafe prediction scratch root.")
+        _remove_empty_owned_prediction_checkpoint_parent(prediction_path)
+        if any(prediction_path.iterdir()):
             raise ProtocolError("Refusing to clean nonempty/unsafe prediction scratch root.")
         prediction_path.rmdir()
     if generation_path.exists():
@@ -448,6 +451,25 @@ def _remove_empty_owned_source_checkpoint_parent(path: Path) -> None:
     if any(checkpoint_root.iterdir()):
         raise ProtocolError(
             "Flip-router completed source checkpoint parent is not empty."
+        )
+    checkpoint_root.rmdir()
+
+
+def _remove_empty_owned_prediction_checkpoint_parent(path: Path) -> None:
+    """Normalize the neutral prediction runtime's one empty owned parent."""
+
+    checkpoint_root = path / "checkpoints"
+    if not checkpoint_root.exists():
+        if checkpoint_root.is_symlink():
+            raise ProtocolError(
+                "Flip-router prediction checkpoint parent is a dangling symlink."
+            )
+        return
+    if checkpoint_root.is_symlink() or not checkpoint_root.is_dir():
+        raise ProtocolError("Flip-router prediction checkpoint parent is unsafe.")
+    if any(checkpoint_root.iterdir()):
+        raise ProtocolError(
+            "Flip-router completed prediction checkpoint parent is not empty."
         )
     checkpoint_root.rmdir()
 
