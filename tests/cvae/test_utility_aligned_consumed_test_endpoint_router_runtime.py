@@ -183,6 +183,29 @@ def test_source_feature_recovery_requires_exact_prelabel_inventory(tmp_path: Pat
         initialization_recovery.detect_initializing_cache_identity_recovery(root)
 
 
+def test_feature_task_recovery_requires_exact_staged_support_inventory(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path.resolve()
+    for relative in initialization_recovery.FEATURE_TASK_RECOVERY_FILES:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if relative == "reports/run_state.json":
+            state = {
+                **initialization_recovery.FAILED_FEATURE_TASK_STATE,
+                "updated_at_utc": "2026-08-12T10:33:56+00:00",
+            }
+            path.write_text(json.dumps(state), encoding="utf-8")
+        else:
+            path.write_bytes(b"sealed")
+    assert initialization_recovery.detect_initializing_cache_identity_recovery(root)
+
+    support = root / "checkpoints/feature_runtime/support_q0.npy"
+    support.unlink()
+    with pytest.raises(ProtocolError, match="feature-task recovery boundary drifted"):
+        initialization_recovery.detect_initializing_cache_identity_recovery(root)
+
+
 def test_run_lock_recovers_only_a_dead_same_host_owner(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

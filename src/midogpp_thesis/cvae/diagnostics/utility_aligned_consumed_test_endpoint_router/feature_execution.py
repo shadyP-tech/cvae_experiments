@@ -371,6 +371,12 @@ def _build_tasks(
                         ].block_ordinal
                         for generation_seed in GENERATION_SEEDS
                     },
+                    source_block_output_sha256_by_generation_seed={
+                        generation_seed: source_cache.by_key[
+                            (source, training_seed, generation_seed)
+                        ].output_sha256
+                        for generation_seed in GENERATION_SEEDS
+                    },
                     support_root=str(checkpoint_root.resolve()),
                     support_slices=tuple(
                         support_slices[query] for query in candidate_sources(source)

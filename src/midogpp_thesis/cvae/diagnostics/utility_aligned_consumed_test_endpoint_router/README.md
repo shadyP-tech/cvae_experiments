@@ -82,9 +82,15 @@ the canonical producer stores it in the nested extractor protocol, builder
 report, and shard extractors. A second pre-label bug compared the partition-
 aware row hash (`support`) with the physical cache row hash (`unassigned`);
 physical embedding lookup now checks every immutable row field while partition
-seals remain role-aware. The registered exact-snapshot retry recognizes only
-those two failures: the original `FAILED/INITIALIZING` three-file boundary or
-the exact 11-file `FAILED/SOURCE_AND_LABEL_FREE_FEATURES` boundary with its
-sealed 81-stream source cache. It preserves the original resolved config and
-input provenance and rejects `--force`, extra arguments, or any inventory/input
-drift.
+seals remain role-aware. A third pre-label task-contract bug classified the
+16-hex config, expert-bank, and frozen-source semantic identities as 64-hex
+file digests. The contract now keeps those hash families distinct and binds
+each source block's semantic SHA-256 into the GPU task before scoring.
+
+The registered exact-snapshot retry recognizes only those three failures: the
+original `FAILED/INITIALIZING` three-file boundary, the exact 11-file
+`FAILED/SOURCE_AND_LABEL_FREE_FEATURES` embedding-identity boundary with its
+sealed 81-stream source cache, or the feature-task boundary containing those
+11 files plus exactly nine hash-validated staged support arrays. It preserves
+the original resolved config and input provenance and rejects `--force`, extra
+arguments, or any inventory/input drift.

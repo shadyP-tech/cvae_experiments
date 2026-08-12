@@ -4,11 +4,14 @@ from dataclasses import replace
 import inspect
 import json
 from pathlib import Path
+import pickle
 
 import numpy as np
 import pytest
 
 from midogpp_thesis.cvae.protocol import ProtocolError
+from midogpp_thesis.cvae.generation.contracts import COMMON_OUTPUT_DIM
+from midogpp_thesis.cvae.runtime.frozen_source_streams import source_block_sha256
 from midogpp_thesis.cvae.routing.residual_topup.hashing import canonical_sha256
 from midogpp_thesis.cvae.routing.utility_aligned import build_case_bootstrap_plan
 from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_router.contracts import (
@@ -34,9 +37,49 @@ from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_rout
     build_feature_task,
     build_support_slice,
 )
+from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_router.feature_worker import (
+    load_verified_source_means,
+)
 
 
 SHA = "a" * 64
+SHORT_HASH = "a" * 16
+
+
+def _feature_task_kwargs(tmp_path: Path) -> dict[str, object]:
+    support_slices = tuple(
+        build_support_slice(
+            query_center=query,
+            relative_array_path=f"support_q{query}.npy",
+            array_sha256=SHA,
+            case_ids=tuple(f"q{query}_case_{index}" for index in range(8)),
+            row_identity_hash=SHA,
+            center_partition_hash=SHA,
+            feature_support_partition_hash=SHA,
+        )
+        for query in candidate_sources("0")
+    )
+    return {
+        "source_center": "0",
+        "training_seed": 17,
+        "device": "cuda:0",
+        "expert_bank_root": str(tmp_path / "bank"),
+        "source_array_path": str(tmp_path / "source.npy"),
+        "source_block_ordinal_by_generation_seed": {17: 0, 42: 1, 101: 2},
+        "source_block_output_sha256_by_generation_seed": {
+            seed: SHA for seed in GENERATION_SEEDS
+        },
+        "support_root": str(tmp_path),
+        "support_slices": support_slices,
+        "checkpoint_npz_path": str(tmp_path / "feature_e0_train17.npz"),
+        "checkpoint_json_path": str(tmp_path / "feature_e0_train17.json"),
+        "config_contract_hash": SHORT_HASH,
+        "bank_lock_hash": SHORT_HASH,
+        "source_stream_lock_hash": SHORT_HASH,
+        "cache_binding_hash": SHA,
+        "partition_lock_hash": SHA,
+        "metadata_grid_hash": SHA,
+    }
 
 
 def test_default_feature_runtime_api_is_label_free_and_importable() -> None:
@@ -109,36 +152,8 @@ def test_synthetic_component_assembly_has_exact_geometry_and_strict_exclusion() 
 
 
 def test_feature_checkpoint_round_trip_and_tamper_detection(tmp_path: Path) -> None:
-    support_slices = tuple(
-        build_support_slice(
-            query_center=query,
-            relative_array_path=f"support_q{query}.npy",
-            array_sha256=SHA,
-            case_ids=tuple(f"q{query}_case_{index}" for index in range(8)),
-            row_identity_hash=SHA,
-            center_partition_hash=SHA,
-            feature_support_partition_hash=SHA,
-        )
-        for query in candidate_sources("0")
-    )
-    task = build_feature_task(
-        source_center="0",
-        training_seed=17,
-        device="cuda:0",
-        expert_bank_root=str(tmp_path / "bank"),
-        source_array_path=str(tmp_path / "source.npy"),
-        source_block_ordinal_by_generation_seed={17: 0, 42: 1, 101: 2},
-        support_root=str(tmp_path),
-        support_slices=support_slices,
-        checkpoint_npz_path=str(tmp_path / "feature_e0_train17.npz"),
-        checkpoint_json_path=str(tmp_path / "feature_e0_train17.json"),
-        config_contract_hash=SHA,
-        bank_lock_hash=SHA,
-        source_stream_lock_hash=SHA,
-        cache_binding_hash=SHA,
-        partition_lock_hash=SHA,
-        metadata_grid_hash=SHA,
-    )
+    task = build_feature_task(**_feature_task_kwargs(tmp_path))
+    support_slices = task.support_slices
     arrays = {}
     for support in support_slices:
         for suffix in ("reconstruction_0", "reconstruction_1", "kl_0", "kl_1"):
@@ -161,6 +176,75 @@ def test_feature_checkpoint_round_trip_and_tamper_detection(tmp_path: Path) -> N
     path.write_text(json.dumps(raw), encoding="utf-8")
     with pytest.raises(ProtocolError):
         load_feature_checkpoint(task)
+
+
+@pytest.mark.parametrize(
+    ("field", "wrong_value"),
+    (
+        ("config_contract_hash", SHA),
+        ("bank_lock_hash", SHA),
+        ("source_stream_lock_hash", SHA),
+        ("config_contract_hash", "A" * 16),
+        ("cache_binding_hash", SHORT_HASH),
+        ("partition_lock_hash", SHORT_HASH),
+        ("metadata_grid_hash", SHORT_HASH),
+    ),
+)
+def test_feature_task_enforces_exact_hash_families(
+    tmp_path: Path,
+    field: str,
+    wrong_value: str,
+) -> None:
+    kwargs = _feature_task_kwargs(tmp_path)
+    kwargs[field] = wrong_value
+    with pytest.raises(ProtocolError, match="feature task drifted"):
+        build_feature_task(**kwargs)
+
+
+def test_feature_task_rejects_duplicate_source_block_ordinals(tmp_path: Path) -> None:
+    kwargs = _feature_task_kwargs(tmp_path)
+    kwargs["source_block_ordinal_by_generation_seed"] = {17: 0, 42: 0, 101: 2}
+    with pytest.raises(ProtocolError, match="feature task drifted"):
+        build_feature_task(**kwargs)
+
+
+def test_feature_task_hash_binds_source_block_output_hashes(tmp_path: Path) -> None:
+    kwargs = _feature_task_kwargs(tmp_path)
+    original = build_feature_task(**kwargs)
+    restored = pickle.loads(pickle.dumps(original))
+    assert restored.task_hash == original.task_hash
+    assert (
+        dict(restored.source_block_output_sha256_by_generation_seed)
+        == kwargs["source_block_output_sha256_by_generation_seed"]
+    )
+    changed_hashes = dict(kwargs["source_block_output_sha256_by_generation_seed"])
+    changed_hashes[GENERATION_SEEDS[0]] = "b" * 64
+    kwargs["source_block_output_sha256_by_generation_seed"] = changed_hashes
+    changed = build_feature_task(**kwargs)
+    assert changed.task_hash != original.task_hash
+
+
+def test_feature_worker_rejects_source_block_hash_tamper(tmp_path: Path) -> None:
+    source_path = tmp_path / "source.npy"
+    blocks = np.zeros((3, 540, COMMON_OUTPUT_DIM), dtype=np.float32)
+    for ordinal in range(3):
+        blocks[ordinal, 0, 0] = float(ordinal)
+    np.save(source_path, blocks, allow_pickle=False)
+
+    kwargs = _feature_task_kwargs(tmp_path)
+    kwargs["source_block_output_sha256_by_generation_seed"] = {
+        seed: source_block_sha256(blocks[ordinal])
+        for ordinal, seed in enumerate(GENERATION_SEEDS)
+    }
+    task = build_feature_task(**kwargs)
+    means = load_verified_source_means(task)
+    assert tuple(means) == GENERATION_SEEDS
+    assert all(value.shape == (COMMON_OUTPUT_DIM,) for value in means.values())
+
+    blocks[1, 0, 1] = 1.0
+    np.save(source_path, blocks, allow_pickle=False)
+    with pytest.raises(ProtocolError, match="semantic hash drifted"):
+        load_verified_source_means(task)
 
 
 def test_feature_checkpoint_single_atomic_orphan_is_recomputed(tmp_path: Path) -> None:

@@ -48,10 +48,28 @@ SOURCE_FEATURE_RECOVERY_FILES = frozenset(
         "tables/support_partitions.csv",
     }
 )
+FAILED_FEATURE_TASK_STATE = {
+    "schema_version": "midogpp_consumed_test_endpoint_router_run_state_v1",
+    "status": "FAILED",
+    "phase": "SOURCE_AND_LABEL_FREE_FEATURES",
+    "promotion_eligible": False,
+    "terminal_consumed_test_diagnostic_only": True,
+    "automatic_resume_requires_hash_validation": True,
+    "error": "ProtocolError: Endpoint-router feature task drifted.",
+}
+FEATURE_TASK_RECOVERY_FILES = frozenset(
+    {
+        *SOURCE_FEATURE_RECOVERY_FILES,
+        *(
+            f"checkpoints/feature_runtime/support_q{center}.npy"
+            for center in ("0", "1", "2", "3", "5", "6", "7", "8", "9")
+        ),
+    }
+)
 
 
 def detect_initializing_cache_identity_recovery(root: Path) -> bool:
-    """Recognize only either original false pre-label identity failure."""
+    """Recognize only an explicitly registered pre-label repair boundary."""
 
     state_path = root / "reports/run_state.json"
     if not state_path.is_file():
@@ -73,6 +91,13 @@ def detect_initializing_cache_identity_recovery(root: Path) -> bool:
         expected_state = FAILED_EMBEDDING_IDENTITY_STATE
         expected_files = SOURCE_FEATURE_RECOVERY_FILES
         boundary = "source-feature"
+    elif (
+        state.get("phase") == FAILED_FEATURE_TASK_STATE["phase"]
+        and state.get("error") == FAILED_FEATURE_TASK_STATE["error"]
+    ):
+        expected_state = FAILED_FEATURE_TASK_STATE
+        expected_files = FEATURE_TASK_RECOVERY_FILES
+        boundary = "feature-task"
     else:
         return False
     observed = frozenset(
@@ -103,6 +128,8 @@ def detect_initializing_cache_identity_recovery(root: Path) -> bool:
 __all__ = (
     "FAILED_CACHE_IDENTITY_STATE",
     "FAILED_EMBEDDING_IDENTITY_STATE",
+    "FAILED_FEATURE_TASK_STATE",
+    "FEATURE_TASK_RECOVERY_FILES",
     "INITIALIZING_RECOVERY_FILES",
     "SOURCE_FEATURE_RECOVERY_FILES",
     "detect_initializing_cache_identity_recovery",

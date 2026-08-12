@@ -11,6 +11,7 @@ import numpy as np
 
 from ...generation.contracts import COMMON_OUTPUT_DIM
 from ...protocol import ProtocolError
+from ...runtime.frozen_source_streams import source_block_sha256
 from .artifact_io import sha256_file
 from .feature_checkpoint_store import publish_feature_checkpoint
 from .feature_runtime_contracts import FeatureTask
@@ -19,6 +20,38 @@ from .feature_runtime_contracts import FeatureTask
 RESULT_POLL_SECONDS = 1.0
 WORKER_JOIN_SECONDS = 3.0
 FEATURE_DEVICES = ("cuda:0", "cuda:1")
+
+
+def load_verified_source_means(task: FeatureTask) -> Mapping[int, np.ndarray]:
+    """Hash-verify every task-bound source block before feature reduction."""
+
+    source_array = np.load(task.source_array_path, mmap_mode="r", allow_pickle=False)
+    source_means: dict[int, np.ndarray] = {}
+    for generation_seed, ordinal in task.source_block_ordinal_by_generation_seed.items():
+        try:
+            block = np.asarray(source_array[ordinal])
+        except IndexError as exc:
+            raise ProtocolError(
+                "Endpoint-router frozen source block ordinal drifted in feature worker."
+            ) from exc
+        if (
+            block.shape != (540, COMMON_OUTPUT_DIM)
+            or block.dtype != np.float32
+            or not np.isfinite(block).all()
+        ):
+            raise ProtocolError(
+                "Endpoint-router frozen source block drifted in feature worker."
+            )
+        expected_hash = task.source_block_output_sha256_by_generation_seed[
+            generation_seed
+        ]
+        if source_block_sha256(block) != expected_hash:
+            raise ProtocolError(
+                "Endpoint-router frozen source block semantic hash drifted in "
+                "feature worker."
+            )
+        source_means[generation_seed] = np.mean(block, axis=0, dtype=np.float64)
+    return source_means
 
 
 def execute_feature_tasks(
@@ -108,23 +141,13 @@ def feature_worker_main(task_queue: object, result_queue: object) -> None:
             if not isinstance(task, FeatureTask):
                 raise ProtocolError("Endpoint-router feature worker received another task type.")
             torch.cuda.set_device(task.device)
+            source_means = load_verified_source_means(task)
             expert = load_routing_authorized_expert(
                 task.expert_bank_root,
                 source_center=task.source_center,
                 training_seed=task.training_seed,
                 device=task.device,
             )
-            source_array = np.load(task.source_array_path, mmap_mode="r", allow_pickle=False)
-            source_means: dict[int, np.ndarray] = {}
-            for generation_seed, ordinal in task.source_block_ordinal_by_generation_seed.items():
-                block = np.asarray(source_array[ordinal])
-                if (
-                    block.shape != (540, COMMON_OUTPUT_DIM)
-                    or block.dtype != np.float32
-                    or not np.isfinite(block).all()
-                ):
-                    raise ProtocolError("Endpoint-router frozen source block drifted in feature worker.")
-                source_means[generation_seed] = np.mean(block, axis=0, dtype=np.float64)
             arrays: dict[str, np.ndarray] = {}
             components: list[dict[str, object]] = []
             for support in task.support_slices:
@@ -189,4 +212,9 @@ def _terminate(processes: Sequence[object]) -> None:
             process.join(timeout=WORKER_JOIN_SECONDS)  # type: ignore[attr-defined]
 
 
-__all__ = ("FEATURE_DEVICES", "execute_feature_tasks", "feature_worker_main")
+__all__ = (
+    "FEATURE_DEVICES",
+    "execute_feature_tasks",
+    "feature_worker_main",
+    "load_verified_source_means",
+)

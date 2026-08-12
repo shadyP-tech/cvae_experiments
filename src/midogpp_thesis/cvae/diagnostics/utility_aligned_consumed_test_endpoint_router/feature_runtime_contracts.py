@@ -164,6 +164,7 @@ class FeatureTask:
     expert_bank_root: str
     source_array_path: str
     source_block_ordinal_by_generation_seed: Mapping[int, int]
+    source_block_output_sha256_by_generation_seed: Mapping[int, str]
     support_root: str
     support_slices: tuple[SupportSlice, ...]
     checkpoint_npz_path: str
@@ -181,20 +182,33 @@ class FeatureTask:
             int(key): int(value)
             for key, value in self.source_block_ordinal_by_generation_seed.items()
         }
+        block_hashes = {
+            int(key): value
+            for key, value in self.source_block_output_sha256_by_generation_seed.items()
+        }
         slices = tuple(self.support_slices)
-        payload = self.unhashed_payload(blocks=blocks, slices=slices)
+        payload = self.unhashed_payload(
+            blocks=blocks,
+            block_hashes=block_hashes,
+            slices=slices,
+        )
         if (
             self.source_center not in CENTERS
             or self.training_seed not in TRAINING_SEEDS
             or self.device not in {"cuda:0", "cuda:1"}
             or set(blocks) != set(GENERATION_SEEDS)
+            or set(block_hashes) != set(GENERATION_SEEDS)
             or any(value < 0 for value in blocks.values())
+            or len(set(blocks.values())) != len(blocks)
+            or any(not _sha256(value) for value in block_hashes.values())
             or tuple(item.query_center for item in slices)
             != candidate_sources(self.source_center)
-            or any(not _sha256(value) for value in (
+            or any(not _stable_hash(value) for value in (
                 self.config_contract_hash,
                 self.bank_lock_hash,
                 self.source_stream_lock_hash,
+            ))
+            or any(not _sha256(value) for value in (
                 self.cache_binding_hash,
                 self.partition_lock_hash,
                 self.metadata_grid_hash,
@@ -207,15 +221,26 @@ class FeatureTask:
             "source_block_ordinal_by_generation_seed",
             MappingProxyType(blocks),
         )
+        object.__setattr__(
+            self,
+            "source_block_output_sha256_by_generation_seed",
+            MappingProxyType(block_hashes),
+        )
         object.__setattr__(self, "support_slices", slices)
 
     def unhashed_payload(
         self,
         *,
         blocks: Mapping[int, int] | None = None,
+        block_hashes: Mapping[int, str] | None = None,
         slices: Sequence[SupportSlice] | None = None,
     ) -> dict[str, object]:
         block_values = self.source_block_ordinal_by_generation_seed if blocks is None else blocks
+        block_hash_values = (
+            self.source_block_output_sha256_by_generation_seed
+            if block_hashes is None
+            else block_hashes
+        )
         slice_values = self.support_slices if slices is None else slices
         return _feature_task_payload(
             source_center=self.source_center,
@@ -224,6 +249,7 @@ class FeatureTask:
             expert_bank_root=self.expert_bank_root,
             source_array_path=self.source_array_path,
             blocks=block_values,
+            block_hashes=block_hash_values,
             support_root=self.support_root,
             slices=slice_values,
             checkpoint_npz_path=self.checkpoint_npz_path,
@@ -246,6 +272,7 @@ class FeatureTask:
                 self.expert_bank_root,
                 self.source_array_path,
                 dict(self.source_block_ordinal_by_generation_seed),
+                dict(self.source_block_output_sha256_by_generation_seed),
                 self.support_root,
                 self.support_slices,
                 self.checkpoint_npz_path,
@@ -269,6 +296,7 @@ def build_feature_task(
     expert_bank_root: str,
     source_array_path: str,
     source_block_ordinal_by_generation_seed: Mapping[int, int],
+    source_block_output_sha256_by_generation_seed: Mapping[int, str],
     support_root: str,
     support_slices: Sequence[SupportSlice],
     checkpoint_npz_path: str,
@@ -281,6 +309,10 @@ def build_feature_task(
     metadata_grid_hash: str,
 ) -> FeatureTask:
     blocks = {int(key): int(value) for key, value in source_block_ordinal_by_generation_seed.items()}
+    block_hashes = {
+        int(key): value
+        for key, value in source_block_output_sha256_by_generation_seed.items()
+    }
     slices = tuple(support_slices)
     payload = _feature_task_payload(
         source_center=source_center,
@@ -289,6 +321,7 @@ def build_feature_task(
         expert_bank_root=expert_bank_root,
         source_array_path=source_array_path,
         blocks=blocks,
+        block_hashes=block_hashes,
         support_root=support_root,
         slices=slices,
         checkpoint_npz_path=checkpoint_npz_path,
@@ -307,6 +340,7 @@ def build_feature_task(
         expert_bank_root=expert_bank_root,
         source_array_path=source_array_path,
         source_block_ordinal_by_generation_seed=blocks,
+        source_block_output_sha256_by_generation_seed=block_hashes,
         support_root=support_root,
         support_slices=slices,
         checkpoint_npz_path=checkpoint_npz_path,
@@ -329,6 +363,7 @@ def _feature_task_payload(
     expert_bank_root: str,
     source_array_path: str,
     blocks: Mapping[int, int],
+    block_hashes: Mapping[int, str],
     support_root: str,
     slices: Sequence[SupportSlice],
     checkpoint_npz_path: str,
@@ -349,6 +384,9 @@ def _feature_task_payload(
             "source_array_path": source_array_path,
             "source_block_ordinal_by_generation_seed": {
                 str(key): int(blocks[key]) for key in GENERATION_SEEDS
+            },
+            "source_block_output_sha256_by_generation_seed": {
+                str(key): block_hashes[key] for key in GENERATION_SEEDS
             },
             "support_root": support_root,
             "support_slices": [item.to_payload() for item in slices],
@@ -682,6 +720,14 @@ def _sha256(value: object) -> bool:
     return (
         isinstance(value, str)
         and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _stable_hash(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 16
         and all(character in "0123456789abcdef" for character in value)
     )
 
