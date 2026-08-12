@@ -621,6 +621,79 @@ of outcome. It cannot authorize a route, action, policy, model or expert update,
 routing-quality claim, recipe, promotion, deployment, or feed to Stage 50/60/70
 or any later Stage-90 experiment.
 
+## Uniform-B v2 consumed-test utility-aligned target-static endpoint router v1
+
+`midogpp.oracle.uniform_b_v2_consumed_test_utility_aligned_target_static_endpoint_router.v1`
+is a separately authorized terminal diagnostic over the already-consumed
+MIDOG++ test surface. It has exactly six inputs: the promoted expert bank,
+GenerationLock, a dedicated byte-exact label-free cache alias, one capability-
+gated manifest alias containing both `manifest.csv` and `domain_mapping.json`,
+an alias of the immutable original consumption ledger, and a direct single-
+consumer amendment. It consumes no prior Stage-50/60/70 result, Stage-90
+output or amendment, prediction surface, scratch directory, or checkpoint.
+
+Membership is label-free and seed-independent. After canonical case-ID sort,
+the first eight whole cases in every center form support (72 cases and 2,902
+rows); the other 146 cases and 7,026 rows form evaluation. All 218 cases and
+9,928 rows participate. Support labels never open. Class coverage is checked
+only after membership is frozen and cannot change the partition.
+
+The development surface contains exactly 504 `H/q/e` exact-nine probability-
+ensemble BACC deltas. Each fit excludes `H`, `q`, and candidate `e` from their
+respective roles. Development probabilities seal before other-center `q`
+labels open. The one global predictor is derived locally from the hash-pinned
+three-axis domain mapping in the experiment manifest alias; center/domain IDs
+and labels are not model features, and no seventh metadata artifact is used.
+M1 adds one ensemble-first, label-free support action-probability-shift scalar;
+the permutation control is a deterministic same-capacity refit.
+
+The feature runtime also records posterior-mean reconstruction MSE,
+latent-dimension-normalized analytic PS KL, and linear-kernel squared mean
+discrepancy as descriptive CVAE diagnostics. None enters M0/M1/P, none is an
+exact NELBO or downstream utility, and the unsigned probability-shift predictor
+is classifier sensitivity rather than generative compatibility. Every Hxe (and
+any G/R/P alias that selects it) remains an equal-union B action plus a
+single-source tail, not standalone expert utility.
+
+Each target receives one static plan, never a per-case route. The plan is built
+with the neutral `evaluate_ensemble_cardinality_transfer` and
+`build_ensemble_utility_policy` APIs using exactly 32 whole-case support
+bootstrap replicates under seed `90703`. `R` is selected only when the frozen
+source-inner transfer/capacity gates and its selected-gain lower bound pass;
+otherwise the exact `B` action is retained. `G` and `P` are diagnostic
+selections and `U` is a terminal matched control. This is not a simultaneous
+prelabel lower-bound gate against `U/G/P`.
+
+All nine plans and all target predictions are globally sealed before the
+same-outer-`H` evaluation labels open. Those labels never build plan `H`;
+other-center evaluation labels may already have opened as development `q`
+labels after the development seal. Terminal reports contain exact-nine BACC
+for `B/U/G/R/P` and all eight `Hxe` candidates, the predeclared `R-B`, `R-U`,
+`R-G`, and `R-P` contrasts, and descriptive Hxe top-1/rank/normalized-oracle-
+gap diagnostics. No terminal label can update a plan or policy.
+
+The workstation schedule uses one spawned generation worker on each RTX A5000,
+then a CUDA-free four-worker CPU phase with three BLAS threads per worker.
+Arrays are stored as float32; scientific reductions are float64.
+
+```bash
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_v2_consumed_test_utility_aligned_target_static_endpoint_router.v1
+```
+
+Canonical output:
+
+```text
+artifacts/midogpp/90_oracles_and_diagnostics/
+  uniform_b_v2_consumed_test_utility_aligned_target_static_endpoint_router/v1/
+```
+
+Regardless of outcome, the bundle remains
+`EXPLORATORY_CONSUMED_DATA_ONLY` and `DO_NOT_PROMOTE`. It cannot establish
+fresh evidence or routing success, authorize an action/policy/model/expert
+update, feed any numbered stage or another experiment, select a recipe, or
+support promotion or deployment.
+
 ## Uniform-B v2 Consumed-Test Fixed-Bank Hierarchical Residual Stacker v1
 
 `midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_hierarchical_residual_stacker.v1`

@@ -1,6 +1,6 @@
 schema_version: 2
 catalog_kind: midogpp_artifact_catalog
-last_reviewed: 2026-08-10
+last_reviewed: 2026-08-12
 path_base: repository_root
 
 catalog_policy:
@@ -8135,3 +8135,279 @@ artifacts:
       - Trains fixed G, R, and P disagreement-regret models only from post-hoc source-train OOF predictions and previously available train labels, then seals the entire model bank before admitting the target test cache.
       - Produces label-free R_raw and simultaneous-uncertainty-gated R_safe route suggestions over all 9,928 consumed test rows. It computes no test label, BACC, accuracy, regret, utility, oracle, NELBO, or downstream metric.
       - The output is not a policy, does not establish routing success, and cannot authorize action selection, model or expert updates, promotion, deployment, or another experiment.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_utility_aligned_target_static_endpoint_router_parent_v1
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: CONSUMED_TEST_TARGET_STATIC_ENDPOINT_ROUTER_PARENT_LEDGER_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      split: test
+      row_count: '9928'
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      experiment_fenced: 'true'
+      fresh_evidence: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_utility_aligned_target_static_endpoint_router.v1
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    forbidden_reuse: &target_static_endpoint_forbidden_reuse
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Experiment-fenced byte-exact alias of the immutable original ledger; it exposes no prior diagnostic output, amendment, prediction, metric, scratch, or checkpoint.
+      - Only the named target-static endpoint-router v1 may pair it with its direct amendment.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_utility_aligned_target_static_endpoint_router_amendment_v1
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_TARGET_STATIC_ENDPOINT_ROUTER_AMENDMENT_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      amendment_sha256: 600f1ec3618e0d55e09ed30213bbf0ad4776c099ea23c5b44efcedca50c82505
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_utility_aligned_target_static_endpoint_router.v1
+      authorization_scope: one_terminal_consumed_test_utility_aligned_target_static_endpoint_router_v1
+      authorization_basis: current_explicit_user_instruction_to_implement_this_named_terminal_consumed_test_diagnostic
+      claim_role: posthoc_utility_aligned_target_static_endpoint_router_diagnostic
+      support_labels_used: 'false'
+      same_outer_H_evaluation_labels_used_for_plan_H: 'false'
+      target_actions_are_static: 'true'
+      fresh_evidence: 'false'
+      previous_stage90_outputs_used: 'false'
+      previous_stage90_amendments_used: 'false'
+      generic_consumer_authorized: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - uniform_b_v2_consumed_test_utility_aligned_target_static_endpoint_router_ledger_amendment_v1.json
+    expected_file_hashes:
+      uniform_b_v2_consumed_test_utility_aligned_target_static_endpoint_router_ledger_amendment_v1.json:
+        algorithm: sha256
+        digest: 600f1ec3618e0d55e09ed30213bbf0ad4776c099ea23c5b44efcedca50c82505
+    forbidden_reuse: *target_static_endpoint_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Direct amendment over the immutable original ledger; no earlier amendment or Stage-90 output is a parent or input.
+      - It authorizes exactly one terminal reused-test diagnostic and cannot authorize a later or generic consumer.
+
+  - artifact_id: midogpp_stage90_utility_aligned_target_static_endpoint_router_test_manifest_v1
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_TARGET_STATIC_ENDPOINT_ROUTER_CAPABILITY_GATED_MANIFEST_AND_METADATA
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+      split: test
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      domain_mapping_sha256: 79d703ccf3085ae3968698c2ac44a3eabc2713b434762cc6b2fd2fa90126a211
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_TARGET_STATIC_ENDPOINT_ROUTER_V1
+      fresh_evidence: 'false'
+      labels_present: 'true'
+      prelabel_member_access: domain_mapping.json_only
+      prelabel_domain_mapping_fields: domain_axis|domain_name_to_id
+      manifest_labels_available_before_development_prediction_seal: 'false'
+      support_labels_used: 'false'
+      cross_center_evaluation_labels_used_after_development_seal: 'true'
+      same_outer_H_evaluation_labels_used_for_plan_H: 'false'
+      same_outer_H_evaluation_labels_open_only_after_plan_H_and_global_target_prediction_seal: 'true'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_utility_aligned_target_static_endpoint_router.v1
+    required_files:
+      - manifest.csv
+      - domain_mapping.json
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      domain_mapping.json:
+        algorithm: sha256
+        digest: 79d703ccf3085ae3968698c2ac44a3eabc2713b434762cc6b2fd2fa90126a211
+    forbidden_reuse: *target_static_endpoint_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - A single dedicated alias owns both required members so the experiment retains exactly six input artifacts; it does not import the metadata-profile artifact.
+      - Before label capability opens, only the hash-pinned three-axis domain mapping may be parsed. Support labels never open.
+
+  - artifact_id: midogpp_stage90_utility_aligned_target_static_endpoint_router_test_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_TEST_TARGET_STATIC_ENDPOINT_ROUTER_LABEL_FREE_CACHE_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: test
+      row_count: '9928'
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      backbone_identity_hash: 1b5071f2e605fa60
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_TARGET_STATIC_ENDPOINT_ROUTER_V1
+      fresh_evidence: 'false'
+      labels_persisted: 'false'
+      sample_ids_persisted: 'false'
+      image_paths_persisted: 'false'
+      prior_prediction_or_checkpoint_reuse: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_utility_aligned_target_static_endpoint_router.v1
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse: *target_static_endpoint_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Dedicated byte-exact alias over the validated label-free consumed-test embedding cache; it exposes no prior prediction, score, policy, or Stage-90 output.
+      - Only the named target-static endpoint-router v1 may consume it.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_utility_aligned_target_static_endpoint_router_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_utility_aligned_target_static_endpoint_router/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: EXPLORATORY_CONSUMED_DATA_ONLY
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: EXPLORATORY_CONSUMED_DATA_ONLY
+      terminal_decision: DO_NOT_PROMOTE
+      claim_role: posthoc_utility_aligned_target_static_endpoint_router_diagnostic
+      architecture_family: exact_nine_utility_aligned_target_static_endpoint_router_v1
+      config_contract_hash: b1e919a4abf01e93
+      protocol_contract_hash: 3296cc793e477ac66fd260dc3fba53eafd4e37b4b8d62d5fff175d3d23dcbb31
+      evaluation_split: test
+      consumed_test_data: 'true'
+      input_artifact_count: '6'
+      ledger_amendment_sha256: 600f1ec3618e0d55e09ed30213bbf0ad4776c099ea23c5b44efcedca50c82505
+      eligible_test_row_count: '9928'
+      eligible_test_case_count: '218'
+      support_partition_rule: canonical_sort_then_first_eight_whole_cases_per_center
+      support_partition_is_seed_independent: 'true'
+      support_case_count_per_center: '8'
+      support_case_count_total: '72'
+      support_row_count: '2902'
+      evaluation_case_count_total: '146'
+      evaluation_row_count: '7026'
+      development_response_count: '504'
+      global_source_control_provenance: experiment_manifest_only
+      separate_metadata_profile_artifact_used: 'false'
+      target_actions_are_static_per_center: 'true'
+      case_level_routing_used: 'false'
+      support_labels_used: 'false'
+      same_outer_H_evaluation_labels_used_for_plan_H: 'false'
+      same_outer_H_evaluation_labels_open_only_after_plan_H_and_global_target_prediction_seal: 'true'
+      method_ids: B|U|G|R|P|Hxe
+      primary_contrasts: R-B|R-U|R-G|R-P
+      target_support_bootstrap_replicates: '32'
+      target_support_bootstrap_seed: '90703'
+      exact_B_fail_closed_fallback: 'true'
+      simultaneous_prelabel_lcb_vs_U_G_P_required: 'false'
+      source_expert_updated: 'false'
+      target_expert_used: 'false'
+      routing_success_claimed: 'false'
+      routing_quality_claimed: 'false'
+      fresh_evidence: 'false'
+      promotion_eligible: 'false'
+      previous_stage90_outputs_or_amendments_used: 'false'
+      may_feed_another_experiment: 'false'
+      workstation_generation_devices: cuda:0|cuda:1
+      workstation_cpu_topology: 4_workers_x_3_threads
+      workstation_array_storage_dtype: float32
+      workstation_scientific_reduction_dtype: float64
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - arrays/frozen_source_streams.npy
+      - arrays/development_probabilities.npz
+      - arrays/target_action_probabilities.npz
+      - manifests/protocol_manifest.json
+      - manifests/support_partition_lock.json
+      - manifests/action_library.json
+      - manifests/frozen_source_stream_index.json
+      - manifests/frozen_source_stream_lock.json
+      - manifests/development_prediction_index.json
+      - manifests/development_prediction_seal.json
+      - manifests/development_endpoint_response_seal.json
+      - manifests/feature_surface_set.json
+      - manifests/model_index.json
+      - manifests/cardinality_transfer_seal.json
+      - manifests/target_policy_plans.json
+      - manifests/frozen_actions.json
+      - manifests/global_prelabel_seal.json
+      - manifests/target_prediction_index.json
+      - manifests/target_prediction_seal.json
+      - manifests/sealed_terminal_evaluation.json
+      - manifests/content_index.json
+      - tables/support_partitions.csv
+      - tables/development_endpoint_responses.csv
+      - tables/source_inner_feature_rows.csv
+      - tables/model_index.csv
+      - tables/target_feature_rows.csv
+      - tables/target_policy_plans.csv
+      - tables/frozen_actions.csv
+      - tables/terminal_endpoint_scores.csv
+      - tables/center_contrasts.csv
+      - tables/aggregate_contrasts.csv
+      - tables/oracle_rank_diagnostics.csv
+      - reports/workstation_preflight.json
+      - reports/development_label_access_report.json
+      - reports/label_capability_report.json
+      - reports/leakage_report.json
+      - reports/runtime_summary.json
+      - reports/publication_decision.json
+      - reports/run_state.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Complete terminal consumed-test endpoint-router bundle. It recomputes every probability and consumes no prior Stage-90 output, amendment, scratch, checkpoint, or numbered-stage result.
+      - H/q/e development, label-free support features, source-inner transfer gates, target plans, actions, predictions, and role-scoped label capabilities are independently sealed and reconstructively validated.
+      - Regardless of outcome, it cannot authorize or feed a route, action, policy, model or expert update, routing-quality claim, promotion, deployment, recipe, numbered stage, or another experiment.

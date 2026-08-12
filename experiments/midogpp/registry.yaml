@@ -2191,3 +2191,47 @@ experiments:
       - Seals all B, U, G-delta, R, permutation, and H-by-e predictions before labels open. H-by-e rows are terminal oracle diagnostics only.
       - Confirmation requires positive center-level one-sided lower bounds for R-B, R-G-delta, R-U, and R-P under the all-nine-seed probability ensemble.
       - Uses two persistent RTX A5000 workers, four classifier workers with three BLAS threads each, composition deduplication, float32 memmaps, and fail-closed resume.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_utility_aligned_target_static_endpoint_router.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_utility_aligned_target_static_endpoint_router_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_utility_aligned_target_static_endpoint_router_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_utility_aligned_target_static_endpoint_router_test_cache_v1
+      - midogpp_stage90_utility_aligned_target_static_endpoint_router_test_manifest_v1
+      - midogpp_uniform_b_test_consumption_ledger_utility_aligned_target_static_endpoint_router_parent_v1
+      - midogpp_uniform_b_test_consumption_ledger_utility_aligned_target_static_endpoint_router_amendment_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Reuse of immutable generation geometry, seed pairing, budgets, and classifier settings only; no routing, policy, promotion, or deployment authority is inherited.
+      midogpp_stage90_utility_aligned_target_static_endpoint_router_test_manifest_v1: One experiment-fenced alias owns both the capability-gated labeled manifest and the hash-pinned domain mapping; prelabel code may parse only the latter, so no seventh metadata artifact is admitted.
+      midogpp_uniform_b_test_consumption_ledger_utility_aligned_target_static_endpoint_router_parent_v1: Byte-exact experiment-fenced alias of the immutable original ledger, read only to verify the direct parent hash.
+      midogpp_uniform_b_test_consumption_ledger_utility_aligned_target_static_endpoint_router_amendment_v1: Direct single-consumer authorization for this terminal post-hoc consumed-test diagnostic; it creates no fresh evidence.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - utility-aligned-consumed-test-endpoint-router
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_utility_aligned_target_static_endpoint_router_v1
+    notes:
+      - The canonical first eight whole cases per center are label-free support; the other 146 cases are evaluation. All 9,928 rows and 218 cases participate, with no support/evaluation case overlap and no support labels.
+      - Exactly 504 exact-nine H/q/e endpoint deltas fit strict outer-H/query-q/candidate-e excluded M0 and M1 models. M0 derives its three-axis control from domain_mapping.json in the same manifest alias; identifiers and labels never enter the model.
+      - Development predictions seal before cross-center q labels open. For each target H, its own evaluation labels cannot build its plan and open only after all nine target-static plans and target predictions are globally sealed.
+      - The routed diagnostic action is R only when the source-inner transfer/capacity gates and selected-gain lower bound pass; every failure returns exact B. U is a matched terminal control, G/P are diagnostic selections, and Hxe rows are terminal oracle/rank diagnostics.
+      - The result remains EXPLORATORY_CONSUMED_DATA_ONLY and cannot authorize routing success, an action or policy, model/expert updates, promotion, deployment, recipe selection, any numbered-stage feed, another Stage-90 run, or another experiment.
