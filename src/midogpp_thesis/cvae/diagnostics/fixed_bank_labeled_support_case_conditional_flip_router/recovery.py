@@ -15,6 +15,9 @@ from .bundle import REQUIRED_FILES
 
 RUN_STATE_SCHEMA = "fixed_bank_labeled_support_flip_run_state_v1"
 RECOVERABLE_FAILURE_CLASSES = frozenset({"MemoryError", "OSError", "RuntimeError"})
+_COMPLETED_LOCAL_SOURCE_INVENTORY_ERROR = (
+    "Flip-router local source inventory drifted: missing=[], extras=[]."
+)
 
 _BASE = frozenset({
     "config.resolved.yaml", "provenance/input_artifacts.json", "reports/run_state.json",
@@ -122,7 +125,14 @@ def recovery_capability(root: Path) -> RecoveryCapability | None:
         )
     if phase in _PRELABEL_INDEX:
         _validate_retry_state(state)
-        _validate_prelabel_inventory(observed, phase=phase)
+        if _is_registered_protocol_retry(state):
+            _require_inventory(
+                observed,
+                _prelabel_prior(phase),
+                boundary="COMPLETED_LOCAL_SOURCE_INVENTORY_DEFECT",
+            )
+        else:
+            _validate_prelabel_inventory(observed, phase=phase)
         return RecoveryCapability(
             "PRELABEL_REPLAY", phase, phase, False, True, False, False
         )
@@ -185,9 +195,7 @@ def detect_registered_flip_router_recovery(root: Path) -> bool:
 
 def _validate_prelabel_inventory(observed: frozenset[str], *, phase: str) -> None:
     ordinal = _PRELABEL_INDEX[phase]
-    prior = _BASE | frozenset().union(*(
-        frozenset(group) for _, group in _PRELABEL_PHASES[:ordinal]
-    ))
+    prior = _prelabel_prior(phase)
     sequence = _PRELABEL_PHASES[ordinal][1]
     current = frozenset(sequence)
     checkpoints = frozenset(member for member in observed if _checkpoint_member(member))
@@ -204,6 +212,13 @@ def _validate_prelabel_inventory(observed: frozenset[str], *, phase: str) -> Non
             f"partial_current={sorted((durable & current))}."
         )
     _validate_checkpoint_pairs(checkpoints, phase=phase)
+
+
+def _prelabel_prior(phase: str) -> frozenset[str]:
+    ordinal = _PRELABEL_INDEX[phase]
+    return _BASE | frozenset().union(*(
+        frozenset(group) for _, group in _PRELABEL_PHASES[:ordinal]
+    ))
 
 
 def _require_phase_prefix(
@@ -233,6 +248,8 @@ def _validate_retry_state(state: Mapping[str, object]) -> None:
         if "error" in state or "error_class" in state:
             raise ProtocolError("RUNNING flip-router recovery state carries an error.")
         return
+    if _is_registered_protocol_retry(state):
+        return
     if (
         status != "FAILED"
         or state.get("error_class") not in RECOVERABLE_FAILURE_CLASSES
@@ -240,6 +257,21 @@ def _validate_retry_state(state: Mapping[str, object]) -> None:
         or not str(state["error"])
     ):
         raise ProtocolError("Flip-router FAILED state is not a registered retry class.")
+
+
+def _is_registered_protocol_retry(state: Mapping[str, object]) -> bool:
+    """Admit only the one historical, pre-label source-inventory defect."""
+
+    expected = {
+        "schema_version": RUN_STATE_SCHEMA,
+        "status": "FAILED",
+        "phase": "SOURCE_GENERATION",
+        "terminal_consumed_test_diagnostic_only": True,
+        "automatic_resume_requires_hash_validation": True,
+        "error": _COMPLETED_LOCAL_SOURCE_INVENTORY_ERROR,
+        "error_class": "ProtocolError",
+    }
+    return dict(state) == expected
 
 
 def _load_state(path: Path) -> Mapping[str, object]:

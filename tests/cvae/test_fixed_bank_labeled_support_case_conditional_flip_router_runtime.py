@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from midogpp_thesis.cvae.diagnostics.fixed_bank_labeled_support_case_conditional_flip_router import execution_adapter
 from midogpp_thesis.cvae.diagnostics.fixed_bank_labeled_support_case_conditional_flip_router.config_payloads import (
     canonical_runtime_payload,
@@ -11,6 +13,104 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_labeled_support_case_conditional
 from midogpp_thesis.cvae.diagnostics.fixed_bank_labeled_support_case_conditional_flip_router.runner_dependencies import (
     FlipRouterDependencies,
 )
+from midogpp_thesis.cvae.protocol import ProtocolError
+from midogpp_thesis.cvae.runtime.frozen_source_streams import (
+    SOURCE_ARRAY_MEMBER,
+    SOURCE_INDEX_MEMBER,
+    SOURCE_LOCK_MEMBER,
+)
+
+
+def _write_completed_neutral_source_tree(root: Path) -> None:
+    """Mirror the final tree left by materialize_frozen_source_streams."""
+
+    for member in (SOURCE_ARRAY_MEMBER, SOURCE_INDEX_MEMBER, SOURCE_LOCK_MEMBER):
+        path = root / member
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"sealed fixture")
+    # The neutral runtime removes checkpoints/frozen_source_streams after it
+    # seals the trio, but deliberately leaves this experiment-owned parent.
+    (root / "checkpoints").mkdir()
+
+
+def test_exact_source_inventory_accepts_completed_neutral_runtime_tree(
+    tmp_path: Path,
+) -> None:
+    _write_completed_neutral_source_tree(tmp_path)
+
+    execution_adapter._remove_empty_owned_source_checkpoint_parent(tmp_path)
+
+    assert not (tmp_path / "checkpoints").exists()
+    execution_adapter._require_exact_source_inventory(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "drift",
+    (
+        "foreign_member",
+        "expected_file_is_directory",
+        "symlinked_member",
+        "foreign_empty_directory",
+        "checkpoint_file",
+        "checkpoint_nested_directory",
+    ),
+)
+def test_exact_source_inventory_rejects_member_type_and_link_drift(
+    tmp_path: Path,
+    drift: str,
+) -> None:
+    root = tmp_path / "source"
+    _write_completed_neutral_source_tree(root)
+    if drift == "foreign_member":
+        (root / "manifests/foreign.json").write_bytes(b"foreign")
+    elif drift == "expected_file_is_directory":
+        member = root / SOURCE_ARRAY_MEMBER
+        member.unlink()
+        member.mkdir()
+    elif drift == "symlinked_member":
+        member = root / SOURCE_LOCK_MEMBER
+        member.unlink()
+        external = tmp_path / "external-lock.json"
+        external.write_bytes(b"outside")
+        member.symlink_to(external)
+    elif drift == "foreign_empty_directory":
+        (root / "foreign").mkdir()
+    elif drift == "checkpoint_nested_directory":
+        (root / "checkpoints/frozen_source_streams").mkdir()
+    else:
+        (root / "checkpoints/foreign.bin").write_bytes(b"foreign")
+
+    if drift in {"checkpoint_file", "checkpoint_nested_directory"}:
+        with pytest.raises(ProtocolError, match="checkpoint parent is not empty"):
+            execution_adapter._remove_empty_owned_source_checkpoint_parent(root)
+        return
+
+    execution_adapter._remove_empty_owned_source_checkpoint_parent(root)
+    with pytest.raises(ProtocolError, match="local source inventory drifted") as exc:
+        execution_adapter._require_exact_source_inventory(root)
+
+    assert "directory_missing=" in str(exc.value)
+    assert "directory_extras=" in str(exc.value)
+
+
+@pytest.mark.parametrize("drift", ("symlink", "foreign_file"))
+def test_source_checkpoint_parent_normalization_rejects_unsafe_types(
+    tmp_path: Path,
+    drift: str,
+) -> None:
+    root = tmp_path / "source"
+    _write_completed_neutral_source_tree(root)
+    checkpoint_root = root / "checkpoints"
+    checkpoint_root.rmdir()
+    if drift == "symlink":
+        external = tmp_path / "external-checkpoints"
+        external.mkdir()
+        checkpoint_root.symlink_to(external, target_is_directory=True)
+    else:
+        checkpoint_root.write_bytes(b"foreign")
+
+    with pytest.raises(ProtocolError, match="checkpoint parent is unsafe"):
+        execution_adapter._remove_empty_owned_source_checkpoint_parent(root)
 
 
 def test_dependency_injected_runner_preserves_phase_and_validation_order(

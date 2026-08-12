@@ -122,6 +122,57 @@ def test_registered_recovery_accepts_exact_phase_prefix_and_workspace_dispatch(
     )
 
 
+def test_registered_recovery_accepts_only_exact_completed_source_inventory_defect(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "artifact"
+    _write_phase_prefix(root, "SOURCE_GENERATION")
+    state = _state(phase="SOURCE_GENERATION")
+    state.update(
+        error_class="ProtocolError",
+        error="Flip-router local source inventory drifted: missing=[], extras=[].",
+    )
+    (root / "reports/run_state.json").write_text(
+        json.dumps(state), encoding="utf-8"
+    )
+
+    capability = recovery_capability(root)
+
+    assert capability is not None
+    assert capability.mode == "PRELABEL_REPLAY"
+    assert capability.resume_phase == "SOURCE_GENERATION"
+
+    _touch(root, recovery._PRELABEL_PHASES[recovery._PRELABEL_INDEX["SOURCE_GENERATION"]][1][0])
+    with pytest.raises(
+        ProtocolError, match="COMPLETED_LOCAL_SOURCE_INVENTORY_DEFECT inventory drifted"
+    ):
+        recovery_capability(root)
+
+
+@pytest.mark.parametrize(
+    "error",
+    (
+        "Flip-router local source inventory drifted: missing=[], extras=['foreign'].",
+        "Flip-router local source inventory drifted: missing=[], extras=[]",
+        "another protocol failure",
+    ),
+)
+def test_registered_recovery_rejects_every_other_protocol_error(
+    tmp_path: Path,
+    error: str,
+) -> None:
+    root = tmp_path / "artifact"
+    _write_phase_prefix(root, "SOURCE_GENERATION")
+    state = _state(phase="SOURCE_GENERATION")
+    state.update(error_class="ProtocolError", error=error)
+    (root / "reports/run_state.json").write_text(
+        json.dumps(state), encoding="utf-8"
+    )
+
+    with pytest.raises(ProtocolError, match="not a registered retry class"):
+        recovery_capability(root)
+
+
 @pytest.mark.parametrize("drift", ("unknown_phase", "extra", "symlink"))
 def test_registered_recovery_rejects_boundary_drift(
     tmp_path: Path,

@@ -193,6 +193,7 @@ def materialize_sources(config: object, generation_lock: object, *, root: Path) 
     local_root.mkdir(parents=True, exist_ok=True)
     _require_owned_generation_inventory(local_root)
     local = materialize_frozen_source_streams(config, generation_lock, root=local_root)
+    _remove_empty_owned_source_checkpoint_parent(local_root)
     _require_exact_source_inventory(local_root)
     stage_frozen_source_streams(
         local,
@@ -418,15 +419,37 @@ def _require_exact_source_inventory(path: Path) -> None:
     members = tuple(path.rglob("*"))
     observed = {member.relative_to(path).as_posix() for member in members if member.is_file()}
     directories = {member.relative_to(path).as_posix() for member in members if member.is_dir()}
+    expected_directories = {"arrays", "manifests"}
     if (
         any(member.is_symlink() for member in members)
         or observed != expected
-        or directories != {"arrays", "manifests"}
+        or directories != expected_directories
     ):
         raise ProtocolError(
             f"Flip-router local source inventory drifted: "
-            f"missing={sorted(expected - observed)}, extras={sorted(observed - expected)}."
+            f"missing={sorted(expected - observed)}, extras={sorted(observed - expected)}, "
+            f"directory_missing={sorted(expected_directories - directories)}, "
+            f"directory_extras={sorted(directories - expected_directories)}."
         )
+
+
+def _remove_empty_owned_source_checkpoint_parent(path: Path) -> None:
+    """Normalize the neutral generator's one empty, package-owned parent."""
+
+    checkpoint_root = path / "checkpoints"
+    if not checkpoint_root.exists():
+        if checkpoint_root.is_symlink():
+            raise ProtocolError(
+                "Flip-router source checkpoint parent is a dangling symlink."
+            )
+        return
+    if checkpoint_root.is_symlink() or not checkpoint_root.is_dir():
+        raise ProtocolError("Flip-router source checkpoint parent is unsafe.")
+    if any(checkpoint_root.iterdir()):
+        raise ProtocolError(
+            "Flip-router completed source checkpoint parent is not empty."
+        )
+    checkpoint_root.rmdir()
 
 
 __all__ = (
