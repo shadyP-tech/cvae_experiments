@@ -62,7 +62,7 @@ def build_case_partition(frame: object, *, config: object) -> ThreeRolePartition
 def run_workstation_preflight(
     root: Path, *, runtime: Mapping[str, object]
 ) -> Mapping[str, object]:
-    """Freshly probe every compute-path launch using the fixed workstation plan."""
+    """Probe this launch while preserving the first sealed hardware observation."""
 
     _assert_preflight_runtime(runtime)
     report_path = root / "reports/workstation_preflight.json"
@@ -71,6 +71,10 @@ def run_workstation_preflight(
     ):
         raise ProtocolError("Multi-challenger workstation preflight path is unsafe.")
     fixed = _preflight_fixed_payload()
+    persisted = None
+    if report_path.is_file():
+        persisted = read_json(report_path)
+        _validate_preflight_payload(persisted, root=root, fixed=fixed)
     shared = dict(runtime)
     shared.update(
         {
@@ -107,6 +111,8 @@ def run_workstation_preflight(
     payload["disk_probe_path"] = str(root.resolve())
     payload.update(fixed)
     _validate_preflight_payload(payload, root=root, fixed=fixed)
+    if persisted is not None:
+        return persisted
     atomic_json(report_path, payload)
     return payload
 

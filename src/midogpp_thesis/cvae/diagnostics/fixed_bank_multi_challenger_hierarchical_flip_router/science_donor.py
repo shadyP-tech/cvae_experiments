@@ -146,12 +146,7 @@ def fit_h_specific_donor_phase(
     ] = {}
     single_models = {}
     for target, families, single_model, permutation_hash in fitted:
-        models_by_target[target] = MappingProxyType(
-            {
-                family: MappingProxyType(dict(by_direction))
-                for family, by_direction in families.items()
-            }
-        )
+        models_by_target[target] = _freeze_received_families(families)
         single_models[target] = single_model
         fit_payload = {
             "heldout_target_H": target,
@@ -371,14 +366,33 @@ def _fit_target_job(
         single_model = fit_two_head_ridge(single_rows, heldout_h=target)
     return (
         target,
-        MappingProxyType(
-            {
-                family: MappingProxyType(models)
-                for family, models in families.items()
-            }
-        ),
+        _transport_families(families),
         single_model,
         canonical_hash([row.to_payload() for row in permuted_all]),
+    )
+
+
+def _transport_families(
+    families: Mapping[str, Mapping[str, DirectionalLogitModel]],
+) -> dict[str, dict[str, DirectionalLogitModel]]:
+    """Strip read-only wrappers before crossing the spawned worker boundary."""
+
+    return {
+        str(family): dict(by_direction)
+        for family, by_direction in families.items()
+    }
+
+
+def _freeze_received_families(
+    families: Mapping[str, Mapping[str, DirectionalLogitModel]],
+) -> Mapping[str, Mapping[str, DirectionalLogitModel]]:
+    """Restore the immutable public model tree after worker deserialization."""
+
+    return MappingProxyType(
+        {
+            str(family): MappingProxyType(dict(by_direction))
+            for family, by_direction in families.items()
+        }
     )
 
 

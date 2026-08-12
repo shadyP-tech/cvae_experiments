@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_flip_router import (
+    execution_adapter,
     label_capabilities,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_flip_router.actions import (
@@ -23,6 +24,7 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_fl
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_flip_router.execution_adapter import (
     _assert_preflight_runtime,
+    run_workstation_preflight,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_flip_router.input_contracts import (
     LabelFreeTestFrame,
@@ -136,6 +138,64 @@ def test_shared_generation_worker_invariant_is_explicit_and_fail_closed() -> Non
     del runtime["generation_workers_per_device"]
     with pytest.raises(ProtocolError, match="topology drifted"):
         _assert_preflight_runtime(runtime)
+
+
+def test_recovery_reprobes_without_overwriting_first_preflight(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "artifact"
+    report = root / "reports/workstation_preflight.json"
+    calls: list[int] = []
+
+    def fake_preflight(_probe: Path, **_kwargs: object) -> dict[str, object]:
+        calls.append(len(calls) + 1)
+        return {
+            "schema_version": "midogpp_label_free_workstation_preflight_v1",
+            "status": "PASS",
+            "generation_devices": ["cuda:0", "cuda:1"],
+            "persistent_gpu_workers": 2,
+            "classifier_workers": 4,
+            "blas_threads_per_classifier_worker": 3,
+            "target_action_identity_count": 90,
+            "target_probability_cell_count": 810,
+            "target_unique_classifier_fit_count": 810,
+            "maximum_total_classifier_fit_count": 810,
+            "gpu_then_cpu_phase_order": True,
+            "phase_disjoint_gpu_and_cpu_pools": True,
+            "parent_cuda_initialized": False,
+            "tf32_enabled": False,
+            "amp_enabled": False,
+            "scratch_preference": [SCRATCH_ROOT, "artifact_parent"],
+            "available_cpu_affinity_count": 24,
+            "physical_ram_bytes": 128_000_000_000,
+            "disk_free_bytes_at_launch": 20_000_000_000 + calls[-1],
+            "thread_environment": dict(execution_adapter.REQUIRED_THREAD_ENVIRONMENT),
+            "cuda_visible_devices": "0,1",
+            "package_versions": {
+                name: "fixture"
+                for name in execution_adapter.REQUIRED_DISTRIBUTIONS
+            },
+            "gpus": [
+                {
+                    "index": index,
+                    "name": "NVIDIA RTX A5000",
+                    "memory_total_mib": 24_000,
+                    "memory_free_mib": 20_000,
+                }
+                for index in (0, 1)
+            ],
+        }
+
+    monkeypatch.setattr(execution_adapter, "_preflight", fake_preflight)
+    runtime = canonical_runtime_payload()
+    first = run_workstation_preflight(root, runtime=runtime)
+    first_bytes = report.read_bytes()
+    second = run_workstation_preflight(root, runtime=runtime)
+
+    assert calls == [1, 2]
+    assert second == first
+    assert report.read_bytes() == first_bytes
+    assert first["disk_free_bytes_at_launch"] == 20_000_000_001
 
 
 def test_label_capabilities_require_all_models_and_all_fold_seals(
