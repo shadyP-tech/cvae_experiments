@@ -64,7 +64,11 @@ def write_task_checkpoint(
     action_records: Sequence[Mapping[str, object]],
 ) -> PredictionCheckpoint:
     values = np.ascontiguousarray(probabilities, dtype=np.float32)
-    records = tuple(dict(record) for record in action_records)
+    # Keep the in-memory payload in the same JSON-array shape produced on disk.
+    # A tuple serializes to identical JSON bytes, but `_checkpoint_from` rightly
+    # accepts only the decoded list schema; normalizing here makes the immediate
+    # worker return and a later disk reload follow the same contract.
+    records = [dict(record) for record in action_records]
     expected_rows = len(task.support_row_ids) + len(task.evaluation_row_ids)
     if (
         values.shape != (len(task.actions), expected_rows)

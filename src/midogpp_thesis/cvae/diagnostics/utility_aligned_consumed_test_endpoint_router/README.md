@@ -103,3 +103,14 @@ DTOs and revalidating their hashes in each process. Its registered recovery
 boundary requires the exact base inventory plus the complete feature-input
 seal, nine support arrays, and all 27 paired feature checkpoints; it rejects
 every development/target/label/terminal member.
+
+A later pre-label checkpoint-return failure wrote all 648 development
+checkpoint pairs successfully, then rejected the in-memory action-record tuple
+even though its JSON representation was the required array. Checkpoint writing
+now normalizes that payload to a list before both hashing and immediate return;
+canonical hashes and persisted bytes are unchanged. Its distinct registered
+retry boundary requires exactly the prior 75 members plus all 648 canonical
+development JSON/NPZ pairs (1,371 files total), with no development final seal,
+target checkpoint, label, policy, or terminal member. The normal development
+runtime then reconstructs the immutable plan and revalidates every checkpoint
+binding before assembling the sealed probability store.

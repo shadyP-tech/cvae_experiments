@@ -6,6 +6,7 @@ from pathlib import Path
 
 from ...protocol import ProtocolError
 from .artifact_io import read_json
+from .experiment_contracts import CENTERS, GENERATION_SEEDS, TRAINING_SEEDS
 
 
 FAILED_CACHE_IDENTITY_STATE = {
@@ -87,6 +88,31 @@ COMPLETE_FEATURE_RECOVERY_FILES = frozenset(
         ),
     }
 )
+FAILED_CHECKPOINT_ACTION_RECORDS_STATE = {
+    "schema_version": "midogpp_consumed_test_endpoint_router_run_state_v1",
+    "status": "FAILED",
+    "phase": "GLOBAL_DEVELOPMENT_PREDICTION_SEAL",
+    "promotion_eligible": False,
+    "terminal_consumed_test_diagnostic_only": True,
+    "automatic_resume_requires_hash_validation": True,
+    "error": "ProtocolError: Endpoint-router checkpoint action records are absent.",
+}
+COMPLETE_DEVELOPMENT_CHECKPOINT_RECOVERY_FILES = frozenset(
+    {
+        *COMPLETE_FEATURE_RECOVERY_FILES,
+        *(
+            "checkpoints/development_predictions/"
+            f"development_H{outer_target}_q{query_center}_"
+            f"train{training_seed}_gen{generation_seed}.{suffix}"
+            for outer_target in CENTERS
+            for query_center in CENTERS
+            if query_center != outer_target
+            for training_seed in TRAINING_SEEDS
+            for generation_seed in GENERATION_SEEDS
+            for suffix in ("json", "npz")
+        ),
+    }
+)
 
 
 def detect_initializing_cache_identity_recovery(root: Path) -> bool:
@@ -126,6 +152,13 @@ def detect_initializing_cache_identity_recovery(root: Path) -> bool:
         expected_state = FAILED_PREDICTION_PICKLE_STATE
         expected_files = COMPLETE_FEATURE_RECOVERY_FILES
         boundary = "prediction-pickle"
+    elif (
+        state.get("phase") == FAILED_CHECKPOINT_ACTION_RECORDS_STATE["phase"]
+        and state.get("error") == FAILED_CHECKPOINT_ACTION_RECORDS_STATE["error"]
+    ):
+        expected_state = FAILED_CHECKPOINT_ACTION_RECORDS_STATE
+        expected_files = COMPLETE_DEVELOPMENT_CHECKPOINT_RECOVERY_FILES
+        boundary = "checkpoint-action-records"
     else:
         return False
     observed = frozenset(
@@ -158,7 +191,9 @@ __all__ = (
     "FAILED_EMBEDDING_IDENTITY_STATE",
     "FAILED_FEATURE_TASK_STATE",
     "FAILED_PREDICTION_PICKLE_STATE",
+    "FAILED_CHECKPOINT_ACTION_RECORDS_STATE",
     "COMPLETE_FEATURE_RECOVERY_FILES",
+    "COMPLETE_DEVELOPMENT_CHECKPOINT_RECOVERY_FILES",
     "FEATURE_TASK_RECOVERY_FILES",
     "INITIALIZING_RECOVERY_FILES",
     "SOURCE_FEATURE_RECOVERY_FILES",

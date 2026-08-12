@@ -56,6 +56,32 @@ def _spawn_echo(value: object) -> object:
     return value
 
 
+def _spawn_write_checkpoint(task: PredictionTask) -> PredictionCheckpoint:
+    from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_router.checkpoint_store import (
+        write_task_checkpoint,
+    )
+
+    probabilities = np.linspace(
+        0.1,
+        0.9,
+        num=len(task.actions) * 2,
+        dtype=np.float32,
+    ).reshape(len(task.actions), 2)
+    records = tuple(
+        {
+            "action_id": action.action_id,
+            "action_hash": action.action_hash,
+            "converged": True,
+        }
+        for action in task.actions
+    )
+    return write_task_checkpoint(
+        task,
+        probabilities=probabilities,
+        action_records=records,
+    )
+
+
 def _prediction_task(tmp_path: Path) -> PredictionTask:
     sha = "a" * 64
     sources = ("2", "3", "5", "6", "7", "8", "9")
@@ -218,6 +244,30 @@ def test_spawn_boundary_round_trips_prediction_task_and_checkpoint(
     assert spawned_checkpoint.checkpoint_hash == checkpoint.checkpoint_hash
 
 
+def test_spawned_checkpoint_write_returns_and_reloads_identical_records(
+    tmp_path: Path,
+) -> None:
+    from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_router.checkpoint_store import (
+        load_task_checkpoint,
+    )
+
+    task = _prediction_task(tmp_path)
+    context = mp.get_context("spawn")
+    with context.Pool(processes=1) as pool:
+        returned = pool.map(_spawn_write_checkpoint, (task,))[0]
+
+    loaded = load_task_checkpoint(task)
+    assert loaded is not None
+    assert returned.checkpoint_hash == loaded.checkpoint_hash
+    assert len(returned.action_records) == len(task.actions) == 8
+    assert tuple(dict(row) for row in returned.action_records) == tuple(
+        dict(row) for row in loaded.action_records
+    )
+    assert tuple(row["action_id"] for row in returned.action_records) == tuple(
+        action.action_id for action in task.actions
+    )
+
+
 def test_cache_identity_uses_builder_representation_when_frozen_schema_omits_it() -> None:
     config = SimpleNamespace(
         expected_test_cache_semantic_id="uniform_b_v2_descriptive_test_cache_v1",
@@ -368,6 +418,47 @@ def test_prediction_pickle_recovery_requires_complete_feature_inventory(
     component = root / "checkpoints/feature_runtime/feature_e0_train17.json"
     component.unlink()
     with pytest.raises(ProtocolError, match="prediction-pickle recovery boundary drifted"):
+        initialization_recovery.detect_initializing_cache_identity_recovery(root)
+
+
+def test_checkpoint_action_record_recovery_requires_all_development_pairs(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path.resolve()
+    expected = initialization_recovery.COMPLETE_DEVELOPMENT_CHECKPOINT_RECOVERY_FILES
+    assert len(expected) == 1_371
+    for relative in expected:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if relative == "reports/run_state.json":
+            state = {
+                **initialization_recovery.FAILED_CHECKPOINT_ACTION_RECORDS_STATE,
+                "updated_at_utc": "2026-08-12T12:57:00+00:00",
+            }
+            path.write_text(json.dumps(state), encoding="utf-8")
+        else:
+            path.write_bytes(b"sealed")
+    assert initialization_recovery.detect_initializing_cache_identity_recovery(root)
+
+    member = root / (
+        "checkpoints/development_predictions/"
+        "development_H0_q1_train17_gen17.json"
+    )
+    member.unlink()
+    with pytest.raises(
+        ProtocolError, match="checkpoint-action-records recovery boundary drifted"
+    ):
+        initialization_recovery.detect_initializing_cache_identity_recovery(root)
+
+    member.write_bytes(b"sealed")
+    unexpected = root / (
+        "checkpoints/target_predictions/target_H0_q0_train17_gen17.json"
+    )
+    unexpected.parent.mkdir(parents=True, exist_ok=True)
+    unexpected.write_bytes(b"unsafe")
+    with pytest.raises(
+        ProtocolError, match="checkpoint-action-records recovery boundary drifted"
+    ):
         initialization_recovery.detect_initializing_cache_identity_recovery(root)
 
 
