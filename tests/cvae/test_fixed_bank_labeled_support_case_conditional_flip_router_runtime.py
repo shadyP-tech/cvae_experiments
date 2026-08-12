@@ -9,7 +9,13 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_labeled_support_case_conditional
 from midogpp_thesis.cvae.diagnostics.fixed_bank_labeled_support_case_conditional_flip_router.config_payloads import (
     canonical_runtime_payload,
 )
-from midogpp_thesis.cvae.diagnostics.fixed_bank_labeled_support_case_conditional_flip_router import runner
+from midogpp_thesis.cvae.diagnostics.fixed_bank_labeled_support_case_conditional_flip_router import (
+    runner,
+    runner_runtime,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_labeled_support_case_conditional_flip_router.recovery import (
+    RecoveryCapability,
+)
 from midogpp_thesis.cvae.diagnostics.fixed_bank_labeled_support_case_conditional_flip_router.runner_dependencies import (
     FlipRouterDependencies,
 )
@@ -398,3 +404,87 @@ def test_compute_resume_freshly_reprobes_workstation_but_validation_only_loads(
     assert first["disk_free_bytes_at_launch"] != second["disk_free_bytes_at_launch"]
     assert loaded == second
     assert calls == [1, 2]
+
+
+def test_terminal_finalization_recovery_only_revalidates_sealed_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The historical header retry cannot re-enter prediction or policy phases."""
+
+    root = tmp_path / "artifact"
+    root.mkdir()
+    config = SimpleNamespace(contract_hash="c" * 64)
+    protocol = SimpleNamespace(contract_hash="p" * 64)
+    capability = RecoveryCapability(
+        mode="TERMINAL_FINALIZATION",
+        state_phase="FINALIZATION",
+        resume_phase="FINALIZATION",
+        labels_may_be_reopened_for_validation=True,
+        labels_may_be_opened_for_deterministic_policy_construction=False,
+        labels_may_update_frozen_policy_contract=False,
+        validation_only=True,
+    )
+    events: list[str] = []
+    checks = {"status": "PASS", "scientific_factories_replayed": True}
+
+    monkeypatch.setattr(
+        runner_runtime, "recovery_capability", lambda _root: capability
+    )
+    monkeypatch.setattr(
+        runner_runtime,
+        "cleanup_owned_atomic_temps",
+        lambda _root: events.append("cleanup_temps"),
+    )
+    monkeypatch.setattr(
+        runner_runtime,
+        "write_state",
+        lambda _root, **kwargs: events.append(
+            f"state:{kwargs['status']}:{kwargs['phase']}"
+        ),
+    )
+    monkeypatch.setattr(
+        runner_runtime,
+        "write_content_index",
+        lambda *_args, **_kwargs: events.append("content_index"),
+    )
+    monkeypatch.setattr(
+        runner_runtime,
+        "enter_cuda_free_cpu_phase",
+        lambda: events.append("cuda_free_validation"),
+    )
+
+    def validate(_root: Path, **kwargs: object) -> dict[str, object]:
+        assert kwargs == {"config": config, "allow_pending_validation": True}
+        events.append("reconstructive_validation")
+        return checks
+
+    monkeypatch.setattr(runner_runtime, "validate_bundle", validate)
+    monkeypatch.setattr(
+        runner_runtime,
+        "persist_validation_report",
+        lambda _root, observed: events.append(
+            "validation_report" if observed == checks else "wrong_report"
+        ),
+    )
+    monkeypatch.setattr(
+        runner_runtime,
+        "assert_completed_binding",
+        lambda _root, **kwargs: events.append(
+            "complete_binding" if kwargs["expected_checks"] == checks else "wrong_binding"
+        ),
+    )
+
+    assert runner_runtime.recover_if_possible(
+        root, config=config, protocol=protocol
+    ) == root
+    assert events == [
+        "cleanup_temps",
+        "state:RUNNING:FINALIZATION",
+        "content_index",
+        "cuda_free_validation",
+        "reconstructive_validation",
+        "validation_report",
+        "state:COMPLETE:COMPLETE",
+        "complete_binding",
+    ]

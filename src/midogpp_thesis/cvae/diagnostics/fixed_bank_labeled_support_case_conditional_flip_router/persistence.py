@@ -50,6 +50,34 @@ _TERMINAL_RESULT_KEYS = frozenset({
     "permutation_metrics",
     "sealed_terminal_evaluation",
 })
+# Terminal rows cross a canonical, recursively key-sorted JSON checkpoint before
+# CSV finalization.  Freeze that production order explicitly so persistence and
+# reconstructive replay cannot infer different schemas from mapping insertion
+# order.  These fields also preserve already-sealed workstation CSV bytes.
+TERMINAL_TABLE_FIELDS = {
+    "terminal_case_confusions": (
+        "action_id", "case_id", "fn", "fp", "method_id", "row_hash",
+        "target_center", "tn", "tp",
+    ),
+    "terminal_center_metrics": (
+        "bacc", "method_id", "n_negative", "n_positive", "row_hash",
+        "target_center", "tn", "tp",
+    ),
+    "terminal_contrasts": (
+        "baseline_id", "center_estimates", "ci_high", "ci_low", "contrast_id",
+        "estimate", "method_id", "one_sided_95_lcb", "outer_df", "outer_n",
+        "outer_sd", "outer_se", "replicates", "row_hash", "row_role", "seed",
+        "target_center",
+    ),
+    "router_identification_metrics": (
+        "fold_stability", "normalized_oracle_gap", "oracle_static_action_id",
+        "row_hash", "spearman", "target_center", "top1_oracle_agreement",
+    ),
+    "permutation_metrics": (
+        "F_P_bacc", "F_S_bacc", "F_S_minus_F_P", "action_agreement",
+        "row_hash", "target_center",
+    ),
+}
 _TERMINAL_CHECKPOINT_KEYS = frozenset({
     "schema_version",
     "result",
@@ -237,8 +265,9 @@ def persist_terminal(
         rows = result.get(key)
         if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes)) or not rows:
             raise ProtocolError(f"Flip-router terminal result table is absent: {key}.")
-        payloads = [object_payload(row) for row in rows]
-        persist_rows(root / member, payloads, tuple(payloads[0]))
+        fields = TERMINAL_TABLE_FIELDS[key]
+        payloads = [_exact(object_payload(row), fields) for row in rows]
+        persist_rows(root / member, payloads, fields)
     sealed = result.get("sealed_terminal_evaluation")
     if not isinstance(sealed, Mapping):
         raise ProtocolError("Flip-router terminal seal payload is absent.")
@@ -384,7 +413,8 @@ def _contains_forbidden_raw_key(value: object) -> bool:
 
 
 __all__ = (
-    "TERMINAL_CHECKPOINT_MEMBER", "finalize_terminal_checkpoint", "load_terminal_checkpoint",
+    "TERMINAL_CHECKPOINT_MEMBER", "TERMINAL_TABLE_FIELDS",
+    "finalize_terminal_checkpoint", "load_terminal_checkpoint",
     "persist_decisions", "persist_donor_models", "persist_fold_plans", "persist_initial_surfaces",
     "persist_prelabel_surfaces", "persist_static_and_calibration", "persist_terminal",
     "persist_terminal_checkpoint", "persist_validation_report",

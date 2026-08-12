@@ -18,6 +18,7 @@ from .artifact_io import json_value, object_payload, read_rows
 from .constants import CENTERS
 from .hashing import canonical_hash
 from .label_capabilities import FlipRouterLabelCapabilityManager
+from .persistence import TERMINAL_TABLE_FIELDS
 from .science_runtime import (
     build_fold_decision_phase,
     evaluate_terminal_phase,
@@ -127,7 +128,11 @@ def replay_label_aware_surfaces(
         rows = terminal.get(key)
         if not _rows(rows):
             raise ProtocolError(f"Replayed flip-router terminal table is absent: {key}.")
-        _assert_table(root / member, rows)
+        _assert_table(
+            root / member,
+            rows,
+            expected_fields=TERMINAL_TABLE_FIELDS[key],
+        )
     sealed = terminal.get("sealed_terminal_evaluation")
     if not isinstance(sealed, Mapping):
         raise ProtocolError("Replayed flip-router terminal seal is absent.")
@@ -193,13 +198,21 @@ def _assert_json(path: Path, expected: object) -> None:
         raise ProtocolError(f"Flip-router replayed JSON differs: {path}.")
 
 
-def _assert_table(path: Path, expected_rows: Sequence[object]) -> None:
+def _assert_table(
+    path: Path,
+    expected_rows: Sequence[object],
+    *,
+    expected_fields: tuple[str, ...] | None = None,
+) -> None:
     payloads = tuple(object_payload(row) for row in expected_rows)
     if not payloads:
         raise ProtocolError(f"Flip-router replay produced an empty table: {path}.")
-    fields = tuple(payloads[0])
-    if any(tuple(row) != fields for row in payloads):
+    payload_fields = tuple(payloads[0])
+    if any(tuple(row) != payload_fields for row in payloads):
         raise ProtocolError(f"Flip-router replay table schema is ragged: {path}.")
+    fields = payload_fields if expected_fields is None else expected_fields
+    if len(fields) != len(payload_fields) or set(fields) != set(payload_fields):
+        raise ProtocolError(f"Flip-router replay table schema drifted: {path}.")
     observed = read_rows(path)
     expected = tuple(
         {field: _persisted_cell(row[field]) for field in fields} for row in payloads

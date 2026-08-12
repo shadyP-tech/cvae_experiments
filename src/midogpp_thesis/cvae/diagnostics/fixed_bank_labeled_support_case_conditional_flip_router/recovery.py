@@ -18,6 +18,7 @@ RECOVERABLE_FAILURE_CLASSES = frozenset({"MemoryError", "OSError", "RuntimeError
 _COMPLETED_LOCAL_SOURCE_INVENTORY_ERROR = (
     "Flip-router local source inventory drifted: missing=[], extras=[]."
 )
+_LEGACY_TERMINAL_HEADER_MEMBER = "tables/terminal_case_confusions.csv"
 
 _BASE = frozenset({
     "config.resolved.yaml", "provenance/input_artifacts.json", "reports/run_state.json",
@@ -173,7 +174,17 @@ def recovery_capability(root: Path) -> RecoveryCapability | None:
             "TERMINAL_FINALIZATION", phase, "FINALIZATION", True, False, False, True
         )
     if phase == "FINALIZATION":
-        _validate_retry_state(state)
+        legacy_header_retry = _is_registered_terminal_header_retry(
+            state, root=root
+        )
+        if not legacy_header_retry:
+            _validate_retry_state(state)
+        elif observed != (
+            _POSTLABEL_PREFIX | _TERMINAL_GROUP | _FINAL_INDEX
+        ):
+            raise ProtocolError(
+                "Flip-router LEGACY_TERMINAL_HEADER inventory drifted."
+            )
         allowed = (
             _POSTLABEL_PREFIX | _TERMINAL_GROUP,
             _POSTLABEL_PREFIX | _TERMINAL_GROUP | _FINAL_INDEX,
@@ -269,6 +280,26 @@ def _is_registered_protocol_retry(state: Mapping[str, object]) -> bool:
         "terminal_consumed_test_diagnostic_only": True,
         "automatic_resume_requires_hash_validation": True,
         "error": _COMPLETED_LOCAL_SOURCE_INVENTORY_ERROR,
+        "error_class": "ProtocolError",
+    }
+    return dict(state) == expected
+
+
+def _is_registered_terminal_header_retry(
+    state: Mapping[str, object], *, root: Path
+) -> bool:
+    """Admit the one post-terminal, serialization-only header failure."""
+
+    expected = {
+        "schema_version": RUN_STATE_SCHEMA,
+        "status": "FAILED",
+        "phase": "FINALIZATION",
+        "terminal_consumed_test_diagnostic_only": True,
+        "automatic_resume_requires_hash_validation": True,
+        "error": (
+            "Flip-router persisted table header drifted: "
+            f"{root / _LEGACY_TERMINAL_HEADER_MEMBER}."
+        ),
         "error_class": "ProtocolError",
     }
     return dict(state) == expected

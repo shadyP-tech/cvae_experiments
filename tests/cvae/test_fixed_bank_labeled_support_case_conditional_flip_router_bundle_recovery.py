@@ -228,6 +228,52 @@ def test_postlabel_recovery_allows_label_reread_only_for_reconstructive_validati
     assert capability.labels_may_update_frozen_policy_contract is False
 
 
+def test_exact_legacy_terminal_header_failure_is_validation_only_recoverable(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "artifact"
+    expected = recovery._POSTLABEL_PREFIX | recovery._TERMINAL_GROUP | recovery._FINAL_INDEX
+    for member in expected:
+        _touch(root, member)
+    state = _state(phase="FINALIZATION")
+    state.update(
+        error_class="ProtocolError",
+        error=(
+            "Flip-router persisted table header drifted: "
+            f"{root / 'tables/terminal_case_confusions.csv'}."
+        ),
+    )
+    (root / "reports/run_state.json").write_text(
+        json.dumps(state), encoding="utf-8"
+    )
+
+    capability = recovery_capability(root)
+    assert capability is not None
+    assert capability.mode == "TERMINAL_FINALIZATION"
+    assert capability.validation_only is True
+    assert capability.labels_may_be_reopened_for_validation is True
+    assert capability.labels_may_be_opened_for_deterministic_policy_construction is False
+    assert capability.labels_may_update_frozen_policy_contract is False
+
+    _touch(root, "reports/foreign.json")
+    with pytest.raises(ProtocolError, match="LEGACY_TERMINAL_HEADER inventory drifted"):
+        recovery_capability(root)
+
+
+def test_other_finalization_protocol_error_is_not_recoverable(tmp_path: Path) -> None:
+    root = tmp_path / "artifact"
+    for member in recovery._POSTLABEL_PREFIX | recovery._TERMINAL_GROUP | recovery._FINAL_INDEX:
+        _touch(root, member)
+    state = _state(phase="FINALIZATION")
+    state.update(error_class="ProtocolError", error="another validation failure")
+    (root / "reports/run_state.json").write_text(
+        json.dumps(state), encoding="utf-8"
+    )
+
+    with pytest.raises(ProtocolError, match="not a registered retry class"):
+        recovery_capability(root)
+
+
 @pytest.mark.parametrize(
     ("phase", "prior", "sequence"),
     (

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
 import csv
+import json
+from pathlib import Path
 
 import pytest
 
@@ -9,11 +10,14 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_labeled_support_case_conditional
     FlipRouterLabelCapabilityManager,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_labeled_support_case_conditional_flip_router.persistence import (
+    TERMINAL_TABLE_FIELDS,
+    finalize_terminal_checkpoint,
     persist_decisions,
     persist_donor_models,
     persist_fold_plans,
     persist_static_and_calibration,
     persist_terminal,
+    persist_terminal_checkpoint,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_labeled_support_case_conditional_flip_router.science_runtime import (
     build_fold_decision_phase,
@@ -27,6 +31,11 @@ from midogpp_thesis.cvae.protocol import ProtocolError
 from midogpp_thesis.cvae.runtime.artifact_io import atomic_json, read_json
 
 from flip_router_science_fixture import build_science_fixture
+
+
+_TERMINAL_TABLE_MEMBERS = {
+    key: f"tables/{key}.csv" for key in TERMINAL_TABLE_FIELDS
+}
 
 
 def _serial_process_pool(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -54,7 +63,12 @@ def _serial_process_pool(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-def _materialize(root: Path, monkeypatch: pytest.MonkeyPatch):
+def _materialize(
+    root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    through_terminal_checkpoint: bool = False,
+):
     _serial_process_pool(monkeypatch)
     fixture = build_science_fixture(root, monkeypatch)
     manager = FlipRouterLabelCapabilityManager(
@@ -103,14 +117,17 @@ def _materialize(root: Path, monkeypatch: pytest.MonkeyPatch):
         decision_phase=decisions,
         config=fixture.config,
     )
-    persist_terminal(
-        root,
-        result=terminal,
-        capability_report=manager.report_payload(),
-        leakage_report={"status": "fixture"},
-        publication_decision={"status": "fixture"},
-        runtime_summary={"status": "fixture"},
-    )
+    reports = {
+        "capability_report": manager.report_payload(),
+        "leakage_report": {"status": "fixture"},
+        "publication_decision": {"status": "fixture"},
+        "runtime_summary": {"status": "fixture"},
+    }
+    if through_terminal_checkpoint:
+        persist_terminal_checkpoint(root, result=terminal, **reports)
+        finalize_terminal_checkpoint(root)
+    else:
+        persist_terminal(root, result=terminal, **reports)
     return fixture, donor, decisions, terminal
 
 
@@ -160,6 +177,54 @@ def test_science_phases_persist_and_replay_every_label_aware_surface(
     assert gate["routing_success_claimed"] is False
     assert gate["promotion_eligible"] is False
     assert result["label_aware_scientific_replay"] == "PASS"
+
+
+def test_terminal_checkpoint_round_trip_preserves_canonical_csv_schema_and_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Exercise the runner's JSON-checkpoint -> CSV-finalization boundary."""
+
+    fixture, _donor, _decisions, terminal = _materialize(
+        tmp_path, monkeypatch, through_terminal_checkpoint=True
+    )
+    expected_by_table = {
+        key: tuple(dict(row) for row in terminal[key])
+        for key in TERMINAL_TABLE_FIELDS
+    }
+    for key, fields in TERMINAL_TABLE_FIELDS.items():
+        assert set(expected_by_table[key][0]) == set(fields)
+
+    terminal_seal = read_json(
+        tmp_path / "manifests/sealed_terminal_evaluation.json"
+    )
+    for key, fields in TERMINAL_TABLE_FIELDS.items():
+        member = _TERMINAL_TABLE_MEMBERS[key]
+        with (tmp_path / member).open(
+            "r", encoding="utf-8", newline=""
+        ) as handle:
+            reader = csv.DictReader(handle)
+            observed_fields = tuple(reader.fieldnames or ())
+            observed_rows = tuple(dict(row) for row in reader)
+        expected_rows = expected_by_table[key]
+        persisted_rows = tuple(
+            {field: _persisted_csv_cell(row[field]) for field in fields}
+            for row in expected_rows
+        )
+        assert observed_fields == fields
+        assert observed_rows == persisted_rows
+        assert tuple(row["row_hash"] for row in observed_rows) == tuple(
+            row["row_hash"] for row in expected_rows
+        )
+        assert terminal_seal["table_hashes"][key] == terminal[
+            "sealed_terminal_evaluation"
+        ]["table_hashes"][key]
+    assert _replay(tmp_path, fixture)["label_aware_scientific_replay"] == "PASS"
+
+
+def _persisted_csv_cell(value: object) -> str:
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, sort_keys=True, separators=(",", ":"))
+    return "" if value is None else str(value)
 
 
 @pytest.mark.parametrize(
