@@ -43,7 +43,7 @@ REVISION_B = {
 }
 
 
-def test_repository_registers_only_the_exact_recovery_entry() -> None:
+def test_repository_registers_only_the_two_exact_recovery_entries() -> None:
     workspace = MidogppWorkspace.load()
     registered = [
         experiment
@@ -51,9 +51,19 @@ def test_repository_registers_only_the_exact_recovery_entry() -> None:
         if experiment.run_recovery_strategy is not None
     ]
 
-    assert len(registered) == 1
-    assert registered[0].experiment_id == EXPERIMENT_ID
-    assert registered[0].run_recovery_strategy == STRATEGY
+    assert {
+        experiment.experiment_id: experiment.run_recovery_strategy
+        for experiment in registered
+    } == {
+        EXPERIMENT_ID: STRATEGY,
+        (
+            "midogpp.oracle.uniform_b_v2_consumed_test_"
+            "utility_aligned_target_static_endpoint_router.v1"
+        ): (
+            "exact_existing_snapshot_utility_aligned_"
+            "consumed_test_endpoint_router_v1"
+        ),
+    }
 
 
 def test_workspace_validate_rejects_unknown_or_misbound_recovery_strategy() -> None:

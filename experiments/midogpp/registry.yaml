@@ -2211,6 +2211,7 @@ experiments:
       midogpp_uniform_b_test_consumption_ledger_utility_aligned_target_static_endpoint_router_parent_v1: Byte-exact experiment-fenced alias of the immutable original ledger, read only to verify the direct parent hash.
       midogpp_uniform_b_test_consumption_ledger_utility_aligned_target_static_endpoint_router_amendment_v1: Direct single-consumer authorization for this terminal post-hoc consumed-test diagnostic; it creates no fresh evidence.
     runner:
+      run_recovery_strategy: exact_existing_snapshot_utility_aligned_consumed_test_endpoint_router_v1
       environment:
         CUBLAS_WORKSPACE_CONFIG: ":4096:8"
         CUDA_VISIBLE_DEVICES: "0,1"

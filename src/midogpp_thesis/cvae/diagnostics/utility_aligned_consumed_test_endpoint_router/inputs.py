@@ -181,19 +181,13 @@ def load_label_free_test_frame(config: EndpointRouterInputConfig) -> LabelFreeTe
         validation_report,
         config=config,
     )
-    if (
-        frozen.get("cache_name") != config.expected_test_cache_semantic_id
-        or frozen.get("representation_id")
-        != config.expected_test_cache_representation_id
-        or frozen.get("scoring_manifest_sha256") != config.expected_manifest_sha256
-        or int(frozen.get("expected_row_count", -1)) != EXPECTED_TEST_ROW_COUNT
-        or alignment.get("status") != "PASS"
-        or alignment.get("split") != "test"
-        or alignment.get("manifest_sha256") != config.expected_manifest_sha256
-        or int(alignment.get("row_count", -1)) != EXPECTED_TEST_ROW_COUNT
-        or content.get("content_hash") != config.expected_test_cache_content_hash
-    ):
-        raise ProtocolError("Endpoint-router test-cache identity drifted.")
+    _validate_cache_identity(
+        frozen,
+        alignment,
+        builder_report,
+        content,
+        config=config,
+    )
 
     arrays: list[np.ndarray] = []
     rows: list[LabelFreeCaseRow] = []
@@ -750,6 +744,48 @@ def _validate_cache_manifests(
             raise ProtocolError(
                 f"Endpoint-router cache center {center} alignment drifted."
             )
+
+
+def _validate_cache_identity(
+    frozen: Mapping[str, object],
+    alignment: Mapping[str, object],
+    builder: Mapping[str, object],
+    content: Mapping[str, object],
+    *,
+    config: EndpointRouterInputConfig,
+) -> None:
+    """Bind the cache while respecting the canonical producer's split schema.
+
+    The frozen protocol owns reservation, manifest, and row identities.  Its
+    canonical top level does not contain ``representation_id``; that identity
+    is carried by its nested extractor protocol, the independently validated
+    builder report, and each shard's extractor metadata.  A noncanonical frozen
+    copy may repeat the field at top level, but if present it must agree exactly.
+    """
+
+    frozen_representation = frozen.get("representation_id")
+    extractor_protocol = frozen.get("cache_extractor_protocol")
+    if (
+        frozen.get("cache_name") != config.expected_test_cache_semantic_id
+        or not isinstance(extractor_protocol, Mapping)
+        or extractor_protocol.get("representation_id")
+        != config.expected_test_cache_representation_id
+        or int(extractor_protocol.get("feature_dim", -1)) != FEATURE_DIM
+        or (
+            frozen_representation is not None
+            and frozen_representation != config.expected_test_cache_representation_id
+        )
+        or builder.get("representation_id")
+        != config.expected_test_cache_representation_id
+        or frozen.get("scoring_manifest_sha256") != config.expected_manifest_sha256
+        or int(frozen.get("expected_row_count", -1)) != EXPECTED_TEST_ROW_COUNT
+        or alignment.get("status") != "PASS"
+        or alignment.get("split") != "test"
+        or alignment.get("manifest_sha256") != config.expected_manifest_sha256
+        or int(alignment.get("row_count", -1)) != EXPECTED_TEST_ROW_COUNT
+        or content.get("content_hash") != config.expected_test_cache_content_hash
+    ):
+        raise ProtocolError("Endpoint-router test-cache identity drifted.")
 
 
 def _scan_forbidden_cache_payload(payload: object, *, role: str) -> None:

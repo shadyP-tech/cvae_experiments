@@ -1,6 +1,6 @@
 """Narrow dispatch for registered exact-existing-snapshot recovery.
 
-Recovery is deliberately not a general workspace lifecycle mode.  The sole
+Recovery is deliberately not a general workspace lifecycle mode. Each
 registered strategy recognizes one experiment-specific failed state and lets
 the normal registered runner continue from snapshots whose bytes predate the
 repair checkout.
@@ -17,6 +17,9 @@ from typing import Any, Mapping, Sequence
 
 EXACT_EXISTING_SNAPSHOT_DISAGREEMENT_REGRET_PREDICTION_ONLY_V1 = (
     "exact_existing_snapshot_disagreement_regret_prediction_only_v1"
+)
+EXACT_EXISTING_SNAPSHOT_UTILITY_ALIGNED_CONSUMED_TEST_ENDPOINT_ROUTER_V1 = (
+    "exact_existing_snapshot_utility_aligned_consumed_test_endpoint_router_v1"
 )
 
 _EXPERIMENT_ID = (
@@ -66,6 +69,45 @@ _RUNNER_ENV = {
     "NUMEXPR_NUM_THREADS": "1",
     "PYTHONUNBUFFERED": "1",
 }
+_ENDPOINT_EXPERIMENT_ID = (
+    "midogpp.oracle."
+    "uniform_b_v2_consumed_test_utility_aligned_target_static_endpoint_router.v1"
+)
+_ENDPOINT_CONFIG_PATH = (
+    "experiments/midogpp/stages/90_oracles_and_diagnostics/configs/"
+    "uniform_b_v2_consumed_test_utility_aligned_target_static_endpoint_router_v1.yaml"
+)
+_ENDPOINT_OUTPUT_ARTIFACT_ID = (
+    "midogpp_output_uniform_b_v2_consumed_test_"
+    "utility_aligned_target_static_endpoint_router_v1"
+)
+_ENDPOINT_OUTPUT_CANONICAL_PATH = (
+    "artifacts/midogpp/90_oracles_and_diagnostics/"
+    "uniform_b_v2_consumed_test_utility_aligned_target_static_endpoint_router/v1"
+)
+_ENDPOINT_INPUT_ARTIFACT_IDS = (
+    "midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1",
+    "midogpp_output_uniform_b_v2_generation_lock_v1",
+    "midogpp_stage90_utility_aligned_target_static_endpoint_router_test_cache_v1",
+    "midogpp_stage90_utility_aligned_target_static_endpoint_router_test_manifest_v1",
+    "midogpp_uniform_b_test_consumption_ledger_"
+    "utility_aligned_target_static_endpoint_router_parent_v1",
+    "midogpp_uniform_b_test_consumption_ledger_"
+    "utility_aligned_target_static_endpoint_router_amendment_v1",
+)
+_ENDPOINT_RUNNER_ARGV = (
+    "{python}",
+    "-m",
+    "midogpp_thesis",
+    "cvae-diagnostics",
+    "utility-aligned-consumed-test-endpoint-router",
+    "--config",
+    "{resolved_config}",
+    "--artifact-root",
+    "output://midogpp_output_uniform_b_v2_consumed_test_"
+    "utility_aligned_target_static_endpoint_router_v1",
+)
+_ENDPOINT_RUNNER_ENV = dict(_RUNNER_ENV)
 _REPOSITORY_STATE_KEYS = frozenset(
     {
         "repository_revision",
@@ -140,10 +182,12 @@ class SnapshotBytesGuard:
 
 
 def required_strategy_for_experiment(experiment_id: str) -> str | None:
-    """Return the sole strategy that must remain bound to its exact experiment."""
+    """Return the narrow strategy that must remain bound to each exact experiment."""
 
     if experiment_id == _EXPERIMENT_ID:
         return EXACT_EXISTING_SNAPSHOT_DISAGREEMENT_REGRET_PREDICTION_ONLY_V1
+    if experiment_id == _ENDPOINT_EXPERIMENT_ID:
+        return EXACT_EXISTING_SNAPSHOT_UTILITY_ALIGNED_CONSUMED_TEST_ENDPOINT_ROUTER_V1
     return None
 
 
@@ -170,22 +214,52 @@ def registration_errors(
         return (
             f"{experiment_id}: runner.run_recovery_strategy must remain {required!r}",
         )
-    if strategy_id != EXACT_EXISTING_SNAPSHOT_DISAGREEMENT_REGRET_PREDICTION_ONLY_V1:
+    if strategy_id == EXACT_EXISTING_SNAPSHOT_DISAGREEMENT_REGRET_PREDICTION_ONLY_V1:
+        wanted = (
+            _EXPERIMENT_ID,
+            _CONFIG_PATH,
+            _OUTPUT_ARTIFACT_ID,
+            _OUTPUT_CANONICAL_PATH,
+            _INPUT_ARTIFACT_IDS,
+            _RUNNER_ARGV,
+            _RUNNER_ENV,
+        )
+    elif strategy_id == EXACT_EXISTING_SNAPSHOT_UTILITY_ALIGNED_CONSUMED_TEST_ENDPOINT_ROUTER_V1:
+        wanted = (
+            _ENDPOINT_EXPERIMENT_ID,
+            _ENDPOINT_CONFIG_PATH,
+            _ENDPOINT_OUTPUT_ARTIFACT_ID,
+            _ENDPOINT_OUTPUT_CANONICAL_PATH,
+            _ENDPOINT_INPUT_ARTIFACT_IDS,
+            _ENDPOINT_RUNNER_ARGV,
+            _ENDPOINT_RUNNER_ENV,
+        )
+    else:
         return (
             f"{experiment_id}: unknown runner.run_recovery_strategy {strategy_id!r}",
         )
 
+    (
+        wanted_experiment_id,
+        wanted_config_path,
+        wanted_output_artifact_id,
+        wanted_output_canonical_path,
+        wanted_input_artifact_ids,
+        wanted_runner_argv,
+        wanted_runner_env,
+    ) = wanted
+
     expected: tuple[tuple[str, object, object], ...] = (
-        ("experiment_id", experiment_id, _EXPERIMENT_ID),
+        ("experiment_id", experiment_id, wanted_experiment_id),
         ("stage", stage, "90_oracles_and_diagnostics"),
         ("status", status, "diagnostic"),
         ("claim_scope", claim_scope, "diagnostic_only"),
-        ("config_path", config_path, _CONFIG_PATH),
-        ("output_artifact_id", output_artifact_id, _OUTPUT_ARTIFACT_ID),
-        ("output canonical_path", output_canonical_path, _OUTPUT_CANONICAL_PATH),
-        ("input_artifact_ids", tuple(input_artifact_ids), _INPUT_ARTIFACT_IDS),
-        ("runner.argv", tuple(runner_argv), _RUNNER_ARGV),
-        ("runner.environment", dict(runner_env), _RUNNER_ENV),
+        ("config_path", config_path, wanted_config_path),
+        ("output_artifact_id", output_artifact_id, wanted_output_artifact_id),
+        ("output canonical_path", output_canonical_path, wanted_output_canonical_path),
+        ("input_artifact_ids", tuple(input_artifact_ids), wanted_input_artifact_ids),
+        ("runner.argv", tuple(runner_argv), wanted_runner_argv),
+        ("runner.environment", dict(runner_env), wanted_runner_env),
     )
     return tuple(
         f"{experiment_id}: recovery strategy {strategy_id!r} requires exact {label}"
@@ -197,15 +271,21 @@ def registration_errors(
 def detect_registered_exact_recovery(strategy_id: str, artifact_root: Path) -> bool:
     """Recognize the registered failure and propagate any boundary drift."""
 
-    if strategy_id != EXACT_EXISTING_SNAPSHOT_DISAGREEMENT_REGRET_PREDICTION_ONLY_V1:
-        raise RecoveryContractError(f"Unknown workspace recovery strategy: {strategy_id!r}")
-
     # Import lazily so ordinary workspace validation and preparation do not load
     # the CVAE runtime (and its heavy numerical dependencies).
-    from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_only.recovery_contracts import (  # noqa: E501
-        detect_post_test_seal_recovery,
-    )
-    return bool(detect_post_test_seal_recovery(artifact_root))
+    if strategy_id == EXACT_EXISTING_SNAPSHOT_DISAGREEMENT_REGRET_PREDICTION_ONLY_V1:
+        from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_only.recovery_contracts import (  # noqa: E501
+            detect_post_test_seal_recovery,
+        )
+
+        return bool(detect_post_test_seal_recovery(artifact_root))
+    if strategy_id == EXACT_EXISTING_SNAPSHOT_UTILITY_ALIGNED_CONSUMED_TEST_ENDPOINT_ROUTER_V1:
+        from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_router.initialization_recovery import (  # noqa: E501
+            detect_initializing_cache_identity_recovery,
+        )
+
+        return bool(detect_initializing_cache_identity_recovery(artifact_root))
+    raise RecoveryContractError(f"Unknown workspace recovery strategy: {strategy_id!r}")
 
 
 def validate_preserved_snapshots(
@@ -258,6 +338,7 @@ def validate_preserved_snapshots(
 
 __all__ = (
     "EXACT_EXISTING_SNAPSHOT_DISAGREEMENT_REGRET_PREDICTION_ONLY_V1",
+    "EXACT_EXISTING_SNAPSHOT_UTILITY_ALIGNED_CONSUMED_TEST_ENDPOINT_ROUTER_V1",
     "RecoveryContractError",
     "SnapshotBytesGuard",
     "detect_registered_exact_recovery",

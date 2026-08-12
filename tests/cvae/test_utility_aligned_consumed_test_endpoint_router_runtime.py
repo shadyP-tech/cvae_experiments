@@ -36,6 +36,99 @@ from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_rout
 from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_router import (
     run_lock,
 )
+from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_router import (
+    initialization_recovery,
+)
+from midogpp_thesis.cvae.diagnostics.utility_aligned_consumed_test_endpoint_router.inputs import (
+    _validate_cache_identity,
+)
+
+
+def test_cache_identity_uses_builder_representation_when_frozen_schema_omits_it() -> None:
+    config = SimpleNamespace(
+        expected_test_cache_semantic_id="uniform_b_v2_descriptive_test_cache_v1",
+        expected_test_cache_representation_id="annotation_jpeg_fixed_center_b_v3",
+        expected_manifest_sha256="a" * 64,
+        expected_test_cache_content_hash="b" * 64,
+    )
+    frozen = {
+        "cache_name": config.expected_test_cache_semantic_id,
+        "cache_extractor_protocol": {
+            "representation_id": config.expected_test_cache_representation_id,
+            "feature_dim": 3840,
+        },
+        "scoring_manifest_sha256": config.expected_manifest_sha256,
+        "expected_row_count": 9928,
+    }
+    alignment = {
+        "status": "PASS",
+        "split": "test",
+        "manifest_sha256": config.expected_manifest_sha256,
+        "row_count": 9928,
+    }
+    builder = {"representation_id": config.expected_test_cache_representation_id}
+    content = {"content_hash": config.expected_test_cache_content_hash}
+
+    _validate_cache_identity(frozen, alignment, builder, content, config=config)
+
+    with pytest.raises(ProtocolError, match="test-cache identity drifted"):
+        _validate_cache_identity(
+            {**frozen, "representation_id": "wrong-representation"},
+            alignment,
+            builder,
+            content,
+            config=config,
+        )
+    with pytest.raises(ProtocolError, match="test-cache identity drifted"):
+        _validate_cache_identity(
+            frozen,
+            alignment,
+            {"representation_id": "wrong-representation"},
+            content,
+            config=config,
+        )
+    with pytest.raises(ProtocolError, match="test-cache identity drifted"):
+        _validate_cache_identity(
+            {
+                **frozen,
+                "cache_extractor_protocol": {
+                    "representation_id": "wrong-representation",
+                    "feature_dim": 3840,
+                },
+            },
+            alignment,
+            builder,
+            content,
+            config=config,
+        )
+    with pytest.raises(ProtocolError, match="test-cache identity drifted"):
+        _validate_cache_identity(
+            frozen,
+            alignment,
+            builder,
+            {"content_hash": "wrong-content"},
+            config=config,
+        )
+
+
+def test_initialization_recovery_requires_exact_failed_inventory(tmp_path: Path) -> None:
+    root = tmp_path.resolve()
+    (root / "provenance").mkdir()
+    (root / "reports").mkdir()
+    (root / "config.resolved.yaml").write_text("experiment: {}\n", encoding="utf-8")
+    (root / "provenance/input_artifacts.json").write_text("{}\n", encoding="utf-8")
+    state = {
+        **initialization_recovery.FAILED_CACHE_IDENTITY_STATE,
+        "updated_at_utc": "2026-08-12T09:59:40+00:00",
+    }
+    (root / "reports/run_state.json").write_text(
+        json.dumps(state), encoding="utf-8"
+    )
+    assert initialization_recovery.detect_initializing_cache_identity_recovery(root)
+
+    (root / "unexpected.json").write_text("{}\n", encoding="utf-8")
+    with pytest.raises(ProtocolError, match="recovery boundary drifted"):
+        initialization_recovery.detect_initializing_cache_identity_recovery(root)
 
 
 def test_run_lock_recovers_only_a_dead_same_host_owner(

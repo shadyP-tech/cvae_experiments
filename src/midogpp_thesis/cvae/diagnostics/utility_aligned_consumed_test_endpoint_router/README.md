@@ -75,3 +75,11 @@ label-free compatibility phase, followed by four CPU classifier workers with
 three BLAS threads each. Task checkpoints are hash-bound and resumable within
 the same workspace snapshot; a completed bundle is reusable only after full
 closed-world validation.
+
+The original pre-compute failure `Endpoint-router test-cache identity drifted`
+was caused by expecting `representation_id` at the frozen protocol's top level;
+the canonical producer stores it in the nested extractor protocol, builder
+report, and shard extractors. The registered exact-snapshot retry recognizes
+only that `FAILED/INITIALIZING` three-file boundary, preserves the original
+resolved config and input provenance, and rejects `--force`, extra arguments,
+or any inventory/input drift.
