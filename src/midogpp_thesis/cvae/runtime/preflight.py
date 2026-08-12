@@ -38,6 +38,9 @@ def run_label_free_workstation_preflight(
     expected_scratch_root: str = (
         "/data/local/fixed_bank_label_aware_case_oof_ceiling_v1"
     ),
+    expected_target_action_identity_count: int = 81,
+    expected_target_probability_cell_count: int = 729,
+    expected_unique_classifier_fit_count: int = 729,
 ) -> Mapping[str, object]:
     devices = tuple(str(value) for value in runtime.get("generation_devices", ()))
     scratch = tuple(str(value) for value in runtime.get("scratch_preference", ()))
@@ -61,10 +64,14 @@ def run_label_free_workstation_preflight(
         or int(runtime.get("source_stream_count", -1)) != 81
         or int(runtime.get("source_prefix_rows_per_class", -1)) != 270
         or int(runtime.get("target_task_count", -1)) != 81
-        or int(runtime.get("target_action_identity_count", -1)) != 81
-        or int(runtime.get("target_probability_cell_count", -1)) != 729
-        or int(runtime.get("target_unique_classifier_fit_count", -1)) != 729
-        or int(runtime.get("maximum_total_classifier_fit_count", -1)) != 729
+        or int(runtime.get("target_action_identity_count", -1))
+        != expected_target_action_identity_count
+        or int(runtime.get("target_probability_cell_count", -1))
+        != expected_target_probability_cell_count
+        or int(runtime.get("target_unique_classifier_fit_count", -1))
+        != expected_unique_classifier_fit_count
+        or int(runtime.get("maximum_total_classifier_fit_count", -1))
+        != expected_unique_classifier_fit_count
         or runtime.get("resume_policy")
         != "hash_validated_atomic_phase_and_task_checkpoints"
         or scratch != (str(expected_scratch_root), "artifact_parent")
@@ -115,6 +122,10 @@ def run_label_free_workstation_preflight(
         "persistent_gpu_workers": 2,
         "classifier_workers": 4,
         "blas_threads_per_classifier_worker": 3,
+        "target_action_identity_count": expected_target_action_identity_count,
+        "target_probability_cell_count": expected_target_probability_cell_count,
+        "target_unique_classifier_fit_count": expected_unique_classifier_fit_count,
+        "maximum_total_classifier_fit_count": expected_unique_classifier_fit_count,
         "gpu_then_cpu_phase_order": True,
         "phase_disjoint_gpu_and_cpu_pools": True,
         "parent_cuda_initialized": False,

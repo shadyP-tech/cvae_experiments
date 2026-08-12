@@ -16,6 +16,7 @@ import json
 import multiprocessing as mp
 import os
 from pathlib import Path
+import re
 import shutil
 import sys
 from types import MappingProxyType
@@ -122,14 +123,25 @@ def materialize_frozen_source_streams(
     """Generate all 81 streams through two persistent one-process GPU pools."""
 
     _assert_runtime(config.runtime)
+    _cleanup_final_atomic_temps(root)
     array_path = root / SOURCE_ARRAY_MEMBER
     index_path = root / SOURCE_INDEX_MEMBER
     lock_path = root / SOURCE_LOCK_MEMBER
-    if array_path.is_file() and index_path.is_file() and lock_path.is_file():
+    present = tuple(path.is_file() for path in (array_path, index_path, lock_path))
+    if any(path.is_symlink() for path in (array_path, index_path, lock_path)):
+        raise ProtocolError("Frozen source final trio contains a symlink.")
+    if all(present):
         return load_frozen_source_streams(root, expected_config_hash=config.contract_hash,
                                           expected_generation_lock_hash=generation_lock.generation_lock_hash)
+    if present not in {
+        (False, False, False),
+        (True, False, False),
+        (True, True, False),
+    }:
+        raise ProtocolError("Frozen source final trio is an unsafe partial state.")
 
     checkpoint_root = root / CHECKPOINT_DIRECTORY
+    _validate_checkpoint_tree(checkpoint_root)
     checkpoint_root.mkdir(parents=True, exist_ok=True)
     tasks = _build_tasks(config, generation_lock, checkpoint_root)
     completed: dict[tuple[str, int], Mapping[str, object]] = {}
@@ -188,7 +200,8 @@ def materialize_frozen_source_streams(
         expected_config_hash=config.contract_hash,
         expected_generation_lock_hash=generation_lock.generation_lock_hash,
     )
-    shutil.rmtree(checkpoint_root, ignore_errors=True)
+    _validate_checkpoint_tree(checkpoint_root)
+    shutil.rmtree(checkpoint_root)
     return cache
 
 
@@ -251,6 +264,8 @@ def stage_frozen_source_streams(
     destination = Path(scratch_root).resolve() / local_directory
     if destination == canonical:
         return cache
+    if destination.is_symlink():
+        raise ProtocolError("Frozen source staging destination is a symlink.")
     destination.mkdir(parents=True, exist_ok=True)
     members = (SOURCE_ARRAY_MEMBER, SOURCE_INDEX_MEMBER, SOURCE_LOCK_MEMBER)
     if all((destination / member).is_file() for member in members):
@@ -303,6 +318,55 @@ def _assert_runtime(runtime: Mapping[str, object]) -> None:
         and torch_module.cuda.is_initialized()
     ):
         raise ProtocolError("Frozen source parent process must remain CUDA-free.")
+
+
+def _validate_checkpoint_tree(directory: Path) -> None:
+    if not directory.exists():
+        if directory.is_symlink():
+            raise ProtocolError("Frozen source checkpoint root is a dangling symlink.")
+        return
+    if directory.is_symlink() or not directory.is_dir():
+        raise ProtocolError("Frozen source checkpoint root is unsafe.")
+    centers = r"(?:0|1|2|3|5|6|7|8|9)"
+    seeds = r"(?:17|42|101)"
+    member_pattern = rf"source_{centers}_train_{seeds}\.(?:json|npy)"
+    observed: set[str] = set()
+    for path in directory.iterdir():
+        if path.is_symlink() or not path.is_file():
+            raise ProtocolError("Frozen source checkpoint tree contains an unsafe member.")
+        match = re.fullmatch(r"(?P<base>.+)\.[1-9][0-9]*\.tmp", path.name)
+        if match:
+            if not re.fullmatch(member_pattern, match.group("base")):
+                raise ProtocolError("Frozen source checkpoint has an unknown atomic temp.")
+            path.unlink()
+            continue
+        if not re.fullmatch(member_pattern, path.name):
+            raise ProtocolError("Frozen source checkpoint tree contains an unknown member.")
+        observed.add(path.name)
+    stems: dict[str, set[str]] = {}
+    for member in observed:
+        stem, suffix = member.rsplit(".", 1)
+        stems.setdefault(stem, set()).add(suffix)
+    if any(suffixes not in ({"npy"}, {"json", "npy"}) for suffixes in stems.values()):
+        raise ProtocolError("Frozen source checkpoint pair is unsafe.")
+
+
+def _cleanup_final_atomic_temps(root: Path) -> None:
+    """Remove only exact crash remnants for the ordered final source trio."""
+
+    for member in (SOURCE_ARRAY_MEMBER, SOURCE_INDEX_MEMBER, SOURCE_LOCK_MEMBER):
+        path = root / member
+        parent = path.parent
+        if not parent.exists():
+            continue
+        if parent.is_symlink() or not parent.is_dir():
+            raise ProtocolError("Frozen source final parent is unsafe.")
+        pattern = re.compile(rf"{re.escape(path.name)}\.[1-9][0-9]*\.tmp")
+        for candidate in parent.iterdir():
+            if pattern.fullmatch(candidate.name):
+                if candidate.is_symlink() or not candidate.is_file():
+                    raise ProtocolError("Frozen source final atomic temp is unsafe.")
+                candidate.unlink()
 
 
 def _build_tasks(

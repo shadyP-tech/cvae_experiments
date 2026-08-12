@@ -764,3 +764,49 @@ The result remains `EXPLORATORY_CONSUMED_DATA_ONLY` and `DO_NOT_PROMOTE` even
 if an oracle or learned method improves BACC. It cannot select an action or
 geometry, authorize routing, update a model or expert, feed another experiment,
 or establish fresh evidence.
+
+## Uniform-B v2 consumed-test labeled-support case-conditional flip router v1
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_labeled_support_case_conditional_flip_router.v1`
+tests the remaining labeled-support, case-conditional quadrant identified by
+the actionability/recoverability audit. This is a new, isolated Stage-90
+diagnostic. It recomputes its own surfaces from exactly six fenced inputs and
+does not consume an earlier Stage-90 result, amendment, prediction, scratch, or
+checkpoint.
+
+The action library is frozen to `B`, shared `U`, and the eight A1 source
+actions. All 810 target/action/seed probability cells and every label-free
+case-action feature are sealed before labels open. Within each target center,
+five deterministic whole-case folds rotate three roles: fold `f` is evaluated,
+fold `f+1 mod 5` calibrates only the target-local directional flip rule, and the
+other three folds select among the eight static A1 challengers. `B` and `U` are
+controls, not static-selection candidates; a nonpositive or unauthorized
+challenger falls back to exactly `B`.
+
+`F_S` is the primary heuristic uncertainty-gated case router. It may flip the
+`S_static` hard prediction only where the frozen case features, fixed
+ridge-alpha `1.0` model, fixed directional calibration prior, and predeclared
+descriptive score bound admit the change. That per-case bound is not calibrated
+confidence or a safety guarantee. `G_static` selects its source by an additive
+query/source fixed-effect fit to exact per-`(q,e)` pooled gains under sum-to-zero
+effects, avoiding unequal query-mixture comparisons. `S_static`, `F_G`, and the same-capacity refit
+permutation `F_P` are controls. `O_static` and `O_case` open only during
+terminal scoring. The primary contrasts are `F_S-B`, `F_S-U`, `F_S-F_G`,
+`F_S-F_P`, and `F_S-S_static`; top-1 oracle agreement, Spearman rank,
+normalized oracle gap, and stability remain identification diagnostics.
+
+The workstation schedule uses one persistent spawned generation worker per RTX
+A5000, followed by a disjoint CUDA-free pool of four CPU workers with three
+threads each. Float32 memmaps and hash-validated checkpoints live preferentially
+under `/data/local/fixed_bank_labeled_support_case_conditional_flip_router_v1`;
+scientific reductions and 10,000 whole-case bootstrap replicates use float64.
+
+```bash
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_labeled_support_case_conditional_flip_router.v1
+```
+
+The result is terminal `EXPLORATORY_CONSUMED_DATA_ONLY` evidence regardless of
+its metric values. It cannot establish fresh routing success, authorize an
+action or policy, update a model or expert, select a recipe, feed another
+experiment or numbered stage, or support promotion or deployment.

@@ -2236,3 +2236,50 @@ experiments:
       - Development predictions seal before cross-center q labels open. For each target H, its own evaluation labels cannot build its plan and open only after all nine target-static plans and target predictions are globally sealed.
       - The routed diagnostic action is R only when the source-inner transfer/capacity gates and selected-gain lower bound pass; every failure returns exact B. U is a matched terminal control, G/P are diagnostic selections, and Hxe rows are terminal oracle/rank diagnostics.
       - The result remains EXPLORATORY_CONSUMED_DATA_ONLY and cannot authorize routing success, an action or policy, model/expert updates, promotion, deployment, recipe selection, any numbered-stage feed, another Stage-90 run, or another experiment.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_labeled_support_case_conditional_flip_router.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_labeled_support_case_conditional_flip_router_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_labeled_support_case_conditional_flip_router_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_fixed_bank_labeled_support_case_conditional_flip_router_test_cache_v1
+      - midogpp_stage90_fixed_bank_labeled_support_case_conditional_flip_router_test_manifest_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_labeled_support_case_conditional_flip_router_parent_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_labeled_support_case_conditional_flip_router_amendment_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Reuse of immutable A1 generation geometry, exact-nine seed pairing, budgets, and classifier settings only; no routing, action, policy, promotion, or deployment authority is inherited.
+      midogpp_stage90_fixed_bank_labeled_support_case_conditional_flip_router_test_manifest_v1: Experiment-fenced capability-gated labels open only according to the rotating whole-case source-selection, calibration, and terminal-evaluation roles.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_labeled_support_case_conditional_flip_router_parent_v1: Byte-exact experiment-fenced alias of the immutable original ledger, read only to verify the direct parent hash.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_labeled_support_case_conditional_flip_router_amendment_v1: Direct single-consumer authorization for this terminal post-hoc consumed-test diagnostic; it creates no fresh evidence.
+    runner:
+      run_recovery_strategy: exact_existing_snapshot_fixed_bank_labeled_support_case_conditional_flip_router_v1
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-labeled-support-case-conditional-flip-router
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_labeled_support_case_conditional_flip_router_v1
+    notes:
+      - Explicitly authorized reuse of the already-consumed MIDOG++ test split for one terminal labeled-support case-conditional flip-router diagnostic; it is never fresh routing, action, policy, or promotion evidence.
+      - The exact six-input fence contains the promoted bank, GenerationLock, dedicated single-consumer cache and manifest aliases, a byte-exact original-ledger alias, and this diagnostic's direct amendment. No prior Stage-90 output, amendment, prediction surface, scratch, checkpoint, or numbered-stage result is consumed.
+      - B, shared U, and eight frozen A1 source-action probabilities are recomputed as 810 exact-nine seed cells and globally sealed before labels open. Source-action selection uses three same-H whole-case folds, directional calibration uses the next disjoint fold, and evaluation uses the held fold; roles rotate so every case is evaluated once.
+      - The eight A1 sources are the only static challengers. B and U are controls; a nonpositive or unauthorized static challenger returns exactly B, and no B-versus-U flip feature or gate is admitted.
+      - F_S is the primary heuristic uncertainty-gated case-conditional diagnostic. It uses only the fixed label-free flip feature family, ridge alpha 1.0, a predeclared directional calibration prior, a descriptive score multiplier of 1.96, and zero minimum-gain and runner-up margins; its per-case bound is not calibrated confidence or safety. G_static uses an exact per-(q,e) pooled-gain additive query/source fixed-effect fit with sum-to-zero effects before source selection. S_static, F_G, and same-capacity refit permutation F_P are controls; O_static and O_case are terminal oracles.
+      - The workstation schedule uses one persistent spawned worker per RTX A5000 for source generation, then a disjoint CUDA-free CPU phase with four workers and three threads each, float32 memmaps, float64 reductions, hash-valid checkpoints, and local scratch at /data/local/fixed_bank_labeled_support_case_conditional_flip_router_v1.
+      - Regardless of outcome, the output cannot authorize routing success, an action, policy, model or expert update, promotion, deployment, recipe selection, a numbered-stage feed, another Stage-90 diagnostic, another experiment, or a generic consumer.

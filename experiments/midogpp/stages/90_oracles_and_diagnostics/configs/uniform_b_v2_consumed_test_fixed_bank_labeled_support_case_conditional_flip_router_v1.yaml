@@ -1,0 +1,218 @@
+experiment:
+  id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_labeled_support_case_conditional_flip_router.v1
+  name: uniform_b_v2_consumed_test_fixed_bank_labeled_support_case_conditional_flip_router_v1
+  artifact_root: output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_labeled_support_case_conditional_flip_router_v1
+  claim_scope: diagnostic_only
+  status: EXPLORATORY_CONSUMED_DATA_ONLY
+inputs:
+  expert_bank_artifact_id: midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_artifact_id: midogpp_output_uniform_b_v2_generation_lock_v1
+  test_cache_artifact_id: midogpp_stage90_fixed_bank_labeled_support_case_conditional_flip_router_test_cache_v1
+  test_manifest_artifact_id: midogpp_stage90_fixed_bank_labeled_support_case_conditional_flip_router_test_manifest_v1
+  test_consumption_ledger_artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_labeled_support_case_conditional_flip_router_parent_v1
+  ledger_amendment_artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_labeled_support_case_conditional_flip_router_amendment_v1
+  expert_bank_root: artifact://midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_root: artifact://midogpp_output_uniform_b_v2_generation_lock_v1
+  test_cache_root: artifact://midogpp_stage90_fixed_bank_labeled_support_case_conditional_flip_router_test_cache_v1
+  test_manifest_path: artifact://midogpp_stage90_fixed_bank_labeled_support_case_conditional_flip_router_test_manifest_v1/manifest.csv
+  test_consumption_ledger_path: artifact://midogpp_uniform_b_test_consumption_ledger_fixed_bank_labeled_support_case_conditional_flip_router_parent_v1/reports/test_consumption_ledger.json
+  ledger_amendment_path: artifact://midogpp_uniform_b_test_consumption_ledger_fixed_bank_labeled_support_case_conditional_flip_router_amendment_v1/uniform_b_v2_consumed_test_fixed_bank_labeled_support_case_conditional_flip_router_ledger_amendment_v1.json
+  expected_bank_lock_hash: 9972a41dcd4814cd
+  expected_generation_lock_hash: 34e551425710362e
+  expected_test_cache_semantic_id: uniform_b_v2_descriptive_test_cache_v1
+  expected_test_cache_representation_id: annotation_jpeg_fixed_center_b_v3
+  expected_test_cache_content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+  expected_test_cache_row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+  expected_manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+  expected_test_consumption_ledger_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+  expected_ledger_amendment_sha256: cc7f0e82d3ae4cd557b5f62181f5a9be4a9861ca19ab1c906ef628c9b7c142de
+  expected_ledger_amendment_parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+  ledger_amendment_authorized_experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_labeled_support_case_conditional_flip_router.v1
+protocol:
+  schema_version: midogpp_fixed_bank_labeled_support_flip_protocol_v1
+  stage: 90_oracles_and_diagnostics
+  dataset_family: MIDOG++
+  evaluation_split: test
+  centers: ['0', '1', '2', '3', '5', '6', '7', '8', '9']
+  training_seeds: [17, 42, 101]
+  generation_seeds: [17, 42, 101]
+  exact_seed_pair_count: 9
+  seed_pairing: cartesian_product_exact_nine_no_seed_selection
+  partition_unit: whole_case_within_target_center
+  partition_seed: 90902026
+  partition_namespace: midogpp_fixed_bank_labeled_support_case_conditional_flip_router_test_folds_v1
+  fold_count: 5
+  role_rotation: eval=f_calibration=(f+1)%5_selection=remaining_three
+  selection_calibration_evaluation_case_disjoint: true
+  each_case_evaluated_exactly_once: true
+  strict_outer_H_exclusion: true
+  strict_donor_query_q_exclusion: true
+  strict_candidate_source_e_exclusion: true
+  all_probabilities_sealed_before_any_label_access: true
+  each_fold_decision_invariant_to_and_sealed_without_its_held_evaluation_labels: true
+  terminal_scoring_occurs_only_after_all_45_decision_seals: true
+  original_six_inputs_only: true
+  input_artifact_count: 6
+  previous_stage90_outputs_or_predictions_used: false
+action_library:
+  schema_version: fixed_bank_a1_action_library_v1
+  action_ids: B_U_and_eight_A1_source_actions
+  physical_action_count_per_target: 10
+  target_probability_cell_count: 810
+  baseline_rows_per_source_class: 128
+  uniform_rows_per_source_class: 144
+  source_prefix_rows_per_class: 270
+  A1_selected_rows_per_class: 256
+  A1_other_rows_per_class: 128
+  A1_selected_row_weight: 1.4375
+  A1_other_row_weight: 0.875
+  A1_selected_row_weight_fraction: 23/16
+  A1_other_row_weight_fraction: 7/8
+  candidate_pool_excludes_target_H: true
+  probabilities_averaged_exact_nine_before_any_routing: true
+  previous_probability_surfaces_used: false
+flip_features:
+  family: baseline_anchored_threshold_flip_case_features_v1
+  hard_threshold: 0.5
+  feature_names:
+    - flip_0_to_1_count
+    - flip_0_to_1_rate
+    - flip_1_to_0_count
+    - flip_1_to_0_rate
+    - zero_flip
+    - baseline_abs_margin_on_flip
+    - candidate_abs_margin_on_flip
+    - signed_probability_delta_on_flip
+    - seed_flip_robustness
+    - candidate_seed_disagreement_on_flip
+    - case_size
+  feature_count: 11
+  features_label_free: true
+  no_B_vs_U_flip_feature: true
+  probabilities_ensemble_averaged_before_threshold: true
+  zero_flip_rows_retained: true
+  feature_hyperparameters_selected_after_labels: false
+routing:
+  family: support_calibrated_case_conditional_threshold_flip_v1
+  donor_model: two_head_ridge_tp_tn_contribution
+  ridge_alpha: 1.0
+  ridge_alpha_selection_used: false
+  variance_floor: 0.000001
+  static_challenger_candidates: eight_A1_source_actions_only
+  static_challenger_fallback: B_when_no_positive_authorized_A1
+  G_static_selection_objective: unweighted_least_squares_exact_per_q_e_pooled_bacc_gain
+  G_static_model: gain_qe=grand_mean+query_effect_q+source_effect_e
+  G_static_identifiability_constraints: [sum_query_effects=0, sum_source_effects=0]
+  G_static_selection_score: grand_mean_plus_source_effect
+  selection_labels_use: select_one_static_A1_challenger_per_H_fold
+  calibration_labels_use: direction_shared_case_flip_calibration_only
+  target_labels_update_shared_model: false
+  heuristic_score_multiplier: 1.96
+  minimum_gain: 0.0
+  runner_up_margin: 0.0
+  nonadmitted_case_fallback: B
+  raw_router_descriptive_only: true
+  heuristic_prediction_bound_descriptive_only: true
+  calibrated_case_confidence_or_safety_claimed: false
+  primary_router: F_S
+controls:
+  method_ids: [B, U, G_static, S_static, F_G, F_S, F_P, O_static, O_case]
+  pre_evaluation_method_ids: [B, U, G_static, S_static, F_G, F_S, F_P]
+  terminal_oracle_ids: [O_static, O_case]
+  B_role: fixed_equal_union_baseline_and_exact_fallback
+  U_role: uniform_action_control_not_a_flip_challenger
+  G_static_role: query_fixed_effect_adjusted_other_center_static_A1_source_or_B
+  S_static_role: selection_label_static_A1_source_or_B
+  F_G_role: case_flip_from_G_static
+  F_S_role: primary_heuristic_uncertainty_gated_case_flip_from_S_static
+  F_P_role: blocked_permuted_feature_same_capacity_control
+  O_static_role: terminal_best_static_A1_or_B
+  O_case_role: terminal_best_case_action_after_eval_open
+classifier:
+  family: sklearn_logistic_regression
+  C: 0.01
+  penalty: l2
+  solver: lbfgs
+  max_iter: 3000
+  class_weight: null
+  random_state: 23
+  l1_ratio: null
+  threshold_policy: predict
+  scaler_fit: synthetic_train_only
+evaluation:
+  primary_endpoint: center_pooled_exact_bacc_whole_case_oof
+  primary_method: F_S
+  primary_contrasts: [F_S-B, F_S-U, F_S-F_G, F_S-F_P, F_S-S_static]
+  diagnostic_recoverability_gate:
+    gate_id: all_primary_contrast_outer_center_lcbs_positive_v1
+    lcb_field: one_sided_95_lcb
+    threshold: 0.0
+    comparison: strictly_greater_than
+    required_contrast_count: 5
+    pass_status: PASS
+    fail_status: FAIL
+    diagnostic_only: true
+  routing_metrics: [top1_oracle_agreement, spearman, normalized_oracle_gap, fold_stability]
+  outer_inference_unit: target_center
+  outer_inference_unit_count: 9
+  case_cluster_bootstrap_replicates: 10000
+  case_cluster_bootstrap_seed: 90912030
+  scientific_reductions_dtype: float64
+  raw_labels_persisted: false
+  per_case_bacc_persisted_or_used: false
+runtime:
+  workstation_profile: xeon_w2265_12c24t_125gb_2x_rtx_a5000_24gb
+  generation_devices: [cuda:0, cuda:1]
+  source_workers_per_device: 1
+  generation_workers_per_device: 1
+  source_generation_worker_count: 2
+  persistent_source_workers: true
+  gpu_source_phase_precedes_cpu_phase: true
+  parent_cuda_context_forbidden: true
+  parent_cuda_context_forbidden_during_cpu_phase: true
+  tf32_enabled: false
+  amp_enabled: false
+  generated_cache_format: float32_npy_memmap
+  probability_surface_format: sealed_compressed_float32_npz
+  source_storage_dtype: float32
+  probability_storage_dtype: float32
+  scientific_reductions_dtype: float64
+  classifier_workers: 4
+  classifier_threads_per_worker: 3
+  model_workers: 4
+  model_threads_per_worker: 3
+  bootstrap_workers: 4
+  bootstrap_threads_per_worker: 3
+  multiprocessing_start_method: spawn
+  phase_disjoint_gpu_and_cpu_pools: true
+  source_prefix_rows_per_class: 270
+  target_task_count: 81
+  physical_actions_per_target_task: 10
+  target_probability_cell_count: 810
+  target_unique_classifier_fit_count: 810
+  maximum_total_classifier_fit_count: 810
+  scratch_preference:
+    - /data/local/fixed_bank_labeled_support_case_conditional_flip_router_v1
+    - artifact_parent
+  resume_policy: hash_validated_source_prediction_task_resume_plus_deterministic_phase_replay
+  clean_scratch_only_after_closed_world_validation_pass: true
+  previous_stage90_scratch_reuse_forbidden: true
+claim_boundary:
+  publication_status: EXPLORATORY_CONSUMED_DATA_ONLY
+  terminal_decision: DO_NOT_PROMOTE
+  claim_role: posthoc_known_fixed_bank_labeled_support_case_conditional_flip_router_diagnostic
+  consumed_test_data: true
+  method_development_is_posthoc: true
+  fresh_evidence: false
+  routing_success_claimed: false
+  support_labels_used: true
+  selection_calibration_evaluation_labels_role_separated_per_decision: true
+  each_fold_plan_hash_invariant_to_its_held_evaluation_labels: true
+  source_expert_updated: false
+  target_expert_used: false
+  shared_model_updated_with_target_labels: false
+  action_selection_authorized: false
+  policy_update_authorized: false
+  promotion_eligible: false
+  may_feed_stage50_stage60_stage70_or_another_experiment: false
+  previous_stage90_outputs_or_scratch_used: false

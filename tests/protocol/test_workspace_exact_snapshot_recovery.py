@@ -49,7 +49,7 @@ REVISION_B = {
 }
 
 
-def test_repository_registers_only_the_two_exact_recovery_entries() -> None:
+def test_repository_registers_only_the_three_exact_recovery_entries() -> None:
     workspace = MidogppWorkspace.load()
     registered = [
         experiment
@@ -68,6 +68,13 @@ def test_repository_registers_only_the_two_exact_recovery_entries() -> None:
         ): (
             "exact_existing_snapshot_utility_aligned_"
             "consumed_test_endpoint_router_v1"
+        ),
+        (
+            "midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_"
+            "labeled_support_case_conditional_flip_router.v1"
+        ): (
+            "exact_existing_snapshot_fixed_bank_labeled_support_"
+            "case_conditional_flip_router_v1"
         ),
     }
 

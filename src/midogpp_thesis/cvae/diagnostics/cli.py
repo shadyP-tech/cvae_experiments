@@ -228,6 +228,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     consumed_test_endpoint_router.add_argument("--config", required=True)
     consumed_test_endpoint_router.add_argument("--artifact-root", required=True)
+
+    labeled_support_case_conditional_flip_router = sub.add_parser(
+        "fixed-bank-labeled-support-case-conditional-flip-router",
+        help=(
+            "Run the explicitly authorized consumed-test labeled-support "
+            "case-conditional flip-router diagnostic."
+        ),
+    )
+    labeled_support_case_conditional_flip_router.add_argument(
+        "--config", required=True
+    )
+    labeled_support_case_conditional_flip_router.add_argument(
+        "--artifact-root", required=True
+    )
     return parser
 
 
@@ -552,6 +566,22 @@ def main(argv: list[str] | None = None) -> int:
             args.config
         )
         output = run_utility_aligned_consumed_test_endpoint_router(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "fixed-bank-labeled-support-case-conditional-flip-router":
+        from .fixed_bank_labeled_support_case_conditional_flip_router import (
+            load_fixed_bank_labeled_support_case_conditional_flip_router_config,
+            run_fixed_bank_labeled_support_case_conditional_flip_router,
+        )
+
+        config = load_fixed_bank_labeled_support_case_conditional_flip_router_config(
+            args.config
+        )
+        output = run_fixed_bank_labeled_support_case_conditional_flip_router(
             config,
             artifact_root=artifact_root,
         )

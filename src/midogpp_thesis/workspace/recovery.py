@@ -21,6 +21,9 @@ EXACT_EXISTING_SNAPSHOT_DISAGREEMENT_REGRET_PREDICTION_ONLY_V1 = (
 EXACT_EXISTING_SNAPSHOT_UTILITY_ALIGNED_CONSUMED_TEST_ENDPOINT_ROUTER_V1 = (
     "exact_existing_snapshot_utility_aligned_consumed_test_endpoint_router_v1"
 )
+EXACT_EXISTING_SNAPSHOT_FIXED_BANK_LABELED_SUPPORT_CASE_CONDITIONAL_FLIP_ROUTER_V1 = (
+    "exact_existing_snapshot_fixed_bank_labeled_support_case_conditional_flip_router_v1"
+)
 
 _RUN_STATE_SCHEMA_BY_STRATEGY = {
     EXACT_EXISTING_SNAPSHOT_DISAGREEMENT_REGRET_PREDICTION_ONLY_V1: (
@@ -28,6 +31,9 @@ _RUN_STATE_SCHEMA_BY_STRATEGY = {
     ),
     EXACT_EXISTING_SNAPSHOT_UTILITY_ALIGNED_CONSUMED_TEST_ENDPOINT_ROUTER_V1: (
         "midogpp_consumed_test_endpoint_router_run_state_v1"
+    ),
+    EXACT_EXISTING_SNAPSHOT_FIXED_BANK_LABELED_SUPPORT_CASE_CONDITIONAL_FLIP_ROUTER_V1: (
+        "fixed_bank_labeled_support_flip_run_state_v1"
     ),
 }
 
@@ -117,6 +123,47 @@ _ENDPOINT_RUNNER_ARGV = (
     "utility_aligned_target_static_endpoint_router_v1",
 )
 _ENDPOINT_RUNNER_ENV = dict(_RUNNER_ENV)
+_FLIP_EXPERIMENT_ID = (
+    "midogpp.oracle.uniform_b_v2_consumed_test_"
+    "fixed_bank_labeled_support_case_conditional_flip_router.v1"
+)
+_FLIP_CONFIG_PATH = (
+    "experiments/midogpp/stages/90_oracles_and_diagnostics/configs/"
+    "uniform_b_v2_consumed_test_fixed_bank_labeled_support_"
+    "case_conditional_flip_router_v1.yaml"
+)
+_FLIP_OUTPUT_ARTIFACT_ID = (
+    "midogpp_output_uniform_b_v2_consumed_test_fixed_bank_labeled_support_"
+    "case_conditional_flip_router_v1"
+)
+_FLIP_OUTPUT_CANONICAL_PATH = (
+    "artifacts/midogpp/90_oracles_and_diagnostics/"
+    "uniform_b_v2_consumed_test_fixed_bank_labeled_support_"
+    "case_conditional_flip_router/v1"
+)
+_FLIP_INPUT_ARTIFACT_IDS = (
+    "midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1",
+    "midogpp_output_uniform_b_v2_generation_lock_v1",
+    "midogpp_stage90_fixed_bank_labeled_support_case_conditional_flip_router_test_cache_v1",
+    "midogpp_stage90_fixed_bank_labeled_support_case_conditional_flip_router_test_manifest_v1",
+    "midogpp_uniform_b_test_consumption_ledger_"
+    "fixed_bank_labeled_support_case_conditional_flip_router_parent_v1",
+    "midogpp_uniform_b_test_consumption_ledger_"
+    "fixed_bank_labeled_support_case_conditional_flip_router_amendment_v1",
+)
+_FLIP_RUNNER_ARGV = (
+    "{python}",
+    "-m",
+    "midogpp_thesis",
+    "cvae-diagnostics",
+    "fixed-bank-labeled-support-case-conditional-flip-router",
+    "--config",
+    "{resolved_config}",
+    "--artifact-root",
+    "output://midogpp_output_uniform_b_v2_consumed_test_"
+    "fixed_bank_labeled_support_case_conditional_flip_router_v1",
+)
+_FLIP_RUNNER_ENV = dict(_RUNNER_ENV)
 _REPOSITORY_STATE_KEYS = frozenset(
     {
         "repository_revision",
@@ -197,6 +244,8 @@ def required_strategy_for_experiment(experiment_id: str) -> str | None:
         return EXACT_EXISTING_SNAPSHOT_DISAGREEMENT_REGRET_PREDICTION_ONLY_V1
     if experiment_id == _ENDPOINT_EXPERIMENT_ID:
         return EXACT_EXISTING_SNAPSHOT_UTILITY_ALIGNED_CONSUMED_TEST_ENDPOINT_ROUTER_V1
+    if experiment_id == _FLIP_EXPERIMENT_ID:
+        return EXACT_EXISTING_SNAPSHOT_FIXED_BANK_LABELED_SUPPORT_CASE_CONDITIONAL_FLIP_ROUTER_V1
     return None
 
 
@@ -242,6 +291,16 @@ def registration_errors(
             _ENDPOINT_INPUT_ARTIFACT_IDS,
             _ENDPOINT_RUNNER_ARGV,
             _ENDPOINT_RUNNER_ENV,
+        )
+    elif strategy_id == EXACT_EXISTING_SNAPSHOT_FIXED_BANK_LABELED_SUPPORT_CASE_CONDITIONAL_FLIP_ROUTER_V1:
+        wanted = (
+            _FLIP_EXPERIMENT_ID,
+            _FLIP_CONFIG_PATH,
+            _FLIP_OUTPUT_ARTIFACT_ID,
+            _FLIP_OUTPUT_CANONICAL_PATH,
+            _FLIP_INPUT_ARTIFACT_IDS,
+            _FLIP_RUNNER_ARGV,
+            _FLIP_RUNNER_ENV,
         )
     else:
         return (
@@ -294,6 +353,12 @@ def detect_registered_exact_recovery(strategy_id: str, artifact_root: Path) -> b
         )
 
         return bool(detect_registered_endpoint_router_recovery(artifact_root))
+    if strategy_id == EXACT_EXISTING_SNAPSHOT_FIXED_BANK_LABELED_SUPPORT_CASE_CONDITIONAL_FLIP_ROUTER_V1:
+        from midogpp_thesis.cvae.diagnostics.fixed_bank_labeled_support_case_conditional_flip_router.recovery import (  # noqa: E501
+            detect_registered_flip_router_recovery,
+        )
+
+        return bool(detect_registered_flip_router_recovery(artifact_root))
     raise RecoveryContractError(f"Unknown workspace recovery strategy: {strategy_id!r}")
 
 
@@ -396,6 +461,7 @@ def validate_preserved_snapshots(
 __all__ = (
     "EXACT_EXISTING_SNAPSHOT_DISAGREEMENT_REGRET_PREDICTION_ONLY_V1",
     "EXACT_EXISTING_SNAPSHOT_UTILITY_ALIGNED_CONSUMED_TEST_ENDPOINT_ROUTER_V1",
+    "EXACT_EXISTING_SNAPSHOT_FIXED_BANK_LABELED_SUPPORT_CASE_CONDITIONAL_FLIP_ROUTER_V1",
     "RecoveryContractError",
     "SnapshotBytesGuard",
     "detect_registered_exact_recovery",
