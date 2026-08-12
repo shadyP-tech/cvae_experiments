@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -8,6 +9,7 @@ import pytest
 
 from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_flip_router import (
     persistence,
+    recovery,
     runner,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_flip_router.artifact_io import (
@@ -257,7 +259,29 @@ def test_runner_orders_all_seals_before_terminal_open(
     root = tmp_path / "bundle"
     (root / "provenance").mkdir(parents=True)
     (root / "config.resolved.yaml").write_text("experiment: test\n", encoding="utf-8")
-    (root / "provenance/input_artifacts.json").write_text("{}\n", encoding="utf-8")
+    original_repository_state = {
+        "repository_revision": "a" * 40,
+        "repository_dirty": True,
+        "repository_status_hash": "b" * 64,
+    }
+    repair_repository_state = {
+        "repository_revision": "c" * 40,
+        "repository_dirty": False,
+        "repository_status_hash": "d" * 64,
+    }
+    (root / "provenance/input_artifacts.json").write_text(
+        "{"
+        f'"repository_revision":"{original_repository_state["repository_revision"]}",'
+        '"repository_dirty":true,'
+        f'"repository_status_hash":"{original_repository_state["repository_status_hash"]}"'
+        "}\n",
+        encoding="utf-8",
+    )
+    (root / "reports").mkdir()
+    (root / "reports/run_state.json").write_text(
+        json.dumps(recovery.FAILED_MAPPINGPROXY_STATE) + "\n",
+        encoding="utf-8",
+    )
     absolute = tmp_path.resolve()
     config = SimpleNamespace(
         source_path=root / "config.resolved.yaml",
@@ -285,6 +309,8 @@ def test_runner_orders_all_seals_before_terminal_open(
     donor = SimpleNamespace()
     decisions = SimpleNamespace()
     gate = {"status": "FAIL"}
+    runtime_calls: list[dict[str, object]] = []
+    unchanged_calls: list[dict[str, object]] = []
     terminal = {
         "sealed_terminal_evaluation": {
             "sealed_result_hash": "e" * 64,
@@ -310,6 +336,31 @@ def test_runner_orders_all_seals_before_terminal_open(
             return {"terminal_scoring_opened": True}
 
     monkeypatch.setattr(runner, "assert_input_fence", lambda config: None)
+    monkeypatch.setattr(
+        runner,
+        "current_repair_repository_state",
+        lambda: dict(repair_repository_state),
+    )
+    monkeypatch.setattr(
+        runner,
+        "detect_registered_multi_challenger_recovery",
+        lambda _root: True,
+    )
+    monkeypatch.setattr(
+        runner,
+        "sealed_recovery_input_hashes",
+        lambda _root: {
+            "source_stream_lock_hash": "1" * 64,
+            "global_prediction_seal_hash": "2" * 64,
+            "prelabel_feature_surface_hash": "3" * 64,
+            "fold_plan_surface_hash": "4" * 64,
+        },
+    )
+    monkeypatch.setattr(
+        runner,
+        "assert_repair_repository_state_unchanged",
+        lambda audit: unchanged_calls.append(dict(audit)),
+    )
     monkeypatch.setattr(
         runner,
         "validate_active_diagnostic_workspace_binding",
@@ -365,7 +416,7 @@ def test_runner_orders_all_seals_before_terminal_open(
     monkeypatch.setattr(
         runner,
         "runtime_summary_payload",
-        lambda **kwargs: {"status": "PASS"},
+        lambda **kwargs: runtime_calls.append(dict(kwargs)) or {"status": "PASS"},
     )
     monkeypatch.setattr(runner, "persist_terminal_checkpoint", lambda *args, **kwargs: {})
     monkeypatch.setattr(runner, "finalize_terminal_checkpoint", lambda root: None)
@@ -398,6 +449,10 @@ def test_runner_orders_all_seals_before_terminal_open(
         "fold_decisions_persisted"
     )
     assert events.index("fold_decisions_persisted") < events.index("terminal_opened")
+    assert runtime_calls[0]["recovery_audit"]["recovery_used"] is True
+    assert runtime_calls[0]["recovery_audit"]["original_repository_revision"] == "a" * 40
+    assert runtime_calls[0]["recovery_audit"]["repair_repository_revision"] == "c" * 40
+    assert unchanged_calls == [runtime_calls[0]["recovery_audit"]]
     assert events[-1] == "cleanup"
 
 

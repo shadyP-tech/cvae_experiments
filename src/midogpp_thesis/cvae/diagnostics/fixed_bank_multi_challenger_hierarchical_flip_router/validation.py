@@ -29,6 +29,12 @@ from .inputs import (
     validate_workspace_provenance,
 )
 from .protocol import canonical_consumed_test_protocol
+from .recovery_provenance import (
+    current_repair_repository_state,
+    original_repository_state_from_provenance,
+    sealed_recovery_input_hashes,
+    validate_recovery_audit_payload,
+)
 from .reports import (
     leakage_report_payload,
     protocol_manifest_payload,
@@ -91,7 +97,7 @@ def validate_fixed_bank_multi_challenger_hierarchical_flip_router_bundle(
         expected_generation_lock_hash=locks.generation.generation_lock_hash,
     )
     science = validate_scientific_surfaces(path, config=config, frame=frame)
-    _validate_reports(
+    recovery_audit = _validate_reports(
         path,
         science=science,
         preflight=preflight,
@@ -109,6 +115,7 @@ def validate_fixed_bank_multi_challenger_hierarchical_flip_router_bundle(
         "input_artifact_count": len(provenance),
         "pre_gpu_firewall_status": firewall["status"],
         "workstation_preflight_status": preflight["status"],
+        "mappingproxy_recovery_used": recovery_audit["recovery_used"],
         **dict(science),
         "content_index_validated_before_scientific_members": True,
         "scientific_factories_replayed": True,
@@ -184,7 +191,7 @@ def _validate_reports(
     preflight: Mapping[str, object],
     source: object,
     allow_pending_validation: bool,
-) -> None:
+) -> Mapping[str, object]:
     capability = read_json(root / "reports/label_capability_report.json")
     leakage = read_json(root / "reports/leakage_report.json")
     publication = read_json(root / "reports/publication_decision.json")
@@ -194,6 +201,7 @@ def _validate_reports(
     feature = read_json(root / "manifests/prelabel_feature_seal.json")
     prediction = read_json(root / "manifests/fixed_bank_a1_prediction_seal.json")
     run_state = read_json(root / "reports/run_state.json")
+    recovery_audit = _validate_recovery_lineage(root, runtime=runtime)
     expected_leakage = leakage_report_payload(
         prediction_seal_hash=str(prediction["global_prediction_seal_hash"]),
         feature_seal_hash=str(feature["feature_surface_hash"]),
@@ -241,6 +249,20 @@ def _validate_reports(
         )
     ):
         raise ProtocolError("Multi-challenger terminal reports drifted.")
+    return recovery_audit
+
+
+def _validate_recovery_lineage(
+    root: Path, *, runtime: Mapping[str, object]
+) -> Mapping[str, object]:
+    """Bind the persisted audit to live files and both repository identities."""
+
+    return validate_recovery_audit_payload(
+        runtime.get("mappingproxy_recovery"),
+        original_repository_state=original_repository_state_from_provenance(root),
+        current_repository_state=current_repair_repository_state(),
+        **sealed_recovery_input_hashes(root),
+    )
 
 
 def _reject_raw_label_persistence(root: Path) -> None:

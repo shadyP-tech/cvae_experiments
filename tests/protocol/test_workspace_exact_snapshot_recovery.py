@@ -14,9 +14,14 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_o
     FAILED_INFERENCE_STATE,
     POST_TEST_SEAL_RECOVERY_FILES,
 )
+from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_flip_router.recovery import (
+    FAILED_MAPPINGPROXY_STATE,
+    RECOVERABLE_INVENTORY as MULTI_CHALLENGER_RECOVERABLE_INVENTORY,
+)
 from midogpp_thesis.cvae.protocol import ProtocolError
 from midogpp_thesis.workspace import runtime as workspace_runtime
 from midogpp_thesis.workspace.recovery import (
+    EXACT_EXISTING_SNAPSHOT_FIXED_BANK_MULTI_CHALLENGER_HIERARCHICAL_FLIP_ROUTER_V1,
     EXACT_EXISTING_SNAPSHOT_UTILITY_ALIGNED_CONSUMED_TEST_ENDPOINT_ROUTER_V1,
     RecoveryContractError,
     registered_recovery_state_status,
@@ -37,6 +42,19 @@ OUTPUT_ID = (
     "fixed_bank_disagreement_regret_prediction_only_v1"
 )
 STRATEGY = "exact_existing_snapshot_disagreement_regret_prediction_only_v1"
+MULTI_CHALLENGER_EXPERIMENT_ID = (
+    "midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_"
+    "multi_challenger_hierarchical_flip_router.v1"
+)
+MULTI_CHALLENGER_CONFIG_PATH = (
+    "experiments/midogpp/stages/90_oracles_and_diagnostics/configs/"
+    "uniform_b_v2_consumed_test_fixed_bank_"
+    "multi_challenger_hierarchical_flip_router_v1.yaml"
+)
+MULTI_CHALLENGER_OUTPUT_ID = (
+    "midogpp_output_uniform_b_v2_consumed_test_fixed_bank_"
+    "multi_challenger_hierarchical_flip_router_v1"
+)
 REVISION_A = {
     "repository_revision": "a" * 40,
     "repository_dirty": True,
@@ -49,7 +67,7 @@ REVISION_B = {
 }
 
 
-def test_repository_registers_only_the_three_exact_recovery_entries() -> None:
+def test_repository_registers_only_the_four_exact_recovery_entries() -> None:
     workspace = MidogppWorkspace.load()
     registered = [
         experiment
@@ -75,6 +93,12 @@ def test_repository_registers_only_the_three_exact_recovery_entries() -> None:
         ): (
             "exact_existing_snapshot_fixed_bank_labeled_support_"
             "case_conditional_flip_router_v1"
+        ),
+        (
+            "midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_"
+            "multi_challenger_hierarchical_flip_router.v1"
+        ): (
+            EXACT_EXISTING_SNAPSHOT_FIXED_BANK_MULTI_CHALLENGER_HIERARCHICAL_FLIP_ROUTER_V1
         ),
     }
 
@@ -188,6 +212,58 @@ def test_exact_recovery_preserves_revision_a_snapshots_under_current_revision_b(
     monkeypatch.setattr(workspace_runtime.subprocess, "run", failed_runner)
 
     assert workspace.run(EXPERIMENT_ID) == 17
+    assert len(calls) == 1
+    argv, cwd, env = calls[0]
+    assert tuple(argv) == prepared.argv
+    assert cwd == tmp_path
+    assert env["CUBLAS_WORKSPACE_CONFIG"] == ":4096:8"
+    assert env["CUDA_VISIBLE_DEVICES"] == "0,1"
+    assert prepared.resolved_config_path.read_bytes() == config_before
+    assert prepared.input_manifest_path.read_bytes() == manifest_before
+    preserved_manifest = json.loads(manifest_before)
+    assert {
+        key: preserved_manifest[key] for key in REVISION_A
+    } == REVISION_A
+
+
+def test_multi_challenger_exact_recovery_dispatches_revision_a_snapshot_under_revision_b(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace, state, _inputs = _build_exact_workspace(
+        tmp_path,
+        monkeypatch,
+        experiment_id=MULTI_CHALLENGER_EXPERIMENT_ID,
+        config_path=MULTI_CHALLENGER_CONFIG_PATH,
+        output_id=MULTI_CHALLENGER_OUTPUT_ID,
+    )
+    prepared = workspace.prepare(MULTI_CHALLENGER_EXPERIMENT_ID)
+    _write_failed_inventory(
+        prepared.artifact_root,
+        inventory=MULTI_CHALLENGER_RECOVERABLE_INVENTORY,
+        failed_state=FAILED_MAPPINGPROXY_STATE,
+    )
+    config_before = prepared.resolved_config_path.read_bytes()
+    manifest_before = prepared.input_manifest_path.read_bytes()
+    state.update(REVISION_B)
+    calls: list[tuple[list[str], Path, dict[str, str]]] = []
+
+    def failed_runner(
+        argv: list[str],
+        *,
+        cwd: Path,
+        env: dict[str, str],
+        check: bool,
+    ) -> SimpleNamespace:
+        assert check is False
+        assert prepared.resolved_config_path.read_bytes() == config_before
+        assert prepared.input_manifest_path.read_bytes() == manifest_before
+        calls.append((argv, cwd, env))
+        return SimpleNamespace(returncode=23)
+
+    monkeypatch.setattr(workspace_runtime.subprocess, "run", failed_runner)
+
+    assert workspace.run(MULTI_CHALLENGER_EXPERIMENT_ID) == 23
     assert len(calls) == 1
     argv, cwd, env = calls[0]
     assert tuple(argv) == prepared.argv
@@ -481,6 +557,33 @@ def test_registered_endpoint_recovery_status_uses_endpoint_schema(
         )
 
 
+def test_registered_multi_challenger_status_uses_its_exact_schema(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "multi-challenger-root"
+    state_path = root / "reports/run_state.json"
+    state_path.parent.mkdir(parents=True)
+    state_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "fixed_bank_multi_challenger_run_state_v1",
+                "status": "FAILED",
+                "phase": "DONOR_MODEL_FITTING",
+                "error": "cannot pickle 'mappingproxy' object",
+                "error_class": "TypeError",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert registered_recovery_state_status(
+        EXACT_EXISTING_SNAPSHOT_FIXED_BANK_MULTI_CHALLENGER_HIERARCHICAL_FLIP_ROUTER_V1,
+        root,
+    ) == "FAILED"
+
+
 def test_exact_recovery_rehashes_every_current_input_and_rejects_drift(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -572,13 +675,17 @@ def test_recovery_detects_snapshot_mutation_even_when_runner_fails(
 def _build_exact_workspace(
     repo_root: Path,
     monkeypatch: pytest.MonkeyPatch,
+    *,
+    experiment_id: str = EXPERIMENT_ID,
+    config_path: str = CONFIG_PATH,
+    output_id: str = OUTPUT_ID,
 ) -> tuple[MidogppWorkspace, dict[str, object], list[Path]]:
     source = MidogppWorkspace.load()
     registry = deepcopy(source.registry_payload)
-    target = deepcopy(_registry_experiment(registry, EXPERIMENT_ID))
+    target = deepcopy(_registry_experiment(registry, experiment_id))
     registry["experiments"] = [target]
     input_ids = list(target["input_artifact_ids"])
-    retained_ids = {*input_ids, OUTPUT_ID}
+    retained_ids = {*input_ids, output_id}
     catalog = deepcopy(source.catalog_payload)
     catalog["artifacts"] = [
         entry
@@ -589,7 +696,7 @@ def _build_exact_workspace(
     input_paths: list[Path] = []
     for entry in catalog["artifacts"]:
         artifact_id = str(entry["artifact_id"])
-        if artifact_id == OUTPUT_ID:
+        if artifact_id == output_id:
             continue
         if entry.get("canonical_path"):
             artifact_root = repo_root / str(entry["canonical_path"])
@@ -612,8 +719,8 @@ def _build_exact_workspace(
 
     config = {
         "experiment": {
-            "id": EXPERIMENT_ID,
-            "artifact_root": f"output://{OUTPUT_ID}",
+            "id": experiment_id,
+            "artifact_root": f"output://{output_id}",
             "claim_scope": "diagnostic_only",
         },
         "inputs": {
@@ -622,9 +729,12 @@ def _build_exact_workspace(
         },
         "protocol": {"contract": "test-exact-existing-snapshot"},
     }
-    config_path = repo_root / CONFIG_PATH
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    source_config_path = repo_root / config_path
+    source_config_path.parent.mkdir(parents=True, exist_ok=True)
+    source_config_path.write_text(
+        yaml.safe_dump(config, sort_keys=False),
+        encoding="utf-8",
+    )
     workspace = MidogppWorkspace(
         repo_root=repo_root,
         registry=registry,
@@ -638,12 +748,25 @@ def _build_exact_workspace(
 
 
 def _write_exact_failed_inventory(root: Path) -> None:
-    for relative in POST_TEST_SEAL_RECOVERY_FILES:
+    _write_failed_inventory(
+        root,
+        inventory=POST_TEST_SEAL_RECOVERY_FILES,
+        failed_state=FAILED_INFERENCE_STATE,
+    )
+
+
+def _write_failed_inventory(
+    root: Path,
+    *,
+    inventory: frozenset[str],
+    failed_state: Mapping[str, object],
+) -> None:
+    for relative in inventory:
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         if relative == "reports/run_state.json":
             path.write_text(
-                json.dumps(FAILED_INFERENCE_STATE, sort_keys=True) + "\n",
+                json.dumps(failed_state, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
         elif relative not in {

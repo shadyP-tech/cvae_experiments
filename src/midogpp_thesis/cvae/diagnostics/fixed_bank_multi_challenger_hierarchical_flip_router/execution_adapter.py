@@ -346,6 +346,7 @@ def runtime_summary_payload(
     prediction: GlobalPredictionSeal,
     preflight: Mapping[str, object],
     local_staging: Mapping[str, object],
+    recovery_audit: Mapping[str, object],
 ) -> dict[str, object]:
     return {
         "schema_version": RUNTIME_SUMMARY_SCHEMA,
@@ -371,6 +372,7 @@ def runtime_summary_payload(
         "float32_source_and_probability_store": True,
         "float64_scientific_reductions": True,
         "resume_checkpoints_hash_validated": True,
+        "mappingproxy_recovery": dict(recovery_audit),
     }
 
 

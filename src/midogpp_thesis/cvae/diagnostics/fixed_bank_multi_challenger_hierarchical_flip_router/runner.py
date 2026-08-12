@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Mapping
 
 from ...protocol import ProtocolError
+from ...runtime.artifact_io import read_json
 from .bundle import (
     assert_closed_world,
     cleanup_owned_atomic_temps,
@@ -47,6 +48,15 @@ from .probability_surfaces import (
     seed_probability_rows,
 )
 from .protocol import canonical_consumed_test_protocol
+from .recovery import detect_registered_multi_challenger_recovery
+from .recovery_provenance import (
+    assert_repair_repository_state_unchanged,
+    current_repair_repository_state,
+    fresh_recovery_audit_payload,
+    original_repository_state_from_provenance,
+    recovery_audit_payload,
+    sealed_recovery_input_hashes,
+)
 from .reports import leakage_report_payload, publication_decision_payload
 from .runner_dependencies import MultiChallengerRouterDependencies
 from .runner_runtime import (
@@ -83,10 +93,13 @@ def _run(
     assert_launch_files(root, config)
     assert_workspace_resolved_paths(config, root=root)
     with exclusive_run_lock(root):
+        recovery_audit = _launch_recovery_audit(root)
         recovered = recover_if_possible(root, config=config, protocol=protocol)
         if recovered is not None:
             (deps.cleanup_staging or cleanup_validated_local_stage)(config)
             return recovered
+        if recovery_audit is None:
+            recovery_audit = _fresh_launch_audit(root)
         cleanup_owned_atomic_temps(root)
         assert_closed_world(root, allow_incomplete=True)
         initial_members = {
@@ -239,6 +252,7 @@ def _run(
                 prediction=prediction,
                 preflight=preflight,
                 local_staging=local_staging,
+                recovery_audit=recovery_audit,
             )
             persist_terminal_checkpoint(
                 root,
@@ -264,6 +278,8 @@ def _run(
             persist_validation_report(root, checks)
             write_state(root, status="COMPLETE", phase="COMPLETE")
             assert_completed_binding(root, config=config, expected_checks=checks)
+            if recovery_audit["recovery_used"] is True:
+                assert_repair_repository_state_unchanged(recovery_audit)
         except BaseException as exc:
             write_state(
                 root,
@@ -277,6 +293,38 @@ def _run(
         config, canonical_source=canonical_source
     )
     return root
+
+
+def _launch_recovery_audit(root: Path) -> Mapping[str, object] | None:
+    """Capture exact recovery lineage before the FAILED state is overwritten."""
+
+    state_path = root / "reports/run_state.json"
+    if not state_path.exists():
+        return _fresh_launch_audit(root)
+    if state_path.is_symlink() or not state_path.is_file():
+        raise ProtocolError("Multi-challenger run state is absent or unsafe.")
+    state = read_json(state_path)
+    if state.get("status") != "FAILED":
+        return None
+    if not detect_registered_multi_challenger_recovery(root):
+        raise ProtocolError(
+            "Multi-challenger refuses an unregistered FAILED partial root."
+        )
+    return recovery_audit_payload(
+        original_repository_state=original_repository_state_from_provenance(root),
+        repair_repository_state=current_repair_repository_state(),
+        **sealed_recovery_input_hashes(root),
+    )
+
+
+def _fresh_launch_audit(root: Path) -> Mapping[str, object]:
+    original = dict(original_repository_state_from_provenance(root))
+    current = dict(current_repair_repository_state())
+    if original != current:
+        raise ProtocolError(
+            "Multi-challenger fresh run repository state differs from provenance."
+        )
+    return fresh_recovery_audit_payload()
 
 
 def _phase(

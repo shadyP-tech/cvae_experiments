@@ -28,6 +28,11 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_fl
     TEST_MANIFEST_ARTIFACT_ID,
 )
 from midogpp_thesis.cvae.protocol import ProtocolError
+from midogpp_thesis.workspace.recovery import (
+    EXACT_EXISTING_SNAPSHOT_FIXED_BANK_MULTI_CHALLENGER_HIERARCHICAL_FLIP_ROUTER_V1,
+    detect_registered_exact_recovery,
+    required_strategy_for_experiment,
+)
 from midogpp_thesis.workspace.runtime import MidogppWorkspace
 
 
@@ -146,7 +151,12 @@ def test_registry_catalog_aliases_and_output_are_experiment_fenced() -> None:
     assert experiment.status == "diagnostic"
     assert experiment.claim_scope == "diagnostic_only"
     assert experiment.input_artifact_ids == INPUT_ARTIFACT_IDS
-    assert experiment.run_recovery_strategy is None
+    assert experiment.run_recovery_strategy == (
+        EXACT_EXISTING_SNAPSHOT_FIXED_BANK_MULTI_CHALLENGER_HIERARCHICAL_FLIP_ROUTER_V1
+    )
+    assert required_strategy_for_experiment(EXPERIMENT_ID) == (
+        experiment.run_recovery_strategy
+    )
     assert experiment.runner_argv[3:5] == (
         "cvae-diagnostics",
         "fixed-bank-multi-challenger-hierarchical-flip-router",
@@ -185,6 +195,34 @@ def test_registry_catalog_aliases_and_output_are_experiment_fenced() -> None:
         OUTPUT_ARTIFACT_ID in candidate.input_artifact_ids
         for candidate in workspace.experiments.values()
     )
+
+
+def test_workspace_recovery_strategy_lazily_dispatches_package_detector(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_flip_router import (
+        recovery as package_recovery,
+    )
+
+    calls: list[Path] = []
+
+    def detect(root: Path) -> bool:
+        calls.append(root)
+        return True
+
+    monkeypatch.setattr(
+        package_recovery,
+        "detect_registered_multi_challenger_recovery",
+        detect,
+    )
+    root = tmp_path / "exact-snapshot"
+
+    assert detect_registered_exact_recovery(
+        EXACT_EXISTING_SNAPSHOT_FIXED_BANK_MULTI_CHALLENGER_HIERARCHICAL_FLIP_ROUTER_V1,
+        root,
+    ) is True
+    assert calls == [root]
 
 
 def test_config_rejects_menu_model_and_claim_drift(tmp_path: Path) -> None:
