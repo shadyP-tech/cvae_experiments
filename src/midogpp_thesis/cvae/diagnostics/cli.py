@@ -242,6 +242,20 @@ def build_parser() -> argparse.ArgumentParser:
     labeled_support_case_conditional_flip_router.add_argument(
         "--artifact-root", required=True
     )
+
+    multi_challenger_hierarchical_flip_router = sub.add_parser(
+        "fixed-bank-multi-challenger-hierarchical-flip-router",
+        help=(
+            "Run the explicitly authorized terminal consumed-test "
+            "multi-challenger hierarchical flip-router diagnostic."
+        ),
+    )
+    multi_challenger_hierarchical_flip_router.add_argument(
+        "--config", required=True
+    )
+    multi_challenger_hierarchical_flip_router.add_argument(
+        "--artifact-root", required=True
+    )
     return parser
 
 
@@ -582,6 +596,22 @@ def main(argv: list[str] | None = None) -> int:
             args.config
         )
         output = run_fixed_bank_labeled_support_case_conditional_flip_router(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "fixed-bank-multi-challenger-hierarchical-flip-router":
+        from .fixed_bank_multi_challenger_hierarchical_flip_router import (
+            load_fixed_bank_multi_challenger_hierarchical_flip_router_config,
+            run_fixed_bank_multi_challenger_hierarchical_flip_router,
+        )
+
+        config = load_fixed_bank_multi_challenger_hierarchical_flip_router_config(
+            args.config
+        )
+        output = run_fixed_bank_multi_challenger_hierarchical_flip_router(
             config,
             artifact_root=artifact_root,
         )

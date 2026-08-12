@@ -2283,3 +2283,49 @@ experiments:
       - F_S is the primary heuristic uncertainty-gated case-conditional diagnostic. It uses only the fixed label-free flip feature family, ridge alpha 1.0, a predeclared directional calibration prior, a descriptive score multiplier of 1.96, and zero minimum-gain and runner-up margins; its per-case bound is not calibrated confidence or safety. G_static uses an exact per-(q,e) pooled-gain additive query/source fixed-effect fit with sum-to-zero effects before source selection. S_static, F_G, and same-capacity refit permutation F_P are controls; O_static and O_case are terminal oracles.
       - The workstation schedule uses one persistent spawned worker per RTX A5000 for source generation, then a disjoint CUDA-free CPU phase with four workers and three threads each, float32 memmaps, float64 reductions, hash-valid checkpoints, and local scratch at /data/local/fixed_bank_labeled_support_case_conditional_flip_router_v1.
       - Regardless of outcome, the output cannot authorize routing success, an action, policy, model or expert update, promotion, deployment, recipe selection, a numbered-stage feed, another Stage-90 diagnostic, another experiment, or a generic consumer.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_multi_challenger_hierarchical_flip_router.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_multi_challenger_hierarchical_flip_router_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_multi_challenger_hierarchical_flip_router_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_fixed_bank_multi_challenger_hierarchical_flip_router_test_cache_v1
+      - midogpp_stage90_fixed_bank_multi_challenger_hierarchical_flip_router_test_manifest_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_multi_challenger_hierarchical_flip_router_parent_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_multi_challenger_hierarchical_flip_router_amendment_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Reuse of immutable A1 generation geometry, exact-nine seed pairing, budgets, and classifier settings only; no routing, action, policy, promotion, or deployment authority is inherited.
+      midogpp_stage90_fixed_bank_multi_challenger_hierarchical_flip_router_test_manifest_v1: Experiment-fenced capability-gated labels open only through the rotating whole-case source-selection, calibration, and terminal-evaluation capabilities.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_multi_challenger_hierarchical_flip_router_parent_v1: Byte-exact experiment-fenced alias of the immutable original ledger, read only to verify the direct parent hash.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_multi_challenger_hierarchical_flip_router_amendment_v1: Direct single-consumer authorization for this terminal post-hoc consumed-test diagnostic; it creates no fresh evidence.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-multi-challenger-hierarchical-flip-router
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_multi_challenger_hierarchical_flip_router_v1
+    notes:
+      - Explicitly authorized reuse of the already-consumed MIDOG++ test split for one terminal multi-challenger hierarchical flip-router diagnostic; it remains EXPLORATORY_CONSUMED_DATA_ONLY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE.
+      - The exact six-input fence contains the promoted bank, GenerationLock, dedicated single-consumer cache and manifest aliases, a byte-exact original-ledger alias, and this diagnostic's direct amendment. It consumes no prior Stage-90 output, amendment, prediction surface, scratch, checkpoint, or numbered-stage result.
+      - B, shared U, and eight frozen A1 source-action probabilities plus every label-free flip feature seal before labels. Five whole-case folds rotate three disjoint selection folds, one calibration fold, and one evaluation fold; every donor row has distinct held target H, query q, and candidate source e.
+      - Selection ranks all eight A1 actions against fixed B and seals B plus the top three with S_static as anchor, or B when no positive S_static exists. Calibration is target-local and menu-bound and cannot update the shared G, R, or P direction models.
+      - R_multi is primary. It switches from the anchor only when its expected-gain margin over the runner-up has a positive 1.96 LCB using epistemic plus calibration uncertainty and no residual outcome variance. F_single, G_multi, P_multi, B, U, and S_static are controls; O_menu, O_binary over B and S_static, O_static, and O_case are terminal oracles only.
+      - The workstation schedule uses two persistent spawned A5000 source workers, then a disjoint CUDA-free CPU phase with four model workers and four bootstrap workers at three threads each, float32 storage, float64 reductions, hash-valid checkpoints, two fresh-process validation passes, and /data/local/fixed_bank_multi_challenger_hierarchical_flip_router_v1 scratch.
+      - Regardless of outcome, this diagnostic cannot authorize routing success, an action, policy, model or expert update, promotion, deployment, recipe selection, a numbered-stage feed, another Stage-90 diagnostic, another experiment, or a generic consumer.

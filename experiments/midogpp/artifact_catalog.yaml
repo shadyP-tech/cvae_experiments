@@ -8748,3 +8748,337 @@ artifacts:
       - F_S is the primary heuristic uncertainty-gated case-conditional method over S_static; its per-case score bound is descriptive, not calibrated confidence or safety. G_static adjusts exact per-(q,e) pooled gains with additive query/source fixed effects and sum-to-zero constraints before choosing a source. B, U, S_static, F_G, and same-capacity refit permutation F_P are controls; O_static and O_case are terminal bounds only.
       - Exact pooled BACC, top-1 oracle agreement, Spearman rank correlation, normalized oracle gap, and stability are terminal diagnostics. Single-class cases contribute sufficient statistics, and technical seed cells are not inference units.
       - The six-input fence contains no earlier Stage-90 output, amendment, prediction, scratch, checkpoint, or numbered-stage result. Regardless of outcome, the output cannot authorize routing success, an action or policy, a model or expert update, promotion, deployment, recipe selection, a numbered-stage feed, another diagnostic, another experiment, or a generic consumer.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_multi_challenger_hierarchical_flip_router_parent_v1
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: CONSUMED_TEST_MULTI_CHALLENGER_HIERARCHICAL_FLIP_ROUTER_PARENT_LEDGER_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      split: test
+      row_count: '9928'
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      experiment_fenced: 'true'
+      fresh_evidence: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_multi_challenger_hierarchical_flip_router.v1
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    forbidden_reuse: &multi_challenger_hierarchical_flip_router_forbidden_reuse
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Experiment-fenced byte-exact alias of the immutable original consumed-test ledger; it exposes no earlier diagnostic output, amendment, prediction, metric, scratch, or checkpoint.
+      - Only the named multi-challenger hierarchical flip-router v1 may pair this alias with its direct amendment.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_multi_challenger_hierarchical_flip_router_amendment_v1
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_MULTI_CHALLENGER_HIERARCHICAL_FLIP_ROUTER_AMENDMENT_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      amendment_sha256: ba87cbf15ec4cbf85b2d93d41304dd9ed876d6ad0af87f5ba3d45b506deacc04
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_multi_challenger_hierarchical_flip_router.v1
+      authorization_scope: one_terminal_consumed_test_fixed_bank_multi_challenger_hierarchical_flip_router_v1
+      authorization_basis: explicit_user_instruction_to_implement_this_terminal_consumed_test_multi_challenger_hierarchical_router_diagnostic
+      claim_role: posthoc_known_fixed_bank_multi_challenger_hierarchical_flip_router_diagnostic
+      action_geometry_ids: A1
+      candidate_menu_top_k: '3'
+      support_ranking_reference: B
+      support_prior_cases: '8'
+      direction_model_families: G|R|P
+      direction_model_alphas: feature=1.0|source=4.0|query=4.0|intercept=0.25
+      calibration_alpha: '4.0'
+      action_margin_z: '1.96'
+      anchor_fallback: S_static_or_B_when_S_static_equals_B
+      whole_case_oof_fold_count: '5'
+      partition_seed: '90902026'
+      partition_namespace: midogpp_fixed_bank_multi_challenger_hierarchical_flip_router_test_folds_v1
+      rotating_roles: evaluation_f|calibration_f_plus_1|source_selection_remaining_three
+      target_support_labels_update_shared_model: 'false'
+      exact_nine_probability_ensemble: 'true'
+      target_probability_cell_count: '810'
+      fresh_evidence: 'false'
+      previous_stage90_outputs_used: 'false'
+      previous_stage90_amendments_used: 'false'
+      generic_consumer_authorized: 'false'
+      may_feed_another_stage90_experiment: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - uniform_b_v2_consumed_test_fixed_bank_multi_challenger_hierarchical_flip_router_ledger_amendment_v1.json
+    expected_file_hashes:
+      uniform_b_v2_consumed_test_fixed_bank_multi_challenger_hierarchical_flip_router_ledger_amendment_v1.json:
+        algorithm: sha256
+        digest: ba87cbf15ec4cbf85b2d93d41304dd9ed876d6ad0af87f5ba3d45b506deacc04
+    forbidden_reuse: *multi_challenger_hierarchical_flip_router_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Direct hash-chained amendment over the immutable original ledger; no earlier amendment or Stage-90 result is a parent or input.
+      - It authorizes only this named terminal post-hoc consumed-test diagnostic and creates no fresh routing, action, policy, or promotion evidence.
+
+  - artifact_id: midogpp_stage90_fixed_bank_multi_challenger_hierarchical_flip_router_test_manifest_v1
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_MULTI_CHALLENGER_HIERARCHICAL_FLIP_ROUTER_CAPABILITY_GATED_LABELS
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+      split: test
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_MULTI_CHALLENGER_HIERARCHICAL_FLIP_ROUTER_V1
+      fresh_evidence: 'false'
+      labels_present: 'true'
+      labels_available_before_probability_and_feature_seals: 'false'
+      whole_case_oof_fold_count: '5'
+      partition_seed: '90902026'
+      partition_namespace: midogpp_fixed_bank_multi_challenger_hierarchical_flip_router_test_folds_v1
+      source_selection_label_scope: same_H_three_source_selection_folds_only
+      directional_calibration_label_scope: same_H_one_calibration_fold_menu_actions_only
+      evaluation_label_scope: same_H_one_heldout_evaluation_fold_only
+      target_support_shared_model_update: 'false'
+      held_evaluation_labels_available_to_their_fold_decision: 'false'
+      terminal_scoring_occurs_only_after_all_45_decision_seals: 'true'
+      terminal_oracles_available_before_evaluation_labels: 'false'
+      single_class_cases_retained: 'true'
+      mixed_class_case_count: '213'
+      negative_only_case_count: '4'
+      positive_only_case_count: '1'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_multi_challenger_hierarchical_flip_router.v1
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse: *multi_challenger_hierarchical_flip_router_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias of the consumed canonical test manifest with separate selection, calibration, and terminal-evaluation label capabilities.
+      - Evaluation labels cannot influence their fold's menu, models, calibrations, margins, actions, or seals; target support labels cannot update shared direction models.
+
+  - artifact_id: midogpp_stage90_fixed_bank_multi_challenger_hierarchical_flip_router_test_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_TEST_MULTI_CHALLENGER_HIERARCHICAL_FLIP_ROUTER_LABEL_FREE_CACHE_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: test
+      row_count: '9928'
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      backbone_identity_hash: 1b5071f2e605fa60
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_MULTI_CHALLENGER_HIERARCHICAL_FLIP_ROUTER_V1
+      fresh_evidence: 'false'
+      labels_persisted: 'false'
+      labels_absent: 'true'
+      sample_ids_persisted: 'false'
+      image_paths_persisted: 'false'
+      prior_prediction_or_checkpoint_reuse: 'false'
+      previous_stage90_output_used: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_multi_challenger_hierarchical_flip_router.v1
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse: *multi_challenger_hierarchical_flip_router_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias over the validated label-free consumed-test embedding cache; it creates no fresh evidence.
+      - Only the named multi-challenger router may use this alias to recompute and globally seal B, U, eight A1 actions, and the frozen label-free features under its own output and scratch roots.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_multi_challenger_hierarchical_flip_router_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_multi_challenger_hierarchical_flip_router/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: EXPLORATORY_CONSUMED_DATA_ONLY
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: EXPLORATORY_CONSUMED_DATA_ONLY
+      terminal_decision: DO_NOT_PROMOTE
+      routing_status: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      claim_role: posthoc_known_fixed_bank_multi_challenger_hierarchical_flip_router_diagnostic
+      architecture_family: fixed_bank_multi_challenger_hierarchical_flip_router_v1
+      config_contract_hash: c53aa5fa1c6e818e
+      protocol_contract_hash: 6d0991795fc5d9d25544bb5acab67873a2e823c7bfcb78e6a55206f051b6045e
+      evaluation_split: test
+      consumed_test_data: 'true'
+      input_artifact_count: '6'
+      ledger_amendment_required_and_hash_chained: 'true'
+      ledger_amendment_sha256: ba87cbf15ec4cbf85b2d93d41304dd9ed876d6ad0af87f5ba3d45b506deacc04
+      candidate_generalization: known_fixed_bank_reuse
+      unseen_expert_transfer_claim: 'false'
+      eligible_test_row_count: '9928'
+      evaluation_case_count: '218'
+      single_class_cases_retained: 'true'
+      per_case_bacc_stored_or_used: 'false'
+      whole_case_oof_fold_count: '5'
+      partition_seed: '90902026'
+      partition_namespace: midogpp_fixed_bank_multi_challenger_hierarchical_flip_router_test_folds_v1
+      fold_roles: evaluation_f|calibration_f_plus_1|source_selection_remaining_three
+      each_case_evaluated_exactly_once: 'true'
+      strict_H_q_e_distinct: 'true'
+      each_fold_decision_invariant_to_its_held_evaluation_labels: 'true'
+      terminal_scoring_occurs_only_after_all_45_decision_seals: 'true'
+      action_geometry_ids: A1
+      action_strength_sweep_used: 'false'
+      action_count_per_target: '10'
+      target_probability_cell_count: '810'
+      exact_seed_pair_count: '9'
+      exact_nine_ensemble_first: 'true'
+      candidate_menu_top_k: '3'
+      candidate_menu_always_includes: B
+      candidate_menu_source_pool: eight_frozen_A1_source_actions_only
+      support_ranking_reference: B
+      support_ranking_objective: pooled_exact_bacc_gain_vs_B
+      support_prior_cases: '8.0'
+      anchor_fallback: S_static_or_B_when_S_static_equals_B
+      direction_model_families: G|R|P
+      direction_model_response: pooled_binomial_correct_flip_counts_by_direction
+      feature_alpha: '1.0'
+      source_alpha: '4.0'
+      query_alpha: '4.0'
+      intercept_alpha: '0.25'
+      calibration_alpha: '4.0'
+      target_support_labels_update_shared_model: 'false'
+      residual_outcome_variance_in_action_standard_error: 'false'
+      action_margin: winner_expected_gain_minus_runner_up_expected_gain
+      action_margin_z: '1.96'
+      method_ids: B|U|S_static|F_single|G_multi|R_multi|P_multi|O_menu|O_binary|O_static|O_case
+      primary_router_id: R_multi
+      O_binary_action_set: B|S_static
+      terminal_oracles_are_pre_evaluation_methods: 'false'
+      whole_case_cluster_bootstrap_replicates: '10000'
+      whole_case_cluster_bootstrap_seed: '90912030'
+      primary_endpoint: center_pooled_exact_bacc_over_whole_case_oof_predictions
+      primary_contrasts: R_multi-B|R_multi-U|R_multi-F_single|R_multi-G_multi|R_multi-P_multi|R_multi-S_static
+      diagnostic_recoverability_gate: all_six_primary_contrast_outer_center_one_sided_95_lcbs_strictly_positive
+      diagnostic_recoverability_outcome_is_diagnostic_only: 'true'
+      routing_success_claimed: 'false'
+      action_selection_authorized: 'false'
+      policy_update_authorized: 'false'
+      model_update_authorized: 'false'
+      expert_update_authorized: 'false'
+      fresh_evidence: 'false'
+      promotion_eligible: 'false'
+      previous_stage90_outputs_used: 'false'
+      previous_stage90_amendments_used: 'false'
+      may_feed_another_stage90_experiment: 'false'
+      may_feed_another_experiment: 'false'
+      workstation_generation_devices: cuda:0|cuda:1
+      workstation_generation_workers_per_device: '1'
+      workstation_source_workers: 2_persistent_spawned_A5000_workers
+      workstation_model_topology: 4_workers_x_3_threads
+      workstation_bootstrap_topology: 4_workers_x_3_threads
+      workstation_scratch_root: /data/local/fixed_bank_multi_challenger_hierarchical_flip_router_v1
+      two_fresh_process_validation_required: 'true'
+      source_and_probability_storage_dtype: float32
+      scientific_reductions_dtype: float64
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - arrays/frozen_source_streams.npy
+      - arrays/fixed_bank_a1_action_probabilities.npz
+      - manifests/protocol_manifest.json
+      - manifests/action_library.json
+      - manifests/three_role_partition.json
+      - manifests/frozen_source_stream_index.json
+      - manifests/frozen_source_stream_lock.json
+      - manifests/fixed_bank_a1_prediction_index.json
+      - manifests/fixed_bank_a1_prediction_seal.json
+      - manifests/sealed_probability_surface.json
+      - manifests/prelabel_feature_seal.json
+      - manifests/fold_plan_seals.json
+      - manifests/donor_model_seals.json
+      - manifests/candidate_menu_seals.json
+      - manifests/calibration_seals.json
+      - manifests/all_method_decisions_seal.json
+      - manifests/permutation_provenance_seal.json
+      - manifests/sealed_terminal_evaluation.json
+      - manifests/content_index.json
+      - tables/action_library.csv
+      - tables/three_role_partitions.csv
+      - tables/seed_probability_rows.csv
+      - tables/aggregated_probability_rows.csv
+      - tables/case_action_features.csv
+      - tables/directional_donor_responses.csv
+      - tables/model_fits.csv
+      - tables/candidate_menus.csv
+      - tables/directional_calibrations.csv
+      - tables/candidate_scores.csv
+      - tables/method_decisions.csv
+      - tables/terminal_case_confusions.csv
+      - tables/terminal_center_metrics.csv
+      - tables/terminal_contrasts.csv
+      - tables/router_identification_metrics.csv
+      - tables/permutation_metrics.csv
+      - tables/menu_oracle_metrics.csv
+      - reports/workstation_preflight.json
+      - reports/label_capability_report.json
+      - reports/leakage_report.json
+      - reports/publication_decision.json
+      - reports/runtime_summary.json
+      - reports/run_state.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Explicitly authorized terminal consumed-test multi-challenger hierarchical flip-router diagnostic. It recomputes probabilities, features, menus, calibrations, decisions, controls, and terminal oracles under dedicated roots from exactly six fenced inputs.
+      - Five deterministic whole-case folds rotate source selection, target-local calibration, and evaluation. Held evaluation labels never enter the corresponding menu, model, calibration, threshold, margin, decision, or seal; each donor row enforces distinct H, q, and e.
+      - R_multi is the primary support-anchored multi-challenger router. Its winner-versus-runner-up gate uses only epistemic and calibration uncertainty, while F_single, G_multi, P_multi, B, U, and S_static are controls. All four O methods are terminal bounds only.
+      - The six-input fence contains no earlier Stage-90 output, amendment, prediction, scratch, checkpoint, or numbered-stage result. Regardless of outcome, this output cannot authorize routing success, an action or policy, a model or expert update, promotion, deployment, recipe selection, a numbered-stage feed, another diagnostic, another experiment, or a generic consumer.

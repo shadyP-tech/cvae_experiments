@@ -810,3 +810,50 @@ The result is terminal `EXPLORATORY_CONSUMED_DATA_ONLY` evidence regardless of
 its metric values. It cannot establish fresh routing success, authorize an
 action or policy, update a model or expert, select a recipe, feed another
 experiment or numbered stage, or support promotion or deployment.
+
+## Uniform-B v2 consumed-test multi-challenger hierarchical flip router v1
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_multi_challenger_hierarchical_flip_router.v1`
+is the isolated follow-up to the negative single-challenger result. It keeps
+the same immutable A1 action geometry but recomputes all 810 exact-nine
+probability cells from the original six fenced inputs. It never consumes the
+earlier Stage-90 result, prediction surface, amendment, scratch, or checkpoint.
+
+Within each five-fold whole-case rotation, three selection folds rank all eight
+A1 candidates against fixed B and seal B plus the top three. The best
+positive support action is the static anchor (otherwise B). A disjoint
+calibration fold fits only two target-local Gaussian-prior direction offsets;
+the strict-H/q/e shared models remain frozen. Sparse directions retain the
+donor prediction and its prior or Laplace uncertainty rather than aborting or
+receiving zero variance.
+
+The shared directional models use pooled beneficial-flip binomial counts with
+penalized query and candidate-source effects. `R_multi` adds the fixed eleven
+label-free case/action features, `G_multi` omits those features, and `P_multi`
+refits the same capacity after complete-case feature-block permutation. The
+router compares all menu actions jointly and leaves the support-static anchor
+only when the winner-versus-runner-up expected-gain margin has a positive
+predeclared 1.96 bound. The bound includes shared-model and calibration
+covariance but no irreducible outcome variance, and is therefore a descriptive
+asymptotic action margin rather than calibrated confidence or safety.
+
+The workstation schedule uses one persistent spawned source worker per A5000,
+then a disjoint CUDA-free CPU phase with four workers and three threads each.
+Probability lookups are pre-indexed by case/action, generated streams use
+float32 memmaps, reductions use float64, and fitted values are replayed with a
+field-level allow-listed tolerance while provenance, hyperparameters, menus,
+ranks, actions, reasons, counts, and terminal confusion products remain exact.
+Finalization and recovery accept a validation report only after two independent
+fresh Python processes reconstruct the same full-bundle checks exactly.
+
+```bash
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_multi_challenger_hierarchical_flip_router.v1
+```
+
+`R_multi` must beat B, U, `F_single`, `G_multi`, `P_multi`, and `S_static` by a
+strictly positive one-sided cross-center LCB for its diagnostic gate to pass.
+Regardless of that result, the artifact remains
+`EXPLORATORY_CONSUMED_DATA_ONLY` and `TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`;
+it cannot establish fresh routing or deployment evidence or feed another
+experiment.
