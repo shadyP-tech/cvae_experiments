@@ -48,7 +48,7 @@ from .probability_surfaces import (
     seed_probability_rows,
 )
 from .protocol import canonical_consumed_test_protocol
-from .recovery import detect_registered_multi_challenger_recovery
+from .recovery import recovery_capability
 from .recovery_provenance import (
     assert_repair_repository_state_unchanged,
     current_repair_repository_state,
@@ -306,10 +306,17 @@ def _launch_recovery_audit(root: Path) -> Mapping[str, object] | None:
     state = read_json(state_path)
     if state.get("status") != "FAILED":
         return None
-    if not detect_registered_multi_challenger_recovery(root):
+    capability = recovery_capability(root)
+    if capability is None:
         raise ProtocolError(
             "Multi-challenger refuses an unregistered FAILED partial root."
         )
+    # The terminal-header defect is a validation-only B->C continuation.  Its
+    # exact recovery path runs before any fresh/scientific phase and carries a
+    # separate report-level audit, so it must not mint a second A->C
+    # mappingproxy audit here.
+    if capability.mode == "FINALIZATION_VALIDATION":
+        return None
     return recovery_audit_payload(
         original_repository_state=original_repository_state_from_provenance(root),
         repair_repository_state=current_repair_repository_state(),

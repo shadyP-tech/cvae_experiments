@@ -25,6 +25,11 @@ from .constants import CENTERS
 from .hashing import fitted_numeric_fingerprint
 from .label_capabilities import MultiChallengerLabelCapabilityManager
 from .partitions import CaseIdentityRow, build_three_role_partition
+from .terminal_schema import (
+    TERMINAL_TABLE_FIELDS,
+    TERMINAL_TABLE_MEMBERS,
+    canonical_terminal_rows,
+)
 from .probability_surfaces import (
     aggregate_exact_nine,
     build_prelabel_surface,
@@ -771,23 +776,19 @@ def _semantic_decision_mapping(row: Mapping[str, object]) -> Mapping[str, object
 
 
 def _validate_terminal_tables(root: Path, replayed: Mapping[str, object]) -> None:
-    members = {
-        "terminal_case_confusions": "terminal_case_confusions.csv",
-        "terminal_center_metrics": "terminal_center_metrics.csv",
-        "terminal_contrasts": "terminal_contrasts.csv",
-        "router_identification_metrics": "router_identification_metrics.csv",
-        "permutation_metrics": "permutation_metrics.csv",
-        "menu_oracle_metrics": "menu_oracle_metrics.csv",
-    }
     persisted_tables: dict[str, tuple[dict[str, object], ...]] = {}
-    for key, member in members.items():
+    for key, member in TERMINAL_TABLE_MEMBERS.items():
         rows = replayed[key]
-        if not isinstance(rows, Sequence):
+        if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes)):
             raise ProtocolError(f"Multi-challenger replay table malformed: {key}.")
-        payloads = tuple(object_payload(row) for row in rows)
+        payloads = canonical_terminal_rows(key, rows)
         persisted_tables[key] = _read_rows_like(
-            root / "tables" / member, payloads
+            root / member, payloads
         )
+        if any(tuple(row) != TERMINAL_TABLE_FIELDS[key] for row in payloads):
+            raise ProtocolError(
+                f"Multi-challenger replay terminal schema drifted: {key}."
+            )
         for persisted_row in persisted_tables[key]:
             unhashed = {
                 field: value

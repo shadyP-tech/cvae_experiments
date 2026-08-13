@@ -183,6 +183,65 @@ def test_pending_runtime_validation_attests_before_report_persistence(
     ]
 
 
+def test_pending_finalization_audit_is_parent_bound_before_two_fresh_replays(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    audit = {
+        "schema_version": "fixture_finalization_audit_v1",
+        "finalization_recovery_used": True,
+    }
+    base = _checks(terminal_finalization_recovery=audit)
+    attested = {**base, fresh.ATTESTATION_KEY: {"status": "sentinel"}}
+    calls: list[object] = []
+
+    def parent(_root: Path, **kwargs: object) -> Mapping[str, object]:
+        calls.append(("parent", kwargs))
+        assert kwargs["allow_pending_validation"] is True
+        assert kwargs["finalization_recovery_audit"] == audit
+        return base
+
+    monkeypatch.setattr(
+        "midogpp_thesis.cvae.diagnostics."
+        "fixed_bank_multi_challenger_hierarchical_flip_router.validation."
+        "validate_fixed_bank_multi_challenger_hierarchical_flip_router_bundle",
+        parent,
+    )
+
+    def two_processes(
+        _root: Path, *, expected_checks: Mapping[str, object]
+    ) -> Mapping[str, object]:
+        # `require_two_fresh_process_validations` launches workers without an
+        # in-memory audit.  Their complete validator independently derives the
+        # same check payload from the exact FAILED state and live clean C.
+        calls.append(("two_fresh_processes", dict(expected_checks)))
+        assert expected_checks["terminal_finalization_recovery"] == audit
+        return attested
+
+    monkeypatch.setattr(
+        fresh, "require_two_fresh_process_validations", two_processes
+    )
+
+    observed = runner_runtime.validate_bundle(
+        tmp_path,
+        config=SimpleNamespace(),
+        allow_pending_validation=True,
+        finalization_recovery_audit=audit,
+    )
+
+    assert observed == attested
+    assert calls == [
+        (
+            "parent",
+            {
+                "config": ANY,
+                "allow_pending_validation": True,
+                "finalization_recovery_audit": audit,
+            },
+        ),
+        ("two_fresh_processes", base),
+    ]
+
+
 def test_validation_report_persistence_rejects_missing_or_tampered_attestation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

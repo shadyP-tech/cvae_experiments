@@ -58,10 +58,10 @@ def recovery_audit_payload(
         prelabel_feature_surface_hash=prelabel_feature_surface_hash,
         fold_plan_surface_hash=fold_plan_surface_hash,
     )
-    original = _validated_repository_state(
+    original = validated_repository_state(
         original_repository_state, role="original", require_clean=False
     )
-    repair = _validated_repository_state(
+    repair = validated_repository_state(
         repair_repository_state, role="repair", require_clean=True
     )
     if repair["repository_revision"] == original["repository_revision"]:
@@ -103,10 +103,10 @@ def validate_recovery_audit_payload(
         prelabel_feature_surface_hash=prelabel_feature_surface_hash,
         fold_plan_surface_hash=fold_plan_surface_hash,
     )
-    original = _validated_repository_state(
+    original = validated_repository_state(
         original_repository_state, role="original", require_clean=False
     )
-    current = _validated_repository_state(
+    current = validated_repository_state(
         current_repository_state, role="current", require_clean=False
     )
     observed = dict(value)
@@ -139,7 +139,7 @@ def original_repository_state_from_provenance(
     """Read revision A only from the immutable prepared input manifest."""
 
     payload = read_json(Path(root) / "provenance/input_artifacts.json")
-    return _validated_repository_state(
+    return validated_repository_state(
         {
             "repository_revision": payload.get("repository_revision"),
             "repository_dirty": payload.get("repository_dirty"),
@@ -195,7 +195,7 @@ def assert_repair_repository_state_unchanged(
 ) -> None:
     """Require the clean repair checkout to remain unchanged through recovery."""
 
-    expected = _validated_repository_state(
+    expected = validated_repository_state(
         {
             "repository_revision": audit.get("repair_repository_revision"),
             "repository_dirty": audit.get("repair_repository_dirty"),
@@ -315,24 +315,24 @@ def _validate_reused_hashes(
     fold_plan_surface_hash: object,
 ) -> None:
     if (
-        not _is_hex(source_stream_lock_hash, length=64)
-        or not _is_hex(global_prediction_seal_hash, length=64)
-        or not _is_hex(prelabel_feature_surface_hash, length=64)
-        or not _is_hex(fold_plan_surface_hash, length=64)
+        not is_hex(source_stream_lock_hash, length=64)
+        or not is_hex(global_prediction_seal_hash, length=64)
+        or not is_hex(prelabel_feature_surface_hash, length=64)
+        or not is_hex(fold_plan_surface_hash, length=64)
     ):
         raise ProtocolError("Mappingproxy recovery reused-seal hash is invalid.")
 
 
-def _validated_repository_state(
+def validated_repository_state(
     value: Mapping[str, object], *, role: str, require_clean: bool
 ) -> dict[str, object]:
     revision = value.get("repository_revision")
     dirty = value.get("repository_dirty")
     status_hash = value.get("repository_status_hash")
     if (
-        not _is_hex(revision, length=40)
+        not is_hex(revision, length=40)
         or not isinstance(dirty, bool)
-        or not _is_hex(status_hash, length=64)
+        or not is_hex(status_hash, length=64)
         or (require_clean and dirty is not False)
     ):
         raise ProtocolError(
@@ -345,7 +345,7 @@ def _validated_repository_state(
     }
 
 
-def _is_hex(value: object, *, length: int) -> bool:
+def is_hex(value: object, *, length: int) -> bool:
     return (
         isinstance(value, str)
         and len(value) == length
@@ -357,8 +357,10 @@ __all__ = (
     "assert_repair_repository_state_unchanged",
     "current_repair_repository_state",
     "fresh_recovery_audit_payload",
+    "is_hex",
     "original_repository_state_from_provenance",
     "recovery_audit_payload",
     "sealed_recovery_input_hashes",
     "validate_recovery_audit_payload",
+    "validated_repository_state",
 )

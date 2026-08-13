@@ -11,6 +11,11 @@ from .actions import build_action_library
 from .artifact_io import json_value, object_payload, persist_json, persist_rows
 from .hashing import canonical_hash
 from .reports import protocol_manifest_payload, run_state_payload
+from .terminal_schema import (
+    TERMINAL_TABLE_FIELDS,
+    TERMINAL_TABLE_MEMBERS,
+    canonical_terminal_rows,
+)
 
 
 TERMINAL_CHECKPOINT_MEMBER = "checkpoints/terminal_evaluation/sealed_result.json"
@@ -273,19 +278,16 @@ def persist_terminal(
     publication_decision: Mapping[str, object],
     runtime_summary: Mapping[str, object],
 ) -> None:
-    table_members = {
-        "terminal_case_confusions": "tables/terminal_case_confusions.csv",
-        "terminal_center_metrics": "tables/terminal_center_metrics.csv",
-        "terminal_contrasts": "tables/terminal_contrasts.csv",
-        "router_identification_metrics": "tables/router_identification_metrics.csv",
-        "permutation_metrics": "tables/permutation_metrics.csv",
-        "menu_oracle_metrics": "tables/menu_oracle_metrics.csv",
-    }
-    for key, member in table_members.items():
+    for key, member in TERMINAL_TABLE_MEMBERS.items():
         rows = result.get(key)
         if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes)) or not rows:
             raise ProtocolError(f"Multi-challenger terminal table absent: {key}.")
-        _persist_nonempty_rows(root / member, [object_payload(row) for row in rows])
+        canonical_rows = canonical_terminal_rows(key, rows)
+        persist_rows(
+            root / member,
+            canonical_rows,
+            TERMINAL_TABLE_FIELDS[key],
+        )
     sealed = result.get("sealed_terminal_evaluation")
     if not isinstance(sealed, Mapping):
         raise ProtocolError("Multi-challenger terminal seal is absent.")

@@ -11,6 +11,7 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_fl
     persistence,
     recovery,
     runner,
+    runner_runtime,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_flip_router.artifact_io import (
     persist_rows,
@@ -20,6 +21,9 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_fl
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_flip_router.science_decisions import (
     _calibration_semantic_hash,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_flip_router.terminal_schema import (
+    TERMINAL_TABLE_FIELDS,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_flip_router.validation_science import (
     _CALIBRATION_FLOAT_PATHS,
@@ -45,12 +49,9 @@ def test_terminal_checkpoint_is_atomic_and_contains_only_terminal_products(
     tmp_path: Path,
 ) -> None:
     result = {
-        "terminal_case_confusions": ({"case_id": "c", "tp": 1},),
-        "terminal_center_metrics": ({"target_center": "0", "bacc": 1.0},),
-        "terminal_contrasts": ({"contrast_id": "R_multi-B", "estimate": 0.1},),
-        "router_identification_metrics": ({"target_center": "0", "spearman": 0.0},),
-        "permutation_metrics": ({"target_center": "0", "action_agreement": 1.0},),
-        "menu_oracle_metrics": ({"target_center": "0", "menu_oracle_bacc": 1.0},),
+        key: ({field: field for field in fields},)
+        for key, fields in TERMINAL_TABLE_FIELDS.items()
+    } | {
         "sealed_terminal_evaluation": {
             "sealed_result_hash": "a" * 64,
             "raw_labels_persisted": False,
@@ -343,8 +344,13 @@ def test_runner_orders_all_seals_before_terminal_open(
     )
     monkeypatch.setattr(
         runner,
-        "detect_registered_multi_challenger_recovery",
-        lambda _root: True,
+        "recovery_capability",
+        lambda _root: SimpleNamespace(mode="MAPPINGPROXY_REPLAY"),
+    )
+    monkeypatch.setattr(
+        runner_runtime,
+        "recovery_capability",
+        lambda _root: SimpleNamespace(mode="MAPPINGPROXY_REPLAY"),
     )
     monkeypatch.setattr(
         runner,

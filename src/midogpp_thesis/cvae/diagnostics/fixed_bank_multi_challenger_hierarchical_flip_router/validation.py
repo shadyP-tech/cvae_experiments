@@ -28,7 +28,12 @@ from .inputs import (
     validate_pre_gpu_firewall,
     validate_workspace_provenance,
 )
+from .finalization_provenance import (
+    finalization_recovery_audit_payload_for_root,
+    validate_finalization_recovery_audit_payload,
+)
 from .protocol import canonical_consumed_test_protocol
+from .recovery import failed_finalization_schema_state
 from .recovery_provenance import (
     current_repair_repository_state,
     original_repository_state_from_provenance,
@@ -52,6 +57,7 @@ def validate_fixed_bank_multi_challenger_hierarchical_flip_router_bundle(
     *,
     config: object,
     allow_pending_validation: bool = False,
+    finalization_recovery_audit: Mapping[str, object] | None = None,
 ) -> Mapping[str, object]:
     """Replay external admission and all science without repairing the bundle."""
 
@@ -97,12 +103,13 @@ def validate_fixed_bank_multi_challenger_hierarchical_flip_router_bundle(
         expected_generation_lock_hash=locks.generation.generation_lock_hash,
     )
     science = validate_scientific_surfaces(path, config=config, frame=frame)
-    recovery_audit = _validate_reports(
+    recovery_audit, finalization_audit = _validate_reports(
         path,
         science=science,
         preflight=preflight,
         source=source,
         allow_pending_validation=allow_pending_validation,
+        explicit_finalization_recovery_audit=finalization_recovery_audit,
     )
     checks = {
         "schema_version": VALIDATION_SCHEMA,
@@ -116,6 +123,7 @@ def validate_fixed_bank_multi_challenger_hierarchical_flip_router_bundle(
         "pre_gpu_firewall_status": firewall["status"],
         "workstation_preflight_status": preflight["status"],
         "mappingproxy_recovery_used": recovery_audit["recovery_used"],
+        "terminal_finalization_recovery": dict(finalization_audit),
         **dict(science),
         "content_index_validated_before_scientific_members": True,
         "scientific_factories_replayed": True,
@@ -175,6 +183,7 @@ def assert_completed_bundle_binding(
         or checks.get("config_contract_hash")
         != str(getattr(config, "contract_hash"))
         or checks.get("protocol_contract_hash") != protocol.contract_hash
+        or not isinstance(checks.get("terminal_finalization_recovery"), Mapping)
         or read_json(path / "reports/validation_report.json") != checks
         or read_json(path / "reports/run_state.json")
         != run_state_payload("COMPLETE", "COMPLETE")
@@ -191,7 +200,8 @@ def _validate_reports(
     preflight: Mapping[str, object],
     source: object,
     allow_pending_validation: bool,
-) -> Mapping[str, object]:
+    explicit_finalization_recovery_audit: Mapping[str, object] | None,
+) -> tuple[Mapping[str, object], Mapping[str, object]]:
     capability = read_json(root / "reports/label_capability_report.json")
     leakage = read_json(root / "reports/leakage_report.json")
     publication = read_json(root / "reports/publication_decision.json")
@@ -202,6 +212,13 @@ def _validate_reports(
     prediction = read_json(root / "manifests/fixed_bank_a1_prediction_seal.json")
     run_state = read_json(root / "reports/run_state.json")
     recovery_audit = _validate_recovery_lineage(root, runtime=runtime)
+    finalization_audit = _validate_finalization_recovery_lineage(
+        root,
+        runtime=runtime,
+        mappingproxy_recovery_audit=recovery_audit,
+        allow_pending_validation=allow_pending_validation,
+        explicit_finalization_recovery_audit=explicit_finalization_recovery_audit,
+    )
     expected_leakage = leakage_report_payload(
         prediction_seal_hash=str(prediction["global_prediction_seal_hash"]),
         feature_seal_hash=str(feature["feature_surface_hash"]),
@@ -241,28 +258,115 @@ def _validate_reports(
         or terminal.get("terminal_scoring_after_all_45_decision_seals") is not True
         or terminal.get("terminal_oracles_used_for_decisions") is not False
         or terminal.get("raw_labels_persisted") is not False
-        or run_state
-        != (
-            run_state_payload("RUNNING", "FINALIZATION")
-            if allow_pending_validation
-            else run_state_payload("COMPLETE", "COMPLETE")
+        or not _valid_validation_run_state(
+            root,
+            run_state=run_state,
+            allow_pending_validation=allow_pending_validation,
+            finalization_recovery_audit=finalization_audit,
         )
     ):
         raise ProtocolError("Multi-challenger terminal reports drifted.")
-    return recovery_audit
+    return recovery_audit, finalization_audit
 
 
 def _validate_recovery_lineage(
     root: Path, *, runtime: Mapping[str, object]
 ) -> Mapping[str, object]:
-    """Bind the persisted audit to live files and both repository identities."""
+    """Validate A->B from the persisted B identity, not a later C checkout."""
+
+    audit = runtime.get("mappingproxy_recovery")
+    if not isinstance(audit, Mapping):
+        raise ProtocolError("Multi-challenger mappingproxy recovery audit is absent.")
+    original = original_repository_state_from_provenance(root)
+    persisted_b = (
+        {
+            "repository_revision": audit.get("repair_repository_revision"),
+            "repository_dirty": audit.get("repair_repository_dirty"),
+            "repository_status_hash": audit.get("repair_repository_status_hash"),
+        }
+        if audit.get("recovery_used") is True
+        else original
+    )
 
     return validate_recovery_audit_payload(
-        runtime.get("mappingproxy_recovery"),
-        original_repository_state=original_repository_state_from_provenance(root),
-        current_repository_state=current_repair_repository_state(),
+        audit,
+        original_repository_state=original,
+        current_repository_state=persisted_b,
         **sealed_recovery_input_hashes(root),
     )
+
+
+def _validate_finalization_recovery_lineage(
+    root: Path,
+    *,
+    runtime: Mapping[str, object],
+    mappingproxy_recovery_audit: Mapping[str, object],
+    allow_pending_validation: bool,
+    explicit_finalization_recovery_audit: Mapping[str, object] | None,
+) -> Mapping[str, object]:
+    """Reconstruct B->C only in checks, leaving B-era runtime bytes untouched."""
+
+    failed_state = failed_finalization_schema_state(root)
+    if explicit_finalization_recovery_audit is not None:
+        return validate_finalization_recovery_audit_payload(
+            explicit_finalization_recovery_audit,
+            root,
+            failed_state=failed_state,
+            mappingproxy_recovery_audit=mappingproxy_recovery_audit,
+            current_repository_state=current_repair_repository_state(),
+        )
+    if allow_pending_validation:
+        return _finalization_audit_from_pending_or_report(
+            root,
+            mappingproxy_recovery_audit=mappingproxy_recovery_audit,
+            failed_state=failed_state,
+        )
+    report = read_json(root / "reports/validation_report.json")
+    return validate_finalization_recovery_audit_payload(
+        report.get("terminal_finalization_recovery"),
+        root,
+        failed_state=failed_state,
+        mappingproxy_recovery_audit=mappingproxy_recovery_audit,
+        current_repository_state=current_repair_repository_state(),
+    )
+
+
+def _finalization_audit_from_pending_or_report(
+    root: Path,
+    *,
+    mappingproxy_recovery_audit: Mapping[str, object],
+    failed_state: Mapping[str, object],
+) -> Mapping[str, object]:
+    """Return the expected audit during pending replay, else the report value.
+
+    The validation report cannot be consulted while it is being attested.  Its
+    audit is therefore reconstructed directly on the pending path.  Once the
+    report exists, the top-level completed-bundle comparison checks that this
+    same deterministic value was persisted.
+    """
+
+    # A sentinel lets the validator helper request its canonical expected
+    # payload without putting an audit into any scientific artifact.
+    return finalization_recovery_audit_payload_for_root(
+        root,
+        failed_state=failed_state,
+        mappingproxy_recovery_audit=mappingproxy_recovery_audit,
+        current_repository_state=current_repair_repository_state(),
+    )
+
+
+def _valid_validation_run_state(
+    root: Path,
+    *,
+    run_state: Mapping[str, object],
+    allow_pending_validation: bool,
+    finalization_recovery_audit: Mapping[str, object],
+) -> bool:
+    if not allow_pending_validation:
+        return run_state == run_state_payload("COMPLETE", "COMPLETE")
+    if finalization_recovery_audit.get("finalization_recovery_used") is True:
+        return run_state == failed_finalization_schema_state(root)
+    return run_state == run_state_payload("RUNNING", "FINALIZATION")
 
 
 def _reject_raw_label_persistence(root: Path) -> None:

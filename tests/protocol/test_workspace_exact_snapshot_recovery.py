@@ -16,7 +16,9 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_disagreement_regret_prediction_o
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_flip_router.recovery import (
     FAILED_MAPPINGPROXY_STATE,
+    FINALIZATION_RECOVERABLE_INVENTORY,
     RECOVERABLE_INVENTORY as MULTI_CHALLENGER_RECOVERABLE_INVENTORY,
+    failed_finalization_schema_state,
 )
 from midogpp_thesis.cvae.protocol import ProtocolError
 from midogpp_thesis.workspace import runtime as workspace_runtime
@@ -226,9 +228,11 @@ def test_exact_recovery_preserves_revision_a_snapshots_under_current_revision_b(
     } == REVISION_A
 
 
-def test_multi_challenger_exact_recovery_dispatches_revision_a_snapshot_under_revision_b(
+@pytest.mark.parametrize("failure_kind", ("mappingproxy", "finalization"))
+def test_multi_challenger_exact_recovery_dispatches_revision_a_snapshot_under_later_revision(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    failure_kind: str,
 ) -> None:
     workspace, state, _inputs = _build_exact_workspace(
         tmp_path,
@@ -238,10 +242,20 @@ def test_multi_challenger_exact_recovery_dispatches_revision_a_snapshot_under_re
         output_id=MULTI_CHALLENGER_OUTPUT_ID,
     )
     prepared = workspace.prepare(MULTI_CHALLENGER_EXPERIMENT_ID)
+    inventory = (
+        MULTI_CHALLENGER_RECOVERABLE_INVENTORY
+        if failure_kind == "mappingproxy"
+        else FINALIZATION_RECOVERABLE_INVENTORY
+    )
+    failed_state = (
+        FAILED_MAPPINGPROXY_STATE
+        if failure_kind == "mappingproxy"
+        else failed_finalization_schema_state(prepared.artifact_root)
+    )
     _write_failed_inventory(
         prepared.artifact_root,
-        inventory=MULTI_CHALLENGER_RECOVERABLE_INVENTORY,
-        failed_state=FAILED_MAPPINGPROXY_STATE,
+        inventory=inventory,
+        failed_state=failed_state,
     )
     config_before = prepared.resolved_config_path.read_bytes()
     manifest_before = prepared.input_manifest_path.read_bytes()

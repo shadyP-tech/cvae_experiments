@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_flip_router import (  # noqa: E501
+    finalization_provenance,
     recovery,
     recovery_provenance,
     runner,
@@ -15,6 +16,14 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_fl
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_flip_router.hashing import (  # noqa: E501
     canonical_hash,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_flip_router.finalization_provenance import (  # noqa: E501
+    assert_finalization_repair_repository_state_unchanged,
+    finalization_recovery_audit_payload_for_root,
+    validate_finalization_recovery_audit_payload,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_flip_router.recovery import (  # noqa: E501
+    failed_finalization_schema_state,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_flip_router.recovery_provenance import (  # noqa: E501
     assert_repair_repository_state_unchanged,
@@ -36,6 +45,11 @@ REPAIR_STATE = {
     "repository_revision": "3" * 40,
     "repository_dirty": False,
     "repository_status_hash": "4" * 64,
+}
+FINALIZATION_REPAIR_STATE = {
+    "repository_revision": "9" * 40,
+    "repository_dirty": False,
+    "repository_status_hash": "a" * 64,
 }
 REUSED_HASHES = {
     "source_stream_lock_hash": "5" * 64,
@@ -273,6 +287,117 @@ def test_repair_checkout_must_remain_unchanged(
         assert_repair_repository_state_unchanged(audit)
 
 
+def test_finalization_audit_binds_b_c_content_and_terminal_headers(
+    tmp_path: Path,
+) -> None:
+    mappingproxy_audit = recovery_audit_payload(
+        original_repository_state=ORIGINAL_STATE,
+        repair_repository_state=REPAIR_STATE,
+        **REUSED_HASHES,
+    )
+    _write_finalization_surface(tmp_path)
+    audit = finalization_recovery_audit_payload_for_root(
+        tmp_path,
+        failed_state=failed_finalization_schema_state(tmp_path),
+        mappingproxy_recovery_audit=mappingproxy_audit,
+        current_repository_state=FINALIZATION_REPAIR_STATE,
+    )
+
+    assert audit["finalization_recovery_used"] is True
+    assert audit["failed_run_state_hash"] == canonical_hash(
+        failed_finalization_schema_state(tmp_path)
+    )
+    assert audit["prior_mappingproxy_recovery_audit_hash"] == mappingproxy_audit[
+        "recovery_audit_hash"
+    ]
+    assert audit["prior_repository_revision"] == REPAIR_STATE["repository_revision"]
+    assert audit["repair_repository_revision"] == FINALIZATION_REPAIR_STATE[
+        "repository_revision"
+    ]
+    assert len(audit["terminal_table_surfaces"]) == 6
+    assert audit["source_generation_recomputed_during_finalization_recovery"] is False
+    assert audit["predictions_recomputed_during_finalization_recovery"] is False
+    assert audit["donor_models_recomputed_during_finalization_recovery"] is False
+    assert audit["decisions_recomputed_during_finalization_recovery"] is False
+    assert audit["terminal_evaluation_recomputed_during_finalization_recovery"] is False
+    assert audit["policy_mutated_during_finalization_recovery"] is False
+    assert (
+        validate_finalization_recovery_audit_payload(
+            audit,
+            tmp_path,
+            failed_state=failed_finalization_schema_state(tmp_path),
+            mappingproxy_recovery_audit=mappingproxy_audit,
+            current_repository_state=FINALIZATION_REPAIR_STATE,
+        )
+        == audit
+    )
+
+
+def test_finalization_audit_supports_an_uninterrupted_fresh_science_checkout(
+    tmp_path: Path,
+) -> None:
+    _write_finalization_surface(tmp_path)
+    provenance = tmp_path / "provenance/input_artifacts.json"
+    provenance.parent.mkdir(parents=True, exist_ok=True)
+    provenance.write_text(
+        json.dumps(ORIGINAL_STATE) + "\n",
+        encoding="utf-8",
+    )
+
+    audit = finalization_recovery_audit_payload_for_root(
+        tmp_path,
+        failed_state=failed_finalization_schema_state(tmp_path),
+        mappingproxy_recovery_audit=fresh_recovery_audit_payload(),
+        current_repository_state=ORIGINAL_STATE,
+    )
+
+    assert audit["finalization_recovery_used"] is False
+    assert audit["failed_run_state_hash"] is None
+    assert audit["prior_repository_revision"] == ORIGINAL_STATE[
+        "repository_revision"
+    ]
+    assert audit["prior_repository_dirty"] is True
+    assert audit["repair_repository_revision"] is None
+    assert (
+        audit[
+            "labels_reopened_only_for_read_only_validation_during_finalization_recovery"
+        ]
+        is False
+    )
+
+
+def test_finalization_audit_and_clean_c_assertion_reject_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mappingproxy_audit = recovery_audit_payload(
+        original_repository_state=ORIGINAL_STATE,
+        repair_repository_state=REPAIR_STATE,
+        **REUSED_HASHES,
+    )
+    _write_finalization_surface(tmp_path)
+    audit = finalization_recovery_audit_payload_for_root(
+        tmp_path,
+        failed_state=failed_finalization_schema_state(tmp_path),
+        mappingproxy_recovery_audit=mappingproxy_audit,
+        current_repository_state=FINALIZATION_REPAIR_STATE,
+    )
+    with pytest.raises(ProtocolError, match="finalization recovery audit drifted"):
+        validate_finalization_recovery_audit_payload(
+            {**audit, "policy_mutated_during_finalization_recovery": True},
+            tmp_path,
+            failed_state=failed_finalization_schema_state(tmp_path),
+            mappingproxy_recovery_audit=mappingproxy_audit,
+            current_repository_state=FINALIZATION_REPAIR_STATE,
+        )
+    monkeypatch.setattr(
+        finalization_provenance,
+        "current_repair_repository_state",
+        lambda: {**FINALIZATION_REPAIR_STATE, "repository_dirty": True},
+    )
+    with pytest.raises(ProtocolError, match="changed during continuation"):
+        assert_finalization_repair_repository_state_unchanged(audit)
+
+
 def test_validator_rebinds_runtime_audit_and_rejects_tampering(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -339,11 +464,12 @@ def test_validator_rebinds_runtime_audit_and_rejects_tampering(
             "repository_revision": "a" * 40,
         },
     )
-    with pytest.raises(ProtocolError, match="audit drifted"):
-        validation._validate_recovery_lineage(  # noqa: SLF001
-            Path("/unused"),
-            runtime={"mappingproxy_recovery": audit},
-        )
+    # A later C checkout must not retroactively mutate the persisted A->B
+    # provenance check; C is validated by the separate report-local audit.
+    assert validation._validate_recovery_lineage(  # noqa: SLF001
+        Path("/unused"),
+        runtime={"mappingproxy_recovery": audit},
+    ) == audit
 
 
 @pytest.mark.parametrize(
@@ -408,3 +534,34 @@ def test_public_runner_rejects_unregistered_failed_root_before_mutation(
             artifact_root=root,
         )
     assert state_path.read_text(encoding="utf-8") == before
+
+
+def _write_finalization_surface(root: Path) -> None:
+    from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_flip_router.artifact_io import (  # noqa: E501
+        sha256_file,
+    )
+    from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_flip_router.terminal_schema import (  # noqa: E501
+        TERMINAL_TABLE_FIELDS,
+        TERMINAL_TABLE_MEMBERS,
+    )
+
+    members = []
+    for key, member in TERMINAL_TABLE_MEMBERS.items():
+        path = root / member
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            ",".join(TERMINAL_TABLE_FIELDS[key]) + "\n" + ",".join(
+                "x" for _ in TERMINAL_TABLE_FIELDS[key]
+            ) + "\n",
+            encoding="utf-8",
+        )
+        members.append({"member": member, "sha256": sha256_file(path)})
+    index = {
+        "schema_version": "fixed_bank_multi_challenger_content_index_v1",
+        "members": members,
+        "content_hash": "b" * 64,
+    }
+    (root / "manifests").mkdir(exist_ok=True)
+    (root / "manifests/content_index.json").write_text(
+        json.dumps(index), encoding="utf-8"
+    )

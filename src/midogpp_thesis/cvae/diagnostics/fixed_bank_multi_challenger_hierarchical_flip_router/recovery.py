@@ -1,20 +1,26 @@
-"""Exact recovery detector for the observed donor-fit serialization failure.
+"""Exact recovery capabilities for the two observed execution defects.
 
-This is not a general retry policy.  It recognizes one historical failure:
-the run reached ``DONOR_MODEL_FITTING`` after durably sealing every prelabel
-surface and all fold plans, then failed before writing any donor product when a
-``mappingproxy`` crossed a process-serialization boundary.
+This is not a general retry policy.  It recognizes only:
+
+* the original ``mappingproxy`` serialization failure before donor products;
+* the subsequent terminal-CSV schema failure after every scientific product
+  and the content index were durably written.
+
+The second capability is validation-only.  It must never authorize source,
+prediction, donor, decision, or terminal reconstruction/persistence.
 """
 
 from __future__ import annotations
 
 import json
 import os
+from dataclasses import dataclass
 from pathlib import Path
 import re
 from typing import Mapping
 
 from ...protocol import ProtocolError
+from .bundle import REQUIRED_FILES
 
 
 FAILED_MAPPINGPROXY_STATE: dict[str, object] = {
@@ -26,6 +32,25 @@ FAILED_MAPPINGPROXY_STATE: dict[str, object] = {
     "error": "cannot pickle 'mappingproxy' object",
     "error_class": "TypeError",
 }
+
+FINALIZATION_SCHEMA_MEMBER = "tables/terminal_case_confusions.csv"
+
+
+def failed_finalization_schema_state(root: Path) -> dict[str, object]:
+    """Return the exact root-bound state emitted by the observed validator bug."""
+
+    return {
+        "schema_version": "fixed_bank_multi_challenger_run_state_v1",
+        "status": "FAILED",
+        "phase": "FINALIZATION",
+        "terminal_consumed_test_diagnostic_only": True,
+        "automatic_resume_requires_hash_validation": True,
+        "error": (
+            "Multi-challenger table schema drifted: "
+            f"{Path(root) / FINALIZATION_SCHEMA_MEMBER}."
+        ),
+        "error_class": "ProtocolError",
+    }
 
 # Exact durable products written before donor fitting begins.  Donor, decision,
 # terminal, validation, and compute-checkpoint products are intentionally absent.
@@ -55,20 +80,66 @@ RECOVERABLE_INVENTORY = frozenset(
     }
 )
 
+# Every scientific and runtime product, including the pre-existing content
+# index, was durable when the first parent-process validation rejected the
+# terminal CSV header.  The validation report had not yet been written.
+FINALIZATION_RECOVERABLE_INVENTORY = frozenset(REQUIRED_FILES) - {
+    "reports/validation_report.json"
+}
+FINALIZATION_RETRY_INVENTORIES = (
+    FINALIZATION_RECOVERABLE_INVENTORY,
+    frozenset(REQUIRED_FILES),
+)
+
+
+@dataclass(frozen=True)
+class MultiChallengerRecoveryCapability:
+    """Typed authority granted by an exact failed state and inventory."""
+
+    mode: str
+    state_phase: str
+    validation_only: bool
+    labels_may_be_reopened_for_validation: bool
+    scientific_products_may_be_recomputed: bool
+    scientific_products_may_be_persisted: bool
+
+    def __post_init__(self) -> None:
+        if self.mode not in {"MAPPINGPROXY_REPLAY", "FINALIZATION_VALIDATION"}:
+            raise ProtocolError("Multi-challenger recovery mode drifted.")
+        if self.mode == "FINALIZATION_VALIDATION":
+            if (
+                not self.validation_only
+                or not self.labels_may_be_reopened_for_validation
+                or self.scientific_products_may_be_recomputed
+                or self.scientific_products_may_be_persisted
+            ):
+                raise ProtocolError(
+                    "Multi-challenger finalization capability is not validation-only."
+                )
+        elif (
+            self.validation_only
+            or self.labels_may_be_reopened_for_validation
+            or not self.scientific_products_may_be_recomputed
+            or not self.scientific_products_may_be_persisted
+        ):
+            raise ProtocolError(
+                "Multi-challenger mappingproxy replay capability drifted."
+            )
+
 _STATE_MEMBER = "reports/run_state.json"
 _ATOMIC_REMNANT = re.compile(r"(?P<base>.+)\.[1-9][0-9]*\.tmp")
 _RECOVERABLE_DIRECTORIES = frozenset(
     parent.as_posix()
-    for member in RECOVERABLE_INVENTORY
+    for member in RECOVERABLE_INVENTORY | FINALIZATION_RECOVERABLE_INVENTORY
     for parent in Path(member).parents
     if parent.as_posix() != "."
 )
 
 
-def detect_registered_multi_challenger_recovery(root: Path) -> bool:
-    """Recognize only the exact failed snapshot eligible for deterministic replay.
+def recovery_capability(root: Path) -> MultiChallengerRecoveryCapability | None:
+    """Return only the capability granted by an exact registered boundary.
 
-    A non-matching run state returns ``False``.  Once the exact failure marker is
+    A non-matching run state returns ``None``.  Once the exact failure marker is
     present, any state, inventory, file-type, directory, or symlink drift raises
     ``ProtocolError`` instead of broadening recovery.
     """
@@ -77,7 +148,7 @@ def detect_registered_multi_challenger_recovery(root: Path) -> bool:
     if path.is_symlink():
         raise ProtocolError("Multi-challenger recovery root must not be a symlink.")
     if not path.exists():
-        return False
+        return None
     if not path.is_dir():
         raise ProtocolError("Multi-challenger recovery root is not a directory.")
 
@@ -85,34 +156,90 @@ def detect_registered_multi_challenger_recovery(root: Path) -> bool:
     if state_path.is_symlink():
         raise ProtocolError("Multi-challenger recovery run state is a symlink.")
     if not state_path.exists():
-        return False
+        return None
     if not state_path.is_file():
         raise ProtocolError("Multi-challenger recovery run state is unsafe.")
     state = _read_state(state_path)
     if state.get("status") != "FAILED":
-        return False
+        return None
+
+    expected_finalization = failed_finalization_schema_state(path)
     if (
-        state.get("phase") != FAILED_MAPPINGPROXY_STATE["phase"]
-        or state.get("error") != FAILED_MAPPINGPROXY_STATE["error"]
+        state.get("phase") == FAILED_MAPPINGPROXY_STATE["phase"]
+        and state.get("error") == FAILED_MAPPINGPROXY_STATE["error"]
     ):
-        return False
-    if dict(state) != FAILED_MAPPINGPROXY_STATE:
+        expected_state = FAILED_MAPPINGPROXY_STATE
+        expected_inventory = RECOVERABLE_INVENTORY
+        role = "mappingproxy"
+        capability = MultiChallengerRecoveryCapability(
+            mode="MAPPINGPROXY_REPLAY",
+            state_phase="DONOR_MODEL_FITTING",
+            validation_only=False,
+            labels_may_be_reopened_for_validation=False,
+            scientific_products_may_be_recomputed=True,
+            scientific_products_may_be_persisted=True,
+        )
+    elif (
+        state.get("phase") == expected_finalization["phase"]
+        and state.get("error") == expected_finalization["error"]
+    ):
+        expected_state = expected_finalization
+        expected_inventory = FINALIZATION_RECOVERABLE_INVENTORY
+        role = "finalization"
+        capability = MultiChallengerRecoveryCapability(
+            mode="FINALIZATION_VALIDATION",
+            state_phase="FINALIZATION",
+            validation_only=True,
+            labels_may_be_reopened_for_validation=True,
+            scientific_products_may_be_recomputed=False,
+            scientific_products_may_be_persisted=False,
+        )
+    else:
+        return None
+
+    if dict(state) != expected_state:
         raise ProtocolError(
-            "Multi-challenger mappingproxy recovery state drifted: "
+            f"Multi-challenger {role} recovery state drifted: "
             "state_matches=False."
         )
 
     durable, atomic_bases = _inventory(path)
-    missing = sorted(RECOVERABLE_INVENTORY - durable)
-    extras = sorted(durable - RECOVERABLE_INVENTORY)
-    partial_atomic = sorted(atomic_bases - durable)
-    if missing or extras or partial_atomic:
+    allowed_inventories = (
+        FINALIZATION_RETRY_INVENTORIES
+        if role == "finalization"
+        else (expected_inventory,)
+    )
+    exact_inventory = next(
+        (inventory for inventory in allowed_inventories if durable == inventory),
+        None,
+    )
+    missing = sorted(expected_inventory - durable)
+    allowed_inventory_union = (
+        frozenset().union(*allowed_inventories)
+        if allowed_inventories
+        else expected_inventory
+    )
+    extras = sorted(durable - allowed_inventory_union)
+    unknown_atomic = sorted(atomic_bases - allowed_inventory_union)
+    if unknown_atomic:
         raise ProtocolError(
-            "Multi-challenger mappingproxy recovery inventory drifted: "
+            f"Multi-challenger {role} recovery contains an unknown atomic "
+            f"remnant: {unknown_atomic}."
+        )
+    partial_atomic = sorted(atomic_bases - durable)
+    if exact_inventory is None or partial_atomic:
+        raise ProtocolError(
+            f"Multi-challenger {role} recovery inventory drifted: "
             f"missing={missing}, extras={extras}, "
             f"partial_atomic_bases={partial_atomic}."
         )
-    return True
+    return capability
+
+
+def detect_registered_multi_challenger_recovery(root: Path) -> bool:
+    """Boolean workspace-dispatch facade over :func:`recovery_capability`."""
+
+    return recovery_capability(root) is not None
 
 
 def _read_state(path: Path) -> Mapping[str, object]:
@@ -124,7 +251,7 @@ def _read_state(path: Path) -> Mapping[str, object]:
         ) from exc
     if not isinstance(state, Mapping):
         raise ProtocolError(
-            "Multi-challenger mappingproxy recovery state is malformed."
+            "Multi-challenger recovery state is malformed."
         )
     return state
 
@@ -160,16 +287,16 @@ def _inventory(root: Path) -> tuple[frozenset[str], frozenset[str]]:
             match = _ATOMIC_REMNANT.fullmatch(relative)
             if match is not None:
                 base = match.group("base")
-                if base not in RECOVERABLE_INVENTORY:
+                if base not in frozenset(REQUIRED_FILES):
                     raise ProtocolError(
-                        "Multi-challenger mappingproxy recovery contains an unknown "
+                        "Multi-challenger recovery contains an unknown "
                         f"atomic remnant: {relative}."
                     )
                 atomic_bases.add(base)
                 continue
             if candidate.stat().st_size <= 0:
                 raise ProtocolError(
-                    "Multi-challenger mappingproxy recovery contains an empty "
+                    "Multi-challenger recovery contains an empty "
                     f"durable member: {relative}."
                 )
             durable.add(relative)
@@ -178,6 +305,12 @@ def _inventory(root: Path) -> tuple[frozenset[str], frozenset[str]]:
 
 __all__ = (
     "FAILED_MAPPINGPROXY_STATE",
+    "FINALIZATION_RECOVERABLE_INVENTORY",
+    "FINALIZATION_RETRY_INVENTORIES",
+    "FINALIZATION_SCHEMA_MEMBER",
+    "MultiChallengerRecoveryCapability",
     "RECOVERABLE_INVENTORY",
     "detect_registered_multi_challenger_recovery",
+    "failed_finalization_schema_state",
+    "recovery_capability",
 )
