@@ -2376,3 +2376,48 @@ experiments:
       - S4 chooses the highest A1 pooled support exact-BACC gain strictly above B, with a 1e-12 tie tolerance and numeric-source tie break; absent a positive gain or either support class it falls back exactly to B. G_static uses only other centers and never same-target support labels. There are no case features, donor models, target-local calibration, threshold search, or hyperparameter search.
       - The workstation schedule uses one persistent spawned source worker per RTX A5000, followed by a disjoint CUDA-free CPU phase with four workers and three threads each, float32 memmaps, float64 reductions, hash-valid checkpoints, two fresh-process validation passes, and /data/local/fixed_bank_support_static_router_s4_v1 scratch.
       - Two-sided t8 intervals and fixed-null exceedance counts/fractions are descriptive only; no confirmatory p-value, success gate, route, action, model/expert update, policy, promotion, deployment, recipe selection, numbered-stage feed, another Stage-90 diagnostic, another experiment, or generic consumer can be authorized.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_loo_directional_shrinkage_ensemble.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_loo_directional_shrinkage_ensemble_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_loo_directional_shrinkage_ensemble_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_fixed_bank_loo_directional_shrinkage_ensemble_test_cache_v1
+      - midogpp_stage90_fixed_bank_loo_directional_shrinkage_ensemble_test_manifest_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_loo_directional_shrinkage_ensemble_parent_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_loo_directional_shrinkage_ensemble_amendment_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Reuse of immutable A1 generation geometry, exact-nine seed pairing, budgets, and classifier settings only; no routing, action, policy, downstream, promotion, or deployment authority is inherited.
+      midogpp_stage90_fixed_bank_loo_directional_shrinkage_ensemble_test_manifest_v1: Experiment-fenced labels open only through donor, route-scoped same-H leave-one-case-out support, and terminal capabilities after the globally sealed physical surface and all 218 endpoint plans and aggregate method decisions.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_loo_directional_shrinkage_ensemble_parent_v1: Byte-exact experiment-fenced alias of the immutable original ledger, read only to verify the direct parent hash.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_loo_directional_shrinkage_ensemble_amendment_v1: Direct single-consumer authorization for this terminal post-hoc consumed-test diagnostic; it creates no fresh evidence.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-loo-directional-shrinkage-ensemble
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_loo_directional_shrinkage_ensemble_v1
+    notes:
+      - Explicitly authorized reuse of the already-consumed MIDOG++ test split for one terminal fixed-bank whole-case leave-one-out directional-shrinkage ensemble diagnostic. It is POST_HOC_CONSUMED_TEST_SENSITIVITY with fresh_evidence=false and cannot establish routing or downstream utility.
+      - The exact six ordered inputs are the promoted bank, GenerationLock, dedicated single-consumer cache and manifest aliases, a byte-exact immutable-original-ledger alias, and this diagnostic's direct amendment. No earlier Stage-90 output, amendment, prediction surface, scratch, checkpoint, or numbered-stage result is consumed.
+      - B, U, and eight A1 actions are recomputed as 810 physical exact-nine seed cells and globally sealed before any labels open. The held unit is each of 218 whole cases or groups c, support is same-H excluding c, and every endpoint plan plus aggregate method decision seals before terminal c labels open.
+      - DCSE_LOO scores zero-to-one and one-to-zero B-defined hard-flip branches with pooled additive confusion counts. G excludes H and e and equal-center averages legal q. The only executable arms are the nine Cartesian products K in 4,5,6 and w in 0.5,0.6,0.7; OFF contributes B, comparisons are rational until the 1e-12 final tie check, and G_directional_matched runs the same pipeline with S set to G.
+      - The workstation schedule uses two persistent spawned RTX A5000 generation workers followed by a disjoint CUDA-free CPU phase with four workers and three BLAS threads each. Dedicated /data/local/fixed_bank_loo_directional_shrinkage_ensemble_v1 scratch is throughput-only; intra-launch atomic task checkpoints are cleaned after a validated global seal, and owned-task replay, terminal recovery, and cross-run recovery are forbidden.
+      - The bounded interpretation is no stable incremental target-support advantage versus G. Primary checks, delete-one controls, nominal intervals, and the 10000-replicate candidate-identity null are descriptive only; no outcome can authorize routing, downstream utility, action or policy changes, promotion, deployment, recipe selection, another stage, diagnostic, experiment, or generic consumer.

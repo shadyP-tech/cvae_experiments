@@ -266,6 +266,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     support_static_router.add_argument("--config", required=True)
     support_static_router.add_argument("--artifact-root", required=True)
+
+    loo_directional_shrinkage_ensemble = sub.add_parser(
+        "fixed-bank-loo-directional-shrinkage-ensemble",
+        help=(
+            "Run the terminal consumed-test fixed-bank whole-case LOO "
+            "directional-shrinkage ensemble diagnostic."
+        ),
+    )
+    loo_directional_shrinkage_ensemble.add_argument("--config", required=True)
+    loo_directional_shrinkage_ensemble.add_argument(
+        "--artifact-root", required=True
+    )
     return parser
 
 
@@ -636,6 +648,22 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_fixed_bank_support_static_router_config(args.config)
         output = run_fixed_bank_support_static_router(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "fixed-bank-loo-directional-shrinkage-ensemble":
+        from .fixed_bank_loo_directional_shrinkage_ensemble import (
+            load_fixed_bank_loo_directional_shrinkage_ensemble_config,
+            run_fixed_bank_loo_directional_shrinkage_ensemble,
+        )
+
+        config = load_fixed_bank_loo_directional_shrinkage_ensemble_config(
+            args.config
+        )
+        output = run_fixed_bank_loo_directional_shrinkage_ensemble(
             config,
             artifact_root=artifact_root,
         )

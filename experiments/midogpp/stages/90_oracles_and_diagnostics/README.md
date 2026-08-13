@@ -905,3 +905,62 @@ The registered run is unexecuted. Any future output remains
 exceedance counts/fractions are descriptive only; there is no confirmatory
 p-value or pass/fail gate, and the result may not feed another experiment,
 numbered stage, action, policy, recipe, promotion, or deployment.
+
+## Uniform-B v2 consumed-test fixed-bank LOO directional-shrinkage ensemble v1
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_loo_directional_shrinkage_ensemble.v1`
+is a new isolated Stage-90 diagnostic over the already-consumed MIDOG++ test
+split. Its six inputs are the promoted bank, GenerationLock, dedicated cache
+and manifest aliases, a byte-exact original-ledger alias, and this experiment's
+direct amendment. It consumes no previous Stage-90 artifact, amendment,
+prediction surface, scratch directory, or checkpoint.
+
+B, U, and eight frozen A1 source actions are recomputed as 810 physical
+target/action/seed cells and globally sealed before labels open. Each of the
+218 whole cases or groups `c` is then held out in turn; support for that route
+is all other cases in the same target `H`. Directional support gains are pooled
+additive confusion-count gains over B on the `zero_to_one` and `one_to_zero`
+B-defined hard branches. The donor prior for source `e` equal-center averages
+only query centers `q` outside `{H,e}`.
+
+For each direction, sources are ranked by G. The complete executable arm grid
+is `K={4,5,6}` crossed with exact rational weights
+`w={1/2,3/5,7/10}`. Each arm selects from OFF plus its top-K sources using
+`w*S + (1-w)*G`; OFF has score zero and contributes B. Comparisons remain
+rational until a final `1e-12` tie check, ordered OFF then numeric source. All
+nine arm identities remain present even when they select duplicate endpoints.
+DCSE averages the nine selected endpoint probabilities separately on the two B
+branches before the sole `0.5` threshold, with equality mapped positive. The
+matched G method uses the identical pipeline with `S:=G`.
+
+Every endpoint plan and aggregate method decision for all 218 held cases must
+seal before terminal labels open. Controls include raw directional LOO, the
+nested delete-one-support frequency committee, hard vote, unique-action mean,
+uniform A1, direction decomposition, leave-one-arm ablations, and whole-pipeline
+delete-one-center recomputations. The 10,000-replicate candidate-identity null
+uses seed `20260813` and is descriptive only; it carries no exchangeability or
+p-value claim.
+
+The workstation schedule uses two persistent spawned RTX A5000 generation
+workers, followed by a disjoint CUDA-free CPU phase with four workers and three
+BLAS threads each. Float32 stores sources and probabilities, int64 stores
+confusion counts, and float64 performs scientific reductions. Dedicated
+`/data/local/fixed_bank_loo_directional_shrinkage_ensemble_v1` scratch is
+throughput-only. Intra-launch atomic task checkpoints are cleaned after their
+validated global seal; owned-task replay, terminal recovery, and cross-run
+recovery are forbidden.
+
+```bash
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_loo_directional_shrinkage_ensemble.v1
+```
+
+The run is registered but unexecuted. The contract hash is
+`500dc61f9f8d3bd0`, the protocol hash is `d3dfdfb4d612a97b`, and the direct
+amendment SHA-256 is
+`05f800f1bd053528477abd1e67163612c01d44f56418f98961bcdf64677bdc52`.
+Its bounded interpretation remains **no stable incremental target-support
+advantage versus G**. Even if every descriptive stability check is positive,
+the result remains `fresh_evidence=false`, terminal diagnostic-only evidence;
+it cannot establish routing or downstream utility or authorize another stage,
+experiment, action, policy, recipe, promotion, deployment, or generic reuse.

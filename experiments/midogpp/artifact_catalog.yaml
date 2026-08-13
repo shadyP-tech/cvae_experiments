@@ -9399,3 +9399,331 @@ artifacts:
       - B, U, and all eight frozen A1 actions seal globally before any label opens. For every target/fold, its S4 decision and null plan seal before labels can open with that same target/fold's evaluation capability; cases may be support in other rotations only.
       - S4 uses exact pooled BACC over the other four whole-case folds, selects only a strictly positive A1 gain over B, and otherwise returns B. Any support aggregate lacking either class also returns B. G_static scores each candidate e by equal-center mean exact gain over q not in {H,e}, excludes e itself as a donor query, and falls back to B unless the best gain is strictly positive; no case features, donor fit, or target calibration exist.
       - Two-sided t8 intervals and fixed-null exceedance counts/fractions are descriptive only. Regardless of outcome, this artifact cannot authorize routing success, an action or policy, a model or expert update, promotion, deployment, recipe selection, a numbered-stage feed, another diagnostic, another experiment, or a generic consumer.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_loo_directional_shrinkage_ensemble_parent_v1
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: CONSUMED_TEST_LOO_DIRECTIONAL_SHRINKAGE_ENSEMBLE_PARENT_LEDGER_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      split: test
+      row_count: '9928'
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      experiment_fenced: 'true'
+      fresh_evidence: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_loo_directional_shrinkage_ensemble.v1
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    forbidden_reuse: &loo_directional_shrinkage_ensemble_forbidden_reuse
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Experiment-fenced byte-exact alias of the immutable original consumed-test ledger; it exposes no earlier diagnostic output, amendment, prediction, metric, scratch, or checkpoint.
+      - Only the named whole-case LOO directional-shrinkage diagnostic may pair this alias with its direct amendment.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_loo_directional_shrinkage_ensemble_amendment_v1
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_LOO_DIRECTIONAL_SHRINKAGE_ENSEMBLE_AMENDMENT_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      amendment_sha256: 05f800f1bd053528477abd1e67163612c01d44f56418f98961bcdf64677bdc52
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_loo_directional_shrinkage_ensemble.v1
+      authorization_scope: one_terminal_consumed_test_fixed_bank_loo_directional_shrinkage_ensemble_v1
+      authorization_basis: explicit_user_instruction_to_implement_this_named_terminal_consumed_test_whole_case_loo_directional_shrinkage_ensemble_diagnostic
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      claim_role: posthoc_fixed_bank_whole_case_loo_directional_shrinkage_ensemble_diagnostic
+      held_unit: whole_case_or_group_c
+      held_unit_count: '218'
+      support_scope: same_H_all_whole_cases_except_held_c
+      direction_ids: zero_to_one|one_to_zero
+      arm_grid: K4_5_6_x_w0.5_0.6_0.7
+      arm_count: '9'
+      matched_G_pipeline: identical_with_S_equal_to_G
+      fresh_evidence: 'false'
+      previous_stage90_outputs_used: 'false'
+      previous_stage90_amendments_used: 'false'
+      generic_consumer_authorized: 'false'
+      may_feed_another_stage90_experiment: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - uniform_b_v2_consumed_test_fixed_bank_loo_directional_shrinkage_ensemble_ledger_amendment_v1.json
+    expected_file_hashes:
+      uniform_b_v2_consumed_test_fixed_bank_loo_directional_shrinkage_ensemble_ledger_amendment_v1.json:
+        algorithm: sha256
+        digest: 05f800f1bd053528477abd1e67163612c01d44f56418f98961bcdf64677bdc52
+    forbidden_reuse: *loo_directional_shrinkage_ensemble_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Direct hash-chained amendment over the immutable original ledger; no earlier amendment or Stage-90 result is a parent or input.
+      - It authorizes only this named terminal post-hoc directional-shrinkage diagnostic and creates no fresh routing, downstream, action, policy, or promotion evidence.
+
+  - artifact_id: midogpp_stage90_fixed_bank_loo_directional_shrinkage_ensemble_test_manifest_v1
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_LOO_DIRECTIONAL_SHRINKAGE_ENSEMBLE_CAPABILITY_GATED_LABELS
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+      split: test
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_LOO_DIRECTIONAL_SHRINKAGE_ENSEMBLE_V1
+      fresh_evidence: 'false'
+      labels_present: 'true'
+      labels_available_before_global_probability_seal: 'false'
+      held_unit: whole_case_or_group_c
+      held_unit_count: '218'
+      arbitrary_folds_used: 'false'
+      support_label_scope: same_H_all_whole_cases_except_held_c_only
+      terminal_label_scope: held_whole_case_c_only_after_all_plan_and_aggregate_seals
+      donor_label_scope: query_q_not_in_H_or_e_only
+      role_scoped_label_capabilities_enforced: 'true'
+      route_scoped_support_grants_only: 'true'
+      all_endpoint_plans_sealed_before_terminal_labels: 'true'
+      all_aggregate_method_seals_complete_before_terminal_labels: 'true'
+      target_support_source_expert_or_shared_model_update: 'false'
+      terminal_oracles_available_before_terminal_labels: 'false'
+      single_class_cases_retained: 'true'
+      mixed_class_case_count: '213'
+      negative_only_case_count: '4'
+      positive_only_case_count: '1'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_loo_directional_shrinkage_ensemble.v1
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse: *loo_directional_shrinkage_ensemble_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias of the consumed canonical test manifest. It exposes labels only through donor, same-H leave-one-case-out support, and post-seal terminal capabilities.
+      - Every one of the 218 endpoint plans and the aggregate method decision seal must exist before a terminal held-case label capability can open.
+
+  - artifact_id: midogpp_stage90_fixed_bank_loo_directional_shrinkage_ensemble_test_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_TEST_LOO_DIRECTIONAL_SHRINKAGE_ENSEMBLE_LABEL_FREE_CACHE_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: test
+      row_count: '9928'
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      backbone_identity_hash: 1b5071f2e605fa60
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_LOO_DIRECTIONAL_SHRINKAGE_ENSEMBLE_V1
+      fresh_evidence: 'false'
+      labels_persisted: 'false'
+      labels_absent: 'true'
+      sample_ids_persisted: 'false'
+      image_paths_persisted: 'false'
+      prior_prediction_or_checkpoint_reuse: 'false'
+      previous_stage90_output_used: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_loo_directional_shrinkage_ensemble.v1
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse: *loo_directional_shrinkage_ensemble_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias over the validated label-free consumed-test embedding cache; it creates no fresh evidence.
+      - Only the named directional-shrinkage diagnostic may use this alias to recompute B, U, and eight A1 probability surfaces under experiment-owned output and checkpoint namespaces.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_loo_directional_shrinkage_ensemble_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_loo_directional_shrinkage_ensemble/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: POST_HOC_CONSUMED_TEST_SENSITIVITY
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      routing_status: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      claim_role: posthoc_fixed_bank_whole_case_loo_directional_shrinkage_ensemble_diagnostic
+      bounded_interpretation: no_stable_incremental_target_support_advantage_vs_G
+      architecture_family: fixed_bank_whole_case_loo_directional_shrinkage_ensemble_v1
+      config_contract_hash: 500dc61f9f8d3bd0
+      protocol_contract_hash: d3dfdfb4d612a97b
+      evaluation_split: test
+      consumed_test_data: 'true'
+      input_artifact_count: '6'
+      ledger_amendment_required_and_hash_chained: 'true'
+      ledger_amendment_sha256: 05f800f1bd053528477abd1e67163612c01d44f56418f98961bcdf64677bdc52
+      candidate_generalization: known_fixed_bank_reuse
+      unseen_expert_transfer_claim: 'false'
+      eligible_test_row_count: '9928'
+      evaluation_case_count: '218'
+      held_unit: whole_case_or_group_c
+      support_scope: same_H_all_whole_cases_except_held_c
+      arbitrary_folds_used: 'false'
+      each_case_evaluated_exactly_once: 'true'
+      role_scoped_label_capabilities_enforced: 'true'
+      route_scoped_support_grants_only: 'true'
+      all_physical_probabilities_globally_sealed_before_labels: 'true'
+      all_endpoint_plans_and_aggregate_decisions_sealed_before_terminal_labels: 'true'
+      action_geometry_ids: A1
+      action_count_per_target: '10'
+      target_probability_cell_count: '810'
+      exact_seed_pair_count: '9'
+      exact_nine_ensemble_first: 'true'
+      direction_ids: zero_to_one|one_to_zero
+      support_score: pooled_additive_confusion_count_directional_exact_bacc_gain_vs_B
+      G_definition: equal_center_mean_directional_gain_over_query_q_not_in_H_or_e
+      G_query_scope: q_not_in_H_or_e
+      K_grid: 4|5|6
+      w_grid: 0.5|0.6|0.7
+      w_rational_grid: 1/2|3/5|7/10
+      arm_count: '9'
+      arm_identities_retained: 'true'
+      endpoint_score: w_times_S_plus_one_minus_w_times_G
+      off_action_id: 'OFF'
+      final_tie_tolerance: '1e-12'
+      sole_final_threshold: '0.5'
+      matched_G_pipeline: identical_nine_arm_pipeline_with_S_set_equal_to_G
+      method_ids: B|U|DCSE_LOO|G_directional_matched|DLOO_raw|LOO_frequency_committee|O_directional_static|O_case_directional
+      primary_endpoint: center_pooled_exact_bacc_from_int64_confusion_sums
+      matched_G_nominal_intervals_jackknife_and_null_are_not_gates: 'true'
+      candidate_identity_null_replicates: '10000'
+      candidate_identity_null_seed: '20260813'
+      candidate_identity_null_algorithm: splitmix64_route_candidate_block_permutation_v1
+      candidate_identity_null_shape: 10000x218x8_uint8
+      candidate_identity_null_scope: route_local_support_S_candidate_blocks_paired_directions
+      candidate_identity_null_fixed_surfaces: B|G|physical_probabilities|canonical_decisions
+      candidate_identity_exchangeability_claimed: 'false'
+      confirmatory_p_value_computed: 'false'
+      routing_success_claimed: 'false'
+      routing_quality_claimed: 'false'
+      downstream_utility_claimed: 'false'
+      action_selection_authorized: 'false'
+      policy_update_authorized: 'false'
+      model_update_authorized: 'false'
+      expert_update_authorized: 'false'
+      fresh_evidence: 'false'
+      promotion_eligible: 'false'
+      previous_stage90_outputs_used: 'false'
+      previous_stage90_amendments_used: 'false'
+      may_feed_another_stage90_experiment: 'false'
+      may_feed_another_experiment: 'false'
+      workstation_generation_devices: cuda:0|cuda:1
+      workstation_source_workers: 2_persistent_spawned_A5000_workers
+      workstation_cpu_topology: 4_workers_x_3_blas_threads_cuda_free
+      workstation_scratch_root: /data/local/fixed_bank_loo_directional_shrinkage_ensemble_v1
+      scratch_role: throughput_only
+      runtime_recovery_scope: no_cross_run_recovery_intra_launch_atomic_task_checkpoints_only
+      owned_task_checkpoint_replay_allowed: 'false'
+      successful_phase_checkpoint_cleanup_after_validated_global_seal: 'true'
+      terminal_or_cross_run_recovery_allowed: 'false'
+      two_fresh_process_validation_required: 'true'
+      source_and_probability_storage_dtype: float32
+      confusion_count_dtype: int64
+      scientific_reductions_dtype: float64
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - arrays/frozen_source_streams.npy
+      - arrays/fixed_bank_a1_action_probabilities.npz
+      - manifests/protocol_manifest.json
+      - manifests/action_library.json
+      - manifests/frozen_source_stream_index.json
+      - manifests/frozen_source_stream_lock.json
+      - manifests/fixed_bank_a1_prediction_index.json
+      - manifests/fixed_bank_a1_prediction_seal.json
+      - manifests/physical_prelabel_seal.json
+      - manifests/loo_plan_seal.json
+      - manifests/donor_prior_seal.json
+      - manifests/endpoint_library_seal.json
+      - manifests/arm_decisions_seal.json
+      - manifests/aggregate_plan_decision_seal.json
+      - manifests/terminal_evaluation_seal.json
+      - manifests/content_index.json
+      - tables/action_library.csv
+      - tables/exact_nine_probability_index.csv
+      - tables/loo_plans.csv
+      - tables/case_action_confusions.csv
+      - tables/directional_gains.csv
+      - tables/donor_priors.csv
+      - tables/endpoint_arms.csv
+      - tables/arm_decisions.csv
+      - tables/control_decisions.csv
+      - tables/method_predictions.csv
+      - tables/descriptive_control_predictions.csv
+      - tables/terminal_case_confusions.csv
+      - tables/terminal_method_metrics.csv
+      - tables/terminal_center_metrics.csv
+      - tables/terminal_contrasts.csv
+      - tables/whole_pipeline_delete_one_center.csv
+      - tables/leave_one_arm_ablations.csv
+      - tables/null_statistics.csv
+      - reports/workstation_preflight.json
+      - reports/label_capability_report.json
+      - reports/leakage_report.json
+      - reports/publication_decision.json
+      - reports/runtime_summary.json
+      - reports/run_state.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Explicitly authorized terminal consumed-test whole-case LOO directional-shrinkage diagnostic. It recomputes the physical probability surface, donor priors, endpoint arms, decisions, controls, null, terminal metrics, and validations under experiment-owned namespaces from exactly six fenced inputs.
+      - B, U, and all eight A1 actions seal globally before labels. Each held whole case c is excluded from its same-H support, G excludes H and e, and all 218 endpoint plans plus aggregate decisions seal before terminal labels open.
+      - Only the nine K-by-w arm identities declared by the config are executable. OFF contributes B, the final threshold is 0.5 with equality positive, and the matched G control uses the identical pipeline with S equal to G.
+      - The bounded interpretation is no stable incremental target-support advantage versus G. All success checks and inferential summaries are descriptive; regardless of outcome, this artifact cannot authorize routing, downstream utility, action or policy changes, model or expert updates, promotion, deployment, recipe selection, a numbered-stage feed, another diagnostic, another experiment, or a generic consumer.
