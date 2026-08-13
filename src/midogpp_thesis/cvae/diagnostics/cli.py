@@ -278,6 +278,20 @@ def build_parser() -> argparse.ArgumentParser:
     loo_directional_shrinkage_ensemble.add_argument(
         "--artifact-root", required=True
     )
+
+    case_directional_correctness_abstention_router = sub.add_parser(
+        "fixed-bank-case-directional-correctness-abstention-router",
+        help=(
+            "Run the terminal consumed-test held-case directional-correctness "
+            "and abstention diagnostic."
+        ),
+    )
+    case_directional_correctness_abstention_router.add_argument(
+        "--config", required=True
+    )
+    case_directional_correctness_abstention_router.add_argument(
+        "--artifact-root", required=True
+    )
     return parser
 
 
@@ -664,6 +678,24 @@ def main(argv: list[str] | None = None) -> int:
             args.config
         )
         output = run_fixed_bank_loo_directional_shrinkage_ensemble(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "fixed-bank-case-directional-correctness-abstention-router":
+        from .fixed_bank_case_directional_correctness_abstention_router import (
+            load_fixed_bank_case_directional_correctness_abstention_router_config,
+            run_fixed_bank_case_directional_correctness_abstention_router,
+        )
+
+        config = (
+            load_fixed_bank_case_directional_correctness_abstention_router_config(
+                args.config
+            )
+        )
+        output = run_fixed_bank_case_directional_correctness_abstention_router(
             config,
             artifact_root=artifact_root,
         )

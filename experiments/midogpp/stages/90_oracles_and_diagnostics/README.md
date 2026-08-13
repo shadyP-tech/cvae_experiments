@@ -964,3 +964,55 @@ advantage versus G**. Even if every descriptive stability check is positive,
 the result remains `fresh_evidence=false`, terminal diagnostic-only evidence;
 it cannot establish routing or downstream utility or authorize another stage,
 experiment, action, policy, recipe, promotion, deployment, or generic reuse.
+
+## Uniform-B v2 consumed-test fixed-bank case-directional correctness abstention router v1
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_case_directional_correctness_abstention_router.v1`
+is an isolated successor diagnostic for the remaining DCSE bottleneck: deciding
+whether a source's actual held-case directional flips are likely to be helpful
+or should abstain to B. It recomputes the frozen B, U, and eight A1 actions from
+the original six experiment-fenced inputs. It consumes no earlier Stage-90
+artifact, fitted model, amendment, prediction surface, scratch directory, or
+checkpoint.
+
+For every held whole case `c` in target center `H`, six label-free directional
+features are computed for each source and each B-defined flip direction. A
+separate fixed ridge-binomial logistic model is fitted on labeled cases in
+`H` excluding `c` only. Its expected directional correctness is converted to a support-
+denominator utility proxy and averaged, with exact weight `1/2`, with the donor
+prior computed only from query centers `q` outside `{H,e}`. OFF is score zero,
+is first in `1e-12` ties, and leaves B unchanged. The model family, alpha,
+iterations, convergence tolerance, clips, six features, score weights, and
+candidate order are frozen; there is no fitted threshold or parameter search.
+
+The label capability boundary is global. All 72 donor grants complete before
+any target-local route support is opened. The held route's labels never enter
+its feature row, scaler, fit, denominators, or decision. All 218 route decisions
+and predictions bind to one aggregate seal before terminal labels can open.
+A deterministic candidate-feature-block permutation is persisted as a
+descriptive specificity control only. Terminal BACC contrasts and directional
+oracles are descriptive and cannot become a success gate.
+
+The workstation runs two persistent spawned RTX A5000 generation workers,
+then clears CUDA and runs four spawned CPU route workers with three BLAS
+threads each. Source/probability storage is float32, confusion counts are
+int64, and scientific reductions are float64. Dedicated
+`/data/local/fixed_bank_case_directional_correctness_abstention_router_v1`
+scratch is throughput-only; cross-run and terminal recovery are forbidden.
+Two independent CUDA-free interpreter replays must reconstruct the same
+closed-world bundle before completion.
+
+```bash
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_case_directional_correctness_abstention_router.v1
+```
+
+The registered run is unexecuted. The config contract hash is
+`a41dce9dfd086f4a`, the protocol hash is
+`336c64c87e48a37b7437c9cd0b6cf44ddf155fc10f93f6e701debd1aaf571429`,
+and the direct amendment SHA-256 is
+`edbd969666bdd1c5752e2d9904505e07026e6b8307430cfd8fa804010a06e3be`.
+Every possible result remains `POST_HOC_CONSUMED_TEST_SENSITIVITY` and
+`TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`: it cannot establish fresh routing,
+held-case exact BACC prediction, downstream utility, or deployment evidence,
+and it may not feed another experiment or stage.

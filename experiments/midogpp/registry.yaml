@@ -2421,3 +2421,48 @@ experiments:
       - DCSE_LOO scores zero-to-one and one-to-zero B-defined hard-flip branches with pooled additive confusion counts. G excludes H and e and equal-center averages legal q. The only executable arms are the nine Cartesian products K in 4,5,6 and w in 0.5,0.6,0.7; OFF contributes B, comparisons are rational until the 1e-12 final tie check, and G_directional_matched runs the same pipeline with S set to G.
       - The workstation schedule uses two persistent spawned RTX A5000 generation workers followed by a disjoint CUDA-free CPU phase with four workers and three BLAS threads each. Dedicated /data/local/fixed_bank_loo_directional_shrinkage_ensemble_v1 scratch is throughput-only; intra-launch atomic task checkpoints are cleaned after a validated global seal, and owned-task replay, terminal recovery, and cross-run recovery are forbidden.
       - The bounded interpretation is no stable incremental target-support advantage versus G. Primary checks, delete-one controls, nominal intervals, and the 10000-replicate candidate-identity null are descriptive only; no outcome can authorize routing, downstream utility, action or policy changes, promotion, deployment, recipe selection, another stage, diagnostic, experiment, or generic consumer.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_case_directional_correctness_abstention_router.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_case_directional_correctness_abstention_router_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_case_directional_correctness_abstention_router_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_fixed_bank_case_directional_correctness_abstention_router_test_cache_v1
+      - midogpp_stage90_fixed_bank_case_directional_correctness_abstention_router_test_manifest_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_case_directional_correctness_abstention_router_parent_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_case_directional_correctness_abstention_router_amendment_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Reuse of immutable A1 generation geometry, exact-nine seed pairing, budgets, and classifier settings only; no routing, action, policy, downstream, promotion, or deployment authority is inherited.
+      midogpp_stage90_fixed_bank_case_directional_correctness_abstention_router_test_manifest_v1: Experiment-fenced labels open only through q-not-in-H-or-e donor, route-scoped same-H-minus-held-case support, and terminal capabilities after the globally sealed physical, feature, plan, prediction, and decision surfaces.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_case_directional_correctness_abstention_router_parent_v1: Byte-exact experiment-fenced alias of the immutable original ledger, read only to verify the direct parent hash.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_case_directional_correctness_abstention_router_amendment_v1: Direct single-consumer authorization for this terminal post-hoc consumed-test diagnostic; it creates no fresh evidence.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-case-directional-correctness-abstention-router
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_case_directional_correctness_abstention_router_v1
+    notes:
+      - Explicitly authorized reuse of the already-consumed MIDOG++ test split for one terminal held-case directional-correctness and abstention diagnostic. It remains POST_HOC_CONSUMED_TEST_SENSITIVITY with fresh_evidence=false and cannot establish deployable routing or downstream utility.
+      - Exactly six inputs are admitted: the promoted bank, GenerationLock, dedicated single-consumer cache and manifest aliases, a byte-exact immutable-original-ledger alias, and this diagnostic's direct amendment. No earlier Stage-90 output, amendment, prediction surface, scratch, checkpoint, or numbered-stage result is consumed.
+      - B, U, and eight A1 actions are recomputed as 810 exact-nine physical cells. Held-case directional response features use probabilities only. For each H,c,e,d, model fitting, feature scaling, response labels, and class denominators use H minus c only; donor G uses q outside H and e.
+      - CDCA_LOO ranks all eight non-target sources plus OFF from a frozen one-half case-correctness proxy plus one-half donor G score. OFF is B and wins ties within 1e-12. The proxy is not predicted held-case exact BACC, NELBO compatibility, or downstream utility.
+      - Two persistent spawned RTX A5000 generation workers precede a disjoint CUDA-free CPU phase with four workers and three BLAS threads each. Dedicated /data/local/fixed_bank_case_directional_correctness_abstention_router_v1 scratch is throughput-only; cross-run and terminal recovery are forbidden, and two fresh-process validation replays are required.
+      - Every route probability and decision plus the global 218-route barrier seals before terminal labels open. All contrasts, oracles, and the fixed feature-block permutation are descriptive only and cannot authorize routing, action, policy, promotion, deployment, another stage, diagnostic, experiment, or generic consumer.
