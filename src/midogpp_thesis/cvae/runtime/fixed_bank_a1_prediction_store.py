@@ -10,7 +10,13 @@ import numpy as np
 
 from ...common.hashing import stable_hash
 from ..protocol import ProtocolError
-from .artifact_io import atomic_json, atomic_npz, read_json, sha256_file
+from .artifact_io import (
+    atomic_json,
+    atomic_npz,
+    read_json,
+    sha256_array,
+    sha256_file,
+)
 from .fixed_bank_a1_prediction_contracts import (
     ACTION_COUNT_PER_TARGET,
     EXPECTED_CELL_COUNT,
@@ -70,20 +76,8 @@ def write_prediction_store(
     arrays_path = root / PREDICTION_ARRAY_MEMBER
     index_path = root / PREDICTION_INDEX_MEMBER
     seal_path = root / PREDICTION_SEAL_MEMBER
-    existing = tuple(path.is_file() for path in (arrays_path, index_path, seal_path))
-    if any(path.is_symlink() for path in (arrays_path, index_path, seal_path)):
-        raise ProtocolError("Fixed-bank A1 final prediction trio contains a symlink.")
-    # The two partial states below are exact ordered crash boundaries.  Every
-    # byte is deterministically rebuilt from already hash-validated task
-    # checkpoints; a seal without both predecessors is never repairable.
-    if existing not in {
-        (False, False, False),
-        (True, False, False),
-        (True, True, False),
-    }:
-        raise ProtocolError("Fixed-bank A1 final prediction trio is unsafe or sealed.")
-    arrays = {}
-    index_rows = []
+    arrays: dict[str, np.ndarray] = {}
+    index_rows: list[dict[str, object]] = []
     for ordinal, cell in enumerate(cells):
         member = f"cell_{ordinal:04d}"
         arrays[member] = cell.probabilities
@@ -101,8 +95,7 @@ def write_prediction_store(
                 "fit_provenance_hash": cell.fit_provenance_hash,
             }
         )
-    atomic_npz(arrays_path, **arrays)
-    index = {
+    index: dict[str, object] = {
         "schema_version": "fixed_bank_a1_prediction_index_v1",
         "config_contract_hash": config_hash,
         "partition_hash": partition_hash,
@@ -114,7 +107,29 @@ def write_prediction_store(
         "case_ids_by_center": {key: list(value) for key, value in cases.items()},
         "cells": index_rows,
     }
-    atomic_json(index_path, index)
+
+    final_paths = (arrays_path, index_path, seal_path)
+    _validate_final_member_paths(root, final_paths)
+    existing = tuple(path.exists() for path in final_paths)
+    # These are the only ordered crash boundaries.  An existing predecessor is
+    # immutable: validate it against the reconstructed expectation and reuse
+    # its bytes.  A seal without both predecessors is never repairable.
+    if existing not in {
+        (False, False, False),
+        (True, False, False),
+        (True, True, False),
+    }:
+        raise ProtocolError("Fixed-bank A1 final prediction trio is unsafe or sealed.")
+
+    if existing[0]:
+        _validate_existing_arrays(arrays_path, cells=cells, arrays=arrays)
+    else:
+        atomic_npz(arrays_path, **arrays)
+    if existing[1]:
+        _validate_existing_index(index_path, expected=index)
+    else:
+        atomic_json(index_path, index)
+
     seal = {
         "schema_version": "fixed_bank_a1_prediction_seal_v1",
         "status": "SEALED_ALL_810_LABEL_FREE_FIXED_BANK_A1_CELLS",
@@ -139,6 +154,59 @@ def write_prediction_store(
         seal_path,
         {**seal, "global_prediction_seal_hash": stable_hash(seal)},
     )
+
+
+def _validate_final_member_paths(root: Path, paths: Sequence[Path]) -> None:
+    directories = (root, *(path.parent for path in paths))
+    if any(path.is_symlink() for path in (*directories, *paths)):
+        raise ProtocolError("Fixed-bank A1 final prediction trio contains a symlink.")
+    if any(path.exists() and not path.is_dir() for path in directories):
+        raise ProtocolError("Fixed-bank A1 final prediction directory is unsafe.")
+    if any(path.exists() and not path.is_file() for path in paths):
+        raise ProtocolError("Fixed-bank A1 final prediction member is not a file.")
+
+
+def _validate_existing_arrays(
+    path: Path,
+    *,
+    cells: Sequence[PredictionCell],
+    arrays: Mapping[str, np.ndarray],
+) -> None:
+    expected_members = tuple(arrays)
+    try:
+        with np.load(path, allow_pickle=False) as archive:
+            if tuple(archive.files) != expected_members:
+                raise ProtocolError(
+                    "Existing fixed-bank A1 prediction array members drifted; "
+                    "refusing repair."
+                )
+            for member, cell in zip(expected_members, cells, strict=True):
+                observed = np.asarray(archive[member])
+                expected = arrays[member]
+                if (
+                    observed.dtype != expected.dtype
+                    or observed.shape != expected.shape
+                    or sha256_array(observed) != cell.probability_sha256
+                ):
+                    raise ProtocolError(
+                        "Existing fixed-bank A1 prediction array cell drifted; "
+                        "refusing repair."
+                    )
+    except ProtocolError:
+        raise
+    except Exception as exc:
+        raise ProtocolError(
+            "Existing fixed-bank A1 prediction array is unreadable; refusing repair."
+        ) from exc
+
+
+def _validate_existing_index(
+    path: Path, *, expected: Mapping[str, object]
+) -> None:
+    if read_json(path) != dict(expected):
+        raise ProtocolError(
+            "Existing fixed-bank A1 prediction index drifted; refusing repair."
+        )
 
 
 def load_global_prediction_seal(

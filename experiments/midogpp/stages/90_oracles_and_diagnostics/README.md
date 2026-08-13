@@ -857,3 +857,51 @@ Regardless of that result, the artifact remains
 `EXPLORATORY_CONSUMED_DATA_ONLY` and `TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`;
 it cannot establish fresh routing or deployment evidence or feed another
 experiment.
+
+## Uniform-B v2 consumed-test fixed-bank support-static router S4 v1
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_support_static_router_s4.v1`
+is a quarantined support-size sensitivity diagnostic over the already-consumed
+MIDOG++ test split. It recomputes from exactly six ordered inputs: the promoted
+bank, GenerationLock, dedicated cache and manifest aliases, a byte-exact alias
+of the immutable original consumption ledger, and this run's direct amendment.
+No earlier Stage-90 output, amendment, prediction, scratch, or checkpoint is an
+input.
+
+The fixed action surface is B, internal control U, and eight A1 source actions.
+Across five deterministic whole-case folds, the other four folds are support
+for S4 and the held fold is evaluation. S4 compares all eight A1 actions with B
+by exact pooled support BACC, selects the highest gain only when it is strictly
+positive, uses a `1e-12` tolerance plus numeric-source tie break, and otherwise
+returns exactly B. A support aggregate lacking either class also returns B.
+For each candidate source `e`, `G_static` is the equal-center mean exact gain
+over query centers `q` outside `{H,e}`; it also requires a strictly positive
+best gain or falls back to B. There are no case features, donor fits,
+target-local calibration, thresholds, or learned hyperparameters. `O_static`
+and `O_case` exist only after terminal label open.
+
+B, U, and all A1 probabilities seal globally before labels open. Label access
+then follows per-`(H,f)` role capabilities: each S4 route and its 10,000-draw
+null plan seal before the evaluation capability for that same target/fold can
+open. The null holds B fixed and shifts complete A1 case contribution blocks
+using the predeclared SHA-256/counter-SplitMix64 nonzero cyclic-shift family;
+labels are never permuted.
+
+The workstation schedule uses one persistent spawned source worker per RTX
+A5000, then a CUDA-free pool of four CPU workers with three threads each.
+Float32 memmaps hold source and probability products, float64 is used for
+scientific reductions, and scratch is isolated at
+`/data/local/fixed_bank_support_static_router_s4_v1`. Two fresh-process replay
+validations are required.
+
+```bash
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_support_static_router_s4.v1
+```
+
+The registered run is unexecuted. Any future output remains
+`POST_HOC_CONSUMED_TEST_SENSITIVITY` and
+`TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`. Two-sided t8 intervals and null
+exceedance counts/fractions are descriptive only; there is no confirmatory
+p-value or pass/fail gate, and the result may not feed another experiment,
+numbered stage, action, policy, recipe, promotion, or deployment.

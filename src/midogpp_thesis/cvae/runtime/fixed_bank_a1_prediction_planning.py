@@ -35,6 +35,8 @@ def write_target_scratch(
     _plain_directory(directory)
     manifest_path = directory / "target_scratch.json"
     array_path = directory / "target_embeddings.npy"
+    if manifest_path.is_symlink() or array_path.is_symlink():
+        raise ProtocolError("Fixed-bank A1 target scratch member is a symlink.")
     if manifest_path.is_file() or array_path.is_file():
         if manifest_path.is_file() and not array_path.is_file():
             raise ProtocolError("Fixed-bank A1 target scratch is partial.")
@@ -49,10 +51,7 @@ def write_target_scratch(
     cursor = 0
     for target in CENTERS:
         target_rows = tuple(getattr(frame, "rows_by_center")[target])
-        identifiers = [
-            str(getattr(row, "evaluation_row_id", getattr(row, "sample_id")))
-            for row in target_rows
-        ]
+        identifiers = [_row_identity(row) for row in target_rows]
         cases = [str(getattr(row, "case_id")) for row in target_rows]
         offsets[target] = {
             "start": cursor,
@@ -71,7 +70,7 @@ def write_target_scratch(
         or not np.isfinite(embeddings).all()
     ):
         raise ProtocolError("Fixed-bank A1 target scratch geometry drifted.")
-    atomic_npy(array_path, embeddings)
+    _persist_or_validate_target_array(array_path, embeddings)
     for target in CENTERS:
         offset = offsets[target]
         offset["target_slice_sha256"] = sha256_array(
@@ -93,6 +92,32 @@ def write_target_scratch(
     payload = {**unhashed, "scratch_hash": stable_hash(unhashed)}
     atomic_json(manifest_path, payload)
     return payload
+
+
+def _persist_or_validate_target_array(path: Path, expected: np.ndarray) -> None:
+    """Preserve an exact array-only crash predecessor; reject any drift."""
+
+    if path.is_symlink():
+        raise ProtocolError("Fixed-bank A1 target scratch array is a symlink.")
+    if path.exists():
+        if not path.is_file():
+            raise ProtocolError("Fixed-bank A1 target scratch array is not a file.")
+        try:
+            observed = np.load(path, allow_pickle=False)
+        except (OSError, ValueError) as exc:
+            raise ProtocolError(
+                "Existing fixed-bank A1 target scratch array is unreadable; refusing repair."
+            ) from exc
+        if (
+            observed.dtype != expected.dtype
+            or observed.shape != expected.shape
+            or sha256_array(observed) != sha256_array(expected)
+        ):
+            raise ProtocolError(
+                "Existing fixed-bank A1 target scratch array differs; refusing repair."
+            )
+        return
+    atomic_npy(path, expected)
 
 
 def validate_target_scratch(
@@ -187,6 +212,15 @@ def _plain_directory(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
     if not path.is_dir() or path.is_symlink():
         raise ProtocolError(f"Fixed-bank A1 scratch directory is unsafe: {path}.")
+
+
+def _row_identity(row: object) -> str:
+    value = getattr(row, "evaluation_row_id", None)
+    if value is None:
+        value = getattr(row, "sample_id", None)
+    if value is None or not str(value):
+        raise ProtocolError("Fixed-bank A1 target row identity is absent.")
+    return str(value)
 
 
 __all__ = (

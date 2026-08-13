@@ -1064,3 +1064,45 @@ runnable but remains **unrun**. Reusing all 218 test cases is explicitly
 terminal descriptive analysis: regardless of its numerical outcome, it cannot
 select an action geometry or recipe, authorize routing or promotion, update a
 model or expert, or feed another experiment.
+
+## Fixed-bank four-fold support-static S4 sensitivity implementation
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_support_static_router_s4.v1`
+is registered and runnable but remains unexecuted. It is explicitly
+`POST_HOC_CONSUMED_TEST_SENSITIVITY` with terminal status
+`TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`.
+
+The six-input fence contains only the promoted expert bank, GenerationLock,
+dedicated cache and manifest aliases, a byte-exact alias of the immutable
+original test-consumption ledger, and this experiment's direct amendment. It
+does not consume a prior Stage-90 output, amendment, prediction surface,
+scratch, checkpoint, or numbered-stage result.
+
+The diagnostic recomputes B, internal-control U, and eight A1 source actions as
+810 exact-nine probability cells. Five deterministic whole-case folds give S4
+the other four folds as support. It chooses an A1 action only for a strictly
+positive exact pooled-BACC gain over B, with a `1e-12` tolerance and numeric
+source tie break; otherwise, or whenever support lacks either class, it returns
+B. For each candidate `e`, `G_static` is the equal-center mean exact gain over
+donor query centers `q` outside `{H,e}` and falls back to B unless the best gain
+is strictly positive. No case feature, donor model, target-local calibration,
+threshold search, or hyperparameter search is part of the method.
+
+Probability products seal globally before labels. Every target/fold S4 route
+and its 10,000-draw fixed null plan then seal before that same target/fold's
+evaluation-label capability opens. The null shifts complete A1 case
+sufficient-statistic blocks, holds B fixed, and never permutes labels. Terminal
+`O_static` and `O_case` are bounds only.
+
+The registered config contract hash is `d0830988c454be0d`; the direct amendment
+SHA-256 is
+`b1a97bd2c64f48075c07e9ba29fc5fd9c1679c16bdf51b4d7c78dcd9509aa11f`.
+The canonical workstation uses two A5000 source workers, then a CUDA-free
+`4 x 3` CPU pool, float32 storage, float64 reductions, isolated scratch at
+`/data/local/fixed_bank_support_static_router_s4_v1`, and two fresh-process
+replay validations.
+
+Only descriptive two-sided t8 intervals and null exceedance counts/fractions
+are allowed. There is no confirmatory p-value or success gate, and no result may
+feed routing, action selection, a policy, a model/expert update, promotion,
+deployment, another Stage-90 diagnostic, or any numbered stage.

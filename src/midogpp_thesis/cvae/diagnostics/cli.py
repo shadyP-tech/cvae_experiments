@@ -256,6 +256,16 @@ def build_parser() -> argparse.ArgumentParser:
     multi_challenger_hierarchical_flip_router.add_argument(
         "--artifact-root", required=True
     )
+
+    support_static_router = sub.add_parser(
+        "fixed-bank-support-static-router",
+        help=(
+            "Run the terminal consumed-test fixed-bank support-static S4 "
+            "sensitivity diagnostic."
+        ),
+    )
+    support_static_router.add_argument("--config", required=True)
+    support_static_router.add_argument("--artifact-root", required=True)
     return parser
 
 
@@ -612,6 +622,20 @@ def main(argv: list[str] | None = None) -> int:
             args.config
         )
         output = run_fixed_bank_multi_challenger_hierarchical_flip_router(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "fixed-bank-support-static-router":
+        from .fixed_bank_support_static_router import (
+            load_fixed_bank_support_static_router_config,
+            run_fixed_bank_support_static_router,
+        )
+
+        config = load_fixed_bank_support_static_router_config(args.config)
+        output = run_fixed_bank_support_static_router(
             config,
             artifact_root=artifact_root,
         )

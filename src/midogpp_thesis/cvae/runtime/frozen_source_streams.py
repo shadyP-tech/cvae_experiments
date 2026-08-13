@@ -131,8 +131,15 @@ def materialize_frozen_source_streams(
     if any(path.is_symlink() for path in (array_path, index_path, lock_path)):
         raise ProtocolError("Frozen source final trio contains a symlink.")
     if all(present):
-        return load_frozen_source_streams(root, expected_config_hash=config.contract_hash,
-                                          expected_generation_lock_hash=generation_lock.generation_lock_hash)
+        cache = load_frozen_source_streams(
+            root,
+            expected_config_hash=config.contract_hash,
+            expected_generation_lock_hash=generation_lock.generation_lock_hash,
+        )
+        _cleanup_completed_checkpoint_remnants(
+            config, generation_lock, root=root, cache=cache
+        )
+        return cache
     if present not in {
         (False, False, False),
         (True, False, False),
@@ -160,7 +167,10 @@ def materialize_frozen_source_streams(
         if verified.get("checkpoint_hash") != payload.get("checkpoint_hash"):
             raise ProtocolError("Frozen source checkpoint return drifted.")
         completed[key] = verified
-        print(f"[label-aware-oof] source jobs {len(completed)}/{len(tasks)}", flush=True)
+        print(
+            f"[fixed-bank:source-streams] source jobs {len(completed)}/{len(tasks)}",
+            flush=True,
+        )
     if len(completed) != EXPECTED_TASK_COUNT:
         raise ProtocolError("Frozen source checkpoint coverage is incomplete.")
 
@@ -175,7 +185,7 @@ def materialize_frozen_source_streams(
         "target_embeddings_consumed": False,
     }
     index = {**index_unhashed, "source_stream_index_hash": stable_hash(index_unhashed)}
-    atomic_json(index_path, index)
+    _persist_or_validate_json(index_path, index)
     lock_unhashed = {
         "schema_version": "midogpp_frozen_source_stream_lock_v1",
         "status": "COMPLETE_LABEL_FREE_FROZEN_SOURCE_STREAMS",
@@ -194,7 +204,7 @@ def materialize_frozen_source_streams(
         "float32_store": True,
     }
     lock = {**lock_unhashed, "source_stream_lock_hash": stable_hash(lock_unhashed)}
-    atomic_json(lock_path, lock)
+    _persist_or_validate_json(lock_path, lock)
     cache = load_frozen_source_streams(
         root,
         expected_config_hash=config.contract_hash,
@@ -268,24 +278,29 @@ def stage_frozen_source_streams(
         raise ProtocolError("Frozen source staging destination is a symlink.")
     destination.mkdir(parents=True, exist_ok=True)
     members = (SOURCE_ARRAY_MEMBER, SOURCE_INDEX_MEMBER, SOURCE_LOCK_MEMBER)
-    if all((destination / member).is_file() for member in members):
-        try:
-            staged = load_frozen_source_streams(
-                destination,
-                expected_config_hash=str(cache.lock_payload["config_contract_hash"]),
-                expected_generation_lock_hash=str(cache.lock_payload["generation_lock_hash"]),
-            )
-            if dict(staged.lock_payload) == dict(cache.lock_payload):
-                return staged
-        except ProtocolError:
-            pass
+    _assert_plain_parent_chain(destination, destination)
+    for member in members:
+        _assert_plain_parent_chain(destination, (destination / member).parent)
     expected = {
         SOURCE_ARRAY_MEMBER: str(cache.lock_payload["source_array_sha256"]),
         SOURCE_INDEX_MEMBER: str(cache.lock_payload["source_stream_index_sha256"]),
         SOURCE_LOCK_MEMBER: sha256_file(canonical / SOURCE_LOCK_MEMBER),
     }
     for member in members:
-        atomic_copy(canonical / member, destination / member, expected_sha256=expected[member])
+        path = destination / member
+        if path.is_symlink():
+            raise ProtocolError("Frozen source staging member is a symlink.")
+        if path.exists():
+            if not path.is_file() or sha256_file(path) != expected[member]:
+                raise ProtocolError(
+                    "Existing staged frozen source member differs; refusing repair."
+                )
+            continue
+        atomic_copy(
+            canonical / member,
+            path,
+            expected_sha256=expected[member],
+        )
     staged = load_frozen_source_streams(
         destination,
         expected_config_hash=str(cache.lock_payload["config_contract_hash"]),
@@ -294,6 +309,23 @@ def stage_frozen_source_streams(
     if dict(staged.lock_payload) != dict(cache.lock_payload):
         raise ProtocolError("Staged frozen source lock differs from canonical.")
     return staged
+
+
+def _assert_plain_parent_chain(root: Path, parent: Path) -> None:
+    """Reject symlinked/non-directory parents within an owned staging root."""
+
+    base = Path(root)
+    current = Path(parent)
+    try:
+        current.relative_to(base)
+    except ValueError as exc:
+        raise ProtocolError("Frozen source staging parent escapes its root.") from exc
+    while True:
+        if current.exists() and (current.is_symlink() or not current.is_dir()):
+            raise ProtocolError("Frozen source staging parent is unsafe.")
+        if current == base:
+            break
+        current = current.parent
 
 
 def _assert_runtime(runtime: Mapping[str, object]) -> None:
@@ -367,6 +399,121 @@ def _cleanup_final_atomic_temps(root: Path) -> None:
                 if candidate.is_symlink() or not candidate.is_file():
                     raise ProtocolError("Frozen source final atomic temp is unsafe.")
                 candidate.unlink()
+
+
+def _cleanup_completed_checkpoint_remnants(
+    config: FrozenSourceConfig,
+    generation_lock: GenerationLock,
+    *,
+    root: Path,
+    cache: FrozenSourceStreamCache,
+) -> None:
+    """Validate and remove only source checkpoints left after final publication.
+
+    A crash between publishing the final trio and deleting task checkpoints may
+    leave all 27 pairs, a validated subset from a partial ``rmtree``, or an
+    array-only worker remnant.  Every remaining byte is rebound to the final
+    cache before this exact package-owned directory is removed.
+    """
+
+    checkpoint_root = root / CHECKPOINT_DIRECTORY
+    _validate_checkpoint_tree(checkpoint_root)
+    if not checkpoint_root.exists():
+        return
+    tasks = _build_tasks(config, generation_lock, checkpoint_root)
+    expected_members = {
+        Path(str(task["checkpoint_path"])).name: task for task in tasks
+    } | {
+        Path(str(task["array_path"])).name: task for task in tasks
+    }
+    observed = tuple(checkpoint_root.iterdir())
+    if any(path.name not in expected_members for path in observed):
+        raise ProtocolError("Frozen source checkpoint remnant is not package-owned.")
+    for task in tasks:
+        json_path = Path(str(task["checkpoint_path"]))
+        array_path = Path(str(task["array_path"]))
+        if json_path.exists():
+            if not array_path.is_file():
+                raise ProtocolError("Frozen source checkpoint JSON lacks its array.")
+            payload = _load_checkpoint(json_path, task=task)
+            _assert_checkpoint_matches_final_cache(payload, task=task, cache=cache)
+        elif array_path.exists():
+            _assert_checkpoint_array_matches_final_cache(
+                array_path, task=task, cache=cache
+            )
+    # Revalidate immediately before deletion so a partial or unsafe tree cannot
+    # be normalized into an apparently clean completed cache.
+    _validate_checkpoint_tree(checkpoint_root)
+    shutil.rmtree(checkpoint_root)
+
+
+def _assert_checkpoint_matches_final_cache(
+    payload: Mapping[str, object],
+    *,
+    task: Mapping[str, object],
+    cache: FrozenSourceStreamCache,
+) -> None:
+    records = payload.get("records")
+    if not isinstance(records, list):
+        raise ProtocolError("Frozen source checkpoint records are absent.")
+    for raw, key in zip(records, task["generation_keys"], strict=True):
+        final = cache.by_key[(
+            str(task["source_center"]),
+            int(task["training_seed"]),
+            int(key.generation_seed),
+        )]
+        if (
+            not isinstance(raw, Mapping)
+            or raw.get("stream_id") != final.stream_id
+            or raw.get("expert_lock_hash") != final.expert_lock_hash
+            or raw.get("output_sha256") != final.output_sha256
+        ):
+            raise ProtocolError(
+                "Frozen source checkpoint remnant differs from the final cache."
+            )
+
+
+def _assert_checkpoint_array_matches_final_cache(
+    path: Path,
+    *,
+    task: Mapping[str, object],
+    cache: FrozenSourceStreamCache,
+) -> None:
+    try:
+        values = np.load(path, mmap_mode="r", allow_pickle=False)
+    except (OSError, ValueError) as exc:
+        raise ProtocolError("Frozen source checkpoint array is unreadable.") from exc
+    expected_shape = (
+        len(GENERATION_SEEDS),
+        2 * SOURCE_ROWS_PER_CLASS,
+        COMMON_OUTPUT_DIM,
+    )
+    if values.shape != expected_shape or values.dtype != np.float32:
+        raise ProtocolError("Frozen source checkpoint array geometry drifted.")
+    for ordinal, key in enumerate(task["generation_keys"]):
+        final = cache.by_key[(
+            str(task["source_center"]),
+            int(task["training_seed"]),
+            int(key.generation_seed),
+        )]
+        if _array_bundle_sha256(values[ordinal]) != final.output_sha256:
+            raise ProtocolError(
+                "Frozen source checkpoint array differs from the final cache."
+            )
+
+
+def _persist_or_validate_json(path: Path, payload: Mapping[str, object]) -> None:
+    """Publish one ordered final JSON member without rewriting existing bytes."""
+
+    if path.is_symlink():
+        raise ProtocolError("Frozen source final JSON member is a symlink.")
+    if path.exists():
+        if not path.is_file() or read_json(path) != dict(payload):
+            raise ProtocolError(
+                "Existing frozen source final JSON differs; refusing repair."
+            )
+        return
+    atomic_json(path, payload)
 
 
 def _build_tasks(
@@ -447,10 +594,7 @@ def _generate_task(task: Mapping[str, object]) -> dict[str, object]:
         values = np.ascontiguousarray(np.stack([block.embeddings for block in blocks]), dtype=np.float32)
         array_path = Path(str(task["array_path"]))
         array_path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = array_path.with_suffix(array_path.suffix + f".{os.getpid()}.tmp")
-        with temporary.open("wb") as handle:
-            np.save(handle, values, allow_pickle=False)
-        os.replace(temporary, array_path)
+        _persist_or_validate_checkpoint_array(array_path, values)
         records = [
             {
                 "generation_seed": block.key.generation_seed,
@@ -480,7 +624,7 @@ def _generate_task(task: Mapping[str, object]) -> dict[str, object]:
             "float32_outputs": True,
         }
         payload = {**unhashed, "checkpoint_hash": stable_hash(unhashed)}
-        atomic_json(Path(str(task["checkpoint_path"])), payload)
+        _persist_or_validate_json(Path(str(task["checkpoint_path"])), payload)
         return payload
     finally:
         del expert
@@ -492,6 +636,48 @@ def _generate_task(task: Mapping[str, object]) -> dict[str, object]:
                 torch.cuda.empty_cache()
         except (ImportError, RuntimeError):
             pass
+
+
+def _persist_or_validate_checkpoint_array(
+    path: Path, expected: np.ndarray
+) -> None:
+    """Preserve an exact array-only task crash predecessor; reject drift.
+
+    Source generation is deterministic under the frozen generation key.  A
+    worker interrupted after publishing its NPY but before its JSON checkpoint
+    therefore recomputes the expected values, validates the existing NPY
+    semantically, and publishes only the missing successor.  Existing bytes are
+    never rewritten.
+    """
+
+    if path.is_symlink():
+        raise ProtocolError("Frozen source checkpoint array is a symlink.")
+    if path.exists():
+        if not path.is_file():
+            raise ProtocolError("Frozen source checkpoint array is not a file.")
+        try:
+            observed = np.load(path, allow_pickle=False)
+        except (OSError, ValueError) as exc:
+            raise ProtocolError(
+                "Existing frozen source checkpoint array is unreadable; refusing repair."
+            ) from exc
+        if (
+            observed.dtype != expected.dtype
+            or observed.shape != expected.shape
+            or sha256_array(observed) != sha256_array(expected)
+        ):
+            raise ProtocolError(
+                "Existing frozen source checkpoint array differs; refusing repair."
+            )
+        return
+    temporary = path.with_suffix(path.suffix + f".{os.getpid()}.tmp")
+    try:
+        with temporary.open("wb") as handle:
+            np.save(handle, expected, allow_pickle=False)
+        os.replace(temporary, path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
 
 
 def _load_checkpoint(path: Path, *, task: Mapping[str, object]) -> Mapping[str, object]:
@@ -546,35 +732,59 @@ def _materialize_array(
 ) -> tuple[FrozenSourceStreamRecord, ...]:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + f".{os.getpid()}.tmp")
-    values = np.lib.format.open_memmap(
-        temporary,
-        mode="w+",
-        dtype=np.float32,
-        shape=(EXPECTED_STREAM_COUNT, 2 * SOURCE_ROWS_PER_CLASS, COMMON_OUTPUT_DIM),
-    )
     records: list[FrozenSourceStreamRecord] = []
     cursor = 0
-    for task in tasks:
-        result = completed[_task_key(task)]
-        task_values = np.load(Path(str(result["array_path"])), mmap_mode="r", allow_pickle=False)
-        for seed_ordinal, raw in enumerate(result["records"]):
-            values[cursor] = task_values[seed_ordinal]
-            records.append(
-                FrozenSourceStreamRecord(
-                    block_ordinal=cursor,
-                    source_center=str(task["source_center"]),
-                    training_seed=int(task["training_seed"]),
-                    generation_seed=int(raw["generation_seed"]),
-                    stream_id=str(raw["stream_id"]),
-                    expert_lock_hash=str(raw["expert_lock_hash"]),
-                    rows_per_class=SOURCE_ROWS_PER_CLASS,
-                    output_sha256=str(raw["output_sha256"]),
-                )
+    try:
+        values = np.lib.format.open_memmap(
+            temporary,
+            mode="w+",
+            dtype=np.float32,
+            shape=(
+                EXPECTED_STREAM_COUNT,
+                2 * SOURCE_ROWS_PER_CLASS,
+                COMMON_OUTPUT_DIM,
+            ),
+        )
+        for task in tasks:
+            result = completed[_task_key(task)]
+            task_values = np.load(
+                Path(str(result["array_path"])),
+                mmap_mode="r",
+                allow_pickle=False,
             )
-            cursor += 1
-    values.flush()
-    del values
-    os.replace(temporary, path)
+            for seed_ordinal, raw in enumerate(result["records"]):
+                values[cursor] = task_values[seed_ordinal]
+                records.append(
+                    FrozenSourceStreamRecord(
+                        block_ordinal=cursor,
+                        source_center=str(task["source_center"]),
+                        training_seed=int(task["training_seed"]),
+                        generation_seed=int(raw["generation_seed"]),
+                        stream_id=str(raw["stream_id"]),
+                        expert_lock_hash=str(raw["expert_lock_hash"]),
+                        rows_per_class=SOURCE_ROWS_PER_CLASS,
+                        output_sha256=str(raw["output_sha256"]),
+                    )
+                )
+                cursor += 1
+        values.flush()
+        del values
+        if path.exists():
+            if (
+                path.is_symlink()
+                or not path.is_file()
+                or path.stat().st_size != temporary.stat().st_size
+                or sha256_file(path) != sha256_file(temporary)
+            ):
+                raise ProtocolError(
+                    "Existing frozen source final array differs; refusing repair."
+                )
+            temporary.unlink()
+        else:
+            os.replace(temporary, path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
     if cursor != EXPECTED_STREAM_COUNT:
         raise ProtocolError("Frozen source stream materialization coverage drifted.")
     return tuple(records)

@@ -75,6 +75,10 @@ does not make an unrun experiment claim-eligible.
   implemented terminal diagnostic that separates fixed-bank action headroom,
   case complementarity, donor-model recoverability, and same-target support
   rank stability across two frozen budget-controlled action geometries.
+- `wiki/03-experiments/midogpp-uniform-b-v2-consumed-test-fixed-bank-support-static-router-s4.md`:
+  registered four-fold support-static S4 consumed-test sensitivity with
+  route-scoped label capabilities, strict B fallback, descriptive t8 intervals,
+  and a fixed action-identity null; it cannot feed or authorize later work.
 - `wiki/03-experiments/midogpp-uniform-b-variant-diagnostics.md`: two
   completed workstation-only Variant-B Stage-90 diagnostics, their remote
   namespaces and artifact roots, negative tail-average stability result,

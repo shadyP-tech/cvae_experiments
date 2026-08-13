@@ -73,7 +73,7 @@ def execute_or_resume_prediction_tasks(
                     )
                 completed[str(task["task_id"])] = loaded
                 print(
-                    f"[flip-router:predictions] tasks {len(completed)}/{len(tasks)}",
+                    f"[fixed-bank:predictions] tasks {len(completed)}/{len(tasks)}",
                     flush=True,
                 )
     if len(completed) != len(tasks):
@@ -162,7 +162,7 @@ def execute_prediction_task(task: Mapping[str, object]) -> None:
     json_path = Path(str(task["checkpoint_json_path"]))
     if npz_path.is_symlink() or json_path.is_symlink():
         raise ProtocolError("Fixed-bank A1 checkpoint path is a symlink.")
-    atomic_npz(npz_path, probabilities=matrix)
+    _persist_or_validate_checkpoint_array(npz_path, matrix)
     checkpoint = {
         "schema_version": "fixed_bank_a1_prediction_checkpoint_v1",
         "task_id": task["task_id"],
@@ -178,10 +178,47 @@ def execute_prediction_task(task: Mapping[str, object]) -> None:
         "labels_available": False,
         "target_expert_available": False,
     }
-    atomic_json(
-        json_path,
-        {**checkpoint, "checkpoint_hash": stable_hash(checkpoint)},
-    )
+    expected_json = {**checkpoint, "checkpoint_hash": stable_hash(checkpoint)}
+    if json_path.exists():
+        if not json_path.is_file() or read_json(json_path) != expected_json:
+            raise ProtocolError(
+                "Existing fixed-bank A1 checkpoint JSON differs; refusing repair."
+            )
+    else:
+        atomic_json(json_path, expected_json)
+
+
+def _persist_or_validate_checkpoint_array(path: Path, matrix: np.ndarray) -> None:
+    """Reuse an exact NPZ-only crash predecessor; never overwrite its bytes."""
+
+    if path.is_symlink():
+        raise ProtocolError("Fixed-bank A1 checkpoint array is a symlink.")
+    if path.exists():
+        if not path.is_file():
+            raise ProtocolError("Fixed-bank A1 checkpoint array is not a file.")
+        try:
+            with np.load(path, allow_pickle=False) as archive:
+                if tuple(archive.files) != ("probabilities",):
+                    raise ProtocolError(
+                        "Existing fixed-bank A1 checkpoint array members drifted; refusing repair."
+                    )
+                observed = np.asarray(archive["probabilities"])
+        except ProtocolError:
+            raise
+        except (OSError, ValueError) as exc:
+            raise ProtocolError(
+                "Existing fixed-bank A1 checkpoint array is unreadable; refusing repair."
+            ) from exc
+        if (
+            observed.dtype != matrix.dtype
+            or observed.shape != matrix.shape
+            or sha256_array(observed) != sha256_array(matrix)
+        ):
+            raise ProtocolError(
+                "Existing fixed-bank A1 checkpoint array differs; refusing repair."
+            )
+        return
+    atomic_npz(path, probabilities=matrix)
 
 
 def _initialize_prediction_worker(threads: int) -> None:
@@ -215,7 +252,9 @@ def load_prediction_checkpoint(
         return None
     if not json_path.is_file() and npz_path.is_file():
         # Exact crash boundary: the array is written before its hash-bearing
-        # JSON.  The worker deterministically overwrites it from the task.
+        # JSON.  The worker deterministically recomputes and semantically
+        # validates the array, preserving exact existing bytes, before it may
+        # publish the missing JSON successor.
         return None
     if json_path.is_file() and not npz_path.is_file():
         raise ProtocolError("Fixed-bank A1 checkpoint is partial.")

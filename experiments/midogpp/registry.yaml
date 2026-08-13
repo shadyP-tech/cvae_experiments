@@ -2330,3 +2330,48 @@ experiments:
       - R_multi is primary. It switches from the anchor only when its expected-gain margin over the runner-up has a positive 1.96 LCB using epistemic plus calibration uncertainty and no residual outcome variance. F_single, G_multi, P_multi, B, U, and S_static are controls; O_menu, O_binary over B and S_static, O_static, and O_case are terminal oracles only.
       - The workstation schedule uses two persistent spawned A5000 source workers, then a disjoint CUDA-free CPU phase with four model workers and four bootstrap workers at three threads each, float32 storage, float64 reductions, hash-valid checkpoints, two fresh-process validation passes, and /data/local/fixed_bank_multi_challenger_hierarchical_flip_router_v1 scratch.
       - Regardless of outcome, this diagnostic cannot authorize routing success, an action, policy, model or expert update, promotion, deployment, recipe selection, a numbered-stage feed, another Stage-90 diagnostic, another experiment, or a generic consumer.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_support_static_router_s4.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_support_static_router_s4_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_support_static_router_s4_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_fixed_bank_support_static_router_s4_test_cache_v1
+      - midogpp_stage90_fixed_bank_support_static_router_s4_test_manifest_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_support_static_router_s4_parent_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_support_static_router_s4_amendment_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Reuse of immutable A1 generation geometry, exact-nine seed pairing, budgets, and classifier settings only; no routing, action, policy, promotion, or deployment authority is inherited.
+      midogpp_stage90_fixed_bank_support_static_router_s4_test_manifest_v1: Experiment-fenced label capabilities open support and evaluation labels only for their declared target/fold roles; each route and null plan seals before its own evaluation capability opens.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_support_static_router_s4_parent_v1: Byte-exact experiment-fenced alias of the immutable original ledger, read only to verify the direct parent hash.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_support_static_router_s4_amendment_v1: Direct single-consumer authorization for this terminal post-hoc consumed-test sensitivity diagnostic; it creates no fresh evidence.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-support-static-router
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_support_static_router_s4_v1
+    notes:
+      - Explicitly authorized reuse of the already-consumed MIDOG++ test split for one terminal fixed-bank support-static S4 sensitivity diagnostic; it is POST_HOC_CONSUMED_TEST_SENSITIVITY and never fresh routing, action, policy, or promotion evidence.
+      - The exact six ordered inputs are the promoted bank, GenerationLock, dedicated single-consumer cache and manifest aliases, a byte-exact immutable-original-ledger alias, and this diagnostic's direct amendment. No earlier Stage-90 output, amendment, prediction surface, scratch, checkpoint, or numbered-stage result is consumed.
+      - B, internal-control U, and eight frozen A1 source actions are recomputed as 810 exact-nine seed cells and globally sealed before labels open. Five whole-case folds use the other four folds as support and the held fold only for evaluation; each target/fold S4 and null decision seals before its own evaluation-label capability opens.
+      - S4 chooses the highest A1 pooled support exact-BACC gain strictly above B, with a 1e-12 tie tolerance and numeric-source tie break; absent a positive gain or either support class it falls back exactly to B. G_static uses only other centers and never same-target support labels. There are no case features, donor models, target-local calibration, threshold search, or hyperparameter search.
+      - The workstation schedule uses one persistent spawned source worker per RTX A5000, followed by a disjoint CUDA-free CPU phase with four workers and three threads each, float32 memmaps, float64 reductions, hash-valid checkpoints, two fresh-process validation passes, and /data/local/fixed_bank_support_static_router_s4_v1 scratch.
+      - Two-sided t8 intervals and fixed-null exceedance counts/fractions are descriptive only; no confirmatory p-value, success gate, route, action, model/expert update, policy, promotion, deployment, recipe selection, numbered-stage feed, another Stage-90 diagnostic, another experiment, or generic consumer can be authorized.
