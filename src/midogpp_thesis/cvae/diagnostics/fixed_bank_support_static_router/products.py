@@ -277,7 +277,24 @@ class ActionGain:
             raise ProtocolError("Action gain is not candidate pooled BACC minus B.")
 
     def to_payload(self) -> dict[str, object]:
-        return dict(self.__dict__)
+        # This payload is embedded in selection and decision seals and is
+        # compared directly with a JSON reload during independent replay.
+        # Emit JSON-native arrays here: ``json.dump`` serializes tuples as
+        # arrays, but a subsequent ``json.load`` returns lists, so exposing
+        # the internal tuples made byte-correct persisted seals compare
+        # unequal to their otherwise identical reconstruction.
+        return {
+            "action_id": self.action_id,
+            "selected_source": self.selected_source,
+            "action_score": self.action_score,
+            "baseline_score": self.baseline_score,
+            "gain": self.gain,
+            "score_type": self.score_type,
+            "label_scope": self.label_scope,
+            "donor_centers": list(self.donor_centers),
+            "label_case_keys": [list(value) for value in self.label_case_keys],
+            "contribution_hash": self.contribution_hash,
+        }
 
 
 @dataclass(frozen=True)

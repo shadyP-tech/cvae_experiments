@@ -9,7 +9,35 @@ from pathlib import Path
 from typing import Mapping
 
 from ...protocol import ProtocolError
+from ...runtime.artifact_io import read_json
 from .persistence import write_run_state
+
+
+def recover_if_possible(
+    root: Path, *, config: object, protocol: object
+) -> Path | None:
+    """Dispatch only the exact validator-only finalization recovery."""
+
+    from .recovery import recover_exact_finalization, recovery_capability
+
+    capability = recovery_capability(root)
+    if capability is not None:
+        return recover_exact_finalization(
+            root,
+            config=config,
+            protocol=protocol,
+            capability=capability,
+        )
+    state_path = root / "reports/run_state.json"
+    if state_path.exists():
+        if state_path.is_symlink() or not state_path.is_file():
+            raise ProtocolError("S4 existing run state is unsafe.")
+        state = read_json(state_path)
+        if state.get("status") in {"FAILED", "RUNNING"}:
+            raise ProtocolError(
+                "S4 existing partial run is not an exact recovery boundary."
+            )
+    return None
 
 
 def assert_launch_files(root: Path, config: object) -> None:
@@ -90,5 +118,6 @@ __all__ = (
     "assert_workspace_resolved_paths",
     "exclusive_run_lock",
     "observe",
+    "recover_if_possible",
     "write_state",
 )

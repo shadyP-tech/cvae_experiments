@@ -29,6 +29,9 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_support_static_router.protocol i
 )
 from midogpp_thesis.cvae.protocol import ProtocolError
 from midogpp_thesis.workspace.runtime import MidogppWorkspace
+from midogpp_thesis.workspace.recovery import (
+    EXACT_EXISTING_SNAPSHOT_FIXED_BANK_SUPPORT_STATIC_ROUTER_S4_V1,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -214,10 +217,34 @@ def test_registry_catalog_aliases_output_and_closed_world_are_fenced() -> None:
     assert experiment.status == "diagnostic"
     assert experiment.claim_scope == "diagnostic_only"
     assert experiment.input_artifact_ids == contracts.INPUT_ARTIFACT_IDS
-    assert experiment.runner_argv[3:5] == (
+    assert experiment.run_recovery_strategy == (
+        EXACT_EXISTING_SNAPSHOT_FIXED_BANK_SUPPORT_STATIC_ROUTER_S4_V1
+    )
+    assert experiment.config_path == (
+        "experiments/midogpp/stages/90_oracles_and_diagnostics/configs/"
+        "uniform_b_v2_consumed_test_fixed_bank_support_static_router_s4_v1.yaml"
+    )
+    assert experiment.runner_argv == (
+        "{python}",
+        "-m",
+        "midogpp_thesis",
         "cvae-diagnostics",
         "fixed-bank-support-static-router",
+        "--config",
+        "{resolved_config}",
+        "--artifact-root",
+        "output://midogpp_output_uniform_b_v2_consumed_test_"
+        "fixed_bank_support_static_router_s4_v1",
     )
+    assert experiment.runner_env == {
+        "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+        "CUDA_VISIBLE_DEVICES": "0,1",
+        "OMP_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "NUMEXPR_NUM_THREADS": "1",
+        "PYTHONUNBUFFERED": "1",
+    }
     for artifact_id in (
         contracts.TEST_CACHE_ARTIFACT_ID,
         contracts.TEST_MANIFEST_ARTIFACT_ID,

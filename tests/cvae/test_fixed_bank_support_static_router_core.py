@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+import json
 
 import pytest
 
@@ -20,6 +21,7 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_support_static_router.constants 
 from midogpp_thesis.cvae.diagnostics.fixed_bank_support_static_router.decisions import (
     _vectorized_null_route_selections,
     permute_support_candidate_blocks,
+    seal_global_static_selections,
     select_global_static_action,
     select_support_static_action,
 )
@@ -28,6 +30,9 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_support_static_router.hashing im
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_support_static_router.partitions import (
     CaseFold,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_support_static_router.persistence import (
+    persist_global_static,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_support_static_router.products import (
     BinaryLabelRow,
@@ -38,6 +43,7 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_support_static_router.scoring im
     pooled_bacc,
     score_case_action_counts,
 )
+from midogpp_thesis.cvae.runtime.artifact_io import read_json
 from midogpp_thesis.cvae.protocol import ProtocolError
 
 
@@ -140,19 +146,22 @@ def test_s4_falls_back_to_B_for_nonpositive_or_single_class_support() -> None:
     assert all(row.gain is None for row in single.action_gains)
 
 
-def _g_donors() -> OrderedDict[str, tuple[CaseActionCounts, ...]]:
+def _g_donors(
+    target: str = "0",
+) -> OrderedDict[str, tuple[CaseActionCounts, ...]]:
     result: OrderedDict[str, tuple[CaseActionCounts, ...]] = OrderedDict()
-    for source in candidate_sources("0"):
+    winning_source = candidate_sources(target)[0]
+    for source in candidate_sources(target):
         action = a1_action_id(source)
         rows: list[CaseActionCounts] = []
         for query in CENTERS:
-            if query in {"0", source}:
+            if query in {target, source}:
                 continue
             # Unequal query case counts make accidental row pooling observably different.
             for ordinal in range(1 if query == "1" else 2):
                 case = f"{query}-{ordinal}"
                 rows.append(CaseActionCounts(query, case, B_ACTION_ID, 10, 5, 10, 5))
-                correct = 8 if source == "1" else 4
+                correct = 8 if source == winning_source else 4
                 rows.append(CaseActionCounts(query, case, action, 10, correct, 10, correct))
         result[action] = tuple(rows)
     return result
@@ -171,6 +180,35 @@ def test_g_static_enforces_H_e_exclusion_and_equal_center_mean() -> None:
     )
     with pytest.raises(ProtocolError, match="q not in"):
         select_global_static_action("0", poisoned, prerequisite_seal_hash=SHA)
+
+
+def test_g_static_selection_payload_is_exact_after_json_round_trip(tmp_path) -> None:
+    """Persisted and independently reconstructed seal payloads compare exactly."""
+
+    selections = tuple(
+        select_global_static_action(
+            target, _g_donors(target), prerequisite_seal_hash=SHA
+        )
+        for target in CENTERS
+    )
+    seal = seal_global_static_selections(
+        selections, probability_seal_hash="a" * 16
+    )
+    payload = seal.to_payload()
+    assert json.loads(json.dumps(payload, allow_nan=False)) == payload
+    assert all(
+        canonical_hash(dict(gain.__dict__)) == canonical_hash(gain.to_payload())
+        for selection in selections
+        for gain in selection.action_gains
+    )
+    assert all(
+        isinstance(row["donor_centers"], list)
+        and all(isinstance(key, list) for key in row["label_case_keys"])
+        for selection in payload["selections"]
+        for row in selection["action_gains"]
+    )
+    persist_global_static(tmp_path, selections=selections, seal_payload=payload)
+    assert read_json(tmp_path / "manifests/global_static_selection_seal.json") == payload
 
 
 def test_vectorized_block_null_matches_scalar_selector_for_small_replay() -> None:

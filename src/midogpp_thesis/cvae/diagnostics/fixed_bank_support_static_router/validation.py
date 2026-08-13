@@ -27,6 +27,8 @@ from .reports import (
     protocol_manifest_payload,
     publication_decision_payload,
 )
+from .recovery import FAILED_FINALIZATION_STATE
+from .recovery_provenance import audit_for_validation
 from .validation_science import validate_scientific_surfaces
 from .workspace_inputs import (
     validate_active_diagnostic_workspace_binding,
@@ -89,6 +91,7 @@ def validate_fixed_bank_support_static_router_bundle(
     science = dict(
         validate_scientific_surfaces(path, config=config, frame=frame)
     )
+    finalization_audit = audit_for_validation(path)
     _validate_reports(
         path,
         science=science,
@@ -102,6 +105,7 @@ def validate_fixed_bank_support_static_router_bundle(
         "config_contract_hash": str(getattr(config, "contract_hash")),
         "protocol_contract_hash": protocol.contract_hash,
         "source_stream_lock_hash": source.lock_hash,
+        "finalization_recovery": dict(finalization_audit),
         "workspace_binding": workspace,
         "input_artifact_count": len(provenance),
         "pre_gpu_firewall_status": firewall["status"],
@@ -242,6 +246,8 @@ def _validate_fresh_process_report(
 
 def _validate_run_state(root: Path) -> None:
     payload = read_json(root / "reports/run_state.json")
+    if payload == FAILED_FINALIZATION_STATE:
+        return
     if (
         payload.get("schema_version")
         != "fixed_bank_support_static_router_run_state_v1"

@@ -20,10 +20,15 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_multi_challenger_hierarchical_fl
     RECOVERABLE_INVENTORY as MULTI_CHALLENGER_RECOVERABLE_INVENTORY,
     failed_finalization_schema_state,
 )
+from midogpp_thesis.cvae.diagnostics.fixed_bank_support_static_router.recovery import (
+    FAILED_FINALIZATION_STATE as S4_FAILED_FINALIZATION_STATE,
+    FINALIZATION_RECOVERABLE_INVENTORY as S4_FINALIZATION_RECOVERABLE_INVENTORY,
+)
 from midogpp_thesis.cvae.protocol import ProtocolError
 from midogpp_thesis.workspace import runtime as workspace_runtime
 from midogpp_thesis.workspace.recovery import (
     EXACT_EXISTING_SNAPSHOT_FIXED_BANK_MULTI_CHALLENGER_HIERARCHICAL_FLIP_ROUTER_V1,
+    EXACT_EXISTING_SNAPSHOT_FIXED_BANK_SUPPORT_STATIC_ROUTER_S4_V1,
     EXACT_EXISTING_SNAPSHOT_UTILITY_ALIGNED_CONSUMED_TEST_ENDPOINT_ROUTER_V1,
     RecoveryContractError,
     registered_recovery_state_status,
@@ -57,6 +62,18 @@ MULTI_CHALLENGER_OUTPUT_ID = (
     "midogpp_output_uniform_b_v2_consumed_test_fixed_bank_"
     "multi_challenger_hierarchical_flip_router_v1"
 )
+S4_EXPERIMENT_ID = (
+    "midogpp.oracle.uniform_b_v2_consumed_test_"
+    "fixed_bank_support_static_router_s4.v1"
+)
+S4_CONFIG_PATH = (
+    "experiments/midogpp/stages/90_oracles_and_diagnostics/configs/"
+    "uniform_b_v2_consumed_test_fixed_bank_support_static_router_s4_v1.yaml"
+)
+S4_OUTPUT_ID = (
+    "midogpp_output_uniform_b_v2_consumed_test_"
+    "fixed_bank_support_static_router_s4_v1"
+)
 REVISION_A = {
     "repository_revision": "a" * 40,
     "repository_dirty": True,
@@ -69,7 +86,7 @@ REVISION_B = {
 }
 
 
-def test_repository_registers_only_the_four_exact_recovery_entries() -> None:
+def test_repository_registers_only_the_five_exact_recovery_entries() -> None:
     workspace = MidogppWorkspace.load()
     registered = [
         experiment
@@ -101,6 +118,9 @@ def test_repository_registers_only_the_four_exact_recovery_entries() -> None:
             "multi_challenger_hierarchical_flip_router.v1"
         ): (
             EXACT_EXISTING_SNAPSHOT_FIXED_BANK_MULTI_CHALLENGER_HIERARCHICAL_FLIP_ROUTER_V1
+        ),
+        S4_EXPERIMENT_ID: (
+            EXACT_EXISTING_SNAPSHOT_FIXED_BANK_SUPPORT_STATIC_ROUTER_S4_V1
         ),
     }
 
@@ -290,6 +310,100 @@ def test_multi_challenger_exact_recovery_dispatches_revision_a_snapshot_under_la
     assert {
         key: preserved_manifest[key] for key in REVISION_A
     } == REVISION_A
+
+
+def test_s4_exact_recovery_dispatches_revision_a_snapshot_under_later_revision(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace, state, _inputs = _build_exact_workspace(
+        tmp_path,
+        monkeypatch,
+        experiment_id=S4_EXPERIMENT_ID,
+        config_path=S4_CONFIG_PATH,
+        output_id=S4_OUTPUT_ID,
+    )
+    prepared = workspace.prepare(S4_EXPERIMENT_ID)
+    _write_failed_inventory(
+        prepared.artifact_root,
+        inventory=S4_FINALIZATION_RECOVERABLE_INVENTORY,
+        failed_state=S4_FAILED_FINALIZATION_STATE,
+    )
+    config_before = prepared.resolved_config_path.read_bytes()
+    manifest_before = prepared.input_manifest_path.read_bytes()
+    state.update(REVISION_B)
+    calls: list[tuple[list[str], Path, dict[str, str]]] = []
+
+    def failed_runner(
+        argv: list[str],
+        *,
+        cwd: Path,
+        env: dict[str, str],
+        check: bool,
+    ) -> SimpleNamespace:
+        assert check is False
+        assert prepared.resolved_config_path.read_bytes() == config_before
+        assert prepared.input_manifest_path.read_bytes() == manifest_before
+        calls.append((argv, cwd, env))
+        return SimpleNamespace(returncode=29)
+
+    monkeypatch.setattr(workspace_runtime.subprocess, "run", failed_runner)
+
+    assert workspace.run(S4_EXPERIMENT_ID) == 29
+    assert len(calls) == 1
+    argv, cwd, env = calls[0]
+    assert tuple(argv) == prepared.argv
+    assert cwd == tmp_path
+    assert env["CUBLAS_WORKSPACE_CONFIG"] == ":4096:8"
+    assert env["CUDA_VISIBLE_DEVICES"] == "0,1"
+    assert prepared.resolved_config_path.read_bytes() == config_before
+    assert prepared.input_manifest_path.read_bytes() == manifest_before
+    preserved_manifest = json.loads(manifest_before)
+    assert {key: preserved_manifest[key] for key in REVISION_A} == REVISION_A
+
+
+@pytest.mark.parametrize(
+    ("run_kwargs", "message"),
+    (
+        ({"force": True}, "rejects --force"),
+        ({"extra_args": ("--unregistered",)}, "rejects extra runner arguments"),
+    ),
+)
+def test_s4_exact_recovery_rejects_workspace_boundary_widening_before_launch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    run_kwargs: Mapping[str, object],
+    message: str,
+) -> None:
+    workspace, state, _inputs = _build_exact_workspace(
+        tmp_path,
+        monkeypatch,
+        experiment_id=S4_EXPERIMENT_ID,
+        config_path=S4_CONFIG_PATH,
+        output_id=S4_OUTPUT_ID,
+    )
+    prepared = workspace.prepare(S4_EXPERIMENT_ID)
+    _write_failed_inventory(
+        prepared.artifact_root,
+        inventory=S4_FINALIZATION_RECOVERABLE_INVENTORY,
+        failed_state=S4_FAILED_FINALIZATION_STATE,
+    )
+    before = (
+        prepared.resolved_config_path.read_bytes(),
+        prepared.input_manifest_path.read_bytes(),
+    )
+    state.update(REVISION_B)
+
+    def forbidden_runner(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("runner must not execute")
+
+    monkeypatch.setattr(workspace_runtime.subprocess, "run", forbidden_runner)
+
+    with pytest.raises(WorkspaceError, match=message):
+        workspace.run(S4_EXPERIMENT_ID, **run_kwargs)  # type: ignore[arg-type]
+
+    assert prepared.resolved_config_path.read_bytes() == before[0]
+    assert prepared.input_manifest_path.read_bytes() == before[1]
 
 
 def test_exact_recovery_rejects_force_before_any_snapshot_write(
@@ -594,6 +708,21 @@ def test_registered_multi_challenger_status_uses_its_exact_schema(
 
     assert registered_recovery_state_status(
         EXACT_EXISTING_SNAPSHOT_FIXED_BANK_MULTI_CHALLENGER_HIERARCHICAL_FLIP_ROUTER_V1,
+        root,
+    ) == "FAILED"
+
+
+def test_registered_s4_status_uses_its_exact_schema(tmp_path: Path) -> None:
+    root = tmp_path / "support-static-router-root"
+    state_path = root / "reports/run_state.json"
+    state_path.parent.mkdir(parents=True)
+    state_path.write_text(
+        json.dumps(S4_FAILED_FINALIZATION_STATE, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    assert registered_recovery_state_status(
+        EXACT_EXISTING_SNAPSHOT_FIXED_BANK_SUPPORT_STATIC_ROUTER_S4_V1,
         root,
     ) == "FAILED"
 

@@ -81,6 +81,7 @@ def _run(
         assert_workspace_resolved_paths,
         exclusive_run_lock,
         observe,
+        recover_if_possible,
         write_state,
     )
     from .scoring import score_case_action_counts
@@ -104,6 +105,13 @@ def _run(
     assert_workspace_resolved_paths(config, root=root)
     canonical_source = None
     with exclusive_run_lock(root):
+        recovered = recover_if_possible(root, config=config, protocol=protocol)
+        if recovered is not None:
+            return recovered
+        if (root / "reports/run_state.json").exists():
+            raise ProtocolError(
+                "S4 existing run state is not an exact recovery boundary."
+            )
         cleanup_owned_atomic_temps(root)
         assert_closed_world(root, allow_incomplete=True)
         if not (root / "reports/run_state.json").exists() and set(relative_files(root)) != {
