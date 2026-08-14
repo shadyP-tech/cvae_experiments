@@ -5,6 +5,7 @@ import csv
 from contextlib import nullcontext
 import errno
 import importlib
+import json
 import os
 from pathlib import Path
 import pkgutil
@@ -50,7 +51,12 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_loo_opportunity_gated_dual_endpo
 from midogpp_thesis.cvae.diagnostics.fixed_bank_loo_opportunity_gated_dual_endpoint_router.artifact_rows import (
     reject_forbidden_persistence,
 )
+from midogpp_thesis.cvae.diagnostics.fixed_bank_loo_opportunity_gated_dual_endpoint_router.artifact_writers import (
+    persist_rows,
+    read_rows,
+)
 from midogpp_thesis.cvae.diagnostics.fixed_bank_loo_opportunity_gated_dual_endpoint_router.source_surface_runtime import (
+    ProbabilityIndexRow,
     runtime_summary_payload,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_loo_opportunity_gated_dual_endpoint_router.split_plans import (
@@ -110,6 +116,57 @@ def test_runtime_summary_persists_only_path_free_scratch_identity() -> None:
     )
     reject_forbidden_persistence(payload)
     assert payload["scratch_root_id"] == preflight["scratch_root_id"]
+
+
+def test_probability_index_row_has_exact_json_schema_and_persists_roundtrip(
+    tmp_path: Path,
+) -> None:
+    row = ProbabilityIndexRow(
+        "0",
+        "B",
+        23,
+        (SHA,) * 9,
+        SHA,
+        SHA,
+        SHA,
+    )
+    expected = {
+        "target_center": "0",
+        "action_id": "B",
+        "row_count": 23,
+        "source_cell_probability_sha256": [SHA] * 9,
+        "sample_identity_hash": SHA,
+        "case_identity_hash": SHA,
+        "exact_nine_probability_sha256": SHA,
+        "storage_dtype": "float32",
+        "reduction_dtype": "float64",
+    }
+    payload = row.to_payload()
+    assert payload == expected
+    assert json.loads(json.dumps(payload, allow_nan=False)) == expected
+    path = tmp_path / "exact_nine_probability_index.csv"
+    assert persist_rows(path, (row,)) == (expected,)
+    assert read_rows(path) == (expected,)
+
+
+def test_no_successor_payload_method_recurses_through_json_native_self() -> None:
+    package = importlib.import_module(PACKAGE)
+    root = Path(next(iter(package.__path__)))
+    offenders: list[tuple[str, int]] = []
+    for path in root.glob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) or node.name != "to_payload":
+                continue
+            for call in ast.walk(node):
+                if (
+                    isinstance(call, ast.Call)
+                    and isinstance(call.func, ast.Name)
+                    and call.func.id == "json_native"
+                    and any(isinstance(argument, ast.Name) and argument.id == "self" for argument in call.args)
+                ):
+                    offenders.append((path.name, call.lineno))
+    assert offenders == []
 
 
 def _route_fixture() -> tuple[object, dict[str, object]]:

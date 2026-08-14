@@ -21,7 +21,7 @@ from ...runtime.frozen_source_streams import (
     materialize_frozen_source_streams,
     stage_frozen_source_streams,
 )
-from .hashing import canonical_hash, json_native
+from .hashing import canonical_hash
 from .scratch_policy import (
     LOCAL_GENERATION_DIRECTORY,
     fresh_scratch_base,
@@ -42,7 +42,21 @@ class ProbabilityIndexRow:
     reduction_dtype: str = "float64"
 
     def to_payload(self) -> dict[str, object]:
-        return json_native(self)  # type: ignore[return-value]
+        # Keep this explicit: passing ``self`` to ``json_native`` would call
+        # this method again before reaching the dataclass fallback.
+        return {
+            "target_center": self.target_center,
+            "action_id": self.action_id,
+            "row_count": self.row_count,
+            "source_cell_probability_sha256": list(
+                self.source_cell_probability_sha256
+            ),
+            "sample_identity_hash": self.sample_identity_hash,
+            "case_identity_hash": self.case_identity_hash,
+            "exact_nine_probability_sha256": self.exact_nine_probability_sha256,
+            "storage_dtype": self.storage_dtype,
+            "reduction_dtype": self.reduction_dtype,
+        }
 
 
 @dataclass(frozen=True)
