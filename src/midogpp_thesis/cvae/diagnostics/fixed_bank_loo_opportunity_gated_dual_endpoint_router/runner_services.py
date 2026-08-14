@@ -166,12 +166,19 @@ def read_scoped_manifest_labels(
 ) -> Sequence[object]:
     from .response_products import BinaryLabel
 
-    universe = {(row.center, row.case_id, row.sample_id): row for row in frame.rows}
+    frame_rows = tuple(frame.rows)
+    universe = {(row.center, row.case_id, row.sample_id): row for row in frame_rows}
+    frame_by_ordinal = {
+        row.manifest_row_index: (row.center, row.case_id, row.sample_id)
+        for row in frame_rows
+    }
+    if len(universe) != len(frame_rows) or len(frame_by_ordinal) != len(frame_rows):
+        raise ProtocolError("Dual-endpoint sealed manifest identities duplicate.")
     if not allowed_keys or not set(allowed_keys) <= set(universe):
         raise ProtocolError("Dual-endpoint label grant escapes sealed rows.")
     ordered = tuple(
         key
-        for row in frame.rows
+        for row in frame_rows
         if (key := (row.center, row.case_id, row.sample_id)) in allowed_keys
     )
     requested = {key: universe[key] for key in ordered}
@@ -181,6 +188,7 @@ def read_scoped_manifest_labels(
     if len(requested_by_ordinal) != len(requested):
         raise ProtocolError("Dual-endpoint granted manifest ordinals duplicate.")
     found: dict[tuple[str, str, str], object] = {}
+    seen_frame_ordinals: set[int] = set()
     manifest_path = Path(getattr(config, "test_manifest_path"))
     manifest_hash = str(getattr(config, "expected_manifest_sha256"))
     try:
@@ -191,9 +199,9 @@ def read_scoped_manifest_labels(
             if any(column not in header for column in required_columns):
                 raise ProtocolError("Dual-endpoint manifest header drifted.")
             positions = {column: header.index(column) for column in required_columns}
-            row_count = 0
             for ordinal, raw_line in enumerate(handle):
-                row_count += 1
+                if ordinal in frame_by_ordinal:
+                    seen_frame_ordinals.add(ordinal)
                 expected_key = requested_by_ordinal.get(ordinal)
                 if expected_key is None:
                     # Capability firewall: excluded rows are never CSV-decoded,
@@ -212,8 +220,16 @@ def read_scoped_manifest_labels(
                 found[key] = BinaryLabel(
                     *key, int(values[positions["label"]]), "scoped_loader"
                 )
-        if row_count != len(frame.rows):
-            raise ProtocolError("Dual-endpoint manifest row count drifted.")
+        # The sealed frame is a 9,928-row test projection of the full canonical
+        # manifest, whose original ordinals span a larger row surface.  Require
+        # the source manifest to cover every sealed frame ordinal without
+        # conflating its cardinality with the projected frame cardinality.
+        if seen_frame_ordinals != set(frame_by_ordinal):
+            raise ProtocolError(
+                "Dual-endpoint manifest does not cover the sealed frame ordinals."
+            )
+    except ProtocolError:
+        raise
     except (OSError, KeyError, TypeError, ValueError) as exc:
         raise ProtocolError("Cannot load dual-endpoint scoped labels.") from exc
     if set(found) != set(requested):

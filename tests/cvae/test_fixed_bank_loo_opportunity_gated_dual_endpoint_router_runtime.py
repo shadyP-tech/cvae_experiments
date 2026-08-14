@@ -295,14 +295,15 @@ def test_scoped_loader_never_csv_decodes_excluded_label_cells(
         "0,excluded-b,EXCLUDED_SENTINEL_B\n",
         encoding="utf-8",
     )
-    identities = tuple(
+    # The label-free frame is a projection: its one row retains ordinal 1 from
+    # the larger three-row source manifest.
+    identities = (
         SimpleNamespace(
             center="0",
-            case_id=case,
-            sample_id=evaluation_row_id(SHA, ordinal),
-            manifest_row_index=ordinal,
-        )
-        for ordinal, case in enumerate(("excluded-a", "allowed", "excluded-b"))
+            case_id="allowed",
+            sample_id=evaluation_row_id(SHA, 1),
+            manifest_row_index=1,
+        ),
     )
     decoded: list[str] = []
     real_reader = csv.reader
@@ -316,12 +317,43 @@ def test_scoped_loader_never_csv_decodes_excluded_label_cells(
 
     monkeypatch.setattr(module.csv, "reader", spy)
     config = SimpleNamespace(test_manifest_path=manifest, expected_manifest_sha256=SHA)
-    allowed = frozenset({("0", "allowed", identities[1].sample_id)})
+    allowed = frozenset({("0", "allowed", identities[0].sample_id)})
     (label,) = read_scoped_manifest_labels(
         config, SimpleNamespace(rows=identities), allowed_keys=allowed
     )
     assert label.value == 1
     assert not any("EXCLUDED_SENTINEL" in value for value in decoded)
+
+
+def test_scoped_loader_rejects_sealed_frame_ordinal_beyond_eof(
+    tmp_path: Path,
+) -> None:
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text(
+        "center,case_id,label\n"
+        "0,allowed,1\n",
+        encoding="utf-8",
+    )
+    allowed_identity = SimpleNamespace(
+        center="0",
+        case_id="allowed",
+        sample_id=evaluation_row_id(SHA, 0),
+        manifest_row_index=0,
+    )
+    missing_identity = SimpleNamespace(
+        center="0",
+        case_id="missing",
+        sample_id=evaluation_row_id(SHA, 2),
+        manifest_row_index=2,
+    )
+    config = SimpleNamespace(test_manifest_path=manifest, expected_manifest_sha256=SHA)
+    allowed = frozenset({("0", "allowed", allowed_identity.sample_id)})
+    with pytest.raises(ProtocolError, match="does not cover the sealed frame ordinals"):
+        read_scoped_manifest_labels(
+            config,
+            SimpleNamespace(rows=(allowed_identity, missing_identity)),
+            allowed_keys=allowed,
+        )
 
 
 def test_runner_phase_order_uses_four_cohesive_service_groups(
