@@ -40,6 +40,7 @@ from .reports import (
     publication_decision_payload,
     seal_payload,
 )
+from .route_numerics import exact_route_blas_scope
 from .scoring import (
     score_directional_correctness_observations,
     score_directional_gains,
@@ -154,6 +155,7 @@ def reconstruct_plan_and_feature_products(
     }
 
 
+@exact_route_blas_scope()
 def reconstruct_route_products(
     root: Path,
     *,

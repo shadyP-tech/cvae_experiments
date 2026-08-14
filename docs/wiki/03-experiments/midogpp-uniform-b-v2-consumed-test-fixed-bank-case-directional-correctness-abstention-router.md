@@ -60,10 +60,19 @@ pipeline, and is never a gate.
 
 Generation uses two persistent spawned RTX A5000 workers. CUDA is then hidden
 before a separate CPU phase of four spawned workers with three BLAS threads
-each. Float32 stores source/probability surfaces, int64 stores confusion counts,
-and float64 performs scientific reductions. Scratch is dedicated to this run
-and is not a recovery input. Completion requires a 43-member closed-world
-bundle and two independent CUDA-free process replays.
+each. Reconstructive validation enters that same exact three-thread BLAS scope
+for route fitting, then restores its outer one-thread process scope. Float32
+stores source/probability surfaces, int64 stores confusion counts, and float64
+performs scientific reductions. Scratch is dedicated to this run and is not a
+recovery input. Completion requires a 43-member closed-world bundle and two
+independent CUDA-free process replays.
+
+Ordinary cross-run, prediction, scientific, terminal, and scratch recovery are
+forbidden. One registered exact-existing-snapshot strategy recognizes only the
+observed `route_model_fits.csv` validation-finalization failure. It may reopen
+labels for read-only reconstruction and publish the index-excluded validation
+report and run state; it cannot change any of the 40 indexed scientific,
+prediction, decision, terminal, or runtime members.
 
 ```bash
 /home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \

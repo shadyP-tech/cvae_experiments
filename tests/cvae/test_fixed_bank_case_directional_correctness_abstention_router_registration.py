@@ -31,6 +31,9 @@ from midogpp_thesis.cvae.runtime.fixed_bank_a1_prediction_contracts import (
     validate_action_library,
 )
 from midogpp_thesis.workspace.runtime import MidogppWorkspace
+from midogpp_thesis.workspace.recovery import (
+    EXACT_EXISTING_SNAPSHOT_FIXED_BANK_CASE_DIRECTIONAL_CORRECTNESS_ABSTENTION_ROUTER_V1,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -122,7 +125,9 @@ def test_workspace_catalog_and_exact_43_file_inventory() -> None:
     assert experiment.status == "diagnostic"
     assert experiment.claim_scope == "diagnostic_only"
     assert experiment.input_artifact_ids == contracts.INPUT_ARTIFACT_IDS
-    assert experiment.run_recovery_strategy is None
+    assert experiment.run_recovery_strategy == (
+        EXACT_EXISTING_SNAPSHOT_FIXED_BANK_CASE_DIRECTIONAL_CORRECTNESS_ABSTENTION_ROUTER_V1
+    )
     assert experiment.runner_argv[4] == (
         "fixed-bank-case-directional-correctness-abstention-router"
     )

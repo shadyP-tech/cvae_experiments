@@ -2441,6 +2441,7 @@ experiments:
       midogpp_uniform_b_test_consumption_ledger_fixed_bank_case_directional_correctness_abstention_router_parent_v1: Byte-exact experiment-fenced alias of the immutable original ledger, read only to verify the direct parent hash.
       midogpp_uniform_b_test_consumption_ledger_fixed_bank_case_directional_correctness_abstention_router_amendment_v1: Direct single-consumer authorization for this terminal post-hoc consumed-test diagnostic; it creates no fresh evidence.
     runner:
+      run_recovery_strategy: exact_existing_snapshot_fixed_bank_case_directional_correctness_abstention_router_v1
       environment:
         CUBLAS_WORKSPACE_CONFIG: ":4096:8"
         CUDA_VISIBLE_DEVICES: "0,1"
@@ -2465,4 +2466,5 @@ experiments:
       - B, U, and eight A1 actions are recomputed as 810 exact-nine physical cells. Held-case directional response features use probabilities only. For each H,c,e,d, model fitting, feature scaling, response labels, and class denominators use H minus c only; donor G uses q outside H and e.
       - CDCA_LOO ranks all eight non-target sources plus OFF from a frozen one-half case-correctness proxy plus one-half donor G score. OFF is B and wins ties within 1e-12. The proxy is not predicted held-case exact BACC, NELBO compatibility, or downstream utility.
       - Two persistent spawned RTX A5000 generation workers precede a disjoint CUDA-free CPU phase with four workers and three BLAS threads each. Dedicated /data/local/fixed_bank_case_directional_correctness_abstention_router_v1 scratch is throughput-only; cross-run and terminal recovery are forbidden, and two fresh-process validation replays are required.
+      - The registered exact-existing-snapshot strategy authorizes only validation finalization for the exact observed route-model replay failure. It cannot regenerate, rewrite, or change any indexed scientific, prediction, decision, or terminal member; ordinary cross-run and terminal recovery remain forbidden.
       - Every route probability and decision plus the global 218-route barrier seals before terminal labels open. All contrasts, oracles, and the fixed feature-block permutation are descriptive only and cannot authorize routing, action, policy, promotion, deployment, another stage, diagnostic, experiment, or generic consumer.

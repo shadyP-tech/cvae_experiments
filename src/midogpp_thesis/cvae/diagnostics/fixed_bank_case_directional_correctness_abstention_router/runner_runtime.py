@@ -16,6 +16,11 @@ from ...protocol import ProtocolError
 from ...runtime.artifact_io import read_json
 from .bundle import assert_closed_world, relative_files
 from .persistence import write_run_state
+from .route_numerics import (
+    ROUTE_BLAS_THREADS,
+    assert_exact_route_blas_topology,
+    install_exact_route_blas_topology,
+)
 
 
 _ROUTE_SURFACE: object | None = None
@@ -43,7 +48,11 @@ def execute_route_jobs(
     """Score/select 218 independent routes in four spawned 3-thread workers."""
 
     tasks = tuple(dict(job) for job in jobs)
-    if workers != 4 or threads_per_worker != 3 or not tasks:
+    if (
+        workers != 4
+        or threads_per_worker != ROUTE_BLAS_THREADS
+        or not tasks
+    ):
         raise ProtocolError("Case-directional route worker topology drifted.")
     with ProcessPoolExecutor(
         max_workers=workers,
@@ -61,7 +70,7 @@ def execute_route_jobs(
 
 def _initialize_route_worker(surface: object, threads: int) -> None:
     global _ROUTE_SURFACE, _ROUTE_THREADPOOL_LIMITER
-    if threads != 3:
+    if threads != ROUTE_BLAS_THREADS:
         raise ProtocolError("Case-directional route worker threads drifted.")
     os.environ["CUDA_VISIBLE_DEVICES"] = ""
     for name in (
@@ -73,24 +82,16 @@ def _initialize_route_worker(surface: object, threads: int) -> None:
         "BLIS_NUM_THREADS",
     ):
         os.environ[name] = "3"
-    try:
-        from threadpoolctl import threadpool_limits
-    except ImportError as exc:  # pragma: no cover - sklearn runtime dependency
-        raise ProtocolError(
-            "Case-directional route worker lacks threadpoolctl."
-        ) from exc
-    _ROUTE_THREADPOOL_LIMITER = threadpool_limits(limits=threads)
+    _ROUTE_THREADPOOL_LIMITER = install_exact_route_blas_topology(
+        threads=threads
+    )
     _ROUTE_SURFACE = surface
 
 
 def _execute_route_job(job: Mapping[str, object]) -> RouteJobResult:
     if _ROUTE_SURFACE is None or os.environ.get("CUDA_VISIBLE_DEVICES") != "":
         raise ProtocolError("Case-directional route worker was not initialized.")
-    from threadpoolctl import threadpool_info
-
-    blas = tuple(row for row in threadpool_info() if row.get("user_api") == "blas")
-    if blas and any(int(row.get("num_threads", -1)) != 3 for row in blas):
-        raise ProtocolError("Case-directional route worker BLAS topology is not three threads.")
+    assert_exact_route_blas_topology()
     from .decisions import (
         fit_route_directional_models,
         select_case_directional_abstention_decision,
@@ -211,7 +212,7 @@ def assert_workspace_resolved_paths(config: object, *, root: Path) -> None:
 
 
 def reject_existing_run_state(root: Path) -> None:
-    """Recovery is absent: any former run state is foreign, partial, or complete."""
+    """Reject every state outside the separately admitted exact finalization repair."""
 
     state = root / "reports/run_state.json"
     if not state.exists():
@@ -222,6 +223,24 @@ def reject_existing_run_state(root: Path) -> None:
     raise ProtocolError(
         "Case-directional cross-run recovery is forbidden; "
         f"existing status={payload.get('status')}, phase={payload.get('phase')}."
+    )
+
+
+def recover_if_possible(
+    root: Path, *, config: object, protocol: object
+) -> Path | None:
+    """Dispatch only the exact registered validator-only finalization recovery."""
+
+    from .recovery import recover_exact_finalization, recovery_capability
+
+    capability = recovery_capability(Path(root))
+    if capability is None:
+        return None
+    return recover_exact_finalization(
+        Path(root),
+        config=config,
+        protocol=protocol,
+        capability=capability,
     )
 
 
@@ -337,6 +356,7 @@ __all__ = (
     "execute_route_jobs",
     "exclusive_run_lock",
     "observe",
+    "recover_if_possible",
     "reject_existing_run_state",
     "write_state",
 )

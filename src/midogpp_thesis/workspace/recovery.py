@@ -30,6 +30,10 @@ EXACT_EXISTING_SNAPSHOT_FIXED_BANK_MULTI_CHALLENGER_HIERARCHICAL_FLIP_ROUTER_V1 
 EXACT_EXISTING_SNAPSHOT_FIXED_BANK_SUPPORT_STATIC_ROUTER_S4_V1 = (
     "exact_existing_snapshot_fixed_bank_support_static_router_s4_v1"
 )
+EXACT_EXISTING_SNAPSHOT_FIXED_BANK_CASE_DIRECTIONAL_CORRECTNESS_ABSTENTION_ROUTER_V1 = (
+    "exact_existing_snapshot_fixed_bank_case_directional_correctness_"
+    "abstention_router_v1"
+)
 
 _RUN_STATE_SCHEMA_BY_STRATEGY = {
     EXACT_EXISTING_SNAPSHOT_DISAGREEMENT_REGRET_PREDICTION_ONLY_V1: (
@@ -46,6 +50,9 @@ _RUN_STATE_SCHEMA_BY_STRATEGY = {
     ),
     EXACT_EXISTING_SNAPSHOT_FIXED_BANK_SUPPORT_STATIC_ROUTER_S4_V1: (
         "fixed_bank_support_static_router_run_state_v1"
+    ),
+    EXACT_EXISTING_SNAPSHOT_FIXED_BANK_CASE_DIRECTIONAL_CORRECTNESS_ABSTENTION_ROUTER_V1: (
+        "fixed_bank_cdca_run_state_v1"
     ),
 }
 
@@ -256,6 +263,49 @@ _S4_RUNNER_ARGV = (
     "fixed_bank_support_static_router_s4_v1",
 )
 _S4_RUNNER_ENV = dict(_RUNNER_ENV)
+_CDCA_EXPERIMENT_ID = (
+    "midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_"
+    "case_directional_correctness_abstention_router.v1"
+)
+_CDCA_CONFIG_PATH = (
+    "experiments/midogpp/stages/90_oracles_and_diagnostics/configs/"
+    "uniform_b_v2_consumed_test_fixed_bank_case_directional_correctness_"
+    "abstention_router_v1.yaml"
+)
+_CDCA_OUTPUT_ARTIFACT_ID = (
+    "midogpp_output_uniform_b_v2_consumed_test_fixed_bank_"
+    "case_directional_correctness_abstention_router_v1"
+)
+_CDCA_OUTPUT_CANONICAL_PATH = (
+    "artifacts/midogpp/90_oracles_and_diagnostics/"
+    "uniform_b_v2_consumed_test_fixed_bank_case_directional_correctness_"
+    "abstention_router/v1"
+)
+_CDCA_INPUT_ARTIFACT_IDS = (
+    "midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1",
+    "midogpp_output_uniform_b_v2_generation_lock_v1",
+    "midogpp_stage90_fixed_bank_case_directional_correctness_abstention_"
+    "router_test_cache_v1",
+    "midogpp_stage90_fixed_bank_case_directional_correctness_abstention_"
+    "router_test_manifest_v1",
+    "midogpp_uniform_b_test_consumption_ledger_fixed_bank_case_directional_"
+    "correctness_abstention_router_parent_v1",
+    "midogpp_uniform_b_test_consumption_ledger_fixed_bank_case_directional_"
+    "correctness_abstention_router_amendment_v1",
+)
+_CDCA_RUNNER_ARGV = (
+    "{python}",
+    "-m",
+    "midogpp_thesis",
+    "cvae-diagnostics",
+    "fixed-bank-case-directional-correctness-abstention-router",
+    "--config",
+    "{resolved_config}",
+    "--artifact-root",
+    "output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_"
+    "case_directional_correctness_abstention_router_v1",
+)
+_CDCA_RUNNER_ENV = dict(_RUNNER_ENV)
 _REPOSITORY_STATE_KEYS = frozenset(
     {
         "repository_revision",
@@ -342,6 +392,10 @@ def required_strategy_for_experiment(experiment_id: str) -> str | None:
         return EXACT_EXISTING_SNAPSHOT_FIXED_BANK_MULTI_CHALLENGER_HIERARCHICAL_FLIP_ROUTER_V1
     if experiment_id == _S4_EXPERIMENT_ID:
         return EXACT_EXISTING_SNAPSHOT_FIXED_BANK_SUPPORT_STATIC_ROUTER_S4_V1
+    if experiment_id == _CDCA_EXPERIMENT_ID:
+        return (
+            EXACT_EXISTING_SNAPSHOT_FIXED_BANK_CASE_DIRECTIONAL_CORRECTNESS_ABSTENTION_ROUTER_V1
+        )
     return None
 
 
@@ -421,6 +475,19 @@ def registration_errors(
             _S4_RUNNER_ARGV,
             _S4_RUNNER_ENV,
         )
+    elif (
+        strategy_id
+        == EXACT_EXISTING_SNAPSHOT_FIXED_BANK_CASE_DIRECTIONAL_CORRECTNESS_ABSTENTION_ROUTER_V1
+    ):
+        wanted = (
+            _CDCA_EXPERIMENT_ID,
+            _CDCA_CONFIG_PATH,
+            _CDCA_OUTPUT_ARTIFACT_ID,
+            _CDCA_OUTPUT_CANONICAL_PATH,
+            _CDCA_INPUT_ARTIFACT_IDS,
+            _CDCA_RUNNER_ARGV,
+            _CDCA_RUNNER_ENV,
+        )
     else:
         return (
             f"{experiment_id}: unknown runner.run_recovery_strategy {strategy_id!r}",
@@ -493,6 +560,19 @@ def detect_registered_exact_recovery(strategy_id: str, artifact_root: Path) -> b
         )
 
         return bool(detect_registered_support_static_router_recovery(artifact_root))
+    if (
+        strategy_id
+        == EXACT_EXISTING_SNAPSHOT_FIXED_BANK_CASE_DIRECTIONAL_CORRECTNESS_ABSTENTION_ROUTER_V1
+    ):
+        from midogpp_thesis.cvae.diagnostics.fixed_bank_case_directional_correctness_abstention_router.recovery import (  # noqa: E501
+            detect_registered_case_directional_correctness_abstention_router_recovery,
+        )
+
+        return bool(
+            detect_registered_case_directional_correctness_abstention_router_recovery(
+                artifact_root
+            )
+        )
     raise RecoveryContractError(f"Unknown workspace recovery strategy: {strategy_id!r}")
 
 
@@ -598,6 +678,7 @@ __all__ = (
     "EXACT_EXISTING_SNAPSHOT_FIXED_BANK_LABELED_SUPPORT_CASE_CONDITIONAL_FLIP_ROUTER_V1",
     "EXACT_EXISTING_SNAPSHOT_FIXED_BANK_MULTI_CHALLENGER_HIERARCHICAL_FLIP_ROUTER_V1",
     "EXACT_EXISTING_SNAPSHOT_FIXED_BANK_SUPPORT_STATIC_ROUTER_S4_V1",
+    "EXACT_EXISTING_SNAPSHOT_FIXED_BANK_CASE_DIRECTIONAL_CORRECTNESS_ABSTENTION_ROUTER_V1",
     "RecoveryContractError",
     "SnapshotBytesGuard",
     "detect_registered_exact_recovery",

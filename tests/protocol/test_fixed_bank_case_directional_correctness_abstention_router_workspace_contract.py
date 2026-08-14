@@ -15,6 +15,9 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_case_directional_correctness_abs
     build_frozen_science_protocol,
 )
 from midogpp_thesis.workspace.runtime import MidogppWorkspace
+from midogpp_thesis.workspace.recovery import (
+    EXACT_EXISTING_SNAPSHOT_FIXED_BANK_CASE_DIRECTIONAL_CORRECTNESS_ABSTENTION_ROUTER_V1,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -39,7 +42,9 @@ def test_successor_is_exact_six_input_terminal_consumed_diagnostic() -> None:
     assert experiment.claim_scope == "diagnostic_only"
     assert experiment.input_artifact_ids == contracts.INPUT_ARTIFACT_IDS
     assert len(experiment.input_artifact_ids) == 6
-    assert experiment.run_recovery_strategy is None
+    assert experiment.run_recovery_strategy == (
+        EXACT_EXISTING_SNAPSHOT_FIXED_BANK_CASE_DIRECTIONAL_CORRECTNESS_ABSTENTION_ROUTER_V1
+    )
     assert output.required_files == REQUIRED_FILES
     assert len(REQUIRED_FILES) == 43
     assert output.semantic_identities["config_contract_hash"] == config.contract_hash

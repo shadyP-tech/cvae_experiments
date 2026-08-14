@@ -24,9 +24,14 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_support_static_router.recovery i
     FAILED_FINALIZATION_STATE as S4_FAILED_FINALIZATION_STATE,
     FINALIZATION_RECOVERABLE_INVENTORY as S4_FINALIZATION_RECOVERABLE_INVENTORY,
 )
+from midogpp_thesis.cvae.diagnostics.fixed_bank_case_directional_correctness_abstention_router.recovery import (
+    FAILED_FINALIZATION_STATE as CDCA_FAILED_FINALIZATION_STATE,
+    FINALIZATION_RECOVERABLE_INVENTORY as CDCA_FINALIZATION_RECOVERABLE_INVENTORY,
+)
 from midogpp_thesis.cvae.protocol import ProtocolError
 from midogpp_thesis.workspace import runtime as workspace_runtime
 from midogpp_thesis.workspace.recovery import (
+    EXACT_EXISTING_SNAPSHOT_FIXED_BANK_CASE_DIRECTIONAL_CORRECTNESS_ABSTENTION_ROUTER_V1,
     EXACT_EXISTING_SNAPSHOT_FIXED_BANK_MULTI_CHALLENGER_HIERARCHICAL_FLIP_ROUTER_V1,
     EXACT_EXISTING_SNAPSHOT_FIXED_BANK_SUPPORT_STATIC_ROUTER_S4_V1,
     EXACT_EXISTING_SNAPSHOT_UTILITY_ALIGNED_CONSUMED_TEST_ENDPOINT_ROUTER_V1,
@@ -74,6 +79,19 @@ S4_OUTPUT_ID = (
     "midogpp_output_uniform_b_v2_consumed_test_"
     "fixed_bank_support_static_router_s4_v1"
 )
+CDCA_EXPERIMENT_ID = (
+    "midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_"
+    "case_directional_correctness_abstention_router.v1"
+)
+CDCA_CONFIG_PATH = (
+    "experiments/midogpp/stages/90_oracles_and_diagnostics/configs/"
+    "uniform_b_v2_consumed_test_fixed_bank_case_directional_correctness_"
+    "abstention_router_v1.yaml"
+)
+CDCA_OUTPUT_ID = (
+    "midogpp_output_uniform_b_v2_consumed_test_fixed_bank_"
+    "case_directional_correctness_abstention_router_v1"
+)
 REVISION_A = {
     "repository_revision": "a" * 40,
     "repository_dirty": True,
@@ -86,7 +104,7 @@ REVISION_B = {
 }
 
 
-def test_repository_registers_only_the_five_exact_recovery_entries() -> None:
+def test_repository_registers_only_the_six_exact_recovery_entries() -> None:
     workspace = MidogppWorkspace.load()
     registered = [
         experiment
@@ -121,6 +139,9 @@ def test_repository_registers_only_the_five_exact_recovery_entries() -> None:
         ),
         S4_EXPERIMENT_ID: (
             EXACT_EXISTING_SNAPSHOT_FIXED_BANK_SUPPORT_STATIC_ROUTER_S4_V1
+        ),
+        CDCA_EXPERIMENT_ID: (
+            EXACT_EXISTING_SNAPSHOT_FIXED_BANK_CASE_DIRECTIONAL_CORRECTNESS_ABSTENTION_ROUTER_V1
         ),
     }
 
@@ -362,6 +383,56 @@ def test_s4_exact_recovery_dispatches_revision_a_snapshot_under_later_revision(
     assert {key: preserved_manifest[key] for key in REVISION_A} == REVISION_A
 
 
+def test_cdca_exact_recovery_dispatches_revision_a_snapshot_under_later_revision(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace, state, _inputs = _build_exact_workspace(
+        tmp_path,
+        monkeypatch,
+        experiment_id=CDCA_EXPERIMENT_ID,
+        config_path=CDCA_CONFIG_PATH,
+        output_id=CDCA_OUTPUT_ID,
+    )
+    prepared = workspace.prepare(CDCA_EXPERIMENT_ID)
+    _write_failed_inventory(
+        prepared.artifact_root,
+        inventory=CDCA_FINALIZATION_RECOVERABLE_INVENTORY,
+        failed_state=CDCA_FAILED_FINALIZATION_STATE,
+    )
+    config_before = prepared.resolved_config_path.read_bytes()
+    manifest_before = prepared.input_manifest_path.read_bytes()
+    state.update(REVISION_B)
+    calls: list[tuple[list[str], Path, dict[str, str]]] = []
+
+    def failed_runner(
+        argv: list[str],
+        *,
+        cwd: Path,
+        env: dict[str, str],
+        check: bool,
+    ) -> SimpleNamespace:
+        assert check is False
+        assert prepared.resolved_config_path.read_bytes() == config_before
+        assert prepared.input_manifest_path.read_bytes() == manifest_before
+        calls.append((argv, cwd, env))
+        return SimpleNamespace(returncode=31)
+
+    monkeypatch.setattr(workspace_runtime.subprocess, "run", failed_runner)
+
+    assert workspace.run(CDCA_EXPERIMENT_ID) == 31
+    assert len(calls) == 1
+    argv, cwd, env = calls[0]
+    assert tuple(argv) == prepared.argv
+    assert cwd == tmp_path
+    assert env["CUBLAS_WORKSPACE_CONFIG"] == ":4096:8"
+    assert env["CUDA_VISIBLE_DEVICES"] == "0,1"
+    assert prepared.resolved_config_path.read_bytes() == config_before
+    assert prepared.input_manifest_path.read_bytes() == manifest_before
+    preserved_manifest = json.loads(manifest_before)
+    assert {key: preserved_manifest[key] for key in REVISION_A} == REVISION_A
+
+
 @pytest.mark.parametrize(
     ("run_kwargs", "message"),
     (
@@ -401,6 +472,50 @@ def test_s4_exact_recovery_rejects_workspace_boundary_widening_before_launch(
 
     with pytest.raises(WorkspaceError, match=message):
         workspace.run(S4_EXPERIMENT_ID, **run_kwargs)  # type: ignore[arg-type]
+
+    assert prepared.resolved_config_path.read_bytes() == before[0]
+    assert prepared.input_manifest_path.read_bytes() == before[1]
+
+
+@pytest.mark.parametrize(
+    ("run_kwargs", "message"),
+    (
+        ({"force": True}, "rejects --force"),
+        ({"extra_args": ("--unregistered",)}, "rejects extra runner arguments"),
+    ),
+)
+def test_cdca_exact_recovery_rejects_workspace_boundary_widening_before_launch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    run_kwargs: Mapping[str, object],
+    message: str,
+) -> None:
+    workspace, state, _inputs = _build_exact_workspace(
+        tmp_path,
+        monkeypatch,
+        experiment_id=CDCA_EXPERIMENT_ID,
+        config_path=CDCA_CONFIG_PATH,
+        output_id=CDCA_OUTPUT_ID,
+    )
+    prepared = workspace.prepare(CDCA_EXPERIMENT_ID)
+    _write_failed_inventory(
+        prepared.artifact_root,
+        inventory=CDCA_FINALIZATION_RECOVERABLE_INVENTORY,
+        failed_state=CDCA_FAILED_FINALIZATION_STATE,
+    )
+    before = (
+        prepared.resolved_config_path.read_bytes(),
+        prepared.input_manifest_path.read_bytes(),
+    )
+    state.update(REVISION_B)
+
+    def forbidden_runner(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("runner must not execute")
+
+    monkeypatch.setattr(workspace_runtime.subprocess, "run", forbidden_runner)
+
+    with pytest.raises(WorkspaceError, match=message):
+        workspace.run(CDCA_EXPERIMENT_ID, **run_kwargs)  # type: ignore[arg-type]
 
     assert prepared.resolved_config_path.read_bytes() == before[0]
     assert prepared.input_manifest_path.read_bytes() == before[1]
@@ -908,8 +1023,17 @@ def _write_failed_inventory(
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         if relative == "reports/run_state.json":
+            serialized = (
+                json.dumps(
+                    failed_state,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                if failed_state == CDCA_FAILED_FINALIZATION_STATE
+                else json.dumps(failed_state, sort_keys=True)
+            )
             path.write_text(
-                json.dumps(failed_state, sort_keys=True) + "\n",
+                serialized + "\n",
                 encoding="utf-8",
             )
         elif relative not in {

@@ -1002,13 +1002,24 @@ scratch is throughput-only; cross-run and terminal recovery are forbidden.
 Two independent CUDA-free interpreter replays must reconstruct the same
 closed-world bundle before completion.
 
+The first workstation execution reached validation finalization but exposed a
+numerical-topology defect: route workers fitted under three-thread BLAS while
+the serial validator replayed under one thread, changing only last-bit model
+coefficients and their derived hashes. The repair shares one exact
+three-thread route-numerics scope between production and reconstruction and
+retains exact comparison with no tolerance. A registered validation-only
+finalization strategy accepts only that exact failed state and inventory; it
+cannot rewrite indexed science or terminal products. Ordinary cross-run and
+terminal recovery remain forbidden.
+
 ```bash
 /home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
   midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_case_directional_correctness_abstention_router.v1
 ```
 
-The registered run is unexecuted. The config contract hash is
-`a41dce9dfd086f4a`, the protocol hash is
+The registered run has sealed terminal products but is not complete evidence
+until the repaired parent and two fresh-process replays pass. The config
+contract hash is `a41dce9dfd086f4a`, the protocol hash is
 `336c64c87e48a37b7437c9cd0b6cf44ddf155fc10f93f6e701debd1aaf571429`,
 and the direct amendment SHA-256 is
 `edbd969666bdd1c5752e2d9904505e07026e6b8307430cfd8fa804010a06e3be`.

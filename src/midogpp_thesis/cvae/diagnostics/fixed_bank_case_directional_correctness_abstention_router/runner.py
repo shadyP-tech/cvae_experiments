@@ -55,6 +55,7 @@ from .runner_runtime import (
     execute_route_jobs,
     exclusive_run_lock,
     observe,
+    recover_if_possible,
     reject_existing_run_state,
     write_state,
 )
@@ -84,6 +85,10 @@ def run_fixed_bank_case_directional_correctness_abstention_router(
     )
 
     with exclusive_run_lock(root):
+        recovered = recover_if_possible(root, config=config, protocol=protocol)
+        if recovered is not None:
+            cleanup_validated_scratch(config)
+            return recovered
         reject_existing_run_state(root)
         assert_no_foreign_or_partial_state(root)
         phase = "INPUT_ADMISSION"

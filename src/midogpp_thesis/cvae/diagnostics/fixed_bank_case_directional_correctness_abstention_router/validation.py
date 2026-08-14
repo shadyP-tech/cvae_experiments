@@ -33,7 +33,9 @@ from .inputs import (
     validate_workspace_provenance,
 )
 from .protocol import build_frozen_science_protocol
-from .reports import protocol_manifest_payload, run_state_payload
+from .reports import protocol_manifest_payload
+from .recovery_provenance import audit_for_validation
+from .route_numerics import ROUTE_BLAS_THREADS
 from .validation_prelabel import reconstruct_prelabel, validate_action_products
 from .validation_science import (
     reconstruct_plan_and_feature_products,
@@ -47,6 +49,7 @@ def validate_fixed_bank_case_directional_correctness_abstention_router_bundle(
     *,
     config: object,
     allow_pending_validation: bool = False,
+    finalization_recovery_audit: Mapping[str, object] | None = None,
 ) -> Mapping[str, object]:
     """Rebuild every scientific product without writing or repairing evidence."""
 
@@ -63,6 +66,11 @@ def validate_fixed_bank_case_directional_correctness_abstention_router_bundle(
         path,
         config_contract_hash=str(getattr(config, "contract_hash")),
         protocol_contract_hash=protocol.protocol_hash,
+    )
+    finalization_audit = audit_for_validation(
+        path,
+        allow_pending_validation=allow_pending_validation,
+        explicit_audit=finalization_recovery_audit,
     )
     _reject_forbidden_persistence(path)
 
@@ -141,21 +149,12 @@ def validate_fixed_bank_case_directional_correctness_abstention_router_bundle(
         ),
         feature_seal_hash=str(plan_products["feature_seal"]["seal_hash"]),
     )
-    expected_state = (
-        run_state_payload(
-            "RUNNING", "CLOSED_WORLD_TWO_FRESH_PROCESS_VALIDATION"
-        )
-        if allow_pending_validation
-        else run_state_payload("COMPLETE", "COMPLETE")
-    )
-    if read_json(path / "reports/run_state.json") != expected_state:
-        raise ProtocolError("Case-directional run state is not reconstructive.")
-
     checks = {
         "status": "PASS",
         "content_hash": content["content_hash"],
         "config_contract_hash": str(getattr(config, "contract_hash")),
         "protocol_contract_hash": protocol.protocol_hash,
+        "finalization_recovery": dict(finalization_audit),
         "workspace_binding": workspace,
         "input_artifact_count": len(provenance),
         "pre_gpu_firewall_status": firewall["status"],
@@ -213,6 +212,7 @@ def validate_fixed_bank_case_directional_correctness_abstention_router_bundle(
         "predicted_held_case_exact_bacc_claimed": False,
         "content_index_validated_before_scientific_members": True,
         "two_fresh_cuda_free_process_replays_required": True,
+        "route_fit_and_replay_blas_threads": ROUTE_BLAS_THREADS,
         "fitted_numeric_tolerance_used": False,
         "nonrepairing_validation": True,
         "closed_world": True,
