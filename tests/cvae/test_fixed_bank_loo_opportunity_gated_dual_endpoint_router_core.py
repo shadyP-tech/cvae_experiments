@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+from fractions import Fraction
 from types import SimpleNamespace
 
 import pytest
@@ -32,6 +33,10 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_loo_opportunity_gated_dual_endpo
 from midogpp_thesis.cvae.diagnostics.fixed_bank_loo_opportunity_gated_dual_endpoint_router.hashing import canonical_hash
 from midogpp_thesis.cvae.diagnostics.fixed_bank_loo_opportunity_gated_dual_endpoint_router.held_case_features import build_label_free_features, case_directional_features
 from midogpp_thesis.cvae.diagnostics.fixed_bank_loo_opportunity_gated_dual_endpoint_router.identification import select_case_identification_decision
+from midogpp_thesis.cvae.diagnostics.fixed_bank_loo_opportunity_gated_dual_endpoint_router.identification_metrics import (
+    build_case_directional_oracles,
+    build_static_directional_oracles,
+)
 from midogpp_thesis.cvae.diagnostics.fixed_bank_loo_opportunity_gated_dual_endpoint_router.identification_products import IdentificationCandidateScore
 from midogpp_thesis.cvae.diagnostics.fixed_bank_loo_opportunity_gated_dual_endpoint_router.label_capabilities import DualEndpointLabelFirewall
 from midogpp_thesis.cvae.diagnostics.fixed_bank_loo_opportunity_gated_dual_endpoint_router.prediction_products import MethodPrediction
@@ -312,6 +317,76 @@ def test_terminal_metric_dtos_pin_methods_counts_domains_and_center_order() -> N
             1.1, 0.52, 0.0, 1.0, 0.81,
             tuple((center, 0.81) for center in reversed(CENTERS)),
         )
+
+
+def test_case_directional_oracle_uses_center_denominators_for_single_class_cases() -> None:
+    rows: list[CaseActionConfusion] = []
+    case_specs = {
+        "0": (
+            ("positive-only", 1, 0),
+            ("negative-only", 0, 2),
+            ("mixed-anchor", 4, 5),
+        ),
+        **{
+            target: ((f"mixed-{target}", 1, 1),)
+            for target in CENTERS
+            if target != "0"
+        },
+    }
+    for target in CENTERS:
+        for case_id, n_positive, n_negative in case_specs[target]:
+            rows.append(
+                CaseActionConfusion(
+                    target, case_id, "B", n_positive, n_positive,
+                    n_negative, n_negative, 0, 0, 0, 0, "terminal",
+                )
+            )
+            for source in candidate_sources(target):
+                special = target == "0"
+                rows.append(
+                    CaseActionConfusion(
+                        target, case_id, a1_action_id(source),
+                        n_positive, n_positive, n_negative, n_negative,
+                        int(special and case_id == "positive-only" and source == "1"),
+                        int(special and case_id == "negative-only" and source == "1"),
+                        int(special and case_id == "positive-only" and source == "2"),
+                        int(special and case_id == "negative-only" and source == "2"),
+                        "terminal",
+                    )
+                )
+    case_oracles = {row.key: row for row in build_case_directional_oracles(rows)}
+    static_oracles = {
+        (row.target_center, row.direction): row
+        for row in build_static_directional_oracles(rows)
+    }
+    assert case_oracles[("0", "positive-only", "zero_to_one")].utility_for("1") == Fraction(1, 10)
+    assert case_oracles[("0", "negative-only", "zero_to_one")].utility_for("1") == Fraction(-1, 14)
+    assert case_oracles[("0", "positive-only", "one_to_zero")].utility_for("2") == Fraction(-1, 10)
+    assert case_oracles[("0", "negative-only", "one_to_zero")].utility_for("2") == Fraction(1, 14)
+    assert case_oracles[("0", "positive-only", "zero_to_one")].selected_source == "1"
+    assert case_oracles[("0", "negative-only", "zero_to_one")].selected_source is None
+    assert case_oracles[("0", "positive-only", "one_to_zero")].selected_source is None
+    assert case_oracles[("0", "negative-only", "one_to_zero")].selected_source == "2"
+
+    for target in CENTERS:
+        target_cases = tuple(case_id for case_id, *_ in case_specs[target])
+        for direction in DIRECTION_IDS:
+            for source in candidate_sources(target):
+                assert sum(
+                    (
+                        case_oracles[(target, case_id, direction)].utility_for(source)
+                        for case_id in target_cases
+                    ),
+                    Fraction(0),
+                ) == static_oracles[(target, direction)].utility_for(source)
+
+    positive_only_center = tuple(
+        row
+        for row in rows
+        if row.target_center == "0" and row.case_id == "positive-only"
+    )
+    with pytest.raises(ProtocolError, match="requires both classes per center"):
+        build_case_directional_oracles(positive_only_center)
 
 
 def test_permuted_features_preserve_canonical_order_through_full_route_worker() -> None:

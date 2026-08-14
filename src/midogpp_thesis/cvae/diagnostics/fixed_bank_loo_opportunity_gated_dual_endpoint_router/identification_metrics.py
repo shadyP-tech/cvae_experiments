@@ -21,16 +21,31 @@ from .terminal_products import (
 )
 
 
-def _utility(row: CaseActionConfusion, direction: str) -> Fraction:
-    if row.n_positive <= 0 or row.n_negative <= 0:
-        raise ProtocolError("OGDE terminal directional utility requires both classes.")
+def _utility(
+    row: CaseActionConfusion,
+    direction: str,
+    *,
+    center_n_positive: int,
+    center_n_negative: int,
+) -> Fraction:
+    """Return one case's additive contribution to center-pooled BACC.
+
+    A whole case may legitimately contain only one class.  Case-oracle choices
+    therefore use the target center's pooled class denominators, never a
+    per-case BACC denominator.
+    """
+
+    if center_n_positive <= 0 or center_n_negative <= 0:
+        raise ProtocolError(
+            "OGDE terminal directional utility requires both classes per center."
+        )
     if direction == "zero_to_one":
-        return Fraction(row.flip_0to1_positive, 2 * row.n_positive) - Fraction(
-            row.flip_0to1_negative, 2 * row.n_negative
+        return Fraction(row.flip_0to1_positive, 2 * center_n_positive) - Fraction(
+            row.flip_0to1_negative, 2 * center_n_negative
         )
     if direction == "one_to_zero":
-        return Fraction(row.flip_1to0_negative, 2 * row.n_negative) - Fraction(
-            row.flip_1to0_positive, 2 * row.n_positive
+        return Fraction(row.flip_1to0_negative, 2 * center_n_negative) - Fraction(
+            row.flip_1to0_positive, 2 * center_n_positive
         )
     raise ProtocolError("OGDE terminal oracle direction drifted.")
 
@@ -60,13 +75,42 @@ def build_case_directional_oracles(
 ) -> tuple[DirectionalOracleDecision, ...]:
     indexed = {(row.target_center, row.case_id, row.action_id): row for row in confusions}
     cases = tuple(sorted({(row.target_center, row.case_id) for row in confusions}))
+    center_denominators: dict[str, tuple[int, int]] = {}
+    for target in CENTERS:
+        baseline_rows = tuple(
+            row
+            for row in confusions
+            if row.target_center == target and row.action_id == "B"
+        )
+        if not baseline_rows:
+            continue
+        center_denominators[target] = (
+            sum(row.n_positive for row in baseline_rows),
+            sum(row.n_negative for row in baseline_rows),
+        )
     output: list[DirectionalOracleDecision] = []
     for target, case in cases:
+        try:
+            center_n_positive, center_n_negative = center_denominators[target]
+        except KeyError as exc:
+            raise ProtocolError(
+                "OGDE terminal case oracle lacks baseline center denominators."
+            ) from exc
         for direction in DIRECTION_IDS:
-            utilities = {
-                source: _utility(indexed[(target, case, f"A1::source={source}")], direction)
-                for source in candidate_sources(target)
-            }
+            try:
+                utilities = {
+                    source: _utility(
+                        indexed[(target, case, f"A1::source={source}")],
+                        direction,
+                        center_n_positive=center_n_positive,
+                        center_n_negative=center_n_negative,
+                    )
+                    for source in candidate_sources(target)
+                }
+            except KeyError as exc:
+                raise ProtocolError(
+                    "OGDE terminal case oracle lacks a candidate confusion row."
+                ) from exc
             output.append(_oracle("O_CASE_DIRECTIONAL", target, case, direction, utilities))
     return tuple(output)
 
@@ -86,11 +130,20 @@ def build_static_directional_oracles(
                 if direction == "zero_to_one":
                     favorable = sum(row.flip_0to1_positive for row in rows)
                     adverse = sum(row.flip_0to1_negative for row in rows)
-                    utilities[source] = Fraction(favorable, 2 * positive) - Fraction(adverse, 2 * negative)
                 else:
                     favorable = sum(row.flip_1to0_negative for row in rows)
                     adverse = sum(row.flip_1to0_positive for row in rows)
-                    utilities[source] = Fraction(favorable, 2 * negative) - Fraction(adverse, 2 * positive)
+                if positive <= 0 or negative <= 0:
+                    raise ProtocolError(
+                        "OGDE terminal directional utility requires both classes per center."
+                    )
+                utilities[source] = (
+                    Fraction(favorable, 2 * positive)
+                    - Fraction(adverse, 2 * negative)
+                    if direction == "zero_to_one"
+                    else Fraction(favorable, 2 * negative)
+                    - Fraction(adverse, 2 * positive)
+                )
             output.append(_oracle("O_DIRECTIONAL_STATIC", target, "__STATIC__", direction, utilities))
     return tuple(output)
 
