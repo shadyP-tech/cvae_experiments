@@ -7,6 +7,29 @@ Every oracle row must be marked non-deployable. Diagnostic results may explain
 a failure or quantify headroom, but they must not tune or select a deployable
 policy and must remain separate from held-out utility claims.
 
+## Uniform-B v2 Consumed-Test Opportunity-Gated Dual-Endpoint Router v1
+
+This terminal diagnostic independently recomputes the common B/U/eight-A1
+probability surface and combines two frozen endpoints. I admits only positive
+held-case flip opportunities with a strictly positive `H minus c`
+support-calibrated expected-BACC proxy, separately mean-absolute normalizes the
+eight case and donor-G scores, and ranks them with fixed weights `4/5` and
+`1/5`. R recomputes the exact nine `K in {4,5,6}` by
+`w in {1/2,3/5,7/10}` robust arms. The portfolio is exactly
+`3/5 P(I) + 2/5 P(R)` before the sole threshold `0.5`.
+
+The experiment uses six successor-fenced original inputs and a direct
+original-ledger amendment; no earlier Stage-90 result or probability surface
+is an input. It has no recovery strategy. The reused test surface and both
+portfolio weights are post-hoc, so all BACC, calibration, identification,
+permutation, and delete-center summaries are descriptive only. Active-source
+identification, incremental superiority to R, nominal significance, fresh
+routing, downstream utility, promotion, and deployment remain unestablished.
+
+See
+[`midogpp-uniform-b-v2-consumed-test-fixed-bank-loo-opportunity-gated-dual-endpoint-router.md`](../../../../docs/wiki/03-experiments/midogpp-uniform-b-v2-consumed-test-fixed-bank-loo-opportunity-gated-dual-endpoint-router.md)
+for the full protocol and workstation schedule.
+
 The rejected subtree also preserves evidence from the old limited-domain
 MIDOG++ scanner support-routing surface. That surface did not cover the current
 full dataset contract, so its top-1, rank, and oracle-gap values are not

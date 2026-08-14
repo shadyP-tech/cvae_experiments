@@ -292,6 +292,20 @@ def build_parser() -> argparse.ArgumentParser:
     case_directional_correctness_abstention_router.add_argument(
         "--artifact-root", required=True
     )
+
+    opportunity_gated_dual_endpoint_router = sub.add_parser(
+        "fixed-bank-loo-opportunity-gated-dual-endpoint-router",
+        help=(
+            "Run the terminal consumed-test fixed-bank opportunity-gated "
+            "dual-endpoint probability-router diagnostic."
+        ),
+    )
+    opportunity_gated_dual_endpoint_router.add_argument(
+        "--config", required=True
+    )
+    opportunity_gated_dual_endpoint_router.add_argument(
+        "--artifact-root", required=True
+    )
     return parser
 
 
@@ -696,6 +710,22 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
         output = run_fixed_bank_case_directional_correctness_abstention_router(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "fixed-bank-loo-opportunity-gated-dual-endpoint-router":
+        from .fixed_bank_loo_opportunity_gated_dual_endpoint_router import (
+            load_fixed_bank_loo_opportunity_gated_dual_endpoint_router_config,
+            run_fixed_bank_loo_opportunity_gated_dual_endpoint_router,
+        )
+
+        config = load_fixed_bank_loo_opportunity_gated_dual_endpoint_router_config(
+            args.config
+        )
+        output = run_fixed_bank_loo_opportunity_gated_dual_endpoint_router(
             config,
             artifact_root=artifact_root,
         )

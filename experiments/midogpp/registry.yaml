@@ -2468,3 +2468,49 @@ experiments:
       - Two persistent spawned RTX A5000 generation workers precede a disjoint CUDA-free CPU phase with four workers and three BLAS threads each. Dedicated /data/local/fixed_bank_case_directional_correctness_abstention_router_v1 scratch is throughput-only; cross-run and terminal recovery are forbidden, and two fresh-process validation replays are required.
       - The registered exact-existing-snapshot strategy authorizes only validation finalization for the exact observed route-model replay failure. It cannot regenerate, rewrite, or change any indexed scientific, prediction, decision, or terminal member; ordinary cross-run and terminal recovery remain forbidden.
       - Every route probability and decision plus the global 218-route barrier seals before terminal labels open. All contrasts, oracles, and the fixed feature-block permutation are descriptive only and cannot authorize routing, action, policy, promotion, deployment, another stage, diagnostic, experiment, or generic consumer.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_loo_opportunity_gated_dual_endpoint_router.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_loo_opportunity_gated_dual_endpoint_router_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_loo_opportunity_gated_dual_endpoint_router_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_fixed_bank_loo_opportunity_gated_dual_endpoint_router_test_cache_v1
+      - midogpp_stage90_fixed_bank_loo_opportunity_gated_dual_endpoint_router_test_manifest_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_loo_opportunity_gated_dual_endpoint_router_parent_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_loo_opportunity_gated_dual_endpoint_router_amendment_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Reuse of immutable A1 generation geometry, exact-nine seed pairing, budgets, and classifier settings only; no routing, action, policy, downstream, promotion, or deployment authority is inherited.
+      midogpp_stage90_fixed_bank_loo_opportunity_gated_dual_endpoint_router_test_manifest_v1: Successor-fenced labels open only through q-not-in-H-or-e donor, route-scoped same-H-minus-held-case support, and terminal capabilities after the common physical surface and all identification, robust-endpoint, portfolio, and attribution decisions seal.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_loo_opportunity_gated_dual_endpoint_router_parent_v1: Byte-exact successor-fenced alias of the immutable original ledger, read only to verify the direct parent hash.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_loo_opportunity_gated_dual_endpoint_router_amendment_v1: Direct single-consumer authorization for this terminal post-hoc consumed-test diagnostic; it creates no fresh evidence.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-loo-opportunity-gated-dual-endpoint-router
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_loo_opportunity_gated_dual_endpoint_router_v1
+    notes:
+      - Explicitly authorized reuse of the already-consumed MIDOG++ test split for one terminal opportunity-gated dual-endpoint probability-router diagnostic. It is POST_HOC_CONSUMED_TEST_SENSITIVITY with fresh_evidence=false; weights were selected on this same evaluation surface.
+      - The exact six ordered inputs are the promoted bank, GenerationLock, successor-fenced byte-identical label-free cache and capability-gated manifest aliases, a successor-fenced byte-exact immutable-original-ledger alias, and this experiment's direct original-ledger amendment. No prior Stage-90 output, amendment, probability surface, scratch, checkpoint, or numbered-stage result is consumed.
+      - B, U, and eight A1 actions are independently recomputed as 810 exact-nine physical cells and globally sealed. For I, every H,c,e,d correctness fit and scaler uses H minus c; eligible candidates require a positive held-case flip opportunity and a strictly positive support-calibrated expected-BACC proxy. Separate exact-eight mean-absolute scales precede the fixed 4/5 case plus 1/5 donor-G score, with zero and nonfinite routes failing closed to OFF.
+      - R independently recomputes all nine K in {4,5,6} by w in {1/2,3/5,7/10} endpoint arms and retains duplicate arm identities. The final probability is exactly 3/5 I plus 2/5 R before the sole threshold 0.5. This is a common prediction-probability ensemble, not a generative mixture, NELBO estimate, or held-case utility available to the router.
+      - Attribution controls include calibration-only B/R, feature-block permutations, gate-only, source-only, matched G, and full-pipeline delete-one-center reconstruction. All results and intervals are descriptive; incremental improvement versus R and active-source identification remain unestablished.
+      - Two persistent spawned RTX A5000 generation workers precede a disjoint CUDA-free CPU phase with four workers and three BLAS threads each. Dedicated /data/local/fixed_bank_loo_opportunity_gated_dual_endpoint_router_v1 scratch is throughput-only; no recovery strategy is registered, cross-run and terminal recovery are forbidden, and two fresh-process validation replays are required.
+      - Regardless of outcome, this terminal consumed-test diagnostic cannot authorize routing, downstream utility, action or policy changes, model or expert updates, promotion, deployment, recipe selection, a numbered-stage feed, another diagnostic, another experiment, or a generic consumer.
