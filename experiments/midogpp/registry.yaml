@@ -2514,3 +2514,52 @@ experiments:
       - Attribution controls include calibration-only B/R, feature-block permutations, gate-only, source-only, matched G, and full-pipeline delete-one-center reconstruction. All results and intervals are descriptive; incremental improvement versus R and active-source identification remain unestablished.
       - Two persistent spawned RTX A5000 generation workers precede a disjoint CUDA-free CPU phase with four workers and three BLAS threads each. Dedicated /data/local/fixed_bank_loo_opportunity_gated_dual_endpoint_router_v1 scratch is throughput-only; no recovery strategy is registered, cross-run and terminal recovery are forbidden, and two fresh-process validation replays are required.
       - Regardless of outcome, this terminal consumed-test diagnostic cannot authorize routing, downstream utility, action or policy changes, model or expert updates, promotion, deployment, recipe selection, a numbered-stage feed, another diagnostic, another experiment, or a generic consumer.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_loo_nested_donor_endpoint_regret_router.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_loo_nested_donor_endpoint_regret_router_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_loo_nested_donor_endpoint_regret_router_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_fixed_bank_loo_nested_donor_endpoint_regret_router_test_cache_v1
+      - midogpp_stage90_fixed_bank_loo_nested_donor_endpoint_regret_router_test_manifest_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_loo_nested_donor_endpoint_regret_router_parent_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_loo_nested_donor_endpoint_regret_router_amendment_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Reuse of immutable A1 generation geometry, exact-nine seed pairing, budgets, and classifier settings only; no routing, action, policy, downstream, promotion, or deployment authority is inherited.
+      midogpp_stage90_fixed_bank_loo_nested_donor_endpoint_regret_router_test_manifest_v1: Experiment-fenced labels open only through source-prior, regret-donor, H-minus-c outer support, H-minus-c-minus-s unordered-pair support, and terminal capabilities after every one of the 218 routes seals.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_loo_nested_donor_endpoint_regret_router_parent_v1: Byte-exact experiment-fenced alias of the immutable original ledger, read only to verify the direct parent hash.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_loo_nested_donor_endpoint_regret_router_amendment_v1: Direct single-consumer authorization for this terminal post-hoc consumed-test diagnostic; it creates no fresh evidence.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-loo-nested-donor-endpoint-regret-router
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_loo_nested_donor_endpoint_regret_router_v1
+    notes:
+      - Explicitly authorized reuse of the already-consumed MIDOG++ test split for one terminal nested donor endpoint-regret sensitivity. Its support-aware route and protected fallback are not label-blind. It is POST_HOC_CONSUMED_TEST_SENSITIVITY, fresh_evidence=false, and cannot establish deployable routing or downstream utility.
+      - Exactly six original inputs are admitted. B, U, and eight frozen A1 actions are independently recomputed as 810 exact-nine physical cells; no earlier Stage-90 result, amendment, probability surface, scratch directory, checkpoint, or numbered-stage result is consumed.
+      - Each target case c is routed from H-minus-c support. Each nested voter s uses one unordered H-minus-c-minus-s endpoint state that is reused for both ordered directions. The 2,660 pair states plus 218 outer states require exactly 46,048 endpoint-model fits.
+      - Donor regret uses every case in each of the eight J-not-equal-H centers, including explicit zero-regret P rows. The center-balanced partial-pool Ridge gives each donor center equal total weight; alpha is 1, center-effect alpha is 8, and every scaler/model is refit for each delete-donor control.
+      - "The decisive firewall additionally excludes outer H from every donor descriptor's external source prior: q is outside outer H, donor J, and candidate e. Prior-dependent endpoint composition is rebound over the already-fitted IRLS basis, adding zero endpoint fits and preventing target-center labels from leaking through another center's descriptor."
+      - NDR_MODEL_BASED routes only when nested support, full-model positive BACC regret, at least seven of eight positive delete-donor fits, a nonpositive point estimate of full-model log-loss delta, and at least seven of eight point-estimate loss-safe delete fits all pass; this is not a noninferiority test, and every failure falls back exactly to P_PROTECTED.
+      - The eight dependent donor-center blocks provide only a descriptive feasibility screen. Optimistic independent-binomial tails are reported as power references, statistical authorization is disabled, and the resulting center-block feasibility method returns P_PROTECTED for every target.
+      - The 512 center-sign-flip control reselects the frozen policy identity while holding route features, models, and case decisions fixed. It is not a full-pipeline or full-selection null replay and supports no nominal significance claim.
+      - Two persistent spawned RTX A5000 generation workers precede a disjoint CUDA-free CPU phase with four LPT-balanced route workers and three BLAS threads each. Dedicated /data/local scratch is preferred, artifact-parent scratch is the fallback, and two full fresh-process validation replays are required.
+      - Regardless of outcome, this artifact cannot authorize routing success, action or policy changes, model or expert updates, promotion, deployment, recipe selection, a numbered-stage feed, another diagnostic, another experiment, or a generic consumer.

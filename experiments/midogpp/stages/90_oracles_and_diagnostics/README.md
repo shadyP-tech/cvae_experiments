@@ -1050,3 +1050,75 @@ Every possible result remains `POST_HOC_CONSUMED_TEST_SENSITIVITY` and
 `TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`: it cannot establish fresh routing,
 held-case exact BACC prediction, downstream utility, or deployment evidence,
 and it may not feed another experiment or stage.
+
+## Uniform-B v2 consumed-test nested donor endpoint-regret router v1
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_loo_nested_donor_endpoint_regret_router.v1`
+is the isolated successor diagnostic for testing whether case-level endpoint
+choice can be stabilized across domains. It independently regenerates B, U,
+and all eight frozen A1 actions from exactly six experiment-fenced inputs and
+seals 810 exact-nine probability cells. It consumes no earlier Stage-90
+result, amendment, prediction surface, scratch directory, or checkpoint.
+
+For each target case `c` in center `H`, endpoint nomination uses whole-case
+support `H-c`. Every support voter `s` is evaluated by one unordered state
+fitted on `H-{c,s}`; each unordered state is reused for its two ordered voter
+directions. The canonical topology is 218 outer routes, 2,660 unordered pair
+states, 5,320 ordered voters, and 46,048 endpoint-model fits. All route plans
+are sealed before labels open.
+
+The stability mechanism trains on every case in each donor center `J != H`,
+including explicit zero-regret protected-P rows when no alternative exists.
+Paired BACC regret and paired log-loss delta are separate response surfaces.
+The fixed partial-pool Ridge gives each donor center equal total weight, uses
+`alpha=1` for feature slopes and `alpha=8` for donor-center effects, and refits
+both preprocessing and models for every donor-center deletion. Crucially, a
+donor descriptor for outer target `H` computes its external prior only from
+query centers outside `H`, donor `J`, and candidate source `e`. It rebinds that
+prior over an already-fitted IRLS basis, so outer-H labels cannot leak through
+another donor's descriptor and no extra endpoint fit is required.
+
+The primary route switches away from `P_PROTECTED` only when the full model
+predicts positive BACC regret, at least seven of eight delete-donor models
+remain positive, nested support gain exceeds one half of its voter dispersion,
+the full log-loss delta is nonpositive, and at least seven of eight deleted
+fits are also proper-loss safe. Every finite gate failure falls back to
+`P_PROTECTED`; malformed scientific topology aborts the run. The loss checks
+are point-estimate no-worse gates, not noninferiority tests. Both the route and
+fallback depend on legal consumed-test support labels, so neither is described
+as label-blind.
+
+The eight donor-center blocks are retained only as a descriptive feasibility
+screen. Because their cross-fitted fits are dependent, the reported
+independent-binomial tails are optimistic power references rather than valid
+LTT p-values; statistical authorization is disabled and the feasibility method
+returns protected P for every target. The exact 512 center-sign-flip control
+reselects the frozen policy identity but holds features, fits, and case
+decisions fixed, so it is not a full-pipeline or full-selection null replay.
+Terminal output separately reports case-weighted and equal-center endpoint
+agreement, rank, normalized oracle gap, center contrasts, switch attribution,
+and donor-regret rank association without a nominal significance claim.
+
+The workstation schedule uses two persistent spawned RTX A5000 generation
+workers, then clears CUDA and runs four LPT-balanced CPU route workers with
+three BLAS threads each. Float32 stores sources and probability cells, int64
+stores confusion counts, and float64 performs scientific reductions. Scratch
+prefers `/data/local/fixed_bank_loo_nested_donor_endpoint_regret_router_v1`
+and otherwise uses an artifact-parent directory. Two sequential CUDA-free
+fresh interpreters must reconstruct the full science exactly before the
+closed-world bundle can complete.
+
+```bash
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_loo_nested_donor_endpoint_regret_router.v1
+```
+
+The experiment is registered but unexecuted. Its config contract hash is
+`1f60b4352a67c60f`, protocol hash is
+`474ef49cf7b2fd6ce60ac10d473d5ffdb49abf028737b1aa5ee1d644f782884b`,
+and direct amendment SHA-256 is
+`20af29472bc6d8e1dc81f6167f65b038e4b57dbb8c0e93dd79a8e84e8b6439dc`.
+Every outcome remains `POST_HOC_CONSUMED_TEST_SENSITIVITY` and
+`TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`. It cannot establish fresh routing,
+generalization, downstream utility, or deployment evidence, and no artifact
+or decision from this run may feed another experiment or stage.

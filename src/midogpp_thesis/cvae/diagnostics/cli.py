@@ -306,6 +306,18 @@ def build_parser() -> argparse.ArgumentParser:
     opportunity_gated_dual_endpoint_router.add_argument(
         "--artifact-root", required=True
     )
+
+    nested_donor_endpoint_regret_router = sub.add_parser(
+        "fixed-bank-loo-nested-donor-endpoint-regret-router",
+        help=(
+            "Run the terminal consumed-test fixed-bank nested donor "
+            "endpoint-regret routing diagnostic."
+        ),
+    )
+    nested_donor_endpoint_regret_router.add_argument("--config", required=True)
+    nested_donor_endpoint_regret_router.add_argument(
+        "--artifact-root", required=True
+    )
     return parser
 
 
@@ -726,6 +738,20 @@ def main(argv: list[str] | None = None) -> int:
             args.config
         )
         output = run_fixed_bank_loo_opportunity_gated_dual_endpoint_router(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "fixed-bank-loo-nested-donor-endpoint-regret-router":
+        from .fixed_bank_loo_nested_donor_endpoint_regret_router import (
+            load_nested_donor_endpoint_regret_config,
+            run_nested_donor_endpoint_regret_router,
+        )
+
+        config = load_nested_donor_endpoint_regret_config(args.config)
+        output = run_nested_donor_endpoint_regret_router(
             config,
             artifact_root=artifact_root,
         )
