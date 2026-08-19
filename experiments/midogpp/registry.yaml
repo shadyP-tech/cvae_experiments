@@ -2564,6 +2564,53 @@ experiments:
       - Two persistent spawned RTX A5000 generation workers precede a disjoint CUDA-free CPU phase with four LPT-balanced route workers and three BLAS threads each. Dedicated /data/local scratch is preferred, artifact-parent scratch is the fallback, and two full fresh-process validation replays are required.
       - Regardless of outcome, this artifact cannot authorize routing success, action or policy changes, model or expert updates, promotion, deployment, recipe selection, a numbered-stage feed, another diagnostic, another experiment, or a generic consumer.
 
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_crossfit_sample_influence_router.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_p_anchored_crossfit_sample_influence_router_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_crossfit_sample_influence_router_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_fixed_bank_p_anchored_crossfit_sample_influence_router_test_cache_v1
+      - midogpp_stage90_fixed_bank_p_anchored_crossfit_sample_influence_router_test_manifest_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_crossfit_sample_influence_router_parent_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_crossfit_sample_influence_router_amendment_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Reuse of immutable A1 generation geometry, exact-nine seed pairing, budgets, and classifier settings only; no routing, action, policy, downstream, promotion, or deployment authority is inherited.
+      midogpp_stage90_fixed_bank_p_anchored_crossfit_sample_influence_router_test_manifest_v1: Experiment-fenced labels open only through source-prior, donor-response, H-minus-c route-local support, and terminal capabilities after all routes seal.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_crossfit_sample_influence_router_parent_v1: Byte-exact experiment-fenced alias of the immutable original ledger, read only to verify the direct parent hash.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_crossfit_sample_influence_router_amendment_v1: Direct single-consumer authorization for this terminal post-hoc consumed-test diagnostic; it creates no fresh evidence.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-p-anchored-crossfit-sample-influence-router
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_crossfit_sample_influence_router_v1
+    notes:
+      - Explicitly authorized reuse of the already-consumed MIDOG++ test split for one terminal target-support-conditioned diagnostic. It is POST_HOC_CONSUMED_TEST_SENSITIVITY with fresh_evidence=false and is not a deployment or promotion experiment.
+      - Exactly six original inputs are admitted. All 810 physical probability cells are recomputed; no earlier Stage-90 output, amendment, probability surface, scratch directory, or checkpoint is consumed.
+      - Every case c receives its own standardized balanced logistic posterior fit on H-minus-c. The held case labels never enter its scaler, model, influence scores, veto, or sealed decisions; the model is never shared across routes and never replaces the frozen endpoint classifier.
+      - The 30-dimensional label-free sample fingerprint contains exact-nine mean, population SD, and positive-vote fraction for B, U, and eight target-excluded A1 actions. Balanced probabilities are corrected back to the natural H-minus-c prevalence before balanced-accuracy influence aggregation.
+      - PCSI_DUAL_VETO requires positive target-local influence plus outer-center-excluded donor predictions of positive BACC contribution and nonpositive Brier and log-loss contributions. It selects at most one B/I/R action per direction, uses fixed 0.25 sign-preserving shrinkage, and falls back exactly to P.
+      - Score-only, proper-only, and within-case complete-row blocked-fingerprint policies are predeclared. Terminal labels diagnose sample helpfulness AUC/calibration, action rank signal, center stability, oracle gaps, and realized utility only after all routes seal.
+      - The CPU phase uses four center-batched spawned workers with one BLAS thread for 436 route-local posterior fits; the donor veto is fitted once as 81 light full/delete models. The preceding physical generation remains two persistent RTX A5000 workers.
+      - Regardless of outcome, this artifact cannot authorize routing success, action or policy changes, model or expert updates, promotion, deployment, recipe selection, a numbered-stage feed, another diagnostic, another experiment, or a generic consumer.
+
   - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_directional_signed_utility_router.v1
     stage: 90_oracles_and_diagnostics
     status: diagnostic

@@ -338,6 +338,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pdsur.add_argument("--config", required=True)
     pdsur.add_argument("--artifact-root", required=True)
+
+    pcsi = sub.add_parser(
+        "fixed-bank-p-anchored-crossfit-sample-influence-router",
+        help=(
+            "Run the terminal consumed-test fixed-bank P-anchored "
+            "cross-fit sample-influence routing diagnostic."
+        ),
+    )
+    pcsi.add_argument("--config", required=True)
+    pcsi.add_argument("--artifact-root", required=True)
     return parser
 
 
@@ -802,6 +812,22 @@ def main(argv: list[str] | None = None) -> int:
             args.config
         )
         output = run_p_anchored_directional_signed_utility_router(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "fixed-bank-p-anchored-crossfit-sample-influence-router":
+        from .fixed_bank_p_anchored_crossfit_sample_influence_router import (
+            load_p_anchored_crossfit_sample_influence_router_config,
+            run_p_anchored_crossfit_sample_influence_router,
+        )
+
+        config = load_p_anchored_crossfit_sample_influence_router_config(
+            args.config
+        )
+        output = run_p_anchored_crossfit_sample_influence_router(
             config,
             artifact_root=artifact_root,
         )
