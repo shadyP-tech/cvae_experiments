@@ -1122,3 +1122,49 @@ Every outcome remains `POST_HOC_CONSUMED_TEST_SENSITIVITY` and
 `TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`. It cannot establish fresh routing,
 generalization, downstream utility, or deployment evidence, and no artifact
 or decision from this run may feed another experiment or stage.
+
+## Uniform-B v2 consumed-test directional signed-utility router v1
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_directional_signed_utility_router.v1`
+is the isolated successor to the crossing-helpfulness and nested-regret
+diagnostics. It recomputes the same 810 exact-nine probability cells from six
+original fenced inputs and retains the lean 218-case, 3,488-endpoint-fit
+topology. No earlier diagnostic artifact, amendment, probability surface, or
+scratch state is an input.
+
+The scientific unit is the complete case by `{B,I,R}` by
+`{zero_to_one,one_to_zero}` rectangle. Structural no-crossing cells remain as
+exact-zero rows. One center-balanced multivariate ridge design, with six
+unpenalized action-direction intercepts, predicts the direct equal-center
+contributions to BACC, Brier score, and log loss. It is refit for all eight
+donor deletions; predictions are bias-corrected using only the corresponding
+held-donor residuals. These 162 light fits are stability checks,
+not independent confidence replicates.
+
+`PDSUR_STABLE` selects at most one endpoint per direction, requires seven of
+eight donor-deletion signs to agree, applies the proper-loss safety gates, and
+falls back to `P_PROTECTED` on every tie or failed gate. Selected endpoint
+probabilities receive a fixed `0.25` shrinkage toward `0.5`; this preserves the
+selected hard class while reducing overconfidence. BACC-only, full-only, and
+case-blocked-feature controls are persisted separately.
+
+On the workstation:
+
+```bash
+env PYTHONPATH=src \
+  /home/stud/spark/.venvs/cvae-breakhis/bin/python \
+  -m midogpp_thesis workspace validate
+
+env PYTHONPATH=src \
+  /home/stud/spark/.venvs/cvae-breakhis/bin/python \
+  -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_directional_signed_utility_router.v1
+```
+
+The config contract hash is `50915569869e8b8d`, the protocol hash is
+`1094b4d5487bfa1f5ec9b76a5f55fc8a23637184777c1bbd9e9044285f39c14b`,
+and the direct amendment SHA-256 is
+`e17a88f15b1f4ec7537ae61aaa78369a4714869ce9d4abcea53e39d4037b34b8`.
+MIDOG++ test reuse is terminal diagnostic analysis only: every outcome remains
+`POST_HOC_CONSUMED_TEST_SENSITIVITY` and
+`TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE` and cannot feed another experiment.
