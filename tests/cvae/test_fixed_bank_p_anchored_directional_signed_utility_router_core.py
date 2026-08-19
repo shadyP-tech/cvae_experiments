@@ -260,6 +260,50 @@ def test_blocked_control_moves_features_but_preserves_signed_responses() -> None
     assert any(a.feature_values != b.feature_values for a, b in zip(rows, blocked, strict=True))
 
 
+def test_blocked_control_keeps_structural_zero_response_geometry() -> None:
+    zero_features = (0.0,) * len(UTILITY_FEATURE_NAMES)
+    crossing_features = (1.0,) * len(UTILITY_FEATURE_NAMES)
+    rows = (
+        DonorUtilityRow(
+            "0",
+            "1",
+            "case-a",
+            "B",
+            "zero_to_one",
+            zero_features,
+            0,
+            0.0,
+            0.0,
+            0.0,
+            "1" * 64,
+        ),
+        DonorUtilityRow(
+            "0",
+            "1",
+            "case-b",
+            "B",
+            "zero_to_one",
+            crossing_features,
+            2,
+            0.01,
+            -0.02,
+            -0.03,
+            "2" * 64,
+        ),
+    )
+
+    blocked = blocked_feature_permutation(rows)
+
+    assert [row.feature_values for row in blocked] == [
+        crossing_features,
+        zero_features,
+    ]
+    assert [row.crossing_count for row in blocked] == [0, 2]
+    assert [row.bacc_contribution_delta for row in blocked] == [0.0, 0.01]
+    assert [row.brier_contribution_delta for row in blocked] == [0.0, -0.02]
+    assert [row.log_loss_contribution_delta for row in blocked] == [0.0, -0.03]
+
+
 def test_selection_is_one_action_per_direction_with_exact_p_fallback() -> None:
     endpoint = _endpoint()
     descriptors = build_utility_descriptors(endpoint)

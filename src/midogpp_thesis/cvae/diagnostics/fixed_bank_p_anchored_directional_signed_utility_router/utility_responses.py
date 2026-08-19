@@ -159,7 +159,11 @@ def blocked_feature_permutation(
                 original.alternative,
                 original.direction,
                 feature_source.feature_values,
-                feature_source.crossing_count,
+                # crossing_count belongs to the response geometry.  The
+                # blocked control permutes only model inputs; moving this
+                # auxiliary response invariant can pair a structural-zero
+                # feature row with a nonzero original response.
+                original.crossing_count,
                 original.bacc_contribution_delta,
                 original.brier_contribution_delta,
                 original.log_loss_contribution_delta,
