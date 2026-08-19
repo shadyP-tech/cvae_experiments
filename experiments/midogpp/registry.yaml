@@ -2611,6 +2611,53 @@ experiments:
       - The CPU phase uses four center-batched spawned workers with one BLAS thread for 436 route-local posterior fits; the donor veto is fitted once as 81 light full/delete models. The preceding physical generation remains two persistent RTX A5000 workers.
       - Regardless of outcome, this artifact cannot authorize routing success, action or policy changes, model or expert updates, promotion, deployment, recipe selection, a numbered-stage feed, another diagnostic, another experiment, or a generic consumer.
 
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_crossfit_posterior_utility_margin_router.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_p_anchored_crossfit_posterior_utility_margin_router_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_crossfit_posterior_utility_margin_router_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_fixed_bank_p_anchored_crossfit_posterior_utility_margin_router_test_cache_v1
+      - midogpp_stage90_fixed_bank_p_anchored_crossfit_posterior_utility_margin_router_test_manifest_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_crossfit_posterior_utility_margin_router_parent_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_crossfit_posterior_utility_margin_router_amendment_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Reuse of immutable A1 generation geometry, exact-nine seed pairing, budgets, and classifier settings only; no routing, action, policy, downstream, promotion, or deployment authority is inherited.
+      midogpp_stage90_fixed_bank_p_anchored_crossfit_posterior_utility_margin_router_test_manifest_v1: Experiment-fenced labels open only through source-prior, donor-response, H-minus-c grouped posterior support, and terminal capabilities after all routes seal.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_crossfit_posterior_utility_margin_router_parent_v1: Byte-exact experiment-fenced alias of the immutable original ledger, read only to verify the direct parent hash.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_crossfit_posterior_utility_margin_router_amendment_v1: Direct single-consumer authorization for this terminal post-hoc consumed-test diagnostic; it creates no fresh evidence.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-p-anchored-crossfit-posterior-utility-margin-router
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_crossfit_posterior_utility_margin_router_v1
+    notes:
+      - This is one explicitly authorized terminal reuse of the already-consumed MIDOG++ test split; it remains POST_HOC_CONSUMED_TEST_SENSITIVITY and creates no fresh evidence.
+      - Exactly six original inputs are admitted and all 810 physical probability cells are recomputed. No predecessor Stage-90 output, route, checkpoint, probability surface, or scratch state is consumed.
+      - Each route uses five label-free whole-case folds inside H-minus-c. Fold models predict c plus their excluded support cases; OOF AUC and Brier skill gate route reliability without opening c labels.
+      - Expected BACC, Brier, and log-loss action deltas are computed analytically under each fold posterior and reduced with a median plus or minus 1.4826 MAD rule. There is no donor-response regression.
+      - Outer-center-excluded donor outcomes calibrate one scalar abstention margin per outer center and fingerprint control. An inner leave-one-donor replay must be safe or the primary policy falls back to exact P for that center.
+      - PUMR_DONOR_MARGIN, BACC-only, zero-margin, and within-case blocked-fingerprint policies are frozen before terminal labels. Terminal diagnostics cannot update any route or feed another experiment.
+      - The CPU phase uses four spawned center batches and one BLAS thread per posterior worker for 2,180 logistic fits. Physical generation remains two persistent RTX A5000 workers.
+      - Regardless of outcome, this artifact cannot authorize routing success, action or policy changes, model or expert updates, promotion, deployment, recipe selection, a numbered-stage feed, another diagnostic, another experiment, or a generic consumer.
+
   - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_directional_signed_utility_router.v1
     stage: 90_oracles_and_diagnostics
     status: diagnostic
