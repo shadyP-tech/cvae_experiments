@@ -41,9 +41,13 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_crossfit_posterior_ut
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_crossfit_posterior_utility_margin_router.hashing import (
     canonical_hash,
+    json_native,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_crossfit_posterior_utility_margin_router.margin_calibration import (
     calibrate_margin,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_crossfit_posterior_utility_margin_router.persistence import (
+    persist_terminal,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_crossfit_posterior_utility_margin_router.posterior_contracts import (
     PhysicalFingerprintSurface,
@@ -241,6 +245,25 @@ def test_science_package_has_no_cross_diagnostic_imports() -> None:
         assert not any(fragment in module for fragment in forbidden for module in modules)
 
 
+def test_json_boundary_normalizes_numpy_scalars_but_rejects_arrays() -> None:
+    wrapped = {
+        "passed": np.bool_(True),
+        "count": np.int64(7),
+        "score": np.float32(0.25),
+        "nested": (np.bool_(False),),
+    }
+    converted = json_native(wrapped)
+    assert converted == {
+        "passed": True,
+        "count": 7,
+        "score": 0.25,
+        "nested": [False],
+    }
+    assert canonical_hash(wrapped) == canonical_hash(converted)
+    with pytest.raises(ProtocolError, match="cannot convert ndarray"):
+        json_native(np.asarray([True]))
+
+
 def test_five_fold_plan_is_whole_case_and_label_free() -> None:
     fingerprint, _labels = _fingerprint()
     plans = build_support_fold_plans(fingerprint, held_case_id="case-0")
@@ -393,7 +416,9 @@ def test_composition_uses_margin_and_preserves_exact_p_on_unauthorized_center() 
     assert fallback.probabilities == endpoint.probabilities[PORTFOLIO_METHOD_ID]
 
 
-def test_small_end_to_end_surface_seals_before_terminal_labels() -> None:
+def test_small_end_to_end_surface_seals_and_persists_terminal_tree(
+    tmp_path: Path,
+) -> None:
     store_hash = canonical_hash({"store": "fixture"})
     centers = {}
     labels: dict[tuple[str, str, str], int] = {}
@@ -457,3 +482,12 @@ def test_small_end_to_end_surface_seals_before_terminal_labels() -> None:
     assert terminal.capability_report["status"] == "PASS"
     assert terminal.capability_report["route_decision_seal_count"] == 63
     assert terminal.diagnostic_summary["promotion_eligible"] is False
+    persist_terminal(
+        tmp_path,
+        terminal=terminal,
+        leakage_report={"status": "PASS", "numpy_flag": np.bool_(True)},
+        publication_decision={"status": "DIAGNOSTIC_ONLY"},
+        runtime_summary={"posterior_fit_count": np.int64(630)},
+    )
+    assert (tmp_path / "reports/diagnostic_summary.json").is_file()
+    assert (tmp_path / "tables/information_gate.json").is_file()

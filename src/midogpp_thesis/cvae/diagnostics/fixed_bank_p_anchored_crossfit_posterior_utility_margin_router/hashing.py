@@ -8,17 +8,18 @@ from dataclasses import asdict, is_dataclass
 from fractions import Fraction
 from typing import Any
 
+import numpy as np
+
 from ...protocol import ProtocolError
 
 
 def canonical_hash(payload: object) -> str:
     encoded = json.dumps(
-        payload,
+        json_native(payload),
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=True,
         allow_nan=False,
-        default=str,
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
@@ -38,6 +39,19 @@ def json_native(value: Any) -> Any:
 
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
+    # NumPy reductions and comparisons return scalar wrappers.  Their values
+    # are scientifically identical to the corresponding Python scalars, but
+    # the standard-library JSON encoder does not recognize those wrappers.
+    # Keep the conversion explicit so arrays, complex numbers, datetimes, and
+    # other unsupported NumPy objects remain fail-closed below.
+    if isinstance(value, np.bool_):
+        return bool(value)
+    if isinstance(value, np.integer):
+        return int(value)
+    if isinstance(value, np.floating):
+        return float(value)
+    if isinstance(value, np.str_):
+        return str(value)
     if isinstance(value, Fraction):
         return {"numerator": value.numerator, "denominator": value.denominator}
     converter = getattr(value, "to_payload", None)
