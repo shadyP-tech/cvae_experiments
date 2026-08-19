@@ -1,4 +1,4 @@
-"""Thin, phase-ordered runner for the terminal nested donor-regret diagnostic."""
+"""Thin, phase-ordered runner for the terminal PDCB diagnostic."""
 
 from __future__ import annotations
 
@@ -43,11 +43,11 @@ from .run_admission import (
     write_state,
 )
 from .scratch import cleanup_scratch
-from .validation import validate_nested_donor_endpoint_regret_bundle
+from .validation import validate_p_anchored_directional_crossing_bagging_bundle
 from .workstation import assert_cuda_free_cpu_phase
 
 
-def run_nested_donor_endpoint_regret_router(
+def run_p_anchored_directional_crossing_bagging(
     config: object,
     *,
     artifact_root: str | Path | None = None,
@@ -89,7 +89,7 @@ def run_nested_donor_endpoint_regret_router(
                 root, runtime=getattr(config, "runtime")
             )
 
-            phase = "TWO_PERSISTENT_A5000_WORKERS_THEN_EXACT_810_CPU_FITS"
+            phase = "TWO_PERSISTENT_A5000_WORKERS_THEN_EXACT_810_CLASSIFIER_FITS"
             write_state(root, status="RUNNING", phase=phase)
             _observe(phase_observer, phase)
             physical = materialize_physical_inputs(
@@ -104,7 +104,7 @@ def run_nested_donor_endpoint_regret_router(
                 probability_index=probability_index_rows(physical.prediction),
             )
 
-            phase = "NESTED_WHOLE_CASE_ENDPOINTS_AND_DONOR_REGRET"
+            phase = "OUTER_LOO_ENDPOINTS_AND_DONOR_CROSSING_BAGGING"
             write_state(root, status="RUNNING", phase=phase)
             _observe(phase_observer, phase)
             preterminal = build_preterminal_result(
@@ -147,14 +147,14 @@ def run_nested_donor_endpoint_regret_router(
                 config_contract_hash=str(getattr(config, "contract_hash")),
                 protocol_contract_hash=protocol.protocol_hash,
             )
-            checks = validate_nested_donor_endpoint_regret_bundle(
+            checks = validate_p_anchored_directional_crossing_bagging_bundle(
                 root, config=config, allow_pending_validation=True
             )
             attested = require_two_fresh_process_validations(
                 root, expected_checks=checks
             )
             persist_validation_report(root, attested)
-            validate_nested_donor_endpoint_regret_bundle(
+            validate_p_anchored_directional_crossing_bagging_bundle(
                 root, config=config, allow_pending_validation=False
             )
             cleanup_scratch(
@@ -180,4 +180,7 @@ def _observe(callback: Callable[[str], None] | None, phase: str) -> None:
         callback(phase)
 
 
-__all__ = ("run_nested_donor_endpoint_regret_router",)
+run_pdcb = run_p_anchored_directional_crossing_bagging
+
+
+__all__ = ("run_p_anchored_directional_crossing_bagging", "run_pdcb")

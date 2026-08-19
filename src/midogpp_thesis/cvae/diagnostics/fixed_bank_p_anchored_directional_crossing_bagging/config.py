@@ -1,4 +1,4 @@
-"""Exact-schema config loader for the nested donor-regret diagnostic."""
+"""Exact-schema config loader for the PDCB diagnostic."""
 
 from __future__ import annotations
 
@@ -60,7 +60,7 @@ CONFIG_TOP_LEVEL = frozenset(
 
 
 @dataclass(frozen=True)
-class NestedDonorEndpointRegretConfig:
+class PAnchoredDirectionalCrossingBaggingConfig:
     source_path: Path
     artifact_root: Path
     expert_bank_root: Path
@@ -127,16 +127,16 @@ class NestedDonorEndpointRegretConfig:
         }
 
 
-def load_nested_donor_endpoint_regret_config(
+def load_p_anchored_directional_crossing_bagging_config(
     path: str | Path,
-) -> NestedDonorEndpointRegretConfig:
+) -> PAnchoredDirectionalCrossingBaggingConfig:
     source = Path(path).resolve()
     try:
         raw = yaml.safe_load(source.read_text(encoding="utf-8")) or {}
     except (OSError, yaml.YAMLError) as exc:
-        raise ProtocolError("Cannot read nested donor-regret config.") from exc
+        raise ProtocolError("Cannot read PDCB config.") from exc
     if not isinstance(raw, Mapping) or set(raw) != set(CONFIG_TOP_LEVEL):
-        raise ProtocolError("Nested donor-regret top-level config drifted.")
+        raise ProtocolError("PDCB top-level config drifted.")
     _reject_pending(raw)
     experiment = _section(raw, "experiment")
     inputs = _section(raw, "inputs")
@@ -154,12 +154,12 @@ def load_nested_donor_endpoint_regret_config(
             experiment.get("status") != "POST_HOC_CONSUMED_TEST_SENSITIVITY",
         )
     ):
-        raise ProtocolError("Nested donor-regret experiment identity drifted.")
+        raise ProtocolError("PDCB experiment identity drifted.")
     artifact_root_text = str(experiment["artifact_root"])
     if artifact_root_text.startswith("output://") and artifact_root_text != (
         f"output://{OUTPUT_ARTIFACT_ID}"
     ):
-        raise ProtocolError("Nested donor-regret output identity drifted.")
+        raise ProtocolError("PDCB output identity drifted.")
     fixed_inputs = {
         "expert_bank_artifact_id": EXPERT_BANK_ARTIFACT_ID,
         "generation_lock_artifact_id": GENERATION_LOCK_ARTIFACT_ID,
@@ -196,12 +196,12 @@ def load_nested_donor_endpoint_regret_config(
     if set(inputs) != set(fixed_inputs) | set(locations) or any(
         inputs.get(key) != value for key, value in fixed_inputs.items()
     ):
-        raise ProtocolError("Nested donor-regret exact-six input schema drifted.")
+        raise ProtocolError("PDCB exact-six input schema drifted.")
     for key, (artifact_id, member) in locations.items():
         value = str(inputs[key])
         expected = f"artifact://{artifact_id}" + (f"/{member}" if member else "")
         if value.startswith("artifact://") and value != expected:
-            raise ProtocolError(f"Nested donor-regret artifact URI drifted: {key}.")
+            raise ProtocolError(f"PDCB artifact URI drifted: {key}.")
     sections = {
         "protocol": frozen_protocol_payload(),
         "action_library": canonical_action_library_payload(),
@@ -212,10 +212,10 @@ def load_nested_donor_endpoint_regret_config(
     }
     for key, expected in sections.items():
         if dict(_section(raw, key)) != expected:
-            raise ProtocolError(f"Nested donor-regret config section drifted: {key}.")
+            raise ProtocolError(f"PDCB config section drifted: {key}.")
     classifier = _classifier(_section(raw, "classifier"))
     if classifier != CLASSIFIER:
-        raise ProtocolError("Nested donor-regret classifier drifted.")
+        raise ProtocolError("PDCB classifier drifted.")
     scientific = {
         "experiment_id": EXPERIMENT_ID,
         "input_artifact_ids": list(INPUT_ARTIFACT_IDS),
@@ -225,7 +225,7 @@ def load_nested_donor_endpoint_regret_config(
     resolved = {
         key: _resolve(source.parent, str(inputs[key])) for key in locations
     }
-    return NestedDonorEndpointRegretConfig(
+    return PAnchoredDirectionalCrossingBaggingConfig(
         source_path=source,
         artifact_root=_resolve(source.parent, artifact_root_text),
         classifier=classifier,
@@ -238,7 +238,7 @@ def load_nested_donor_endpoint_regret_config(
 def _section(raw: Mapping[str, object], key: str) -> Mapping[str, object]:
     value = raw.get(key)
     if not isinstance(value, Mapping):
-        raise ProtocolError(f"Nested donor-regret config section absent: {key}.")
+        raise ProtocolError(f"PDCB config section absent: {key}.")
     return value
 
 
@@ -268,7 +268,7 @@ def _classifier(raw: Mapping[str, object]) -> ClassifierSpec:
             scaler_fit=str(raw["scaler_fit"]),
         )
     except (KeyError, TypeError, ValueError) as exc:
-        raise ProtocolError("Nested donor-regret classifier payload malformed.") from exc
+        raise ProtocolError("PDCB classifier payload malformed.") from exc
 
 
 def _reject_pending(value: object) -> None:
@@ -284,11 +284,16 @@ def _reject_pending(value: object) -> None:
         or "TO_BE_RECOMPUTED" in value
         or value.startswith("__PENDING_")
     ):
-        raise ProtocolError("Nested donor-regret config contains a pending value.")
+        raise ProtocolError("PDCB config contains a pending value.")
 
 
 __all__ = (
     "CONFIG_TOP_LEVEL",
-    "NestedDonorEndpointRegretConfig",
-    "load_nested_donor_endpoint_regret_config",
+    "PAnchoredDirectionalCrossingBaggingConfig",
+    "load_p_anchored_directional_crossing_bagging_config",
 )
+
+
+# Short aliases keep generic workspace glue simple without importing older diagnostics.
+PDCBConfig = PAnchoredDirectionalCrossingBaggingConfig
+load_pdcb_config = load_p_anchored_directional_crossing_bagging_config

@@ -10603,3 +10603,276 @@ artifacts:
       - This output reconstructs all physical probabilities from exactly six original, experiment-fenced inputs and persists no raw labels or sample/image paths.
       - The unconfirmed thesis-specific mechanism hypothesis combines outer-center-excluded nested donor regret, center-balanced partial pooling, deletion consensus, a point-estimate proper-loss fallback gate, and descriptive center-block feasibility. It is not a new generic conformal method or formal risk control.
       - Every result is terminal diagnostic evidence. No outcome may feed or authorize a later experiment, route, policy, model, expert, promotion, deployment, or generic consumer.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_directional_crossing_bagging_parent_v1
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: CONSUMED_TEST_PDCB_PARENT_LEDGER_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      split: test
+      row_count: '9928'
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      experiment_fenced: 'true'
+      fresh_evidence: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_directional_crossing_bagging.v1
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    forbidden_reuse: &pdcb_forbidden_reuse
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact single-consumer alias of the immutable original consumed-test ledger; it exposes no previous Stage-90 result, amendment, probability surface, scratch, or checkpoint.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_directional_crossing_bagging_amendment_v1
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_PDCB_AMENDMENT_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      amendment_sha256: 3aa675b2c85490e09386baa04b999c079977b412d0643c69e10e1d8555047682
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_directional_crossing_bagging.v1
+      authorization_scope: one_terminal_consumed_test_fixed_bank_p_anchored_directional_crossing_bagging_v1
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      claim_role: posthoc_fixed_bank_p_anchored_directional_crossing_bagging_diagnostic
+      fresh_evidence: 'false'
+      previous_stage90_outputs_used: 'false'
+      previous_stage90_amendments_used: 'false'
+      generic_consumer_authorized: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - uniform_b_v2_consumed_test_fixed_bank_p_anchored_directional_crossing_bagging_ledger_amendment_v1.json
+    expected_file_hashes:
+      uniform_b_v2_consumed_test_fixed_bank_p_anchored_directional_crossing_bagging_ledger_amendment_v1.json:
+        algorithm: sha256
+        digest: 3aa675b2c85490e09386baa04b999c079977b412d0643c69e10e1d8555047682
+    forbidden_reuse: *pdcb_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Direct hash-chained authorization over the immutable original ledger for this named terminal diagnostic only; it creates no fresh evidence.
+
+  - artifact_id: midogpp_stage90_fixed_bank_p_anchored_directional_crossing_bagging_test_manifest_v1
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_PDCB_CAPABILITY_GATED_LABELS
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+      split: test
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_PDCB_V1
+      fresh_evidence: 'false'
+      labels_present: 'true'
+      labels_available_before_global_probability_seal: 'false'
+      held_unit: whole_case_or_group_c
+      held_unit_count: '218'
+      outer_support_scope: H_minus_c
+      double_exclusion_scope_used: 'false'
+      source_prior_scope: q_not_in_H_or_e
+      donor_feature_source_prior_scope: q_not_in_outer_H_or_donor_J_or_e
+      crossing_response_scope: J_not_equal_outer_H
+      outer_target_labels_excluded_from_all_donor_models: 'true'
+      terminal_label_scope: after_all_218_routes_and_aggregate_seal
+      role_scoped_label_capabilities_enforced: 'true'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_directional_crossing_bagging.v1
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse: *pdcb_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Labels are decoded only for the exact capability grant; ungranted CSV rows are skipped without decoding their label fields.
+
+  - artifact_id: midogpp_stage90_fixed_bank_p_anchored_directional_crossing_bagging_test_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_TEST_PDCB_LABEL_FREE_CACHE_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: test
+      row_count: '9928'
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      experiment_fenced: 'true'
+      fresh_evidence: 'false'
+      labels_absent: 'true'
+      image_paths_persisted: 'false'
+      previous_stage90_output_used: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_directional_crossing_bagging.v1
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse: *pdcb_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias over the validated label-free consumed-test embedding cache; it independently recomputes all physical probabilities.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_directional_crossing_bagging_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_p_anchored_directional_crossing_bagging/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: POST_HOC_CONSUMED_TEST_SENSITIVITY
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      routing_status: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      claim_role: posthoc_fixed_bank_p_anchored_directional_crossing_bagging_diagnostic
+      bounded_interpretation: outer_center_excluded_donor_crossing_bagging_sensitivity_only
+      architecture_family: fixed_bank_p_anchored_directional_crossing_bagging_v1
+      config_contract_hash: e2293a3f340012ad
+      protocol_contract_hash: cd285eb64fa28224ea88d0704a932c3524aee8f519bc35c30fc3c4b6361bde1a
+      evaluation_split: test
+      consumed_test_data: 'true'
+      method_development_is_posthoc: 'true'
+      target_evaluation_labels_used_before_route_seal: 'false'
+      input_artifact_count: '6'
+      ledger_amendment_sha256: 3aa675b2c85490e09386baa04b999c079977b412d0643c69e10e1d8555047682
+      eligible_test_row_count: '9928'
+      evaluation_case_count: '218'
+      outer_route_count: '218'
+      double_exclusion_state_count: '0'
+      outer_endpoint_model_fit_count: '3488'
+      crossing_model_fit_count: '162'
+      prior_rebinding_additional_endpoint_model_fit_count: '0'
+      crossing_model: center_balanced_shared_slope_ridge_logistic
+      donor_feature_prior_scope: q_not_in_outer_H_or_donor_J_or_e
+      ridge_alpha: '1.0'
+      center_dummy_effects_used: 'false'
+      delete_donor_aggregation: median_probability_times_positive_deletion_fraction
+      composition: convex_P_anchor_plus_all_positive_crossing_alternatives
+      exact_P_fallback: 'true'
+      information_gate_scope: terminal_diagnostic_only
+      proper_loss_safety_rule: equal_center_Brier_and_log_loss_nonworse_than_P
+      proper_loss_safety_gate_scope: terminal_only_no_same_surface_route_change
+      route_pipeline_refit_inside_selection_control: 'false'
+      full_selection_inference_claimed: 'false'
+      generic_ensemble_or_calibration_method_novelty_claimed: 'false'
+      target_expert_used: 'false'
+      routing_success_claimed: 'false'
+      routing_quality_claimed: 'false'
+      downstream_utility_claimed: 'false'
+      nominal_significance_claimed: 'false'
+      fresh_evidence: 'false'
+      promotion_eligible: 'false'
+      previous_stage90_outputs_used: 'false'
+      previous_stage90_amendments_used: 'false'
+      may_feed_another_stage90_experiment: 'false'
+      may_feed_another_experiment: 'false'
+      workstation_generation_devices: cuda:0|cuda:1
+      workstation_source_workers: 2_persistent_spawned_A5000_workers
+      workstation_cpu_topology: 4_workers_x_3_blas_threads_cuda_free
+      workstation_scratch_root: /data/local/fixed_bank_p_anchored_directional_crossing_bagging_v1
+      runtime_recovery_scope: no_cross_run_recovery_intra_launch_atomic_task_checkpoints_only
+      registered_recovery_strategy: none
+      two_fresh_process_validation_required: 'true'
+      source_and_probability_storage_dtype: float32
+      scientific_reductions_dtype: float64
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - arrays/frozen_source_streams.npy
+      - arrays/fixed_bank_a1_action_probabilities.npz
+      - manifests/frozen_source_stream_index.json
+      - manifests/frozen_source_stream_lock.json
+      - manifests/fixed_bank_a1_prediction_index.json
+      - manifests/fixed_bank_a1_prediction_seal.json
+      - manifests/protocol_manifest.json
+      - manifests/action_library.json
+      - manifests/physical_surface_seal.json
+      - manifests/outer_plan_seal.json
+      - manifests/policy_menu.json
+      - manifests/decision_barrier.json
+      - manifests/preterminal_aggregate_seal.json
+      - manifests/terminal_evaluation_seal.json
+      - manifests/content_index.json
+      - tables/exact_nine_probability_index.json
+      - tables/outer_plans.json
+      - tables/crossing_descriptors.json
+      - tables/donor_crossing_rows.json
+      - tables/crossing_models.json
+      - tables/crossing_predictions.json
+      - tables/composed_predictions.json
+      - tables/terminal_method_metrics.json
+      - tables/terminal_center_contrasts.json
+      - tables/terminal_case_oracles.json
+      - tables/crossing_information_rows.json
+      - tables/crossing_information_centers.json
+      - tables/information_gate.json
+      - tables/selection_control.json
+      - reports/workstation_preflight.json
+      - reports/diagnostic_summary.json
+      - reports/label_capability_report.json
+      - reports/leakage_report.json
+      - reports/publication_decision.json
+      - reports/runtime_summary.json
+      - reports/run_state.json
+      - reports/fresh_process_attestation.json
+      - reports/validation_report.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - This output reconstructs all physical probabilities from exactly six original, experiment-fenced inputs and persists no raw labels or sample/image paths.
+      - The unconfirmed thesis-specific mechanism combines action-specific crossing prediction, outer-center-excluded donor transfer, complete delete-one-donor aggregation, and a convex P anchor. It is not a new generic ensemble or calibration method.
+      - Every result is terminal diagnostic evidence. No outcome may feed or authorize a later experiment, route, policy, model, expert, promotion, deployment, or generic consumer.

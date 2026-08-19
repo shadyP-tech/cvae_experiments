@@ -318,6 +318,16 @@ def build_parser() -> argparse.ArgumentParser:
     nested_donor_endpoint_regret_router.add_argument(
         "--artifact-root", required=True
     )
+
+    pdcb = sub.add_parser(
+        "fixed-bank-p-anchored-directional-crossing-bagging",
+        help=(
+            "Run the terminal consumed-test fixed-bank P-anchored "
+            "directional crossing-bagging diagnostic."
+        ),
+    )
+    pdcb.add_argument("--config", required=True)
+    pdcb.add_argument("--artifact-root", required=True)
     return parser
 
 
@@ -752,6 +762,20 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_nested_donor_endpoint_regret_config(args.config)
         output = run_nested_donor_endpoint_regret_router(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if args.surface == "fixed-bank-p-anchored-directional-crossing-bagging":
+        from .fixed_bank_p_anchored_directional_crossing_bagging import (
+            load_p_anchored_directional_crossing_bagging_config,
+            run_p_anchored_directional_crossing_bagging,
+        )
+
+        config = load_p_anchored_directional_crossing_bagging_config(args.config)
+        output = run_p_anchored_directional_crossing_bagging(
             config,
             artifact_root=artifact_root,
         )

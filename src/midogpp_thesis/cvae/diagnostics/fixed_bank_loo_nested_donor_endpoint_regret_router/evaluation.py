@@ -410,9 +410,13 @@ def _oracle_diagnostics(
             contributions: dict[str, float] = {}
             for endpoint in ENDPOINT_METHOD_IDS:
                 hard = np.asarray(prediction.probabilities[endpoint]) >= HARD_THRESHOLD
-                contributions[endpoint] = 0.5 * (
-                    np.sum((y == 1) & hard, dtype=np.int64) / n_positive
-                    + np.sum((y == 0) & (~hard), dtype=np.int64) / n_negative
+                contributions[endpoint] = float(
+                    0.5
+                    * (
+                        np.sum((y == 1) & hard, dtype=np.int64) / n_positive
+                        + np.sum((y == 0) & (~hard), dtype=np.int64)
+                        / n_negative
+                    )
                 )
             oracle = min(
                 ENDPOINT_METHOD_IDS,
@@ -426,15 +430,18 @@ def _oracle_diagnostics(
             selected_value = contributions[selected]
             p_value = contributions[PORTFOLIO_METHOD_ID]
             oracle_value = contributions[oracle]
-            headroom = oracle_value - p_value
-            normalized_gap = (
+            headroom = float(oracle_value - p_value)
+            normalized_gap = float(
                 max(0.0, oracle_value - selected_value) / headroom
                 if headroom > 1.0e-12
                 else 0.0
             )
-            rank = 1 + sum(
-                value > selected_value + 1.0e-12
-                for value in contributions.values()
+            rank = int(
+                1
+                + sum(
+                    value > selected_value + 1.0e-12
+                    for value in contributions.values()
+                )
             )
             decision = decisions.get((center, case))
             if decision is not None and decision.alternative != PORTFOLIO_METHOD_ID:

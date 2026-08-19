@@ -2563,3 +2563,50 @@ experiments:
       - The 512 center-sign-flip control reselects the frozen policy identity while holding route features, models, and case decisions fixed. It is not a full-pipeline or full-selection null replay and supports no nominal significance claim.
       - Two persistent spawned RTX A5000 generation workers precede a disjoint CUDA-free CPU phase with four LPT-balanced route workers and three BLAS threads each. Dedicated /data/local scratch is preferred, artifact-parent scratch is the fallback, and two full fresh-process validation replays are required.
       - Regardless of outcome, this artifact cannot authorize routing success, action or policy changes, model or expert updates, promotion, deployment, recipe selection, a numbered-stage feed, another diagnostic, another experiment, or a generic consumer.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_directional_crossing_bagging.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_p_anchored_directional_crossing_bagging_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_directional_crossing_bagging_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_fixed_bank_p_anchored_directional_crossing_bagging_test_cache_v1
+      - midogpp_stage90_fixed_bank_p_anchored_directional_crossing_bagging_test_manifest_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_directional_crossing_bagging_parent_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_directional_crossing_bagging_amendment_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Reuse of immutable A1 generation geometry, exact-nine seed pairing, budgets, and classifier settings only; no routing, action, policy, downstream, promotion, or deployment authority is inherited.
+      midogpp_stage90_fixed_bank_p_anchored_directional_crossing_bagging_test_manifest_v1: Experiment-fenced labels open only through source-prior, crossing-donor, H-minus-c outer support, and terminal capabilities after every composed route seals.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_directional_crossing_bagging_parent_v1: Byte-exact experiment-fenced alias of the immutable original ledger, read only to verify the direct parent hash.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_directional_crossing_bagging_amendment_v1: Direct single-consumer authorization for this terminal post-hoc consumed-test diagnostic; it creates no fresh evidence.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-p-anchored-directional-crossing-bagging
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_directional_crossing_bagging_v1
+    notes:
+      - Explicitly authorized reuse of the already-consumed MIDOG++ test split for one terminal P-anchored directional crossing-bagging diagnostic. It remains POST_HOC_CONSUMED_TEST_SENSITIVITY with fresh_evidence=false.
+      - Exactly six original inputs are admitted. All 810 fixed-bank probability cells are recomputed; no earlier Stage-90 output, amendment, probability surface, scratch directory, checkpoint, or numbered-stage result is consumed.
+      - Each target case uses only its H-minus-c endpoint state. The router needs no nested support voters, so it deliberately eliminates all 2,660 double-exclusion states and reduces endpoint-model work from 46,048 to 3,488 fits.
+      - Each actionable P-versus-B/I/R hard crossing receives a label-free descriptor. A center-balanced shared-slope ridge-logistic model is trained on J-not-equal-H donors, then refit for every delete-one-donor subset. No unseen-target center dummy effect is used.
+      - PDCB_BAGGED converts the median deletion probability and positive-deletion fraction into nonnegative weights, composes all alternatives convexly with a unit P anchor, and falls back exactly to P when all weights are zero. Full-only and blocked-feature controls are predeclared.
+      - The terminal information gate reports crossing AUROC, Spearman, proper scores, deletion dispersion, selectivity, oracle gaps, and a fixed-menu 512 center-sign-flip control. It cannot alter same-surface routes or authorize a fresh claim.
+      - Two persistent spawned RTX A5000 generation workers precede a disjoint CUDA-free CPU phase with four workers and three BLAS threads each. Dedicated /data/local scratch is preferred, and two full fresh-process reconstruction validations are required.
+      - Regardless of outcome, this artifact cannot authorize routing success, action or policy changes, model or expert updates, promotion, deployment, recipe selection, a numbered-stage feed, another diagnostic, another experiment, or a generic consumer.

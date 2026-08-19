@@ -76,6 +76,7 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_loo_nested_donor_endpoint_regret
 from midogpp_thesis.cvae.protocol import ProtocolError
 from midogpp_thesis.cvae.runtime.artifact_io import read_json, sha256_file
 from midogpp_thesis.cvae.runtime.fixed_bank_a1_prediction_contracts import (
+    sha256_digest,
     validate_action_library,
 )
 from midogpp_thesis.workspace.runtime import MidogppWorkspace
@@ -187,7 +188,31 @@ def test_action_library_satisfies_neutral_exact_810_contract() -> None:
     assert tuple(actions) == CENTERS
     assert all(len(rows) == 10 for rows in actions.values())
     assert sum(len(rows) for rows in payload.values()) == 90
+    assert all(
+        sha256_digest(action.action_hash)
+        for rows in actions.values()
+        for action in rows
+    )
     assert len(digest) == 16
+
+
+def test_neutral_action_library_rejects_short_action_identity() -> None:
+    tampered: dict[str, tuple[SimpleNamespace, ...]] = {}
+    for target, actions in action_library_by_target().items():
+        wrapped: list[SimpleNamespace] = []
+        for ordinal, action in enumerate(actions):
+            payload = action.to_payload()
+            if target == CENTERS[0] and ordinal == 0:
+                payload["action_hash"] = "a" * 16
+            wrapped.append(
+                SimpleNamespace(
+                    to_payload=lambda payload=payload: dict(payload),
+                )
+            )
+        tampered[target] = tuple(wrapped)
+
+    with pytest.raises(ProtocolError, match="action menu drifted"):
+        validate_action_library(tampered)
 
 
 def test_cli_surface_is_registered_without_eager_execution() -> None:
@@ -211,6 +236,44 @@ def test_config_rejects_scientific_drift(tmp_path: Path) -> None:
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
     with pytest.raises(ProtocolError, match="config section drifted"):
+        load_nested_donor_endpoint_regret_config(path)
+
+
+def test_config_accepts_workspace_resolved_output_path(tmp_path: Path) -> None:
+    payload = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
+    resolved_root = tmp_path / "canonical-output"
+    payload["experiment"]["artifact_root"] = str(resolved_root)
+    path = tmp_path / "config.resolved.yaml"
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    resolved = load_nested_donor_endpoint_regret_config(path)
+    assert resolved.artifact_root == resolved_root
+    assert resolved.contract_hash == "1f60b4352a67c60f"
+
+
+def test_exact_workspace_rendered_config_is_loadable(tmp_path: Path) -> None:
+    workspace = MidogppWorkspace.load(ROOT)
+    rendered = workspace._render_run(  # noqa: SLF001 - exact runner handoff seam
+        EXPERIMENT_ID,
+        require_inputs=False,
+        validate_workspace=True,
+        include_all_declared_inputs=False,
+    )
+    path = tmp_path / "config.resolved.yaml"
+    path.write_text(rendered.resolved_config_content, encoding="utf-8")
+
+    resolved = load_nested_donor_endpoint_regret_config(path)
+    assert resolved.artifact_root == rendered.prepared.artifact_root.resolve()
+    assert resolved.contract_hash == "1f60b4352a67c60f"
+
+
+def test_config_rejects_foreign_unresolved_output_uri(tmp_path: Path) -> None:
+    payload = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
+    payload["experiment"]["artifact_root"] = "output://foreign"
+    path = tmp_path / "config.yaml"
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ProtocolError, match="output identity drifted"):
         load_nested_donor_endpoint_regret_config(path)
 
 

@@ -81,7 +81,7 @@ class ActionSpec:
         if any(counts[label] != expected_counts for label in ("0", "1")) or weights != expected_weights:
             raise ProtocolError("Action counts or sample weights drifted.")
         unhashed = {
-            "schema_version": "fixed_bank_nested_regret_action_v1",
+            "schema_version": "fixed_bank_pdcb_action_v1",
             "target_center": target,
             "action_id": self.action_id,
             "selected_source": selected,
@@ -107,7 +107,7 @@ class ActionSpec:
 
     def to_payload(self) -> dict[str, object]:
         return {
-            "schema_version": "fixed_bank_nested_regret_action_v1",
+            "schema_version": "fixed_bank_pdcb_action_v1",
             "target_center": self.target_center,
             "action_id": self.action_id,
             "selected_source": self.selected_source,

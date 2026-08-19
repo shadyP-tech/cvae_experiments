@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import replace
+import json
+from pathlib import Path
 from types import MappingProxyType, SimpleNamespace
 
 import numpy as np
@@ -37,6 +40,10 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_loo_nested_donor_endpoint_regret
 from midogpp_thesis.cvae.diagnostics.fixed_bank_loo_nested_donor_endpoint_regret_router.nested_endpoint_regret import (
     build_donor_regret_row,
 )
+from midogpp_thesis.cvae.diagnostics.fixed_bank_loo_nested_donor_endpoint_regret_router.persistence import (
+    persist_terminal,
+)
+from midogpp_thesis.cvae.protocol import ProtocolError
 from midogpp_thesis.cvae.diagnostics.fixed_bank_loo_nested_donor_endpoint_regret_router.workstation import (
     assert_canonical_workload,
     schedule_center_batches,
@@ -216,7 +223,9 @@ def test_donor_case_labels_enter_only_response_not_descriptor() -> None:
     assert baseline.log_loss_delta == pytest.approx(-poisoned.log_loss_delta)
 
 
-def test_synthetic_full_engine_seals_before_terminal_and_poison_exclusions() -> None:
+def test_synthetic_full_engine_seals_before_terminal_and_poison_exclusions(
+    tmp_path: Path,
+) -> None:
     surface, labels = _surface_and_labels()
     baseline = build_preterminal_result(
         surface, _loader(labels), use_processes=False
@@ -280,3 +289,36 @@ def test_synthetic_full_engine_seals_before_terminal_and_poison_exclusions() -> 
     assert terminal.selection_control[
         "route_features_models_and_decisions_refit_inside_replicate"
     ] is False
+
+    reports = {
+        "leakage_report": {"schema_version": "test_leakage_v1", "status": "PASS"},
+        "publication_decision": {
+            "schema_version": "test_publication_v1",
+            "decision": "DIAGNOSTIC_ONLY",
+        },
+        "runtime_summary": {"schema_version": "test_runtime_v1", "status": "PASS"},
+    }
+    valid_root = tmp_path / "valid-terminal"
+    persist_terminal(valid_root, terminal=terminal, **reports)
+    oracle_payload = json.loads(
+        (valid_root / "tables/terminal_case_oracles.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert oracle_payload["row_count"] == len(terminal.case_oracle_rows)
+    assert all(
+        type(row["selected_endpoint_rank"]) is int
+        for row in oracle_payload["rows"]
+    )
+
+    invalid_rows = list(terminal.case_oracle_rows)
+    invalid_row = dict(invalid_rows[0])
+    invalid_row["selected_endpoint_rank"] = np.int64(
+        invalid_row["selected_endpoint_rank"]
+    )
+    invalid_rows[0] = MappingProxyType(invalid_row)
+    invalid_terminal = replace(terminal, case_oracle_rows=tuple(invalid_rows))
+    invalid_root = tmp_path / "invalid-terminal"
+    with pytest.raises(ProtocolError, match="cannot convert int64"):
+        persist_terminal(invalid_root, terminal=invalid_terminal, **reports)
+    assert not (invalid_root / "manifests/terminal_evaluation_seal.json").exists()

@@ -9,7 +9,7 @@ from ...runtime.artifact_io import atomic_json
 from .actions import action_library_by_target
 from .artifact_io import persist_json, persist_rows
 from .constants import CENTERS
-from .hashing import canonical_hash
+from .hashing import canonical_hash, json_native
 from .reports import run_state_payload
 
 
@@ -217,6 +217,23 @@ def persist_terminal(
     publication_decision: Mapping[str, object],
     runtime_summary: Mapping[str, object],
 ) -> None:
+    # Validate the complete terminal serialization tree before publishing its
+    # first member.  A late non-JSON scalar must not leave a partially written
+    # terminal bundle after the expensive physical and nested-route phases.
+    json_native(
+        {
+            "terminal_evaluation_seal": dict(terminal.terminal_seal),
+            "terminal_method_metrics": terminal.method_metrics,
+            "terminal_center_contrasts": terminal.center_contrasts,
+            "terminal_case_oracles": terminal.case_oracle_rows,
+            "selection_control": dict(terminal.selection_control),
+            "diagnostic_summary": dict(terminal.diagnostic_summary),
+            "label_capability_report": dict(terminal.capability_report),
+            "leakage_report": leakage_report,
+            "publication_decision": publication_decision,
+            "runtime_summary": runtime_summary,
+        }
+    )
     persist_json(
         root / "manifests/terminal_evaluation_seal.json",
         dict(terminal.terminal_seal),

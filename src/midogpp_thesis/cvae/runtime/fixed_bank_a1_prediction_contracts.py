@@ -183,9 +183,12 @@ def validate_action_library(
             len(rows) != ACTION_COUNT_PER_TARGET
             or len({str(row.get("action_id")) for row in rows})
             != ACTION_COUNT_PER_TARGET
+            or len({str(row.get("action_hash")) for row in rows})
+            != ACTION_COUNT_PER_TARGET
             or any(
                 str(row.get("target_center")) != target
                 or row.get("target_expert_excluded") is not True
+                or not sha256_digest(row.get("action_hash"))
                 for row in rows
             )
         ):

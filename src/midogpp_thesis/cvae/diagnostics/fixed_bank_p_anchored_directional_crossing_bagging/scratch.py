@@ -33,23 +33,23 @@ class ScratchLease:
 def probe_scratch(root: Path, runtime: Mapping[str, object]) -> dict[str, object]:
     lease = select_scratch(root, runtime)
     if lease.root.exists() or lease.root.is_symlink():
-        raise ProtocolError("Nested-regret prior-run or foreign scratch is forbidden.")
+        raise ProtocolError("PDCB prior-run or foreign scratch is forbidden.")
     parent = lease.root.parent
     if parent.is_symlink() or not parent.is_dir():
-        raise ProtocolError("Nested-regret scratch parent is absent or unsafe.")
+        raise ProtocolError("PDCB scratch parent is absent or unsafe.")
     free_bytes = int(shutil.disk_usage(parent).free)
     if free_bytes < int(runtime["minimum_artifact_disk_free_bytes"]):
-        raise ProtocolError("Nested-regret scratch reserve is too low.")
+        raise ProtocolError("PDCB scratch reserve is too low.")
     try:
         with tempfile.TemporaryDirectory(
-            prefix=".nested-regret-write-probe-", dir=parent
+            prefix=".pdcb-write-probe-", dir=parent
         ) as probe:
             marker = Path(probe) / "probe"
-            marker.write_bytes(b"nested-regret\n")
+            marker.write_bytes(b"pdcb\n")
             with marker.open("r+b") as handle:
                 os.fsync(handle.fileno())
     except OSError as exc:
-        raise ProtocolError("Nested-regret scratch parent is not writable.") from exc
+        raise ProtocolError("PDCB scratch parent is not writable.") from exc
     return {
         "scratch_root_id": lease.root.name,
         "scratch_role": lease.role,
@@ -61,17 +61,17 @@ def probe_scratch(root: Path, runtime: Mapping[str, object]) -> dict[str, object
 
 def select_scratch(root: Path, runtime: Mapping[str, object]) -> ScratchLease:
     if tuple(runtime.get("scratch_preference", ())) != (SCRATCH_ROOT, "artifact_parent"):
-        raise ProtocolError("Nested-regret scratch preference drifted.")
+        raise ProtocolError("PDCB scratch preference drifted.")
     dedicated = Path(SCRATCH_ROOT)
     if not dedicated.is_absolute() or str(dedicated) != SCRATCH_ROOT:
-        raise ProtocolError("Nested-regret dedicated scratch is not literal.")
+        raise ProtocolError("PDCB dedicated scratch is not literal.")
     if dedicated.exists() or dedicated.is_symlink():
-        raise ProtocolError("Nested-regret dedicated scratch contains prior state.")
+        raise ProtocolError("PDCB dedicated scratch contains prior state.")
     if dedicated.parent.is_dir() and not dedicated.parent.is_symlink():
         return ScratchLease(dedicated, "dedicated_local")
-    fallback = Path(root).resolve().parent / f".{Path(root).name}.nested-regret-scratch"
+    fallback = Path(root).resolve().parent / f".{Path(root).name}.pdcb-scratch"
     if fallback.exists() or fallback.is_symlink():
-        raise ProtocolError("Nested-regret fallback scratch contains prior state.")
+        raise ProtocolError("PDCB fallback scratch contains prior state.")
     return ScratchLease(fallback, "artifact_parent")
 
 
@@ -99,7 +99,7 @@ def cleanup_scratch(
         or prediction_root.is_symlink()
         or any(path.is_symlink() for path in base.rglob("*"))
     ):
-        raise ProtocolError("Nested-regret scratch tree is unsafe to clean.")
+        raise ProtocolError("PDCB scratch tree is unsafe to clean.")
     local = load_frozen_source_streams(
         source_root,
         expected_config_hash=str(getattr(config, "contract_hash")),
@@ -111,12 +111,12 @@ def cleanup_scratch(
         expected_generation_lock_hash=EXPECTED_GENERATION_LOCK_HASH,
     )
     if dict(local.lock_payload) != dict(canonical.lock_payload):
-        raise ProtocolError("Nested-regret scratch/canonical source seals differ.")
+        raise ProtocolError("PDCB scratch/canonical source seals differ.")
     _remove_empty_owned_checkpoint_parent(source_root, role="source")
     _require_exact_source_inventory(source_root)
     _remove_empty_owned_checkpoint_parent(prediction_root, role="prediction")
     if any(prediction_root.iterdir()):
-        raise ProtocolError("Nested-regret prediction scratch was not sealed and cleaned.")
+        raise ProtocolError("PDCB prediction scratch was not sealed and cleaned.")
     shutil.rmtree(base)
 
 
@@ -127,14 +127,14 @@ def _remove_empty_owned_checkpoint_parent(path: Path, *, role: str) -> None:
     if not checkpoint_root.exists():
         if checkpoint_root.is_symlink():
             raise ProtocolError(
-                f"Nested-regret {role} checkpoint parent is a dangling symlink."
+                f"PDCB {role} checkpoint parent is a dangling symlink."
             )
         return
     if checkpoint_root.is_symlink() or not checkpoint_root.is_dir():
-        raise ProtocolError(f"Nested-regret {role} checkpoint parent is unsafe.")
+        raise ProtocolError(f"PDCB {role} checkpoint parent is unsafe.")
     if any(checkpoint_root.iterdir()):
         raise ProtocolError(
-            f"Nested-regret completed {role} checkpoint parent is not empty."
+            f"PDCB completed {role} checkpoint parent is not empty."
         )
     checkpoint_root.rmdir()
 
@@ -158,7 +158,7 @@ def _require_exact_source_inventory(path: Path) -> None:
         or observed_files != expected_files
         or observed_directories != expected_directories
     ):
-        raise ProtocolError("Nested-regret local source inventory drifted.")
+        raise ProtocolError("PDCB local source inventory drifted.")
 
 
 __all__ = (
