@@ -2752,3 +2752,49 @@ experiments:
       - The terminal information gate reports crossing AUROC, Spearman, proper scores, deletion dispersion, selectivity, oracle gaps, and a fixed-menu 512 center-sign-flip control. It cannot alter same-surface routes or authorize a fresh claim.
       - Two persistent spawned RTX A5000 generation workers precede a disjoint CUDA-free CPU phase with four workers and three BLAS threads each. Dedicated /data/local scratch is preferred, and two full fresh-process reconstruction validations are required.
       - Regardless of outcome, this artifact cannot authorize routing success, action or policy changes, model or expert updates, promotion, deployment, recipe selection, a numbered-stage feed, another diagnostic, another experiment, or a generic consumer.
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_simultaneous_shift_calibrated_utility_router.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_p_anchored_simultaneous_shift_calibrated_utility_router_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_simultaneous_shift_calibrated_utility_router_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_fixed_bank_p_anchored_simultaneous_shift_calibrated_utility_router_test_cache_v1
+      - midogpp_stage90_fixed_bank_p_anchored_simultaneous_shift_calibrated_utility_router_test_manifest_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_simultaneous_shift_calibrated_utility_router_parent_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_simultaneous_shift_calibrated_utility_router_amendment_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Reuse of immutable A1 generation geometry, exact-nine seed pairing, budgets, and classifier settings only; no routing, action, policy, downstream, promotion, or deployment authority is inherited.
+      midogpp_stage90_fixed_bank_p_anchored_simultaneous_shift_calibrated_utility_router_test_manifest_v1: Experiment-fenced labels open only through source-prior, donor-response, H-minus-c grouped posterior support, and terminal capabilities after all routes seal.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_simultaneous_shift_calibrated_utility_router_parent_v1: Byte-exact experiment-fenced alias of the immutable original ledger, read only to verify the direct parent hash.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_simultaneous_shift_calibrated_utility_router_amendment_v1: Direct single-consumer authorization for this terminal post-hoc consumed-test diagnostic; it creates no fresh evidence.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-p-anchored-simultaneous-shift-calibrated-utility-router
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_simultaneous_shift_calibrated_utility_router_v1
+    notes:
+      - This is one explicitly authorized terminal reuse of the already-consumed MIDOG++ test split; it remains POST_HOC_CONSUMED_TEST_SENSITIVITY and creates no fresh evidence.
+      - Exactly six original inputs are admitted and all 810 physical probability cells are recomputed. No predecessor Stage-90 output, route, checkpoint, probability surface, or scratch state is consumed.
+      - Each route uses five label-free whole-case folds inside H-minus-c. Fold models predict c plus their excluded support cases; OOF AUC and Brier skill gate route reliability without opening c labels.
+      - Expected BACC, Brier, and log-loss action deltas are computed analytically under each fold posterior. Donor residuals use partially pooled robust scales, and each donor-direction maximum is taken over all six action cells and all three endpoints before the frozen 0.75 envelope quantile.
+      - Held-case bounds receive a frozen label-free inflation from descriptor shift, fold instability, and inverse square-root crossing count. Nested leave-one-donor lower-tail BACC and upper-tail proper-loss checks must authorize a nonvacuous envelope or the center falls back exactly to P.
+      - PSSCUR_ROBUST_ENVELOPE, minimax-envelope, zero-shift, and within-case blocked-fingerprint policies are frozen before terminal labels. The robust envelope is not claimed to provide finite-sample conformal coverage, and terminal diagnostics cannot update any route or feed another experiment.
+      - The CPU phase uses four spawned center batches and one BLAS thread per posterior worker for 2,180 logistic fits. Physical generation remains two persistent RTX A5000 workers.
+      - Regardless of outcome, this artifact cannot authorize routing success, action or policy changes, model or expert updates, promotion, deployment, recipe selection, a numbered-stage feed, another diagnostic, another experiment, or a generic consumer.

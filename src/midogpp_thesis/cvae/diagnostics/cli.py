@@ -358,6 +358,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pumr.add_argument("--config", required=True)
     pumr.add_argument("--artifact-root", required=True)
+
+    psscur = sub.add_parser(
+        "fixed-bank-p-anchored-simultaneous-shift-calibrated-utility-router",
+        help=(
+            "Run the terminal consumed-test fixed-bank P-anchored "
+            "simultaneous shift-calibrated utility routing diagnostic."
+        ),
+    )
+    psscur.add_argument("--config", required=True)
+    psscur.add_argument("--artifact-root", required=True)
     return parser
 
 
@@ -370,6 +380,25 @@ def main(argv: list[str] | None = None) -> int:
 
         output = build_snapshot_from_config(
             args.config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
+
+    if (
+        args.surface
+        == "fixed-bank-p-anchored-simultaneous-shift-calibrated-utility-router"
+    ):
+        from .fixed_bank_p_anchored_simultaneous_shift_calibrated_utility_router import (
+            load_p_anchored_simultaneous_shift_calibrated_utility_router_config,
+            run_p_anchored_simultaneous_shift_calibrated_utility_router,
+        )
+
+        config = load_p_anchored_simultaneous_shift_calibrated_utility_router_config(
+            args.config
+        )
+        output = run_p_anchored_simultaneous_shift_calibrated_utility_router(
+            config,
             artifact_root=artifact_root,
         )
         print(output)
