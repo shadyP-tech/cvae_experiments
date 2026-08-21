@@ -1220,15 +1220,24 @@ MIDOG++ test reuse is terminal diagnostic analysis only: every outcome remains
 `POST_HOC_CONSUMED_TEST_SENSITIVITY` and
 `TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE` and cannot feed another experiment.
 
-## Route-scoped boundary-projected PCSI case-regret diagnostic v1
+## Route-scoped boundary-projected PCSI case-regret diagnostic v2 repair
 
-`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router.v1`
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router.v2`
 is the fresh, executable sibling of the blocked center-aggregated PCSI-PARC
 design. The blocked predecessor remains registered as planned evidence of the
 identity-feedback failure and is not an input. This successor independently
 recomputes all 810 physical probability cells from six direct-original inputs
 and reuses all 9,928 eligible MIDOG++ test rows through 218 leave-one-whole-case
 routes.
+
+The first execution identity, `.v1`, failed preterminally on the workstation
+when Python 3.12 attempted to transfer a `mappingproxy`-containing utility-model
+result from a spawned worker. Its output, scratch, checkpoints, arrays, seals,
+and partial label-capability history are quarantined. The `.v2` amendment
+authorizes only the mechanical spawn-serialization repair in commit
+`1fbd792430dcdb2bfe16f78ead4095fd91c52f0e`; the workstation pickle and real
+spawn-process regression gate passed `2 passed, 5 deselected`. V2 cannot read
+any v1 state and starts from new output and scratch roots.
 
 Every scientific object that can affect a decision carries case identity. A
 target candidate and screen use only `(H,c)` state `H-c`. A pseudo candidate
@@ -1254,10 +1263,10 @@ numeric leaves, 576 reference blocks, 1,962 route screens, and 3,488 case-local
 pseudo replays. The final surfaces are P, projected observed-max, raw
 observed-max, and projected q=0. The former 81-fit legacy control is removed.
 
-The config contract hash is `fb33bc9b867ccb2c`, the protocol hash is
+The v2 config contract hash is `aa1fd1d4b63b2404`, the unchanged protocol hash is
 `e9da22f3909cd68d8e2bc1cfda727de5167ea93e6ca7aa2e6d466dc9e7f2b85a`,
-and the direct-original-ledger amendment SHA-256 is
-`3b44f5a61284f91baa9f92476e0b0bd18969e26879313ee0e3b13fe346218230`.
+and the fresh direct-original-ledger v2 amendment SHA-256 is
+`5836f034b7f90d46741560f005ebaa1cbbe141e16c5731b41cf9ed112553be87`.
 The observed donor-case maximum is neither conformal nor a confidence bound and
 has no coverage guarantee. Every output remains post-hoc consumed-test
 sensitivity only, cannot establish routing success or target performance, and

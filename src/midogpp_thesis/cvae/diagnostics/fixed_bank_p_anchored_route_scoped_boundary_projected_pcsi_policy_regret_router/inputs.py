@@ -52,7 +52,10 @@ from .constants import (
     PORTFOLIO_METHOD_ID,
     PRIMARY_METHOD_ID,
     PROJECTED_NO_ENVELOPE_METHOD_ID,
+    QUARANTINED_V1_EXPERIMENT_ID,
+    QUARANTINED_V1_OUTPUT_ARTIFACT_ID,
     RAW_OBSERVED_MAX_METHOD_ID,
+    REPAIR_CODE_COMMIT,
 )
 from .experiment_contracts import (
     AUTHORIZATION_SCOPE,
@@ -262,6 +265,14 @@ def _load_ledger_chain(
     parent = _read_json(parent_path)
     amendment = _read_json(amendment_path)
     required_true = (
+        "mechanical_repair_only",
+        "scientific_protocol_unchanged_from_v1",
+        "v1_output_quarantined",
+        "v1_failure_preterminal",
+        "v1_spawn_serialization_failure_recorded",
+        "v1_source_prior_donor_response_and_route_support_capabilities_had_opened",
+        "v1_pseudo_evaluation_and_terminal_capabilities_had_not_opened",
+        "spawn_serialization_boundary_fix_verified",
         "all_physical_probabilities_globally_sealed_before_any_label_access",
         "role_scoped_label_capabilities_enforced",
         "all_72_source_prior_grants_complete_before_route_support",
@@ -285,6 +296,10 @@ def _load_ledger_chain(
     )
     required_false = (
         "fresh_evidence",
+        "scientific_method_changed_from_v1",
+        "quarantined_v1_output_used",
+        "quarantined_v1_scratch_or_checkpoint_used",
+        "prior_partial_label_capability_state_used",
         "previous_stage90_outputs_used",
         "previous_stage90_amendments_used",
         "previous_prediction_surfaces_used",
@@ -324,6 +339,19 @@ def _load_ledger_chain(
         or amendment.get("parent_sha256") != EXPECTED_TEST_CONSUMPTION_LEDGER_SHA256
         or amendment.get("authorized_consumer_experiment_ids") != [EXPERIMENT_ID]
         or amendment.get("authorization_scope") != AUTHORIZATION_SCOPE
+        or amendment.get("authorization_basis")
+        != "explicit_user_authorization_for_v2_spawn_serialization_mechanical_repair_run"
+        or amendment.get("authorized_repair_code_commit") != REPAIR_CODE_COMMIT
+        or amendment.get("quarantined_v1_experiment_id")
+        != QUARANTINED_V1_EXPERIMENT_ID
+        or amendment.get("quarantined_v1_output_artifact_id")
+        != QUARANTINED_V1_OUTPUT_ARTIFACT_ID
+        or amendment.get("v1_failure_exception")
+        != "TypeError: cannot pickle 'mappingproxy' object"
+        or amendment.get("v1_failure_phase")
+        != "OUTER_LOO_ENDPOINTS_TARGET_POSTERIORS_AND_DONOR_VETO_ROUTING"
+        or amendment.get("workstation_spawn_gate")
+        != "2_passed_5_deselected_python_3_12_spawn_process_transfer"
         or amendment.get("claim_role") != CLAIM_ROLE
         or amendment.get("test_row_count") != EXPECTED_TEST_ROW_COUNT
         or amendment.get("target_probability_cell_count") != 810

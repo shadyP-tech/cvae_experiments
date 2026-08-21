@@ -14,16 +14,26 @@ from typing import Mapping
 
 EXPERIMENT_ID = (
     "midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_"
-    "p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router.v1"
+    "p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router.v2"
 )
 EXPERIMENT_NAME = (
     "uniform_b_v2_consumed_test_fixed_bank_"
-    "p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_v1"
+    "p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_v2"
 )
 OUTPUT_ARTIFACT_ID = (
     "midogpp_output_uniform_b_v2_consumed_test_fixed_bank_"
+    "p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_v2"
+)
+QUARANTINED_V1_EXPERIMENT_ID = (
+    "midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_"
+    "p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router.v1"
+)
+QUARANTINED_V1_OUTPUT_ARTIFACT_ID = (
+    "midogpp_output_uniform_b_v2_consumed_test_fixed_bank_"
     "p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_v1"
 )
+EXECUTION_REVISION = "v2_spawn_serialization_mechanical_repair"
+REPAIR_CODE_COMMIT = "1fbd792430dcdb2bfe16f78ead4095fd91c52f0e"
 
 DATASET_FAMILY = "MIDOG++"
 EVALUATION_SPLIT = "test"
@@ -234,7 +244,7 @@ BLAS_THREADS_PER_CPU_WORKER = 3
 UTILITY_CPU_WORKERS = 4
 UTILITY_BLAS_THREADS_PER_WORKER = 1
 TARGET_POSTERIOR_BLAS_THREADS_PER_WORKER = 1
-SCRATCH_ROOT = "/data/local/fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_v1"
+SCRATCH_ROOT = "/data/local/fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_v2"
 
 
 def candidate_sources(target_center: object) -> tuple[str, ...]:

@@ -2801,23 +2801,38 @@ experiments:
 
   - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router.v1
     stage: 90_oracles_and_diagnostics
+    status: failed
+    claim_scope: diagnostic_only
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_v1
+    runner:
+      argv:
+        - "{python}"
+        - -c
+        - "raise SystemExit('PCSI-RACR v1 is terminally failed and quarantined')"
+    notes:
+      - The workstation v1 identity is terminally FAILED in OUTER_LOO_ENDPOINTS_TARGET_POSTERIORS_AND_DONOR_VETO_ROUTING because a spawned worker result contained mappingproxy state that Python 3.12 could not pickle.
+      - Source-prior, donor-response, and route-support capabilities had opened before failure; pseudo-evaluation and terminal capabilities had not opened. This partial capability history remains consumed and is not recoverable.
+      - The v1 output, scratch, checkpoints, arrays, seals, partial label-capability state, and run_state are quarantined and cannot be resumed, forced, deleted-and-recreated, or consumed by v2.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router.v2
+    stage: 90_oracles_and_diagnostics
     status: diagnostic
     claim_scope: diagnostic_only
-    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_v1.yaml
-    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_v1
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_v2.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_v2
     input_artifact_ids:
       - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
       - midogpp_output_uniform_b_v2_generation_lock_v1
-      - midogpp_stage90_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_test_cache_v1
-      - midogpp_stage90_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_test_manifest_v1
-      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_parent_v1
-      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_amendment_v1
+      - midogpp_stage90_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_test_cache_v2
+      - midogpp_stage90_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_test_manifest_v2
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_parent_v2
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_amendment_v2
     input_claim_scope_exceptions:
       midogpp_output_uniform_b_v2_generation_lock_v1: Reuse of immutable A1 generation geometry, exact-nine seed pairing, budgets, and classifier settings only; no routing, action, policy, downstream, promotion, or deployment authority is inherited.
-      midogpp_stage90_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_test_cache_v1: Single-consumer byte-exact label-free consumed-test cache alias authorized only for this terminal diagnostic; no evidence authority is inherited.
-      midogpp_stage90_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_test_manifest_v1: Labels open only through source-prior, H/J-excluded donor response, H-minus-c or J-minus-d route support, per-case pseudo evaluation, and terminal capabilities; own-route identity noninterference is hash-bound.
-      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_parent_v1: Byte-exact experiment-fenced alias of the immutable original ledger, read only to verify the direct parent hash.
-      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_amendment_v1: Direct single-consumer authorization for this terminal post-hoc consumed-test diagnostic; it creates no fresh evidence.
+      midogpp_stage90_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_test_cache_v2: Fresh single-consumer byte-exact label-free alias of the original consumed-test cache; the quarantined v1 cache alias and all v1 outputs remain unavailable to this run.
+      midogpp_stage90_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_test_manifest_v2: Fresh single-consumer label-capability alias; no capability or partial label-access state from v1 is inherited.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_parent_v2: Byte-exact experiment-fenced alias of the immutable original ledger, read only to verify the direct parent hash.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_amendment_v2: Direct single-consumer authorization for one mechanical spawn-serialization repair run; it creates no fresh evidence.
     runner:
       environment:
         CUBLAS_WORKSPACE_CONFIG: ":4096:8"
@@ -2836,9 +2851,11 @@ experiments:
         - --config
         - "{resolved_config}"
         - --artifact-root
-        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_v1
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_v2
     notes:
-      - This is a one-shot POST_HOC_CONSUMED_TEST_SENSITIVITY over all 9,928 eligible rows and 218 whole-case routes; fresh_evidence=false and may_feed_another_experiment=false.
+      - Explicitly authorized v2 mechanical repair run over the already-consumed MIDOG++ test split; it remains one-shot POST_HOC_CONSUMED_TEST_SENSITIVITY with fresh_evidence=false and may_feed_another_experiment=false.
+      - The v1 output, scratch, checkpoints, arrays, seals, and partial capability history are quarantined. V2 recomputes from the immutable original six fenced inputs under a new output root, scratch root, amendment, and config contract.
+      - The scientific method and frozen protocol are unchanged from v1. Commit 1fbd792430dcdb2bfe16f78ead4095fd91c52f0e changes only spawn-boundary serialization, verified on workstation by the two-test Python 3.12 spawn gate.
       - Every target decision is keyed by H,c. Every pseudo replay is keyed by geometry,H,J,d. The own held-case label is excluded from its descriptor, screen, candidate, regret calibration input, and decision.
       - Transport uses one support-conditioned case state at a time. Target reference blocks use H/K-excluded donor states; pseudo reference blocks use H/J/K-excluded donor states. Equal center then equal case weighting is frozen before pseudo evaluation.
       - The primary margin is the coordinatewise maximum positive overprediction observed across every case in all eight donor centers. It is not conformal, not a confidence bound, and has no finite-sample coverage claim.

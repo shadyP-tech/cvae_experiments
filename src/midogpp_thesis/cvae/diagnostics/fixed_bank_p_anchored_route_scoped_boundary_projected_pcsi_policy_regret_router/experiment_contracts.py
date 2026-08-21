@@ -18,11 +18,11 @@ from .constants import (
 CANONICAL_OUTPUT_ROOT = (
     "artifacts/midogpp/90_oracles_and_diagnostics/"
     "uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_"
-    "pcsi_policy_regret_router/v1"
+    "pcsi_policy_regret_router/v2"
 )
 AUTHORIZATION_SCOPE = (
     "one_terminal_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_"
-    "pcsi_policy_regret_router_v1"
+    "pcsi_policy_regret_router_v2_spawn_serialization_repair"
 )
 
 EXPERT_BANK_ARTIFACT_ID = (
@@ -31,23 +31,23 @@ EXPERT_BANK_ARTIFACT_ID = (
 GENERATION_LOCK_ARTIFACT_ID = "midogpp_output_uniform_b_v2_generation_lock_v1"
 TEST_CACHE_ARTIFACT_ID = (
     "midogpp_stage90_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_"
-    "policy_regret_router_test_cache_v1"
+    "policy_regret_router_test_cache_v2"
 )
 TEST_MANIFEST_ARTIFACT_ID = (
     "midogpp_stage90_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_"
-    "policy_regret_router_test_manifest_v1"
+    "policy_regret_router_test_manifest_v2"
 )
 TEST_CONSUMPTION_LEDGER_ARTIFACT_ID = (
     "midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_"
-    "boundary_projected_pcsi_policy_regret_router_parent_v1"
+    "boundary_projected_pcsi_policy_regret_router_parent_v2"
 )
 LEDGER_AMENDMENT_ARTIFACT_ID = (
     "midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_"
-    "boundary_projected_pcsi_policy_regret_router_amendment_v1"
+    "boundary_projected_pcsi_policy_regret_router_amendment_v2"
 )
 LEDGER_AMENDMENT_FILENAME = (
     "uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_"
-    "pcsi_policy_regret_router_ledger_amendment_v1.json"
+    "pcsi_policy_regret_router_ledger_amendment_v2.json"
 )
 
 INPUT_ARTIFACT_IDS = (
@@ -66,7 +66,7 @@ EXPECTED_TEST_CONSUMPTION_LEDGER_SHA256 = (
     "8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16"
 )
 EXPECTED_LEDGER_AMENDMENT_SHA256 = (
-    "3b44f5a61284f91baa9f92476e0b0bd18969e26879313ee0e3b13fe346218230"
+    "5836f034b7f90d46741560f005ebaa1cbbe141e16c5731b41cf9ed112553be87"
 )
 EXPECTED_TEST_CACHE_SEMANTIC_ID = "uniform_b_v2_descriptive_test_cache_v1"
 EXPECTED_TEST_CACHE_REPRESENTATION_ID = "annotation_jpeg_fixed_center_b_v3"
