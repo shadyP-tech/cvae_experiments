@@ -2799,6 +2799,57 @@ experiments:
       - The CPU phase uses four spawned center batches and one BLAS thread per posterior worker for 2,180 logistic fits. Physical generation remains two persistent RTX A5000 workers.
       - Regardless of outcome, this artifact cannot authorize routing success, action or policy changes, model or expert updates, promotion, deployment, recipe selection, a numbered-stage feed, another diagnostic, another experiment, or a generic consumer.
 
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router.v1
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_test_cache_v1
+      - midogpp_stage90_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_test_manifest_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_parent_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_amendment_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Reuse of immutable A1 generation geometry, exact-nine seed pairing, budgets, and classifier settings only; no routing, action, policy, downstream, promotion, or deployment authority is inherited.
+      midogpp_stage90_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_test_cache_v1: Single-consumer byte-exact label-free alias of the original consumed-test cache; it carries no predecessor Stage-90 probabilities, routes, fitted models, decisions, scratch state, or evidentiary authority.
+      midogpp_stage90_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_test_manifest_v1: Experiment-fenced labels open only through source-prior, H-minus-c support, sealed J-minus-d pseudo evaluation, and terminal capabilities after all decisions seal.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_parent_v1: Byte-exact experiment-fenced alias of the immutable original ledger, read only to verify the direct parent hash.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_amendment_v1: Direct single-consumer authorization for this terminal post-hoc method-development diagnostic; it creates no fresh evidence.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-p-anchored-route-scoped-center-balanced-posterior-utility-prefix-router
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_v1
+    notes:
+      - This is one explicitly authorized terminal reuse of the already-consumed MIDOG++ test split. Prior consumed-test findings informed the frozen method design, so the result remains POST_HOC_CONSUMED_TEST_SENSITIVITY and cannot be confirmation.
+      - Exactly six original, experiment-fenced inputs are admitted and all 810 physical probability cells are recomputed. No v2 result, route, fitted model, hash, amendment, probability surface, checkpoint, or scratch state is consumed.
+      - Each target candidate uses only H-minus-c support. A pseudo candidate reuses the sealed J-minus-d posterior; no H rows or labels and no d labels enter that fit, while H and J are excluded from actionable endpoint-source selection and donor calibration. Its frozen label-free fingerprint still contains A1::source=H, so this is explicitly role exclusion rather than H-covariate invariance.
+      - BACC, favorable Brier, and favorable log-loss action gains are computed analytically from posterior probabilities with posterior-augmented center denominators. One common utility vector drives eligibility, action ranking, calibration, and authorization.
+      - Donor calibration uses the center-balanced median conditional overprediction bias with at least six supported donor centers. Pseudo replay uses leave-J calibration. This is descriptive expected-bias correction, not a conformal or confidence bound.
+      - The primary policy ranks complete case policies and enumerates deterministic prefixes. Feasible prefixes require positive aggregate corrected BACC and nonnegative aggregate proper gains; exact ties prefer smaller K, then the prefix hash. Every invalid or infeasible route returns byte-exact P.
+      - P, unified-prefix, unified-candidate-only, observed-maximum-prefix, and routed cyclic-fingerprint controls are sealed before terminal labels. Numeric transport is audit-only; structural lineage and own-route noninterference remain hard gates.
+      - The optimized posterior workload is exactly 218 held-case routes times identity/cyclic control equals 436 H-minus-c fits. Pseudo H/J/d candidates reference the sealed J-minus-d prediction, disclose the retained label-free H fingerprint covariate, and never reopen support or refit a posterior.
+      - Validation reconstructs the six-input origin and replays every persisted endpoint/posterior output plus all downstream label-derived semantics. Complete fitted DTOs are content sealed, while optimizer-fit correctness is the explicit trust boundary; the two fresh validators perform zero optimizer refits.
+      - Two persistent RTX A5000 generation workers precede a CUDA-free CPU phase with four spawned workers. Worker DTOs are plain serializable values, dense arrays are deduplicated, and two fresh-process reconstructions are required.
+      - Regardless of outcome, this artifact cannot authorize routing success, action or policy changes, model or expert updates, promotion, deployment, recipe selection, a numbered-stage feed, another diagnostic, another experiment, or a generic consumer.
+
   - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router.v1
     stage: 90_oracles_and_diagnostics
     status: failed

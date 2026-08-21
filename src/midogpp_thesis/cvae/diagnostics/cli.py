@@ -369,6 +369,16 @@ def build_parser() -> argparse.ArgumentParser:
     psscur.add_argument("--config", required=True)
     psscur.add_argument("--artifact-root", required=True)
 
+    cbpupr = sub.add_parser(
+        "fixed-bank-p-anchored-route-scoped-center-balanced-posterior-utility-prefix-router",
+        help=(
+            "Run the terminal consumed-test fixed-bank P-anchored "
+            "route-scoped center-balanced posterior-utility prefix diagnostic."
+        ),
+    )
+    cbpupr.add_argument("--config", required=True)
+    cbpupr.add_argument("--artifact-root", required=True)
+
     pcsi_parc = sub.add_parser(
         "fixed-bank-p-anchored-boundary-projected-pcsi-policy-regret-router",
         help=(
@@ -394,6 +404,29 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     artifact_root = Path(args.artifact_root)
+
+    if args.surface == (
+        "fixed-bank-p-anchored-route-scoped-center-balanced-"
+        "posterior-utility-prefix-router"
+    ):
+        from .fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router import (
+            load_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_config,
+            run_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router,
+        )
+
+        config = (
+            load_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_config(
+                args.config
+            )
+        )
+        output = (
+            run_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router(
+                config,
+                artifact_root=artifact_root,
+            )
+        )
+        print(output)
+        return 0
 
     if args.surface == (
         "fixed-bank-p-anchored-route-scoped-boundary-projected-"

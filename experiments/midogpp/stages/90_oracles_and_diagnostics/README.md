@@ -1271,3 +1271,73 @@ The observed donor-case maximum is neither conformal nor a confidence bound and
 has no coverage guarantee. Every output remains post-hoc consumed-test
 sensitivity only, cannot establish routing success or target performance, and
 may not feed another experiment, stage, model, expert, policy, or deployment.
+
+## Route-scoped center-balanced posterior-utility prefix diagnostic
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router.v1`
+is a new terminal-only method-development sibling motivated by the completed
+PCSI-RACR v2 bottleneck analysis. Prior consumed-test findings informed the
+method design, so this run cannot be fresh confirmation. It independently
+recomputes the 810 physical probability cells from six experiment-fenced
+original inputs and cannot read any v2 output, route, model, amendment, hash,
+probability surface, checkpoint, or scratch state.
+
+For every target route `(H,c)` and pseudo route `(H,J,d)`, the held case is
+excluded from its own posterior and candidate policy. Analytic posterior utility
+uses one all-favorable-positive vector for BACC, Brier, and log-loss gains with
+posterior-augmented center denominators. That same vector drives action
+eligibility, deterministic B/I/R ranking, donor calibration, and prefix
+authorization; there is no transferred ridge utility model.
+
+The pseudo-route exclusion is deliberately role-scoped, not a claim of full
+covariate exclusion. A pseudo route reuses the sealed `J-d` posterior, so no H
+rows or labels enter that fit and no pseudo-case `d` label enters its own eta.
+H and J are excluded from actionable endpoint-source selection and donor
+calibration. The frozen label-free fingerprint does, however, retain the
+`A1::source=H` covariate; consequently the reused posterior is not H-covariate
+invariant and the artifact states that limitation explicitly.
+
+Calibration first averages conditional overprediction within each supported
+donor center and then takes a center-balanced median. Target calibration requires
+at least six supported donor centers; pseudo replay excludes its own donor J.
+This estimates descriptive expected bias. It is not conformal, a confidence
+bound, calibrated uncertainty, or a tail guarantee.
+
+The primary policy orders complete case policies by corrected expected BACC and
+enumerates only prefixes `K=0..m_H`. A prefix is feasible when its aggregate
+corrected BACC is positive and both aggregate proper gains are nonnegative.
+Maximum aggregate corrected BACC wins; exact ties prefer smaller K and then the
+prefix hash. Invalid, incomplete, nonfinite, or infeasible decisions emit
+byte-exact `P_PROTECTED`.
+
+P, unified-prefix, unified-candidate-only, observed-maximum-prefix, and routed
+within-case cyclic-fingerprint controls are globally sealed before terminal
+labels. Numeric transport is audit-only and handles zero-MAD sparse dimensions
+without an artificial `1e-12` division; structural lineage and route
+noninterference remain hard checks. Regardless of outcome, every result remains
+`POST_HOC_CONSUMED_TEST_SENSITIVITY` and
+`TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE` and cannot feed another experiment.
+
+Bundle validation independently rebuilds the six-input physical origin,
+fingerprints, target and pseudo endpoint probabilities, posterior eta outputs,
+candidate utilities, donor-label replays, calibrations, transport diagnostics,
+and terminal metrics. To keep the workstation validation pass bounded, it does
+not refit the 3,488 endpoint or 436 posterior optimizers: their complete fitted
+DTOs are persisted and content sealed, and optimizer-fit correctness is the
+explicit trust boundary. Two fresh validation processes replay every fitted DTO
+output and all downstream scientific semantics with zero optimizer refits.
+The registered config contract hash is `ec5ddac96ef1ca98`; the frozen protocol
+hash is
+`dc92f288cb4b0fb28e84ee0bbbc01476279600a71e4baad54b8c31ea808bc933`.
+
+Run the registered experiment from a synchronized, clean workstation checkout:
+
+```bash
+cd /home/stud/spark/cvae_experiments
+export PYTHONPATH="$PWD/src"
+/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
+  midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router.v1
+```
+
+The runner rejects existing or partial state and does not support cross-run
+recovery; launch only into the resolver-provided fresh output directory.

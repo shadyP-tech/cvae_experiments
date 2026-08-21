@@ -11911,6 +11911,299 @@ artifacts:
       - The unconfirmed thesis-specific mechanism combines grouped posterior cross-fitting, analytic proper utility, partially pooled cell residual scales, selection-aware donor-block envelopes, label-free held-case shift inflation, lower-tail donor authorization, and a P-protected fallback. No generic method novelty or routing success is claimed.
       - Every result is terminal diagnostic evidence. No outcome may feed or authorize a later experiment, route, policy, model, expert, promotion, deployment, or generic consumer.
 
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_parent_v1
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: CONSUMED_TEST_CBPUPR_PARENT_LEDGER_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      split: test
+      row_count: '9928'
+      held_unit_count: '218'
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      experiment_fenced: 'true'
+      fresh_evidence: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router.v1
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    forbidden_reuse: &cbpupr_forbidden_reuse
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact single-consumer alias of the immutable original consumed-test ledger; it exposes no previous Stage-90 output, amendment, probability surface, route, scratch, or checkpoint.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_amendment_v1
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_CBPUPR_AMENDMENT_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      amendment_sha256: 2a8b8eb10e6809d88de1fe8b44aac1c37c5618bee6a339a4770e143a893cec3c
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router.v1
+      authorization_scope: one_terminal_consumed_test_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_v1
+      prior_consumed_test_findings_informed_method_design: 'true'
+      prior_consumed_test_bytes_used_as_scientific_inputs: 'false'
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      fresh_evidence: 'false'
+      previous_stage90_outputs_used: 'false'
+      previous_stage90_amendments_used: 'false'
+      no_v2_semantic_artifacts_used: 'true'
+      generic_consumer_authorized: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_ledger_amendment_v1.json
+    expected_file_hashes:
+      uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_ledger_amendment_v1.json:
+        algorithm: sha256
+        digest: 2a8b8eb10e6809d88de1fe8b44aac1c37c5618bee6a339a4770e143a893cec3c
+    forbidden_reuse: *cbpupr_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Direct hash-chained authorization over the immutable original ledger for this named terminal post-hoc method-development diagnostic only; it creates no fresh evidence.
+
+  - artifact_id: midogpp_stage90_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_test_manifest_v1
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_CBPUPR_CAPABILITY_GATED_LABELS
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+      split: test
+      row_count: '9928'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_CBPUPR_V1
+      fresh_evidence: 'false'
+      labels_present: 'true'
+      labels_available_before_global_probability_seal: 'false'
+      held_unit: whole_case_or_group_c
+      held_unit_count: '218'
+      outer_support_scope: H_minus_c
+      pseudo_support_scope: J_minus_d_with_outer_H_role_exclusion_not_covariate_exclusion
+      pseudo_outer_H_support_rows_or_labels_enter_posterior_fit_or_normalization: 'false'
+      pseudo_outer_H_frozen_label_free_expert_fingerprint_covariates_present: 'true'
+      pseudo_posterior_is_outer_H_covariate_invariant: 'false'
+      pseudo_outer_H_excluded_from_actionable_endpoint_source_selection: 'true'
+      pseudo_outer_H_and_J_excluded_from_donor_calibration: 'true'
+      ordered_H_J_pair_count: '72'
+      target_posterior_fits_per_route_and_control: '1'
+      target_posterior_inner_crossfit_or_oof_reliability_used: 'false'
+      target_posterior_shared_across_distinct_target_case_routes: 'false'
+      target_posterior_referenced_by_outer_H_pseudo_wrappers: 'true'
+      terminal_label_scope: after_all_replays_calibrations_decisions_and_aggregate_seal
+      role_scoped_label_capabilities_enforced: 'true'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router.v1
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse: *cbpupr_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Labels are decoded only through exact role-scoped grants; held case labels never enter their own posterior, action score, candidate, calibration input, transport authorization, or decision.
+
+  - artifact_id: midogpp_stage90_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_test_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_TEST_CBPUPR_LABEL_FREE_CACHE_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: test
+      row_count: '9928'
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      experiment_fenced: 'true'
+      fresh_evidence: 'false'
+      labels_absent: 'true'
+      previous_stage90_output_used: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router.v1
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse: *cbpupr_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias over the validated label-free consumed-test embedding cache; all physical probabilities are independently recomputed.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: POST_HOC_CONSUMED_TEST_SENSITIVITY
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      claim_role: posthoc_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_diagnostic
+      bounded_interpretation: center_balanced_posterior_expected_utility_prefix_sensitivity_on_consumed_MIDOGpp_test_only
+      architecture_family: fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_v1
+      config_contract_hash: ec5ddac96ef1ca98
+      protocol_contract_hash: dc92f288cb4b0fb28e84ee0bbbc01476279600a71e4baad54b8c31ea808bc933
+      evaluation_split: test
+      consumed_test_data: 'true'
+      eligible_test_row_count: '9928'
+      held_case_route_count: '218'
+      physical_probability_cell_count: '810'
+      outer_endpoint_model_fit_count: '3488'
+      target_local_posterior_model_fit_count: '436'
+      pseudo_route_count: '1744'
+      prior_consumed_test_findings_informed_method_design: 'true'
+      prior_consumed_test_bytes_used_as_scientific_inputs: 'false'
+      no_v2_semantic_artifacts_used: 'true'
+      target_support_labels_used: 'true'
+      outer_support_scope: H_minus_c
+      pseudo_support_scope: J_minus_d_with_outer_H_role_exclusion_not_covariate_exclusion
+      pseudo_outer_H_support_rows_or_labels_enter_posterior_fit_or_normalization: 'false'
+      pseudo_outer_H_frozen_label_free_expert_fingerprint_covariates_present: 'true'
+      pseudo_posterior_is_outer_H_covariate_invariant: 'false'
+      pseudo_outer_H_excluded_from_actionable_endpoint_source_selection: 'true'
+      pseudo_outer_H_and_J_excluded_from_donor_calibration: 'true'
+      ordered_H_J_pair_count: '72'
+      donor_response_model_fit_count: '0'
+      utility_model_fit_count: '0'
+      posterior_utility_score: unified_analytic_favorable_BACC_Brier_log_loss
+      calibration: center_balanced_median_conditional_overprediction_bias
+      minimum_supported_donor_center_count: '6'
+      prefix_unit: complete_case_policy
+      primary_policy_id: CBPUPR_UNIFIED_PREFIX
+      numeric_transport_is_authorization_gate: 'false'
+      structural_transport_lineage_is_authorization_gate: 'true'
+      exact_P_fallback: 'true'
+      finite_sample_coverage_claimed: 'false'
+      information_gate_scope: terminal_diagnostic_only
+      fresh_evidence: 'false'
+      promotion_eligible: 'false'
+      previous_stage90_outputs_used: 'false'
+      previous_stage90_amendments_used: 'false'
+      may_feed_another_experiment: 'false'
+      workstation_generation_devices: cuda:0|cuda:1
+      workstation_cpu_topology: 4_spawned_workers_with_parent_side_reindexing
+      workstation_scratch_root: /data/local/fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_v1
+      two_fresh_process_validation_required: 'true'
+      all_fitted_DTO_outputs_replayed_during_validation: 'true'
+      validation_endpoint_optimizer_refit_count: '0'
+      validation_posterior_optimizer_refit_count: '0'
+      optimizer_fit_correctness_is_content_sealed_trust_boundary: 'true'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - arrays/frozen_source_streams.npy
+      - arrays/fixed_bank_a1_action_probabilities.npz
+      - arrays/route_endpoint_probabilities.npz
+      - arrays/pseudo_route_endpoint_probabilities.npz
+      - arrays/target_local_posterior_probabilities.npz
+      - arrays/candidate_probabilities.npz
+      - arrays/composed_probabilities.npz
+      - manifests/frozen_source_stream_index.json
+      - manifests/frozen_source_stream_lock.json
+      - manifests/fixed_bank_a1_prediction_index.json
+      - manifests/fixed_bank_a1_prediction_seal.json
+      - manifests/route_endpoint_probability_index.json
+      - manifests/pseudo_route_endpoint_probability_index.json
+      - manifests/target_local_posterior_probability_index.json
+      - manifests/candidate_probability_index.json
+      - manifests/composed_probability_index.json
+      - manifests/protocol_manifest.json
+      - manifests/action_library.json
+      - manifests/physical_surface_seal.json
+      - manifests/outer_plan_seal.json
+      - manifests/policy_menu.json
+      - manifests/decision_barrier.json
+      - manifests/preterminal_aggregate_seal.json
+      - manifests/terminal_evaluation_seal.json
+      - manifests/content_index.json
+      - tables/exact_nine_probability_index.json
+      - tables/outer_plans.json
+      - tables/physical_fingerprints.json
+      - tables/route_support_capabilities.json
+      - tables/route_endpoint_states.json
+      - tables/pseudo_source_priors.json
+      - tables/target_local_posterior_models.json
+      - tables/target_local_posterior_predictions.json
+      - tables/pseudo_posterior_references.json
+      - tables/expected_utility_predictions.json
+      - tables/candidate_eligibility.json
+      - tables/target_candidate_policies.json
+      - tables/pseudo_candidate_policies.json
+      - tables/pseudo_policy_replays.json
+      - tables/donor_bias_calibrations.json
+      - tables/prefix_decisions.json
+      - tables/transport_diagnostics.json
+      - tables/composed_predictions.json
+      - tables/route_decisions.json
+      - tables/terminal_method_metrics.json
+      - tables/terminal_center_contrasts.json
+      - tables/terminal_case_oracles.json
+      - tables/gate_funnel.json
+      - tables/information_diagnostics.json
+      - reports/workstation_preflight.json
+      - reports/diagnostic_summary.json
+      - reports/label_capability_report.json
+      - reports/leakage_report.json
+      - reports/publication_decision.json
+      - reports/runtime_summary.json
+      - reports/run_state.json
+      - reports/fresh_process_attestation.json
+      - reports/validation_report.json
+    forbidden_reuse: *cbpupr_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - This output recomputes all physical probabilities from six original inputs and persists no raw labels, sample paths, or predecessor semantic artifacts.
+      - Pseudo routes reuse sealed J-minus-d posteriors. H rows and labels are excluded from the posterior fit and H/J are excluded from actionable endpoint-source and donor-calibration roles, but the frozen label-free A1::source=H fingerprint covariate remains; no H-covariate-invariance claim is made.
+      - The method unifies posterior utility estimation, center-balanced expected-bias correction, and deterministic complete-case prefix selection. It is descriptive and makes no coverage, confidence, routing-success, or generic method claim.
+      - Validation rebuilds the six-input origin and replays all fitted DTO outputs and downstream label-derived semantics. The complete endpoint and posterior fit DTOs are content sealed, zero optimizer refits occur during bundle validation, and optimizer-fit correctness remains the explicit trust boundary.
+      - Every result is terminal diagnostic evidence. No outcome may feed or authorize a later experiment, route, policy, model, expert, promotion, deployment, or generic consumer.
+
   - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_parent_v2
     stage: dataset_contract
     physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42

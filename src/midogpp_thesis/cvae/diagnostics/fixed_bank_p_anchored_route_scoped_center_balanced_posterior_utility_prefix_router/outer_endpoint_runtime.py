@@ -1,0 +1,364 @@
+"""Center-batched H-c endpoint reconstruction without unused nested voters."""
+
+from __future__ import annotations
+
+from concurrent.futures import ProcessPoolExecutor
+from dataclasses import dataclass
+import multiprocessing as mp
+import os
+from typing import Mapping, Sequence
+
+import numpy as np
+
+from ...protocol import ProtocolError
+from .constants import (
+    BLAS_THREADS_PER_CPU_WORKER,
+    CENTERS,
+    CPU_WORKERS,
+    EXPECTED_OUTER_ENDPOINT_MODEL_FIT_COUNT,
+)
+from .contracts import CenterProbabilitySurface, EndpointCasePrediction
+from .endpoint_reconstruction import (
+    CenterCaseOutcomes,
+    EndpointState,
+    PreparedCenter,
+    fit_endpoint_state_from_outcomes,
+    rebind_endpoint_state_priors,
+    reconstruct_case_endpoints,
+)
+from .endpoint_preparation import prepare_center
+from .hashing import require_sha256
+from .outer_plans import WholeCaseOuterPlan
+from .workstation import BLAS_ENVIRONMENT_NAMES
+
+
+_THREADPOOL_LIMITER: object | None = None
+
+
+@dataclass(frozen=True)
+class OuterEndpointJob:
+    target_center: str
+    prepared: PreparedCenter
+    route_outcomes: tuple[tuple[str, CenterCaseOutcomes], ...]
+    outer_plans: tuple[WholeCaseOuterPlan, ...]
+    donor_priors: tuple[tuple[tuple[str, str], float], ...]
+
+
+@dataclass(frozen=True)
+class OuterEndpointProducts:
+    target_center: str
+    predictions: tuple[EndpointCasePrediction, ...]
+    states: tuple[tuple[str, EndpointState], ...]
+    state_hashes: tuple[tuple[str, str], ...]
+    endpoint_model_fit_count: int
+
+
+def compute_outer_endpoint_products(job: OuterEndpointJob) -> OuterEndpointProducts:
+    priors = dict(job.donor_priors)
+    outcomes_by_case = dict(job.route_outcomes)
+    if (
+        tuple(outcomes_by_case) != tuple(plan.case_id for plan in job.outer_plans)
+        or any(
+            outcomes_by_case[plan.case_id].case_ids != plan.support_case_ids
+            for plan in job.outer_plans
+        )
+    ):
+        raise ProtocolError("CBPUPR route-scoped endpoint capabilities drifted.")
+    states: list[tuple[str, EndpointState]] = []
+    predictions: list[EndpointCasePrediction] = []
+    fit_count = 0
+    for plan in job.outer_plans:
+        state = fit_endpoint_state_from_outcomes(
+            job.prepared,
+            support_case_ids=plan.support_case_ids,
+            outcomes=outcomes_by_case[plan.case_id],
+            donor_priors=priors,
+        )
+        states.append((plan.case_id, state))
+        predictions.append(
+            reconstruct_case_endpoints(
+                job.prepared,
+                state,
+                evaluation_case_id=plan.case_id,
+            )
+        )
+        fit_count += state.model_fit_count
+    if fit_count != 16 * len(job.outer_plans):
+        raise ProtocolError("CBPUPR outer endpoint workload drifted.")
+    return OuterEndpointProducts(
+        job.target_center,
+        tuple(predictions),
+        tuple(states),
+        tuple((case, state.state_hash) for case, state in states),
+        fit_count,
+    )
+
+
+def recompose_outer_endpoint_products(
+    job: OuterEndpointJob,
+    fitted: OuterEndpointProducts,
+    *,
+    donor_priors: Mapping[tuple[str, str], float],
+    excluded_source_centers: Sequence[str] = (),
+) -> OuterEndpointProducts:
+    """Rebind outer-excluded priors without repeating endpoint model fits."""
+
+    if fitted.target_center != job.target_center:
+        raise ProtocolError("CBPUPR prior rebind target drifted.")
+    states = tuple(
+        (
+            case,
+            rebind_endpoint_state_priors(
+                state,
+                donor_priors,
+                excluded_source_centers=excluded_source_centers,
+            ),
+        )
+        for case, state in fitted.states
+    )
+    return OuterEndpointProducts(
+        job.target_center,
+        tuple(
+            reconstruct_case_endpoints(
+                job.prepared,
+                state,
+                evaluation_case_id=case,
+            )
+            for case, state in states
+        ),
+        states,
+        tuple((case, state.state_hash) for case, state in states),
+        0,
+    )
+
+
+def execute_outer_endpoint_jobs(
+    jobs: Sequence[OuterEndpointJob],
+    *,
+    use_processes: bool = True,
+) -> tuple[OuterEndpointProducts, ...]:
+    rows = tuple(jobs)
+    if tuple(job.target_center for job in rows) != CENTERS:
+        raise ProtocolError("CBPUPR endpoint job order drifted.")
+    if not use_processes:
+        results = tuple(compute_outer_endpoint_products(job) for job in rows)
+    else:
+        with ProcessPoolExecutor(
+            max_workers=CPU_WORKERS,
+            mp_context=mp.get_context("spawn"),
+            initializer=_initialize_worker,
+            initargs=(BLAS_THREADS_PER_CPU_WORKER,),
+        ) as executor:
+            payloads = tuple(_job_payload(row) for row in rows)
+            raw = tuple(
+                executor.map(_compute_outer_endpoint_payload, payloads, chunksize=1)
+            )
+        unordered = tuple(_products_from_payload(row) for row in raw)
+        by_center = {row.target_center: row for row in unordered}
+        results = tuple(by_center[center] for center in CENTERS)
+    if sum(row.endpoint_model_fit_count for row in results) != EXPECTED_OUTER_ENDPOINT_MODEL_FIT_COUNT:
+        raise ProtocolError("CBPUPR global outer endpoint workload drifted.")
+    return results
+
+
+def _job_payload(job: OuterEndpointJob) -> dict[str, object]:
+    """Strip every MappingProxyType before crossing the spawn boundary."""
+
+    surface = job.prepared.surface
+    return {
+        "target_center": job.target_center,
+        "surface": {
+            "center": surface.center,
+            "sample_ids": surface.sample_ids,
+            "case_ids": surface.case_ids,
+            "seed_probabilities": tuple(
+                (action, np.asarray(values, dtype=np.float32))
+                for action, values in surface.seed_probabilities.items()
+            ),
+            "probability_store_hash": surface.probability_store_hash,
+        },
+        "route_outcomes": tuple(
+            (
+                case,
+                {
+                    "center": outcomes.center,
+                    "case_ids": outcomes.case_ids,
+                    "successes": np.asarray(outcomes.successes, dtype=np.int64),
+                    "trials": np.asarray(outcomes.trials, dtype=np.int64),
+                    "n_positive": np.asarray(outcomes.n_positive, dtype=np.int64),
+                    "n_negative": np.asarray(outcomes.n_negative, dtype=np.int64),
+                },
+            )
+            for case, outcomes in job.route_outcomes
+        ),
+        "outer_plans": tuple(row.to_payload() for row in job.outer_plans),
+        "donor_priors": tuple(
+            ((str(source), str(direction)), float(value))
+            for (source, direction), value in job.donor_priors
+        ),
+    }
+
+
+def _job_from_payload(raw: dict[str, object]) -> OuterEndpointJob:
+    surface_raw = raw["surface"]
+    if not isinstance(surface_raw, dict):
+        raise ProtocolError("CBPUPR endpoint worker input payload drifted.")
+    surface = CenterProbabilitySurface(
+        str(surface_raw["center"]),
+        tuple(surface_raw["sample_ids"]),
+        tuple(surface_raw["case_ids"]),
+        {str(action): np.asarray(values, dtype=np.float32) for action, values in surface_raw["seed_probabilities"]},
+        str(surface_raw["probability_store_hash"]),
+    )
+    plans: list[WholeCaseOuterPlan] = []
+    for value in raw["outer_plans"]:
+        if not isinstance(value, dict):
+            raise ProtocolError("CBPUPR endpoint plan worker payload drifted.")
+        plan = WholeCaseOuterPlan(
+            str(value["target_center"]),
+            str(value["case_id"]),
+            str(value["group_id"]),
+            tuple(value["support_case_ids"]),
+            tuple(value["evaluation_sample_ids"]),
+            str(value["probability_surface_hash"]),
+        )
+        if plan.plan_hash != value.get("plan_hash"):
+            raise ProtocolError("CBPUPR endpoint plan hash drifted in worker.")
+        plans.append(plan)
+    return OuterEndpointJob(
+        str(raw["target_center"]),
+        prepare_center(surface),
+        tuple(
+            (
+                str(case),
+                CenterCaseOutcomes(
+                    str(value["center"]),
+                    tuple(value["case_ids"]),
+                    np.asarray(value["successes"], dtype=np.int64),
+                    np.asarray(value["trials"], dtype=np.int64),
+                    np.asarray(value["n_positive"], dtype=np.int64),
+                    np.asarray(value["n_negative"], dtype=np.int64),
+                ),
+            )
+            for case, value in raw["route_outcomes"]
+        ),
+        tuple(plans),
+        tuple(
+            ((str(key[0]), str(key[1])), float(value))
+            for key, value in raw["donor_priors"]
+        ),
+    )
+
+
+def _compute_outer_endpoint_payload(raw: dict[str, object]) -> dict[str, object]:
+    return _products_payload(compute_outer_endpoint_products(_job_from_payload(raw)))
+
+
+def _products_payload(products: OuterEndpointProducts) -> dict[str, object]:
+    return {
+        "target_center": products.target_center,
+        "predictions": tuple(
+            {
+                "center": row.center,
+                "case_id": row.case_id,
+                "sample_ids": row.sample_ids,
+                "probabilities": tuple(
+                    (method, tuple(values)) for method, values in row.probabilities.items()
+                ),
+                "state_hash": row.state_hash,
+                "prediction_hash": row.prediction_hash,
+            }
+            for row in products.predictions
+        ),
+        "states": tuple((case, _state_payload(state)) for case, state in products.states),
+        "state_hashes": products.state_hashes,
+        "endpoint_model_fit_count": products.endpoint_model_fit_count,
+    }
+
+
+def _state_payload(state: EndpointState) -> dict[str, object]:
+    return {
+        "target_center": state.target_center,
+        "support_case_ids": state.support_case_ids,
+        "model_mean": np.asarray(state.model_mean, dtype=np.float64),
+        "model_scale": np.asarray(state.model_scale, dtype=np.float64),
+        "model_coefficients": np.asarray(state.model_coefficients, dtype=np.float64),
+        "model_valid": np.asarray(state.model_valid, dtype=bool),
+        "robust_sources": state.robust_sources,
+        "allowed_sources": state.allowed_sources,
+        "support_n_positive": state.support_n_positive,
+        "support_n_negative": state.support_n_negative,
+        "support_gains": tuple((source, direction, float(value)) for (source, direction), value in state.support_gains.items()),
+        "donor_priors": tuple((source, direction, float(value)) for (source, direction), value in state.donor_priors.items()),
+        "state_hash": state.state_hash,
+        "model_fit_count": state.model_fit_count,
+    }
+
+
+def _products_from_payload(raw: dict[str, object]) -> OuterEndpointProducts:
+    predictions: list[EndpointCasePrediction] = []
+    for value in raw["predictions"]:
+        prediction = EndpointCasePrediction(
+            str(value["center"]),
+            str(value["case_id"]),
+            tuple(value["sample_ids"]),
+            {str(method): tuple(probabilities) for method, probabilities in value["probabilities"]},
+            str(value["state_hash"]),
+        )
+        if prediction.prediction_hash != value.get("prediction_hash"):
+            raise ProtocolError("CBPUPR endpoint worker prediction hash drifted.")
+        predictions.append(prediction)
+    states = tuple((str(case), _state_from_payload(value)) for case, value in raw["states"])
+    result = OuterEndpointProducts(
+        str(raw["target_center"]),
+        tuple(predictions),
+        states,
+        tuple((str(case), str(digest)) for case, digest in raw["state_hashes"]),
+        int(raw["endpoint_model_fit_count"]),
+    )
+    if result.state_hashes != tuple((case, state.state_hash) for case, state in states):
+        raise ProtocolError("CBPUPR endpoint worker state index drifted.")
+    return result
+
+
+def _state_from_payload(raw: object) -> EndpointState:
+    if not isinstance(raw, dict):
+        raise ProtocolError("CBPUPR endpoint worker state payload drifted.")
+    require_sha256(raw["state_hash"], "endpoint_state_hash")
+    return EndpointState(
+        str(raw["target_center"]),
+        tuple(raw["support_case_ids"]),
+        np.asarray(raw["model_mean"], dtype=np.float64),
+        np.asarray(raw["model_scale"], dtype=np.float64),
+        np.asarray(raw["model_coefficients"], dtype=np.float64),
+        np.asarray(raw["model_valid"], dtype=bool),
+        tuple(tuple(value) for value in raw["robust_sources"]),
+        tuple(str(value) for value in raw["allowed_sources"]),
+        int(raw["support_n_positive"]),
+        int(raw["support_n_negative"]),
+        {(str(source), str(direction)): float(value) for source, direction, value in raw["support_gains"]},
+        {(str(source), str(direction)): float(value) for source, direction, value in raw["donor_priors"]},
+        str(raw["state_hash"]),
+        int(raw["model_fit_count"]),
+    )
+
+
+def _initialize_worker(threads: int) -> None:
+    global _THREADPOOL_LIMITER
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+    for name in BLAS_ENVIRONMENT_NAMES:
+        os.environ[name] = str(threads)
+    try:
+        from threadpoolctl import threadpool_limits
+    except ImportError as exc:  # pragma: no cover
+        raise ProtocolError("CBPUPR endpoint worker lacks threadpoolctl.") from exc
+    _THREADPOOL_LIMITER = threadpool_limits(limits=threads)
+
+
+__all__ = (
+    "OuterEndpointJob",
+    "OuterEndpointProducts",
+    "compute_outer_endpoint_products",
+    "execute_outer_endpoint_jobs",
+    "recompose_outer_endpoint_products",
+)
