@@ -334,19 +334,27 @@ class MidogppWorkspace:
                 authorized_consumers = artifact.semantic_identities.get(
                     "authorized_consumer_experiment_ids"
                 )
+                allowed_consumers = {
+                    value.strip()
+                    for value in (authorized_consumers or "").split("|")
+                    if value.strip()
+                }
                 if authorized_consumers:
-                    allowed_consumers = {
-                        value.strip()
-                        for value in authorized_consumers.split("|")
-                        if value.strip()
-                    }
                     if experiment.experiment_id not in allowed_consumers:
                         errors.append(
                             f"{experiment.experiment_id}: input {artifact_id} is fenced to "
                             f"authorized consumers {sorted(allowed_consumers)}"
                         )
                 forbidden_reuse = reuse_purposes.intersection(artifact.forbidden_reuse)
-                if forbidden_reuse:
+                claim_scope_rationale = experiment.input_claim_scope_exceptions.get(
+                    artifact_id, ""
+                )
+                permits_single_consumer_oracle_reuse = (
+                    forbidden_reuse == {"oracle_and_diagnostic_evidence"}
+                    and allowed_consumers == {experiment.experiment_id}
+                    and bool(claim_scope_rationale.strip())
+                )
+                if forbidden_reuse and not permits_single_consumer_oracle_reuse:
                     errors.append(
                         f"{experiment.experiment_id}: {artifact_id} forbids reuse as "
                         f"{sorted(forbidden_reuse)}"

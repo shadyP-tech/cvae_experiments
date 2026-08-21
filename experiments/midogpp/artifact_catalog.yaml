@@ -11910,3 +11910,592 @@ artifacts:
       - This output recomputes all physical probabilities from six original inputs and persists no raw labels or sample/image paths.
       - The unconfirmed thesis-specific mechanism combines grouped posterior cross-fitting, analytic proper utility, partially pooled cell residual scales, selection-aware donor-block envelopes, label-free held-case shift inflation, lower-tail donor authorization, and a P-protected fallback. No generic method novelty or routing success is claimed.
       - Every result is terminal diagnostic evidence. No outcome may feed or authorize a later experiment, route, policy, model, expert, promotion, deployment, or generic consumer.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_parent_v1
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: CONSUMED_TEST_PCSI_RACR_PARENT_LEDGER_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      split: test
+      row_count: '9928'
+      held_unit_count: '218'
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      experiment_fenced: 'true'
+      fresh_evidence: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router.v1
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    forbidden_reuse: &pcsi_racr_forbidden_reuse
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact single-consumer alias of the immutable original consumed-test ledger; no prior Stage-90 artifact is exposed.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_amendment_v1
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_PCSI_RACR_AMENDMENT_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      amendment_sha256: 3b44f5a61284f91baa9f92476e0b0bd18969e26879313ee0e3b13fe346218230
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router.v1
+      authorization_scope: one_terminal_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_v1
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      fresh_evidence: 'false'
+      previous_stage90_outputs_used: 'false'
+      previous_stage90_amendments_used: 'false'
+      generic_consumer_authorized: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_ledger_amendment_v1.json
+    expected_file_hashes:
+      uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_ledger_amendment_v1.json:
+        algorithm: sha256
+        digest: 3b44f5a61284f91baa9f92476e0b0bd18969e26879313ee0e3b13fe346218230
+    forbidden_reuse: *pcsi_racr_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+
+  - artifact_id: midogpp_stage90_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_test_manifest_v1
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_PCSI_RACR_CAPABILITY_GATED_LABELS
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+      split: test
+      row_count: '9928'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_PCSI_RACR_V1
+      fresh_evidence: 'false'
+      labels_present: 'true'
+      labels_available_before_global_probability_seal: 'false'
+      held_unit: whole_case_or_group_c
+      held_unit_count: '218'
+      outer_support_scope: H_minus_c
+      pseudo_support_scope: J_minus_d
+      own_route_noninterference_proven: 'true'
+      pseudo_transport_audit_only: 'true'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router.v1
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse: *pcsi_racr_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+
+  - artifact_id: midogpp_stage90_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_test_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_TEST_PCSI_RACR_LABEL_FREE_CACHE_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: test
+      row_count: '9928'
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      experiment_fenced: 'true'
+      fresh_evidence: 'false'
+      labels_absent: 'true'
+      previous_stage90_output_used: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router.v1
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse: *pcsi_racr_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router/v1
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: POST_HOC_CONSUMED_TEST_SENSITIVITY
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      claim_role: posthoc_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_diagnostic
+      bounded_interpretation: route_scoped_case_local_observed_regret_sensitivity_on_consumed_MIDOGpp_test_only
+      architecture_family: fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_v1
+      config_contract_hash: fb33bc9b867ccb2c
+      protocol_contract_hash: e9da22f3909cd68d8e2bc1cfda727de5167ea93e6ca7aa2e6d466dc9e7f2b85a
+      evaluation_split: test
+      consumed_test_data: 'true'
+      eligible_test_row_count: '9928'
+      held_case_route_count: '218'
+      physical_probability_cell_count: '810'
+      outer_endpoint_model_fit_count: '3488'
+      target_local_posterior_model_fit_count: '436'
+      utility_model_fit_count: '1314'
+      case_local_pseudo_target_replay_count: '3488'
+      role_bound_transport_descriptor_count: '15914'
+      numeric_transport_leaf_count: '14170'
+      transport_reference_block_summary_count: '576'
+      route_transport_screen_count: '1962'
+      final_case_prediction_count_including_P: '872'
+      target_support_labels_used: 'true'
+      transport_semantics: route_scoped_support_conditioned_single_case_P_B_I_R
+      transport_source_prior_labels_used_upstream: 'true'
+      transport_route_local_support_labels_used_upstream: 'true'
+      transport_held_case_evaluation_capability_used_directly: 'false'
+      transport_pseudo_evaluation_capability_used_directly: 'false'
+      transport_terminal_evaluation_capability_used_directly: 'false'
+      transport_label_free_claim: 'false'
+      transport_uses_pre_equivalence_endpoint_crossing_rates: 'true'
+      transport_screens_sealed_before_pseudo_evaluation_capability_open: 'true'
+      transport_screens_sealed_before_terminal_evaluation_capability_open: 'true'
+      transport_identity_level_route_noninterference_required: 'true'
+      transport_identity_level_route_noninterference_proven: 'true'
+      transport_authorization_valid: 'true'
+      transport_protocol_status: ROUTE_SCOPED_OWN_CASE_NONINTERFERENCE
+      execution_authorized: 'true'
+      pseudo_transport_audit_only: 'true'
+      observed_envelope_is_conformal: 'false'
+      finite_sample_coverage_claimed: 'false'
+      fresh_evidence: 'false'
+      promotion_eligible: 'false'
+      previous_stage90_outputs_used: 'false'
+      previous_stage90_amendments_used: 'false'
+      may_feed_another_experiment: 'false'
+      workstation_scratch_root: /data/local/fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_v1
+      two_fresh_process_validation_required: 'true'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - arrays/frozen_source_streams.npy
+      - arrays/fixed_bank_a1_action_probabilities.npz
+      - manifests/frozen_source_stream_index.json
+      - manifests/frozen_source_stream_lock.json
+      - manifests/fixed_bank_a1_prediction_index.json
+      - manifests/fixed_bank_a1_prediction_seal.json
+      - manifests/protocol_manifest.json
+      - manifests/action_library.json
+      - manifests/physical_surface_seal.json
+      - manifests/outer_plan_seal.json
+      - manifests/donor_runtime.json
+      - manifests/policy_replay_runtime.json
+      - manifests/policy_menu.json
+      - manifests/decision_barrier.json
+      - manifests/preterminal_aggregate_seal.json
+      - manifests/terminal_evaluation_seal.json
+      - manifests/content_index.json
+      - tables/exact_nine_probability_index.json
+      - tables/outer_plans.json
+      - tables/double_exclusion_plans.json
+      - tables/physical_fingerprints.json
+      - tables/target_local_posterior_models.json
+      - tables/target_local_posterior_predictions.json
+      - tables/action_equivalence_classes.json
+      - tables/projected_utility_descriptors.json
+      - tables/projected_donor_utility_rows.json
+      - tables/double_excluded_prior_provenance.json
+      - tables/double_excluded_endpoint_scopes.json
+      - tables/pseudo_donor_utility_rows.json
+      - tables/projected_utility_models.json
+      - tables/projected_utility_predictions.json
+      - tables/transport_reference_blocks.json
+      - tables/descriptor_matches.json
+      - tables/donor_case_envelopes.json
+      - tables/route_calibrations.json
+      - tables/sample_influence_predictions.json
+      - tables/transport_descriptors.json
+      - tables/transport_screens.json
+      - tables/target_candidate_policies.json
+      - tables/pseudo_candidate_policies.json
+      - tables/policy_regret_replays.json
+      - tables/policy_authorizations.json
+      - tables/final_policy_predictions.json
+      - tables/route_decisions.json
+      - tables/terminal_method_metrics.json
+      - tables/terminal_center_contrasts.json
+      - tables/terminal_case_oracles.json
+      - tables/terminal_projected_action_diagnostics.json
+      - tables/terminal_policy_regret_diagnostics.json
+      - tables/terminal_transport_diagnostics.json
+      - tables/terminal_selected_case_diagnostics.json
+      - tables/terminal_policy_regret_centers.json
+      - tables/terminal_action_frequencies.json
+      - tables/terminal_diagnostic.json
+      - tables/selection_control.json
+      - reports/workstation_preflight.json
+      - reports/diagnostic_summary.json
+      - reports/label_capability_report.json
+      - reports/leakage_report.json
+      - reports/publication_decision.json
+      - reports/runtime_summary.json
+      - reports/phase_telemetry.json
+      - reports/run_state.json
+      - reports/fresh_process_attestation.json
+      - reports/validation_report.json
+    forbidden_reuse: *pcsi_racr_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Every persisted decision is route keyed; pseudo screens are audit-only and no route can consume its own held-case label before its decision seal.
+      - The observed donor-case envelope is terminal consumed-test sensitivity only, with no conformal, confidence-bound, coverage, routing-success, promotion, or downstream claim.
+
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_boundary_projected_pcsi_policy_regret_router_parent_v1
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: CONSUMED_TEST_PCSI_PARC_PARENT_LEDGER_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      split: test
+      row_count: '9928'
+      held_unit_count: '218'
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      experiment_fenced: 'true'
+      fresh_evidence: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_boundary_projected_pcsi_policy_regret_router.v1
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    forbidden_reuse: &pcsi_parc_forbidden_reuse
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact single-consumer alias of the immutable original consumed-test ledger; it exposes no previous Stage-90 output, amendment, probability surface, decision, scratch, or checkpoint.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_boundary_projected_pcsi_policy_regret_router_amendment_v1
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_PCSI_PARC_AMENDMENT_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      amendment_sha256: 02caca5981c4630b9e8e1b98c756f6732117269c029fef9ac628abb5410b7c58
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_boundary_projected_pcsi_policy_regret_router.v1
+      authorization_scope: one_terminal_consumed_test_fixed_bank_p_anchored_boundary_projected_pcsi_policy_regret_router_v1
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      claim_role: posthoc_fixed_bank_p_anchored_boundary_projected_pcsi_policy_regret_router_diagnostic
+      fresh_evidence: 'false'
+      previous_stage90_outputs_used: 'false'
+      previous_stage90_amendments_used: 'false'
+      generic_consumer_authorized: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - uniform_b_v2_consumed_test_fixed_bank_p_anchored_boundary_projected_pcsi_policy_regret_router_ledger_amendment_v1.json
+    expected_file_hashes:
+      uniform_b_v2_consumed_test_fixed_bank_p_anchored_boundary_projected_pcsi_policy_regret_router_ledger_amendment_v1.json:
+        algorithm: sha256
+        digest: 02caca5981c4630b9e8e1b98c756f6732117269c029fef9ac628abb5410b7c58
+    forbidden_reuse: *pcsi_parc_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Direct hash-chained authorization over the immutable original ledger for this named terminal diagnostic only; no previous amendment or Stage-90 output is a parent or input.
+
+  - artifact_id: midogpp_stage90_fixed_bank_p_anchored_boundary_projected_pcsi_policy_regret_router_test_manifest_v1
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_PCSI_PARC_CAPABILITY_GATED_LABELS
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+      split: test
+      row_count: '9928'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      experiment_fenced: 'true'
+      consumption_status: CONSUMED_FOR_STAGE90_PCSI_PARC_V1
+      fresh_evidence: 'false'
+      labels_present: 'true'
+      labels_available_before_global_probability_seal: 'false'
+      held_unit: whole_case_or_group_c
+      held_unit_count: '218'
+      outer_support_scope: H_minus_c
+      source_prior_scope: q_not_in_H_or_e
+      actual_donor_feature_source_prior_scope: q_not_in_outer_H_or_training_donor_K_or_source_e
+      pseudo_donor_feature_source_prior_scope: q_not_in_outer_H_or_pseudo_target_J_or_training_donor_K_or_source_e
+      transport_semantics: support_conditioned_endpoint_reconstructed_P_B_I_R
+      transport_endpoint_support_scope: endpoint_target_T_minus_held_case_c
+      transport_actual_source_prior_scope: q_not_in_endpoint_target_T_or_source_e
+      transport_donor_source_prior_scope: q_not_in_outer_H_or_endpoint_target_T_or_source_e
+      transport_source_prior_labels_used_upstream: 'true'
+      transport_route_local_support_labels_used_upstream: 'true'
+      transport_held_case_evaluation_capability_used_directly: 'false'
+      transport_pseudo_evaluation_capability_used_directly: 'false'
+      transport_terminal_evaluation_capability_used_directly: 'false'
+      transport_label_free_claim: 'false'
+      transport_uses_pre_equivalence_endpoint_crossing_rates: 'true'
+      transport_screens_sealed_before_pseudo_evaluation_capability_open: 'true'
+      transport_screens_sealed_before_terminal_evaluation_capability_open: 'true'
+      transport_identity_level_route_noninterference_required: 'true'
+      transport_identity_level_route_noninterference_proven: 'false'
+      transport_authorization_valid: 'false'
+      transport_protocol_status: BLOCKED_IDENTITY_LEVEL_ROUTE_FEEDBACK
+      donor_response_scope: J_not_equal_outer_H
+      policy_regret_prediction_scope: H_and_J_double_excluded
+      terminal_label_scope: after_all_218_routes_and_aggregate_seal
+      role_scoped_label_capabilities_enforced: 'true'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_boundary_projected_pcsi_policy_regret_router.v1
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse: *pcsi_parc_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Labels open only through exact capabilities. Held-case, pseudo-evaluation, and terminal capabilities are not opened directly during transport construction, but center-wide OOF endpoint aggregation fails identity-level own-route noninterference and blocks canonical execution pending a route-scoped redesign.
+
+  - artifact_id: midogpp_stage90_fixed_bank_p_anchored_boundary_projected_pcsi_policy_regret_router_test_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_TEST_PCSI_PARC_LABEL_FREE_CACHE_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: test
+      row_count: '9928'
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      experiment_fenced: 'true'
+      fresh_evidence: 'false'
+      labels_absent: 'true'
+      previous_stage90_output_used: 'false'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_boundary_projected_pcsi_policy_regret_router.v1
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse: *pcsi_parc_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Byte-exact experiment-fenced alias over the validated label-free consumed-test embedding cache; all 810 physical probability cells are independently recomputed.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_boundary_projected_pcsi_policy_regret_router_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_p_anchored_boundary_projected_pcsi_policy_regret_router/v1
+    availability: planned_protocol_blocked
+    migration: canonical_output
+    evidence_label: NEEDS_EVIDENCE_BLOCKED_IDENTITY_FEEDBACK
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      claim_role: posthoc_fixed_bank_p_anchored_boundary_projected_pcsi_policy_regret_router_diagnostic
+      bounded_interpretation: target_support_conditioned_boundary_projected_whole_policy_regret_sensitivity_on_consumed_MIDOGpp_test_only
+      architecture_family: fixed_bank_p_anchored_boundary_projected_pcsi_policy_regret_router_v1
+      config_contract_hash: 82f65ec3ad9f3d3d
+      protocol_contract_hash: 222a4ec08039330a94b35a43c7c73039ad4a17b1a10f0646d032c18938e607ab
+      evaluation_split: test
+      consumed_test_data: 'true'
+      eligible_test_row_count: '9928'
+      held_case_route_count: '218'
+      physical_probability_cell_count: '810'
+      outer_endpoint_model_fit_count: '3488'
+      target_local_posterior_model_fit_count: '436'
+      utility_model_fit_count: '1395'
+      projected_PARC_utility_model_fit_count: '657'
+      raw_full_action_PARC_utility_model_fit_count: '657'
+      fresh_legacy_dual_veto_utility_model_fit_count: '81'
+      whole_policy_pseudo_target_replay_count: '144'
+      held_case_evaluation_capability_used_before_route_seal: 'false'
+      target_support_labels_used: 'true'
+      transport_semantics: support_conditioned_endpoint_reconstructed_P_B_I_R
+      transport_endpoint_support_scope: endpoint_target_T_minus_held_case_c
+      transport_actual_source_prior_scope: q_not_in_endpoint_target_T_or_source_e
+      transport_donor_source_prior_scope: q_not_in_outer_H_or_endpoint_target_T_or_source_e
+      transport_source_prior_labels_used_upstream: 'true'
+      transport_route_local_support_labels_used_upstream: 'true'
+      transport_held_case_evaluation_capability_used_directly: 'false'
+      transport_pseudo_evaluation_capability_used_directly: 'false'
+      transport_terminal_evaluation_capability_used_directly: 'false'
+      transport_label_free_claim: 'false'
+      transport_uses_pre_equivalence_endpoint_crossing_rates: 'true'
+      transport_screens_sealed_before_pseudo_evaluation_capability_open: 'true'
+      transport_screens_sealed_before_terminal_evaluation_capability_open: 'true'
+      transport_identity_level_route_noninterference_required: 'true'
+      transport_identity_level_route_noninterference_proven: 'false'
+      transport_authorization_valid: 'false'
+      transport_protocol_status: BLOCKED_IDENTITY_LEVEL_ROUTE_FEEDBACK
+      execution_authorized: 'false'
+      target_local_posterior_shared_across_routes: 'false'
+      target_local_posterior_is_final_classifier: 'false'
+      projected_geometry: binary32_nearest_threshold_with_off_crossing_exact_P
+      raw_full_action_control_geometry: full_B_I_R_probability_on_P_crossing_mask
+      fresh_legacy_control_geometry: fixed_sign_preserving_shrinkage_0_25
+      utility_model: joint_three_response_ridge_alpha_1_two_direction_intercepts_twelve_slopes
+      policy_regret_scope: whole_policy_H_J_double_excluded_componentwise_worst_observed_donor
+      finite_sample_conformal_coverage_claimed: 'false'
+      intended_primary_gate_after_route_scoped_redesign: all_transport_screens_and_all_three_corrected_gain_coordinates_strictly_positive
+      intended_exact_P_fallback_after_route_scoped_redesign: 'true'
+      information_gate_scope: terminal_diagnostic_only
+      fresh_evidence: 'false'
+      promotion_eligible: 'false'
+      previous_stage90_outputs_used: 'false'
+      previous_stage90_amendments_used: 'false'
+      may_feed_another_experiment: 'false'
+      workstation_generation_devices: cuda:0|cuda:1
+      workstation_cpu_topology: 4_endpoint_workers_x_3_blas_then_4_cuda_hidden_posterior_utility_replay_workers_x_1_blas
+      workstation_scratch_root: /data/local/fixed_bank_p_anchored_boundary_projected_pcsi_policy_regret_router_v1
+      two_fresh_process_validation_required: 'true'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - arrays/frozen_source_streams.npy
+      - arrays/fixed_bank_a1_action_probabilities.npz
+      - manifests/frozen_source_stream_index.json
+      - manifests/frozen_source_stream_lock.json
+      - manifests/fixed_bank_a1_prediction_index.json
+      - manifests/fixed_bank_a1_prediction_seal.json
+      - manifests/protocol_manifest.json
+      - manifests/action_library.json
+      - manifests/physical_surface_seal.json
+      - manifests/outer_plan_seal.json
+      - manifests/donor_runtime.json
+      - manifests/policy_replay_runtime.json
+      - manifests/policy_menu.json
+      - manifests/decision_barrier.json
+      - manifests/preterminal_aggregate_seal.json
+      - manifests/terminal_evaluation_seal.json
+      - manifests/content_index.json
+      - tables/exact_nine_probability_index.json
+      - tables/outer_plans.json
+      - tables/double_exclusion_plans.json
+      - tables/physical_fingerprints.json
+      - tables/target_local_posterior_models.json
+      - tables/target_local_posterior_predictions.json
+      - tables/action_equivalence_classes.json
+      - tables/projected_utility_descriptors.json
+      - tables/projected_donor_utility_rows.json
+      - tables/double_excluded_prior_provenance.json
+      - tables/double_excluded_endpoint_scopes.json
+      - tables/pseudo_donor_utility_rows.json
+      - tables/projected_utility_models.json
+      - tables/projected_utility_predictions.json
+      - tables/fresh_legacy_utility_descriptors.json
+      - tables/fresh_legacy_donor_utility_rows.json
+      - tables/fresh_legacy_utility_models.json
+      - tables/fresh_legacy_utility_predictions.json
+      - tables/sample_influence_predictions.json
+      - tables/transport_descriptors.json
+      - tables/transport_screens.json
+      - tables/target_candidate_policies.json
+      - tables/pseudo_candidate_policies.json
+      - tables/policy_regret_replays.json
+      - tables/policy_authorizations.json
+      - tables/final_policy_predictions.json
+      - tables/route_decisions.json
+      - tables/terminal_method_metrics.json
+      - tables/terminal_center_contrasts.json
+      - tables/terminal_case_oracles.json
+      - tables/terminal_projected_action_diagnostics.json
+      - tables/terminal_policy_regret_diagnostics.json
+      - tables/terminal_transport_diagnostics.json
+      - tables/terminal_selected_case_diagnostics.json
+      - tables/terminal_policy_regret_centers.json
+      - tables/terminal_action_frequencies.json
+      - tables/terminal_diagnostic.json
+      - tables/selection_control.json
+      - reports/workstation_preflight.json
+      - reports/diagnostic_summary.json
+      - reports/label_capability_report.json
+      - reports/leakage_report.json
+      - reports/publication_decision.json
+      - reports/runtime_summary.json
+      - reports/phase_telemetry.json
+      - reports/run_state.json
+      - reports/fresh_process_attestation.json
+      - reports/validation_report.json
+    forbidden_reuse: *pcsi_parc_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - The planned output would independently recompute physical probabilities from exactly six original inputs and persist no raw labels or sample/image paths.
+      - Selection and intended authorization use different frozen estimands: target influence selects a projected action, while H/J-double-excluded whole-policy endpoint-vector regret and support-conditioned endpoint-reconstructed transport would authorize or abstain. Direct late evaluation capabilities remain closed, but center-wide OOF transport aggregation does not prove label-identity noninterference for the held route.
+      - NEEDS EVIDENCE — canonical execution and persistence are blocked before policy authorization until transport is redesigned and poison-validated at route scope.
+      - Every result is terminal diagnostic evidence. No outcome may feed or authorize a later experiment, route, policy, model, expert, promotion, deployment, or generic consumer.

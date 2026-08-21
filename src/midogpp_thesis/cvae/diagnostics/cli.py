@@ -368,12 +368,76 @@ def build_parser() -> argparse.ArgumentParser:
     )
     psscur.add_argument("--config", required=True)
     psscur.add_argument("--artifact-root", required=True)
+
+    pcsi_parc = sub.add_parser(
+        "fixed-bank-p-anchored-boundary-projected-pcsi-policy-regret-router",
+        help=(
+            "Run the terminal consumed-test fixed-bank P-anchored "
+            "boundary-projected PCSI whole-policy-regret diagnostic."
+        ),
+    )
+    pcsi_parc.add_argument("--config", required=True)
+    pcsi_parc.add_argument("--artifact-root", required=True)
+
+    pcsi_racr = sub.add_parser(
+        "fixed-bank-p-anchored-route-scoped-boundary-projected-pcsi-policy-regret-router",
+        help=(
+            "Run the terminal consumed-test route-scoped P-anchored "
+            "boundary-projected PCSI case-regret diagnostic."
+        ),
+    )
+    pcsi_racr.add_argument("--config", required=True)
+    pcsi_racr.add_argument("--artifact-root", required=True)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     artifact_root = Path(args.artifact_root)
+
+    if args.surface == (
+        "fixed-bank-p-anchored-route-scoped-boundary-projected-"
+        "pcsi-policy-regret-router"
+    ):
+        from .fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router import (
+            load_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_config,
+            run_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router,
+        )
+
+        config = (
+            load_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router_config(
+                args.config
+            )
+        )
+        output = (
+            run_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router(
+                config,
+                artifact_root=artifact_root,
+            )
+        )
+        print(output)
+        return 0
+
+    if (
+        args.surface
+        == "fixed-bank-p-anchored-boundary-projected-pcsi-policy-regret-router"
+    ):
+        from .fixed_bank_p_anchored_boundary_projected_pcsi_policy_regret_router import (
+            load_p_anchored_boundary_projected_pcsi_policy_regret_router_config,
+            run_p_anchored_boundary_projected_pcsi_policy_regret_router,
+        )
+
+        config = (
+            load_p_anchored_boundary_projected_pcsi_policy_regret_router_config(
+                args.config
+            )
+        )
+        output = run_p_anchored_boundary_projected_pcsi_policy_regret_router(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
 
     if args.surface == "build-b-paired-reparameterization-snapshot":
         from .b_paired_reparameterization_audit import build_snapshot_from_config

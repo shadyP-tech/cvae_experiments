@@ -453,6 +453,107 @@ def test_claim_scope_exception_does_not_bypass_forbidden_reuse() -> None:
         workspace.validate()
 
 
+def _workspace_with_oracle_reuse_exception(
+    *,
+    authorized_consumers: str = "test.oracle",
+    rationale: str | None = "Protocol-reviewed single-consumer terminal diagnostic reuse.",
+    forbidden_reuse: tuple[str, ...] = ("oracle_and_diagnostic_evidence",),
+    additional_stage_reuse_purposes: tuple[str, ...] = (),
+) -> MidogppWorkspace:
+    source = MidogppWorkspace.load()
+    registry = deepcopy(source.registry_payload)
+    catalog = deepcopy(source.catalog_payload)
+    if additional_stage_reuse_purposes:
+        stage = next(
+            item
+            for item in registry["stages"]
+            if item["id"] == "oracles_and_diagnostics"
+        )
+        stage["input_reuse_purposes"] = [
+            *stage["input_reuse_purposes"],
+            *additional_stage_reuse_purposes,
+        ]
+    artifact_id = "test_oracle_exception_input"
+    catalog["artifacts"].extend(
+        [
+            {
+                "artifact_id": artifact_id,
+                "stage": "dataset_contract",
+                "physical_path": "unused",
+                "evidence_label": "PASS",
+                "claim_scope": "dataset_contract_and_split_provenance",
+                "semantic_identities": {
+                    "authorized_consumer_experiment_ids": authorized_consumers,
+                },
+                "forbidden_reuse": list(forbidden_reuse),
+            },
+            {
+                "artifact_id": "test_oracle_output",
+                "stage": "90_oracles_and_diagnostics",
+                "canonical_path": "artifacts/midogpp/90_oracles_and_diagnostics/test/v1",
+                "migration": "canonical_output",
+                "availability": "generated_on_run",
+                "evidence_label": "POST_HOC_CONSUMED_TEST_SENSITIVITY",
+                "claim_scope": "diagnostic_only",
+            },
+        ]
+    )
+    experiment: dict[str, object] = {
+        "experiment_id": "test.oracle",
+        "stage": "90_oracles_and_diagnostics",
+        "status": "diagnostic",
+        "claim_scope": "diagnostic_only",
+        "output_artifact_id": "test_oracle_output",
+        "input_artifact_ids": [artifact_id],
+        "runner": {"argv": ["{python}", "-c", "pass"]},
+    }
+    if rationale is not None:
+        experiment["input_claim_scope_exceptions"] = {artifact_id: rationale}
+    registry["experiments"].append(experiment)
+    return MidogppWorkspace(
+        repo_root=source.repo_root,
+        registry=registry,
+        catalog=catalog,
+        workspace=source.workspace_payload,
+        protocol_defaults=source.protocol_defaults_payload,
+    )
+
+
+def test_single_consumer_oracle_reuse_exception_requires_all_three_guards() -> None:
+    _workspace_with_oracle_reuse_exception().validate()
+
+
+@pytest.mark.parametrize(
+    ("authorized_consumers", "rationale"),
+    (
+        ("test.oracle|test.other", "Reviewed, but not single-consumer."),
+        ("test.oracle", None),
+        ("test.oracle", " "),
+    ),
+)
+def test_oracle_reuse_exception_rejects_multi_consumer_or_missing_rationale(
+    authorized_consumers: str,
+    rationale: str | None,
+) -> None:
+    workspace = _workspace_with_oracle_reuse_exception(
+        authorized_consumers=authorized_consumers,
+        rationale=rationale,
+    )
+
+    with pytest.raises(WorkspaceError):
+        workspace.validate()
+
+
+def test_oracle_reuse_exception_rejects_any_additional_forbidden_overlap() -> None:
+    workspace = _workspace_with_oracle_reuse_exception(
+        forbidden_reuse=("oracle_and_diagnostic_evidence", "routing_evidence"),
+        additional_stage_reuse_purposes=("routing_evidence",),
+    )
+
+    with pytest.raises(WorkspaceError, match="forbids reuse as"):
+        workspace.validate()
+
+
 def test_prepare_rejects_expected_file_hash_mismatch_before_writing(tmp_path: Path) -> None:
     source = MidogppWorkspace.load()
     registry = deepcopy(source.registry_payload)

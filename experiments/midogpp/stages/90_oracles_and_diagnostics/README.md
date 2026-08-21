@@ -7,6 +7,57 @@ Every oracle row must be marked non-deployable. Diagnostic results may explain
 a failure or quantify headroom, but they must not tune or select a deployable
 policy and must remain separate from held-out utility claims.
 
+## PCSI-PARC Boundary-Projected Whole-Policy Regret Router v1
+
+This Stage-90 experiment is planned but not runnable. It is designed as one final
+`POST_HOC_CONSUMED_TEST_SENSITIVITY` over all 9,928 eligible MIDOG++ test rows.
+It would evaluate each of the 218 whole cases exactly once with only `H minus c`
+available as route-local support and recompute 810 physical cells from exactly
+six original inputs; no predecessor Stage-90 output, amendment, probability
+surface, decision, checkpoint, or scratch state is an input.
+
+PCSI-PARC projects only hard P-to-B/I/R crossings to the nearest binary32 side
+of `0.5`, collapses byte-identical projected vectors, and keeps off-crossing P
+probabilities byte-identical. Target influence would select an action. Intended
+authorization combines joint BACC/Brier/log-loss ridge responses, true H/J
+double exclusion, support-conditioned endpoint-reconstructed transport, and
+144 full-policy pseudo-target replays. `RAW_FULL_ACTION_PARC`, fresh legacy
+dual-veto, projected-no-PARC, and blocked-fingerprint controls remain
+hash-isolated.
+
+NEEDS EVIDENCE — `execution_authorized=false` and
+`transport_protocol_status=BLOCKED_IDENTITY_LEVEL_ROUTE_FEEDBACK`. Transport
+uses upstream source-prior and route-local endpoint-target-minus-held-case
+support capabilities. Although held-case, pseudo-evaluation, and terminal
+capabilities are not opened directly, a center-wide aggregate of OOF endpoint
+states can carry one case's label identity through other case fits back into
+that case's authorization. Identity-level route noninterference is therefore
+unproved, and canonical execution and persistence are blocked pending a
+route-scoped transport redesign plus poison validation.
+
+The intended workstation schedule uses two persistent RTX A5000 generation workers,
+then disjoint CUDA-hidden CPU phases: four endpoint processes with three BLAS
+threads and four posterior/utility/replay processes with one BLAS thread. The
+frozen counts are 3,488 endpoint fits, 436 posterior fits, 1,395 utility fits,
+and 144 whole-policy replays.
+
+The registration remains `status: planned`; `workspace run` refuses before the
+runner, and the runner independently rejects the invalid transport lineage.
+
+Reserved canonical output (no canonical bundle may be persisted while blocked):
+
+```text
+artifacts/midogpp/90_oracles_and_diagnostics/
+  uniform_b_v2_consumed_test_fixed_bank_p_anchored_boundary_projected_pcsi_policy_regret_router/v1/
+```
+
+Any future corrected run remains terminal-only: `fresh_evidence=false` and
+`may_feed_another_experiment=false`. It cannot establish routing quality,
+NELBO compatibility, downstream utility, nominal coverage or significance,
+promotion, or deployment. Until route-scoped transport is validated, retain P;
+after a compliant diagnostic, move the unchanged rule
+to a fresh whole-case/patient/slide-disjoint reservation.
+
 ## Uniform-B v2 Consumed-Test Opportunity-Gated Dual-Endpoint Router v1
 
 This terminal diagnostic independently recomputes the common B/U/eight-A1
@@ -1168,3 +1219,46 @@ and the direct amendment SHA-256 is
 MIDOG++ test reuse is terminal diagnostic analysis only: every outcome remains
 `POST_HOC_CONSUMED_TEST_SENSITIVITY` and
 `TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE` and cannot feed another experiment.
+
+## Route-scoped boundary-projected PCSI case-regret diagnostic v1
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router.v1`
+is the fresh, executable sibling of the blocked center-aggregated PCSI-PARC
+design. The blocked predecessor remains registered as planned evidence of the
+identity-feedback failure and is not an input. This successor independently
+recomputes all 810 physical probability cells from six direct-original inputs
+and reuses all 9,928 eligible MIDOG++ test rows through 218 leave-one-whole-case
+routes.
+
+Every scientific object that can affect a decision carries case identity. A
+target candidate and screen use only `(H,c)` state `H-c`. A pseudo candidate
+uses only `(H,J,d)` state `J-d`. Target reference blocks use H/K-excluded donor
+states, while pseudo reference blocks use H/J/K-excluded states. Equal center
+then equal case weighting, median/MAD normalization, and the leave-one-reference
+center maximum threshold are sealed before any pseudo-evaluation capability
+opens. Pseudo transport is audit-only and never vetoes or authorizes a target
+route.
+
+For geometry `g`, outer center `H`, donor center `J`, pseudo case `d`, and
+favorable endpoint coordinate `k`, the diagnostic residual is
+`r[g,H,J,d,k] = Ghat[g,H,J,d,k] - G[g,H,J,d,k]`. The primary margin is
+`q[g,H,k] = max(0, max_J max_d r[g,H,J,d,k])`. Every donor case is retained;
+missing, nonfinite, or incomplete scope invalidates the outer geometry. A target
+case changes only if its transport screen passes and all three coordinates of
+`Ghat[g,H,c]-q[g,H]` are strictly positive. Equality and every failed gate emit
+byte-exact `P_PROTECTED`.
+
+The frozen workload is 3,488 endpoint fits, 436 route-local posterior fits,
+1,314 ridge fits, 15,914 role-bound transport descriptors representing 14,170
+numeric leaves, 576 reference blocks, 1,962 route screens, and 3,488 case-local
+pseudo replays. The final surfaces are P, projected observed-max, raw
+observed-max, and projected q=0. The former 81-fit legacy control is removed.
+
+The config contract hash is `fb33bc9b867ccb2c`, the protocol hash is
+`e9da22f3909cd68d8e2bc1cfda727de5167ea93e6ca7aa2e6d466dc9e7f2b85a`,
+and the direct-original-ledger amendment SHA-256 is
+`3b44f5a61284f91baa9f92476e0b0bd18969e26879313ee0e3b13fe346218230`.
+The observed donor-case maximum is neither conformal nor a confidence bound and
+has no coverage guarantee. Every output remains post-hoc consumed-test
+sensitivity only, cannot establish routing success or target performance, and
+may not feed another experiment, stage, model, expert, policy, or deployment.
