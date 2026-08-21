@@ -210,6 +210,8 @@ class DoubleExcludedDonorPriorProvenance:
 
 @dataclass(frozen=True)
 class GeometryOuterFitProducts:
+    """Spawn-boundary DTO; immutable mappings are restored only in the parent."""
+
     geometry_id: str
     outer_target_center: str
     target_full_model: ProjectedUtilityModel
@@ -219,6 +221,24 @@ class GeometryOuterFitProducts:
     pseudo_delete_models: Mapping[str, Mapping[str, ProjectedUtilityModel]]
     pseudo_predictions: Mapping[str, tuple[ProjectedUtilityPrediction, ...]]
     model_fit_count: int
+
+    def __post_init__(self) -> None:
+        mappings = (
+            self.target_delete_models,
+            self.pseudo_full_models,
+            self.pseudo_delete_models,
+            self.pseudo_predictions,
+        )
+        if (
+            any(type(value) is not dict for value in mappings)
+            or any(
+                type(value) is not dict
+                for value in self.pseudo_delete_models.values()
+            )
+        ):
+            raise ProtocolError(
+                "PCSI-RACR worker result must use plain spawn-safe dictionaries."
+            )
 
 
 @dataclass(frozen=True)
@@ -543,7 +563,8 @@ def _build_geometry_runtime(
 
     target_full = {outer: by_outer[outer].target_full_model for outer in CENTERS}
     target_deleted = {
-        outer: by_outer[outer].target_delete_models for outer in CENTERS
+        outer: MappingProxyType(dict(by_outer[outer].target_delete_models))
+        for outer in CENTERS
     }
     target_predictions = {
         outer: by_outer[outer].target_predictions for outer in CENTERS
@@ -555,7 +576,9 @@ def _build_geometry_runtime(
         if pseudo != outer
     }
     pseudo_deleted = {
-        (outer, pseudo): by_outer[outer].pseudo_delete_models[pseudo]
+        (outer, pseudo): MappingProxyType(
+            dict(by_outer[outer].pseudo_delete_models[pseudo])
+        )
         for outer in CENTERS
         for pseudo in CENTERS
         if pseudo != outer
@@ -713,11 +736,14 @@ def _fit_geometry_outer(job: _GeometryFitJob) -> GeometryOuterFitProducts:
         job.geometry_id,
         outer,
         target_full,
-        target_deleted,
+        dict(target_deleted),
         target_predictions,
-        MappingProxyType(pseudo_full),
-        MappingProxyType(pseudo_deleted),
-        MappingProxyType(pseudo_predictions),
+        dict(pseudo_full),
+        {
+            pseudo: dict(models)
+            for pseudo, models in pseudo_deleted.items()
+        },
+        dict(pseudo_predictions),
         fit_count,
     )
 

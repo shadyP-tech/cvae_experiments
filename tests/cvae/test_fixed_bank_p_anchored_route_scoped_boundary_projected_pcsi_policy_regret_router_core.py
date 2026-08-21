@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from concurrent.futures import ProcessPoolExecutor
+import multiprocessing as mp
+import pickle
 from types import MappingProxyType, SimpleNamespace
 
 import numpy as np
@@ -17,12 +20,15 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_boundary
     EXPECTED_FINAL_CASE_PREDICTION_COUNT,
     EXPECTED_POLICY_REPLAY_COUNT,
     EXPECTED_UTILITY_MODEL_FIT_COUNT,
+    DIRECTION_IDS,
     PORTFOLIO_METHOD_ID,
     PRIMARY_METHOD_ID,
     PROJECTION_GEOMETRY_ID,
     PROJECTED_NO_ENVELOPE_METHOD_ID,
     RAW_OBSERVED_MAX_METHOD_ID,
     UNPROJECTED_GEOMETRY_ID,
+    UTILITY_FEATURE_NAMES,
+    UTILITY_RESPONSE_IDS,
     physical_action_ids,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router.contracts import (
@@ -33,6 +39,9 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_boundary
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router.engine import (
     build_preterminal_result,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router.donor_runtime import (
+    GeometryOuterFitProducts,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router.decision import (
     ABSTAIN_TO_P,
@@ -49,10 +58,52 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_boundary
     persist_preterminal,
     persist_terminal,
 )
+from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router.projected_contracts import (
+    ProjectedUtilityModel,
+)
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_boundary_projected_pcsi_policy_regret_router.reports import (
     leakage_report_payload,
     publication_decision_payload,
 )
+
+
+def _spawn_echo(value: object) -> object:
+    return value
+
+
+def _spawn_safe_outer_fit_products() -> GeometryOuterFitProducts:
+    training = tuple(center for center in CENTERS if center != "0")
+    model = ProjectedUtilityModel(
+        "0",
+        PROJECTION_GEOMETRY_ID,
+        training,
+        UTILITY_FEATURE_NAMES,
+        DIRECTION_IDS,
+        tuple(0.0 for _ in UTILITY_FEATURE_NAMES),
+        tuple(1.0 for _ in UTILITY_FEATURE_NAMES),
+        tuple((response, (0.0, 0.0)) for response in UTILITY_RESPONSE_IDS),
+        tuple(
+            (
+                response,
+                tuple(0.0 for _ in UTILITY_FEATURE_NAMES),
+            )
+            for response in UTILITY_RESPONSE_IDS
+        ),
+        1.0,
+        MappingProxyType({center: 1 for center in training}),
+        "a" * 64,
+    )
+    return GeometryOuterFitProducts(
+        PROJECTION_GEOMETRY_ID,
+        "0",
+        model,
+        {"1": model},
+        (),
+        {"1": model},
+        {"1": {"2": model}},
+        {"1": ()},
+        3,
+    )
 
 
 def _small_surface() -> tuple[
@@ -144,6 +195,31 @@ def test_approved_workload_counts_are_frozen() -> None:
     assert EXPECTED_UTILITY_MODEL_FIT_COUNT == 1_314
     assert EXPECTED_POLICY_REPLAY_COUNT == 3_488
     assert EXPECTED_FINAL_CASE_PREDICTION_COUNT == 872
+
+
+def test_geometry_worker_result_round_trips_through_pickle() -> None:
+    products = _spawn_safe_outer_fit_products()
+    restored = pickle.loads(pickle.dumps(products, protocol=pickle.HIGHEST_PROTOCOL))
+    assert restored == products
+    assert type(restored.target_full_model.training_row_count_by_center).__name__ == (
+        "mappingproxy"
+    )
+
+
+def test_geometry_worker_result_crosses_real_spawn_boundary() -> None:
+    products = _spawn_safe_outer_fit_products()
+    try:
+        with ProcessPoolExecutor(
+            max_workers=1,
+            mp_context=mp.get_context("spawn"),
+        ) as executor:
+            spawned = executor.submit(_spawn_echo, products).result(timeout=30)
+    except (OSError, PermissionError) as exc:
+        pytest.skip(f"OS spawn boundary is unavailable: {exc}")
+    assert spawned == products
+    assert type(spawned.target_full_model.training_row_count_by_center).__name__ == (
+        "mappingproxy"
+    )
 
 
 def test_observed_envelope_is_complete_componentwise_max() -> None:

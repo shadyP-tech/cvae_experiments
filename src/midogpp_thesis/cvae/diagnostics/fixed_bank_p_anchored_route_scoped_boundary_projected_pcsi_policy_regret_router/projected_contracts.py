@@ -252,6 +252,28 @@ class ProjectedUtilityModel:
             "model_hash": self.model_hash,
         }
 
+    def __reduce__(self) -> tuple[object, tuple[object, ...]]:
+        """Rebuild the immutable count mapping after a spawn-process transfer."""
+
+        return (
+            type(self),
+            (
+                self.outer_target_center,
+                self.geometry_id,
+                self.training_centers,
+                self.feature_names,
+                self.direction_ids,
+                self.feature_mean,
+                self.feature_scale,
+                self.direction_intercepts,
+                self.slope_coefficients,
+                self.ridge_alpha,
+                dict(self.training_row_count_by_center),
+                self.model_hash,
+                self.fit_status,
+            ),
+        )
+
 
 @dataclass(frozen=True, order=True)
 class ProjectedUtilityPrediction:
