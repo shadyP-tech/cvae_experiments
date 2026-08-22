@@ -1,16 +1,16 @@
 # Current Experimental State
 
-Last updated: 2026-08-09
+Last updated: 2026-08-22
 
 This page records verified evidence and canonical availability after the
 completed MIDOG++ repository migration. The canonical contract, feature
 caches, source-inner evidence, and the completed Uniform-B v2 Stage-30 bank,
-Stage-40 GenerationLock, and Stage-60 equal-union, metadata, validation-cache,
-source-inner utility, and utility/regret policy artifacts are registered in
-this checkout. Their canonical production artifacts are validated on the
-workstation. These boundaries authorize a bank, generation contract, direct
-control, compatibility proxy, and pre-evaluation policies; they do not
-establish routing quality or frozen-policy downstream utility.
+Stage-40 GenerationLock, Stage-60 policy locks, and Stage-70 descriptive
+frozen-policy comparison are registered in this checkout. Their canonical
+production artifacts are validated on the workstation. The Stage-70 artifact
+establishes descriptive downstream utility for the already-frozen arms on a
+previously consumed test surface; it does not establish a fresh routing claim,
+policy promotion, deployment utility, or new-center generalization.
 
 ## Local Readiness Snapshot
 
@@ -47,10 +47,16 @@ establish routing quality or frozen-policy downstream utility.
   policies have publication state `POLICY_FROZEN_FOR_MATCHED_STAGE70_EVALUATION`;
   the utility/regret policy falls back exactly to equal-union for every outer
   fold.
-- Stage 70 has no result. The next gate is a separately authorized fresh
-  target-evaluation artifact, followed by matched scoring of the frozen
-  equal-union, metadata max-tie, and utility/regret arms; target labels remain
-  scoring-only after predictions.
+- Stage 70 is `COMPLETE` and validates `PASS` for a descriptive comparison on
+  the previously consumed MIDOG++ test surface. Equal-union reaches mean BACC
+  `0.774968`; metadata max-tie reaches `0.745099`; the utility/regret policy is
+  exactly equivalent to equal-union at `0.774968`. Metadata minus equal-union
+  is `-0.029868`, with descriptive paired bootstrap interval
+  `[-0.050406, -0.008705]`. Predictions were sealed before labels, labels were
+  scoring-only, and no Stage-50 or Stage-90 result was consumed. Publication
+  remains `DESCRIPTIVE_COMPARISON_COMPLETE`, with
+  `fresh_confirmatory_status=BLOCKED_NO_UNCONSUMED_ELIGIBLE_SPLIT` and no
+  routing-policy promotion.
 - The completed consumed-validation utility-aligned exact-tail Stage-90
   diagnostic is a protocol-clean negative routing result. Probability-ensemble
   BACC is `0.770276` for `B` and `0.762182` for `R2`; the center-paired `R2-B`
@@ -59,6 +65,26 @@ establish routing quality or frozen-policy downstream utility.
   top-1 `1/9`, mean rank correlation `-0.000860`, and normalized oracle gap
   `0.513228`. This establishes descriptive composition headroom and failed
   source identification, not an attainable policy gain.
+- The completed PSSCUR Stage-90 diagnostic validates but routes zero cases,
+  exactly reproduces protected portfolio `P` at BACC `0.807317`, and fails its
+  information gate with diagnosis
+  `POSTERIOR_UTILITY_DOES_NOT_RANK_REALIZED_ACTIONS`. PCSI-RACR v2 also
+  validates its full closed-world replay; its primary observed-maximum
+  uncertainty envelope authorizes zero policies and leaves BACC at `0.807317`,
+  while the no-envelope sensitivity authorizes 11 target policies. Both are
+  `POST_HOC_CONSUMED_TEST_SENSITIVITY` and
+  `TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`.
+- CBPUPR v2 completed all 81 prediction tasks and 810 physical classifier
+  cells, then terminated `FAILED` preterminally in
+  `ROUTE_ENDPOINTS_436_POSTERIORS_AND_CANDIDATE_SEAL` with
+  `CBPUPR endpoint worker plan lineage drifted.` The production outer plan
+  carried the global nine-center physical-surface hash, while the worker
+  validator compared it with a per-center surface hash. The terminal-access
+  journal count is zero: target terminal-evaluation labels and metrics never
+  opened. Cross-run and terminal recovery remain forbidden; v2 is not a
+  routing result and cannot feed any later experiment. V3 is now registered as
+  a separately authorized one-shot global-and-center-surface-lineage mechanical
+  repair with direct-original inputs. It has not run and is not evidence.
 - The planned successor now aligns its Stage-60 response with the Stage-70
   endpoint: one `(H,q,e)` observation is BACC after averaging all nine positive
   probability vectors and thresholding once. The old 4,536 seed cells are
@@ -659,11 +685,10 @@ lock is `d504ea0a07302acd`, plan hash is `cefe176313b1ea23`, and assignment hash
 is `bd004f2bbb49228b`.
 
 This is a conservative source-inner policy result, not routing-quality or
-downstream-utility evidence. The next evidence is separately authorized,
-fresh, matched Stage-70 target scoring of the frozen equal-union, metadata
-max-tie, and utility/regret policy arms. The Stage-20 value `0.770112` must not
-be presented as an expected Stage-70 result because it came from seven-source
-source-inner tasks.
+downstream-utility evidence by itself. Its three frozen arms have now been
+scored in the descriptive Stage-70 comparison below. The Stage-20 value
+`0.770112` must not be presented as an expected or observed Stage-70 result
+because it came from seven-source source-inner tasks.
 
 The equal-union artifact pins all 11 materialized files; each metadata artifact
 pins 12 files; and the new cache, utility, and policy artifacts are catalogued
@@ -676,6 +701,91 @@ repository-status hash
 `b9581b6f4e31a7ed63791e9bcf9591c73223a103d54ca15b8de17b49e45f7d2d`.
 Preserve the exact working-tree diff or regenerate and revalidate all
 thesis-facing locks from a clean committed revision before archival.
+
+## MIDOG++ Uniform-B V2 Descriptive Frozen-Policy Comparison
+
+Canonical workstation artifact:
+
+```text
+artifacts/midogpp/70_frozen_policy_downstream/
+uniform_b_v2_descriptive_frozen_policy_comparison/v1/
+```
+
+The run is `COMPLETE`; closed-world validation and leakage checks report
+`PASS`. It materializes and seals all 243 target/seed/policy prediction cells
+before target labels open. Target labels are used for scoring only; no target
+support, routing recomputation, Stage-50 result, or Stage-90 result enters the
+run. Artifact provenance records clean repository revision `380a0a99...`.
+
+| Frozen policy | Mean BACC | Mean macro-F1 | Interpretation |
+| --- | ---: | ---: | --- |
+| equal-union control | `0.774968` | `0.772608` | strongest descriptive arm |
+| metadata max-tie union | `0.745099` | `0.739957` | worse than equal-union on average |
+| utility/regret policy | `0.774968` | `0.772608` | exact equal-union fallback equivalence |
+
+Metadata minus equal-union BACC is `-0.029868`. The 2,000-replicate
+center-and-within-center-case descriptive bootstrap interval is
+`[-0.050406, -0.008705]`. The utility/regret arm is not an independent policy
+hypothesis at evaluation: its predictions, probabilities, and metrics are
+exactly identical to equal-union for all 81 cells because Stage 60 froze the
+fallback in every outer fold.
+
+The publication decision is `DESCRIPTIVE_COMPARISON_COMPLETE` under claim
+scope `descriptive_frozen_policy_comparison_on_previously_consumed_test`.
+`fresh_confirmatory_status` is `BLOCKED_NO_UNCONSUMED_ELIGIBLE_SPLIT`;
+`routing_policy_promoted=false`. The interval is descriptive resampling
+uncertainty only. This artifact supports a protocol-clean negative result for
+the tested metadata policy and a strong dense-composition baseline. It cannot
+support fresh routing superiority, external/new-center generalization,
+deployment utility, or selection of another policy.
+
+See
+`docs/wiki/03-experiments/midogpp-uniform-b-v2-descriptive-frozen-policy-comparison-v1.md`.
+
+## Latest Consumed-Test Posterior-Utility Diagnostics
+
+Three route-scoped Stage-90 lineages sharpen the routing bottleneck while
+remaining outside every numbered-stage evidence path:
+
+- PSSCUR v1 is `COMPLETE` and validates `PASS`. Its primary robust envelope
+  authorizes zero routes, reproduces protected `P` exactly at mean BACC
+  `0.807317`, and fails the information gate. The artifact diagnosis is
+  `POSTERIOR_UTILITY_DOES_NOT_RANK_REALIZED_ACTIONS`.
+- PCSI-RACR v2 is `COMPLETE` and validates `PASS`, including two independent
+  fresh-process full reconstructions. It recomputes 810 physical cells and
+  3,488 endpoint fits, fits 436 target posteriors and 1,314 utility models,
+  and replays 3,488 policies. The primary projected observed-maximum envelope
+  authorizes zero target policies and remains exactly at protected `P` BACC
+  `0.807317`; a no-envelope sensitivity authorizes 11 policies. The primary
+  result therefore diagnoses uncertainty-transport scarcity, not routing
+  success. Its canonical provenance records a dirty revision and is not the
+  primary archival thesis artifact.
+- CBPUPR v1 completed its physical and posterior workloads but failed during
+  content plus two-fresh-process validation with
+  `CBPUPR persisted posterior prediction/model lineage drifted.` Its terminal
+  labels had opened, so the quarantined root and provisional payloads are
+  invalid as scientific evidence and cannot be resumed or consumed. The
+  separately authorized v2 canonical-row-order repair completed 81 prediction
+  tasks and all 810 physical cells, then failed earlier in
+  `ROUTE_ENDPOINTS_436_POSTERIORS_AND_CANDIDATE_SEAL` with
+  `CBPUPR endpoint worker plan lineage drifted.` V2 compared a global physical
+  surface hash with a per-center surface hash; it stopped with terminal journal
+  count zero and opened no terminal-evaluation labels or metrics. V2 is also
+  nonrecoverable and non-runnable. V3 now carries a distinct single-use
+  authorization, config, six-input direct-original lineage, ledger amendment,
+  and output/scratch identity. It has not been launched, cannot recover or
+  rerun from partial state, and is not current evidence.
+
+PSSCUR and PCSI-RACR both publish only
+`POST_HOC_CONSUMED_TEST_SENSITIVITY` with terminal decision
+`TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`, `fresh_evidence=false`, and
+`may_feed_another_experiment=false`. Their common scientific use is bottleneck
+localization: candidate action headroom can exist while transferred posterior
+utility and its uncertainty envelope fail to authorize reliable beneficial
+changes to the protected dense portfolio.
+
+See
+`docs/wiki/03-experiments/midogpp-uniform-b-v2-consumed-test-posterior-utility-routing-diagnostics.md`.
 
 ## Quarantine And Planned Work
 
@@ -706,9 +816,11 @@ absent.
   planned alternative; its published locks do not supersede the active v2
   bank. The Stage-40 GenerationLock and all Stage-60 control/comparison locks,
   including the utility/regret policy with exact equal-union fallback, are
-  complete and independently validated. A separately authorized target-
-  evaluation artifact and matched Stage-70 evaluation follow. Routing quality
-  and downstream utility remain unknown until that fresh evaluation is complete.
+  complete and independently validated. The descriptive Stage-70 comparison is
+  also complete: metadata max-tie is worse than equal-union and utility/regret
+  is its exact fallback. Fresh routing quality remains unconfirmed because no
+  unconsumed eligible split is available; the completed comparison cannot be
+  promoted into a fresh policy or deployment claim.
 
 - The fixed residual-top-up B/U/G/S decomposition is now implemented and
   registered as two `planned` experiments:

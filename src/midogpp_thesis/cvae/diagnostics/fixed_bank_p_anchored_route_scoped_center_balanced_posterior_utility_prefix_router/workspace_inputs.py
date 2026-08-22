@@ -19,6 +19,7 @@ from .experiment_contracts import (
     TEST_CONSUMPTION_LEDGER_ARTIFACT_ID,
     TEST_MANIFEST_ARTIFACT_ID,
 )
+from .source_seal import source_seal_identity
 
 
 def validate_active_workspace_binding(config: object) -> Mapping[str, object]:
@@ -38,6 +39,34 @@ def validate_active_workspace_binding(config: object) -> Mapping[str, object]:
         or output.claim_scope != CLAIM_SCOPE
     ):
         raise ProtocolError("CBPUPR workspace catalog drifted.")
+    source_identity = source_seal_identity()
+    semantic = dict(output.semantic_identities)
+    protocol = dict(getattr(config, "protocol"))
+    expected_semantic = {
+        "config_contract_hash": str(getattr(config, "contract_hash")),
+        "repair_source_manifest_sha256": str(
+            source_identity["repair_source_manifest_sha256"]
+        ),
+        "repair_source_tree_sha256": str(
+            source_identity["repair_source_tree_sha256"]
+        ),
+        "repair_source_member_count": str(
+            source_identity["repair_source_member_count"]
+        ),
+        "expected_ledger_amendment_sha256": str(
+            getattr(config, "expected_ledger_amendment_sha256")
+        ),
+    }
+    if (
+        any(semantic.get(key) != value for key, value in expected_semantic.items())
+        or protocol.get("repair_source_manifest_sha256")
+        != source_identity["repair_source_manifest_sha256"]
+        or protocol.get("repair_source_tree_sha256")
+        != source_identity["repair_source_tree_sha256"]
+        or protocol.get("repair_source_member_count")
+        != source_identity["repair_source_member_count"]
+    ):
+        raise ProtocolError("CBPUPR workspace source-seal binding drifted.")
     expected = {
         "artifact_root": workspace.resolve_artifact(
             getattr(config, "output_artifact_id"), for_output=True, require_exists=False

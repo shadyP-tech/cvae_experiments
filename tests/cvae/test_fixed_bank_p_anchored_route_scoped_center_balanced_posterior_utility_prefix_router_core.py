@@ -3,8 +3,10 @@ from __future__ import annotations
 from concurrent.futures import ProcessPoolExecutor
 import inspect
 from itertools import product
+import json
 import multiprocessing as mp
 import pickle
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -31,6 +33,11 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_center_b
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router.contracts import (
     EndpointCasePrediction,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router.constants import (
+    CANONICAL_PHYSICAL_ROW_ORDER,
+    CENTERS,
+    SOURCE_PROBABILITY_INDEX_ROW_ORDER,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router.decision import (
     ABSTAIN_TO_P,
@@ -59,8 +66,16 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_center_b
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router.persistence import (
     persist_dense_npz,
+    persist_physical_surface,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router.physical_runtime import (
+    ProbabilityIndexRow,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router.physical_fingerprint import (
+    fingerprint_feature_names,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router.posterior_contracts import (
+    CONTROL_IDS,
     CasePosteriorPrediction,
     PseudoPosteriorReference,
 )
@@ -81,6 +96,7 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_center_b
     UtilityReplay,
     build_center_balanced_utility_calibration,
 )
+from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router import validation_transport_numeric
 from midogpp_thesis.cvae.protocol import ProtocolError
 
 
@@ -219,6 +235,83 @@ def test_posterior_eta_is_float32_before_scoring_and_persistence(tmp_path) -> No
         on_disk = np.asarray(persisted[prediction.prediction_hash], dtype=np.float32)
     assert on_disk.tobytes() == in_memory.tobytes()
     assert manifest["arrays"][0]["dtype"] == "float32"
+
+
+def test_physical_surface_seal_explicitly_binds_canonical_row_order(tmp_path) -> None:
+    persist_physical_surface(
+        tmp_path,
+        physical=SimpleNamespace(
+            canonical_source_cache=SimpleNamespace(lock_hash="b" * 64),
+            prediction=SimpleNamespace(seal_hash="c" * 64),
+        ),
+        surface=SimpleNamespace(
+            surface_hash="d" * 64,
+            probability_store_hash="e" * 64,
+        ),
+        probability_index=tuple(
+            SimpleNamespace(
+                to_payload=lambda index=index: {
+                    "cell_id": f"cell-{index}",
+                    "row_order": SOURCE_PROBABILITY_INDEX_ROW_ORDER,
+                }
+            )
+            for index in range(90)
+        ),
+    )
+    payload = json.loads(
+        (tmp_path / "manifests/physical_surface_seal.json").read_text()
+    )
+
+    assert (
+        payload["source_probability_index_row_order"]
+        == SOURCE_PROBABILITY_INDEX_ROW_ORDER
+    )
+    assert (
+        payload["canonical_physical_row_order"]
+        == CANONICAL_PHYSICAL_ROW_ORDER
+    )
+    seal_hash = payload.pop("physical_surface_seal_hash")
+    assert seal_hash == canonical_hash(payload)
+
+    with pytest.raises(ProtocolError, match="source probability index order"):
+        persist_physical_surface(
+            tmp_path / "bad",
+            physical=SimpleNamespace(
+                canonical_source_cache=SimpleNamespace(lock_hash="b" * 64),
+                prediction=SimpleNamespace(seal_hash="c" * 64),
+            ),
+            surface=SimpleNamespace(
+                surface_hash="d" * 64,
+                probability_store_hash="e" * 64,
+            ),
+            probability_index=tuple(
+                SimpleNamespace(
+                    to_payload=lambda index=index: {
+                        "cell_id": f"cell-{index}",
+                        "row_order": (
+                            "ambiguous" if index == 0
+                            else SOURCE_PROBABILITY_INDEX_ROW_ORDER
+                        ),
+                    }
+                )
+                for index in range(90)
+            ),
+        )
+
+
+def test_probability_index_explicitly_retains_source_store_row_order() -> None:
+    payload = ProbabilityIndexRow(
+        "0",
+        "B",
+        2,
+        ("a" * 64,) * 9,
+        "b" * 64,
+        "c" * 64,
+        "d" * 64,
+    ).to_payload()
+
+    assert payload["row_order"] == SOURCE_PROBABILITY_INDEX_ROW_ORDER
+    assert payload["row_order"] != CANONICAL_PHYSICAL_ROW_ORDER
 
 
 def test_pseudo_posterior_discloses_role_not_covariate_exclusion() -> None:
@@ -533,6 +626,71 @@ def test_zero_mad_transport_is_dropped_and_recorded_as_novelty() -> None:
     assert audit.zero_scale_novelty_dimensions == ("constant", "sparse")
     assert audit.l2_distance < 10.0
     assert audit.to_payload()["authorization_gate"] is False
+
+
+@pytest.mark.parametrize(
+    "poisoned_row_order",
+    (None, "physical_store_iteration_order"),
+)
+def test_numeric_transport_rejects_missing_or_wrong_fingerprint_row_order(
+    monkeypatch,
+    tmp_path,
+    poisoned_row_order,
+) -> None:
+    cases_by_center = {
+        center: (f"case-{center}",) for center in CENTERS
+    }
+    plans = {
+        (center, f"case-{center}"): {
+            "evaluation_sample_ids": [f"sample-{center}"]
+        }
+        for center in CENTERS
+    }
+    models = {
+        (center, f"case-{center}", control): {
+            "fingerprint_hash": "c" * 64
+        }
+        for center in CENTERS
+        for control in CONTROL_IDS
+    }
+    topology = SimpleNamespace(
+        cases_by_center=cases_by_center,
+        plans=plans,
+        models=models,
+    )
+    rows = [
+        {
+            "schema_version": "fixed_bank_cbpupr_fingerprint_summary_v1",
+            "center": center,
+            "control_id": control,
+            "sample_count": 1,
+            "case_count": 1,
+            "row_order": CANONICAL_PHYSICAL_ROW_ORDER,
+            "feature_names": list(fingerprint_feature_names(center)),
+            "feature_array_sha256": "a" * 64,
+            "source_surface_hash": "b" * 64,
+            "fingerprint_hash": "c" * 64,
+            "raw_feature_rows_persisted": False,
+            "labels_used": False,
+        }
+        for center in CENTERS
+        for control in CONTROL_IDS
+    ]
+    if poisoned_row_order is None:
+        del rows[0]["row_order"]
+    else:
+        rows[0]["row_order"] = poisoned_row_order
+    monkeypatch.setattr(
+        validation_transport_numeric,
+        "table_rows",
+        lambda _root, _name: rows,
+    )
+
+    with pytest.raises(ProtocolError, match="transport physical fingerprint lineage"):
+        validation_transport_numeric._validate_fingerprint_lineage(
+            tmp_path,
+            topology,
+        )
 
 
 def test_cyclic_control_is_deterministic_and_nonzero() -> None:

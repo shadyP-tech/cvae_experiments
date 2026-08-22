@@ -44,7 +44,15 @@ does not make an unrun experiment claim-eligible.
 - `wiki/03-experiments/midogpp-uniform-b-v2-source-inner-utility-regret-policy-v1.md`:
   completed label-blind validation cache, non-selecting source-inner utility
   surface, uncertainty-gated utility/regret policy, exact equal-union fallback,
-  and matched Stage-70 boundary.
+  completed descriptive Stage-70 fallback equivalence, and fresh-confirmation
+  boundary.
+- `wiki/03-experiments/midogpp-uniform-b-v2-descriptive-frozen-policy-comparison-v1.md`:
+  completed validated Stage-70 comparison of equal-union, metadata max-tie,
+  and utility/regret fallback on the previously consumed test surface, with
+  descriptive metrics and explicit non-promotion boundary.
+- `wiki/03-experiments/midogpp-uniform-b-v2-consumed-test-posterior-utility-routing-diagnostics.md`:
+  terminal PSSCUR and PCSI-RACR zero-route bottleneck results plus the failed
+  CBPUPR fresh-process lineage validation, all fenced from promotion or reuse.
 - `wiki/03-experiments/midogpp-uniform-b-v2-utility-aligned-residual-router.md`:
   planned fresh exact-tail utility learnability surface, uncertainty-gated
   target-specific residual policy, sealed Stage-70 confirmation, the separate

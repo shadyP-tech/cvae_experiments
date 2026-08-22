@@ -1,0 +1,14 @@
+method,bacc,role
+Support-NELBO top-1,0.5252,selected
+Random top-1,0.5185,control
+Support-NELBO top-2,0.5463,composition
+Support-NELBO top-3,0.5758,composition
+All-4 geometric,0.5887,composition
+Single-expert oracle,0.6769,oracle
+Class-conditioned CVAE selected,0.7107,generation
+Class-conditioned CVAE oracle,0.7687,oracle
+Dense arithmetic CVAE,0.7883,composition
+Dense geometric CVAE,0.8144,composition
+GMM selected,0.8073,diagnostic
+GMM oracle,0.8442,oracle
+Real PCA64 reconstruction reference,0.8620,reference

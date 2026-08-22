@@ -1,0 +1,6 @@
+arm,bacc,gap_to_posterior_sample
+P0 standard-normal prior,0.757348,0.014223
+PS aggregate-posterior prior,0.770112,0.001459
+Posterior mean,0.771145,0.000426
+Q posterior sample ceiling,0.771571,0.000000
+PCA-only reference,0.766401,0.005170

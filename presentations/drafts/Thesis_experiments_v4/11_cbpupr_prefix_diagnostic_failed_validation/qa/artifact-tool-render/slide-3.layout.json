@@ -1,0 +1,867 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/2vscev",
+    "id": "2vscev",
+    "slide": 3,
+    "layoutId": "0fedab1a-e0e6-4964-94b5-78cd53cc8c9e",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "3036609a-291e-4d3f-8427-21b8329e2dc3",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#FFFFFF",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Helvetica Neue"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "0fedab1a-e0e6-4964-94b5-78cd53cc8c9e",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "3036609a-291e-4d3f-8427-21b8329e2dc3",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "3036609a-291e-4d3f-8427-21b8329e2dc3",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/d0jat0ji",
+      "id": "1",
+      "name": "slide-3-title",
+      "bbox": [
+        42,
+        34,
+        1130,
+        64
+      ],
+      "geometry": "rect",
+      "text": "Provisional deltas are invalid because validation failed",
+      "textPreview": "Provisional deltas are invalid because validation failed",
+      "resolvedFontSize": 36,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 36,
+        "typeface": "Helvetica Neue",
+        "color": "#000000",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Provisional deltas are invalid because validation failed"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Provisional deltas are invalid because validation failed",
+          "resolvedTextStyle": {
+            "fontSize": 36,
+            "typeface": "Helvetica Neue",
+            "color": "#000000",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Provisional deltas are invalid because validation failed",
+              "fontSize": 36,
+              "typeface": "Helvetica Neue",
+              "color": "#000000",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/qx8ry5kr",
+      "id": "2",
+      "name": "slide-3-number",
+      "bbox": [
+        1188,
+        43,
+        48,
+        28
+      ],
+      "geometry": "rect",
+      "text": "3",
+      "textPreview": "3",
+      "resolvedFontSize": 14,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 14,
+        "typeface": "Helvetica Neue",
+        "color": "#5B6472",
+        "alignment": "right",
+        "verticalAlignment": "top",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "3"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "3",
+          "resolvedTextStyle": {
+            "fontSize": 14,
+            "typeface": "Helvetica Neue",
+            "color": "#5B6472",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "3",
+              "fontSize": 14,
+              "typeface": "Helvetica Neue",
+              "color": "#5B6472",
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ryhsra1c",
+      "id": "3",
+      "name": "rule-112",
+      "bbox": [
+        42,
+        112,
+        1196,
+        1.5
+      ],
+      "geometry": "rect",
+      "fillColor": "#B8BCC4",
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "chart",
+      "scope": "slide",
+      "aid": "ch/wbqtgvm1",
+      "id": "4",
+      "name": "primary-result-chart",
+      "bbox": [
+        42,
+        150,
+        770,
+        490
+      ],
+      "chartType": "bar"
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/14jaxkje",
+      "id": "5",
+      "name": "chart-caption",
+      "bbox": [
+        52,
+        642,
+        750,
+        28
+      ],
+      "geometry": "rect",
+      "text": "Debugging context only — not a valid experiment result.",
+      "textPreview": "Debugging context only — not a valid experiment result.",
+      "resolvedFontSize": 12,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 12,
+        "typeface": "Helvetica Neue",
+        "color": "#5B6472",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Debugging context only — not a valid experiment result."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Debugging context only — not a valid experiment result.",
+          "resolvedTextStyle": {
+            "fontSize": 12,
+            "typeface": "Helvetica Neue",
+            "color": "#5B6472"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Debugging context only — not a valid experiment result.",
+              "fontSize": 12,
+              "typeface": "Helvetica Neue",
+              "color": "#5B6472"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/e1sb25kn",
+      "id": "6",
+      "name": "metric-label",
+      "bbox": [
+        862,
+        155,
+        330,
+        30
+      ],
+      "geometry": "rect",
+      "text": "WHAT CHANGED",
+      "textPreview": "WHAT CHANGED",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Helvetica Neue",
+        "color": "#C43D4B",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "WHAT CHANGED"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "WHAT CHANGED",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Helvetica Neue",
+            "color": "#C43D4B",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "WHAT CHANGED",
+              "fontSize": 17,
+              "typeface": "Helvetica Neue",
+              "color": "#C43D4B",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/z21sva18",
+      "id": "7",
+      "name": "metric-value-0",
+      "bbox": [
+        862,
+        208,
+        330,
+        52
+      ],
+      "geometry": "rect",
+      "text": "14",
+      "textPreview": "14",
+      "resolvedFontSize": 34,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 34,
+        "typeface": "Helvetica Neue",
+        "color": "#C43D4B",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "14"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "14",
+          "resolvedTextStyle": {
+            "fontSize": 34,
+            "typeface": "Helvetica Neue",
+            "color": "#C43D4B",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "14",
+              "fontSize": 34,
+              "typeface": "Helvetica Neue",
+              "color": "#C43D4B",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 8,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/g769sv2p",
+      "id": "8",
+      "name": "metric-text-0",
+      "bbox": [
+        862,
+        262,
+        330,
+        58
+      ],
+      "geometry": "rect",
+      "text": "Provisional unified-prefix routed cases",
+      "textPreview": "Provisional unified-prefix routed cases",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Helvetica Neue",
+        "color": "#5B6472",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Provisional unified-prefix routed cases"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Provisional unified-prefix routed cases",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Helvetica Neue",
+            "color": "#5B6472"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Provisional unified-prefix routed cases",
+              "fontSize": 17,
+              "typeface": "Helvetica Neue",
+              "color": "#5B6472"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 9,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/h8zalgja",
+      "id": "9",
+      "name": "metric-rule-1",
+      "bbox": [
+        862,
+        332,
+        330,
+        1
+      ],
+      "geometry": "rect",
+      "fillColor": "#B8BCC4",
+      "lineWidth": 0
+    },
+    {
+      "order": 10,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/147udw36",
+      "id": "10",
+      "name": "metric-value-1",
+      "bbox": [
+        862,
+        350,
+        330,
+        52
+      ],
+      "geometry": "rect",
+      "text": "0.121",
+      "textPreview": "0.121",
+      "resolvedFontSize": 34,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 34,
+        "typeface": "Helvetica Neue",
+        "color": "#C43D4B",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "0.121"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "0.121",
+          "resolvedTextStyle": {
+            "fontSize": 34,
+            "typeface": "Helvetica Neue",
+            "color": "#C43D4B",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "0.121",
+              "fontSize": 34,
+              "typeface": "Helvetica Neue",
+              "color": "#C43D4B",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 11,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/03yt4rml",
+      "id": "11",
+      "name": "metric-text-1",
+      "bbox": [
+        862,
+        404,
+        330,
+        58
+      ],
+      "geometry": "rect",
+      "text": "Descriptive max-menu randomization fraction",
+      "textPreview": "Descriptive max-menu randomization fraction",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Helvetica Neue",
+        "color": "#5B6472",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Descriptive max-menu randomization"
+          },
+          {
+            "index": 2,
+            "text": "fraction"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Descriptive max-menu randomization fraction",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Helvetica Neue",
+            "color": "#5B6472"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Descriptive max-menu randomization fraction",
+              "fontSize": 17,
+              "typeface": "Helvetica Neue",
+              "color": "#5B6472"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 12,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/f2pcbml0",
+      "id": "12",
+      "name": "metric-rule-2",
+      "bbox": [
+        862,
+        474,
+        330,
+        1
+      ],
+      "geometry": "rect",
+      "fillColor": "#B8BCC4",
+      "lineWidth": 0
+    },
+    {
+      "order": 13,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/e1wb2h4f",
+      "id": "13",
+      "name": "metric-value-2",
+      "bbox": [
+        862,
+        492,
+        330,
+        52
+      ],
+      "geometry": "rect",
+      "text": "FAILED",
+      "textPreview": "FAILED",
+      "resolvedFontSize": 34,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 34,
+        "typeface": "Helvetica Neue",
+        "color": "#C43D4B",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "FAILED"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "FAILED",
+          "resolvedTextStyle": {
+            "fontSize": 34,
+            "typeface": "Helvetica Neue",
+            "color": "#C43D4B",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "FAILED",
+              "fontSize": 34,
+              "typeface": "Helvetica Neue",
+              "color": "#C43D4B",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 14,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/p87uhw32",
+      "id": "14",
+      "name": "metric-text-2",
+      "bbox": [
+        862,
+        546,
+        330,
+        58
+      ],
+      "geometry": "rect",
+      "text": "Posterior prediction/model lineage validation",
+      "textPreview": "Posterior prediction/model lineage validation",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Helvetica Neue",
+        "color": "#5B6472",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Posterior prediction/model lineage"
+          },
+          {
+            "index": 2,
+            "text": "validation"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Posterior prediction/model lineage validation",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Helvetica Neue",
+            "color": "#5B6472"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Posterior prediction/model lineage validation",
+              "fontSize": 17,
+              "typeface": "Helvetica Neue",
+              "color": "#5B6472"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 15,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/o7yd8b2x",
+      "id": "15",
+      "name": "source-footer",
+      "bbox": [
+        42,
+        682,
+        1090,
+        22
+      ],
+      "geometry": "rect",
+      "text": "Source: CBPUPR v1 failed run_state and provisional diagnostic tables",
+      "textPreview": "Source: CBPUPR v1 failed run_state and provisional diagnostic tables",
+      "resolvedFontSize": 10,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 10,
+        "typeface": "Helvetica Neue",
+        "color": "#5B6472",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Source: CBPUPR v1 failed run_state and provisional diagnostic tables"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Source: CBPUPR v1 failed run_state and provisional diagnostic tables",
+          "resolvedTextStyle": {
+            "fontSize": 10,
+            "typeface": "Helvetica Neue",
+            "color": "#5B6472"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Source: CBPUPR v1 failed run_state and provisional diagnostic tables",
+              "fontSize": 10,
+              "typeface": "Helvetica Neue",
+              "color": "#5B6472"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

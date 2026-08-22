@@ -1,4 +1,4 @@
-"""Canonical executable config sections for terminal-only CBPUPR v1."""
+"""Canonical executable config sections for the terminal-only CBPUPR v2 repair."""
 
 from __future__ import annotations
 
@@ -10,6 +10,8 @@ from .constants import (
     A1_SELECTED_ROW_WEIGHT,
     B_ROWS_PER_SOURCE_CLASS,
     BLOCKED_CONTROL_METHOD_ID,
+    CANONICAL_PHYSICAL_ROW_ORDER,
+    CANONICAL_POSTERIOR_ROW_ORDER,
     CANDIDATE_ONLY_METHOD_ID,
     CENTERS,
     CLAIM_ROLE,
@@ -22,6 +24,8 @@ from .constants import (
     EXPECTED_PSEUDO_ROUTE_COUNT,
     EXPECTED_TARGET_POSTERIOR_MODEL_FIT_COUNT,
     EXPECTED_TOTAL_POSTERIOR_MODEL_FIT_COUNT,
+    EXECUTION_REVISION,
+    EXECUTION_SCHEMA_REVISION,
     GENERATED_CACHE_FORMAT,
     GENERATION_WORKERS_PER_DEVICE,
     LOG_LOSS_CLIP_EPSILON,
@@ -32,10 +36,16 @@ from .constants import (
     POSTERIOR_FITS_PER_ROUTE_AND_CONTROL,
     PRIMARY_METHOD_ID,
     PUBLICATION_STATUS,
+    QUARANTINED_V1_EXPERIMENT_ID,
+    QUARANTINED_V1_OUTPUT_ARTIFACT_ID,
+    QUARANTINED_V1_SCRATCH_ROOT,
+    REPAIR_BASE_COMMIT,
+    REPAIR_CODE_IDENTITY,
     RUN_RECOVERY_POLICY,
     SCRATCH_ROOT,
     SOURCE_JOB_COUNT,
     SOURCE_PREFIX_ROWS_PER_CLASS,
+    SOURCE_PROBABILITY_INDEX_ROW_ORDER,
     SOURCE_STREAM_COUNT,
     SOURCE_WORKERS_PER_DEVICE,
     TARGET_POSTERIOR_C,
@@ -57,6 +67,7 @@ from .constants import (
     TRANSPORT_MIN_REFERENCE_CENTER_COUNT,
     WORKSTATION_PROFILE,
 )
+from .source_seal import source_seal_identity
 
 
 CLASSIFIER = ClassifierSpec(
@@ -194,8 +205,24 @@ def canonical_evaluation_payload() -> dict[str, object]:
 
 
 def canonical_runtime_payload() -> dict[str, object]:
+    source_identity = source_seal_identity()
     return {
-        "schema_version": "fixed_bank_cbpupr_workstation_runtime_v1",
+        "schema_version": "fixed_bank_cbpupr_workstation_runtime_v2",
+        "execution_revision": EXECUTION_REVISION,
+        "execution_schema_revision": EXECUTION_SCHEMA_REVISION,
+        "repair_source_manifest_member": source_identity[
+            "repair_source_manifest_member"
+        ],
+        "repair_source_manifest_sha256": source_identity[
+            "repair_source_manifest_sha256"
+        ],
+        "repair_source_tree_sha256": source_identity[
+            "repair_source_tree_sha256"
+        ],
+        "repair_source_member_count": source_identity[
+            "repair_source_member_count"
+        ],
+        "repair_source_manifest_checked_pre_gpu": True,
         "workstation_profile": WORKSTATION_PROFILE,
         "generation_devices": ["cuda:0", "cuda:1"],
         "cuda_visible_devices": "0,1",
@@ -217,6 +244,11 @@ def canonical_runtime_payload() -> dict[str, object]:
         "generated_cache_format": GENERATED_CACHE_FORMAT,
         "probability_surface_format": "sealed_compressed_float32_npz",
         "dense_array_manifest_format": "json_hash_offsets_only",
+        "source_probability_index_row_order": SOURCE_PROBABILITY_INDEX_ROW_ORDER,
+        "canonical_physical_row_order": CANONICAL_PHYSICAL_ROW_ORDER,
+        "posterior_prediction_and_model_row_order": CANONICAL_POSTERIOR_ROW_ORDER,
+        "worker_DTOs_carry_explicit_canonical_row_identity": True,
+        "canonical_row_order_enforced_before_worker_transfer": True,
         "numeric_transport_MAD_scale": TRANSPORT_MAD_SCALE,
         "numeric_transport_zero_scale_threshold": TRANSPORT_SCALE_FLOOR,
         "numeric_transport_minimum_reference_centers": (
@@ -264,6 +296,11 @@ def canonical_runtime_payload() -> dict[str, object]:
         "cross_run_recovery_allowed": False,
         "terminal_recovery_allowed": False,
         "two_fresh_process_validation_required": True,
+        "preterminal_closed_world_validation_required": True,
+        "preterminal_parent_validation_required": True,
+        "preterminal_fresh_process_validation_count": 2,
+        "preterminal_validation_attested_before_terminal_labels": True,
+        "final_fresh_process_validation_count": 2,
         "validation_endpoint_optimizer_refit_count": 0,
         "validation_posterior_optimizer_refit_count": 0,
         "previous_stage90_scratch_reuse_forbidden": True,
@@ -271,7 +308,9 @@ def canonical_runtime_payload() -> dict[str, object]:
 
 
 def canonical_claim_boundary_payload() -> dict[str, object]:
+    source_identity = source_seal_identity()
     return {
+        "schema_version": "fixed_bank_cbpupr_claim_boundary_v2",
         "publication_status": PUBLICATION_STATUS,
         "terminal_decision": TERMINAL_DECISION,
         "claim_role": CLAIM_ROLE,
@@ -286,6 +325,44 @@ def canonical_claim_boundary_payload() -> dict[str, object]:
         "target_evaluation_labels_used_before_route_seal": False,
         "fresh_evidence": False,
         "terminal_stage90_diagnostic": True,
+        "execution_authorized": True,
+        "execution_revision": EXECUTION_REVISION,
+        "execution_schema_revision": EXECUTION_SCHEMA_REVISION,
+        "repair_code_identity": REPAIR_CODE_IDENTITY,
+        "repair_base_commit": REPAIR_BASE_COMMIT,
+        "repair_source_manifest_member": source_identity[
+            "repair_source_manifest_member"
+        ],
+        "repair_source_manifest_sha256": source_identity[
+            "repair_source_manifest_sha256"
+        ],
+        "repair_source_tree_sha256": source_identity[
+            "repair_source_tree_sha256"
+        ],
+        "repair_source_member_count": source_identity[
+            "repair_source_member_count"
+        ],
+        "repair_source_manifest_checked_pre_gpu": True,
+        "repair_source_identity_persisted_in_protocol_manifest": True,
+        "mechanical_repair_only": True,
+        "scientific_protocol_unchanged_from_v1": True,
+        "scientific_method_changed_from_v1": False,
+        "canonical_row_order_repair_only": True,
+        "canonical_row_order_repair_verified": True,
+        "quarantined_v1_experiment_id": QUARANTINED_V1_EXPERIMENT_ID,
+        "quarantined_v1_output_artifact_id": QUARANTINED_V1_OUTPUT_ARTIFACT_ID,
+        "quarantined_v1_scratch_root": QUARANTINED_V1_SCRATCH_ROOT,
+        "v1_output_quarantined": True,
+        "v1_target_terminal_capability_had_opened": True,
+        "v1_terminal_outputs_had_persisted": True,
+        "v1_final_validation_passed": False,
+        "quarantined_v1_output_used": False,
+        "quarantined_v1_scratch_or_checkpoint_used": False,
+        "quarantined_v1_terminal_outputs_used": False,
+        "prior_v1_label_capability_history_used": False,
+        "prior_v1_amendment_used": False,
+        "preterminal_bundle_validated_before_terminal_labels": True,
+        "preterminal_two_fresh_processes_required_before_terminal_labels": True,
         "routing_success_claimed": False,
         "routing_quality_claimed": False,
         "downstream_utility_claimed": False,

@@ -1,0 +1,805 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/edp302",
+    "id": "edp302",
+    "slide": 4,
+    "layoutId": "1dd67d19-5464-4145-b77d-7b7db33184a7",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "83f714b4-72d6-40a7-a9a2-5c77a770433b",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#FFFFFF",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Helvetica Neue"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "1dd67d19-5464-4145-b77d-7b7db33184a7",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "83f714b4-72d6-40a7-a9a2-5c77a770433b",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "83f714b4-72d6-40a7-a9a2-5c77a770433b",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/crutkn2t",
+      "id": "1",
+      "name": "slide-4-title",
+      "bbox": [
+        42,
+        34,
+        1130,
+        64
+      ],
+      "geometry": "rect",
+      "text": "The active routing hypothesis is not supported",
+      "textPreview": "The active routing hypothesis is not supported",
+      "resolvedFontSize": 36,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 36,
+        "typeface": "Helvetica Neue",
+        "color": "#000000",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "The active routing hypothesis is not supported"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "The active routing hypothesis is not supported",
+          "resolvedTextStyle": {
+            "fontSize": 36,
+            "typeface": "Helvetica Neue",
+            "color": "#000000",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "The active routing hypothesis is not supported",
+              "fontSize": 36,
+              "typeface": "Helvetica Neue",
+              "color": "#000000",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/rq1sbi18",
+      "id": "2",
+      "name": "slide-4-number",
+      "bbox": [
+        1188,
+        43,
+        48,
+        28
+      ],
+      "geometry": "rect",
+      "text": "4",
+      "textPreview": "4",
+      "resolvedFontSize": 14,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 14,
+        "typeface": "Helvetica Neue",
+        "color": "#5B6472",
+        "alignment": "right",
+        "verticalAlignment": "top",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "4"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "4",
+          "resolvedTextStyle": {
+            "fontSize": 14,
+            "typeface": "Helvetica Neue",
+            "color": "#5B6472",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "4",
+              "fontSize": 14,
+              "typeface": "Helvetica Neue",
+              "color": "#5B6472",
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/qpsbidkn",
+      "id": "3",
+      "name": "rule-112",
+      "bbox": [
+        42,
+        112,
+        1196,
+        1.5
+      ],
+      "geometry": "rect",
+      "fillColor": "#B8BCC4",
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/1g3ahsja",
+      "id": "4",
+      "name": "supported-label",
+      "bbox": [
+        42,
+        158,
+        520,
+        30
+      ],
+      "geometry": "rect",
+      "text": "SUPPORTED INTERPRETATION",
+      "textPreview": "SUPPORTED INTERPRETATION",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Helvetica Neue",
+        "color": "#D68A00",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "SUPPORTED INTERPRETATION"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "SUPPORTED INTERPRETATION",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Helvetica Neue",
+            "color": "#D68A00",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "SUPPORTED INTERPRETATION",
+              "fontSize": 17,
+              "typeface": "Helvetica Neue",
+              "color": "#D68A00",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/0futon2p",
+      "id": "5",
+      "name": "supported-text",
+      "bbox": [
+        42,
+        205,
+        530,
+        334
+      ],
+      "geometry": "rect",
+      "text": "Dense equal-union CVAE composition is the strongest deployable-style descriptive arm; metadata similarity is not a reliable utility rule.",
+      "textPreview": "Dense equal-union CVAE composition is the strongest deployable-style descriptive arm; metadata similarity is not a reliable utility rule.",
+      "resolvedFontSize": 25,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 25,
+        "typeface": "Helvetica Neue",
+        "color": "#000000",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 4,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Dense equal-union CVAE composition is"
+          },
+          {
+            "index": 2,
+            "text": "the strongest deployable-style descriptive"
+          },
+          {
+            "index": 3,
+            "text": "arm; metadata similarity is not a reliable"
+          },
+          {
+            "index": 4,
+            "text": "utility rule."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Dense equal-union CVAE composition is the strongest deployable-style descriptive arm; metadata similarity is not a reliable utility rule.",
+          "resolvedTextStyle": {
+            "fontSize": 25,
+            "typeface": "Helvetica Neue",
+            "color": "#000000",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Dense equal-union CVAE composition is the strongest deployable-style descriptive arm; metadata similarity is not a reliable utility rule.",
+              "fontSize": 25,
+              "typeface": "Helvetica Neue",
+              "color": "#000000",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/zelsfi14",
+      "id": "6",
+      "name": "objective-text",
+      "bbox": [
+        42,
+        566,
+        530,
+        80
+      ],
+      "geometry": "rect",
+      "text": "Objectives 3–5 evaluated directly; result is negative but complete.",
+      "textPreview": "Objectives 3–5 evaluated directly; result is negative but complete.",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Helvetica Neue",
+        "color": "#5B6472",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Objectives 3–5 evaluated directly; result is negative but complete."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Objectives 3–5 evaluated directly; result is negative but complete.",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Helvetica Neue",
+            "color": "#5B6472"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Objectives 3–5 evaluated directly; result is negative but complete.",
+              "fontSize": 17,
+              "typeface": "Helvetica Neue",
+              "color": "#5B6472"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/edcbmxkj",
+      "id": "7",
+      "name": "conclusion-rule",
+      "bbox": [
+        612,
+        150,
+        1.5,
+        500
+      ],
+      "geometry": "rect",
+      "fillColor": "#B8BCC4",
+      "lineWidth": 0
+    },
+    {
+      "order": 8,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/hkja5836",
+      "id": "8",
+      "name": "boundary-label",
+      "bbox": [
+        654,
+        158,
+        540,
+        30
+      ],
+      "geometry": "rect",
+      "text": "CLAIM BOUNDARY",
+      "textPreview": "CLAIM BOUNDARY",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Helvetica Neue",
+        "color": "#C43D4B",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "CLAIM BOUNDARY"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "CLAIM BOUNDARY",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Helvetica Neue",
+            "color": "#C43D4B",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "CLAIM BOUNDARY",
+              "fontSize": 17,
+              "typeface": "Helvetica Neue",
+              "color": "#C43D4B",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 9,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/gja9c32l",
+      "id": "9",
+      "name": "boundary-text",
+      "bbox": [
+        654,
+        205,
+        540,
+        205
+      ],
+      "geometry": "rect",
+      "text": "The test surface was previously consumed. No policy promotion, fresh significance, deployment, or new-center claim is authorized.",
+      "textPreview": "The test surface was previously consumed. No policy promotion, fresh significance, deployment, or new-center claim is authorized.",
+      "resolvedFontSize": 21,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 21,
+        "typeface": "Helvetica Neue",
+        "color": "#000000",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 3,
+        "lines": [
+          {
+            "index": 1,
+            "text": "The test surface was previously consumed. No policy"
+          },
+          {
+            "index": 2,
+            "text": "promotion, fresh significance, deployment, or"
+          },
+          {
+            "index": 3,
+            "text": "new-center claim is authorized."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "The test surface was previously consumed. No policy promotion, fresh significance, deployment, or new-center claim is authorized.",
+          "resolvedTextStyle": {
+            "fontSize": 21,
+            "typeface": "Helvetica Neue",
+            "color": "#000000"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "The test surface was previously consumed. No policy promotion, fresh significance, deployment, or new-center claim is authorized.",
+              "fontSize": 21,
+              "typeface": "Helvetica Neue",
+              "color": "#000000"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 10,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/i9s7q5wz",
+      "id": "10",
+      "name": "next-panel",
+      "bbox": [
+        654,
+        458,
+        540,
+        164
+      ],
+      "geometry": "rect",
+      "fillColor": "#EDEDED",
+      "lineWidth": 0
+    },
+    {
+      "order": 11,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ja1ozaxk",
+      "id": "11",
+      "name": "next-label",
+      "bbox": [
+        680,
+        482,
+        490,
+        28
+      ],
+      "geometry": "rect",
+      "text": "NEXT DECISION",
+      "textPreview": "NEXT DECISION",
+      "resolvedFontSize": 16,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 16,
+        "typeface": "Helvetica Neue",
+        "color": "#D68A00",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "NEXT DECISION"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "NEXT DECISION",
+          "resolvedTextStyle": {
+            "fontSize": 16,
+            "typeface": "Helvetica Neue",
+            "color": "#D68A00",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "NEXT DECISION",
+              "fontSize": 16,
+              "typeface": "Helvetica Neue",
+              "color": "#D68A00",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 12,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/kbapsfe5",
+      "id": "12",
+      "name": "next-text",
+      "bbox": [
+        680,
+        522,
+        490,
+        76
+      ],
+      "geometry": "rect",
+      "text": "Treat equal union as the safe conclusion unless one fresh, predeclared routing study is feasible.",
+      "textPreview": "Treat equal union as the safe conclusion unless one fresh, predeclared routing study is feasible.",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Helvetica Neue",
+        "color": "#000000",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Treat equal union as the safe conclusion unless"
+          },
+          {
+            "index": 2,
+            "text": "one fresh, predeclared routing study is feasible."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Treat equal union as the safe conclusion unless one fresh, predeclared routing study is feasible.",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Helvetica Neue",
+            "color": "#000000",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Treat equal union as the safe conclusion unless one fresh, predeclared routing study is feasible.",
+              "fontSize": 20,
+              "typeface": "Helvetica Neue",
+              "color": "#000000",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 13,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/5wjq1kfa",
+      "id": "13",
+      "name": "source-footer",
+      "bbox": [
+        42,
+        682,
+        1090,
+        22
+      ],
+      "geometry": "rect",
+      "text": "Source: Stage-70 descriptive frozen-policy comparison",
+      "textPreview": "Source: Stage-70 descriptive frozen-policy comparison",
+      "resolvedFontSize": 10,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 10,
+        "typeface": "Helvetica Neue",
+        "color": "#5B6472",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Source: Stage-70 descriptive frozen-policy comparison"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Source: Stage-70 descriptive frozen-policy comparison",
+          "resolvedTextStyle": {
+            "fontSize": 10,
+            "typeface": "Helvetica Neue",
+            "color": "#5B6472"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Source: Stage-70 descriptive frozen-policy comparison",
+              "fontSize": 10,
+              "typeface": "Helvetica Neue",
+              "color": "#5B6472"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

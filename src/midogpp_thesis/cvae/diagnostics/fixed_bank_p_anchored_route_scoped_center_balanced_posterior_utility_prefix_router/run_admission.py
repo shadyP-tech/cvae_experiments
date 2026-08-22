@@ -13,9 +13,33 @@ from typing import Iterator, Mapping
 from ...protocol import ProtocolError
 from ...runtime.artifact_io import read_json, sha256_file
 from .bundle import assert_closed_world, relative_files
-from .constants import SCRATCH_ROOT
+from .constants import (
+    QUARANTINED_V1_EXPERIMENT_ID,
+    QUARANTINED_V1_SCRATCH_ROOT,
+)
 from .hashing import canonical_hash
 from .persistence import write_run_state
+from .terminal_failure_quarantine import (
+    FAILED_TERMINAL_LINEAGE_ARTIFACT_DIRECTORIES,
+    FAILED_TERMINAL_LINEAGE_ERROR,
+    FAILED_TERMINAL_LINEAGE_FILES,
+    FAILED_TERMINAL_LINEAGE_FINAL_MEMBERS,
+    FAILED_TERMINAL_LINEAGE_SCRATCH_DIRECTORIES,
+    FAILED_TERMINAL_LINEAGE_SCRATCH_FILES,
+    audit_failed_terminal_lineage_for_quarantine,
+    quarantine_failed_terminal_lineage,
+)
+from .v2_terminal_failure_quarantine import (
+    V2_FINAL_PERSISTENCE_ORDER,
+    V2_FINAL_PHASE,
+    V2_TERMINAL_FAILURE_ARTIFACT_DIRECTORIES,
+    V2_TERMINAL_FAILURE_SCRATCH_DIRECTORIES,
+    V2_TERMINAL_FAILURE_SCRATCH_FILES,
+    V2_TERMINAL_PERSISTENCE_ORDER,
+    V2_TERMINAL_PHASE,
+    audit_failed_v2_terminal_or_final_for_quarantine,
+    quarantine_failed_v2_terminal_or_final,
+)
 
 
 FAILED_WORKSTATION_PREFLIGHT_FILES = frozenset(
@@ -28,6 +52,16 @@ FAILED_WORKSTATION_PREFLIGHT_FILES = frozenset(
         "reports/run_state.json",
     }
 )
+
+
+def reject_quarantined_v1_execution(config: object) -> None:
+    """Block direct-CLI reuse after the one-shot v1 terminal capability opened."""
+
+    if str(getattr(config, "experiment_id", "")) == QUARANTINED_V1_EXPERIMENT_ID:
+        raise ProtocolError(
+            "CBPUPR v1 is terminally failed; a separately authorized v2 "
+            "execution identity is required."
+        )
 
 
 def assert_launch_files(root: Path, config: object) -> None:
@@ -71,7 +105,7 @@ def reject_existing_run_state(root: Path) -> None:
 def audit_failed_workstation_preflight_for_quarantine(
     root: Path,
 ) -> Mapping[str, object]:
-    """Certify only the zero-capability failed-preflight state for whole-root quarantine."""
+    """Certify only the zero-capability failed-preflight state for quarantine."""
 
     unresolved = Path(root)
     if unresolved.is_symlink():
@@ -97,10 +131,7 @@ def quarantine_failed_workstation_preflight(
         + r"\.quarantine-failed-preflight-[0-9]{8}T[0-9]{6}Z",
         quarantine.name,
     )
-    if (
-        quarantine.parent != resolved.parent
-        or expected_name is None
-    ):
+    if quarantine.parent != resolved.parent or expected_name is None:
         raise ProtocolError("CBPUPR failed-preflight quarantine destination is unsafe.")
     with _exclusive_existing_run_lock(resolved):
         audit = _audit_locked_failed_workstation_preflight(resolved)
@@ -145,7 +176,7 @@ def _audit_locked_failed_workstation_preflight(
         raise ProtocolError(
             "CBPUPR failed-preflight zero-capability inventory drifted."
         )
-    scratch = Path(SCRATCH_ROOT)
+    scratch = Path(QUARANTINED_V1_SCRATCH_ROOT)
     if scratch.exists() or scratch.is_symlink():
         raise ProtocolError("CBPUPR failed-preflight scratch is not absent.")
     payload: dict[str, object] = {
@@ -179,13 +210,21 @@ def _exclusive_existing_run_lock(root: Path) -> Iterator[None]:
     path = root / ".run.lock"
     if path.is_symlink() or not path.is_file():
         raise ProtocolError("CBPUPR failed-preflight run lock is absent or unsafe.")
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    # Linux requires a writable descriptor for an exclusive flock. O_RDWR does
+    # not alter bytes because neither O_TRUNC nor O_CREAT is present.
+    flags = (
+        os.O_RDWR
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
     descriptor = os.open(path, flags)
+    locked = False
     try:
         if not stat.S_ISREG(os.fstat(descriptor).st_mode):
             raise ProtocolError("CBPUPR failed-preflight run lock is not regular.")
         try:
             fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            locked = True
         except BlockingIOError as exc:
             raise ProtocolError(
                 "CBPUPR diagnostic is active; failed-preflight quarantine is forbidden."
@@ -193,7 +232,8 @@ def _exclusive_existing_run_lock(root: Path) -> Iterator[None]:
         yield
     finally:
         try:
-            fcntl.flock(descriptor, fcntl.LOCK_UN)
+            if locked:
+                fcntl.flock(descriptor, fcntl.LOCK_UN)
         finally:
             os.close(descriptor)
 
@@ -248,13 +288,31 @@ def write_state(
 
 
 __all__ = (
+    "FAILED_TERMINAL_LINEAGE_ARTIFACT_DIRECTORIES",
+    "FAILED_TERMINAL_LINEAGE_ERROR",
+    "FAILED_TERMINAL_LINEAGE_FILES",
+    "FAILED_TERMINAL_LINEAGE_FINAL_MEMBERS",
+    "FAILED_TERMINAL_LINEAGE_SCRATCH_DIRECTORIES",
+    "FAILED_TERMINAL_LINEAGE_SCRATCH_FILES",
     "FAILED_WORKSTATION_PREFLIGHT_FILES",
+    "V2_FINAL_PERSISTENCE_ORDER",
+    "V2_FINAL_PHASE",
+    "V2_TERMINAL_FAILURE_ARTIFACT_DIRECTORIES",
+    "V2_TERMINAL_FAILURE_SCRATCH_DIRECTORIES",
+    "V2_TERMINAL_FAILURE_SCRATCH_FILES",
+    "V2_TERMINAL_PERSISTENCE_ORDER",
+    "V2_TERMINAL_PHASE",
+    "audit_failed_terminal_lineage_for_quarantine",
+    "audit_failed_v2_terminal_or_final_for_quarantine",
     "audit_failed_workstation_preflight_for_quarantine",
     "assert_launch_files",
     "assert_no_partial_state",
     "assert_workspace_resolved_paths",
     "exclusive_run_lock",
+    "quarantine_failed_terminal_lineage",
+    "quarantine_failed_v2_terminal_or_final",
     "quarantine_failed_workstation_preflight",
+    "reject_quarantined_v1_execution",
     "reject_existing_run_state",
     "write_state",
 )

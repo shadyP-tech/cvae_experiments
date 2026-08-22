@@ -1,0 +1,436 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/js149o",
+    "id": "js149o",
+    "slide": 1,
+    "layoutId": "0fedab1a-e0e6-4964-94b5-78cd53cc8c9e",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "3036609a-291e-4d3f-8427-21b8329e2dc3",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#FFFFFF",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Helvetica Neue"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "0fedab1a-e0e6-4964-94b5-78cd53cc8c9e",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "3036609a-291e-4d3f-8427-21b8329e2dc3",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "3036609a-291e-4d3f-8427-21b8329e2dc3",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/wjmdovut",
+      "id": "1",
+      "name": "cover-eyebrow",
+      "bbox": [
+        42,
+        40,
+        760,
+        34
+      ],
+      "geometry": "rect",
+      "text": "STAGE 90 — FAILED VALIDATION BUNDLE",
+      "textPreview": "STAGE 90 — FAILED VALIDATION BUNDLE",
+      "resolvedFontSize": 18,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 18,
+        "typeface": "Helvetica Neue",
+        "color": "#C43D4B",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "STAGE 90 — FAILED VALIDATION BUNDLE"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "STAGE 90 — FAILED VALIDATION BUNDLE",
+          "resolvedTextStyle": {
+            "fontSize": 18,
+            "typeface": "Helvetica Neue",
+            "color": "#C43D4B",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "STAGE 90 — FAILED VALIDATION BUNDLE",
+              "fontSize": 18,
+              "typeface": "Helvetica Neue",
+              "color": "#C43D4B",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/vidcfad8",
+      "id": "2",
+      "name": "cover-accent",
+      "bbox": [
+        42,
+        112,
+        10,
+        326
+      ],
+      "geometry": "rect",
+      "fillColor": "#C43D4B",
+      "lineWidth": 0
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ah4vm5cn",
+      "id": "3",
+      "name": "cover-title",
+      "bbox": [
+        76,
+        108,
+        1080,
+        244
+      ],
+      "geometry": "rect",
+      "text": "CBPUPR produced provisional activity but failed lineage reconstruction",
+      "textPreview": "CBPUPR produced provisional activity but failed lineage reconstruction",
+      "resolvedFontSize": 56,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 56,
+        "typeface": "Helvetica Neue",
+        "color": "#000000",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "CBPUPR produced provisional activity"
+          },
+          {
+            "index": 2,
+            "text": "but failed lineage reconstruction"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "CBPUPR produced provisional activity but failed lineage reconstruction",
+          "resolvedTextStyle": {
+            "fontSize": 56,
+            "typeface": "Helvetica Neue",
+            "color": "#000000",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "CBPUPR produced provisional activity but failed lineage reconstruction",
+              "fontSize": 56,
+              "typeface": "Helvetica Neue",
+              "color": "#000000",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/9gvud0v2",
+      "id": "4",
+      "name": "cover-subtitle",
+      "bbox": [
+        76,
+        376,
+        960,
+        90
+      ],
+      "geometry": "rect",
+      "text": "Why validation status must dominate attractive numeric deltas",
+      "textPreview": "Why validation status must dominate attractive numeric deltas",
+      "resolvedFontSize": 26,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 26,
+        "typeface": "Helvetica Neue",
+        "color": "#5B6472",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Why validation status must dominate attractive numeric deltas"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Why validation status must dominate attractive numeric deltas",
+          "resolvedTextStyle": {
+            "fontSize": 26,
+            "typeface": "Helvetica Neue",
+            "color": "#5B6472"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Why validation status must dominate attractive numeric deltas",
+              "fontSize": 26,
+              "typeface": "Helvetica Neue",
+              "color": "#5B6472"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/8fmdkvuh",
+      "id": "5",
+      "name": "cover-status-panel",
+      "bbox": [
+        76,
+        516,
+        1120,
+        92
+      ],
+      "geometry": "rect",
+      "fillColor": "#EDEDED",
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/netcbqdc",
+      "id": "6",
+      "name": "cover-status",
+      "bbox": [
+        102,
+        538,
+        1070,
+        50
+      ],
+      "geometry": "rect",
+      "text": "FAILED • ProtocolError • no scientific result",
+      "textPreview": "FAILED • ProtocolError • no scientific result",
+      "resolvedFontSize": 22,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 22,
+        "typeface": "Helvetica Neue",
+        "color": "#C43D4B",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "FAILED • ProtocolError • no scientific result"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "FAILED • ProtocolError • no scientific result",
+          "resolvedTextStyle": {
+            "fontSize": 22,
+            "typeface": "Helvetica Neue",
+            "color": "#C43D4B",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "FAILED • ProtocolError • no scientific result",
+              "fontSize": 22,
+              "typeface": "Helvetica Neue",
+              "color": "#C43D4B",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/mdkvilcr",
+      "id": "7",
+      "name": "source-footer",
+      "bbox": [
+        42,
+        682,
+        1090,
+        22
+      ],
+      "geometry": "rect",
+      "text": "Source: CBPUPR v1 failed run_state and provisional diagnostic tables",
+      "textPreview": "Source: CBPUPR v1 failed run_state and provisional diagnostic tables",
+      "resolvedFontSize": 10,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 10,
+        "typeface": "Helvetica Neue",
+        "color": "#5B6472",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Source: CBPUPR v1 failed run_state and provisional diagnostic tables"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Source: CBPUPR v1 failed run_state and provisional diagnostic tables",
+          "resolvedTextStyle": {
+            "fontSize": 10,
+            "typeface": "Helvetica Neue",
+            "color": "#5B6472"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Source: CBPUPR v1 failed run_state and provisional diagnostic tables",
+              "fontSize": 10,
+              "typeface": "Helvetica Neue",
+              "color": "#5B6472"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

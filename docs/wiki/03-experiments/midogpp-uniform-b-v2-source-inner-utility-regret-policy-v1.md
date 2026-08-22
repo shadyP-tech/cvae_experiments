@@ -102,14 +102,25 @@ normalization or bootstrap. It forms 4,536 regret cells and 72 outer candidate
 summaries, then applies the frozen three-level pseudo-target / case / paired-
 seed bootstrap. Macro-F1 is descriptive only; no individual seed is selected.
 
-## Next evidence and archival caveat
+## Completed descriptive Stage-70 evidence and archival caveat
 
-The next permitted result is fresh, separately authorized, matched Stage-70
-target scoring of three already-frozen arms: equal-union, metadata max-tie, and
-this utility/regret policy. Candidate eligibility, generated-sample budget,
-GenerationLock streams, classifier contract, paired seed cells, and evaluation
-rows must match. Only that scoring can support routing-quality or downstream-
-utility claims.
+The separate descriptive Stage-70 comparison is complete. This utility/regret
+arm is exactly equivalent to equal-union in all 81 cells: both reach mean BACC
+`0.7749677917` and macro-F1 `0.7726084368`, and the prediction/probability
+hashes match exactly. This confirms that the frozen fallback contract was
+honored; it is not evidence for adaptive routing.
+
+The comparison validates `PASS`, seals all predictions before label opening,
+and uses target labels for scoring only. Its claim scope is nevertheless
+`descriptive_frozen_policy_comparison_on_previously_consumed_test`, with
+`fresh_confirmatory_status=BLOCKED_NO_UNCONSUMED_ELIGIBLE_SPLIT` and no policy
+promotion. See
+`docs/wiki/03-experiments/midogpp-uniform-b-v2-descriptive-frozen-policy-comparison-v1.md`.
+
+A routing-success claim would require one frozen hypothesis and a genuinely
+unconsumed whole-case/patient/slide-disjoint or external/new-center evaluation
+surface. Stage-90 post-hoc diagnostics cannot repair this evidence gap or feed
+back into the Stage-60 policy.
 
 The artifact bytes are hash-locked, but the runs record dirty revision
 `40221038ca714bf33fd21582857d21fa1db4e6f3` (`repository_dirty=true`). The

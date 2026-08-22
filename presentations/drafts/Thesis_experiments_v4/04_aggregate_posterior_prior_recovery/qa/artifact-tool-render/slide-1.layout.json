@@ -1,0 +1,436 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/5yei0t",
+    "id": "5yei0t",
+    "slide": 1,
+    "layoutId": "90a03962-241d-461a-9d28-79049e31de91",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "9722d96b-ed10-492e-9004-07b2d525579e",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#FFFFFF",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Helvetica Neue"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "90a03962-241d-461a-9d28-79049e31de91",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "9722d96b-ed10-492e-9004-07b2d525579e",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "9722d96b-ed10-492e-9004-07b2d525579e",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ihkj6x0f",
+      "id": "1",
+      "name": "cover-eyebrow",
+      "bbox": [
+        42,
+        40,
+        760,
+        34
+      ],
+      "geometry": "rect",
+      "text": "STAGE 20 — PRIOR RECOVERY",
+      "textPreview": "STAGE 20 — PRIOR RECOVERY",
+      "resolvedFontSize": 18,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 18,
+        "typeface": "Helvetica Neue",
+        "color": "#2A9D6F",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "STAGE 20 — PRIOR RECOVERY"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "STAGE 20 — PRIOR RECOVERY",
+          "resolvedTextStyle": {
+            "fontSize": 18,
+            "typeface": "Helvetica Neue",
+            "color": "#2A9D6F",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "STAGE 20 — PRIOR RECOVERY",
+              "fontSize": 18,
+              "typeface": "Helvetica Neue",
+              "color": "#2A9D6F",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/5kb2hsz6",
+      "id": "2",
+      "name": "cover-accent",
+      "bbox": [
+        42,
+        112,
+        10,
+        326
+      ],
+      "geometry": "rect",
+      "fillColor": "#2A9D6F",
+      "lineWidth": 0
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/4j2187il",
+      "id": "3",
+      "name": "cover-title",
+      "bbox": [
+        76,
+        108,
+        1080,
+        244
+      ],
+      "geometry": "rect",
+      "text": "A source-only aggregate prior nearly reaches posterior sampling",
+      "textPreview": "A source-only aggregate prior nearly reaches posterior sampling",
+      "resolvedFontSize": 56,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 56,
+        "typeface": "Helvetica Neue",
+        "color": "#000000",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "A source-only aggregate prior nearly"
+          },
+          {
+            "index": 2,
+            "text": "reaches posterior sampling"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "A source-only aggregate prior nearly reaches posterior sampling",
+          "resolvedTextStyle": {
+            "fontSize": 56,
+            "typeface": "Helvetica Neue",
+            "color": "#000000",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "A source-only aggregate prior nearly reaches posterior sampling",
+              "fontSize": 56,
+              "typeface": "Helvetica Neue",
+              "color": "#000000",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/rmdkj2hw",
+      "id": "4",
+      "name": "cover-subtitle",
+      "bbox": [
+        76,
+        376,
+        960,
+        90
+      ],
+      "geometry": "rect",
+      "text": "Recovering deployable CVAE utility before expert-bank promotion",
+      "textPreview": "Recovering deployable CVAE utility before expert-bank promotion",
+      "resolvedFontSize": 26,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 26,
+        "typeface": "Helvetica Neue",
+        "color": "#5B6472",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Recovering deployable CVAE utility before expert-bank promotion"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Recovering deployable CVAE utility before expert-bank promotion",
+          "resolvedTextStyle": {
+            "fontSize": 26,
+            "typeface": "Helvetica Neue",
+            "color": "#5B6472"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Recovering deployable CVAE utility before expert-bank promotion",
+              "fontSize": 26,
+              "typeface": "Helvetica Neue",
+              "color": "#5B6472"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ql4jax0r",
+      "id": "5",
+      "name": "cover-status-panel",
+      "bbox": [
+        76,
+        516,
+        1120,
+        92
+      ],
+      "geometry": "rect",
+      "fillColor": "#EDEDED",
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/d8v2lcz2",
+      "id": "6",
+      "name": "cover-status",
+      "bbox": [
+        102,
+        538,
+        1070,
+        50
+      ],
+      "geometry": "rect",
+      "text": "Complete and validated • source-inner mechanism evidence",
+      "textPreview": "Complete and validated • source-inner mechanism evidence",
+      "resolvedFontSize": 22,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 22,
+        "typeface": "Helvetica Neue",
+        "color": "#2A9D6F",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Complete and validated • source-inner mechanism evidence"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Complete and validated • source-inner mechanism evidence",
+          "resolvedTextStyle": {
+            "fontSize": 22,
+            "typeface": "Helvetica Neue",
+            "color": "#2A9D6F",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Complete and validated • source-inner mechanism evidence",
+              "fontSize": 22,
+              "typeface": "Helvetica Neue",
+              "color": "#2A9D6F",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/s7m1c7ih",
+      "id": "7",
+      "name": "source-footer",
+      "bbox": [
+        42,
+        682,
+        1090,
+        22
+      ],
+      "geometry": "rect",
+      "text": "Source: Uniform-B aggregate-prior union v2 study",
+      "textPreview": "Source: Uniform-B aggregate-prior union v2 study",
+      "resolvedFontSize": 10,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 10,
+        "typeface": "Helvetica Neue",
+        "color": "#5B6472",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Source: Uniform-B aggregate-prior union v2 study"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Source: Uniform-B aggregate-prior union v2 study",
+          "resolvedTextStyle": {
+            "fontSize": 10,
+            "typeface": "Helvetica Neue",
+            "color": "#5B6472"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Source: Uniform-B aggregate-prior union v2 study",
+              "fontSize": 10,
+              "typeface": "Helvetica Neue",
+              "color": "#5B6472"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

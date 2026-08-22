@@ -1,0 +1,4 @@
+policy,authorized_case_policies,primary_bacc,delta_vs_p,claim_role
+Projected observed-max,0,0.807316779,0.000000000,primary
+Raw observed-max,0,0.807316779,0.000000000,control
+Projected no-envelope,11,,,sensitivity

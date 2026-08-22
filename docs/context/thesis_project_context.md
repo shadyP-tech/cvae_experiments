@@ -1,6 +1,6 @@
 # Thesis Project Context
 
-Last updated: 2026-08-05
+Last updated: 2026-08-22
 
 This file is the stable context anchor for the thesis project. It should define
 the durable protocol vocabulary, evidence categories, and claim boundaries.
@@ -51,10 +51,14 @@ non-selecting source-inner policy-training input; its per-query best candidate
 is an oracle reference only for regret calculation. The policy may select one
 source only under its predeclared uncertainty gate and otherwise reuses the
 exact frozen equal-union control. These are generation, proxy, and
-policy-contract results only; they establish no routing-quality or downstream-
-utility result. Stage 70 remains planned pending separately authorized fresh
-target evaluation and matched scoring. Stage 90 contains non-deployable
-diagnostics and rejected historical MIDOG++ lineages.
+policy-contract results only. Stage 70 now contains a completed, validated
+comparison of the frozen equal-union, metadata max-tie, and utility/regret arms
+on a previously consumed test surface. That artifact establishes descriptive
+downstream utility and a negative result for the tested metadata policy, but it
+does not establish fresh routing superiority, promote a policy, or support
+deployment or new-center generalization. Stage 90 contains non-deployable
+terminal diagnostics, failed validation roots, and rejected historical
+MIDOG++ lineages; none may feed a numbered stage or fresh claim.
 
 BreakHis, Camelyon17, and generic historical material is isolated under
 `artifacts/cross_dataset_archive/` and is outside the active MIDOG++ registry.

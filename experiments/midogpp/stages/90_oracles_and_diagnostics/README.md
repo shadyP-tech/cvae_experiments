@@ -1274,13 +1274,25 @@ may not feed another experiment, stage, model, expert, policy, or deployment.
 
 ## Route-scoped center-balanced posterior-utility prefix diagnostic
 
-`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router.v1`
-is a new terminal-only method-development sibling motivated by the completed
-PCSI-RACR v2 bottleneck analysis. Prior consumed-test findings informed the
-method design, so this run cannot be fresh confirmation. It independently
-recomputes the 810 physical probability cells from six experiment-fenced
-original inputs and cannot read any v2 output, route, model, amendment, hash,
-probability surface, checkpoint, or scratch state.
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router.v2`
+was the separately authorized canonical-row-order mechanical repair of the
+terminal-only v1 method. It is now permanently `FAILED` and non-runnable. V1
+opened terminal labels before its final validator rejected source-store
+posterior/model row order and is quarantined. V2 used fresh fenced inputs and
+recomputed all 81 prediction tasks and 810 physical classifier cells, but it
+failed preterminally in
+`ROUTE_ENDPOINTS_436_POSTERIORS_AND_CANDIDATE_SEAL` with
+`CBPUPR endpoint worker plan lineage drifted.`
+
+The v2 failure is a hash-scope contract mismatch. Each outer plan carries the
+global nine-center `PhysicalProbabilitySurface` hash, whereas its worker-side
+validator compared that value with a per-center `CenterProbabilitySurface`
+hash. V2 stopped before the candidate seal and before terminal access. Its
+terminal-access journal count is zero; no terminal intent, opened receipt,
+terminal-evaluation labels, terminal metrics, or diagnostic result exists.
+Nevertheless, its launched one-shot identity and amendment are exhausted and
+its partial output and scratch cannot be recovered, resumed, repaired in place,
+or consumed by a successor.
 
 For every target route `(H,c)` and pseudo route `(H,J,d)`, the held case is
 excluded from its own posterior and candidate policy. Analytic posterior utility
@@ -1318,26 +1330,32 @@ noninterference remain hard checks. Regardless of outcome, every result remains
 `POST_HOC_CONSUMED_TEST_SENSITIVITY` and
 `TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE` and cannot feed another experiment.
 
-Bundle validation independently rebuilds the six-input physical origin,
-fingerprints, target and pseudo endpoint probabilities, posterior eta outputs,
-candidate utilities, donor-label replays, calibrations, transport diagnostics,
-and terminal metrics. To keep the workstation validation pass bounded, it does
-not refit the 3,488 endpoint or 436 posterior optimizers: their complete fitted
-DTOs are persisted and content sealed, and optimizer-fit correctness is the
-explicit trust boundary. Two fresh validation processes replay every fitted DTO
-output and all downstream scientific semantics with zero optimizer refits.
-The registered config contract hash is `278ca0ec77747a72`; the frozen protocol
-hash is
-`dc92f288cb4b0fb28e84ee0bbbc01476279600a71e4baad54b8c31ea808bc933`.
+The v2 design required an exact closed-world preterminal bundle, parent plus
+two-fresh-process agreement before terminal labels, two final fresh-process
+validators, a byte-sealed source tree, and an irreversible terminal-access
+journal. Those safeguards worked as intended: the production mismatch failed
+closed before the terminal journal opened. Their presence does not convert the
+partial v2 root into evidence.
 
-Run the registered experiment from a synchronized, clean workstation checkout:
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router.v3`
+is the explicitly authorized one-shot mechanical successor. The code-level repair
+adds an explicit global `physical_surface_hash` to the outer-endpoint job,
+round-trips it through the spawn payload, validates plan lineage against that
+global hash, and retains the separate per-center surface check. It changes no
+scientific route, candidate, calibration, prefix, tie, or exact-P fallback
+rule.
 
-```bash
-cd /home/stud/spark/cvae_experiments
-export PYTHONPATH="$PWD/src"
-/home/stud/spark/.venvs/cvae-breakhis/bin/python -m midogpp_thesis workspace run \
-  midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router.v1
-```
+V3 has a distinct canonical config, four direct-original v3 aliases, a
+single-consumer ledger amendment, source/config hashes, output/scratch identity,
+and v3-only workspace runner. The authorization is single use: launch only from
+an absent v3 output and scratch root, never with v1/v2 outputs, checkpoints,
+arrays, surfaces, capability history, amendments, or recovery state. No v3
+result exists until that workstation run completes and validates.
 
-The runner rejects existing or partial state and does not support cross-run
-recovery; launch only into the resolver-provided fresh output directory.
+V1 and v2 remain failed execution provenance only; v3 is authorized but not yet
+run and therefore is not evidence. Regardless of its eventual outcome, the full MIDOG++ test dataset is
+already consumed, so the maximum claim stays
+`POST_HOC_CONSUMED_TEST_SENSITIVITY`, `fresh_evidence=false`, and
+`TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`. No version can authorize routing
+success, model or expert updates, promotion, deployment, a numbered-stage feed,
+another experiment, thesis evidence, or a generic consumer.

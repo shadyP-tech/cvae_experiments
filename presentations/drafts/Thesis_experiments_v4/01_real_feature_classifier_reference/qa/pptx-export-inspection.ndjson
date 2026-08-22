@@ -1,0 +1,69 @@
+{"kind":"deck","id":"pr/rfwske","name":"Deck"}
+{"kind":"layout","layoutId":"66415aaa-c0fe-4534-954d-2403b48850ec","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"69f9bbef-4288-4419-8afd-2f1c9a0c1db7","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/xqwi7i","slide":1,"title":"STAGE 10 — REAL-FEATURE REFERENCE","textShapes":5}
+{"kind":"textbox","id":"sh/rilk7upc","slide":1,"name":"cover-eyebrow","text":"STAGE 10 — REAL-FEATURE REFERENCE","textPreview":"STAGE 10 — REAL-FEATURE REFERENCE","textChars":33,"textLines":1,"bbox":[42,40,760,34]}
+{"kind":"shape","id":"sh/cjulgfqx","slide":1,"name":"cover-accent","bbox":[42,112,10,326]}
+{"kind":"textbox","id":"sh/dk329k7i","slide":1,"name":"cover-title","text":"Source-inner tuning establishes a credible Virchow2 denominator","textPreview":"Source-inner tuning establishes a credible Virchow2 denominator","textChars":63,"textLines":1,"bbox":[76,108,1080,244]}
+{"kind":"textbox","id":"sh/2dsja58f","slide":1,"name":"cover-subtitle","text":"MIDOG++ held-out-center transfer before any CVAE or routing decision","textPreview":"MIDOG++ held-out-center transfer before any CVAE or routing decision","textChars":68,"textLines":1,"bbox":[76,376,960,90]}
+{"kind":"shape","id":"sh/3e1k3ap0","slide":1,"name":"cover-status-panel","bbox":[76,516,1120,92]}
+{"kind":"textbox","id":"sh/4falcfql","slide":1,"name":"cover-status","text":"Validated • real_feature_transfer_only • target labels used for scoring only","textPreview":"Validated • real_feature_transfer_only • target labels used for scoring only","textChars":76,"textLines":1,"bbox":[102,538,1070,50]}
+{"kind":"textbox","id":"sh/pgj25k76","slide":1,"name":"source-footer","text":"Source: Stage-10 validated reference • BACC 0.740312","textPreview":"Source: Stage-10 validated reference • BACC 0.740312","textChars":52,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/xqwi7i","slide":1,"text":"[Sources]\n- docs/wiki/03-experiments/midogpp-real-feature-source-inner-classifier-reference.md\n- MIDOG++: https://www.nature.com/articles/s41597-023-02327-4\n- Virchow2: https://arxiv.org/html/2408.00738v2\n[/Sources]"}
+{"kind":"slide","id":"sl/i08pmd","slide":2,"title":"The reference isolates classifier choice from generation","textShapes":18}
+{"kind":"textbox","id":"sh/qhovihoz","slide":2,"name":"slide-2-title","text":"The reference isolates classifier choice from generation","textPreview":"The reference isolates classifier choice from generation","textChars":56,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/d4fudwna","slide":2,"name":"slide-2-number","text":"2","textPreview":"2","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/c36dkr65","slide":2,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/z6hcfm5g","slide":2,"name":"question-label","text":"RESEARCH QUESTION","textPreview":"RESEARCH QUESTION","textChars":17,"textLines":1,"bbox":[42,154,420,30]}
+{"kind":"textbox","id":"sh/y58vm1ov","slide":2,"name":"question","text":"Can source-inner model selection improve real-feature transfer without target-label leakage?","textPreview":"Can source-inner model selection improve real-feature transfer without target-label leakage?","textChars":92,"textLines":1,"bbox":[42,202,490,290]}
+{"kind":"textbox","id":"sh/l8zuhwnm","slide":2,"name":"protocol-note","text":"Nine eligible centers; center 4 quarantined; one classifier seed.","textPreview":"Nine eligible centers; center 4 quarantined; one classifier seed.","textChars":65,"textLines":1,"bbox":[42,526,490,116]}
+{"kind":"shape","id":"sh/07qdor61","slide":2,"name":"column-rule","bbox":[585,146,1.5,506]}
+{"kind":"textbox","id":"sh/fadc325c","slide":2,"name":"step-num-0","text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[628,150,42,34]}
+{"kind":"textbox","id":"sh/e94baxor","slide":2,"name":"step-label-0","text":"Hold out one center","textPreview":"Hold out one center","textChars":19,"textLines":1,"bbox":[688,148,500,36]}
+{"kind":"textbox","id":"sh/czadwjqh","slide":2,"name":"step-text-0","text":"Fit and select only on the other eight eligible centers.","textPreview":"Fit and select only on the other eight eligible centers.","textChars":56,"textLines":1,"bbox":[688,188,500,66]}
+{"kind":"shape","id":"sh/d0je5or2","slide":2,"name":"step-rule-0","bbox":[628,261,560,1]}
+{"kind":"textbox","id":"sh/qdsvu98r","slide":2,"name":"step-num-1","text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[628,274,42,34]}
+{"kind":"textbox","id":"sh/re1w3e9c","slide":2,"name":"step-label-1","text":"Tune source-inner","textPreview":"Tune source-inner","textChars":17,"textLines":1,"bbox":[688,272,500,36]}
+{"kind":"textbox","id":"sh/03ud0jqt","slide":2,"name":"step-text-1","text":"Search C, class weighting, and iteration budget under a frozen rule.","textPreview":"Search C, class weighting, and iteration budget under a frozen rule.","textChars":68,"textLines":1,"bbox":[688,312,500,66]}
+{"kind":"shape","id":"sh/143e9o7e","slide":2,"name":"step-rule-1","bbox":[628,385,560,1]}
+{"kind":"textbox","id":"sh/e1cvyt8n","slide":2,"name":"step-num-2","text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[628,398,42,34]}
+{"kind":"textbox","id":"sh/z2lw7ep8","slide":2,"name":"step-label-2","text":"Freeze threshold","textPreview":"Freeze threshold","textChars":16,"textLines":1,"bbox":[688,396,500,36]}
+{"kind":"textbox","id":"sh/g7qdozq9","slide":2,"name":"step-text-2","text":"The one-SE rule returns 0.5 in all nine folds.","textPreview":"The one-SE rule returns 0.5 in all nine folds.","textChars":46,"textLines":1,"bbox":[688,436,500,66]}
+{"kind":"shape","id":"sh/h8zex4ru","slide":2,"name":"step-rule-2","bbox":[628,509,560,1]}
+{"kind":"textbox","id":"sh/h4ru1gjy","slide":2,"name":"step-num-3","text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[628,522,42,34]}
+{"kind":"textbox","id":"sh/w3itsbid","slide":2,"name":"step-label-3","text":"Score target last","textPreview":"Score target last","textChars":17,"textLines":1,"bbox":[688,520,500,36]}
+{"kind":"textbox","id":"sh/v29czq1s","slide":2,"name":"step-text-3","text":"Target labels enter only after classifier and threshold are fixed.","textPreview":"Target labels enter only after classifier and threshold are fixed.","textChars":66,"textLines":1,"bbox":[688,560,500,66]}
+{"kind":"textbox","id":"sh/a10bql07","slide":2,"name":"source-footer","text":"Source: Stage-10 validated reference • BACC 0.740312","textPreview":"Source: Stage-10 validated reference • BACC 0.740312","textChars":52,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/i08pmd","slide":2,"text":"[Sources]\n- docs/wiki/03-experiments/midogpp-real-feature-source-inner-classifier-reference.md\n- MIDOG++: https://www.nature.com/articles/s41597-023-02327-4\n- Virchow2: https://arxiv.org/html/2408.00738v2\n[/Sources]"}
+{"kind":"slide","id":"sl/5zb7n6","slide":3,"title":"Classifier selection raises BACC by 7.45 points","textShapes":11}
+{"kind":"textbox","id":"sh/e5k7uhwj","slide":3,"name":"slide-3-title","text":"Classifier selection raises BACC by 7.45 points","textPreview":"Classifier selection raises BACC by 7.45 points","textChars":47,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/18b65cvu","slide":3,"name":"slide-3-number","text":"3","textPreview":"3","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/072pw7e9","slide":3,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/qh0nqxw7","slide":3,"name":"chart-caption","text":"Equal-center mean on real Virchow2 features.","textPreview":"Equal-center mean on real Virchow2 features.","textChars":44,"textLines":1,"bbox":[52,642,750,28]}
+{"kind":"textbox","id":"sh/d4r61cvy","slide":3,"name":"metric-label","text":"WHAT CHANGED","textPreview":"WHAT CHANGED","textChars":12,"textLines":1,"bbox":[862,155,330,30]}
+{"kind":"textbox","id":"sh/c3ips7ed","slide":3,"name":"metric-value-0","text":"+0.0745","textPreview":"+0.0745","textChars":7,"textLines":1,"bbox":[862,208,330,52]}
+{"kind":"textbox","id":"sh/vedobmdc","slide":3,"name":"metric-text-0","text":"Mean BACC improvement","textPreview":"Mean BACC improvement","textChars":21,"textLines":1,"bbox":[862,262,330,58]}
+{"kind":"shape","id":"sh/ad4721wr","slide":3,"name":"metric-rule-1","bbox":[862,332,330,1]}
+{"kind":"textbox","id":"sh/wn6d4bm5","slide":3,"name":"metric-value-1","text":"9 / 9","textPreview":"9 / 9","textChars":5,"textLines":1,"bbox":[862,350,330,52]}
+{"kind":"textbox","id":"sh/xofexgna","slide":3,"name":"metric-text-1","text":"Held-out centers improved","textPreview":"Held-out centers improved","textChars":25,"textLines":1,"bbox":[862,404,330,58]}
+{"kind":"shape","id":"sh/alov2l4z","slide":3,"name":"metric-rule-2","bbox":[862,474,330,1]}
+{"kind":"textbox","id":"sh/vmxwv65k","slide":3,"name":"metric-value-2","text":"+0.0000","textPreview":"+0.0000","textChars":7,"textLines":1,"bbox":[862,492,330,52]}
+{"kind":"textbox","id":"sh/8zmd0bmt","slide":3,"name":"metric-text-2","text":"Additional gain from threshold tuning","textPreview":"Additional gain from threshold tuning","textChars":37,"textLines":1,"bbox":[862,546,330,58]}
+{"kind":"textbox","id":"sh/90futgne","slide":3,"name":"source-footer","text":"Source: Stage-10 validated reference • BACC 0.740312","textPreview":"Source: Stage-10 validated reference • BACC 0.740312","textChars":52,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"chart","id":"ch/ji1w3a18","slide":3,"name":"primary-result-chart","chartType":"bar","bbox":[42,150,770,490]}
+{"kind":"notes","id":"nt/5zb7n6","slide":3,"text":"[Sources]\n- docs/wiki/03-experiments/midogpp-real-feature-source-inner-classifier-reference.md\n- MIDOG++: https://www.nature.com/articles/s41597-023-02327-4\n- Virchow2: https://arxiv.org/html/2408.00738v2\n[/Sources]"}
+{"kind":"slide","id":"sl/pw6nnv","slide":4,"title":"Later losses are not explained by an empty representation","textShapes":10}
+{"kind":"textbox","id":"sh/x8nq5sfu","slide":4,"name":"slide-4-title","text":"Later losses are not explained by an empty representation","textPreview":"Later losses are not explained by an empty representation","textChars":57,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/a5c7uxgj","slide":4,"name":"slide-4-number","text":"4","textPreview":"4","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/b6l832x4","slide":4,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/kve907yl","slide":4,"name":"supported-label","text":"SUPPORTED INTERPRETATION","textPreview":"SUPPORTED INTERPRETATION","textChars":24,"textLines":1,"bbox":[42,158,520,30]}
+{"kind":"textbox","id":"sh/lwnq9cf6","slide":4,"name":"supported-text","text":"Real Virchow2 features carry meaningful cross-center task signal, and source-inner classifier selection materially strengthens the denominator.","textPreview":"Real Virchow2 features carry meaningful cross-center task signal, and source-inner classifier selection materially strengthens the denomi...","textChars":143,"textLines":1,"bbox":[42,205,530,334]}
+{"kind":"textbox","id":"sh/y9wryxgf","slide":4,"name":"objective-text","text":"Objective 1 achieved for the reference surface; prerequisite for objective 2.","textPreview":"Objective 1 achieved for the reference surface; prerequisite for objective 2.","textChars":77,"textLines":1,"bbox":[42,566,530,80]}
+{"kind":"shape","id":"sh/ju5872x0","slide":4,"name":"conclusion-rule","bbox":[612,150,1.5,500]}
+{"kind":"textbox","id":"sh/0zaponyh","slide":4,"name":"boundary-label","text":"CLAIM BOUNDARY","textPreview":"CLAIM BOUNDARY","textChars":14,"textLines":1,"bbox":[654,158,540,30]}
+{"kind":"textbox","id":"sh/103qx8f2","slide":4,"name":"boundary-text","text":"This is not CVAE preservation, synthetic utility, compatibility ranking, or routing evidence. One classifier seed limits stability claims.","textPreview":"This is not CVAE preservation, synthetic utility, compatibility ranking, or routing evidence. One classifier seed limits stability claims.","textChars":138,"textLines":1,"bbox":[654,205,540,205]}
+{"kind":"shape","id":"sh/dc7ut4v6","slide":4,"name":"next-panel","bbox":[654,458,540,164]}
+{"kind":"textbox","id":"sh/cbed0zul","slide":4,"name":"next-label","text":"NEXT DECISION","textPreview":"NEXT DECISION","textChars":13,"textLines":1,"bbox":[680,482,490,28]}
+{"kind":"textbox","id":"sh/ra5crud0","slide":4,"name":"next-text","text":"Measure CVAE outputs against this frozen reference and keep all target selection closed.","textPreview":"Measure CVAE outputs against this frozen reference and keep all target selection closed.","textChars":88,"textLines":1,"bbox":[680,522,490,76]}
+{"kind":"textbox","id":"sh/q9wvypcv","slide":4,"name":"source-footer","text":"Source: Stage-10 validated reference • BACC 0.740312","textPreview":"Source: Stage-10 validated reference • BACC 0.740312","textChars":52,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/pw6nnv","slide":4,"text":"[Sources]\n- docs/wiki/03-experiments/midogpp-real-feature-source-inner-classifier-reference.md\n- MIDOG++: https://www.nature.com/articles/s41597-023-02327-4\n- Virchow2: https://arxiv.org/html/2408.00738v2\n[/Sources]"}

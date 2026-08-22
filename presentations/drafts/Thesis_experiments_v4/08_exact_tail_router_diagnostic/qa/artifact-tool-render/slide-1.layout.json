@@ -1,0 +1,436 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/rnsvqh",
+    "id": "rnsvqh",
+    "slide": 1,
+    "layoutId": "88a234d3-2242-4d0f-9b09-f62cf68dfe32",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "223fbe71-4318-4133-82e1-a0d18957509f",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#FFFFFF",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Helvetica Neue"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "88a234d3-2242-4d0f-9b09-f62cf68dfe32",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "223fbe71-4318-4133-82e1-a0d18957509f",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "223fbe71-4318-4133-82e1-a0d18957509f",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/6dgzedkf",
+      "id": "1",
+      "name": "cover-eyebrow",
+      "bbox": [
+        42,
+        40,
+        760,
+        34
+      ],
+      "geometry": "rect",
+      "text": "STAGE 90 — EXACT-TAIL DIAGNOSTIC",
+      "textPreview": "STAGE 90 — EXACT-TAIL DIAGNOSTIC",
+      "resolvedFontSize": 18,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 18,
+        "typeface": "Helvetica Neue",
+        "color": "#D68A00",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "STAGE 90 — EXACT-TAIL DIAGNOSTIC"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "STAGE 90 — EXACT-TAIL DIAGNOSTIC",
+          "resolvedTextStyle": {
+            "fontSize": 18,
+            "typeface": "Helvetica Neue",
+            "color": "#D68A00",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "STAGE 90 — EXACT-TAIL DIAGNOSTIC",
+              "fontSize": 18,
+              "typeface": "Helvetica Neue",
+              "color": "#D68A00",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/tg7i9sj6",
+      "id": "2",
+      "name": "cover-accent",
+      "bbox": [
+        42,
+        112,
+        10,
+        326
+      ],
+      "geometry": "rect",
+      "fillColor": "#D68A00",
+      "lineWidth": 0
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/sfyhgn2l",
+      "id": "3",
+      "name": "cover-title",
+      "bbox": [
+        76,
+        108,
+        1080,
+        244
+      ],
+      "geometry": "rect",
+      "text": "Oracle headroom exists, but the proxy does not rank actions",
+      "textPreview": "Oracle headroom exists, but the proxy does not rank actions",
+      "resolvedFontSize": 56,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 56,
+        "typeface": "Helvetica Neue",
+        "color": "#000000",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Oracle headroom exists, but the proxy"
+          },
+          {
+            "index": 2,
+            "text": "does not rank actions"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Oracle headroom exists, but the proxy does not rank actions",
+          "resolvedTextStyle": {
+            "fontSize": 56,
+            "typeface": "Helvetica Neue",
+            "color": "#000000",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Oracle headroom exists, but the proxy does not rank actions",
+              "fontSize": 56,
+              "typeface": "Helvetica Neue",
+              "color": "#000000",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/jap03y1o",
+      "id": "4",
+      "name": "cover-subtitle",
+      "bbox": [
+        76,
+        376,
+        960,
+        90
+      ],
+      "geometry": "rect",
+      "text": "A terminal consumed-validation test of utility-aligned routing",
+      "textPreview": "A terminal consumed-validation test of utility-aligned routing",
+      "resolvedFontSize": 26,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 26,
+        "typeface": "Helvetica Neue",
+        "color": "#5B6472",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "A terminal consumed-validation test of utility-aligned routing"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "A terminal consumed-validation test of utility-aligned routing",
+          "resolvedTextStyle": {
+            "fontSize": 26,
+            "typeface": "Helvetica Neue",
+            "color": "#5B6472"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "A terminal consumed-validation test of utility-aligned routing",
+              "fontSize": 26,
+              "typeface": "Helvetica Neue",
+              "color": "#5B6472"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/i9wzadkj",
+      "id": "5",
+      "name": "cover-status-panel",
+      "bbox": [
+        76,
+        516,
+        1120,
+        92
+      ],
+      "geometry": "rect",
+      "fillColor": "#EDEDED",
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/5c7i58ju",
+      "id": "6",
+      "name": "cover-status",
+      "bbox": [
+        102,
+        538,
+        1070,
+        50
+      ],
+      "geometry": "rect",
+      "text": "Complete and validated • consumed_data_diagnostic_only",
+      "textPreview": "Complete and validated • consumed_data_diagnostic_only",
+      "resolvedFontSize": 22,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 22,
+        "typeface": "Helvetica Neue",
+        "color": "#D68A00",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Complete and validated • consumed_data_diagnostic_only"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Complete and validated • consumed_data_diagnostic_only",
+          "resolvedTextStyle": {
+            "fontSize": 22,
+            "typeface": "Helvetica Neue",
+            "color": "#D68A00",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Complete and validated • consumed_data_diagnostic_only",
+              "fontSize": 22,
+              "typeface": "Helvetica Neue",
+              "color": "#D68A00",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/4byhc329",
+      "id": "7",
+      "name": "source-footer",
+      "bbox": [
+        42,
+        682,
+        1090,
+        22
+      ],
+      "geometry": "rect",
+      "text": "Source: consumed-validation exact-tail router v1",
+      "textPreview": "Source: consumed-validation exact-tail router v1",
+      "resolvedFontSize": 10,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 10,
+        "typeface": "Helvetica Neue",
+        "color": "#5B6472",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Source: consumed-validation exact-tail router v1"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Source: consumed-validation exact-tail router v1",
+          "resolvedTextStyle": {
+            "fontSize": 10,
+            "typeface": "Helvetica Neue",
+            "color": "#5B6472"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Source: consumed-validation exact-tail router v1",
+              "fontSize": 10,
+              "typeface": "Helvetica Neue",
+              "color": "#5B6472"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

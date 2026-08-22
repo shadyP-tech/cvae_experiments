@@ -1,0 +1,66 @@
+{"kind":"slide","id":"sl/powld7","slide":1,"title":"STAGE 30 — EXPERT-BANK PROMOTION","textShapes":5}
+{"kind":"textbox","id":"sh/3a5s3el4","slide":1,"name":"cover-eyebrow","text":"STAGE 30 — EXPERT-BANK PROMOTION","textPreview":"STAGE 30 — EXPERT-BANK PROMOTION","textChars":32,"textLines":1,"bbox":[42,40,760,34]}
+{"kind":"shape","id":"sh/4betwzm9","slide":1,"name":"cover-accent","bbox":[42,112,10,326]}
+{"kind":"textbox","id":"sh/pcna543u","slide":1,"name":"cover-title","text":"All 27 independent CVAE experts pass the routing-bank gates","textPreview":"All 27 independent CVAE experts pass the routing-bank gates","textChars":59,"textLines":1,"bbox":[76,108,1080,244]}
+{"kind":"textbox","id":"sh/u5crqp47","slide":1,"name":"cover-subtitle","text":"A separate promotion firewall turns mechanism evidence into an authorized action space","textPreview":"A separate promotion firewall turns mechanism evidence into an authorized action space","textChars":86,"textLines":1,"bbox":[76,376,960,90]}
+{"kind":"shape","id":"sh/f6lszuls","slide":1,"name":"cover-status-panel","bbox":[76,516,1120,92]}
+{"kind":"textbox","id":"sh/g7etszmd","slide":1,"name":"cover-status","text":"ROUTING_AUTHORIZED • expert_bank_construction_only","textPreview":"ROUTING_AUTHORIZED • expert_bank_construction_only","textChars":50,"textLines":1,"bbox":[102,538,1070,50]}
+{"kind":"textbox","id":"sh/h8na143y","slide":1,"name":"source-footer","text":"Source: Stage-30 routing-authorized expert bank","textPreview":"Source: Stage-30 routing-authorized expert bank","textChars":47,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/powld7","slide":1,"text":"[Sources]\n- docs/wiki/03-experiments/midogpp-uniform-b-v2-routing-authorized-expert-bank-v1.md\n- artifacts/midogpp/30_expert_bank/uniform_b_v2_routing_authorized_expert_bank_v1/\n[/Sources]"}
+{"kind":"slide","id":"sl/5e17pu","slide":2,"title":"Promotion validates the whole bank without expert selection","textShapes":18}
+{"kind":"textbox","id":"sh/lkjaxgf2","slide":2,"name":"slide-2-title","text":"Promotion validates the whole bank without expert selection","textPreview":"Promotion validates the whole bank without expert selection","textChars":59,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/yxsr2lwb","slide":2,"name":"slide-2-number","text":"2","textPreview":"2","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/jy1sv6xw","slide":2,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/8na98ved","slide":2,"name":"question-label","text":"RESEARCH QUESTION","textPreview":"RESEARCH QUESTION","textChars":17,"textLines":1,"bbox":[42,154,420,30]}
+{"kind":"textbox","id":"sh/to3a10fy","slide":2,"name":"question","text":"Can all source/seed checkpoints enter routing without held-out expert or seed selection?","textPreview":"Can all source/seed checkpoints enter routing without held-out expert or seed selection?","textChars":88,"textLines":1,"bbox":[42,202,490,290]}
+{"kind":"textbox","id":"sh/6lsr6lwn","slide":2,"name":"protocol-note","text":"Nine centers × three training seeds; seeds remain replications, not actions.","textPreview":"Nine centers × three training seeds; seeds remain replications, not actions.","textChars":76,"textLines":1,"bbox":[42,526,490,116]}
+{"kind":"shape","id":"sh/7m1szqxs","slide":2,"name":"column-rule","bbox":[585,146,1.5,506]}
+{"kind":"textbox","id":"sh/orq9wre9","slide":2,"name":"step-num-0","text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[628,150,42,34]}
+{"kind":"textbox","id":"sh/9szqpwfu","slide":2,"name":"step-label-0","text":"Train independently","textPreview":"Train independently","textChars":19,"textLines":1,"bbox":[688,148,500,36]}
+{"kind":"textbox","id":"sh/5sz6tgjq","slide":2,"name":"step-text-0","text":"Nine source centers crossed with seeds 17, 42, and 101.","textPreview":"Nine source centers crossed with seeds 17, 42, and 101.","textChars":55,"textLines":1,"bbox":[688,188,500,66]}
+{"kind":"shape","id":"sh/4rq50b25","slide":2,"name":"step-rule-0","bbox":[628,261,560,1]}
+{"kind":"textbox","id":"sh/3qhorq10","slide":2,"name":"step-num-1","text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[628,274,42,34]}
+{"kind":"textbox","id":"sh/ip8nylkf","slide":2,"name":"step-label-1","text":"Attach source priors","textPreview":"Attach source priors","textChars":20,"textLines":1,"bbox":[688,272,500,36]}
+{"kind":"textbox","id":"sh/dgz6x0j2","slide":2,"name":"step-text-1","text":"Each checkpoint retains its local frame and aggregate-posterior state.","textPreview":"Each checkpoint retains its local frame and aggregate-posterior state.","textChars":70,"textLines":1,"bbox":[688,312,500,66]}
+{"kind":"shape","id":"sh/cfqp4v2h","slide":2,"name":"step-rule-1","bbox":[628,385,560,1]}
+{"kind":"textbox","id":"sh/rehovq1w","slide":2,"name":"step-num-2","text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[628,398,42,34]}
+{"kind":"textbox","id":"sh/qd8n2lkb","slide":2,"name":"step-label-2","text":"Audit identities","textPreview":"Audit identities","textChars":16,"textLines":1,"bbox":[688,396,500,36]}
+{"kind":"textbox","id":"sh/1kj610jy","slide":2,"name":"step-text-2","text":"Hashes, rows, convergence, and fallback counts are validated fail-closed.","textPreview":"Hashes, rows, convergence, and fallback counts are validated fail-closed.","textChars":73,"textLines":1,"bbox":[688,436,500,66]}
+{"kind":"shape","id":"sh/0japsf2d","slide":2,"name":"step-rule-2","bbox":[628,509,560,1]}
+{"kind":"textbox","id":"sh/kz2hk3u1","slide":2,"name":"step-num-3","text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[628,522,42,34]}
+{"kind":"textbox","id":"sh/l0bid8vm","slide":2,"name":"step-label-3","text":"Freeze equal union","textPreview":"Freeze equal union","textChars":18,"textLines":1,"bbox":[688,520,500,36]}
+{"kind":"textbox","id":"sh/yx0zidcv","slide":2,"name":"step-text-3","text":"The future control excludes H and allocates 128 samples per source/class.","textPreview":"The future control excludes H and allocates 128 samples per source/class.","textChars":73,"textLines":1,"bbox":[688,560,500,66]}
+{"kind":"textbox","id":"sh/jyt0bydg","slide":2,"name":"source-footer","text":"Source: Stage-30 routing-authorized expert bank","textPreview":"Source: Stage-30 routing-authorized expert bank","textChars":47,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/5e17pu","slide":2,"text":"[Sources]\n- docs/wiki/03-experiments/midogpp-uniform-b-v2-routing-authorized-expert-bank-v1.md\n- artifacts/midogpp/30_expert_bank/uniform_b_v2_routing_authorized_expert_bank_v1/\n[/Sources]"}
+{"kind":"slide","id":"sl/h4g5yy","slide":3,"title":"Every seed clears the stability floor","textShapes":11}
+{"kind":"textbox","id":"sh/cjytw3qx","slide":3,"name":"slide-3-title","text":"Every seed clears the stability floor","textPreview":"Every seed clears the stability floor","textChars":37,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/ripcnypc","slide":3,"name":"slide-3-number","text":"3","textPreview":"3","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/qhgbut8r","slide":3,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/4vetsjql","slide":3,"name":"chart-caption","text":"Training-seed means; all 27 checkpoints retained.","textPreview":"Training-seed means; all 27 checkpoints retained.","textChars":49,"textLines":1,"bbox":[52,642,750,28]}
+{"kind":"textbox","id":"sh/3u5cjepg","slide":3,"name":"metric-label","text":"WHAT CHANGED","textPreview":"WHAT CHANGED","textChars":12,"textLines":1,"bbox":[862,155,330,30]}
+{"kind":"textbox","id":"sh/2twbq98v","slide":3,"name":"metric-value-0","text":"27 / 27","textPreview":"27 / 27","textChars":7,"textLines":1,"bbox":[862,208,330,52]}
+{"kind":"textbox","id":"sh/hsnuh47a","slide":3,"name":"metric-text-0","text":"Checkpoint records promoted","textPreview":"Checkpoint records promoted","textChars":27,"textLines":1,"bbox":[862,262,330,58]}
+{"kind":"shape","id":"sh/gretojqp","slide":3,"name":"metric-rule-1","bbox":[862,332,330,1]}
+{"kind":"textbox","id":"sh/m9c365gr","slide":3,"name":"metric-value-1","text":"0","textPreview":"0","textChars":1,"textLines":1,"bbox":[862,350,330,52]}
+{"kind":"textbox","id":"sh/nal4zahc","slide":3,"name":"metric-text-1","text":"Overlap, convergence, and sampler-fallback failures","textPreview":"Overlap, convergence, and sampler-fallback failures","textChars":51,"textLines":1,"bbox":[862,404,330,58]}
+{"kind":"shape","id":"sh/obe58fyx","slide":3,"name":"metric-rule-2","bbox":[862,474,330,1]}
+{"kind":"textbox","id":"sh/9cnm1kzi","slide":3,"name":"metric-value-2","text":"8 sources","textPreview":"8 sources","textChars":9,"textLines":1,"bbox":[862,492,330,52]}
+{"kind":"textbox","id":"sh/elc325gv","slide":3,"name":"metric-text-2","text":"Per target fold in the frozen equal-union control","textPreview":"Per target fold in the frozen equal-union control","textChars":49,"textLines":1,"bbox":[862,546,330,58]}
+{"kind":"textbox","id":"sh/zml4vahg","slide":3,"name":"source-footer","text":"Source: Stage-30 routing-authorized expert bank","textPreview":"Source: Stage-30 routing-authorized expert bank","textChars":47,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"chart","id":"ch/pcr6lw3i","slide":3,"name":"primary-result-chart","chartType":"bar","bbox":[42,150,770,490]}
+{"kind":"notes","id":"nt/h4g5yy","slide":3,"text":"[Sources]\n- docs/wiki/03-experiments/midogpp-uniform-b-v2-routing-authorized-expert-bank-v1.md\n- artifacts/midogpp/30_expert_bank/uniform_b_v2_routing_authorized_expert_bank_v1/\n[/Sources]"}
+{"kind":"slide","id":"sl/9bovm7","slide":4,"title":"The expert action space is built; routing remains unproven","textShapes":10}
+{"kind":"textbox","id":"sh/gr2d4v61","slide":4,"name":"slide-4-title","text":"The expert action space is built; routing remains unproven","textPreview":"The expert action space is built; routing remains unproven","textChars":58,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/vqtwvq5g","slide":4,"name":"slide-4-number","text":"4","textPreview":"4","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/u5kv2lob","slide":4,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/t4bet0nq","slide":4,"name":"supported-label","text":"SUPPORTED INTERPRETATION","textPreview":"SUPPORTED INTERPRETATION","textChars":24,"textLines":1,"bbox":[42,158,520,30]}
+{"kind":"textbox","id":"sh/832d0v65","slide":4,"name":"supported-text","text":"Independent experts, sampler states, and provenance are complete enough to support controlled routing experiments.","textPreview":"Independent experts, sampler states, and provenance are complete enough to support controlled routing experiments.","textChars":114,"textLines":1,"bbox":[42,205,530,334]}
+{"kind":"textbox","id":"sh/729wrq5k","slide":4,"name":"objective-text","text":"Objective 4 is operationally achieved at the bank-construction level.","textPreview":"Objective 4 is operationally achieved at the bank-construction level.","textChars":69,"textLines":1,"bbox":[42,566,530,80]}
+{"kind":"shape","id":"sh/610vyloz","slide":4,"name":"conclusion-rule","bbox":[612,150,1.5,500]}
+{"kind":"textbox","id":"sh/d0ve5knu","slide":4,"name":"boundary-label","text":"CLAIM BOUNDARY","textPreview":"CLAIM BOUNDARY","textChars":14,"textLines":1,"bbox":[654,158,540,30]}
+{"kind":"textbox","id":"sh/szmxcfm9","slide":4,"name":"boundary-text","text":"Bank promotion does not show that any router succeeds. Consumed source-inner labels cannot choose an expert, seed, or policy.","textPreview":"Bank promotion does not show that any router succeeds. Consumed source-inner labels cannot choose an expert, seed, or policy.","textChars":125,"textLines":1,"bbox":[654,205,540,205]}
+{"kind":"shape","id":"sh/uxwjq18j","slide":4,"name":"next-panel","bbox":[654,458,540,164]}
+{"kind":"textbox","id":"sh/vy50z6p4","slide":4,"name":"next-label","text":"NEXT DECISION","textPreview":"NEXT DECISION","textChars":13,"textLines":1,"bbox":[680,482,490,28]}
+{"kind":"textbox","id":"sh/gze1srq9","slide":4,"name":"next-text","text":"Freeze generation and comparison policies before opening target evaluation labels.","textPreview":"Freeze generation and comparison policies before opening target evaluation labels.","textChars":82,"textLines":1,"bbox":[680,522,490,76]}
+{"kind":"textbox","id":"sh/h0n21w7u","slide":4,"name":"source-footer","text":"Source: Stage-30 routing-authorized expert bank","textPreview":"Source: Stage-30 routing-authorized expert bank","textChars":47,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/9bovm7","slide":4,"text":"[Sources]\n- docs/wiki/03-experiments/midogpp-uniform-b-v2-routing-authorized-expert-bank-v1.md\n- artifacts/midogpp/30_expert_bank/uniform_b_v2_routing_authorized_expert_bank_v1/\n[/Sources]"}

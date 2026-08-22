@@ -1,0 +1,69 @@
+{"kind":"deck","id":"pr/ec6yvl","name":"Deck"}
+{"kind":"layout","layoutId":"9722d96b-ed10-492e-9004-07b2d525579e","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"90a03962-241d-461a-9d28-79049e31de91","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/5yei0t","slide":1,"title":"STAGE 20 — PRIOR RECOVERY","textShapes":5}
+{"kind":"textbox","id":"sh/ihkj6x0f","slide":1,"name":"cover-eyebrow","text":"STAGE 20 — PRIOR RECOVERY","textPreview":"STAGE 20 — PRIOR RECOVERY","textChars":25,"textLines":1,"bbox":[42,40,760,34]}
+{"kind":"shape","id":"sh/5kb2hsz6","slide":1,"name":"cover-accent","bbox":[42,112,10,326]}
+{"kind":"textbox","id":"sh/4j2187il","slide":1,"name":"cover-title","text":"A source-only aggregate prior nearly reaches posterior sampling","textPreview":"A source-only aggregate prior nearly reaches posterior sampling","textChars":63,"textLines":1,"bbox":[76,108,1080,244]}
+{"kind":"textbox","id":"sh/rmdkj2hw","slide":1,"name":"cover-subtitle","text":"Recovering deployable CVAE utility before expert-bank promotion","textPreview":"Recovering deployable CVAE utility before expert-bank promotion","textChars":63,"textLines":1,"bbox":[76,376,960,90]}
+{"kind":"shape","id":"sh/ql4jax0r","slide":1,"name":"cover-status-panel","bbox":[76,516,1120,92]}
+{"kind":"textbox","id":"sh/d8v2lcz2","slide":1,"name":"cover-status","text":"Complete and validated • source-inner mechanism evidence","textPreview":"Complete and validated • source-inner mechanism evidence","textChars":56,"textLines":1,"bbox":[102,538,1070,50]}
+{"kind":"textbox","id":"sh/s7m1c7ih","slide":1,"name":"source-footer","text":"Source: Uniform-B aggregate-prior union v2 study","textPreview":"Source: Uniform-B aggregate-prior union v2 study","textChars":48,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/5yei0t","slide":1,"text":"[Sources]\n- docs/context/current_experimental_state.md\n- docs/wiki/03-experiments/midogpp-uniform-b-v2-routing-authorized-expert-bank-v1.md\n[/Sources]"}
+{"kind":"slide","id":"sl/y57bxy","slide":2,"title":"Prior recovery follows from the preservation diagnosis","textShapes":18}
+{"kind":"textbox","id":"sh/61cbq9g3","slide":2,"name":"slide-2-title","text":"Prior recovery follows from the preservation diagnosis","textPreview":"Prior recovery follows from the preservation diagnosis","textChars":54,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/d4nu14zu","slide":2,"name":"slide-2-number","text":"2","textPreview":"2","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/s3etszy9","slide":2,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/jelcvuhc","slide":2,"name":"question-label","text":"RESEARCH QUESTION","textPreview":"RESEARCH QUESTION","textChars":17,"textLines":1,"bbox":[42,154,420,30]}
+{"kind":"textbox","id":"sh/idcbmpgr","slide":2,"name":"question","text":"Can aggregate-posterior sampling close the standard-prior utility gap without target data?","textPreview":"Can aggregate-posterior sampling close the standard-prior utility gap without target data?","textChars":90,"textLines":1,"bbox":[42,202,490,290]}
+{"kind":"textbox","id":"sh/503ux4zi","slide":2,"name":"protocol-note","text":"Nested source-inner tasks; training seeds 17, 42, and 101.","textPreview":"Nested source-inner tasks; training seeds 17, 42, and 101.","textChars":58,"textLines":1,"bbox":[42,526,490,116]}
+{"kind":"shape","id":"sh/4zutozyx","slide":2,"name":"column-rule","bbox":[585,146,1.5,506]}
+{"kind":"textbox","id":"sh/napc7yxw","slide":2,"name":"step-num-0","text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[628,150,42,34]}
+{"kind":"textbox","id":"sh/29wbytgb","slide":2,"name":"step-label-0","text":"Keep experts independent","textPreview":"Keep experts independent","textChars":24,"textLines":1,"bbox":[688,148,500,36]}
+{"kind":"textbox","id":"sh/4fy5cba9","slide":2,"name":"step-text-0","text":"Each source model retains a source-local frame and sampler state.","textPreview":"Each source model retains a source-local frame and sampler state.","textChars":65,"textLines":1,"bbox":[688,188,500,66]}
+{"kind":"shape","id":"sh/pg7mlgbu","slide":2,"name":"step-rule-0","bbox":[628,261,560,1]}
+{"kind":"textbox","id":"sh/idwna1s3","slide":2,"name":"step-num-1","text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[628,274,42,34]}
+{"kind":"textbox","id":"sh/3e54j6to","slide":2,"name":"step-label-1","text":"Construct PS source-only","textPreview":"Construct PS source-only","textChars":24,"textLines":1,"bbox":[688,272,500,36]}
+{"kind":"textbox","id":"sh/gbel8bad","slide":2,"name":"step-text-1","text":"Class-conditional aggregate posterior uses only eligible source data.","textPreview":"Class-conditional aggregate posterior uses only eligible source data.","textChars":69,"textLines":1,"bbox":[688,312,500,66]}
+{"kind":"shape","id":"sh/hcnmhgby","slide":2,"name":"step-rule-1","bbox":[628,385,560,1]}
+{"kind":"textbox","id":"sh/upw361c7","slide":2,"name":"step-num-2","text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[628,398,42,34]}
+{"kind":"textbox","id":"sh/vq54f6ts","slide":2,"name":"step-label-2","text":"Compare matched arms","textPreview":"Compare matched arms","textChars":20,"textLines":1,"bbox":[688,396,500,36]}
+{"kind":"textbox","id":"sh/8nul4ru1","slide":2,"name":"step-text-2","text":"P0, PS, posterior mean, posterior sample, and PCA-only are scored together.","textPreview":"P0, PS, posterior mean, posterior sample, and PCA-only are scored together.","textChars":75,"textLines":1,"bbox":[688,436,500,66]}
+{"kind":"shape","id":"sh/tonmdwbm","slide":2,"name":"step-rule-2","bbox":[628,509,560,1]}
+{"kind":"textbox","id":"sh/94f2hs3a","slide":2,"name":"step-num-3","text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[628,522,42,34]}
+{"kind":"textbox","id":"sh/8jm18nm5","slide":2,"name":"step-label-3","text":"Promote separately","textPreview":"Promote separately","textChars":18,"textLines":1,"bbox":[688,520,500,36]}
+{"kind":"textbox","id":"sh/nidkfilk","slide":2,"name":"step-text-3","text":"Stage-20 results cannot feed routing until Stage-30 review passes.","textPreview":"Stage-20 results cannot feed routing until Stage-30 review passes.","textChars":66,"textLines":1,"bbox":[688,560,500,66]}
+{"kind":"textbox","id":"sh/mh4j6d4z","slide":2,"name":"source-footer","text":"Source: Uniform-B aggregate-prior union v2 study","textPreview":"Source: Uniform-B aggregate-prior union v2 study","textChars":48,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/y57bxy","slide":2,"text":"[Sources]\n- docs/context/current_experimental_state.md\n- docs/wiki/03-experiments/midogpp-uniform-b-v2-routing-authorized-expert-bank-v1.md\n[/Sources]"}
+{"kind":"slide","id":"sl/2r08xb","slide":3,"title":"PS closes 90% of the remaining P0-to-Q gap","textShapes":11}
+{"kind":"textbox","id":"sh/svyt8fix","slide":3,"name":"slide-3-title","text":"PS closes 90% of the remaining P0-to-Q gap","textPreview":"PS closes 90% of the remaining P0-to-Q gap","textChars":42,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/rupczuhc","slide":3,"name":"slide-3-number","text":"3","textPreview":"3","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/qtgb6p0r","slide":3,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/4ret4fil","slide":3,"name":"chart-caption","text":"Seven-source inner tasks; not a Stage-70 estimate.","textPreview":"Seven-source inner tasks; not a Stage-70 estimate.","textChars":50,"textLines":1,"bbox":[52,642,750,28]}
+{"kind":"textbox","id":"sh/3q5cvah0","slide":3,"name":"metric-label","text":"WHAT CHANGED","textPreview":"WHAT CHANGED","textChars":12,"textLines":1,"bbox":[862,155,330,30]}
+{"kind":"textbox","id":"sh/ipwb250v","slide":3,"name":"metric-value-0","text":"+0.0128","textPreview":"+0.0128","textChars":7,"textLines":1,"bbox":[862,208,330,52]}
+{"kind":"textbox","id":"sh/honut0za","slide":3,"name":"metric-text-0","text":"PS minus standard prior P0","textPreview":"PS minus standard prior P0","textChars":26,"textLines":1,"bbox":[862,262,330,58]}
+{"kind":"shape","id":"sh/gnet0vip","slide":3,"name":"metric-rule-1","bbox":[862,332,330,1]}
+{"kind":"textbox","id":"sh/mh8z698z","slide":3,"name":"metric-value-1","text":"0.00146","textPreview":"0.00146","textChars":7,"textLines":1,"bbox":[862,350,330,52]}
+{"kind":"textbox","id":"sh/nihgfepk","slide":3,"name":"metric-text-1","text":"Posterior-sample Q minus PS","textPreview":"Posterior-sample Q minus PS","textChars":27,"textLines":1,"bbox":[862,404,330,58]}
+{"kind":"shape","id":"sh/ojqh8zqp","slide":3,"name":"metric-rule-2","bbox":[862,474,330,1]}
+{"kind":"textbox","id":"sh/9kzyh47a","slide":3,"name":"metric-value-2","text":"0.7646","textPreview":"0.7646","textChars":6,"textLines":1,"bbox":[862,492,330,52]}
+{"kind":"textbox","id":"sh/etof2p8n","slide":3,"name":"metric-text-2","text":"Worst training-seed PS mean","textPreview":"Worst training-seed PS mean","textChars":27,"textLines":1,"bbox":[862,546,330,58]}
+{"kind":"textbox","id":"sh/zuxgbup8","slide":3,"name":"source-footer","text":"Source: Uniform-B aggregate-prior union v2 study","textPreview":"Source: Uniform-B aggregate-prior union v2 study","textChars":48,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"chart","id":"ch/x8bidoz6","slide":3,"name":"primary-result-chart","chartType":"bar","bbox":[42,150,770,490]}
+{"kind":"notes","id":"nt/2r08xb","slide":3,"text":"[Sources]\n- docs/context/current_experimental_state.md\n- docs/wiki/03-experiments/midogpp-uniform-b-v2-routing-authorized-expert-bank-v1.md\n[/Sources]"}
+{"kind":"slide","id":"sl/1swss7","slide":4,"title":"Generation quality is strong enough to build the bank","textShapes":10}
+{"kind":"textbox","id":"sh/y1wfqtg7","slide":4,"name":"slide-4-title","text":"Generation quality is strong enough to build the bank","textPreview":"Generation quality is strong enough to build the bank","textChars":53,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/lo7e18zi","slide":4,"name":"slide-4-number","text":"4","textPreview":"4","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/k3yxs3yx","slide":4,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/by5wvyhg","slide":4,"name":"supported-label","text":"SUPPORTED INTERPRETATION","textPreview":"SUPPORTED INTERPRETATION","textChars":24,"textLines":1,"bbox":[42,158,520,30]}
+{"kind":"textbox","id":"sh/axwvmtgv","slide":4,"name":"supported-text","text":"The source-only aggregate posterior substantially recovers the latent-prior mismatch and is stable across the three training seeds.","textPreview":"The source-only aggregate posterior substantially recovers the latent-prior mismatch and is stable across the three training seeds.","textChars":131,"textLines":1,"bbox":[42,205,530,334]}
+{"kind":"textbox","id":"sh/x0nex8zm","slide":4,"name":"objective-text","text":"Positive objective-2 mechanism result and prerequisite for objective 4.","textPreview":"Positive objective-2 mechanism result and prerequisite for objective 4.","textChars":71,"textLines":1,"bbox":[42,566,530,80]}
+{"kind":"shape","id":"sh/czexo3y1","slide":4,"name":"conclusion-rule","bbox":[612,150,1.5,500]}
+{"kind":"textbox","id":"sh/nulwrehk","slide":4,"name":"boundary-label","text":"CLAIM BOUNDARY","textPreview":"CLAIM BOUNDARY","textChars":14,"textLines":1,"bbox":[654,158,540,30]}
+{"kind":"textbox","id":"sh/2tcvi9gz","slide":4,"name":"boundary-text","text":"The 0.770112 value is source-inner seven-source evidence. It does not predict target utility or validate a router.","textPreview":"The 0.770112 value is source-inner seven-source evidence. It does not predict target utility or validate a router.","textChars":114,"textLines":1,"bbox":[654,205,540,205]}
+{"kind":"shape","id":"sh/k3ils3uh","slide":4,"name":"next-panel","bbox":[654,458,540,164]}
+{"kind":"textbox","id":"sh/l4rml8v2","slide":4,"name":"next-label","text":"NEXT DECISION","textPreview":"NEXT DECISION","textChars":13,"textLines":1,"bbox":[680,482,490,28]}
+{"kind":"textbox","id":"sh/yhg3qtcb","slide":4,"name":"next-text","text":"Promote the complete bank under independent hash, overlap, convergence, and fallback gates.","textPreview":"Promote the complete bank under independent hash, overlap, convergence, and fallback gates.","textChars":91,"textLines":1,"bbox":[680,522,490,76]}
+{"kind":"textbox","id":"sh/jipkjydw","slide":4,"name":"source-footer","text":"Source: Uniform-B aggregate-prior union v2 study","textPreview":"Source: Uniform-B aggregate-prior union v2 study","textChars":48,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/1swss7","slide":4,"text":"[Sources]\n- docs/context/current_experimental_state.md\n- docs/wiki/03-experiments/midogpp-uniform-b-v2-routing-authorized-expert-bank-v1.md\n[/Sources]"}

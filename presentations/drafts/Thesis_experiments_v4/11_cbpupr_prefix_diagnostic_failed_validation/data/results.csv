@@ -1,0 +1,6 @@
+method,bacc,delta_vs_p,route_count,descriptive_interval_lower,descriptive_interval_upper
+P protected,0.807316779,0.000000000,0,0.000000000,0.000000000
+CBPUPR unified prefix,0.808428226,0.001111448,14,-0.000473867,0.002696762
+CBPUPR candidate-only,0.808683586,0.001366807,81,-0.001066605,0.003800219
+Observed-max prefix control,0.806528757,-0.000788022,1,-0.002605204,0.001029160
+Cyclic-fingerprint control,0.806019205,-0.001297574,2,-0.003884164,0.001289016

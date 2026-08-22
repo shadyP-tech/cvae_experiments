@@ -1,0 +1,11 @@
+surface,count,unit,status
+GenerationLock source streams,81,stream,PASS
+Generation health records,162,record,PASS
+Equal-union replicates,81,replicate,PASS
+Equal-union assignments,648,assignment,PASS
+Metadata proxy scores,72,score,PASS
+Metadata assignments,153,assignment,PASS
+Utility predictions,81,prediction cell,PASS
+Utility rows,648,row,PASS
+Regret cells,4536,cell,PASS
+Utility-gated routed folds,0,fold,ABSTAIN

@@ -12,7 +12,11 @@ import numpy as np
 from ...protocol import ProtocolError
 from ...runtime.artifact_io import sha256_array, sha256_file
 from .artifact_io import persist_json, persist_rows
-from .constants import ENDPOINT_METHOD_IDS
+from .constants import (
+    CANONICAL_PHYSICAL_ROW_ORDER,
+    ENDPOINT_METHOD_IDS,
+    SOURCE_PROBABILITY_INDEX_ROW_ORDER,
+)
 from .hashing import canonical_hash
 from .reports import run_state_payload
 from .protocol import FROZEN_PROTOCOL_HASH
@@ -182,9 +186,15 @@ def persist_physical_surface(
     probability_index: object,
 ) -> None:
     rows = tuple(probability_index)
+    row_payloads = [row.to_payload() for row in rows]
+    if len(row_payloads) != 90 or any(
+        row.get("row_order") != SOURCE_PROBABILITY_INDEX_ROW_ORDER
+        for row in row_payloads
+    ):
+        raise ProtocolError("CBPUPR source probability index order drifted.")
     persist_rows(
         root / "tables/exact_nine_probability_index.json",
-        [row.to_payload() for row in rows],
+        row_payloads,
         schema_version="fixed_bank_cbpupr_exact_nine_probability_index_v1",
     )
     payload = {
@@ -197,9 +207,9 @@ def persist_physical_surface(
         "global_prediction_seal_hash": str(
             getattr(getattr(physical, "prediction"), "seal_hash")
         ),
-        "probability_index_hash": canonical_hash(
-            [row.to_payload() for row in rows]
-        ),
+        "probability_index_hash": canonical_hash(row_payloads),
+        "source_probability_index_row_order": SOURCE_PROBABILITY_INDEX_ROW_ORDER,
+        "canonical_physical_row_order": CANONICAL_PHYSICAL_ROW_ORDER,
         "target_probability_cell_count": 810,
         "labels_used": False,
     }

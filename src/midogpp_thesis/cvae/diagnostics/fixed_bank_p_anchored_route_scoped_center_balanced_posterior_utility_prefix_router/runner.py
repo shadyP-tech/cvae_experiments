@@ -1,16 +1,17 @@
-"""Thin, phase-ordered workstation runner for terminal CBPUPR v1."""
+"""Thin, phase-ordered workstation runner for repaired CBPUPR v2."""
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Mapping
 
 from ...protocol import ProtocolError
 from ...runtime.artifact_io import read_json
-from .bundle import write_content_index
+from .bundle import write_content_index, write_preterminal_content_index
 from .engine import build_preterminal_result
 from .evaluation import evaluate_terminal
 from .fresh_process_validation import (
+    require_two_fresh_preterminal_process_validations,
     require_two_fresh_process_validations,
     validation_report_payload,
 )
@@ -39,16 +40,33 @@ from .physical_runtime import (
     runtime_summary_payload,
 )
 from .preflight import run_workstation_preflight
+from .preterminal_gate import (
+    persist_preterminal_capability_report,
+    persist_preterminal_validation_report,
+    persist_preterminal_validation_seal,
+    preterminal_validation_report_payload,
+    validate_preterminal_gate_artifacts,
+)
+from .preterminal_validation import (
+    PRETERMINAL_VALIDATION_PHASE,
+    validate_preterminal_bundle,
+    verify_preterminal_attested_bundle,
+)
 from .reports import leakage_report_payload, publication_decision_payload
 from .run_admission import (
     assert_launch_files,
     assert_no_partial_state,
     assert_workspace_resolved_paths,
     exclusive_run_lock,
+    reject_quarantined_v1_execution,
     reject_existing_run_state,
     write_state,
 )
 from .scratch import cleanup_scratch
+from .terminal_access_journal import (
+    persist_terminal_label_access_intent,
+    persist_terminal_label_access_opened_receipt,
+)
 from .validation import (
     validate_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_bundle,
     verify_completed_attested_bundle,
@@ -62,6 +80,7 @@ def run_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router(
     artifact_root: str | Path | None = None,
     phase_observer: Callable[[str], None] | None = None,
 ) -> Path:
+    reject_quarantined_v1_execution(config)
     root = Path(artifact_root or getattr(config, "artifact_root")).resolve()
     assert_workspace_resolved_paths(config, root=root)
     assert_launch_files(root, config)
@@ -127,11 +146,40 @@ def run_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router(
             _observe(phase_observer, phase)
             persist_preterminal(root, preterminal)
 
+            phase = PRETERMINAL_VALIDATION_PHASE
+            write_state(root, status="RUNNING", phase=phase)
+            _observe(phase_observer, phase)
+            persist_preterminal_capability_report(
+                root, preterminal.candidates.firewall.audit_payload()
+            )
+            write_preterminal_content_index(root)
+            preterminal_checks = validate_preterminal_bundle(
+                root, require_attested=False
+            )
+            preterminal_attestation = (
+                require_two_fresh_preterminal_process_validations(
+                    root, expected_checks=preterminal_checks
+                )
+            )
+            preterminal_report = preterminal_validation_report_payload(
+                preterminal_checks, preterminal_attestation
+            )
+            persist_preterminal_validation_report(root, preterminal_report)
+            persist_preterminal_validation_seal(
+                root,
+                checks=preterminal_checks,
+                attestation=preterminal_attestation,
+                report=preterminal_report,
+            )
+            verify_preterminal_attested_bundle(
+                root, expected_checks=preterminal_checks
+            )
+
             phase = "TERMINAL_LABELS_METRICS_AND_CONTROLS"
             write_state(root, status="RUNNING", phase=phase)
             _observe(phase_observer, phase)
             labels, capability = _open_terminal_after_durable_preterminal(
-                root, preterminal
+                root, preterminal, expected_checks=preterminal_checks
             )
             terminal = evaluate_terminal(
                 probabilities=preterminal.decisions.probabilities,
@@ -195,9 +243,12 @@ def _observe(callback: Callable[[str], None] | None, phase: str) -> None:
 
 
 def _open_terminal_after_durable_preterminal(
-    root: Path, preterminal: object
+    root: Path,
+    preterminal: object,
+    *,
+    expected_checks: Mapping[str, object],
 ) -> tuple[tuple[object, ...], dict[str, object]]:
-    """Open the terminal capability only after its durable barrier exists."""
+    """Open terminal labels only after the attested barrier revalidates."""
 
     barrier = root / "manifests/preterminal_aggregate_seal.json"
     decision_barrier = root / "manifests/decision_barrier.json"
@@ -231,10 +282,22 @@ def _open_terminal_after_durable_preterminal(
         }
         or decision_payload.get("decision_barrier_hash")
         != canonical_hash(decision_unhashed)
+        or expected_checks.get("preterminal_hash")
+        != preterminal.preterminal_hash
     ):
         raise ProtocolError("CBPUPR durable preterminal barrier lineage drifted.")
+    # The complete scientific replay ran while the recorded phase was still
+    # preterminal. Recheck the durable attestation/report/seal after the sole
+    # intervening run-state transition and immediately before label access.
+    validate_preterminal_gate_artifacts(root, expected_checks=expected_checks)
+    access_intent = persist_terminal_label_access_intent(
+        root, expected_checks=expected_checks
+    )
     firewall = candidates.firewall
     labels = tuple(firewall.open_target_terminal_labels())
+    persist_terminal_label_access_opened_receipt(
+        root, intent=access_intent, labels=labels
+    )
     capability = firewall.audit_payload()
     persist_label_capability_report(root, capability)
     return labels, capability

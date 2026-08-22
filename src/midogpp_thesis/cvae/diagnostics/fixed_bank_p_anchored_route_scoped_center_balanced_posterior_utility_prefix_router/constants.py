@@ -1,4 +1,4 @@
-"""Frozen identities and numerical constants for CBPUPR v1.
+"""Frozen identities and numerical constants for the CBPUPR v2 repair.
 
 This package is self-contained.  It consumes only the six original MIDOG++
 fixed-bank inputs and never imports another Stage-90 diagnostic.  The whole
@@ -12,15 +12,29 @@ from types import MappingProxyType
 from typing import Mapping
 
 
-EXPERIMENT_ID = (
+QUARANTINED_V1_EXPERIMENT_ID = (
     "midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_"
     "scoped_center_balanced_posterior_utility_prefix_router.v1"
 )
+EXPERIMENT_ID = (
+    "midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_"
+    "scoped_center_balanced_posterior_utility_prefix_router.v2"
+)
 EXPERIMENT_NAME = (
     "uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_"
-    "balanced_posterior_utility_prefix_router_v1"
+    "balanced_posterior_utility_prefix_router_v2"
 )
 OUTPUT_ARTIFACT_ID = f"midogpp_output_{EXPERIMENT_NAME}"
+QUARANTINED_V1_OUTPUT_ARTIFACT_ID = (
+    "midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_"
+    "scoped_center_balanced_posterior_utility_prefix_router_v1"
+)
+EXECUTION_REVISION = "v2_canonical_row_order_mechanical_repair"
+EXECUTION_SCHEMA_REVISION = "fixed_bank_cbpupr_execution_schema_v2"
+REPAIR_CODE_IDENTITY = (
+    "cbpupr_v2_canonical_row_order_and_preterminal_validation_gate"
+)
+REPAIR_BASE_COMMIT = "295b5718e805fc948bcc99be3d92084978be6c8d"
 
 DATASET_FAMILY = "MIDOG++"
 EVALUATION_SPLIT = "test"
@@ -107,6 +121,9 @@ ENDPOINT_ORDER = MappingProxyType(
 HARD_THRESHOLD = 0.5
 PROBABILITY_STORAGE_DTYPE = "float32"
 SCIENTIFIC_REDUCTION_DTYPE = "float64"
+CANONICAL_PHYSICAL_ROW_ORDER = "lexicographic_case_id_then_sample_id"
+SOURCE_PROBABILITY_INDEX_ROW_ORDER = "source_prediction_store_order"
+CANONICAL_POSTERIOR_ROW_ORDER = CANONICAL_PHYSICAL_ROW_ORDER
 PORTFOLIO_IDENTIFICATION_WEIGHT = 3.0 / 5.0
 PORTFOLIO_ROBUST_WEIGHT = 2.0 / 5.0
 K_GRID = (4, 5, 6)
@@ -180,9 +197,13 @@ PERSISTENT_GPU_WORKERS = 2
 CPU_WORKERS = 4
 BLAS_THREADS_PER_CPU_WORKER = 3
 TARGET_POSTERIOR_BLAS_THREADS_PER_WORKER = 1
-SCRATCH_ROOT = (
+QUARANTINED_V1_SCRATCH_ROOT = (
     "/data/local/fixed_bank_p_anchored_route_scoped_center_balanced_"
     "posterior_utility_prefix_router_v1"
+)
+SCRATCH_ROOT = (
+    "/data/local/fixed_bank_p_anchored_route_scoped_center_balanced_"
+    "posterior_utility_prefix_router_v2"
 )
 RUN_RECOVERY_POLICY = (
     "no_cross_run_recovery_intra_launch_atomic_task_checkpoints_only"

@@ -1,0 +1,6 @@
+method,bacc,delta_vs_p,route_count,helpful_switches,harmful_switches
+B,0.800895513,-0.006421266,217,113,200
+I opportunity-gated,0.804160925,-0.003155853,210,75,90
+R nine-arm robust,0.805485786,-0.001830993,210,80,120
+P protected,0.807316779,0.000000000,0,0,0
+PSSCUR robust envelope,0.807316779,0.000000000,0,0,0

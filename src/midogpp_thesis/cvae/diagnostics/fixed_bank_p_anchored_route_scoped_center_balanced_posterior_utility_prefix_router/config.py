@@ -22,7 +22,6 @@ from .config_payloads import (
 from .experiment_contracts import (
     EXPECTED_BANK_LOCK_HASH,
     EXPECTED_GENERATION_LOCK_HASH,
-    EXPECTED_LEDGER_AMENDMENT_SHA256,
     EXPECTED_MANIFEST_SHA256,
     EXPECTED_TEST_CACHE_CONTENT_HASH,
     EXPECTED_TEST_CACHE_REPRESENTATION_ID,
@@ -41,6 +40,7 @@ from .experiment_contracts import (
     TEST_CONSUMPTION_LEDGER_ARTIFACT_ID,
     TEST_MANIFEST_ARTIFACT_ID,
 )
+from .hashing import require_sha256
 from .protocol import frozen_protocol_payload
 
 
@@ -77,6 +77,7 @@ class PAnchoredRouteScopedCenterBalancedPosteriorUtilityPrefixRouterConfig:
     runtime: Mapping[str, object]
     claim_boundary: Mapping[str, object]
     contract_hash: str
+    expected_ledger_amendment_sha256: str
 
     experiment_id: str = EXPERIMENT_ID
     output_artifact_id: str = OUTPUT_ARTIFACT_ID
@@ -87,7 +88,6 @@ class PAnchoredRouteScopedCenterBalancedPosteriorUtilityPrefixRouterConfig:
     expected_test_consumption_ledger_sha256: str = (
         EXPECTED_TEST_CONSUMPTION_LEDGER_SHA256
     )
-    expected_ledger_amendment_sha256: str = EXPECTED_LEDGER_AMENDMENT_SHA256
     expected_test_cache_semantic_id: str = EXPECTED_TEST_CACHE_SEMANTIC_ID
     expected_test_cache_representation_id: str = EXPECTED_TEST_CACHE_REPRESENTATION_ID
     expected_test_cache_content_hash: str = EXPECTED_TEST_CACHE_CONTENT_HASH
@@ -175,7 +175,6 @@ def load_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router
         "expected_test_cache_row_order_hash": EXPECTED_TEST_CACHE_ROW_ORDER_HASH,
         "expected_manifest_sha256": EXPECTED_MANIFEST_SHA256,
         "expected_test_consumption_ledger_sha256": EXPECTED_TEST_CONSUMPTION_LEDGER_SHA256,
-        "expected_ledger_amendment_sha256": EXPECTED_LEDGER_AMENDMENT_SHA256,
         "expected_ledger_amendment_parent_sha256": EXPECTED_TEST_CONSUMPTION_LEDGER_SHA256,
         "ledger_amendment_authorized_experiment_id": EXPERIMENT_ID,
     }
@@ -193,10 +192,15 @@ def load_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router
             LEDGER_AMENDMENT_FILENAME,
         ),
     }
-    if set(inputs) != set(fixed_inputs) | set(locations) or any(
+    dynamic_input_keys = {"expected_ledger_amendment_sha256"}
+    if set(inputs) != set(fixed_inputs) | set(locations) | dynamic_input_keys or any(
         inputs.get(key) != value for key, value in fixed_inputs.items()
     ):
         raise ProtocolError("CBPUPR exact-six input schema drifted.")
+    expected_ledger_amendment_sha256 = require_sha256(
+        inputs.get("expected_ledger_amendment_sha256"),
+        "CBPUPR expected ledger amendment hash",
+    )
     for key, (artifact_id, member) in locations.items():
         value = str(inputs[key])
         expected = f"artifact://{artifact_id}" + (f"/{member}" if member else "")
@@ -219,6 +223,7 @@ def load_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router
     scientific = {
         "experiment_id": EXPERIMENT_ID,
         "input_artifact_ids": list(INPUT_ARTIFACT_IDS),
+        "expected_ledger_amendment_sha256": expected_ledger_amendment_sha256,
         **sections,
         "classifier": classifier.to_payload(),
     }
@@ -230,6 +235,7 @@ def load_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router
         artifact_root=_resolve(source.parent, artifact_root_text),
         classifier=classifier,
         contract_hash=stable_hash(scientific),
+        expected_ledger_amendment_sha256=expected_ledger_amendment_sha256,
         **resolved,
         **{key: dict(_section(raw, key)) for key in sections},
     )

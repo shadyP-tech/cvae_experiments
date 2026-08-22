@@ -1,4 +1,4 @@
-"""Frozen scientific and claim protocol for terminal-only CBPUPR v1."""
+"""Frozen scientific and execution protocol for the terminal-only CBPUPR v2 repair."""
 
 from __future__ import annotations
 
@@ -8,12 +8,16 @@ from typing import Mapping
 from ...protocol import ProtocolError
 from .constants import (
     BLOCKED_CONTROL_METHOD_ID,
+    CANONICAL_PHYSICAL_ROW_ORDER,
+    CANONICAL_POSTERIOR_ROW_ORDER,
     CANDIDATE_ONLY_METHOD_ID,
     CENTERS,
     CLAIM_ROLE,
     CLAIM_SCOPE,
     COMPOSED_POLICY_IDS,
     ENDPOINT_METHOD_IDS,
+    EXECUTION_REVISION,
+    EXECUTION_SCHEMA_REVISION,
     EXPERIMENT_ID,
     EXPECTED_DOUBLE_EXCLUSION_PAIR_COUNT,
     EXPECTED_OUTER_PLAN_COUNT,
@@ -23,6 +27,10 @@ from .constants import (
     PORTFOLIO_METHOD_ID,
     PRIMARY_METHOD_ID,
     PUBLICATION_STATUS,
+    QUARANTINED_V1_EXPERIMENT_ID,
+    QUARANTINED_V1_OUTPUT_ARTIFACT_ID,
+    REPAIR_BASE_COMMIT,
+    REPAIR_CODE_IDENTITY,
     TERMINAL_DECISION,
     TARGET_POSTERIOR_TOLERANCE,
     TARGET_POSTERIOR_PROBABILITY_CLIP,
@@ -33,17 +41,53 @@ from .constants import (
     UTILITY_RESPONSE_IDS,
 )
 from .hashing import canonical_hash
+from .source_seal import source_seal_identity
 
 
-PROTOCOL_SCHEMA_VERSION = "fixed_bank_cbpupr_protocol_v1"
+PROTOCOL_SCHEMA_VERSION = "fixed_bank_cbpupr_protocol_v2"
 
 
 def frozen_protocol_payload() -> dict[str, object]:
     """Return a new JSON-native copy of the immutable protocol contract."""
 
+    source_identity = source_seal_identity()
     return {
         "schema_version": PROTOCOL_SCHEMA_VERSION,
         "experiment_id": EXPERIMENT_ID,
+        "execution_revision": EXECUTION_REVISION,
+        "execution_schema_revision": EXECUTION_SCHEMA_REVISION,
+        "repair_code_identity": REPAIR_CODE_IDENTITY,
+        "repair_base_commit": REPAIR_BASE_COMMIT,
+        "repair_source_manifest_member": source_identity[
+            "repair_source_manifest_member"
+        ],
+        "repair_source_manifest_sha256": source_identity[
+            "repair_source_manifest_sha256"
+        ],
+        "repair_source_tree_sha256": source_identity[
+            "repair_source_tree_sha256"
+        ],
+        "repair_source_member_count": source_identity[
+            "repair_source_member_count"
+        ],
+        "repair_source_manifest_checked_pre_gpu": True,
+        "repair_source_identity_persisted_in_protocol_manifest": True,
+        "mechanical_repair_only": True,
+        "scientific_protocol_unchanged_from_v1": True,
+        "scientific_method_changed_from_v1": False,
+        "canonical_row_order_repair_only": True,
+        "canonical_row_order_repair_verified": True,
+        "quarantined_v1_experiment_id": QUARANTINED_V1_EXPERIMENT_ID,
+        "quarantined_v1_output_artifact_id": QUARANTINED_V1_OUTPUT_ARTIFACT_ID,
+        "v1_output_quarantined": True,
+        "v1_target_terminal_capability_had_opened": True,
+        "v1_terminal_outputs_had_persisted": True,
+        "v1_final_validation_passed": False,
+        "quarantined_v1_output_used": False,
+        "quarantined_v1_scratch_or_checkpoint_used": False,
+        "quarantined_v1_terminal_outputs_used": False,
+        "prior_v1_label_capability_history_used": False,
+        "prior_v1_amendment_used": False,
         "dataset_family": "MIDOG++",
         "split": "test",
         "split_previously_consumed": True,
@@ -59,7 +103,7 @@ def frozen_protocol_payload() -> dict[str, object]:
         "method_development_is_posthoc": True,
         "prior_consumed_test_findings_informed_method_design": True,
         "prior_consumed_test_bytes_used_as_scientific_inputs": False,
-        "no_v2_semantic_artifacts_used": True,
+        "preexisting_v2_semantic_artifacts_used": False,
         "physical_probability_surface_recomputed_from_original_inputs": True,
         "previous_prediction_surfaces_used": False,
         "previous_stage90_outputs_used": False,
@@ -91,6 +135,15 @@ def frozen_protocol_payload() -> dict[str, object]:
         "all_target_and_pseudo_candidates_sealed_before_pseudo_evaluation": True,
         "all_replays_and_calibrations_sealed_before_target_decisions": True,
         "all_target_decisions_and_aggregate_predictions_sealed_before_terminal_labels": True,
+        "canonical_physical_row_order": CANONICAL_PHYSICAL_ROW_ORDER,
+        "posterior_prediction_and_model_row_order": CANONICAL_POSTERIOR_ROW_ORDER,
+        "raw_source_store_permutations_canonicalized_before_worker_transfer": True,
+        "preterminal_closed_world_validation_required": True,
+        "preterminal_parent_validation_required": True,
+        "preterminal_fresh_process_validation_count": 2,
+        "preterminal_validation_attested_before_terminal_labels": True,
+        "terminal_label_loader_forbidden_before_preterminal_attestation": True,
+        "final_fresh_process_validation_count": 2,
         "phase_chain": [
             "PhysicalSeal",
             "OuterAndDoubleExclusionPlanSeal",
@@ -100,6 +153,10 @@ def frozen_protocol_payload() -> dict[str, object]:
             "PseudoEvaluationGrant",
             "PseudoReplayAndCalibrationSeal",
             "DecisionAndAggregateSeal",
+            "PreterminalClosedWorldSeal",
+            "PreterminalParentValidation",
+            "PreterminalFreshProcessValidationX2",
+            "PreterminalValidationAttestation",
             "TargetTerminalLabelGrant",
         ],
         "endpoint_methods": list(ENDPOINT_METHOD_IDS),

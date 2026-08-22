@@ -1,0 +1,66 @@
+{"kind":"slide","id":"sl/pehuzi","slide":1,"title":"STAGE 20 — CVAE PRESERVATION","textShapes":5}
+{"kind":"textbox","id":"sh/hcvyp8b6","slide":1,"name":"cover-eyebrow","text":"STAGE 20 — CVAE PRESERVATION","textPreview":"STAGE 20 — CVAE PRESERVATION","textChars":28,"textLines":1,"bbox":[42,40,760,34]}
+{"kind":"shape","id":"sh/u94zetsf","slide":1,"name":"cover-accent","bbox":[42,112,10,326]}
+{"kind":"textbox","id":"sh/fadgnyt0","slide":1,"name":"cover-title","text":"Posterior-informed decoding preserves utility; naive prior sampling does not","textPreview":"Posterior-informed decoding preserves utility; naive prior sampling does not","textChars":76,"textLines":1,"bbox":[76,108,1080,244]}
+{"kind":"textbox","id":"sh/4f6hknah","slide":1,"name":"cover-subtitle","text":"A dimension-matched test of where the generative chain loses task signal","textPreview":"A dimension-matched test of where the generative chain loses task signal","textChars":72,"textLines":1,"bbox":[76,376,960,90]}
+{"kind":"shape","id":"sh/pgfyt8b2","slide":1,"name":"cover-status-panel","bbox":[76,516,1120,92]}
+{"kind":"textbox","id":"sh/2d4zidsb","slide":1,"name":"cover-status","text":"Thesis-facing • cvae_preservation_only • leakage and identity audits PASS","textPreview":"Thesis-facing • cvae_preservation_only • leakage and identity audits PASS","textChars":73,"textLines":1,"bbox":[102,538,1070,50]}
+{"kind":"textbox","id":"sh/3exgritw","slide":1,"name":"source-footer","text":"Source: tuned_classifier_preservation_v1","textPreview":"Source: tuned_classifier_preservation_v1","textChars":40,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/pehuzi","slide":1,"text":"[Sources]\n- docs/wiki/03-experiments/midogpp-cvae-tuned-classifier-preservation.md\n- Feature-space CVAE: https://bmvc2024.org/proceedings/145/\n[/Sources]"}
+{"kind":"slide","id":"sl/tzjpmv","slide":2,"title":"The experiment separates decoding from prior mismatch","textShapes":18}
+{"kind":"textbox","id":"sh/rm5ori1c","slide":2,"name":"slide-2-title","text":"The experiment separates decoding from prior mismatch","textPreview":"The experiment separates decoding from prior mismatch","textChars":53,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/sne50nix","slide":2,"name":"slide-2-number","text":"2","textPreview":"2","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/d8n6tsji","slide":2,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/ihcnud0v","slide":2,"name":"question-label","text":"RESEARCH QUESTION","textPreview":"RESEARCH QUESTION","textChars":17,"textLines":1,"bbox":[42,154,420,30]}
+{"kind":"textbox","id":"sh/3ilony1g","slide":2,"name":"question","text":"How much classifier-relevant structure survives decode means, posterior samples, and prior samples?","textPreview":"How much classifier-relevant structure survives decode means, posterior samples, and prior samples?","textChars":99,"textLines":1,"bbox":[42,202,490,290]}
+{"kind":"textbox","id":"sh/4je5w3i1","slide":2,"name":"protocol-note","text":"Classifier specifications imported from the validated real-feature reference.","textPreview":"Classifier specifications imported from the validated real-feature reference.","textChars":77,"textLines":1,"bbox":[42,526,490,116]}
+{"kind":"shape","id":"sh/5kn6p8jm","slide":2,"name":"column-rule","bbox":[585,146,1.5,506]}
+{"kind":"textbox","id":"sh/udcnqt0z","slide":2,"name":"step-num-0","text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[628,150,42,34]}
+{"kind":"textbox","id":"sh/velojy1k","slide":2,"name":"step-label-0","text":"Freeze the comparator","textPreview":"Freeze the comparator","textChars":21,"textLines":1,"bbox":[688,148,500,36]}
+{"kind":"textbox","id":"sh/jat872xs","slide":2,"name":"step-text-0","text":"Use the Stage-10 classifier specifications without target re-selection.","textPreview":"Use the Stage-10 classifier specifications without target re-selection.","textChars":71,"textLines":1,"bbox":[688,188,500,66]}
+{"kind":"shape","id":"sh/i9k7yxw7","slide":2,"name":"step-rule-0","bbox":[628,261,560,1]}
+{"kind":"textbox","id":"sh/5cbq9sfi","slide":2,"name":"step-num-1","text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[628,274,42,34]}
+{"kind":"textbox","id":"sh/4b2p0ned","slide":2,"name":"step-label-1","text":"Match dimensionality","textPreview":"Match dimensionality","textChars":20,"textLines":1,"bbox":[688,272,500,36]}
+{"kind":"textbox","id":"sh/ryd8b2xo","slide":2,"name":"step-text-1","text":"Real PCA128 supplies the fair representation-level comparison.","textPreview":"Real PCA128 supplies the fair representation-level comparison.","textChars":62,"textLines":1,"bbox":[688,312,500,66]}
+{"kind":"shape","id":"sh/6d472xw3","slide":2,"name":"step-rule-1","bbox":[628,385,560,1]}
+{"kind":"textbox","id":"sh/t0vqdcfu","slide":2,"name":"step-num-2","text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[628,398,42,34]}
+{"kind":"textbox","id":"sh/szmp47e9","slide":2,"name":"step-label-2","text":"Probe posterior paths","textPreview":"Probe posterior paths","textChars":21,"textLines":1,"bbox":[688,396,500,36]}
+{"kind":"textbox","id":"sh/729ozyxk","slide":2,"name":"step-text-2","text":"Decode means and posterior samples use real-data latent information.","textPreview":"Decode means and posterior samples use real-data latent information.","textChars":68,"textLines":1,"bbox":[688,436,500,66]}
+{"kind":"shape","id":"sh/mh07qdgz","slide":2,"name":"step-rule-2","bbox":[628,509,560,1]}
+{"kind":"textbox","id":"sh/a98ju5kz","slide":2,"name":"step-num-3","text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[628,522,42,34]}
+{"kind":"textbox","id":"sh/ba1knal4","slide":2,"name":"step-label-3","text":"Probe deployable prior","textPreview":"Probe deployable prior","textChars":22,"textLines":1,"bbox":[688,520,500,36]}
+{"kind":"textbox","id":"sh/cba1wf2p","slide":2,"name":"step-text-3","text":"Standard-prior samples test generation without target observations.","textPreview":"Standard-prior samples test generation without target observations.","textChars":67,"textLines":1,"bbox":[688,560,500,66]}
+{"kind":"textbox","id":"sh/xcj2pk3a","slide":2,"name":"source-footer","text":"Source: tuned_classifier_preservation_v1","textPreview":"Source: tuned_classifier_preservation_v1","textChars":40,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/tzjpmv","slide":2,"text":"[Sources]\n- docs/wiki/03-experiments/midogpp-cvae-tuned-classifier-preservation.md\n- Feature-space CVAE: https://bmvc2024.org/proceedings/145/\n[/Sources]"}
+{"kind":"slide","id":"sl/nds4gh","slide":3,"title":"The large loss appears at prior sampling, not decoding","textShapes":11}
+{"kind":"textbox","id":"sh/47654b65","slide":3,"name":"slide-3-title","text":"The large loss appears at prior sampling, not decoding","textPreview":"The large loss appears at prior sampling, not decoding","textChars":54,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/j6x4v6pk","slide":3,"name":"slide-3-number","text":"3","textPreview":"3","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/i5on21oz","slide":3,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/w3m50r6t","slide":3,"name":"chart-caption","text":"Frozen-classifier downstream preservation surface.","textPreview":"Frozen-classifier downstream preservation surface.","textChars":50,"textLines":1,"bbox":[52,642,750,28]}
+{"kind":"textbox","id":"sh/v2d4rmpo","slide":3,"name":"metric-label","text":"WHAT CHANGED","textPreview":"WHAT CHANGED","textChars":12,"textLines":1,"bbox":[862,155,330,30]}
+{"kind":"textbox","id":"sh/uh43y1o3","slide":3,"name":"metric-value-0","text":"0.919","textPreview":"0.919","textChars":5,"textLines":1,"bbox":[862,208,330,52]}
+{"kind":"textbox","id":"sh/9gvmpw7i","slide":3,"name":"metric-text-0","text":"Decode preservation ratio","textPreview":"Decode preservation ratio","textChars":25,"textLines":1,"bbox":[862,262,330,58]}
+{"kind":"shape","id":"sh/8fmlwr6x","slide":3,"name":"metric-rule-1","bbox":[862,332,330,1]}
+{"kind":"textbox","id":"sh/mdgzm1on","slide":3,"name":"metric-value-1","text":"0.911","textPreview":"0.911","textChars":5,"textLines":1,"bbox":[862,350,330,52]}
+{"kind":"textbox","id":"sh/nepgv658","slide":3,"name":"metric-text-1","text":"Posterior-sample preservation ratio","textPreview":"Posterior-sample preservation ratio","textChars":35,"textLines":1,"bbox":[862,404,330,58]}
+{"kind":"shape","id":"sh/8fyhob6t","slide":3,"name":"metric-rule-2","bbox":[862,474,330,1]}
+{"kind":"textbox","id":"sh/9gryxgne","slide":3,"name":"metric-value-2","text":"0.572","textPreview":"0.572","textChars":5,"textLines":1,"bbox":[862,492,330,52]}
+{"kind":"textbox","id":"sh/y9gzi1or","slide":3,"name":"metric-text-2","text":"Prior-sample preservation ratio","textPreview":"Prior-sample preservation ratio","textChars":31,"textLines":1,"bbox":[862,546,330,58]}
+{"kind":"textbox","id":"sh/zapgr65c","slide":3,"name":"source-footer","text":"Source: tuned_classifier_preservation_v1","textPreview":"Source: tuned_classifier_preservation_v1","textChars":40,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"chart","id":"ch/14bitcv2","slide":3,"name":"primary-result-chart","chartType":"bar","bbox":[42,150,770,490]}
+{"kind":"notes","id":"nt/nds4gh","slide":3,"text":"[Sources]\n- docs/wiki/03-experiments/midogpp-cvae-tuned-classifier-preservation.md\n- Feature-space CVAE: https://bmvc2024.org/proceedings/145/\n[/Sources]"}
+{"kind":"slide","id":"sl/vgcfqv","slide":4,"title":"Prior recovery is the justified mechanism target","textShapes":10}
+{"kind":"textbox","id":"sh/tczy5gzi","slide":4,"name":"slide-4-title","text":"Prior recovery is the justified mechanism target","textPreview":"Prior recovery is the justified mechanism target","textChars":48,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/69ofa107","slide":4,"name":"slide-4-number","text":"4","textPreview":"4","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/7axg36hs","slide":4,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/kn6x8ri1","slide":4,"name":"supported-label","text":"SUPPORTED INTERPRETATION","textPreview":"SUPPORTED INTERPRETATION","textChars":24,"textLines":1,"bbox":[42,158,520,30]}
+{"kind":"textbox","id":"sh/l8fe1wzm","slide":4,"name":"supported-text","text":"The decoder retains most dimension-matched task geometry. The deployable standard prior is the dominant generative loss point.","textPreview":"The decoder retains most dimension-matched task geometry. The deployable standard prior is the dominant generative loss point.","textChars":126,"textLines":1,"bbox":[42,205,530,334]}
+{"kind":"textbox","id":"sh/ylof610v","slide":4,"name":"objective-text","text":"Objective 2 partially achieved: conditioned embedding generation is viable but the prior needs recovery.","textPreview":"Objective 2 partially achieved: conditioned embedding generation is viable but the prior needs recovery.","textChars":104,"textLines":1,"bbox":[42,566,530,80]}
+{"kind":"shape","id":"sh/jmxwzmhg","slide":4,"name":"conclusion-rule","bbox":[612,150,1.5,500]}
+{"kind":"textbox","id":"sh/wjmx4ri5","slide":4,"name":"boundary-label","text":"CLAIM BOUNDARY","textPreview":"CLAIM BOUNDARY","textChars":14,"textLines":1,"bbox":[654,158,540,30]}
+{"kind":"textbox","id":"sh/xkvexwza","slide":4,"name":"boundary-text","text":"Preservation is not held-out synthetic-training utility, routing evidence, controllable generation, or a privacy guarantee.","textPreview":"Preservation is not held-out synthetic-training utility, routing evidence, controllable generation, or a privacy guarantee.","textChars":123,"textLines":1,"bbox":[654,205,540,205]}
+{"kind":"shape","id":"sh/dgfahg7q","slide":4,"name":"next-panel","bbox":[654,458,540,164]}
+{"kind":"textbox","id":"sh/sf698bql","slide":4,"name":"next-label","text":"NEXT DECISION","textPreview":"NEXT DECISION","textChars":13,"textLines":1,"bbox":[680,482,490,28]}
+{"kind":"textbox","id":"sh/rexsf690","slide":4,"name":"next-text","text":"Replace P0 with a source-only aggregate-posterior prior and test it source-inner.","textPreview":"Replace P0 with a source-only aggregate-posterior prior and test it source-inner.","textChars":81,"textLines":1,"bbox":[680,522,490,76]}
+{"kind":"textbox","id":"sh/qd4r618f","slide":4,"name":"source-footer","text":"Source: tuned_classifier_preservation_v1","textPreview":"Source: tuned_classifier_preservation_v1","textChars":40,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/vgcfqv","slide":4,"text":"[Sources]\n- docs/wiki/03-experiments/midogpp-cvae-tuned-classifier-preservation.md\n- Feature-space CVAE: https://bmvc2024.org/proceedings/145/\n[/Sources]"}

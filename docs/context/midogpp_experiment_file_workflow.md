@@ -1,6 +1,6 @@
 # MIDOG++ Experiment File Workflow
 
-Last updated: 2026-08-05
+Last updated: 2026-08-22
 
 This is the operational path and command reference for the active MIDOG++
 checkout. Result interpretation belongs in
@@ -75,16 +75,19 @@ The registry orders evidence as follows:
 | 30 | provenance-clean expert bank | active Uniform-B v2 bank; alternative consensus-recipe v1 path planned |
 | 40 | prior and generation | active validated Uniform-B v2 GenerationLock |
 | 50 | all-candidate utility matrix | planned for new runs; local historical diagnostic retained |
-| 60 | routing and composition | active validated equal-union control, metadata compatibility, and metadata max-tie policy locks |
-| 70 | frozen-policy downstream utility | planned; blocked on remaining substantive comparison, authorized target evaluation, and matched scoring |
+| 60 | routing and composition | active validated equal-union, metadata max-tie, source-inner utility, and utility/regret fallback locks |
+| 70 | frozen-policy downstream utility | completed validated descriptive comparison on previously consumed test; fresh confirmation blocked |
 | 90 | oracles, audits, and rejected lineages | diagnostic or rejected only |
 
 Stage 30 has an active, validated routing-authorized bank. Stages 40 and 60
 have validated generation, direct-control, compatibility-proxy, and comparison-
-policy contracts, but no routing-quality or downstream-utility result. A
-preservation result cannot be treated as an expert bank, router input, or
-synthetic downstream-utility result without an explicit registered promotion
-boundary.
+policy contracts. Stage 70 has a validated descriptive downstream comparison:
+equal-union BACC is `0.774968`, metadata max-tie is `0.745099`, and the
+utility/regret policy is exactly equal-union. Because the test surface was
+previously consumed, the result does not promote a router or establish fresh
+routing quality. A preservation result cannot be treated as an expert bank,
+router input, or synthetic downstream-utility result without an explicit
+registered promotion boundary.
 
 ## Dataset Contract
 
@@ -833,12 +836,19 @@ publication is `POLICY_FROZEN_FOR_MATCHED_STAGE70_EVALUATION`, policy lock is
 `d504ea0a07302acd`, plan hash is `cefe176313b1ea23`, and assignment hash is
 `bd004f2bbb49228b`.
 
-Stage 70 now needs a separately authorized fresh target-evaluation artifact,
-then matched scoring of equal-union, metadata, and utility/regret policies
-with identical candidates, GenerationLock/classifier settings, seed replicates,
-and evaluation rows. Labels may be exposed only for metrics after predictions.
-Neither this source-inner result nor its fallback establishes routing quality or
-downstream utility.
+The matched Stage-70 descriptive comparison is complete at
+`artifacts/midogpp/70_frozen_policy_downstream/uniform_b_v2_descriptive_frozen_policy_comparison/v1/`.
+It preserves identical candidates, GenerationLock/classifier settings, seed
+replicates, and evaluation rows, and exposes labels only for metrics after the
+243 prediction cells are sealed. The utility/regret arm is exactly equivalent
+to equal-union; metadata max-tie is worse by `-0.029868` mean BACC with
+descriptive interval `[-0.050406, -0.008705]`.
+
+The comparison is explicitly on a previously consumed test surface. It may be
+used as descriptive downstream evidence only. A fresh routing-quality claim
+still requires a separately authorized, genuinely unconsumed whole-case/
+patient/slide-disjoint or external/new-center evaluation surface. Stage-90
+diagnostics may not satisfy or feed that requirement.
 
 ## Registered Uniform-B Low-Noise Diagnostic
 

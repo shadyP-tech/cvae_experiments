@@ -1,4 +1,4 @@
-"""Frozen six-input and workspace identities for CBPUPR v1."""
+"""Frozen six-input and workspace identities for the CBPUPR v2 repair."""
 
 from __future__ import annotations
 
@@ -18,11 +18,11 @@ from .constants import (
 CANONICAL_OUTPUT_ROOT = (
     "artifacts/midogpp/90_oracles_and_diagnostics/"
     "uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_"
-    "balanced_posterior_utility_prefix_router/v1"
+    "balanced_posterior_utility_prefix_router/v2"
 )
 AUTHORIZATION_SCOPE = (
     "one_terminal_consumed_test_fixed_bank_p_anchored_route_scoped_center_"
-    "balanced_posterior_utility_prefix_router_v1"
+    "balanced_posterior_utility_prefix_router_v2_canonical_row_order_repair"
 )
 
 EXPERT_BANK_ARTIFACT_ID = (
@@ -31,23 +31,23 @@ EXPERT_BANK_ARTIFACT_ID = (
 GENERATION_LOCK_ARTIFACT_ID = "midogpp_output_uniform_b_v2_generation_lock_v1"
 TEST_CACHE_ARTIFACT_ID = (
     "midogpp_stage90_fixed_bank_p_anchored_route_scoped_center_balanced_"
-    "posterior_utility_prefix_router_test_cache_v1"
+    "posterior_utility_prefix_router_test_cache_v2"
 )
 TEST_MANIFEST_ARTIFACT_ID = (
     "midogpp_stage90_fixed_bank_p_anchored_route_scoped_center_balanced_"
-    "posterior_utility_prefix_router_test_manifest_v1"
+    "posterior_utility_prefix_router_test_manifest_v2"
 )
 TEST_CONSUMPTION_LEDGER_ARTIFACT_ID = (
     "midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_"
-    "scoped_center_balanced_posterior_utility_prefix_router_parent_v1"
+    "scoped_center_balanced_posterior_utility_prefix_router_parent_v2"
 )
 LEDGER_AMENDMENT_ARTIFACT_ID = (
     "midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_"
-    "scoped_center_balanced_posterior_utility_prefix_router_amendment_v1"
+    "scoped_center_balanced_posterior_utility_prefix_router_amendment_v2"
 )
 LEDGER_AMENDMENT_FILENAME = (
     "uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_center_"
-    "balanced_posterior_utility_prefix_router_ledger_amendment_v1.json"
+    "balanced_posterior_utility_prefix_router_ledger_amendment_v2.json"
 )
 
 INPUT_ARTIFACT_IDS = (
@@ -64,9 +64,6 @@ EXPECTED_MANIFEST_SHA256 = (
 )
 EXPECTED_TEST_CONSUMPTION_LEDGER_SHA256 = (
     "8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16"
-)
-EXPECTED_LEDGER_AMENDMENT_SHA256 = (
-    "2a8b8eb10e6809d88de1fe8b44aac1c37c5618bee6a339a4770e143a893cec3c"
 )
 EXPECTED_TEST_CACHE_SEMANTIC_ID = "uniform_b_v2_descriptive_test_cache_v1"
 EXPECTED_TEST_CACHE_REPRESENTATION_ID = "annotation_jpeg_fixed_center_b_v3"
@@ -99,6 +96,16 @@ FORBIDDEN_INPUT_FRAGMENTS = (
     "fixed_bank_p_anchored_boundary_projected_",
     "fixed_bank_p_anchored_simultaneous_shift_",
     "fixed_bank_p_anchored_route_scoped_boundary_projected_",
+    "fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_"
+    "prefix_router_v1",
+    "fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_"
+    "prefix_router_test_cache_v1",
+    "fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_"
+    "prefix_router_test_manifest_v1",
+    "fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_"
+    "prefix_router_parent_v1",
+    "fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_"
+    "prefix_router_amendment_v1",
     "fixed_bank_pooled_bacc_case_oof_ceiling",
     "fixed_bank_signed_error_gate",
     "fixed_bank_support_static_router",

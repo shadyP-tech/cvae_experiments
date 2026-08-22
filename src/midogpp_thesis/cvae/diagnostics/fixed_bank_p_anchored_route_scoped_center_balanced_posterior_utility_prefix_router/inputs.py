@@ -35,13 +35,19 @@ from ...generation import (
 from ...generation.contracts import COMMON_OUTPUT_DIM, GenerationLock
 from ...protocol import ProtocolError
 from ...runtime.artifact_io import sha256_file
-from .constants import CENTERS, EXPECTED_TOTAL_CASE_COUNT
+from .constants import (
+    CENTERS,
+    EXPECTED_TOTAL_CASE_COUNT,
+    QUARANTINED_V1_EXPERIMENT_ID,
+    QUARANTINED_V1_OUTPUT_ARTIFACT_ID,
+    REPAIR_BASE_COMMIT,
+    REPAIR_CODE_IDENTITY,
+)
 from .experiment_contracts import (
     AUTHORIZATION_SCOPE,
     CLAIM_ROLE,
     EXPECTED_BANK_LOCK_HASH,
     EXPECTED_GENERATION_LOCK_HASH,
-    EXPECTED_LEDGER_AMENDMENT_SHA256,
     EXPECTED_MANIFEST_SHA256,
     EXPECTED_TEST_CACHE_CONTENT_HASH,
     EXPECTED_TEST_CACHE_REPRESENTATION_ID,
@@ -58,6 +64,7 @@ from .experiment_contracts import (
     TEST_MANIFEST_ARTIFACT_ID,
 )
 from .input_contracts import LabelFreeTestFrame, TestRowIdentity
+from .source_seal import validate_repair_source_seal
 from .workspace_inputs import (
     validate_active_workspace_binding,
     validate_workspace_provenance,
@@ -198,12 +205,32 @@ def validate_pre_gpu_firewall(
     frame: LabelFreeTestFrame,
     locks: ValidatedLocks | None = None,
 ) -> Mapping[str, object]:
+    protocol = dict(getattr(config, "protocol"))
+    source_seal = validate_repair_source_seal(
+        expected_manifest_sha256=protocol.get("repair_source_manifest_sha256"),
+        expected_tree_sha256=protocol.get("repair_source_tree_sha256"),
+    )
+    if (
+        protocol.get("repair_source_manifest_member")
+        != source_seal.get("repair_source_manifest_member")
+        or protocol.get("repair_source_member_count")
+        != source_seal.get("repair_source_member_count")
+        or protocol.get("repair_source_manifest_checked_pre_gpu") is not True
+        or protocol.get("repair_source_identity_persisted_in_protocol_manifest")
+        is not True
+    ):
+        raise ProtocolError("CBPUPR repair source contract drifted.")
     validated = locks or load_validated_locks(config)
     bank_root = Path(getattr(config, "expert_bank_root"))
     promotion = load_promotion_config(bank_root / "config.resolved.yaml")
     checks = validate_promoted_bank(bank_root, config=promotion, allow_pending=False)
     amendment = validated.ledger_amendment
     forbidden = (
+        "quarantined_v1_output_used",
+        "quarantined_v1_scratch_or_checkpoint_used",
+        "quarantined_v1_terminal_outputs_used",
+        "prior_v1_label_capability_history_used",
+        "prior_v1_amendment_used",
         "previous_stage90_outputs_used",
         "previous_stage90_amendments_used",
         "previous_prediction_surfaces_used",
@@ -231,6 +258,7 @@ def validate_pre_gpu_firewall(
             "target_labels_opened": False,
             "target_expert_used": False,
             "predecessor_stage90_artifact_prediction_checkpoint_or_scratch_consumed": False,
+            **dict(source_seal),
             "gpu_work_authorized": True,
         }
     )
@@ -243,11 +271,24 @@ def _load_ledger_chain(
     amendment_path = Path(getattr(config, "ledger_amendment_path"))
     parent = _read_json(parent_path)
     amendment = _read_json(amendment_path)
+    protocol = dict(getattr(config, "protocol"))
     required_true = (
+        "mechanical_repair_only",
+        "scientific_protocol_unchanged_from_v1",
+        "canonical_row_order_repair_only",
+        "canonical_row_order_repair_verified",
+        "v1_output_quarantined",
+        "v1_target_terminal_capability_had_opened",
+        "v1_terminal_outputs_had_persisted",
+        "v1_canonical_row_order_drift_recorded",
+        "preterminal_closed_world_validation_required",
+        "preterminal_parent_validation_required",
+        "preterminal_validation_attested_before_terminal_labels",
+        "terminal_label_loader_forbidden_before_preterminal_attestation",
+        "execution_authorized",
         "split_previously_consumed",
         "method_development_is_posthoc",
         "prior_consumed_test_findings_informed_method_design",
-        "no_v2_semantic_artifacts_used",
         "source_experts_frozen",
         "generation_lock_frozen",
         "physical_probability_surface_recomputed_from_original_inputs",
@@ -266,9 +307,21 @@ def _load_ledger_chain(
         "scratch_reuse_forbidden",
         "cross_run_recovery_forbidden",
         "two_fresh_process_validation_required",
+        "repair_source_manifest_required",
+        "repair_source_manifest_checked_pre_gpu",
+        "repair_source_identity_persisted_in_protocol_manifest",
     )
     required_false = (
         "fresh_evidence",
+        "scientific_method_changed_from_v1",
+        "v1_failure_preterminal",
+        "v1_final_validation_passed",
+        "quarantined_v1_output_used",
+        "quarantined_v1_scratch_or_checkpoint_used",
+        "quarantined_v1_terminal_outputs_used",
+        "prior_v1_label_capability_history_used",
+        "prior_v1_amendment_used",
+        "preexisting_v2_semantic_artifacts_used",
         "prior_consumed_test_bytes_used_as_scientific_inputs",
         "previous_prediction_surfaces_used",
         "previous_stage90_outputs_used",
@@ -313,11 +366,43 @@ def _load_ledger_chain(
         sha256_file(parent_path) != EXPECTED_TEST_CONSUMPTION_LEDGER_SHA256
         or parent.get("status") != "CONSUMED_FOR_REPRESENTATION_ADOPTION"
         or parent.get("split") != "test"
-        or sha256_file(amendment_path) != EXPECTED_LEDGER_AMENDMENT_SHA256
+        or sha256_file(amendment_path)
+        != str(getattr(config, "expected_ledger_amendment_sha256"))
         or amendment.get("amendment_id") != LEDGER_AMENDMENT_ARTIFACT_ID
+        or amendment.get("schema_version")
+        != "midogpp_test_consumption_ledger_amendment_v3"
+        or amendment.get("parent_artifact_id")
+        != "midogpp_uniform_b_test_consumption_ledger_v1"
+        or amendment.get("parent_member") != "reports/test_consumption_ledger.json"
         or amendment.get("parent_sha256") != EXPECTED_TEST_CONSUMPTION_LEDGER_SHA256
         or amendment.get("authorized_consumer_experiment_ids") != [EXPERIMENT_ID]
         or amendment.get("authorization_scope") != AUTHORIZATION_SCOPE
+        or amendment.get("authorization_basis")
+        != "explicit_user_authorization_for_cbpupr_v2_canonical_row_order_mechanical_repair_run"
+        or amendment.get("repair_code_identity") != REPAIR_CODE_IDENTITY
+        or amendment.get("repair_base_commit") != REPAIR_BASE_COMMIT
+        or amendment.get("repair_source_manifest_member")
+        != protocol.get("repair_source_manifest_member")
+        or amendment.get("repair_source_manifest_sha256")
+        != protocol.get("repair_source_manifest_sha256")
+        or amendment.get("repair_source_tree_sha256")
+        != protocol.get("repair_source_tree_sha256")
+        or amendment.get("repair_source_member_count")
+        != protocol.get("repair_source_member_count")
+        or amendment.get("quarantined_v1_experiment_id")
+        != QUARANTINED_V1_EXPERIMENT_ID
+        or amendment.get("quarantined_v1_output_artifact_id")
+        != QUARANTINED_V1_OUTPUT_ARTIFACT_ID
+        or amendment.get("v1_failure_phase")
+        != "CONTENT_AND_TWO_FRESH_PROCESS_VALIDATION"
+        or amendment.get("v1_failure_exception")
+        != "posterior_prediction_model_lineage_order_drift"
+        or amendment.get("canonical_physical_row_order")
+        != "lexicographic_case_id_then_sample_id"
+        or amendment.get("posterior_prediction_and_model_row_order")
+        != "lexicographic_case_id_then_sample_id"
+        or amendment.get("preterminal_fresh_process_validation_count") != 2
+        or amendment.get("final_fresh_process_validation_count") != 2
         or amendment.get("claim_role") != CLAIM_ROLE
         or amendment.get("held_unit_count") != EXPECTED_TOTAL_CASE_COUNT
         or amendment.get("outer_route_count") != EXPECTED_TOTAL_CASE_COUNT

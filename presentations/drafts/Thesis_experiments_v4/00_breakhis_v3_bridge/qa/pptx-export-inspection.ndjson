@@ -1,0 +1,69 @@
+{"kind":"deck","id":"pr/gma9ia","name":"Deck"}
+{"kind":"layout","layoutId":"e13d4d3e-4417-402a-81ba-561a106a0135","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"e6005fdf-07ab-4cc8-ad8d-6a0c6d6e785a","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/fshpmx","slide":1,"title":"PREVIOUS MEETING — CONCEPTUAL BRIDGE","textShapes":5}
+{"kind":"textbox","id":"sh/0n2p0zu9","slide":1,"name":"cover-eyebrow","text":"PREVIOUS MEETING — CONCEPTUAL BRIDGE","textPreview":"PREVIOUS MEETING — CONCEPTUAL BRIDGE","textChars":36,"textLines":1,"bbox":[42,40,760,34]}
+{"kind":"shape","id":"sh/fmtoreto","slide":1,"name":"cover-accent","bbox":[42,112,10,326]}
+{"kind":"textbox","id":"sh/elk7y9c3","slide":1,"name":"cover-title","text":"Dense composition already looked safer than sparse proxy routing","textPreview":"Dense composition already looked safer than sparse proxy routing","textChars":64,"textLines":1,"bbox":[76,108,1080,244]}
+{"kind":"textbox","id":"sh/psvqxobq","slide":1,"name":"cover-subtitle","text":"BreakHis / DINOv2 results that motivated the current MIDOG++ evidence chain","textPreview":"BreakHis / DINOv2 results that motivated the current MIDOG++ evidence chain","textChars":75,"textLines":1,"bbox":[76,376,960,90]}
+{"kind":"shape","id":"sh/ormp4ju5","slide":1,"name":"cover-status-panel","bbox":[76,516,1120,92]}
+{"kind":"textbox","id":"sh/nqdovetk","slide":1,"name":"cover-status","text":"Historical context • numeric results are not pooled with MIDOG++","textPreview":"Historical context • numeric results are not pooled with MIDOG++","textChars":64,"textLines":1,"bbox":[102,538,1070,50]}
+{"kind":"textbox","id":"sh/2p4729cz","slide":1,"name":"source-footer","text":"Source: Thesis_experiment_v3.pdf • historical context","textPreview":"Source: Thesis_experiment_v3.pdf • historical context","textChars":53,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/fshpmx","slide":1,"text":"[Sources]\n- presentations/Thesis_experiment_v3.pdf\n- presentations/drafts/current_progress_synthesis_2026-08-22.md\n[/Sources]"}
+{"kind":"slide","id":"sl/pxvqca","slide":2,"title":"The prior deck isolated representation, generation, and routing","textShapes":18}
+{"kind":"textbox","id":"sh/x8r21kvy","slide":2,"name":"slide-2-title","text":"The prior deck isolated representation, generation, and routing","textPreview":"The prior deck isolated representation, generation, and routing","textChars":63,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/a5g365c7","slide":2,"name":"slide-2-number","text":"2","textPreview":"2","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/b69kzads","slide":2,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/kvilczup","slide":2,"name":"question-label","text":"RESEARCH QUESTION","textPreview":"RESEARCH QUESTION","textChars":17,"textLines":1,"bbox":[42,154,420,30]}
+{"kind":"textbox","id":"sh/lwr254vu","slide":2,"name":"question","text":"Was weak downstream performance caused by representation, generation, or routing?","textPreview":"Was weak downstream performance caused by representation, generation, or routing?","textChars":81,"textLines":1,"bbox":[42,202,490,290]}
+{"kind":"textbox","id":"sh/yt03apcj","slide":2,"name":"protocol-note","text":"Earlier benchmark and protocol. Use for qualitative continuity only.","textPreview":"Earlier benchmark and protocol. Use for qualitative continuity only.","textChars":68,"textLines":1,"bbox":[42,526,490,116]}
+{"kind":"shape","id":"sh/zu9k3ud4","slide":2,"name":"column-rule","bbox":[585,146,1.5,506]}
+{"kind":"textbox","id":"sh/0zy10ve5","slide":2,"name":"step-num-0","text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[628,150,42,34]}
+{"kind":"textbox","id":"sh/1072t0vq","slide":2,"name":"step-label-0","text":"Representation reference","textPreview":"Representation reference","textChars":24,"textLines":1,"bbox":[688,148,500,36]}
+{"kind":"textbox","id":"sh/lgvuhk3m","slide":2,"name":"step-text-0","text":"Real PCA64 reconstruction tested whether compressed features retained task signal.","textPreview":"Real PCA64 reconstruction tested whether compressed features retained task signal.","textChars":82,"textLines":1,"bbox":[688,188,500,66]}
+{"kind":"shape","id":"sh/kfmt8f21","slide":2,"name":"step-rule-0","bbox":[628,261,560,1]}
+{"kind":"textbox","id":"sh/jutsfalg","slide":2,"name":"step-num-1","text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[628,274,42,34]}
+{"kind":"textbox","id":"sh/ytkb65kv","slide":2,"name":"step-label-1","text":"Generation mechanisms","textPreview":"Generation mechanisms","textChars":21,"textLines":1,"bbox":[688,272,500,36]}
+{"kind":"textbox","id":"sh/tkvulk3i","slide":2,"name":"step-text-1","text":"Unconditioned, class-conditioned, and GMM sampling isolated the generative loss.","textPreview":"Unconditioned, class-conditioned, and GMM sampling isolated the generative loss.","textChars":80,"textLines":1,"bbox":[688,312,500,66]}
+{"kind":"shape","id":"sh/8jmtcf2x","slide":2,"name":"step-rule-1","bbox":[628,385,560,1]}
+{"kind":"textbox","id":"sh/7idcjals","slide":2,"name":"step-num-2","text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[628,398,42,34]}
+{"kind":"textbox","id":"sh/6h4ba5k7","slide":2,"name":"step-label-2","text":"Sparse routing","textPreview":"Sparse routing","textChars":14,"textLines":1,"bbox":[688,396,500,36]}
+{"kind":"textbox","id":"sh/hofup43u","slide":2,"name":"step-text-2","text":"Support-NELBO top-k selection tested leakage-safe compatibility ranking.","textPreview":"Support-NELBO top-k selection tested leakage-safe compatibility ranking.","textChars":72,"textLines":1,"bbox":[688,436,500,66]}
+{"kind":"shape","id":"sh/gn6tgz29","slide":2,"name":"step-rule-2","bbox":[628,509,560,1]}
+{"kind":"textbox","id":"sh/03e58neh","slide":2,"name":"step-num-3","text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[628,522,42,34]}
+{"kind":"textbox","id":"sh/147m1sv2","slide":2,"name":"step-label-3","text":"Dense composition","textPreview":"Dense composition","textChars":17,"textLines":1,"bbox":[688,520,500,36]}
+{"kind":"textbox","id":"sh/e1wn6xwr","slide":2,"name":"step-text-3","text":"Arithmetic and geometric probability pooling reduced top-1 selection risk.","textPreview":"Arithmetic and geometric probability pooling reduced top-1 selection risk.","textChars":74,"textLines":1,"bbox":[688,560,500,66]}
+{"kind":"textbox","id":"sh/f254z2dw","slide":2,"name":"source-footer","text":"Source: Thesis_experiment_v3.pdf • historical context","textPreview":"Source: Thesis_experiment_v3.pdf • historical context","textChars":53,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/pxvqca","slide":2,"text":"[Sources]\n- presentations/Thesis_experiment_v3.pdf\n- presentations/drafts/current_progress_synthesis_2026-08-22.md\n[/Sources]"}
+{"kind":"slide","id":"sl/7xmb5f","slide":3,"title":"Generation and dense composition closed most of the gap","textShapes":11}
+{"kind":"textbox","id":"sh/n218fm1o","slide":3,"name":"slide-3-title","text":"Generation and dense composition closed most of the gap","textPreview":"Generation and dense composition closed most of the gap","textChars":55,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/o3a9or29","slide":3,"name":"slide-3-number","text":"3","textPreview":"3","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/943qhwju","slide":3,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/v6l8j610","slide":3,"name":"chart-caption","text":"Selected and reference results from Thesis_experiment_v3.pdf.","textPreview":"Selected and reference results from Thesis_experiment_v3.pdf.","textChars":61,"textLines":1,"bbox":[52,642,750,28]}
+{"kind":"textbox","id":"sh/w7u9sb2l","slide":3,"name":"metric-label","text":"WHAT CHANGED","textPreview":"WHAT CHANGED","textChars":12,"textLines":1,"bbox":[862,155,330,30]}
+{"kind":"textbox","id":"sh/x83qlgj6","slide":3,"name":"metric-value-0","text":"+0.0261","textPreview":"+0.0261","textChars":7,"textLines":1,"bbox":[862,208,330,52]}
+{"kind":"textbox","id":"sh/i9cre1kb","slide":3,"name":"metric-text-0","text":"Geometric vs arithmetic dense CVAE composition","textPreview":"Geometric vs arithmetic dense CVAE composition","textChars":46,"textLines":1,"bbox":[862,262,330,58]}
+{"kind":"shape","id":"sh/jalsn61w","slide":3,"name":"metric-rule-1","bbox":[862,332,330,1]}
+{"kind":"textbox","id":"sh/nu5o3m1s","slide":3,"name":"metric-value-1","text":"4 / 5","textPreview":"4 / 5","textChars":5,"textLines":1,"bbox":[862,350,330,52]}
+{"kind":"textbox","id":"sh/mtcnuhk7","slide":3,"name":"metric-text-1","text":"Centers improved by geometric pooling","textPreview":"Centers improved by geometric pooling","textChars":37,"textLines":1,"bbox":[862,404,330,58]}
+{"kind":"shape","id":"sh/9wn65wjy","slide":3,"name":"metric-rule-2","bbox":[862,474,330,1]}
+{"kind":"textbox","id":"sh/8vepwr2d","slide":3,"name":"metric-value-2","text":"0.862","textPreview":"0.862","textChars":5,"textLines":1,"bbox":[862,492,330,52]}
+{"kind":"textbox","id":"sh/z6lozm1g","slide":3,"name":"metric-text-2","text":"Real PCA64 reference: representation was not the main ceiling","textPreview":"Real PCA64 reference: representation was not the main ceiling","textChars":61,"textLines":1,"bbox":[862,546,330,58]}
+{"kind":"textbox","id":"sh/y5cnqhkb","slide":3,"name":"source-footer","text":"Source: Thesis_experiment_v3.pdf • historical context","textPreview":"Source: Thesis_experiment_v3.pdf • historical context","textChars":53,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"chart","id":"ch/elgzi1on","slide":3,"name":"primary-result-chart","chartType":"bar","bbox":[42,150,770,490]}
+{"kind":"notes","id":"nt/7xmb5f","slide":3,"text":"[Sources]\n- presentations/Thesis_experiment_v3.pdf\n- presentations/drafts/current_progress_synthesis_2026-08-22.md\n[/Sources]"}
+{"kind":"slide","id":"sl/n1w412","slide":4,"title":"The current program rebuilds the diagnosis more rigorously","textShapes":10}
+{"kind":"textbox","id":"sh/94vet07q","slide":4,"name":"slide-4-title","text":"The current program rebuilds the diagnosis more rigorously","textPreview":"The current program rebuilds the diagnosis more rigorously","textChars":58,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/m1kvyl8f","slide":4,"name":"slide-4-number","text":"4","textPreview":"4","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/72twrqp0","slide":4,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/kz2dwbq9","slide":4,"name":"supported-label","text":"SUPPORTED INTERPRETATION","textPreview":"SUPPORTED INTERPRETATION","textChars":24,"textLines":1,"bbox":[42,158,520,30]}
+{"kind":"textbox","id":"sh/l0bepg7u","slide":4,"name":"supported-text","text":"Dense composition is robust; class conditioning and latent distribution modeling matter; proxy-based top-1 selection is brittle.","textPreview":"Dense composition is robust; class conditioning and latent distribution modeling matter; proxy-based top-1 selection is brittle.","textChars":128,"textLines":1,"bbox":[42,205,530,334]}
+{"kind":"textbox","id":"sh/yxkvul83","slide":4,"name":"objective-text","text":"Bridge to objectives 2–5: generation, routing, composition, and downstream utility.","textPreview":"Bridge to objectives 2–5: generation, routing, composition, and downstream utility.","textChars":83,"textLines":1,"bbox":[42,566,530,80]}
+{"kind":"shape","id":"sh/zytwnqpo","slide":4,"name":"conclusion-rule","bbox":[612,150,1.5,500]}
+{"kind":"textbox","id":"sh/cv2dsbqd","slide":4,"name":"boundary-label","text":"CLAIM BOUNDARY","textPreview":"CLAIM BOUNDARY","textChars":14,"textLines":1,"bbox":[654,158,540,30]}
+{"kind":"textbox","id":"sh/xwbelg7y","slide":4,"name":"boundary-text","text":"Do not compare absolute BreakHis and MIDOG++ values as if they were the same estimand. Dataset, backbone, domains, and protocol changed.","textPreview":"Do not compare absolute BreakHis and MIDOG++ values as if they were the same estimand. Dataset, backbone, domains, and protocol changed.","textChars":136,"textLines":1,"bbox":[654,205,540,205]}
+{"kind":"shape","id":"sh/p0jixg7u","slide":4,"name":"next-panel","bbox":[654,458,540,164]}
+{"kind":"textbox","id":"sh/oza1ob69","slide":4,"name":"next-label","text":"NEXT DECISION","textPreview":"NEXT DECISION","textChars":13,"textLines":1,"bbox":[680,482,490,28]}
+{"kind":"textbox","id":"sh/3y10vqpo","slide":4,"name":"next-text","text":"Re-test the same decomposition with pathology-specific features and staged evidence firewalls.","textPreview":"Re-test the same decomposition with pathology-specific features and staged evidence firewalls.","textChars":94,"textLines":1,"bbox":[680,522,490,76]}
+{"kind":"textbox","id":"sh/2xsjmlo3","slide":4,"name":"source-footer","text":"Source: Thesis_experiment_v3.pdf • historical context","textPreview":"Source: Thesis_experiment_v3.pdf • historical context","textChars":53,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/n1w412","slide":4,"text":"[Sources]\n- presentations/Thesis_experiment_v3.pdf\n- presentations/drafts/current_progress_synthesis_2026-08-22.md\n[/Sources]"}

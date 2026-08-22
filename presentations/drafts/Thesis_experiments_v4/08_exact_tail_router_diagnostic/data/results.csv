@@ -1,0 +1,4 @@
+method,bacc,delta_vs_base,role
+Dense base B,0.770276,0.000000,protected baseline
+R2 exact-tail router,0.762182,-0.008093,routed diagnostic
+Single-source oracle,0.791928,0.021652,terminal oracle

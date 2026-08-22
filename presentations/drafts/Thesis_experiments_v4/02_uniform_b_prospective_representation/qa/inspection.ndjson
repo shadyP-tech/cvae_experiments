@@ -1,0 +1,66 @@
+{"kind":"slide","id":"sl/p86gqs","slide":1,"title":"STAGE 90 — PROSPECTIVE WITHIN-CENTER CONFIRMATION","textShapes":5}
+{"kind":"textbox","id":"sh/j29gfm54","slide":1,"name":"cover-eyebrow","text":"STAGE 90 — PROSPECTIVE WITHIN-CENTER CONFIRMATION","textPreview":"STAGE 90 — PROSPECTIVE WITHIN-CENTER CONFIRMATION","textChars":49,"textLines":1,"bbox":[42,40,760,34]}
+{"kind":"shape","id":"sh/k3ixormp","slide":1,"name":"cover-accent","bbox":[42,112,10,326]}
+{"kind":"textbox","id":"sh/54ryhwna","slide":1,"name":"cover-title","text":"Representation B improves A on new cases in every observed center","textPreview":"Representation B improves A on new cases in every observed center","textChars":65,"textLines":1,"bbox":[76,108,1080,244]}
+{"kind":"textbox","id":"sh/adgfihon","slide":1,"name":"cover-subtitle","text":"A frozen Phase-B test after representation discovery","textPreview":"A frozen Phase-B test after representation discovery","textChars":52,"textLines":1,"bbox":[76,376,960,90]}
+{"kind":"shape","id":"sh/vepwb25s","slide":1,"name":"cover-status-panel","bbox":[76,516,1120,92]}
+{"kind":"textbox","id":"sh/wzyxk7md","slide":1,"name":"cover-status","text":"CONFIRMED_WITHIN_CENTER • diagnostic-only for downstream adoption","textPreview":"CONFIRMED_WITHIN_CENTER • diagnostic-only for downstream adoption","textChars":65,"textLines":1,"bbox":[102,538,1070,50]}
+{"kind":"textbox","id":"sh/x07ydcny","slide":1,"name":"source-footer","text":"Source: uniform_b_v3_prospective_test_confirmation_v1","textPreview":"Source: uniform_b_v3_prospective_test_confirmation_v1","textChars":53,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/p86gqs","slide":1,"text":"[Sources]\n- docs/wiki/03-experiments/midogpp-uniform-b-v3-prospective-test-confirmation-v1.md\n- artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v3_prospective_test_confirmation_v1/seed42/\n[/Sources]"}
+{"kind":"slide","id":"sl/aakng0","slide":2,"title":"The test surface was frozen before B features were extracted","textShapes":18}
+{"kind":"textbox","id":"sh/ih0v6tof","slide":2,"name":"slide-2-title","text":"The test surface was frozen before B features were extracted","textPreview":"The test surface was frozen before B features were extracted","textChars":60,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/5kru18n6","slide":2,"name":"slide-2-number","text":"2","textPreview":"2","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/4jid836l","slide":2,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/vupcve54","slide":2,"name":"question-label","text":"RESEARCH QUESTION","textPreview":"RESEARCH QUESTION","textChars":17,"textLines":1,"bbox":[42,154,420,30]}
+{"kind":"textbox","id":"sh/utgv2toj","slide":2,"name":"question","text":"Does fixed representation B outperform A on case-disjoint test rows from the same nine centers?","textPreview":"Does fixed representation B outperform A on case-disjoint test rows from the same nine centers?","textChars":95,"textLines":1,"bbox":[42,202,490,290]}
+{"kind":"textbox","id":"sh/hwruxonu","slide":2,"name":"protocol-note","text":"9,928 test rows; zero sample/case overlap with 9,648 discovery rows.","textPreview":"9,928 test rows; zero sample/case overlap with 9,648 discovery rows.","textChars":68,"textLines":1,"bbox":[42,526,490,116]}
+{"kind":"shape","id":"sh/wvid4j6p","slide":2,"name":"column-rule","bbox":[585,146,1.5,506]}
+{"kind":"textbox","id":"sh/nqpcre5s","slide":2,"name":"step-num-0","text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[628,150,42,34]}
+{"kind":"textbox","id":"sh/mpgvy9o7","slide":2,"name":"step-label-0","text":"Discover on train","textPreview":"Discover on train","textChars":17,"textLines":1,"bbox":[688,148,500,36]}
+{"kind":"textbox","id":"sh/sfqh43m1","slide":2,"name":"step-text-0","text":"Phase A selected the uniform-B hypothesis; those outcomes cannot confirm it.","textPreview":"Phase A selected the uniform-B hypothesis; those outcomes cannot confirm it.","textChars":76,"textLines":1,"bbox":[688,188,500,66]}
+{"kind":"shape","id":"sh/tgjyx8nm","slide":2,"name":"step-rule-0","bbox":[628,261,560,1]}
+{"kind":"textbox","id":"sh/6d8z2d4v","slide":2,"name":"step-num-1","text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[628,274,42,34]}
+{"kind":"textbox","id":"sh/rehgvy5g","slide":2,"name":"step-label-1","text":"Freeze the gate","textPreview":"Freeze the gate","textChars":15,"textLines":1,"bbox":[688,272,500,36]}
+{"kind":"textbox","id":"sh/4bqh03mp","slide":2,"name":"step-text-1","text":"Delta, win count, worst-center floor, and bootstrap lower bound are predeclared.","textPreview":"Delta, win count, worst-center floor, and bootstrap lower bound are predeclared.","textChars":80,"textLines":1,"bbox":[688,312,500,66]}
+{"kind":"shape","id":"sh/5czyt8na","slide":2,"name":"step-rule-1","bbox":[628,385,560,1]}
+{"kind":"textbox","id":"sh/i98zyt4z","slide":2,"name":"step-num-2","text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[628,398,42,34]}
+{"kind":"textbox","id":"sh/jahgry5k","slide":2,"name":"step-label-2","text":"Extract test B","textPreview":"Extract test B","textChars":14,"textLines":1,"bbox":[688,396,500,36]}
+{"kind":"textbox","id":"sh/o7uhcnm9","slide":2,"name":"step-text-2","text":"Pinned Virchow2 revision and pooling window reproduce the representation.","textPreview":"Pinned Virchow2 revision and pooling window reproduce the representation.","textChars":73,"textLines":1,"bbox":[688,436,500,66]}
+{"kind":"shape","id":"sh/p83i5snu","slide":2,"name":"step-rule-2","bbox":[628,509,560,1]}
+{"kind":"textbox","id":"sh/x4zypsfy","slide":2,"name":"step-num-3","text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[628,522,42,34]}
+{"kind":"textbox","id":"sh/c3qhwned","slide":2,"name":"step-label-3","text":"Refit and compare","textPreview":"Refit and compare","textChars":17,"textLines":1,"bbox":[688,520,500,36]}
+{"kind":"textbox","id":"sh/b2hgnixs","slide":2,"name":"step-text-3","text":"A and B classifiers refit under the frozen representation-specific policies.","textPreview":"A and B classifiers refit under the frozen representation-specific policies.","textChars":76,"textLines":1,"bbox":[688,560,500,66]}
+{"kind":"textbox","id":"sh/a1ozudw7","slide":2,"name":"source-footer","text":"Source: uniform_b_v3_prospective_test_confirmation_v1","textPreview":"Source: uniform_b_v3_prospective_test_confirmation_v1","textChars":53,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/aakng0","slide":2,"text":"[Sources]\n- docs/wiki/03-experiments/midogpp-uniform-b-v3-prospective-test-confirmation-v1.md\n- artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v3_prospective_test_confirmation_v1/seed42/\n[/Sources]"}
+{"kind":"slide","id":"sl/7h3n6m","slide":3,"title":"B wins all nine centers with a +0.0634 mean gain","textShapes":11}
+{"kind":"textbox","id":"sh/nupofihs","slide":3,"name":"slide-3-title","text":"B wins all nine centers with a +0.0634 mean gain","textPreview":"B wins all nine centers with a +0.0634 mean gain","textChars":48,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/8fi583yd","slide":3,"name":"slide-3-number","text":"3","textPreview":"3","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/9gr6h8zy","slide":3,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/vi9ojih4","slide":3,"name":"chart-caption","text":"Held-out-center test BACC; same center identities, new cases.","textPreview":"Held-out-center test BACC; same center identities, new cases.","textChars":61,"textLines":1,"bbox":[52,642,750,28]}
+{"kind":"textbox","id":"sh/wji5cny9","slide":3,"name":"metric-label","text":"WHAT CHANGED","textPreview":"WHAT CHANGED","textChars":12,"textLines":1,"bbox":[862,155,330,30]}
+{"kind":"textbox","id":"sh/xkr6lszu","slide":3,"name":"metric-value-0","text":"+0.0634","textPreview":"+0.0634","textChars":7,"textLines":1,"bbox":[862,208,330,52]}
+{"kind":"textbox","id":"sh/qlwnyt0z","slide":3,"name":"metric-text-0","text":"Equal-center mean B minus A","textPreview":"Equal-center mean B minus A","textChars":27,"textLines":1,"bbox":[862,262,330,58]}
+{"kind":"shape","id":"sh/bm547ehk","slide":3,"name":"metric-rule-1","bbox":[862,332,330,1]}
+{"kind":"textbox","id":"sh/fedkzmxc","slide":3,"name":"metric-value-1","text":"9 / 9","textPreview":"9 / 9","textChars":5,"textLines":1,"bbox":[862,350,330,52]}
+{"kind":"textbox","id":"sh/ed4jqhgr","slide":3,"name":"metric-text-1","text":"Strict center wins","textPreview":"Strict center wins","textChars":18,"textLines":1,"bbox":[862,404,330,58]}
+{"kind":"shape","id":"sh/1gv21wfi","slide":3,"name":"metric-rule-2","bbox":[862,474,330,1]}
+{"kind":"textbox","id":"sh/0fm1sryx","slide":3,"name":"metric-value-2","text":"[.0507,.0737]","textPreview":"[.0507,.0737]","textChars":13,"textLines":1,"bbox":[862,492,330,52]}
+{"kind":"textbox","id":"sh/rad0vmh0","slide":3,"name":"metric-text-2","text":"Paired case-bootstrap interval","textPreview":"Paired case-bootstrap interval","textChars":30,"textLines":1,"bbox":[862,546,330,58]}
+{"kind":"textbox","id":"sh/q94jmhgv","slide":3,"name":"source-footer","text":"Source: uniform_b_v3_prospective_test_confirmation_v1","textPreview":"Source: uniform_b_v3_prospective_test_confirmation_v1","textChars":53,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"chart","id":"ch/2907yhcr","slide":3,"name":"primary-result-chart","chartType":"bar","bbox":[42,150,770,490]}
+{"kind":"notes","id":"nt/7h3n6m","slide":3,"text":"[Sources]\n- docs/wiki/03-experiments/midogpp-uniform-b-v3-prospective-test-confirmation-v1.md\n- artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v3_prospective_test_confirmation_v1/seed42/\n[/Sources]"}
+{"kind":"slide","id":"sl/d0dhv6","slide":4,"title":"B reduces representation uncertainty, not center uncertainty","textShapes":10}
+{"kind":"textbox","id":"sh/u58vm1gf","slide":4,"name":"slide-4-title","text":"B reduces representation uncertainty, not center uncertainty","textPreview":"B reduces representation uncertainty, not center uncertainty","textChars":60,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/h8zuxgf6","slide":4,"name":"slide-4-number","text":"4","textPreview":"4","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/g7qdobyl","slide":4,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/72xcrmx4","slide":4,"name":"supported-label","text":"SUPPORTED INTERPRETATION","textPreview":"SUPPORTED INTERPRETATION","textChars":24,"textLines":1,"bbox":[42,158,520,30]}
+{"kind":"textbox","id":"sh/61obihgj","slide":4,"name":"supported-text","text":"B is a robust improvement for new cases drawn from the nine observed center populations.","textPreview":"B is a robust improvement for new cases drawn from the nine observed center populations.","textChars":88,"textLines":1,"bbox":[42,205,530,334]}
+{"kind":"textbox","id":"sh/t4futwfu","slide":4,"name":"objective-text","text":"Strengthens objective 1 and the representation foundation for objective 2.","textPreview":"Strengthens objective 1 and the representation foundation for objective 2.","textChars":74,"textLines":1,"bbox":[42,566,530,80]}
+{"kind":"shape","id":"sh/s36tkryp","slide":4,"name":"conclusion-rule","bbox":[612,150,1.5,500]}
+{"kind":"textbox","id":"sh/ry1c3qx8","slide":4,"name":"boundary-label","text":"CLAIM BOUNDARY","textPreview":"CLAIM BOUNDARY","textChars":14,"textLines":1,"bbox":[654,158,540,30]}
+{"kind":"textbox","id":"sh/qxsvulgn","slide":4,"name":"boundary-text","text":"No new center, institution, scanner population, or external dataset is sampled. Stage-90 placement forbids silent adoption into Stages 20–70.","textPreview":"No new center, institution, scanner population, or external dataset is sampled. Stage-90 placement forbids silent adoption into Stages 20...","textChars":141,"textLines":1,"bbox":[654,205,540,205]}
+{"kind":"shape","id":"sh/83e5cfmt","slide":4,"name":"next-panel","bbox":[654,458,540,164]}
+{"kind":"textbox","id":"sh/94n65kny","slide":4,"name":"next-label","text":"NEXT DECISION","textPreview":"NEXT DECISION","textChars":13,"textLines":1,"bbox":[680,482,490,28]}
+{"kind":"textbox","id":"sh/m1wna54n","slide":4,"name":"next-text","text":"If B is adopted, start a separately authorized downstream lineage rather than rewriting completed evidence.","textPreview":"If B is adopted, start a separately authorized downstream lineage rather than rewriting completed evidence.","textChars":107,"textLines":1,"bbox":[680,522,490,76]}
+{"kind":"textbox","id":"sh/n25o3a58","slide":4,"name":"source-footer","text":"Source: uniform_b_v3_prospective_test_confirmation_v1","textPreview":"Source: uniform_b_v3_prospective_test_confirmation_v1","textChars":53,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/d0dhv6","slide":4,"text":"[Sources]\n- docs/wiki/03-experiments/midogpp-uniform-b-v3-prospective-test-confirmation-v1.md\n- artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v3_prospective_test_confirmation_v1/seed42/\n[/Sources]"}

@@ -12,8 +12,9 @@ frozen and independently validated.
 - Policy lock: `27f16953b32c46cd`
 - Production and independent validation: `PASS`
 
-This is a lock-only result. It establishes neither routing quality nor
-downstream utility.
+This Stage-60 artifact remains a lock-only result. Its frozen policy has now
+been evaluated in the separate descriptive Stage-70 comparison below; the lock
+itself establishes neither routing quality nor downstream utility.
 
 ## Compatibility contract
 
@@ -62,18 +63,31 @@ catalog. Both record revision `40221038ca714bf33fd21582857d21fa1db4e6f3`
 with `repository_dirty=true`; preserve the exact diff or regenerate from a
 clean revision before final archival.
 
-## Next evidence
+## Completed descriptive Stage-70 evidence
 
-The substantive source-inner utility/regret policy is now frozen; see
+The substantive source-inner utility/regret policy is frozen; see
 `docs/wiki/03-experiments/midogpp-uniform-b-v2-source-inner-utility-regret-policy-v1.md`.
 Its uncertainty gate rejected single-source routing for every outer fold and
 reused the exact equal-union fallback. Its source-inner labels remain
 policy-training evidence only; consumed Stage-20 evidence and Stage-50/90
 artifacts still cannot feed the policy.
 
-Authorize one immutable target-evaluation input and implement matched Stage-70
-scoring for equal-union, metadata max-tie, and utility/regret policies.
-Candidate eligibility, generated sample budget, GenerationLock streams,
-classifier settings, seed replicates, and evaluation rows must be identical.
-Only that fresh evaluation may support a routing-quality or downstream-utility
-claim.
+The canonical descriptive comparison is complete at:
+
+```text
+artifacts/midogpp/70_frozen_policy_downstream/
+uniform_b_v2_descriptive_frozen_policy_comparison/v1/
+```
+
+Metadata max-tie reaches mean BACC `0.7450994314`, versus `0.7749677917` for
+equal-union. The delta is `-0.0298683603`, with descriptive paired bootstrap
+interval `[-0.0504064265, -0.0087054046]`. The run validates `PASS`, seals
+predictions before labels, and uses labels for scoring only.
+
+Because the test surface was previously consumed, publication remains
+`DESCRIPTIVE_COMPARISON_COMPLETE` with
+`fresh_confirmatory_status=BLOCKED_NO_UNCONSUMED_ELIGIBLE_SPLIT`. The result is
+valid negative descriptive evidence for this exact metadata rule; it cannot
+promote a router, support deployment, or establish external/new-center
+generalization. See
+`docs/wiki/03-experiments/midogpp-uniform-b-v2-descriptive-frozen-policy-comparison-v1.md`.

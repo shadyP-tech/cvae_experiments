@@ -1,6 +1,6 @@
 # Protocol Status
 
-Last updated: 2026-08-09
+Last updated: 2026-08-22
 
 ## Active MIDOG++ surfaces
 
@@ -16,6 +16,8 @@ Last updated: 2026-08-09
   `src/midogpp_thesis/cvae/generation/`
 - Stage-60 policy locking and validation:
   `src/midogpp_thesis/cvae/routing/`
+- Stage-70 frozen-policy downstream comparison:
+  `artifacts/midogpp/70_frozen_policy_downstream/uniform_b_v2_descriptive_frozen_policy_comparison/v1/`
 - Registry, artifact resolution, and fail-closed launch preparation:
   `src/midogpp_thesis/workspace/`
 
@@ -45,6 +47,8 @@ The working tree contains active implementations for:
 - the completed Uniform-B v2 Stage-40 GenerationLock;
 - the completed Uniform-B v2 Stage-60 equal-union, metadata, source-inner
   utility, and uncertainty-gated utility/regret policy locks;
+- the completed Uniform-B v2 Stage-70 descriptive frozen-policy comparison on
+  the previously consumed test surface;
 - the runnable consumed-data Stage-90 utility-aligned exact-tail diagnostic,
   whose fixed-two-case `R2` arm is always
   `INSUFFICIENT_SUPPORT_FOR_POLICY` and cannot feed later stages;
@@ -105,6 +109,16 @@ and all margin lower bounds are negative. The policy lock is
 `POLICY_FROZEN_FOR_MATCHED_STAGE70_EVALUATION`. No Stage-60 artifact supports
 a routing-quality or target downstream-utility claim.
 
+The matched Stage-70 descriptive comparison is `COMPLETE` and validates
+`PASS`. Equal-union reaches mean BACC `0.774968`; metadata max-tie reaches
+`0.745099`; the utility/regret arm is exactly equal-union at `0.774968`.
+Metadata minus equal-union is `-0.029868`, with descriptive paired bootstrap
+interval `[-0.050406, -0.008705]`. Predictions seal before labels, target
+labels are scoring-only, and no Stage-50 or Stage-90 result is consumed.
+Publication is `DESCRIPTIVE_COMPARISON_COMPLETE`, but
+`fresh_confirmatory_status=BLOCKED_NO_UNCONSUMED_ELIGIBLE_SPLIT`; no routing
+policy is promoted.
+
 ## Current thesis-facing evidence
 
 The tuned-classifier preservation result supports only
@@ -137,6 +151,31 @@ are fully specified, target-excluded, and frozen before evaluation. The utility
 rows are policy-training only, and their per-query best source is a
 non-deployable regret oracle, not target evidence. Neither stage establishes a
 held-out BACC, a routing advantage, or downstream utility.
+
+Stage 70 supports descriptive downstream utility for the three frozen arms on
+the previously consumed test surface. It supports a negative result for the
+tested metadata policy and exact fallback equivalence for utility/regret. It
+does not support fresh routing superiority, policy promotion, deployment,
+external generalization, or new-center generalization.
+
+Completed PSSCUR and PCSI-RACR Stage-90 bundles are terminal consumed-test
+bottleneck diagnostics only. PSSCUR routes zero and diagnoses
+`POSTERIOR_UTILITY_DOES_NOT_RANK_REALIZED_ACTIONS`. PCSI-RACR's primary
+observed-maximum envelope also routes zero, while a no-envelope sensitivity
+authorizes 11 policies. CBPUPR v1 is `FAILED` after terminal access because its
+persisted posterior prediction/model lineage drifted during fresh-process
+validation. CBPUPR v2 is separately `FAILED` preterminally in
+`ROUTE_ENDPOINTS_436_POSTERIORS_AND_CANDIDATE_SEAL`: a global physical-surface
+hash was compared with a per-center surface hash. Its terminal journal count
+is zero and no terminal-evaluation labels or metrics opened. Neither failure
+produces evidence or permits recovery. V3 is now an explicitly authorized,
+one-shot global-and-center-surface-lineage mechanical repair with its own
+config, direct-original six-input identity, ledger amendment, and runner. It
+has not been launched and produces no current evidence; any partial v3 state
+must fail closed without recovery or rerun. Every CBPUPR version remains
+`POST_HOC_CONSUMED_TEST_SENSITIVITY`,
+`TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`, `fresh_evidence=false`, and forbidden
+from promotion or later-experiment feed.
 
 ## Planned surfaces
 
@@ -178,8 +217,9 @@ planned surfaces are:
 
 - the alternative consensus-recipe provenance-clean v1 bank
 - all-candidate utility matrix for a clean bank
-- a separately authorized target-evaluation artifact
-- matched Stage-70 control-versus-metadata-versus-utility-router downstream utility
+- a genuinely unconsumed or external/new-center target-evaluation artifact for
+  any fresh routing confirmation; the descriptive Stage-70 comparison is
+  already complete and cannot satisfy this requirement
 - the planned fixed residual-top-up B/U/G/S Stage-60 lock and fresh Stage-70
   decomposition, blocked until a new unconsumed case-disjoint
   pseudoquery/support/evaluation surface exists

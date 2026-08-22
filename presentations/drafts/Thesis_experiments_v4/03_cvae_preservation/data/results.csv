@@ -1,0 +1,6 @@
+representation,bacc,macro_f1,preservation_ratio
+Tuned real-feature reference,0.740312,0.737205,
+Real PCA128 reference,0.720533,0.718135,0.922785
+CVAE decode mean,0.719681,0.717766,0.919368
+CVAE posterior sample,0.716630,0.714110,0.910740
+CVAE prior sample,0.637563,0.630151,0.571675

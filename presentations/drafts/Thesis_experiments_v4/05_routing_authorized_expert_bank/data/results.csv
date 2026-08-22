@@ -1,0 +1,9 @@
+gate,required,observed,pass
+PS mean BACC,0.700000,0.770112,1
+Worst seed PS mean,0.750000,0.764562,1
+PS minus P0,0.005000,0.012764,1
+Maximum Q minus PS,0.010000,0.001459,1
+Checkpoint records,27,27,1
+Allowed identity failures,0,0,1
+Allowed convergence failures,0,0,1
+Allowed sampler fallbacks,0,0,1

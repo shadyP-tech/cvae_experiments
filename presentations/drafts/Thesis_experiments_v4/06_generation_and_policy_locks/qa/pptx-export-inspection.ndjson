@@ -1,0 +1,69 @@
+{"kind":"deck","id":"pr/g36578","name":"Deck"}
+{"kind":"layout","layoutId":"383706d6-006b-4120-a827-9123b6e0748b","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"7315456c-a393-4ace-ba1f-287ba2c50991","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/ygdr57","slide":1,"title":"STAGES 40 / 60 — GENERATION AND POLICY LOCKS","textShapes":5}
+{"kind":"textbox","id":"sh/4ji98vyl","slide":1,"name":"cover-eyebrow","text":"STAGES 40 / 60 — GENERATION AND POLICY LOCKS","textPreview":"STAGES 40 / 60 — GENERATION AND POLICY LOCKS","textChars":44,"textLines":1,"bbox":[42,40,760,34]}
+{"kind":"shape","id":"sh/3i98fqh0","slide":1,"name":"cover-accent","bbox":[42,112,10,326]}
+{"kind":"textbox","id":"sh/2h0r6lgf","slide":1,"name":"cover-title","text":"The learned utility policy abstains before target evaluation","textPreview":"The learned utility policy abstains before target evaluation","textChars":60,"textLines":1,"bbox":[76,108,1080,244]}
+{"kind":"textbox","id":"sh/hgrqdgza","slide":1,"name":"cover-subtitle","text":"A reproducible three-arm comparison frozen under matched budgets","textPreview":"A reproducible three-arm comparison frozen under matched budgets","textChars":64,"textLines":1,"bbox":[76,376,960,90]}
+{"kind":"shape","id":"sh/gfy94byp","slide":1,"name":"cover-status-panel","bbox":[76,516,1120,92]}
+{"kind":"textbox","id":"sh/fep8bqh4","slide":1,"name":"cover-status","text":"All readiness validators PASS • no downstream metric computed","textPreview":"All readiness validators PASS • no downstream metric computed","textChars":61,"textLines":1,"bbox":[102,538,1070,50]}
+{"kind":"textbox","id":"sh/udgr2lgj","slide":1,"name":"source-footer","text":"Source: GenerationLock and Stage-60 policy locks","textPreview":"Source: GenerationLock and Stage-60 policy locks","textChars":48,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/ygdr57","slide":1,"text":"[Sources]\n- docs/context/current_experimental_state.md\n- docs/wiki/03-experiments/midogpp-uniform-b-v2-source-inner-utility-regret-policy-v1.md\n[/Sources]"}
+{"kind":"slide","id":"sl/qydoov","slide":2,"title":"Generation and routing are locked before labels open","textShapes":18}
+{"kind":"textbox","id":"sh/cre5w7yt","slide":2,"name":"slide-2-title","text":"Generation and routing are locked before labels open","textPreview":"Generation and routing are locked before labels open","textChars":52,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/rq5on2h8","slide":2,"name":"slide-2-number","text":"2","textPreview":"2","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/qpwnuhgn","slide":2,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/1g76twza","slide":2,"name":"question-label","text":"RESEARCH QUESTION","textPreview":"RESEARCH QUESTION","textChars":17,"textLines":1,"bbox":[42,154,420,30]}
+{"kind":"textbox","id":"sh/0fy50ryp","slide":2,"name":"question","text":"Can equal union, metadata routing, and learned utility routing be compared without post-hoc target adaptation?","textPreview":"Can equal union, metadata routing, and learned utility routing be compared without post-hoc target adaptation?","textChars":110,"textLines":1,"bbox":[42,202,490,290]}
+{"kind":"textbox","id":"sh/zepormh4","slide":2,"name":"protocol-note","text":"Same expert pool, total budget, RNG, shuffles, classifier settings, and target rows.","textPreview":"Same expert pool, total budget, RNG, shuffles, classifier settings, and target rows.","textChars":84,"textLines":1,"bbox":[42,526,490,116]}
+{"kind":"shape","id":"sh/edwnyhgj","slide":2,"name":"column-rule","bbox":[585,146,1.5,506]}
+{"kind":"textbox","id":"sh/hk3mhsz6","slide":2,"name":"step-num-0","text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[628,150,42,34]}
+{"kind":"textbox","id":"sh/gju5onyl","slide":2,"name":"step-label-0","text":"GenerationLock","textPreview":"GenerationLock","textChars":14,"textLines":1,"bbox":[688,148,500,36]}
+{"kind":"textbox","id":"sh/ex8bi1w7","slide":2,"name":"step-text-0","text":"81 source streams and 162 health records freeze the physical surface.","textPreview":"81 source streams and 162 health records freeze the physical surface.","textChars":69,"textLines":1,"bbox":[688,188,500,66]}
+{"kind":"shape","id":"sh/fyhcr6ds","slide":2,"name":"step-rule-0","bbox":[628,261,560,1]}
+{"kind":"textbox","id":"sh/0zatkbex","slide":2,"name":"step-num-1","text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[628,274,42,34]}
+{"kind":"textbox","id":"sh/10jutgvi","slide":2,"name":"step-label-1","text":"Equal-union control","textPreview":"Equal-union control","textChars":19,"textLines":1,"bbox":[688,272,500,36]}
+{"kind":"textbox","id":"sh/21sbmlw3","slide":2,"name":"step-text-1","text":"All eight non-target sources receive equal per-class budget.","textPreview":"All eight non-target sources receive equal per-class budget.","textChars":60,"textLines":1,"bbox":[688,312,500,66]}
+{"kind":"shape","id":"sh/nm1cv6do","slide":2,"name":"step-rule-1","bbox":[628,385,560,1]}
+{"kind":"textbox","id":"sh/onatobe9","slide":2,"name":"step-num-2","text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[628,398,42,34]}
+{"kind":"textbox","id":"sh/9ojuxgvu","slide":2,"name":"step-label-2","text":"Metadata max-tie","textPreview":"Metadata max-tie","textChars":16,"textLines":1,"bbox":[688,396,500,36]}
+{"kind":"textbox","id":"sh/apsbqlwf","slide":2,"name":"step-text-2","text":"Exact-match scores retain every maximum tie; no labels or utility enter.","textPreview":"Exact-match scores retain every maximum tie; no labels or utility enter.","textChars":72,"textLines":1,"bbox":[688,436,500,66]}
+{"kind":"shape","id":"sh/bqlczqdk","slide":2,"name":"step-rule-2","bbox":[628,509,560,1]}
+{"kind":"textbox","id":"sh/7uls7qts","slide":2,"name":"step-num-3","text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[628,522,42,34]}
+{"kind":"textbox","id":"sh/6tcbels7","slide":2,"name":"step-label-3","text":"Utility/regret gate","textPreview":"Utility/regret gate","textChars":19,"textLines":1,"bbox":[688,520,500,36]}
+{"kind":"textbox","id":"sh/tw3a90by","slide":2,"name":"step-text-3","text":"Source-inner uncertainty must authorize a source or return exact equal union.","textPreview":"Source-inner uncertainty must authorize a source or return exact equal union.","textChars":77,"textLines":1,"bbox":[688,560,500,66]}
+{"kind":"textbox","id":"sh/8vutgvad","slide":2,"name":"source-footer","text":"Source: GenerationLock and Stage-60 policy locks","textPreview":"Source: GenerationLock and Stage-60 policy locks","textChars":48,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/qydoov","slide":2,"text":"[Sources]\n- docs/context/current_experimental_state.md\n- docs/wiki/03-experiments/midogpp-uniform-b-v2-source-inner-utility-regret-policy-v1.md\n[/Sources]"}
+{"kind":"slide","id":"sl/whdwn6","slide":3,"title":"No fold reaches the 0.80 win-probability threshold","textShapes":11}
+{"kind":"textbox","id":"sh/8bq1gjmh","slide":3,"name":"slide-3-title","text":"No fold reaches the 0.80 win-probability threshold","textPreview":"No fold reaches the 0.80 win-probability threshold","textChars":50,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/nah07e5c","slide":3,"name":"slide-3-number","text":"3","textPreview":"3","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/m98je94r","slide":3,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/wza1kjmt","slide":3,"name":"chart-caption","text":"All paired-regret lower bounds are also negative.","textPreview":"All paired-regret lower bounds are also negative.","textChars":49,"textLines":1,"bbox":[52,642,750,28]}
+{"kind":"textbox","id":"sh/vy10be58","slide":3,"name":"metric-label","text":"WHAT CHANGED","textPreview":"WHAT CHANGED","textChars":12,"textLines":1,"bbox":[862,155,330,30]}
+{"kind":"textbox","id":"sh/adsji94n","slide":3,"name":"metric-value-0","text":"0 / 9","textPreview":"0 / 9","textChars":5,"textLines":1,"bbox":[862,208,330,52]}
+{"kind":"textbox","id":"sh/d4fi1knu","slide":3,"name":"metric-text-0","text":"Outer folds authorized for sparse routing","textPreview":"Outer folds authorized for sparse routing","textChars":41,"textLines":1,"bbox":[862,262,330,58]}
+{"kind":"shape","id":"sh/c3618zm9","slide":3,"name":"metric-rule-1","bbox":[862,332,330,1]}
+{"kind":"textbox","id":"sh/u5ozy1g3","slide":3,"name":"metric-value-1","text":"4,536","textPreview":"4,536","textChars":5,"textLines":1,"bbox":[862,350,330,52]}
+{"kind":"textbox","id":"sh/v6x076ho","slide":3,"name":"metric-text-1","text":"Regret cells evaluated under strict exclusions","textPreview":"Regret cells evaluated under strict exclusions","textChars":46,"textLines":1,"bbox":[862,404,330,58]}
+{"kind":"shape","id":"sh/g76h0ry9","slide":3,"name":"metric-rule-2","bbox":[862,474,330,1]}
+{"kind":"textbox","id":"sh/h8fi9wzu","slide":3,"name":"metric-value-2","text":"Exact","textPreview":"Exact","textChars":5,"textLines":1,"bbox":[862,492,330,52]}
+{"kind":"textbox","id":"sh/i9oz21gf","slide":3,"name":"metric-text-2","text":"Equal-union fallback reused without re-estimation","textPreview":"Equal-union fallback reused without re-estimation","textChars":49,"textLines":1,"bbox":[862,546,330,58]}
+{"kind":"textbox","id":"sh/3ah0b6h0","slide":3,"name":"source-footer","text":"Source: GenerationLock and Stage-60 policy locks","textPreview":"Source: GenerationLock and Stage-60 policy locks","textChars":48,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"chart","id":"ch/5k72x4bq","slide":3,"name":"primary-result-chart","chartType":"bar","bbox":[42,150,770,490]}
+{"kind":"notes","id":"nt/whdwn6","slide":3,"text":"[Sources]\n- docs/context/current_experimental_state.md\n- docs/wiki/03-experiments/midogpp-uniform-b-v2-source-inner-utility-regret-policy-v1.md\n[/Sources]"}
+{"kind":"slide","id":"sl/zomhzf","slide":4,"title":"Abstention is a valid policy result, not a failed run","textShapes":10}
+{"kind":"textbox","id":"sh/svqpkfql","slide":4,"name":"slide-4-title","text":"Abstention is a valid policy result, not a failed run","textPreview":"Abstention is a valid policy result, not a failed run","textChars":53,"textLines":1,"bbox":[42,34,1130,64]}
+{"kind":"textbox","id":"sh/ruh8ru90","slide":4,"name":"slide-4-number","text":"4","textPreview":"4","textChars":1,"textLines":1,"bbox":[1188,43,48,28]}
+{"kind":"shape","id":"sh/6t87ip8f","slide":4,"name":"rule-112","bbox":[42,112,1196,1.5]}
+{"kind":"textbox","id":"sh/10jqh4r2","slide":4,"name":"supported-label","text":"SUPPORTED INTERPRETATION","textPreview":"SUPPORTED INTERPRETATION","textChars":24,"textLines":1,"bbox":[42,158,520,30]}
+{"kind":"textbox","id":"sh/gzqpozqh","slide":4,"name":"supported-text","text":"The permitted source-inner evidence is too uncertain to justify sparse routing, so the policy preserves the strong dense fallback.","textPreview":"The permitted source-inner evidence is too uncertain to justify sparse routing, so the policy preserves the strong dense fallback.","textChars":130,"textLines":1,"bbox":[42,205,530,334]}
+{"kind":"textbox","id":"sh/fyh8vu9w","slide":4,"name":"objective-text","text":"Objective 3 implemented; objective 4 comparison contract complete.","textPreview":"Objective 3 implemented; objective 4 comparison contract complete.","textChars":66,"textLines":1,"bbox":[42,566,530,80]}
+{"kind":"shape","id":"sh/ex87mp8r","slide":4,"name":"conclusion-rule","bbox":[612,150,1.5,500]}
+{"kind":"textbox","id":"sh/pojql4re","slide":4,"name":"boundary-label","text":"CLAIM BOUNDARY","textPreview":"CLAIM BOUNDARY","textChars":14,"textLines":1,"bbox":[654,158,540,30]}
+{"kind":"textbox","id":"sh/o3apszqt","slide":4,"name":"boundary-text","text":"Stages 40/60 establish readiness and frozen decisions only. They provide no target BACC or routing advantage.","textPreview":"Stages 40/60 establish readiness and frozen decisions only. They provide no target BACC or routing advantage.","textChars":109,"textLines":1,"bbox":[654,205,540,205]}
+{"kind":"shape","id":"sh/2l8rup0r","slide":4,"name":"next-panel","bbox":[654,458,540,164]}
+{"kind":"textbox","id":"sh/3m1s3uhc","slide":4,"name":"next-label","text":"NEXT DECISION","textPreview":"NEXT DECISION","textChars":13,"textLines":1,"bbox":[680,482,490,28]}
+{"kind":"textbox","id":"sh/4na9wzih","slide":4,"name":"next-text","text":"Score all three frozen arms in one separately authorized Stage-70 comparison.","textPreview":"Score all three frozen arms in one separately authorized Stage-70 comparison.","textChars":77,"textLines":1,"bbox":[680,522,490,76]}
+{"kind":"textbox","id":"sh/poja5kz2","slide":4,"name":"source-footer","text":"Source: GenerationLock and Stage-60 policy locks","textPreview":"Source: GenerationLock and Stage-60 policy locks","textChars":48,"textLines":1,"bbox":[42,682,1090,22]}
+{"kind":"notes","id":"nt/zomhzf","slide":4,"text":"[Sources]\n- docs/context/current_experimental_state.md\n- docs/wiki/03-experiments/midogpp-uniform-b-v2-source-inner-utility-regret-policy-v1.md\n[/Sources]"}
