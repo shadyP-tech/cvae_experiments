@@ -18,6 +18,7 @@ from .constants import (
     EXPECTED_TOTAL_POSTERIOR_MODEL_FIT_COUNT,
     EXPECTED_OUTER_ENDPOINT_MODEL_FIT_COUNT,
     EXPECTED_OUTER_PLAN_COUNT,
+    RUN_RECOVERY_POLICY,
     SCRATCH_ROOT,
 )
 from .scratch import probe_scratch
@@ -32,27 +33,25 @@ def run_workstation_preflight(
 ) -> Mapping[str, object]:
     assert_runtime(runtime)
     if (
-        runtime.get("resume_policy")
-        != "no_cross_run_recovery_intra_launch_atomic_task_checkpoints_only"
+        runtime.get("resume_policy") != RUN_RECOVERY_POLICY
         or runtime.get("owned_task_checkpoint_replay_allowed") is not False
         or runtime.get("foreign_checkpoint_reuse_forbidden") is not True
         or runtime.get("cross_run_recovery_allowed") is not False
         or runtime.get("terminal_recovery_allowed") is not False
     ):
         raise ProtocolError("CBPUPR recovery policy drifted.")
-    neutral_runtime = dict(runtime)
-    neutral_runtime["resume_policy"] = "hash_validated_atomic_phase_and_task_checkpoints"
     with tempfile.TemporaryDirectory(
         prefix=".cbpupr-preflight-", dir=root.parent
     ) as probe:
         result = dict(
             _neutral(
                 Path(probe),
-                runtime=neutral_runtime,
+                runtime=runtime,
                 expected_scratch_root=SCRATCH_ROOT,
                 expected_target_action_identity_count=90,
                 expected_target_probability_cell_count=810,
                 expected_unique_classifier_fit_count=810,
+                expected_resume_policy=RUN_RECOVERY_POLICY,
             )
         )
     result = {

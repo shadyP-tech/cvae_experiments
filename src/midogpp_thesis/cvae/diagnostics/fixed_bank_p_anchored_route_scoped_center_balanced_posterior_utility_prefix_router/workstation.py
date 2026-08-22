@@ -19,8 +19,18 @@ from .constants import (
     EXPECTED_TOTAL_POSTERIOR_MODEL_FIT_COUNT,
     EXPECTED_OUTER_ENDPOINT_MODEL_FIT_COUNT,
     EXPECTED_OUTER_PLAN_COUNT,
+    GENERATED_CACHE_FORMAT,
+    GENERATION_WORKERS_PER_DEVICE,
     GPU_DEVICES,
     PERSISTENT_GPU_WORKERS,
+    SOURCE_JOB_COUNT,
+    SOURCE_PREFIX_ROWS_PER_CLASS,
+    SOURCE_STREAM_COUNT,
+    SOURCE_WORKERS_PER_DEVICE,
+    TARGET_ACTION_IDENTITY_COUNT,
+    TARGET_PROBABILITY_CELL_COUNT,
+    TARGET_TASK_COUNT,
+    TARGET_UNIQUE_CLASSIFIER_FIT_COUNT,
     TRANSPORT_MAD_SCALE,
     TRANSPORT_SCALE_FLOOR,
     TRANSPORT_MIN_REFERENCE_CENTER_COUNT,
@@ -100,6 +110,11 @@ def assert_canonical_workload(case_counts: Mapping[str, int]) -> None:
 def assert_runtime(runtime: Mapping[str, object]) -> None:
     if (
         tuple(runtime.get("generation_devices", ())) != GPU_DEVICES
+        or int(runtime.get("source_workers_per_device", -1))
+        != SOURCE_WORKERS_PER_DEVICE
+        or int(runtime.get("generation_workers_per_device", -1))
+        != GENERATION_WORKERS_PER_DEVICE
+        or runtime.get("persistent_source_workers") is not True
         or int(runtime.get("persistent_generation_worker_count", -1))
         != PERSISTENT_GPU_WORKERS
         or int(runtime.get("route_model_workers", -1)) != CPU_WORKERS
@@ -111,6 +126,20 @@ def assert_runtime(runtime: Mapping[str, object]) -> None:
         or runtime.get("probability_storage_dtype") != "float32"
         or runtime.get("confusion_count_dtype") != "int64"
         or runtime.get("scientific_reductions_dtype") != "float64"
+        or runtime.get("generated_cache_format") != GENERATED_CACHE_FORMAT
+        or int(runtime.get("source_job_count", -1)) != SOURCE_JOB_COUNT
+        or int(runtime.get("source_stream_count", -1)) != SOURCE_STREAM_COUNT
+        or int(runtime.get("source_prefix_rows_per_class", -1))
+        != SOURCE_PREFIX_ROWS_PER_CLASS
+        or int(runtime.get("target_task_count", -1)) != TARGET_TASK_COUNT
+        or int(runtime.get("target_action_identity_count", -1))
+        != TARGET_ACTION_IDENTITY_COUNT
+        or int(runtime.get("target_probability_cell_count", -1))
+        != TARGET_PROBABILITY_CELL_COUNT
+        or int(runtime.get("target_unique_classifier_fit_count", -1))
+        != TARGET_UNIQUE_CLASSIFIER_FIT_COUNT
+        or int(runtime.get("maximum_total_classifier_fit_count", -1))
+        != TARGET_UNIQUE_CLASSIFIER_FIT_COUNT
         or float(runtime.get("numeric_transport_MAD_scale", -1.0))
         != TRANSPORT_MAD_SCALE
         or float(runtime.get("numeric_transport_zero_scale_threshold", -1.0))

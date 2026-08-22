@@ -1326,7 +1326,7 @@ not refit the 3,488 endpoint or 436 posterior optimizers: their complete fitted
 DTOs are persisted and content sealed, and optimizer-fit correctness is the
 explicit trust boundary. Two fresh validation processes replay every fitted DTO
 output and all downstream scientific semantics with zero optimizer refits.
-The registered config contract hash is `ec5ddac96ef1ca98`; the frozen protocol
+The registered config contract hash is `278ca0ec77747a72`; the frozen protocol
 hash is
 `dc92f288cb4b0fb28e84ee0bbbc01476279600a71e4baad54b8c31ea808bc933`.
 

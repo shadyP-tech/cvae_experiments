@@ -311,6 +311,9 @@ runtime:
   - cuda:0
   - cuda:1
   cuda_visible_devices: 0,1
+  source_workers_per_device: 1
+  generation_workers_per_device: 1
+  persistent_source_workers: true
   persistent_generation_worker_count: 2
   multiprocessing_start_method: spawn
   gpu_generation_phase_precedes_cpu_phase: true
@@ -323,6 +326,7 @@ runtime:
   probability_storage_dtype: float32
   confusion_count_dtype: int64
   scientific_reductions_dtype: float64
+  generated_cache_format: float32_npy_memmap
   probability_surface_format: sealed_compressed_float32_npz
   dense_array_manifest_format: json_hash_offsets_only
   numeric_transport_MAD_scale: 1.4826
@@ -339,7 +343,14 @@ runtime:
   minimum_physical_ram_bytes: 107374182400
   minimum_artifact_disk_free_bytes: 8589934592
   minimum_gpu_free_mib_per_device: 18000
+  source_job_count: 27
+  source_stream_count: 81
+  source_prefix_rows_per_class: 270
+  target_task_count: 81
+  target_action_identity_count: 90
   target_probability_cell_count: 810
+  target_unique_classifier_fit_count: 810
+  maximum_total_classifier_fit_count: 810
   outer_route_count: 218
   ordered_H_J_pair_count: 72
   expected_outer_endpoint_model_fit_count: 3488

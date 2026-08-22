@@ -46,6 +46,21 @@ TRAINING_SEEDS = (17, 42, 101)
 GENERATION_SEEDS = (17, 42, 101)
 SEED_PAIR_COUNT = 9
 
+# Shared frozen-source and fixed-bank A1 physical-runtime geometry.  These
+# values are part of this router's executable contract because the neutral
+# materializers validate them independently before doing any GPU or CPU work.
+SOURCE_WORKERS_PER_DEVICE = 1
+GENERATION_WORKERS_PER_DEVICE = 1
+SOURCE_PREFIX_ROWS_PER_CLASS = 270
+SOURCE_JOB_COUNT = len(CENTERS) * len(TRAINING_SEEDS)
+SOURCE_STREAM_COUNT = SOURCE_JOB_COUNT * len(GENERATION_SEEDS)
+TARGET_TASK_COUNT = len(CENTERS) * SEED_PAIR_COUNT
+PHYSICAL_ACTION_COUNT_PER_TARGET = 10
+TARGET_ACTION_IDENTITY_COUNT = len(CENTERS) * PHYSICAL_ACTION_COUNT_PER_TARGET
+TARGET_PROBABILITY_CELL_COUNT = TARGET_ACTION_IDENTITY_COUNT * SEED_PAIR_COUNT
+TARGET_UNIQUE_CLASSIFIER_FIT_COUNT = TARGET_PROBABILITY_CELL_COUNT
+GENERATED_CACHE_FORMAT = "float32_npy_memmap"
+
 B_ROWS_PER_SOURCE_CLASS = 128
 U_ROWS_PER_SOURCE_CLASS = 144
 A1_SELECTED_ROWS_PER_CLASS = 256
@@ -168,6 +183,9 @@ TARGET_POSTERIOR_BLAS_THREADS_PER_WORKER = 1
 SCRATCH_ROOT = (
     "/data/local/fixed_bank_p_anchored_route_scoped_center_balanced_"
     "posterior_utility_prefix_router_v1"
+)
+RUN_RECOVERY_POLICY = (
+    "no_cross_run_recovery_intra_launch_atomic_task_checkpoints_only"
 )
 
 

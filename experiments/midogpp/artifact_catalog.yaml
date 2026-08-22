@@ -12086,7 +12086,7 @@ artifacts:
       claim_role: posthoc_fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_diagnostic
       bounded_interpretation: center_balanced_posterior_expected_utility_prefix_sensitivity_on_consumed_MIDOGpp_test_only
       architecture_family: fixed_bank_p_anchored_route_scoped_center_balanced_posterior_utility_prefix_router_v1
-      config_contract_hash: ec5ddac96ef1ca98
+      config_contract_hash: 278ca0ec77747a72
       protocol_contract_hash: dc92f288cb4b0fb28e84ee0bbbc01476279600a71e4baad54b8c31ea808bc933
       evaluation_split: test
       consumed_test_data: 'true'

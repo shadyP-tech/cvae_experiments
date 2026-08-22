@@ -41,6 +41,9 @@ def run_label_free_workstation_preflight(
     expected_target_action_identity_count: int = 81,
     expected_target_probability_cell_count: int = 729,
     expected_unique_classifier_fit_count: int = 729,
+    expected_resume_policy: str = (
+        "hash_validated_atomic_phase_and_task_checkpoints"
+    ),
 ) -> Mapping[str, object]:
     devices = tuple(str(value) for value in runtime.get("generation_devices", ()))
     scratch = tuple(str(value) for value in runtime.get("scratch_preference", ()))
@@ -72,8 +75,7 @@ def run_label_free_workstation_preflight(
         != expected_unique_classifier_fit_count
         or int(runtime.get("maximum_total_classifier_fit_count", -1))
         != expected_unique_classifier_fit_count
-        or runtime.get("resume_policy")
-        != "hash_validated_atomic_phase_and_task_checkpoints"
+        or runtime.get("resume_policy") != expected_resume_policy
         or scratch != (str(expected_scratch_root), "artifact_parent")
     ):
         raise ProtocolError("Label-free workstation topology drifted.")
