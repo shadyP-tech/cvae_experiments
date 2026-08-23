@@ -75,12 +75,21 @@ success or feed another experiment.
 ## P-DCAPS donor-cross-fitted action and policy surfaces v2
 
 `midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v2`
-is the separately authorized one-shot execution identity for the hardened
-P-DCAPS terminal diagnostic. Its authorization basis is exactly
+is the exhausted one-shot execution identity for the hardened P-DCAPS terminal
+diagnostic. Its single authorized workstation attempt failed preterminally in
+`FOUR_SPAWN_OUTER_H_WORKERS` because an undefined admission statistic reached
+the strict canonical serializer as a nonfinite float. The failure state is
+`FAILED`; `authorization_exhausted=true`; and recovery, resume, and rerun are
+forbidden. The failed artifact is preserved in place as rejected forensic
+history. It contains no durable preterminal attestation, terminal-label output,
+metric, or valid diagnostic result.
+
+The immutable pre-attempt amendment remains the historical issuance record for
+the authorization basis
 `explicit_user_authorization_for_pdcaps_v2_terminal_consumed_test_diagnostic_run`.
-V1 remains planned and non-executable; v2 does not consume or alias its output,
-amendment, probability surfaces, scratch, checkpoints, arrays, seals, or label-
-capability history.
+It is not rewritten after consumption. V1 remains planned and non-executable;
+v2 did not consume or alias its output, amendment, probability surfaces,
+scratch, checkpoints, arrays, seals, or label-capability history.
 
 V2 truthfully changes three scientific mechanics from v1. Caller-injectable
 response denominators are replaced by lifecycle-derived whole-center
@@ -108,11 +117,94 @@ the whole-case H/J/d firewall, joint identity/cyclic action-surface seal, exact-
 fallback, fixed six-method menu, and preterminal attestation before terminal
 labels open.
 
-This authorization permits execution, not promotion. The output remains
+The consumed v2 authorization permits no further execution and produced no
+interpretable outcome. Its rejected history remains bounded by
 `POST_HOC_CONSUMED_TEST_SENSITIVITY`, `fresh_evidence=false`, and
 `TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`. It cannot feed another experiment,
 numbered stage, routing policy, model, expert, recipe selection, deployment, or
 thesis-facing fresh-confirmatory claim.
+
+## P-DCAPS donor-cross-fitted action and policy surfaces v3
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v3`
+is an implementation-only, **planned and non-runnable** mechanical repair. It
+does not authorize another opening of consumed-test labels and must reject both
+direct and workspace execution before creating an output root, scratch root,
+lock, or capability journal.
+
+V3 represents every admission statistic as an explicit finite-or-undefined
+record. A constant rank input is stored as `value=null` with reason
+`CONSTANT_RANK_INPUT`; an invalid or zero oracle denominator is stored as
+`value=null` with reason `INVALID_OR_ZERO_DENOMINATOR`. Undefined statistics
+always fail their gates and force byte-identical exact P for the primary and
+cyclic controls. They are never converted to zero, epsilon-regularized,
+dropped, rank-imputed, or serialized as NaN or infinity. Defined finite inputs
+retain the v2 gate thresholds and decision semantics.
+
+The complete fixed six-method inventory is constructible through typed v3
+adapters. P protected, action-only, policy-only, and legacy controls retain
+their frozen v2 behavior; primary and cyclic alone consume the repaired
+Admission-H gate. A separately hashed, authorization-free mechanics payload
+binds every v2 response-denominator, zero-prior, ESS, action-library,
+policy-menu, threshold, ordering, classifier, evaluation, and tie contract.
+
+The repair lives in a new sibling package so the recursively sealed 105-file
+v2 source tree remains byte-exact. V3 binds that unchanged predecessor identity
+separately from its own source seal and declares exactly six inputs: the two
+immutable direct-original bank/generation artifacts plus four fresh v3 planning
+aliases for cache, manifest, parent ledger, and amendment. The v2 output, run state, log,
+scratch, probability arrays, amendment, seals, and capability history are not
+inputs.
+
+The planned runner validates the unchanged v2 seal, the disjoint modular v3
+seal, and their combined receipt before inspecting configuration or any run
+path. Seal DTOs are plain, pickle-safe process payloads; spawn round trips and
+tampered-source rejection are regression-tested. Successful source validation
+still ends at the unconditional non-authorizing gate before output, scratch,
+locks, capabilities, or labels can be touched.
+
+No v3 execution has been authorized or launched. Its maximum possible future
+interpretation remains `POST_HOC_CONSUMED_TEST_SENSITIVITY` and
+`TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`; implementation and passing tests do
+not establish routing improvement, downstream utility, or fresh-confirmatory
+evidence.
+
+## P-DCAPS donor-cross-fitted action and policy surfaces v4
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v4`
+is the distinct, explicitly authorized one-shot executable identity for the
+source-sealed v3 nullable-admission repair. Creating the executable does not
+launch it. V2 remains `FAILED_EXHAUSTED`, v3 remains planned and non-executable,
+and neither predecessor's output, amendment, run state, scratch, arrays,
+probability surface, capability history, or authorization is an input.
+
+V4 admits exactly six artifacts: the immutable direct-original expert bank and
+generation lock plus fresh v4 single-consumer aliases for the complete
+label-free test cache, label-capability manifest, parent consumption ledger,
+and authorization amendment. All probability and route surfaces are recomputed
+from those inputs. The unchanged H/J/d exclusion firewall, source-expert
+isolation, fixed six-method menu, deterministic ties, and exact-P fallback
+remain binding.
+
+Three source scopes are sealed separately: the unchanged 105-member v2/base
+tree, the unchanged 13-member v3 repair tree, and the modular v4 executable
+orchestration tree. Target labels can open only after all method decisions and
+compositions are durably persisted and two fresh-process validators agree on
+the preterminal attestation. There is no partial-state recovery or rerun under
+this single-use identity.
+
+The workstation schedule uses two persistent RTX A5000 generation workers,
+then four spawn prediction/classifier workers with three BLAS threads each,
+then a CUDA-hidden phase with four spawn-safe outer-H workers, one BLAS thread
+per worker, one complete H per task, and no nested pools. Its scratch root is
+`/data/local/fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v4`.
+
+The experiment reuses all 9,928 rows and 218 whole cases of the already-consumed
+MIDOG++ test split only for stronger terminal diagnostic analysis. Therefore
+its maximum claim remains `POST_HOC_CONSUMED_TEST_SENSITIVITY`,
+`fresh_evidence=false`, and `TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`; it cannot
+establish fresh routing or downstream-utility evidence, feed another
+experiment, or authorize promotion or deployment.
 
 ## PCSI-PARC Boundary-Projected Whole-Policy Regret Router v1
 

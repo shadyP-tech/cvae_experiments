@@ -405,12 +405,34 @@ def build_parser() -> argparse.ArgumentParser:
         "fixed-bank-p-anchored-route-scoped-donor-crossfit-"
         "action-policy-surface-router-v2",
         help=(
-            "Run the separately authorized one-shot terminal consumed-test "
-            "P-DCAPS v2 diagnostic."
+            "Reject P-DCAPS v2: the terminal consumed-test run failed "
+            "preterminally and its one-shot authorization is exhausted."
         ),
     )
     pdcaps_v2.add_argument("--config", required=True)
     pdcaps_v2.add_argument("--artifact-root", required=True)
+
+    pdcaps_v3 = sub.add_parser(
+        "fixed-bank-p-anchored-route-scoped-donor-crossfit-"
+        "action-policy-surface-router-v3",
+        help=(
+            "Inspect the planned, non-authorized P-DCAPS v3 nullable-"
+            "admission repair; direct execution is refused before mutation."
+        ),
+    )
+    pdcaps_v3.add_argument("--config", required=True)
+    pdcaps_v3.add_argument("--artifact-root", required=True)
+
+    pdcaps_v4 = sub.add_parser(
+        "fixed-bank-p-anchored-route-scoped-donor-crossfit-"
+        "action-policy-surface-router-v4",
+        help=(
+            "Run the authorized one-shot P-DCAPS v4 executable nullable-"
+            "admission repair on the consumed MIDOG++ test split."
+        ),
+    )
+    pdcaps_v4.add_argument("--config", required=True)
+    pdcaps_v4.add_argument("--artifact-root", required=True)
 
     pcsi_parc = sub.add_parser(
         "fixed-bank-p-anchored-boundary-projected-pcsi-policy-regret-router",
@@ -440,26 +462,62 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.surface == (
         "fixed-bank-p-anchored-route-scoped-donor-crossfit-"
-        "action-policy-surface-router-v2"
+        "action-policy-surface-router-v4"
     ):
-        from .fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v2 import (
-            load_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2_config,
-            run_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2,
+        from .fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v4.config import (
+            load_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v4_config,
+        )
+        from .fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v4.runner import (
+            run_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v4,
         )
 
         config = (
-            load_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2_config(
+            load_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v4_config(
                 args.config
             )
         )
         output = (
-            run_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2(
+            run_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v4(
                 config,
                 artifact_root=artifact_root,
             )
         )
         print(output)
         return 0
+
+    if args.surface == (
+        "fixed-bank-p-anchored-route-scoped-donor-crossfit-"
+        "action-policy-surface-router-v3"
+    ):
+        from .fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v3 import (
+            load_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v3_config,
+            run_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v3,
+        )
+
+        config = (
+            load_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v3_config(
+                args.config
+            )
+        )
+        output = (
+            run_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v3(
+                config,
+                artifact_root=artifact_root,
+            )
+        )
+        print(output)
+        return 0
+
+    if args.surface == (
+        "fixed-bank-p-anchored-route-scoped-donor-crossfit-"
+        "action-policy-surface-router-v2"
+    ):
+        from ..protocol import ProtocolError
+
+        raise ProtocolError(
+            "P-DCAPS v2 is terminally failed and its one-shot authorization "
+            "is exhausted; recovery and rerun are forbidden."
+        )
 
     if args.surface == (
         "fixed-bank-p-anchored-route-scoped-donor-crossfit-"

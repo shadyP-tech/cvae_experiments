@@ -13847,13 +13847,32 @@ artifacts:
   - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2
     stage: 90_oracles_and_diagnostics
     canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router/v2
-    availability: generated_on_run
+    availability: workstation_failed_preterminal
     migration: canonical_output
-    evidence_label: POST_HOC_CONSUMED_TEST_SENSITIVITY
+    evidence_label: REJECTED
     claim_scope: diagnostic_only
     semantic_identities:
       publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
       terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      run_state_status: FAILED
+      failure_phase: FOUR_SPAWN_OUTER_H_WORKERS
+      failure_error: P-DCAPS canonical payload contains a nonfinite float.
+      failure_error_class: ProtocolError
+      failure_cause: undefined_admission_statistic_was_hashed_as_nonfinite_float
+      run_state_hash: 2c10b41ee3eb03c1b2ace3f9efb84d3fc2241e355f1271b450254ae8084c11a4
+      runner_exit_status: '1'
+      tee_exit_status: '0'
+      route_surfaces_and_pseudo_responses_complete: 'true'
+      pseudo_response_capabilities_opened: 'true'
+      durable_preterminal_bundle_persisted: 'false'
+      preterminal_validation_attestation_complete: 'false'
+      target_terminal_capability_opened: 'false'
+      terminal_evaluation_labels_opened: 'false'
+      terminal_metrics_computed: 'false'
+      diagnostic_result_valid: 'false'
+      recoverable: 'false'
+      rerunnable: 'false'
+      current_evidence: 'false'
       claim_role: posthoc_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_diagnostic
       bounded_interpretation: donor_crossfit_action_and_policy_surface_sensitivity_on_consumed_MIDOGpp_test_only
       architecture_family: fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2
@@ -13863,9 +13882,12 @@ artifacts:
       execution_authorization_basis: explicit_user_authorization_for_pdcaps_v2_terminal_consumed_test_diagnostic_run
       authorization_scope: one_terminal_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2_diagnostic
       execution_authorized: 'true'
+      original_execution_authorized: 'true'
+      further_execution_authorized: 'false'
       consumed_test_reuse_authorized: 'true'
       single_use_execution_identity: 'true'
-      authorization_exhausted: 'false'
+      single_use_authorization_consumed: 'true'
+      authorization_exhausted: 'true'
       execution_revision: v2_terminal_consumed_test_diagnostic
       source_snapshot_binding_required: 'true'
       source_snapshot_manifest_sha256: 3dc6d096ad607fe550eac47b114332fd6ac9ebec5d9cfb59e80897e9a982addc
@@ -13944,7 +13966,522 @@ artifacts:
     may_feed_recipe_selection: false
     may_feed_deployable_selection: false
     notes:
-      - Authorized one-shot output identity. It cannot be recovered across runs or populated from any v1 output, amendment, scratch, checkpoint, probability surface, array, seal, or label-capability history.
+      - Terminally failed one-shot output identity retained only as immutable negative execution provenance. It cannot be recovered, resumed, repaired in place, recreated, or rerun.
+      - Failure occurred during method assembly after pseudo-response access but before durable preterminal persistence and attestation. No target terminal-evaluation label capability, terminal metric, terminal result, or valid diagnostic report opened.
+      - The v2 authorization is exhausted. Neither this root nor its scratch, probability surfaces, arrays, seals, capability history, amendment, or run state may be consumed by v3 or any other experiment.
       - V2 changes three mechanics from v1: response denominators are lifecycle-derived over the whole center, the zero donor prior is explicit and source-hash-bound, and every canonical physical action must pass per-class ESS >= 5 viability. These are hardening and eligibility deltas, not fresh or promotable evidence.
       - The source snapshot covers complete package-local P-DCAPS Python only. External neutral generation, cache, and bank code remains separately validated input/runtime dependency scope.
-      - All target labels remain terminal-only. The completed artifact can diagnose this method on consumed test data but cannot establish fresh routing success or feed any later experiment, route, model, expert, recipe, promotion, or deployment.
+      - This rejected artifact is not a diagnostic result and cannot establish routing success or feed any later experiment, route, model, expert, recipe, promotion, or deployment.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_parent_v3
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: CONSUMED_TEST_PDCAPS_V3_PLANNED_PARENT_LEDGER_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      split: test
+      row_count: '9928'
+      held_unit_count: '218'
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      experiment_fenced: 'true'
+      registered_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v3
+      consumer_resolution_fence_only: 'true'
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      fresh_evidence: 'false'
+      v2_execution_status: FAILED_EXHAUSTED
+      v2_output_used: 'false'
+      v2_amendment_used: 'false'
+      v2_run_state_used: 'false'
+      v2_label_capability_history_used: 'false'
+      v2_scratch_or_checkpoint_used: 'false'
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    forbidden_reuse: *pdcaps_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Planned v3 byte-exact single-consumer alias of the immutable original ledger. It permits resolution only and exposes no v1/v2 output, amendment, run state, scratch, checkpoint, probability surface, or capability history.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_amendment_v3
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_PDCAPS_V3_NON_AUTHORIZING_REPAIR_AMENDMENT_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      amendment_sha256: 6680969dac70c51a90083056ae8cf7baf4a6a2b83f2417effbf0248cb48b805c
+      registered_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v3
+      consumer_resolution_fence_only: 'true'
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      implementation_authorizes_execution: 'false'
+      separate_future_run_authorization_required: 'true'
+      v2_execution_status: FAILED_EXHAUSTED
+      v2_authorization_reused: 'false'
+      v2_output_used: 'false'
+      v2_amendment_used: 'false'
+      v2_run_state_used: 'false'
+      v2_label_capability_history_used: 'false'
+      v2_scratch_or_checkpoint_used: 'false'
+      mechanical_repair_only: 'true'
+      scientific_protocol_unchanged_from_v2: 'true'
+      scientific_method_changed_from_v2: 'false'
+      complete_v2_scientific_mechanics_payload_bound: 'true'
+      v2_scientific_mechanics_schema: pdcaps_v2_scientific_mechanics_v1
+      v2_protocol_contract_sha256: ee731d8aa907249c28e14414450b849b53fd1d85b668b91da567260322122871
+      v2_path_independent_config_sha256: 9ea968c890f7e6c9ddcc3ec25970ae65e0747ce44053f3b07ecff814c76b2e6f
+      v2_scientific_mechanics_sha256: 52bfc7fb1638168e164176a60a72d959f17b98145fa0cec0a72901cd140e959b
+      nullable_admission_statistics_schema: pdcaps_v3_nullable_admission_statistic_v1
+      undefined_admission_statistic_representation: JSON_NULL_WITH_EXPLICIT_REASON
+      undefined_statistic_gate_result: FAIL_CLOSED_EXACT_P
+      inherited_v2_base_source_manifest_sha256: 3dc6d096ad607fe550eac47b114332fd6ac9ebec5d9cfb59e80897e9a982addc
+      inherited_v2_base_source_tree_sha256: f457d8678eb93fe51520c9fcc188c8d44f8331aec6f37c88124a677bfcc2d5cb
+      inherited_v2_base_source_member_count: '105'
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      fresh_evidence: 'false'
+      generic_consumer_authorized: 'false'
+      target_terminal_labels_may_open: 'false'
+      routing_success_claimed: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_ledger_amendment_v3.json
+    expected_file_hashes:
+      uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_ledger_amendment_v3.json:
+        algorithm: sha256
+        digest: 6680969dac70c51a90083056ae8cf7baf4a6a2b83f2417effbf0248cb48b805c
+    forbidden_reuse: *pdcaps_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Canonical hash-chained planning record only. It registers the nullable-admission-statistics mechanical repair with execution_authorized=false and consumed_test_reuse_authorized=false; implementation does not authorize a run.
+      - The immutable exhausted v2/base source identity is recorded, but no v2 output, amendment, run state, probability surface, scratch, checkpoint, or capability history is an input.
+
+  - artifact_id: midogpp_stage90_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_test_manifest_v3
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_PDCAPS_V3_PLANNED_CAPABILITY_GATED_LABELS
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+      split: test
+      row_count: '9928'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      experiment_fenced: 'true'
+      registered_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v3
+      consumer_resolution_fence_only: 'true'
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      labels_present: 'true'
+      labels_available_before_execution_authorization: 'false'
+      target_terminal_labels_may_open: 'false'
+      outer_center_excluded_from_every_scientific_fit: 'true'
+      pseudo_center_excluded_from_own_prediction: 'true'
+      held_case_d_role: SCORED_RESPONSE_ONLY_AFTER_SURFACE_SEAL
+      terminal_label_scope: after_all_method_decisions_and_durable_preterminal_attestation
+      v2_label_capability_history_used: 'false'
+      fresh_evidence: 'false'
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse: *pdcaps_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Planned v3 direct-original label-capability alias. No source-support, pseudo-response, held-case, or terminal label capability can open while execution remains unauthorized.
+
+  - artifact_id: midogpp_stage90_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_test_cache_v3
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_TEST_PDCAPS_V3_PLANNED_LABEL_FREE_CACHE_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: test
+      row_count: '9928'
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      experiment_fenced: 'true'
+      registered_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v3
+      consumer_resolution_fence_only: 'true'
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      labels_absent: 'true'
+      previous_stage90_output_used: 'false'
+      v2_output_used: 'false'
+      fresh_evidence: 'false'
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse: *pdcaps_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Planned v3 byte-exact alias over the validated original label-free consumed-test cache. Registration permits resolution only and no predecessor output or execution state is inherited.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v3
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router/v3
+    availability: planned_execution_not_authorized
+    migration: canonical_output
+    evidence_label: NEEDS_EVIDENCE_EXECUTION_NOT_AUTHORIZED
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      claim_role: posthoc_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_diagnostic
+      bounded_interpretation: nullable_admission_statistics_mechanical_repair_plan_on_consumed_MIDOGpp_test_only
+      architecture_family: fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v3
+      config_contract_hash: c7ddba773a5bef43846544286158969b81f267778794311efeab4457960e3196
+      protocol_contract_hash: fc2e4ffcd62003f67b207883534086f5368f202a0962fd72872bf2f9a57fb7db
+      expected_ledger_amendment_sha256: 6680969dac70c51a90083056ae8cf7baf4a6a2b83f2417effbf0248cb48b805c
+      workspace_status: planned
+      execution_authorized: 'false'
+      implementation_authorizes_execution: 'false'
+      consumed_test_reuse_authorized: 'false'
+      separate_future_run_authorization_required: 'true'
+      direct_runner_rejects_before_mutation: 'true'
+      output_root_creation_allowed: 'false'
+      scratch_root_creation_allowed: 'false'
+      target_terminal_labels_may_open: 'false'
+      v2_execution_status: FAILED_EXHAUSTED
+      v2_authorization_exhausted: 'true'
+      v2_retry_forbidden: 'true'
+      v2_output_used: 'false'
+      v2_amendment_used: 'false'
+      v2_run_state_used: 'false'
+      v2_probability_or_capability_history_used: 'false'
+      v2_label_capability_history_used: 'false'
+      v2_scratch_or_checkpoint_used: 'false'
+      repair_class: MECHANICAL_NULLABLE_ADMISSION_STATISTICS_ONLY
+      mechanical_repair_only: 'true'
+      scientific_protocol_unchanged_from_v2: 'true'
+      scientific_method_changed_from_v2: 'false'
+      complete_v2_scientific_mechanics_payload_bound: 'true'
+      v2_scientific_mechanics_schema: pdcaps_v2_scientific_mechanics_v1
+      v2_protocol_contract_sha256: ee731d8aa907249c28e14414450b849b53fd1d85b668b91da567260322122871
+      v2_path_independent_config_sha256: 9ea968c890f7e6c9ddcc3ec25970ae65e0747ce44053f3b07ecff814c76b2e6f
+      v2_scientific_mechanics_sha256: 52bfc7fb1638168e164176a60a72d959f17b98145fa0cec0a72901cd140e959b
+      scientific_thresholds_changed_from_v2: 'false'
+      scientific_ordering_changed_from_v2: 'false'
+      donor_inventory_rule_changed_from_v2: 'false'
+      physical_surface_or_outer_fit_changed_from_v2: 'false'
+      method_menu_changed_from_v2: 'false'
+      nullable_admission_statistics_schema: pdcaps_v3_nullable_admission_statistic_v1
+      nullable_admission_statistic_fields: name|value|defined|undefined_reason
+      nullable_undefined_reasons: CONSTANT_RANK_INPUT|INVALID_OR_ZERO_DENOMINATOR
+      undefined_admission_statistic_representation: JSON_NULL_WITH_EXPLICIT_REASON
+      undefined_statistic_gate_result: FAIL_CLOSED_EXACT_P
+      caller_injected_nan_or_infinity_rejected: 'true'
+      canonical_json_allow_nan: 'false'
+      inherited_v2_base_source_snapshot_schema: pdcaps_v2_source_snapshot_v1
+      inherited_v2_base_source_manifest_sha256: 3dc6d096ad607fe550eac47b114332fd6ac9ebec5d9cfb59e80897e9a982addc
+      inherited_v2_base_source_tree_sha256: f457d8678eb93fe51520c9fcc188c8d44f8331aec6f37c88124a677bfcc2d5cb
+      inherited_v2_base_source_member_count: '105'
+      v3_repair_source_snapshot_schema: pdcaps_v3_repair_source_snapshot_v1
+      v3_repair_source_manifest_sha256: 37b8e51f8d0900212ec4bfc8bd68b14ddbde1ed783eaacf86e8301dd9295b4a7
+      v3_repair_source_tree_sha256: df35265e8d27aa602c3ae6c3fcebdc2a3c4838effa4d9f1200e9deb12e7e0a3e
+      v3_repair_source_member_count: '13'
+      source_scopes_are_disjoint: 'true'
+      combined_source_seal_hash: 98252133ec58838851093e3a55434306b531280e57edbe70efbb7fe1d14a3994
+      evaluation_split: test
+      consumed_test_data: 'true'
+      eligible_test_row_count: '9928'
+      held_case_route_count: '218'
+      physical_probability_cell_count: '810'
+      ordered_H_J_pair_count: '72'
+      pseudo_case_route_count: '1744'
+      outer_center_excluded_from_every_scientific_fit: 'true'
+      pseudo_center_excluded_from_own_prediction: 'true'
+      held_case_d_role: SCORED_RESPONSE_ONLY_AFTER_SURFACE_SEAL
+      method_menu: P_PROTECTED|P_DCAPS_PRIMARY|P_DCAPS_ACTION_ONLY|P_DCAPS_POLICY_ONLY|LEGACY_CENTER_POOLED_PREFIX|P_DCAPS_CYCLIC_POISON
+      exact_P_fallback_required: 'true'
+      raw_labels_may_be_persisted: 'false'
+      fresh_evidence: 'false'
+      routing_success_claimed: 'false'
+      downstream_utility_claimed: 'false'
+      confidence_bound_claimed: 'false'
+      finite_sample_coverage_claimed: 'false'
+      promotion_eligible: 'false'
+      deployment_claimed: 'false'
+      previous_stage90_outputs_used: 'false'
+      previous_stage90_amendments_used: 'false'
+      may_feed_another_experiment: 'false'
+      workstation_generation_devices: cuda:0|cuda:1
+      workstation_cpu_topology: 4_spawn_workers_one_complete_outer_H_task_each_no_nested_pools
+      workstation_blas_threads_per_outer_worker: '1'
+      workstation_scratch_root: /data/local/fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v3
+      cross_run_recovery_allowed: 'false'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - reports/run_state.json
+    forbidden_reuse: *pdcaps_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Planned output identity only. No output or scratch directory may be created while execution_authorized=false; both workspace dispatch and direct runner admission reject before mutation.
+      - The implementation repairs only JSON serialization of expected undefined Admission_H statistics. Undefined values persist as null with a frozen reason and select exact byte-identical P; unexpected NaN or infinity remains rejected.
+      - V2 is FAILED_EXHAUSTED and immutable. V3 binds the unchanged 105-member base identity plus a disjoint 13-member modular repair source identity, and consumes no v2 output, amendment, run state, probability surface, scratch, checkpoint, or capability history.
+      - If separately authorized through a new executable identity, all probability surfaces must be recomputed from the two immutable direct-original bank/generation artifacts plus four fresh v3 cache, manifest, parent-ledger, and amendment aliases under the unchanged H/J/d firewall and exact-P boundary.
+      - This terminal consumed-test diagnostic plan creates no fresh evidence and cannot establish routing success or feed another experiment, route, policy, model, expert, recipe, promotion, or deployment.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_parent_v4
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: CONSUMED_TEST_PDCAPS_V4_AUTHORIZED_PARENT_LEDGER_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      split: test
+      row_count: '9928'
+      held_unit_count: '218'
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      experiment_fenced: 'true'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v4
+      execution_authorized: 'true'
+      consumed_test_reuse_authorized: 'true'
+      single_use_execution_identity: 'true'
+      authorization_exhausted: 'false'
+      fresh_evidence: 'false'
+      previous_stage90_output_used: 'false'
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    forbidden_reuse: *pdcaps_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_amendment_v4
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_PDCAPS_V4_SINGLE_USE_EXECUTION_AUTHORIZATION
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      amendment_sha256: aa323b63414ec28520fb97253cf08e086229293a9b4072aed671068a511db7d7
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v4
+      authorization_basis: explicit_user_authorization_2026_08_23_for_pdcaps_v4_terminal_consumed_test_diagnostic_run
+      authorization_scope: one_terminal_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v4_diagnostic
+      authorization_date: '2026-08-23'
+      execution_authorized: 'true'
+      consumed_test_reuse_authorized: 'true'
+      single_use_execution_identity: 'true'
+      authorization_exhausted: 'false'
+      v2_execution_status: FAILED_EXHAUSTED
+      v2_output_used: 'false'
+      v3_output_used: 'false'
+      previous_stage90_amendments_used: 'false'
+      previous_stage90_run_state_used: 'false'
+      previous_stage90_scratch_used: 'false'
+      previous_probability_or_capability_history_used: 'false'
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      fresh_evidence: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_ledger_amendment_v4.json
+    expected_file_hashes:
+      uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_ledger_amendment_v4.json:
+        algorithm: sha256
+        digest: aa323b63414ec28520fb97253cf08e086229293a9b4072aed671068a511db7d7
+    forbidden_reuse: *pdcaps_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+
+  - artifact_id: midogpp_stage90_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_test_manifest_v4
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_PDCAPS_V4_CAPABILITY_GATED_LABELS
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+      split: test
+      row_count: '9928'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      experiment_fenced: 'true'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v4
+      execution_authorized: 'true'
+      consumed_test_reuse_authorized: 'true'
+      labels_present: 'true'
+      labels_available_before_preterminal_attestation: 'false'
+      target_terminal_labels_may_open_after_attestation: 'true'
+      terminal_label_scope: after_all_method_decisions_and_durable_preterminal_attestation
+      previous_label_capability_history_used: 'false'
+      fresh_evidence: 'false'
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse: *pdcaps_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+
+  - artifact_id: midogpp_stage90_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_test_cache_v4
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_TEST_PDCAPS_V4_LABEL_FREE_CACHE_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: test
+      row_count: '9928'
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      experiment_fenced: 'true'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v4
+      execution_authorized: 'true'
+      consumed_test_reuse_authorized: 'true'
+      labels_absent: 'true'
+      previous_stage90_output_used: 'false'
+      fresh_evidence: 'false'
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse: *pdcaps_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v4
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router/v4
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: AUTHORIZED_TERMINAL_CONSUMED_TEST_DIAGNOSTIC_PENDING_RUN
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      bounded_interpretation: one_shot_executable_nullable_admission_repair_on_consumed_MIDOGpp_test_only
+      architecture_family: fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v4
+      config_contract_hash: 3ca778354fc16b6005399840d2c0ba8e243760075a261bda7bf8afa4691e5390
+      protocol_contract_hash: 3bd81804958f8d81fb01fffcfbfcd15fbc5d53cba3e9589249ec53e72642270c
+      expected_ledger_amendment_sha256: aa323b63414ec28520fb97253cf08e086229293a9b4072aed671068a511db7d7
+      execution_authorization_basis: explicit_user_authorization_2026_08_23_for_pdcaps_v4_terminal_consumed_test_diagnostic_run
+      authorization_scope: one_terminal_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v4_diagnostic
+      execution_authorized: 'true'
+      consumed_test_reuse_authorized: 'true'
+      single_use_execution_identity: 'true'
+      authorization_exhausted: 'false'
+      source_snapshot_manifest_sha256: 7a546b90ebe979369b01331a3b948acd8e4a21275ac90ef5368f6dfff19c11f8
+      source_snapshot_tree_sha256: 047a033b83b603eb2304385c13a2e7a9dfc92e085ee111e92d9372a0d1dda474
+      source_snapshot_member_count: '39'
+      v2_source_snapshot_manifest_sha256: 3dc6d096ad607fe550eac47b114332fd6ac9ebec5d9cfb59e80897e9a982addc
+      v2_source_snapshot_tree_sha256: f457d8678eb93fe51520c9fcc188c8d44f8331aec6f37c88124a677bfcc2d5cb
+      v3_repair_source_manifest_sha256: 37b8e51f8d0900212ec4bfc8bd68b14ddbde1ed783eaacf86e8301dd9295b4a7
+      v3_repair_source_tree_sha256: df35265e8d27aa602c3ae6c3fcebdc2a3c4838effa4d9f1200e9deb12e7e0a3e
+      combined_source_seal_sha256: 9540f33048eec501e69182020c030139623b40f1f01e60ac40944ab0dbf629c2
+      evaluation_split: test
+      consumed_test_data: 'true'
+      eligible_test_row_count: '9928'
+      held_case_route_count: '218'
+      target_labels_open_only_after_durable_preterminal_attestation: 'true'
+      exact_P_fallback_required: 'true'
+      raw_labels_may_be_persisted: 'false'
+      v1_output_used: 'false'
+      v2_output_used: 'false'
+      v3_output_used: 'false'
+      previous_stage90_amendments_used: 'false'
+      previous_stage90_run_state_used: 'false'
+      previous_stage90_scratch_used: 'false'
+      previous_probability_or_capability_history_used: 'false'
+      fresh_evidence: 'false'
+      routing_success_claimed: 'false'
+      downstream_utility_claimed: 'false'
+      promotion_eligible: 'false'
+      deployment_claimed: 'false'
+      may_feed_another_experiment: 'false'
+      workstation_generation_devices: cuda:0|cuda:1
+      workstation_cpu_topology: 4_spawn_prediction_workers_x3_BLAS_then_CUDA_hidden_then_4_spawn_outer_H_workers_x1_BLAS_no_nested_pools
+      workstation_blas_threads_per_outer_worker: '1'
+      workstation_scratch_root: /data/local/fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v4
+      cross_run_recovery_allowed: 'false'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - arrays/composed_probabilities.npz
+      - arrays/composed_probabilities.npz.manifest.json
+      - tables/preterminal_science.json
+      - manifests/preterminal_content_index.json
+      - reports/preterminal_fresh_process_attestation.json
+      - tables/terminal_result.json
+      - manifests/final_content_index.json
+      - reports/workstation_preflight.json
+      - reports/diagnostic_summary.json
+      - reports/label_capability_report.json
+      - reports/leakage_report.json
+      - reports/publication_decision.json
+      - reports/runtime_summary.json
+      - reports/final_fresh_process_attestation.json
+      - reports/validation_report.json
+      - reports/run_state.json
+    forbidden_reuse: *pdcaps_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Authorized but not launched. The one-shot identity becomes exhausted after its first admitted execution attempt and has no recovery path.
+      - The complete consumed MIDOG++ test dataset is reused only for stronger terminal diagnostic analysis; no fresh routing, downstream utility, NELBO, significance, promotion, deployment, or transferable evidence claim is permitted.

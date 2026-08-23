@@ -66,15 +66,12 @@ V1_EXPERIMENT_ID = (
     "midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_"
     "route_scoped_donor_crossfit_action_policy_surface_router.v1"
 )
-EXPECTED_ENVIRONMENT = {
-    "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
-    "CUDA_VISIBLE_DEVICES": "0,1",
-    "OMP_NUM_THREADS": "1",
-    "MKL_NUM_THREADS": "1",
-    "OPENBLAS_NUM_THREADS": "1",
-    "NUMEXPR_NUM_THREADS": "1",
-    "PYTHONUNBUFFERED": "1",
-}
+FAILED_RUNNER = (
+    "{python}",
+    "-c",
+    "raise SystemExit('P-DCAPS v2 failed preterminally and cannot be "
+    "recovered or rerun')",
+)
 EXPECTED_OUTPUT_MEMBERS = (
     "config.resolved.yaml",
     "provenance/input_artifacts.json",
@@ -97,7 +94,7 @@ EXPECTED_OUTPUT_MEMBERS = (
 )
 
 
-def test_v2_is_authorized_runnable_exact_six_and_v1_stays_planned() -> None:
+def test_v2_is_failed_exhausted_exact_six_and_v1_stays_planned() -> None:
     config = (
         load_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2_config(
             CONFIG
@@ -115,20 +112,10 @@ def test_v2_is_authorized_runnable_exact_six_and_v1_stays_planned() -> None:
     assert len(INPUT_ARTIFACT_IDS) == len(set(INPUT_ARTIFACT_IDS)) == 6
     assert V1_OUTPUT_ARTIFACT_ID not in INPUT_ARTIFACT_IDS
     assert not any(value.endswith("_v1") for value in INPUT_ARTIFACT_IDS[2:])
-    assert experiment.status == "diagnostic"
-    assert experiment.runnable is True
-    assert experiment.runner_env == EXPECTED_ENVIRONMENT
-    assert experiment.runner_argv == (
-        "{python}",
-        "-m",
-        "midogpp_thesis",
-        "cvae-diagnostics",
-        SURFACE,
-        "--config",
-        "{resolved_config}",
-        "--artifact-root",
-        f"output://{OUTPUT_ARTIFACT_ID}",
-    )
+    assert experiment.status == "failed"
+    assert experiment.runnable is False
+    assert experiment.runner_env == {}
+    assert experiment.runner_argv == FAILED_RUNNER
     assert v1.status == "planned"
     assert v1.runnable is False
 
@@ -168,14 +155,38 @@ def test_v2_is_authorized_runnable_exact_six_and_v1_stays_planned() -> None:
         "ZERO_VECTOR_NO_FITTED_PRIOR"
     )
     assert config.action_library["minimum_effective_sample_size_per_class"] == 5.0
-    assert output.availability == "generated_on_run"
+    assert output.availability == "workstation_failed_preterminal"
     assert output.required_files == EXPECTED_OUTPUT_MEMBERS
-    assert output.evidence_label == "POST_HOC_CONSUMED_TEST_SENSITIVITY"
+    assert output.evidence_label == "REJECTED"
     assert output.semantic_identities["config_contract_hash"] == config.contract_hash
     assert output.semantic_identities["protocol_contract_hash"] == (
         config.protocol["protocol_hash"]
     )
     assert output.semantic_identities["execution_authorized"] == "true"
+    assert output.semantic_identities["original_execution_authorized"] == "true"
+    assert output.semantic_identities["further_execution_authorized"] == "false"
+    assert output.semantic_identities["authorization_exhausted"] == "true"
+    assert output.semantic_identities["single_use_authorization_consumed"] == (
+        "true"
+    )
+    assert output.semantic_identities["run_state_status"] == "FAILED"
+    assert output.semantic_identities["failure_phase"] == (
+        "FOUR_SPAWN_OUTER_H_WORKERS"
+    )
+    assert output.semantic_identities["run_state_hash"] == (
+        "2c10b41ee3eb03c1b2ace3f9efb84d3fc2241e355f1271b450254ae8084c11a4"
+    )
+    assert output.semantic_identities["diagnostic_result_valid"] == "false"
+    assert output.semantic_identities[
+        "route_surfaces_and_pseudo_responses_complete"
+    ] == "true"
+    assert output.semantic_identities["pseudo_response_capabilities_opened"] == (
+        "true"
+    )
+    assert output.semantic_identities["target_terminal_capability_opened"] == (
+        "false"
+    )
+    assert output.semantic_identities["terminal_metrics_computed"] == "false"
     assert output.semantic_identities["consumed_test_reuse_authorized"] == "true"
     assert output.semantic_identities["execution_authorization_basis"] == (
         AUTHORIZATION_BASIS
@@ -379,33 +390,19 @@ def test_v2_config_is_strict_and_path_independent(tmp_path: Path) -> None:
         )
 
 
-def test_v2_cli_surface_is_unique_and_dispatches_v2(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
+def test_v2_cli_surface_is_unique_and_rejects_exhausted_identity() -> None:
     parsed = cli.build_parser().parse_args(
         [SURFACE, "--config", str(CONFIG), "--artifact-root", "/tmp/pdcaps-v2"]
     )
     assert parsed.surface == SURFACE
 
-    import midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v2 as v2_surface
-
-    sentinel = object()
-    calls: list[tuple[object, Path]] = []
-    monkeypatch.setattr(
-        v2_surface,
-        "load_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2_config",
-        lambda _: sentinel,
-    )
-    monkeypatch.setattr(
-        v2_surface,
-        "run_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2",
-        lambda config, *, artifact_root: calls.append((config, artifact_root))
-        or Path("/tmp/pdcaps-v2-result"),
-    )
-
-    assert cli.main(
-        [SURFACE, "--config", str(CONFIG), "--artifact-root", "/tmp/pdcaps-v2"]
-    ) == 0
-    assert calls == [(sentinel, Path("/tmp/pdcaps-v2"))]
-    assert "/tmp/pdcaps-v2-result" in capsys.readouterr().out
+    with pytest.raises(ProtocolError, match="authorization is exhausted"):
+        cli.main(
+            [
+                SURFACE,
+                "--config",
+                str(CONFIG),
+                "--artifact-root",
+                "/tmp/pdcaps-v2",
+            ]
+        )
