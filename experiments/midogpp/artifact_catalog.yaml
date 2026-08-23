@@ -14301,7 +14301,7 @@ artifacts:
     semantic_identities:
       parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
       parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
-      amendment_sha256: aa323b63414ec28520fb97253cf08e086229293a9b4072aed671068a511db7d7
+      amendment_sha256: 8ce04d560c6f133ffb914a04fe9c67a3cd418ae9edf0db3568fc212814e2be1d
       authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v4
       authorization_basis: explicit_user_authorization_2026_08_23_for_pdcaps_v4_terminal_consumed_test_diagnostic_run
       authorization_scope: one_terminal_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v4_diagnostic
@@ -14326,7 +14326,7 @@ artifacts:
     expected_file_hashes:
       uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_ledger_amendment_v4.json:
         algorithm: sha256
-        digest: aa323b63414ec28520fb97253cf08e086229293a9b4072aed671068a511db7d7
+        digest: 8ce04d560c6f133ffb914a04fe9c67a3cd418ae9edf0db3568fc212814e2be1d
     forbidden_reuse: *pdcaps_forbidden_reuse
     may_feed_recipe_selection: false
     may_feed_deployable_selection: false
@@ -14418,23 +14418,23 @@ artifacts:
       terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
       bounded_interpretation: one_shot_executable_nullable_admission_repair_on_consumed_MIDOGpp_test_only
       architecture_family: fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v4
-      config_contract_hash: 3ca778354fc16b6005399840d2c0ba8e243760075a261bda7bf8afa4691e5390
-      protocol_contract_hash: 3bd81804958f8d81fb01fffcfbfcd15fbc5d53cba3e9589249ec53e72642270c
-      expected_ledger_amendment_sha256: aa323b63414ec28520fb97253cf08e086229293a9b4072aed671068a511db7d7
+      config_contract_hash: 67427a922528d16aee0dd4c2e38140bc3a6d7dffcb246f9ed7adcd064185a5ec
+      protocol_contract_hash: 1bac55a0d91d8f8e6887559e55d5aaf8e0082f75606dc910909fcc340a3950e0
+      expected_ledger_amendment_sha256: 8ce04d560c6f133ffb914a04fe9c67a3cd418ae9edf0db3568fc212814e2be1d
       execution_authorization_basis: explicit_user_authorization_2026_08_23_for_pdcaps_v4_terminal_consumed_test_diagnostic_run
       authorization_scope: one_terminal_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v4_diagnostic
       execution_authorized: 'true'
       consumed_test_reuse_authorized: 'true'
       single_use_execution_identity: 'true'
       authorization_exhausted: 'false'
-      source_snapshot_manifest_sha256: 7a546b90ebe979369b01331a3b948acd8e4a21275ac90ef5368f6dfff19c11f8
-      source_snapshot_tree_sha256: 047a033b83b603eb2304385c13a2e7a9dfc92e085ee111e92d9372a0d1dda474
-      source_snapshot_member_count: '39'
+      source_snapshot_manifest_sha256: e195064c0b3a30167ded9d10bb2355bc6ebc8c91c7fd07deb44b115611f8bdbf
+      source_snapshot_tree_sha256: 6f116b8b6766a2c7f1e3d163a6b5226ee61556977ae07ed0f5ce3c93cead17b3
+      source_snapshot_member_count: '41'
       v2_source_snapshot_manifest_sha256: 3dc6d096ad607fe550eac47b114332fd6ac9ebec5d9cfb59e80897e9a982addc
       v2_source_snapshot_tree_sha256: f457d8678eb93fe51520c9fcc188c8d44f8331aec6f37c88124a677bfcc2d5cb
       v3_repair_source_manifest_sha256: 37b8e51f8d0900212ec4bfc8bd68b14ddbde1ed783eaacf86e8301dd9295b4a7
       v3_repair_source_tree_sha256: df35265e8d27aa602c3ae6c3fcebdc2a3c4838effa4d9f1200e9deb12e7e0a3e
-      combined_source_seal_sha256: 9540f33048eec501e69182020c030139623b40f1f01e60ac40944ab0dbf629c2
+      combined_source_seal_sha256: e059e75faa8543316ba19555f6b01ca25a0505ce5e28aed4308c28a17cdb5c9a
       evaluation_split: test
       consumed_test_data: 'true'
       eligible_test_row_count: '9928'

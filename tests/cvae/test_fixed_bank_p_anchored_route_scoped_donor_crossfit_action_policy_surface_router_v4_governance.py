@@ -24,8 +24,14 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_donor_cr
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v4.source_seal import (
     build_combined_source_seal_payload,
+    validate_combined_source_seal,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v4.workspace_manifest import (
+    WORKSPACE_INPUT_MANIFEST_SCHEMA,
+    validate_workspace_manifest_header,
 )
 from midogpp_thesis.cvae.protocol import ProtocolError
+from midogpp_thesis.workspace.runtime import MidogppWorkspace
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -76,6 +82,24 @@ def test_v4_registration_is_exact_six_authorized_terminal_only() -> None:
     assert output["semantic_identities"]["fresh_evidence"] == "false"
 
 
+def test_v4_accepts_the_actual_workspace_input_manifest_transport_schema() -> None:
+    workspace = MidogppWorkspace.load()
+    rendered = workspace._render_run(  # noqa: SLF001 - regression seam
+        EXPERIMENT_ID,
+        require_inputs=False,
+        validate_workspace=True,
+        include_all_declared_inputs=True,
+    )
+    payload = rendered.input_manifest
+
+    assert payload["schema_version"] == WORKSPACE_INPUT_MANIFEST_SCHEMA
+    assert WORKSPACE_INPUT_MANIFEST_SCHEMA == "midogpp_input_artifacts_v2"
+    assert tuple(row["artifact_id"] for row in payload["input_artifacts"]) == tuple(
+        sorted(INPUT_ARTIFACT_IDS)
+    )
+    validate_workspace_manifest_header(payload)
+
+
 def test_v4_ledger_is_single_consumer_and_does_not_reuse_predecessor_state() -> None:
     amendment = json.loads(AMENDMENT.read_text(encoding="utf-8"))
     assert amendment["schema_version"] == LEDGER_AMENDMENT_SCHEMA_VERSION
@@ -114,11 +138,13 @@ def test_v4_import_boundary_forbids_exhausted_v2_and_v3_authority_modules() -> N
 
 
 def test_v4_combined_source_payload_keeps_three_disjoint_scopes() -> None:
+    seal = validate_combined_source_seal()
     payload = build_combined_source_seal_payload()
+    assert seal.v4_member_count == 41
     assert payload["source_scopes_are_disjoint"] is True
     assert payload["v2_base"]["member_count"] == 105
     assert payload["v3_nullable_admission_repair"]["member_count"] == 13
-    assert payload["v4_executable_orchestration"]["member_count"] == 39
+    assert payload["v4_executable_orchestration"]["member_count"] == 41
 
 
 def test_v4_cli_surface_is_registered() -> None:

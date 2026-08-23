@@ -27,10 +27,12 @@ from .identity import (
     EXPERIMENT_ID,
     OUTPUT_ARTIFACT_ID,
 )
-
-
-STAGE_ID = "90_oracles_and_diagnostics"
-CLAIM_SCOPE = "diagnostic_only"
+from .workspace_manifest import (
+    WORKSPACE_CLAIM_SCOPE as CLAIM_SCOPE,
+    WORKSPACE_REPLAY_FIELDS,
+    WORKSPACE_STAGE_ID as STAGE_ID,
+    validate_workspace_manifest_header,
+)
 
 
 def validate_active_workspace_binding(config: object) -> Mapping[str, object]:
@@ -146,15 +148,7 @@ def validate_workspace_provenance(
     """Require the exact workspace-rendered six-input manifest."""
 
     payload = _read_object(Path(root) / "provenance/input_artifacts.json")
-    if (
-        payload.get("schema_version") != "midogpp_input_artifacts_v4"
-        or payload.get("dataset_id") != "midogpp"
-        or payload.get("experiment_id") != EXPERIMENT_ID
-        or payload.get("stage") != STAGE_ID
-        or payload.get("claim_scope") != CLAIM_SCOPE
-        or payload.get("selection_used_target_eval_artifacts") is not False
-    ):
-        raise ProtocolError("P-DCAPS v4 provenance header drifted.")
+    validate_workspace_manifest_header(payload)
     raw_rows = payload.get("input_artifacts")
     if not isinstance(raw_rows, list) or not all(
         isinstance(row, Mapping) for row in raw_rows
@@ -244,17 +238,9 @@ def _replay_workspace_manifest(payload: Mapping[str, object], config: object) ->
     except (KeyError, ValueError, OSError) as exc:
         raise ProtocolError("P-DCAPS v4 provenance replay failed.") from exc
     expected = rendered.input_manifest
-    header = (
-        "schema_version",
-        "dataset_id",
-        "experiment_id",
-        "stage",
-        "claim_scope",
-        "selection_used_target_eval_artifacts",
-    )
-    if any(payload.get(key) != expected.get(key) for key in header) or payload.get(
-        "input_artifacts"
-    ) != expected.get("input_artifacts"):
+    if any(
+        payload.get(key) != expected.get(key) for key in WORKSPACE_REPLAY_FIELDS
+    ) or payload.get("input_artifacts") != expected.get("input_artifacts"):
         raise ProtocolError("P-DCAPS v4 provenance replay differs.")
 
 

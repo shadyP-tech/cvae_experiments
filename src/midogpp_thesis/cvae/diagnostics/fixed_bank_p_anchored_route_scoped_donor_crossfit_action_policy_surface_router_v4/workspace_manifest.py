@@ -1,0 +1,63 @@
+"""Canonical workspace-manifest transport contract for P-DCAPS v4."""
+
+from __future__ import annotations
+
+from typing import Mapping
+
+from ...protocol import ProtocolError
+from .identity import EXPERIMENT_ID
+
+
+WORKSPACE_INPUT_MANIFEST_SCHEMA = "midogpp_input_artifacts_v2"
+WORKSPACE_DATASET_ID = "midogpp"
+WORKSPACE_STAGE_ID = "90_oracles_and_diagnostics"
+WORKSPACE_CLAIM_SCOPE = "diagnostic_only"
+WORKSPACE_HEADER_FIELDS = (
+    "schema_version",
+    "dataset_id",
+    "experiment_id",
+    "stage",
+    "claim_scope",
+    "selection_used_target_eval_artifacts",
+)
+WORKSPACE_REPLAY_FIELDS = WORKSPACE_HEADER_FIELDS + (
+    "repository_revision",
+    "repository_dirty",
+    "repository_status_hash",
+)
+
+
+def validate_workspace_manifest_header(payload: Mapping[str, object]) -> None:
+    """Bind v4 to the workspace renderer's versioned transport header."""
+
+    repository_revision = payload.get("repository_revision")
+    repository_dirty = payload.get("repository_dirty")
+    repository_status_hash = payload.get("repository_status_hash")
+    if (
+        payload.get("schema_version") != WORKSPACE_INPUT_MANIFEST_SCHEMA
+        or payload.get("dataset_id") != WORKSPACE_DATASET_ID
+        or payload.get("experiment_id") != EXPERIMENT_ID
+        or payload.get("stage") != WORKSPACE_STAGE_ID
+        or payload.get("claim_scope") != WORKSPACE_CLAIM_SCOPE
+        or payload.get("selection_used_target_eval_artifacts") is not False
+        or not isinstance(repository_revision, str)
+        or not repository_revision
+        or (
+            repository_dirty is not None
+            and not isinstance(repository_dirty, bool)
+        )
+        or not isinstance(repository_status_hash, str)
+        or not repository_status_hash
+    ):
+        raise ProtocolError("P-DCAPS v4 workspace provenance header drifted.")
+
+
+__all__ = (
+    "WORKSPACE_CLAIM_SCOPE",
+    "WORKSPACE_DATASET_ID",
+    "WORKSPACE_HEADER_FIELDS",
+    "WORKSPACE_INPUT_MANIFEST_SCHEMA",
+    "WORKSPACE_REPLAY_FIELDS",
+    "WORKSPACE_STAGE_ID",
+    "validate_workspace_manifest_header",
+)

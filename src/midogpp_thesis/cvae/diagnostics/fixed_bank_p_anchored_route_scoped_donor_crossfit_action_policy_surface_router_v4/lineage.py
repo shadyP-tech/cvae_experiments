@@ -13,7 +13,8 @@ from ..fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_r
 )
 from .identity import DIRECT_INPUT_ROLES
 from .experiment_contracts import INPUT_ARTIFACT_IDS
-from .identity import EXPERIMENT_ID, canonical_hash, require_sha256
+from .identity import canonical_hash, require_sha256
+from .workspace_manifest import validate_workspace_manifest_header
 
 
 def build_six_input_binding(
@@ -64,14 +65,9 @@ def reconstruct_persisted_six_input_binding(
 
     payload = read_json(Path(root) / "provenance/input_artifacts.json")
     rows = payload.get("input_artifacts")
+    validate_workspace_manifest_header(payload)
     if (
-        payload.get("schema_version") != "midogpp_input_artifacts_v4"
-        or payload.get("dataset_id") != "midogpp"
-        or payload.get("experiment_id") != EXPERIMENT_ID
-        or payload.get("stage") != "90_oracles_and_diagnostics"
-        or payload.get("claim_scope") != "diagnostic_only"
-        or payload.get("selection_used_target_eval_artifacts") is not False
-        or not isinstance(rows, list)
+        not isinstance(rows, list)
         or not all(isinstance(row, Mapping) for row in rows)
         or tuple(str(row.get("artifact_id")) for row in rows)
         != tuple(sorted(INPUT_ARTIFACT_IDS))
