@@ -7,6 +7,113 @@ Every oracle row must be marked non-deployable. Diagnostic results may explain
 a failure or quantify headroom, but they must not tune or select a deployable
 policy and must remain separate from held-out utility claims.
 
+## P-DCAPS donor-cross-fitted action and policy surfaces v1
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v1`
+is implemented and registered as **planned, not executable**. Its config,
+protocol, non-authorizing ledger amendment, registry status, and catalog output
+all retain `execution_authorized=false`. An implementation request does not
+authorize another opening of consumed-test labels, so direct runner admission
+must fail before creating an output directory, scratch directory, checkpoint,
+or label-capability journal.
+
+P-DCAPS addresses the observed action-selection bottleneck at two distinct
+surfaces. First it scores every sealed B/I/R action under true outer-H and
+pseudo-J exclusions, then fits fixed-alpha action-response models under equal
+center, route, and action-cell weighting. Donor-only family-by-direction
+reliability is applied before the within-case argmax. Second, it reconstructs
+every exact-P-plus-prefix pseudo policy and nested-cross-fits a complete-policy
+response surface. Its lower-envelope correction is descriptive OOF
+overprediction plus delete-donor sensitivity; it is not conformal, a confidence
+bound, or a finite-sample guarantee.
+
+The implementation keeps its scientific boundaries package-local and
+independently testable: physical action definitions, immutable surface
+contracts, and neutral materialization are separate modules; action and policy
+calibration are separate subpackages; the typed label lifecycle is the only
+capability seam; execution DTOs contain only primitive tuples and contiguous
+arrays; persistence and fresh-process validation are isolated from the pure
+engine. `physical_adapter.py` remains a thin compatibility facade.
+
+The planned terminal menu is `P_PROTECTED`, `P_DCAPS_PRIMARY`, action-only,
+policy-only, same-run legacy center-pooled prefix, and a cyclic poison control.
+Every tie at the authorization boundary, unsupported stratum, nonfinite result,
+or failed proper-score gate emits exact byte-identical P. Target labels may open
+only after every action, prefix, target decision, aggregate prediction, and
+preterminal attestation is sealed; they can report diagnostics but cannot alter
+routes.
+
+The nested reliability surfaces exclude `H`, routed pseudo center `J`, and
+scored reliability center `K`. Symmetric `{J,K}` training rectangles are solved
+once and rebound only at the immutable scored-center provenance layer. The
+honest workstation budget is therefore 999 numerical ridge heads for the
+action layer and 999 for the policy layer (1,998 total), while 1,755 lineage-
+distinct model DTOs per layer retain both scoring orientations. This replaces
+the earlier 243-per-layer estimate, which counted final and leave-`J` models but
+omitted the additional leave-`{J,K}` reliability fits.
+
+The reported dense-byte estimate is a pessimistic cap for calibration records,
+not a measured process peak. It intentionally excludes Python/process, BLAS,
+classifier, memory-map page-cache, and CUDA-runtime overhead; admission still
+uses the independent 8 GiB dense-surface ceiling and the workstation RAM/disk
+preflight.
+
+Exactly six direct-original inputs are declared: the immutable expert bank,
+generation lock, experiment-fenced label-free cache, experiment-fenced
+manifest, byte-exact original parent ledger alias, and the new non-authorizing
+amendment. No CBPUPR/PCSI/other Stage-90 output, amendment, surface, checkpoint,
+or scratch state is an input. The workstation contract uses two persistent GPU
+generation workers, then four spawn-safe coarse outer-H CPU workers, dense
+integer-indexed surfaces, compact pickle-safe DTOs, no nested pools, and atomic
+per-H chunks.
+
+Even if execution is separately authorized later and the diagnostic improves,
+its maximum status remains `POST_HOC_CONSUMED_TEST_SENSITIVITY` and
+`TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`. It cannot establish fresh routing
+success or feed another experiment.
+
+## P-DCAPS donor-cross-fitted action and policy surfaces v2
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v2`
+is the separately authorized one-shot execution identity for the hardened
+P-DCAPS terminal diagnostic. Its authorization basis is exactly
+`explicit_user_authorization_for_pdcaps_v2_terminal_consumed_test_diagnostic_run`.
+V1 remains planned and non-executable; v2 does not consume or alias its output,
+amendment, probability surfaces, scratch, checkpoints, arrays, seals, or label-
+capability history.
+
+V2 truthfully changes three scientific mechanics from v1. Caller-injectable
+response denominators are replaced by lifecycle-derived whole-center
+support-plus-held denominators; the formerly implicit/default donor endpoint
+prior is made explicit and source-hash-bound as
+`ZERO_VECTOR_NO_FITTED_PRIOR`; and every canonical physical action must satisfy
+a per-class effective-sample-size viability gate of at least 5. These are v2
+methodological hardening and physical-action eligibility deltas. They remain
+terminal consumed-test changes and create neither fresh nor promotable
+evidence.
+
+V2 has six direct inputs: the original frozen expert bank and generation lock,
+plus fresh v2 single-consumer aliases for the original immutable test cache,
+manifest, parent ledger, and the new hash-chained amendment. The complete
+package-local P-DCAPS Python source inventory is manifest- and tree-hash-bound
+before the first filesystem write. Missing, extra, or drifted package-local
+source fails closed; bytecode and cache directories are excluded. External
+neutral generation, cache, and bank modules are validated inputs or runtime
+dependencies, not members of this package-local source snapshot.
+
+The workstation schedule remains two persistent RTX A5000 generation workers,
+followed by four spawn-safe, CUDA-hidden outer-H CPU workers with capped BLAS,
+no nested process pools, and atomic per-H chunks. Every target route still uses
+the whole-case H/J/d firewall, joint identity/cyclic action-surface seal, exact-P
+fallback, fixed six-method menu, and preterminal attestation before terminal
+labels open.
+
+This authorization permits execution, not promotion. The output remains
+`POST_HOC_CONSUMED_TEST_SENSITIVITY`, `fresh_evidence=false`, and
+`TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`. It cannot feed another experiment,
+numbered stage, routing policy, model, expert, recipe selection, deployment, or
+thesis-facing fresh-confirmatory claim.
+
 ## PCSI-PARC Boundary-Projected Whole-Policy Regret Router v1
 
 This Stage-90 experiment is planned but not runnable. It is designed as one final

@@ -1,0 +1,531 @@
+experiment:
+  id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v2
+  name: P-anchored donor-cross-fitted action-and-policy-surface router v2
+  artifact_root: output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2
+  claim_scope: diagnostic_only
+  status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+  execution_authorized: true
+  execution_authorization_basis: explicit_user_authorization_for_pdcaps_v2_terminal_consumed_test_diagnostic_run
+  single_use_execution_identity: true
+inputs:
+  expert_bank_artifact_id: midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_artifact_id: midogpp_output_uniform_b_v2_generation_lock_v1
+  test_cache_artifact_id: midogpp_stage90_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_test_cache_v2
+  test_manifest_artifact_id: midogpp_stage90_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_test_manifest_v2
+  test_consumption_ledger_artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_parent_v2
+  ledger_amendment_artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_amendment_v2
+  expected_bank_lock_hash: 9972a41dcd4814cd
+  expected_generation_lock_hash: 34e551425710362e
+  expected_test_cache_semantic_id: uniform_b_v2_descriptive_test_cache_v1
+  expected_test_cache_representation_id: annotation_jpeg_fixed_center_b_v3
+  expected_test_cache_content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+  expected_test_cache_row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+  expected_manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+  expected_test_consumption_ledger_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+  expected_ledger_amendment_sha256: 83a132f55d86d46fea3631272e3ba9db34db69bb22e61366c0a0d055a2a8e6ad
+  expected_ledger_amendment_parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+  ledger_amendment_consumer_experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v2
+  ledger_amendment_execution_authorized: true
+  ledger_amendment_authorization_basis: explicit_user_authorization_for_pdcaps_v2_terminal_consumed_test_diagnostic_run
+  ledger_amendment_authorization_scope: one_terminal_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2_diagnostic
+  source_snapshot_schema: pdcaps_v2_source_snapshot_v1
+  expected_source_snapshot_manifest_sha256: 3dc6d096ad607fe550eac47b114332fd6ac9ebec5d9cfb59e80897e9a982addc
+  expected_source_snapshot_tree_sha256: f457d8678eb93fe51520c9fcc188c8d44f8331aec6f37c88124a677bfcc2d5cb
+  expected_source_snapshot_member_count: 105
+  expert_bank_root: artifact://midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  generation_lock_root: artifact://midogpp_output_uniform_b_v2_generation_lock_v1
+  test_cache_root: artifact://midogpp_stage90_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_test_cache_v2
+  test_manifest_path: artifact://midogpp_stage90_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_test_manifest_v2/manifest.csv
+  test_consumption_ledger_path: artifact://midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_parent_v2/reports/test_consumption_ledger.json
+  ledger_amendment_path: artifact://midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_amendment_v2/uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_ledger_amendment_v2.json
+protocol:
+  schema_version: pdcaps_terminal_protocol_v2
+  experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v2
+  dataset_family: MIDOG++
+  split: test
+  split_previously_consumed: true
+  fresh_evidence: false
+  publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+  terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+  execution_authorized: true
+  authorization_basis: explicit_user_authorization_for_pdcaps_v2_terminal_consumed_test_diagnostic_run
+  authorization_scope: one_terminal_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2_diagnostic
+  single_use_execution_identity: true
+  authorization_exhausted: false
+  scientific_protocol_unchanged_from_v1: false
+  scientific_method_changed_from_v1: true
+  methodological_delta_role: v2_methodological_hardening_and_physical_action_eligibility
+  methodological_deltas:
+  - caller_injectable_response_denominators_replaced_by_lifecycle_derived_whole_center_support_plus_held_denominators
+  - implicit_or_default_donor_prior_replaced_by_explicit_source_hash_bound_ZERO_VECTOR_NO_FITTED_PRIOR
+  - canonical_physical_action_per_class_ESS_viability_gate_minimum_5
+  methodological_deltas_are_terminal_consumed_test_only: true
+  methodological_deltas_create_fresh_evidence: false
+  methodological_deltas_are_promotable: false
+  v1_output_used: false
+  v1_amendment_used: false
+  v1_label_capability_history_used: false
+  v1_scratch_or_checkpoint_used: false
+  prior_v1_execution_authorization_reused: false
+  source_snapshot_binding_required: true
+  source_snapshot_schema: pdcaps_v2_source_snapshot_v1
+  source_snapshot_scope: complete_package_local_PDCAPS_Python_only
+  external_neutral_module_source_policy: validated_inputs_and_runtime_dependencies_not_source_snapshot_members
+  source_snapshot_manifest_sha256: 3dc6d096ad607fe550eac47b114332fd6ac9ebec5d9cfb59e80897e9a982addc
+  source_snapshot_tree_sha256: f457d8678eb93fe51520c9fcc188c8d44f8331aec6f37c88124a677bfcc2d5cb
+  source_snapshot_member_count: 105
+  source_snapshot_excludes_pyc_and_cache: true
+  response_denominators: derived_inside_lifecycle_from_support_plus_held
+  endpoint_donor_prior_policy: ZERO_VECTOR_NO_FITTED_PRIOR
+  minimum_effective_sample_size_per_class: 5.0
+  authorization_is_separate_from_implementation_request: true
+  source_code_or_implementation_request_alone_authorizes_execution: false
+  execution_requires_external_authorized_config_and_ledger: true
+  input_roles:
+  - expert_bank
+  - generation_lock
+  - test_cache
+  - test_manifest
+  - parent_consumption_ledger
+  - ledger_amendment
+  input_count: 6
+  physical_probability_surface_recomputed_from_original_inputs: true
+  previous_stage90_outputs_used: false
+  previous_stage90_amendments_used: false
+  previous_stage90_scratch_or_checkpoints_used: false
+  held_unit: whole_case_or_group
+  outer_center_excluded_from_every_scientific_fit: true
+  pseudo_center_excluded_from_own_prediction: true
+  held_case_d_role: scored_response_only_after_surface_seal
+  action_strata:
+  - - B
+    - zero_to_one
+  - - B
+    - one_to_zero
+  - - I_OPPORTUNITY_GATED
+    - zero_to_one
+  - - I_OPPORTUNITY_GATED
+    - one_to_zero
+  - - R_NINE_ARM_ROBUST
+    - zero_to_one
+  - - R_NINE_ARM_ROBUST
+    - one_to_zero
+  ridge_alpha: 1.0
+  hyperparameter_selection_used: false
+  fit_only_standardization: true
+  hierarchical_weighting: equal_center_then_route_then_cell
+  minimum_reliability_center_count: 6
+  all_action_surface_sealed_before_pseudo_response_access: true
+  posterior_control_ids:
+  - IDENTITY
+  - WITHIN_CASE_CYCLIC_SHIFT
+  identity_and_cyclic_action_surfaces_jointly_sealed_before_pseudo_response_access: true
+  pseudo_label_capability_opened_once_per_route_for_all_posterior_controls: true
+  all_prefix_cells_sealed_before_policy_response_access: true
+  per_outer_center_admission: true
+  pooled_admission_can_affect_routes: false
+  descriptive_lower_envelope_only: true
+  finite_sample_coverage_claimed: false
+  method_menu:
+  - P_PROTECTED
+  - P_DCAPS_PRIMARY
+  - P_DCAPS_ACTION_ONLY
+  - P_DCAPS_POLICY_ONLY
+  - LEGACY_CENTER_POOLED_PREFIX
+  - P_DCAPS_CYCLIC_POISON
+  tie_tolerance: 1.0e-12
+  exact_p_fallback_required: true
+  target_labels_open_only_after_preterminal_attestation: true
+  all_fixed_method_decisions_and_compositions_sealed_before_target_labels: true
+  raw_labels_may_be_persisted: false
+  may_feed_stage50: false
+  may_feed_stage60: false
+  may_feed_stage70: false
+  may_feed_another_stage90: false
+  may_feed_another_experiment: false
+  routing_success_claimed: false
+  downstream_utility_claimed: false
+  nelbo_compatibility_claimed: false
+  deployment_claimed: false
+  protocol_hash: ee731d8aa907249c28e14414450b849b53fd1d85b668b91da567260322122871
+action_library:
+  schema_version: pdcaps_action_library_v1
+  centers:
+  - '0'
+  - '1'
+  - '2'
+  - '3'
+  - '5'
+  - '6'
+  - '7'
+  - '8'
+  - '9'
+  excluded_center: '4'
+  physical_actions_per_target: 10
+  physical_action_ids: B_U_and_eight_A1_source_actions
+  candidate_action_families:
+  - B
+  - I_OPPORTUNITY_GATED
+  - R_NINE_ARM_ROBUST
+  candidate_action_strata:
+  - - B
+    - zero_to_one
+  - - B
+    - one_to_zero
+  - - I_OPPORTUNITY_GATED
+    - zero_to_one
+  - - I_OPPORTUNITY_GATED
+    - one_to_zero
+  - - R_NINE_ARM_ROBUST
+    - zero_to_one
+  - - R_NINE_ARM_ROBUST
+    - one_to_zero
+  B_rows_per_source_class: 128
+  U_rows_per_source_class: 144
+  A1_selected_rows_per_class: 256
+  A1_other_rows_per_class: 128
+  A1_selected_row_weight: 1.4375
+  A1_other_row_weight: 0.875
+  target_expert_excluded: true
+  probabilities_averaged_exact_nine_before_routing: true
+  physical_probability_storage_dtype: float32
+  all_crossing_actions_retained_until_action_surface_seal: true
+  previous_probability_surface_used: false
+  previous_stage90_output_used: false
+  endpoint_donor_prior_policy: ZERO_VECTOR_NO_FITTED_PRIOR
+  minimum_effective_sample_size_per_class: 5.0
+policy_menu:
+  schema_version: pdcaps_policy_menu_v1
+  method_ids:
+  - P_PROTECTED
+  - P_DCAPS_PRIMARY
+  - P_DCAPS_ACTION_ONLY
+  - P_DCAPS_POLICY_ONLY
+  - LEGACY_CENTER_POOLED_PREFIX
+  - P_DCAPS_CYCLIC_POISON
+  protected_fallback: P_PROTECTED
+  primary_method_id: P_DCAPS_PRIMARY
+  exact_P_fallback_required: true
+  exact_P_fallback_storage_contract: byte_for_byte_float32_identity
+  action_response_model:
+    family: equal_center_weighted_ridge
+    response_coordinates:
+    - bacc
+    - brier
+    - log
+    alpha: 1.0
+    hyperparameter_selection_used: false
+    standardization: fit_rows_only
+    solve_dtype: float64
+    features:
+    - predicted_favorable_metric
+    - crossing_fraction
+    - six_action_family_direction_indicators
+    - predicted_metric_x_action_stratum_interactions
+    weighting: equal_center_then_route_then_action_cell
+    target_fit_scope: all_J_not_equal_H
+    pseudo_fit_scope: all_K_not_in_H_or_J
+    held_case_role: SCORED_RESPONSE_ONLY_AFTER_SURFACE_SEAL
+  stratum_reliability_gate:
+    minimum_represented_donor_centers: 6
+    bacc_spearman_strictly_positive: true
+    equal_center_mean_realized_bacc_strictly_positive: true
+    strict_majority_positive_donor_center_bacc_means: true
+    equal_center_mean_realized_brier_nonnegative: true
+    equal_center_mean_realized_log_nonnegative: true
+    class_domain_support_required: true
+    nonfinite_or_unsupported_action: P_PROTECTED
+    applied_before_within_case_argmax: true
+  action_selection:
+    feasibility: calibrated_BACC_positive_and_calibrated_favorable_Brier_and_log_nonnegative
+    ranking: maximum_calibrated_BACC_then_B_I_R_then_zero_to_one_then_one_to_zero_then_action_hash
+    tie_tolerance: 1.0e-12
+    tie_or_failure_fallback: P_PROTECTED
+  policy_surface_model:
+    family: equal_center_weighted_ridge
+    response_coordinates:
+    - bacc
+    - brier
+    - log
+    alpha: 1.0
+    hyperparameter_selection_used: false
+    standardization: fit_rows_only
+    solve_dtype: float64
+    features:
+    - predicted_favorable_metric
+    - normalized_prefix_depth
+    - maximum_positive_candidate_share
+    - six_action_stratum_proportions
+    weighting: equal_center_then_complete_policy_cell
+    target_fit_scope: all_J_not_equal_H
+    pseudo_fit_scope: all_K_not_in_H_or_J
+    all_complete_prefix_cells_scored: true
+  lower_envelope:
+    formula: policy_prediction_minus_equal_center_mean_positive_OOF_overprediction_minus_maximum_delete_donor_change
+    out_of_fold_only: true
+    finite_sample_coverage_claimed: false
+    confidence_bound_claimed: false
+  prefix_selection:
+    feasibility: lower_envelope_BACC_positive_and_lower_envelope_favorable_Brier_and_log_nonnegative
+    ranking: maximum_BACC_then_smaller_K_then_prefix_hash
+    tie_tolerance: 1.0e-12
+    empty_or_failed_surface_fallback: P_PROTECTED
+  legacy_control_recomputed_same_run: true
+  legacy_control:
+    method_id: LEGACY_CENTER_POOLED_PREFIX
+    implementation_scope: same_run_package_local_only
+    response_scope: donor_pseudo_responses_only
+    pooling: equal_center
+    selection_grid: normalized_target_prefix_depth_grid
+    donor_prefix_match: nearest_normalized_depth_then_smaller_k_then_prefix_hash
+    feasibility: pooled_BACC_strictly_positive_and_pooled_favorable_Brier_and_log_nonnegative
+    ranking: maximum_pooled_BACC_then_smaller_target_k_then_target_prefix_hash
+    target_labels_used: false
+    exact_P_permitted_at_k0: true
+  method_controls:
+    schema_version: pdcaps_fixed_method_controls_v1
+    fixed_menu:
+      P_PROTECTED:
+        source_layer: protected_P_probability_surface
+        selected_actions: none_exact_P_byte_identity
+        admission_H: not_applied
+        expected_posterior_control_id: IDENTITY
+        same_physical_surface_as_identity_required: true
+        role: protected_reference
+      P_DCAPS_PRIMARY:
+        source_layer: identity_action_selection_then_selected_policy_prefix
+        selected_actions: selected_policy_prefix_only_when_Admission_H_passes
+        admission_H: required_pseudo_only_same_run
+        expected_posterior_control_id: IDENTITY
+        same_physical_surface_as_identity_required: true
+        role: primary_terminal_diagnostic
+      P_DCAPS_ACTION_ONLY:
+        source_layer: identity_target_action_selections
+        selected_actions: all_nonfallback_target_action_selections
+        admission_H: bypassed_terminal_ablation
+        expected_posterior_control_id: IDENTITY
+        same_physical_surface_as_identity_required: true
+        role: terminal_action_layer_ablation
+      P_DCAPS_POLICY_ONLY:
+        source_layer: identity_selected_target_policy_prefix
+        selected_actions: selected_policy_prefix
+        admission_H: bypassed_terminal_ablation
+        expected_posterior_control_id: IDENTITY
+        same_physical_surface_as_identity_required: true
+        role: terminal_admission_layer_ablation
+      LEGACY_CENTER_POOLED_PREFIX:
+        source_layer: typed_same_run_legacy_center_pooled_target_decision
+        selected_actions: sealed_legacy_target_prefix
+        admission_H: not_applied
+        expected_posterior_control_id: IDENTITY
+        same_physical_surface_as_identity_required: true
+        role: terminal_legacy_control
+      P_DCAPS_CYCLIC_POISON:
+        source_layer: distinct_cyclic_posterior_action_and_policy_result
+        selected_actions: cyclic_selected_policy_prefix_only_when_cyclic_Admission_H_passes
+        admission_H: required_cyclic_pseudo_only_same_run
+        expected_posterior_control_id: WITHIN_CASE_CYCLIC_SHIFT
+        same_physical_surface_as_identity_required: true
+        distinct_action_surface_seal_from_identity_required: true
+        role: terminal_cyclic_poison_control
+    caller_selected_action_hashes_permitted: false
+    typed_source_and_seal_binding_required: true
+    terminal_diagnostic_only: true
+    routing_authorized: false
+    promotion_allowed: false
+    target_labels_used: false
+  cyclic_poison_control_predeclared: true
+  terminal_labels_may_change_same_surface_routes: false
+  response_denominators: derived_inside_lifecycle_from_support_plus_held
+classifier:
+  family: sklearn_logistic_regression
+  C: 0.01
+  penalty: l2
+  solver: lbfgs
+  max_iter: 3000
+  class_weight: null
+  random_state: 23
+  l1_ratio: null
+  threshold_policy: predict
+  scaler_fit: synthetic_train_only
+evaluation:
+  primary_metric: equal_center_BACC
+  secondary_metrics:
+  - sample_pooled_BACC
+  - global_Brier
+  - equal_center_Brier
+  - global_log_loss
+  - equal_center_log_loss
+  log_loss_clip_epsilon: 1.0e-12
+  center_contrasts_against: P_PROTECTED
+  primary_estimand: equal_center_BACC_of_actual_composed_output_vs_P
+  fixed_method_menu:
+  - P_PROTECTED
+  - P_DCAPS_PRIMARY
+  - P_DCAPS_ACTION_ONLY
+  - P_DCAPS_POLICY_ONLY
+  - LEGACY_CENTER_POOLED_PREFIX
+  - P_DCAPS_CYCLIC_POISON
+  selection_control: exact_2_power_9_center_sign_flip_max_over_fixed_menu
+  route_pipeline_refit_inside_null_replicate: false
+  descriptive_t_interval: two_sided_t8_over_nine_center_contrasts
+  terminal_diagnostics:
+  - action_expected_vs_realized_midrank_spearman_by_stratum
+  - policy_expected_vs_realized_midrank_spearman
+  - joint_safe_routed_policy_rate
+  - normalized_endpoint_oracle_gap
+  - case_harm_rate
+  - center_action_frequencies
+  preterminal_admission_uses_pseudo_donor_responses_only: true
+  target_terminal_labels_may_change_routes: false
+  nominal_coverage_claimed: false
+  nominal_significance_claimed: false
+  raw_labels_persisted: false
+  diagnostic_rows_are_not_independent_inference_units: true
+  nonzero_route_count_is_not_success: true
+runtime:
+  schema_version: pdcaps_workstation_runtime_v2
+  execution_authorized: true
+  execution_authorization_basis: explicit_user_authorization_for_pdcaps_v2_terminal_consumed_test_diagnostic_run
+  execution_revision: v2_terminal_consumed_test_diagnostic
+  single_use_execution_identity: true
+  workstation_profile: xeon_w2265_12c24t_125gb_2x_rtx_a5000_24gb
+  generation_devices:
+  - cuda:0
+  - cuda:1
+  cuda_visible_devices: 0,1
+  source_workers_per_device: 1
+  generation_workers_per_device: 1
+  persistent_source_workers: true
+  persistent_generation_worker_count: 2
+  gpu_generation_phase_precedes_cpu_phase: true
+  cuda_visible_devices_cleared_before_cpu_phase: true
+  parent_cuda_context_forbidden: true
+  phase_disjoint_gpu_and_cpu_pools: true
+  multiprocessing_start_method: spawn
+  outer_task_unit: one_complete_outer_center_H
+  outer_task_count: 9
+  outer_worker_count: 4
+  outer_process_workers: 4
+  nested_process_pools_forbidden: true
+  worker_DTOs_are_plain_pickle_safe_values: true
+  worker_DTOs_forbid_mappingproxy_estimators_handles_and_closures: true
+  worker_results_are_manifest_hashes_and_compact_offsets_only: false
+  worker_results_are_plain_pickle_safe_science_DTOs: true
+  outer_task_handles_both_posterior_controls_sequentially: true
+  classifier_threads_per_worker: 3
+  classifier_workers: 4
+  calibration_threads_per_worker: 1
+  launch_blas_threads: 1
+  maximum_total_cpu_threads: 12
+  minimum_logical_cpu_count: 12
+  minimum_physical_ram_bytes: 107374182400
+  minimum_artifact_disk_free_bytes: 17179869184
+  minimum_scratch_disk_free_bytes: 34359738368
+  minimum_gpu_free_mib_per_device: 18000
+  tf32_enabled: false
+  amp_enabled: false
+  source_storage_dtype: float32
+  probability_storage_dtype: float32
+  scientific_reductions_dtype: float64
+  generated_cache_format: float32_npy_memmap
+  source_job_count: 27
+  source_stream_count: 81
+  source_prefix_rows_per_class: 270
+  target_task_count: 81
+  target_action_identity_count: 90
+  target_probability_cell_count: 810
+  target_unique_classifier_fit_count: 810
+  maximum_total_classifier_fit_count: 810
+  dense_integer_indexed_surfaces: true
+  maximum_dense_surface_bytes: 8589934592
+  outer_chunks_written_atomically: true
+  serial_process_hash_equivalence_required: true
+  physical_probability_cell_count: 810
+  held_case_route_count: 218
+  ordered_H_J_pair_count: 72
+  pseudo_case_route_count: 1744
+  attempted_action_cell_count: 10464
+  expected_primary_crossing_action_replay_count: 2680
+  maximum_crossing_action_replay_count: 10464
+  expected_existing_candidate_prefix_cell_count: 690
+  maximum_pseudo_prefix_cell_count: 381936
+  action_response_numerical_ridge_fit_count: 999
+  action_response_serialized_model_count: 1755
+  unordered_reliability_exclusion_pair_fit_reuse: true
+  policy_surface_numerical_ridge_fit_count: 999
+  policy_surface_serialized_model_count: 1755
+  total_numerical_ridge_fit_count: 1998
+  scratch_preference:
+  - /data/local/fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2
+  - artifact_parent
+  resume_policy: no_cross_run_recovery_atomic_outer_H_chunks_only
+  foreign_checkpoint_reuse_forbidden: true
+  cross_run_recovery_allowed: false
+  terminal_recovery_allowed: false
+  previous_stage90_scratch_reuse_forbidden: true
+  v1_scratch_or_checkpoint_reuse_forbidden: true
+  preterminal_fresh_process_validation_count: 2
+  final_fresh_process_validation_count: 2
+claim_boundary:
+  schema_version: pdcaps_claim_boundary_v2
+  publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+  terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+  claim_role: posthoc_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_diagnostic
+  bounded_interpretation: donor_crossfit_action_and_policy_surface_sensitivity_on_consumed_MIDOGpp_test_only
+  execution_authorized: true
+  authorization_basis: explicit_user_authorization_for_pdcaps_v2_terminal_consumed_test_diagnostic_run
+  authorization_scope: one_terminal_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2_diagnostic
+  single_use_execution_identity: true
+  authorization_exhausted: false
+  v1_output_used: false
+  v1_amendment_used: false
+  v1_label_capability_history_used: false
+  v1_scratch_or_checkpoint_used: false
+  prior_v1_execution_authorization_reused: false
+  scientific_protocol_unchanged_from_v1: false
+  scientific_method_changed_from_v1: true
+  methodological_delta_role: v2_methodological_hardening_and_physical_action_eligibility
+  methodological_deltas:
+  - caller_injectable_response_denominators_replaced_by_lifecycle_derived_whole_center_support_plus_held_denominators
+  - implicit_or_default_donor_prior_replaced_by_explicit_source_hash_bound_ZERO_VECTOR_NO_FITTED_PRIOR
+  - canonical_physical_action_per_class_ESS_viability_gate_minimum_5
+  methodological_deltas_are_terminal_consumed_test_only: true
+  methodological_deltas_create_fresh_evidence: false
+  methodological_deltas_are_promotable: false
+  consumed_test_data: true
+  fresh_evidence: false
+  method_development_is_posthoc: true
+  prior_consumed_test_findings_informed_method_design: true
+  prior_consumed_test_bytes_used_as_scientific_inputs: false
+  target_support_labels_used: true
+  target_support_labels_are_non_deployable_consumed_test_support: true
+  held_case_evaluation_capability_used_before_route_seal: false
+  previous_stage90_outputs_used: false
+  previous_stage90_amendments_used: false
+  previous_probability_surface_used: false
+  previous_stage90_scratch_or_checkpoints_used: false
+  source_experts_frozen: true
+  generation_lock_frozen: true
+  source_expert_updated: false
+  target_expert_used: false
+  shared_model_updated_with_target_labels: false
+  generic_calibration_method_novelty_claimed: false
+  routing_success_claimed: false
+  routing_quality_claimed: false
+  target_performance_claimed: false
+  downstream_utility_claimed: false
+  nelbo_compatibility_claimed: false
+  finite_sample_coverage_claimed: false
+  promotion_eligible: false
+  action_selection_authorized: false
+  policy_update_authorized: false
+  model_update_authorized: false
+  expert_update_authorized: false
+  may_feed_stage50: false
+  may_feed_stage60: false
+  may_feed_stage70: false
+  may_feed_another_stage90: false
+  may_feed_another_experiment: false
+  may_feed_recipe_selection: false
+  may_feed_deployable_selection: false

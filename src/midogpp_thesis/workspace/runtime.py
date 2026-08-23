@@ -334,24 +334,68 @@ class MidogppWorkspace:
                 authorized_consumers = artifact.semantic_identities.get(
                     "authorized_consumer_experiment_ids"
                 )
-                allowed_consumers = {
+                registered_consumers = artifact.semantic_identities.get(
+                    "registered_consumer_experiment_ids"
+                )
+                authorized_consumer_ids = {
                     value.strip()
                     for value in (authorized_consumers or "").split("|")
                     if value.strip()
                 }
+                registered_consumer_ids = {
+                    value.strip()
+                    for value in (registered_consumers or "").split("|")
+                    if value.strip()
+                }
+                if authorized_consumers and registered_consumers:
+                    errors.append(
+                        f"{experiment.experiment_id}: input {artifact_id} mixes "
+                        "authorized and resolution-only registered consumer fences"
+                    )
                 if authorized_consumers:
-                    if experiment.experiment_id not in allowed_consumers:
+                    if experiment.experiment_id not in authorized_consumer_ids:
                         errors.append(
                             f"{experiment.experiment_id}: input {artifact_id} is fenced to "
-                            f"authorized consumers {sorted(allowed_consumers)}"
+                            f"authorized consumers {sorted(authorized_consumer_ids)}"
+                        )
+                if registered_consumers:
+                    if experiment.experiment_id not in registered_consumer_ids:
+                        errors.append(
+                            f"{experiment.experiment_id}: input {artifact_id} is fenced to "
+                            "resolution-only registered consumers "
+                            f"{sorted(registered_consumer_ids)}"
                         )
                 forbidden_reuse = reuse_purposes.intersection(artifact.forbidden_reuse)
                 claim_scope_rationale = experiment.input_claim_scope_exceptions.get(
                     artifact_id, ""
                 )
+                permits_planned_resolution_only_reuse = (
+                    registered_consumer_ids == {experiment.experiment_id}
+                    and experiment.status == "planned"
+                    and not experiment.runnable
+                    and artifact.semantic_identities.get(
+                        "consumer_resolution_fence_only"
+                    )
+                    == "true"
+                    and artifact.semantic_identities.get("execution_authorized")
+                    == "false"
+                    and artifact.semantic_identities.get(
+                        "consumed_test_reuse_authorized"
+                    )
+                    == "false"
+                )
+                if registered_consumers and not permits_planned_resolution_only_reuse:
+                    errors.append(
+                        f"{experiment.experiment_id}: input {artifact_id} registered-consumer "
+                        "fence is valid only for a planned, non-runnable resolution-only "
+                        "experiment"
+                    )
                 permits_single_consumer_oracle_reuse = (
                     forbidden_reuse == {"oracle_and_diagnostic_evidence"}
-                    and allowed_consumers == {experiment.experiment_id}
+                    and (
+                        authorized_consumer_ids == {experiment.experiment_id}
+                        or permits_planned_resolution_only_reuse
+                    )
                     and bool(claim_scope_rationale.strip())
                 )
                 if forbidden_reuse and not permits_single_consumer_oracle_reuse:

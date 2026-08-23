@@ -390,6 +390,28 @@ def build_parser() -> argparse.ArgumentParser:
     cbpupr_v3.add_argument("--config", required=True)
     cbpupr_v3.add_argument("--artifact-root", required=True)
 
+    pdcaps = sub.add_parser(
+        "fixed-bank-p-anchored-route-scoped-donor-crossfit-"
+        "action-policy-surface-router",
+        help=(
+            "Run the planned terminal consumed-test P-DCAPS action- and "
+            "policy-surface diagnostic (execution authorization required)."
+        ),
+    )
+    pdcaps.add_argument("--config", required=True)
+    pdcaps.add_argument("--artifact-root", required=True)
+
+    pdcaps_v2 = sub.add_parser(
+        "fixed-bank-p-anchored-route-scoped-donor-crossfit-"
+        "action-policy-surface-router-v2",
+        help=(
+            "Run the separately authorized one-shot terminal consumed-test "
+            "P-DCAPS v2 diagnostic."
+        ),
+    )
+    pdcaps_v2.add_argument("--config", required=True)
+    pdcaps_v2.add_argument("--artifact-root", required=True)
+
     pcsi_parc = sub.add_parser(
         "fixed-bank-p-anchored-boundary-projected-pcsi-policy-regret-router",
         help=(
@@ -415,6 +437,50 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     artifact_root = Path(args.artifact_root)
+
+    if args.surface == (
+        "fixed-bank-p-anchored-route-scoped-donor-crossfit-"
+        "action-policy-surface-router-v2"
+    ):
+        from .fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v2 import (
+            load_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2_config,
+            run_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2,
+        )
+
+        config = (
+            load_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2_config(
+                args.config
+            )
+        )
+        output = (
+            run_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2(
+                config,
+                artifact_root=artifact_root,
+            )
+        )
+        print(output)
+        return 0
+
+    if args.surface == (
+        "fixed-bank-p-anchored-route-scoped-donor-crossfit-"
+        "action-policy-surface-router"
+    ):
+        from .fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router import (
+            load_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_config,
+            run_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router,
+        )
+
+        config = (
+            load_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_config(
+                args.config
+            )
+        )
+        output = run_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router(
+            config,
+            artifact_root=artifact_root,
+        )
+        print(output)
+        return 0
 
     if args.surface == (
         "fixed-bank-p-anchored-route-scoped-center-balanced-"

@@ -523,6 +523,56 @@ def test_single_consumer_oracle_reuse_exception_requires_all_three_guards() -> N
     _workspace_with_oracle_reuse_exception().validate()
 
 
+def test_planned_registered_consumer_is_resolution_only_not_authorization() -> None:
+    workspace = _workspace_with_oracle_reuse_exception()
+    artifact = next(
+        row
+        for row in workspace.catalog_payload["artifacts"]
+        if row["artifact_id"] == "test_oracle_exception_input"
+    )
+    semantics = artifact["semantic_identities"]
+    semantics.pop("authorized_consumer_experiment_ids")
+    semantics.update(
+        {
+            "registered_consumer_experiment_ids": "test.oracle",
+            "consumer_resolution_fence_only": "true",
+            "execution_authorized": "false",
+            "consumed_test_reuse_authorized": "false",
+        }
+    )
+    experiment = next(
+        row
+        for row in workspace.registry_payload["experiments"]
+        if row["experiment_id"] == "test.oracle"
+    )
+    experiment["status"] = "planned"
+    output = next(
+        row
+        for row in workspace.catalog_payload["artifacts"]
+        if row["artifact_id"] == "test_oracle_output"
+    )
+    output["availability"] = "planned_execution_not_authorized"
+    planned = MidogppWorkspace(
+        repo_root=workspace.repo_root,
+        registry=workspace.registry_payload,
+        catalog=workspace.catalog_payload,
+        workspace=workspace.workspace_payload,
+        protocol_defaults=workspace.protocol_defaults_payload,
+    )
+    planned.validate()
+
+    experiment["status"] = "diagnostic"
+    runnable = MidogppWorkspace(
+        repo_root=workspace.repo_root,
+        registry=workspace.registry_payload,
+        catalog=workspace.catalog_payload,
+        workspace=workspace.workspace_payload,
+        protocol_defaults=workspace.protocol_defaults_payload,
+    )
+    with pytest.raises(WorkspaceError, match="non-runnable resolution-only"):
+        runnable.validate()
+
+
 @pytest.mark.parametrize(
     ("authorized_consumers", "rationale"),
     (

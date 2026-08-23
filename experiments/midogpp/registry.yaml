@@ -3001,3 +3001,97 @@ experiments:
       - The intended PCSI_PARC_PROJECTED gate would require the support-conditioned endpoint-reconstructed transport screen to pass for H and all eight donors plus strictly positive corrected gain coordinates. Upstream source-prior and route-local support capabilities are explicit, while direct held-case, pseudo-evaluation, and terminal capabilities stay closed. However, current center-wide OOF aggregation permits label-identity feedback through other case states, so neither transport nor policy authorization is valid and the canonical runner must stop before execution or persistence.
       - Workstation execution uses two persistent RTX A5000 generation workers; four endpoint processes with three BLAS threads; then CUDA-hidden posterior, utility, and replay phases with four processes and one BLAS thread. Frozen workload counts are 3,488 endpoint fits, 436 posterior fits, 1,395 utility fits, and 144 whole-policy replays.
       - Regardless of outcome, this artifact cannot authorize routing or target-performance success, action or policy changes, model or expert updates, promotion, deployment, recipe selection, a numbered-stage feed, another diagnostic, another experiment, or a generic consumer.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v1
+    stage: 90_oracles_and_diagnostics
+    status: planned
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_test_cache_v1
+      - midogpp_stage90_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_test_manifest_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_parent_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_amendment_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Reuse of immutable A1 generation geometry, exact-nine seed pairing, budgets, and classifier settings only; no routing, action, policy, downstream, promotion, deployment, or execution authority is inherited.
+      midogpp_stage90_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_test_cache_v1: Planned single-consumer byte-exact label-free alias of the original consumed-test cache; it grants neither label access nor execution authority.
+      midogpp_stage90_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_test_manifest_v1: Planned role-scoped label-capability alias. H, J, and held-case exclusions are frozen, but every capability remains unavailable until a separate execution authorization exists.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_parent_v1: Byte-exact experiment-fenced alias of the immutable original ledger, registered for parent-hash validation only and not authorized for execution.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_amendment_v1: Non-authorizing hash-chained registration amendment with execution_authorized=false; implementation does not authorize consumed-test reuse.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-p-anchored-route-scoped-donor-crossfit-action-policy-surface-router
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v1
+    notes:
+      - NEEDS EVIDENCE — this is a complete implementation registration, not a run authorization. Config, protocol, ledger amendment, registry status, and catalog output all keep execution_authorized=false.
+      - The four scoped input aliases use registered_consumer_experiment_ids only as a planned resolution fence. Workspace validation rejects that fence for any runnable status; it is not an execution or consumed-label authorization.
+      - Exactly six independently fenced direct-original inputs are declared. No CBPUPR, PCSI, PSSCUR, PDCB, PDSUR, other Stage-90 output or amendment, numbered-stage result, probability surface, checkpoint, or scratch state may be consumed.
+      - Every action-response prediction for pseudo center J excludes both outer H and J from fitting, scaling, reliability statistics, and corrections. Held case d is scored only after the complete action surface is sealed.
+      - Stratum reliability is learned from donor-pseudo responses before the within-case argmax. Complete-prefix response surfaces are then nested-cross-fitted, and the descriptive lower envelope has no confidence, conformal, or finite-sample coverage claim.
+      - Pseudo reliability excludes H, routed J, and scored K. Symmetric J/K exclusion rectangles are solved once, yielding 999 numerical action-ridge heads and 999 numerical policy-ridge heads across all outer centers; orientation-specific immutable DTOs preserve exact scored-center lineage.
+      - Workstation execution, if separately authorized later under a new executable ledger identity, uses two persistent RTX A5000 generation workers followed by four spawn-safe outer-H CPU workers with no nested pools and atomic per-H chunks.
+      - Every route failure, unsupported stratum, nonfinite value, or tie at the authorization boundary emits exact byte-identical P. Every eventual result would remain terminal post-hoc consumed-test sensitivity and could not feed another experiment.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v2
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_test_cache_v2
+      - midogpp_stage90_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_test_manifest_v2
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_parent_v2
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_amendment_v2
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Reuse of immutable A1 generation geometry, exact-nine seed pairing, budgets, and classifier settings only; no routing, action, policy, downstream, promotion, deployment, or prior execution authority is inherited.
+      midogpp_stage90_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_test_cache_v2: Fresh v2 single-consumer byte-exact label-free alias of the original immutable consumed-test cache; no v1 output, probability surface, checkpoint, scratch state, or semantic alias is available through this artifact.
+      midogpp_stage90_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_test_manifest_v2: Fresh v2 single-consumer role-scoped label-capability alias of the original immutable manifest; no v1 terminal output, capability history, or semantic alias is inherited.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_parent_v2: Fresh v2 byte-exact experiment-fenced alias of the immutable original ledger, read only to verify the direct parent hash; no v1 amendment or execution state is available.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_amendment_v2: Direct single-consumer authorization for exactly one P-DCAPS v2 terminal consumed-test diagnostic run; it creates no fresh evidence and cannot authorize another run or consumer.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-p-anchored-route-scoped-donor-crossfit-action-policy-surface-router-v2
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v2
+    notes:
+      - Explicitly authorized one-shot P-DCAPS v2 terminal diagnostic over the already-consumed MIDOG++ test split. It remains POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE.
+      - V2 truthfully changes three scientific mechanics from v1: callers can no longer inject response denominators because the lifecycle derives whole-center support-plus-held denominators; the donor endpoint prior is explicit source-hash-bound ZERO_VECTOR_NO_FITTED_PRIOR; and canonical physical actions require per-class ESS >= 5 viability. These are terminal consumed-test hardening and eligibility deltas, not fresh or promotable evidence.
+      - Exactly six independently fenced original inputs are admitted. V2 recomputes under fresh output and scratch roots and cannot consume the planned v1 output, amendment, probability surfaces, scratch, checkpoints, arrays, seals, or label-capability history.
+      - The complete package-local P-DCAPS Python source inventory is hash-bound before the first write; pyc files and cache directories are excluded, while missing, extra, or drifted package-local source fails admission. External neutral generation, cache, and bank modules are validated inputs or runtime dependencies, not members of this package-local snapshot.
+      - The authorized run uses two persistent RTX A5000 generation workers followed by four spawn-safe outer-H CPU workers with CUDA hidden, capped BLAS, no nested process pools, and atomic per-H chunks.
+      - No outcome may feed another experiment, numbered stage, routing policy, model, expert, recipe selection, promotion, or deployment. Routing improvement is not claimed before the terminal artifact is validated.
