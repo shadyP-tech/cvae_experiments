@@ -14485,3 +14485,570 @@ artifacts:
     notes:
       - Authorized but not launched. The one-shot identity becomes exhausted after its first admitted execution attempt and has no recovery path.
       - The complete consumed MIDOG++ test dataset is reused only for stronger terminal diagnostic analysis; no fresh routing, downstream utility, NELBO, significance, promotion, deployment, or transferable evidence claim is permitted.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_parent_v1
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: CONSUMED_TEST_SCALE_BP_V1_PLANNED_PARENT_LEDGER_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      split: test
+      row_count: '9928'
+      held_unit_count: '218'
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      experiment_fenced: 'true'
+      registered_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router.v1
+      consumer_resolution_fence_only: 'true'
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      fresh_evidence: 'false'
+      previous_stage90_outputs_used: 'false'
+      previous_stage90_amendments_used: 'false'
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    forbidden_reuse: &scale_bp_forbidden_reuse
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Planned byte-exact alias of the immutable original ledger. It permits registered-consumer resolution only and grants no execution or consumed-label authority.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_amendment_v1
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_SCALE_BP_V1_NON_AUTHORIZING_AMENDMENT_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      amendment_sha256: 9ca3843f21b2ca58a20d0671987fa87d61e22efc3c0b920d244ab0443129fc14
+      registered_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router.v1
+      consumer_resolution_fence_only: 'true'
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      implementation_authorizes_execution: 'false'
+      execution_requires_distinct_future_identity: 'true'
+      generic_consumer_authorized: 'false'
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      target_terminal_labels_may_open: 'false'
+      fresh_evidence: 'false'
+      routing_success_claimed: 'false'
+      nelbo_compatibility_claimed: 'false'
+      previous_stage90_outputs_used: 'false'
+      previous_stage90_amendments_used: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_ledger_amendment_v1.json
+    expected_file_hashes:
+      uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_ledger_amendment_v1.json:
+        algorithm: sha256
+        digest: 9ca3843f21b2ca58a20d0671987fa87d61e22efc3c0b920d244ab0443129fc14
+    forbidden_reuse: *scale_bp_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Canonical hash-chained planning record only. Authorized consumers remain empty; registration cannot open a label capability or create execution state.
+
+  - artifact_id: midogpp_stage90_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_test_manifest_v1
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_SCALE_BP_V1_PLANNED_CAPABILITY_GATED_LABELS
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+      split: test
+      row_count: '9928'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      experiment_fenced: 'true'
+      registered_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router.v1
+      consumer_resolution_fence_only: 'true'
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      labels_present: 'true'
+      labels_available_before_execution_authorization: 'false'
+      target_terminal_labels_may_open: 'false'
+      held_case_c_excluded_from_all_preterminal_fits: 'true'
+      support_fold_prediction_excludes_own_labels: 'true'
+      support_labels_update_route_local_H_c_model_only: 'true'
+      outer_center_H_excluded_from_every_donor_fit: 'true'
+      pseudo_center_J_excluded_from_own_prediction: 'true'
+      pseudo_held_case_d_excluded_from_own_fit: 'true'
+      terminal_label_scope: after_all_method_decisions_and_durable_preterminal_attestation
+      fresh_evidence: 'false'
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse: *scale_bp_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Planned direct-original role-scoped alias. No support, pseudo-response, held-case, or terminal label capability opens while execution remains unauthorized.
+
+  - artifact_id: midogpp_stage90_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_test_cache_v1
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_TEST_SCALE_BP_V1_PLANNED_LABEL_FREE_CACHE_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: test
+      row_count: '9928'
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      experiment_fenced: 'true'
+      registered_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router.v1
+      consumer_resolution_fence_only: 'true'
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      labels_absent: 'true'
+      previous_stage90_output_used: 'false'
+      fresh_evidence: 'false'
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse: *scale_bp_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Planned byte-exact alias over the validated immutable consumed-test cache. It grants resolution only and contains no labels or predecessor state.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router/v1
+    availability: planned_execution_not_authorized
+    migration: canonical_output
+    evidence_label: NEEDS_EVIDENCE_EXECUTION_NOT_AUTHORIZED
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      claim_role: posthoc_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_diagnostic
+      bounded_interpretation: planned_support_calibrated_local_action_diagnostic_on_consumed_MIDOGpp_test_only
+      architecture_family: fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router
+      config_contract_hash: eab564d6b38e49c622785a793d5e4475a68784b01e4dcb4efe2c813de5a446dc
+      protocol_contract_hash: c1bd044dc6fb289357d205c6a7fa1f98794bb402c90eb41aad78f2f815d0efbc
+      source_manifest_member: source_manifest_v1.json
+      source_manifest_sha256: 9a1bdb76c17720814f14dc812aa79a2e36739f40a849071955d25e29a52f55b4
+      source_tree_sha256: e5898871743586bab1f25e465243511e397be430d5a7590f90428e1eca428838
+      source_member_count: '69'
+      source_manifest_checked_before_any_gpu_or_label_access: 'true'
+      expected_ledger_amendment_sha256: 9ca3843f21b2ca58a20d0671987fa87d61e22efc3c0b920d244ab0443129fc14
+      workspace_status: planned
+      execution_authorized: 'false'
+      implementation_authorizes_execution: 'false'
+      consumed_test_reuse_authorized: 'false'
+      separate_future_execution_identity_required: 'true'
+      direct_runner_rejects_before_mutation: 'true'
+      workspace_runner_rejects_before_mutation: 'true'
+      output_root_creation_allowed: 'false'
+      scratch_root_creation_allowed: 'false'
+      lock_creation_allowed: 'false'
+      target_terminal_labels_may_open: 'false'
+      evaluation_split: test
+      consumed_test_data: 'true'
+      eligible_test_row_count: '9928'
+      held_case_route_count: '218'
+      pseudo_outer_center_count: '9'
+      pseudo_H_J_d_context_count: '1744'
+      every_outer_H_must_pass_before_final_routing: 'true'
+      full_algorithm_replay_required: 'true'
+      factory_sealed_all_outer_evidence_bundle_required: 'true'
+      caller_supplied_admission_metrics_oracle_or_denominators_allowed: 'false'
+      terminal_denominators_derived_from_exact_pseudo_center_population: 'true'
+      pseudo_center_label_population_consistent_across_all_H_and_d: 'true'
+      physical_bank_factory_sealed_cell_count: '810'
+      physical_bank_cell_file_offset_slice_and_row_identity_bound: 'true'
+      physical_bank_symlink_out_of_root_missing_duplicate_and_overlap_forbidden: 'true'
+      physical_bank_receipt_hash_propagated_to_endpoint_evidence: 'true'
+      action_families: B|I|R
+      primary_projection: NEAREST_FLOAT32_ON_REQUIRED_SIDE_OF_HALF
+      route_local_support: H_MINUS_C
+      support_fold_count: '4'
+      support_labels_update_route_local_H_c_model_only: 'true'
+      donor_prior_centers: J_NOT_EQUAL_H
+      direct_case_action_selection: 'true'
+      learned_prefix_selection: 'false'
+      exact_P_fallback_required: 'true'
+      raw_labels_may_be_persisted: 'false'
+      previous_stage90_outputs_used: 'false'
+      previous_stage90_amendments_used: 'false'
+      previous_stage90_scratch_or_checkpoints_used: 'false'
+      fresh_evidence: 'false'
+      routing_success_claimed: 'false'
+      downstream_utility_claimed: 'false'
+      nelbo_compatibility_claimed: 'false'
+      confidence_bound_claimed: 'false'
+      finite_sample_coverage_claimed: 'false'
+      promotion_eligible: 'false'
+      deployment_claimed: 'false'
+      may_feed_another_experiment: 'false'
+      workstation_generation_devices: cuda:0|cuda:1
+      workstation_physical_store: 810_FLOAT32_READ_ONLY_MEMMAP_CELLS_ONCE
+      workstation_cpu_topology: 4_CUDA_HIDDEN_SPAWN_OUTER_H_WORKERS_X1_BLAS_SEQUENTIAL_SUPPORT_FOLDS_NO_NESTED_POOLS
+      workstation_scratch_root: /data/local/fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_v1
+      cross_run_recovery_allowed: 'false'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - reports/run_state.json
+    forbidden_reuse: *scale_bp_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Planned output identity only. Neither direct nor workspace dispatch may create this root, scratch, locks, run state, or label-capability journals under v1.
+      - Any separately authorized future execution must use a distinct identity and independently recompute its surfaces from the six direct-original inputs.
+      - No future terminal result under this method can establish fresh routing, NELBO compatibility, downstream utility, promotion, deployment, or transferable evidence on the already-consumed test split.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_parent_v2
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: CONSUMED_TEST_SCALE_BP_V2_AUTHORIZED_PARENT_LEDGER_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      split: test
+      row_count: '9928'
+      held_unit_count: '218'
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      experiment_fenced: 'true'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router.v2
+      execution_authorized: 'true'
+      consumed_test_reuse_authorized: 'true'
+      single_use_execution_identity: 'true'
+      authorization_exhausted: 'false'
+      fresh_evidence: 'false'
+      previous_stage90_outputs_used: 'false'
+      previous_stage90_amendments_used: 'false'
+      previous_stage90_run_state_used: 'false'
+      previous_stage90_scratch_used: 'false'
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    forbidden_reuse: *scale_bp_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Fresh v2 byte-exact alias of the immutable original parent ledger. It is available only to validate the direct parent hash for this single consumer.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_authorization_amendment_v2
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_SCALE_BP_V2_SINGLE_USE_EXECUTION_AUTHORIZATION
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      amendment_sha256: 86f42908fcde9b6fe4ceaaac629f9300ccb4f6a39a6d5753e6bbe10813566db0
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router.v2
+      authorization_basis: explicit_user_authorization_2026_08_26_for_single_scale_bp_v2_consumed_test_terminal_diagnostic
+      authorization_scope: one_complete_scale_bp_v2_execution_on_the_previously_consumed_midogpp_uniform_b_test_surface
+      authorization_date: '2026-08-26'
+      execution_authorized: 'true'
+      consumed_test_reuse_authorized: 'true'
+      single_use_execution_identity: 'true'
+      authorization_exhausted: 'false'
+      implementation_did_not_launch_execution: 'true'
+      durable_external_authorization_lease_required: 'true'
+      lease_claimed_after_all_read_only_preflights: 'true'
+      lease_claimed_before_gpu_or_label_work: 'true'
+      output_or_scratch_deletion_restores_authorization: 'false'
+      lease_repair_removal_or_reuse_allowed: 'false'
+      source_manifest_member: source_manifest_v2.json
+      source_manifest_file_sha256: 3b4452c9a2c180e0afd09e3102f67b5d1834ae527f0af8bc26367d1a63c109fd
+      source_snapshot_manifest_sha256: 37bd9b1818de5009db54b007e5ea3b6fdf8e2f632585f7e47fd4ead7f1628bfb
+      source_snapshot_tree_sha256: b4a10ea0dbaf706f15e284cd81e92d4b6719a4457440c7a305ca7961e44515da
+      source_snapshot_member_count: '80'
+      v1_output_used: 'false'
+      v1_amendment_used: 'false'
+      v1_label_capability_history_used: 'false'
+      v1_scratch_or_checkpoint_used: 'false'
+      previous_stage90_output_used: 'false'
+      previous_stage90_amendment_used: 'false'
+      previous_stage90_run_state_used: 'false'
+      previous_stage90_scratch_used: 'false'
+      previous_probability_surface_used: 'false'
+      cross_run_recovery_used: 'false'
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      fresh_evidence: 'false'
+      routing_success_claimed: 'false'
+      downstream_utility_claimed: 'false'
+      nelbo_compatibility_claimed: 'false'
+      confidence_bound_claimed: 'false'
+      finite_sample_coverage_claimed: 'false'
+      promotion_allowed: 'false'
+      deployment_claimed: 'false'
+      may_feed_stage50: 'false'
+      may_feed_stage60: 'false'
+      may_feed_stage70: 'false'
+      may_feed_another_stage90: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_ledger_amendment_v2.json
+    expected_file_hashes:
+      uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_ledger_amendment_v2.json:
+        algorithm: sha256
+        digest: 86f42908fcde9b6fe4ceaaac629f9300ccb4f6a39a6d5753e6bbe10813566db0
+    forbidden_reuse: *scale_bp_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Direct authority for exactly one complete v2 terminal consumed-test diagnostic execution. Registration and implementation do not launch or consume it.
+
+  - artifact_id: midogpp_stage90_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_test_manifest_v2
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_SCALE_BP_V2_CAPABILITY_GATED_LABELS
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+      split: test
+      row_count: '9928'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      experiment_fenced: 'true'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router.v2
+      execution_authorized: 'true'
+      consumed_test_reuse_authorized: 'true'
+      labels_present: 'true'
+      labels_available_before_execution_admission: 'false'
+      labels_available_before_preterminal_attestation: 'false'
+      donor_labels_close_before_route_support_opens: 'true'
+      held_case_c_excluded_from_all_preterminal_fits: 'true'
+      support_fold_prediction_excludes_own_labels: 'true'
+      support_labels_update_route_local_H_c_model_only: 'true'
+      outer_center_H_excluded_from_every_donor_fit: 'true'
+      pseudo_center_J_excluded_from_own_prediction: 'true'
+      pseudo_held_case_d_excluded_from_own_fit: 'true'
+      delete_center_K_excluded_as_query_and_source: 'true'
+      target_terminal_labels_may_open_after_attestation: 'true'
+      terminal_label_scope: after_all_method_decisions_and_durable_preterminal_attestation
+      raw_labels_may_be_persisted: 'false'
+      previous_label_capability_history_used: 'false'
+      fresh_evidence: 'false'
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse: *scale_bp_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Fresh v2 role-scoped alias of the immutable manifest. Capabilities admit only exact donor, H-minus-c support, pseudo-response, or aggregate terminal scopes.
+
+  - artifact_id: midogpp_stage90_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_test_cache_v2
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_TEST_SCALE_BP_V2_LABEL_FREE_CACHE_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: test
+      row_count: '9928'
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      experiment_fenced: 'true'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router.v2
+      execution_authorized: 'true'
+      consumed_test_reuse_authorized: 'true'
+      labels_absent: 'true'
+      previous_stage90_output_used: 'false'
+      previous_probability_surface_used: 'false'
+      previous_scratch_or_checkpoint_used: 'false'
+      fresh_evidence: 'false'
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse: *scale_bp_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Fresh v2 byte-exact label-free alias of the original immutable cache. All 810 physical cells are independently materialized; no predecessor output, surface, or state is exposed.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_v2
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router/v2
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: AUTHORIZED_TERMINAL_CONSUMED_TEST_DIAGNOSTIC_PENDING_RUN
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      bounded_interpretation: single_post_hoc_scale_bp_v2_sensitivity_on_the_previously_consumed_midogpp_uniform_b_test_surface_only
+      architecture_family: context_adaptive_selective_utility_scale_bp_v2
+      config_contract_hash: b939d5d11f670bd647979fc1100846214f1b3e6194ce5661a36d2e0b7f4ae486
+      protocol_contract_hash: 3829f50ef175a704baf37b9f9daea6eb9d58aca015c35c26485898873d0f3480
+      expected_ledger_amendment_sha256: 86f42908fcde9b6fe4ceaaac629f9300ccb4f6a39a6d5753e6bbe10813566db0
+      source_manifest_member: source_manifest_v2.json
+      source_manifest_file_sha256: 3b4452c9a2c180e0afd09e3102f67b5d1834ae527f0af8bc26367d1a63c109fd
+      source_snapshot_manifest_sha256: 37bd9b1818de5009db54b007e5ea3b6fdf8e2f632585f7e47fd4ead7f1628bfb
+      source_snapshot_tree_sha256: b4a10ea0dbaf706f15e284cd81e92d4b6719a4457440c7a305ca7961e44515da
+      source_snapshot_member_count: '80'
+      source_snapshot_checked_before_any_gpu_or_label_access: 'true'
+      execution_authorization_basis: explicit_user_authorization_2026_08_26_for_single_scale_bp_v2_consumed_test_terminal_diagnostic
+      authorization_scope: one_complete_scale_bp_v2_execution_on_the_previously_consumed_midogpp_uniform_b_test_surface
+      execution_authorized: 'true'
+      consumed_test_reuse_authorized: 'true'
+      single_use_execution_identity: 'true'
+      authorization_exhausted: 'false'
+      implementation_did_not_launch_execution: 'true'
+      durable_external_authorization_lease_required: 'true'
+      lease_claimed_after_all_read_only_preflights: 'true'
+      lease_claimed_before_gpu_or_label_work: 'true'
+      output_or_scratch_deletion_restores_authorization: 'false'
+      lease_repair_removal_or_reuse_allowed: 'false'
+      evaluation_split: test
+      consumed_test_data: 'true'
+      eligible_test_row_count: '9928'
+      held_case_route_count: '218'
+      physical_probability_cell_count: '810'
+      direct_action_count: '6'
+      action_families: B|I|R
+      primary_action_form: NEAREST_FLOAT32_BOUNDARY_PROJECTION
+      calibrated_convex_blend_available: 'false'
+      calibrated_convex_blend_status: DEFERRED_NO_LEGAL_CALIBRATION_SURFACE
+      full_endpoint_role: SENSITIVITY_ONLY
+      P_is_first_class_candidate: 'true'
+      P_candidate_representation: IMPLICIT_ZERO_UTILITY_EXACT_FALLBACK
+      P_candidate_assessment_emitted: 'false'
+      threshold_switch_count_persisted_per_action: 'true'
+      harmful_switch_count_preterminal_available: 'false'
+      harmful_switch_count_status: UNAVAILABLE_PRETERMINAL_TARGET_LABELS_CLOSED
+      latent_embedding_distance_available: 'false'
+      effective_source_training_support_available: 'false'
+      source_calibration_status_available: 'false'
+      target_labels_open_only_after_durable_preterminal_attestation: 'true'
+      two_fresh_process_attestations_required: 'true'
+      exact_P_fallback_required: 'true'
+      raw_labels_may_be_persisted: 'false'
+      v1_output_used: 'false'
+      v1_amendment_used: 'false'
+      v1_label_capability_history_used: 'false'
+      v1_scratch_or_checkpoint_used: 'false'
+      previous_stage90_output_used: 'false'
+      previous_stage90_amendment_used: 'false'
+      previous_stage90_run_state_used: 'false'
+      previous_stage90_scratch_used: 'false'
+      previous_probability_surface_used: 'false'
+      cross_run_recovery_used: 'false'
+      fresh_evidence: 'false'
+      routing_success_claimed: 'false'
+      downstream_utility_claimed: 'false'
+      nelbo_compatibility_claimed: 'false'
+      confidence_bound_claimed: 'false'
+      finite_sample_coverage_claimed: 'false'
+      significance_claimed: 'false'
+      promotion_allowed: 'false'
+      promotion_eligible: 'false'
+      deployment_claimed: 'false'
+      may_feed_stage50: 'false'
+      may_feed_stage60: 'false'
+      may_feed_stage70: 'false'
+      may_feed_another_stage90: 'false'
+      may_feed_another_experiment: 'false'
+      workstation_generation_devices: cuda:0|cuda:1
+      workstation_generation_topology: 2_PERSISTENT_GPU_WORKERS_ONE_PER_RTX_A5000
+      workstation_classifier_topology: 4_SPAWN_WORKERS_X3_BLAS_MATERIALIZE_810_CELLS_ONCE
+      workstation_outer_topology: 4_CUDA_HIDDEN_SPAWN_OUTER_H_WORKERS_X1_BLAS_SEQUENTIAL_SUPPORT_FOLDS
+      workstation_scratch_root: /data/local/fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_v2
+      nested_process_pools_allowed: 'false'
+      cross_run_recovery_allowed: 'false'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - provenance/authorization_consumption_lease.json
+      - manifests/protocol_manifest.json
+      - reports/pre_gpu_firewall.json
+      - reports/workstation_preflight.json
+      - reports/worker_contract_preflight.json
+      - reports/physical_materialization.json
+      - manifests/preterminal_content_index.json
+      - manifests/preterminal_aggregate_seal.json
+      - reports/preterminal_fresh_process_attestation.json
+      - reports/terminal_metrics.json
+      - reports/runtime.json
+      - reports/leakage.json
+      - reports/publication_decision.json
+      - manifests/final_content_index.json
+      - manifests/final_aggregate_seal.json
+      - reports/final_fresh_process_attestation.json
+      - reports/validation.json
+      - reports/run_state.json
+    forbidden_reuse: *scale_bp_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Authorized and registered but not launched. The first admitted execution attempt exhausts this identity; partial output or scratch is never recoverable.
+      - The exhaustion transition is an atomic durable lease outside both run roots. Existing, partial, or malformed lease state rejects permanently, including after deletion or loss of output and scratch.
+      - The complete consumed MIDOG++ test set is reused only for a terminal post-hoc sensitivity. No fresh routing, downstream utility, NELBO compatibility, confidence, significance, promotion, deployment, or transferable thesis evidence is permitted.

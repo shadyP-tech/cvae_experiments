@@ -434,6 +434,33 @@ def build_parser() -> argparse.ArgumentParser:
     pdcaps_v4.add_argument("--config", required=True)
     pdcaps_v4.add_argument("--artifact-root", required=True)
 
+    scale_bp_v2 = sub.add_parser(
+        "fixed-bank-p-anchored-support-calibrated-local-action-empirical-bayes-"
+        "boundary-projected-router-v2",
+        help=(
+            "Run the explicitly authorized single-use SCALE-BP v2 terminal "
+            "consumed-test diagnostic, or its mutation-free no-label dry run."
+        ),
+    )
+    scale_bp_v2.add_argument("--config", required=True)
+    scale_bp_v2.add_argument("--artifact-root", required=True)
+    scale_bp_v2.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validate source and direct-original inputs without consuming authorization.",
+    )
+
+    scale_bp = sub.add_parser(
+        "fixed-bank-p-anchored-support-calibrated-local-action-empirical-bayes-"
+        "boundary-projected-router",
+        help=(
+            "Inspect the planned, non-authorized SCALE-BP v1 implementation; "
+            "direct execution is refused before mutation."
+        ),
+    )
+    scale_bp.add_argument("--config", required=True)
+    scale_bp.add_argument("--artifact-root", required=True)
+
     pcsi_parc = sub.add_parser(
         "fixed-bank-p-anchored-boundary-projected-pcsi-policy-regret-router",
         help=(
@@ -459,6 +486,58 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     artifact_root = Path(args.artifact_root)
+
+    if args.surface == (
+        "fixed-bank-p-anchored-support-calibrated-local-action-empirical-bayes-"
+        "boundary-projected-router-v2"
+    ):
+        import json
+
+        from .fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_v2.config import (
+            load_config,
+        )
+        from .fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_v2.runner import (
+            dry_run_scale_bp_v2,
+            run_scale_bp_v2,
+        )
+
+        config = load_config(args.config)
+        if args.dry_run:
+            print(
+                json.dumps(
+                    dry_run_scale_bp_v2(config, artifact_root=artifact_root),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+        else:
+            print(run_scale_bp_v2(config, artifact_root=artifact_root))
+        return 0
+
+    if args.surface == (
+        "fixed-bank-p-anchored-support-calibrated-local-action-empirical-bayes-"
+        "boundary-projected-router"
+    ):
+        from .fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router.config import (
+            load_support_calibrated_local_action_empirical_bayes_boundary_projected_router_config,
+        )
+        from .fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router.runner import (
+            run_support_calibrated_local_action_empirical_bayes_boundary_projected_router,
+        )
+
+        config = (
+            load_support_calibrated_local_action_empirical_bayes_boundary_projected_router_config(
+                args.config
+            )
+        )
+        output = (
+            run_support_calibrated_local_action_empirical_bayes_boundary_projected_router(
+                config,
+                artifact_root=artifact_root,
+            )
+        )
+        print(output)
+        return 0
 
     if args.surface == (
         "fixed-bank-p-anchored-route-scoped-donor-crossfit-"

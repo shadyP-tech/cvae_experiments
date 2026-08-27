@@ -206,6 +206,163 @@ its maximum claim remains `POST_HOC_CONSUMED_TEST_SENSITIVITY`,
 establish fresh routing or downstream-utility evidence, feed another
 experiment, or authorize promotion or deployment.
 
+## SCALE-BP support-calibrated local-action routing v1
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router.v1`
+is a modular **planned, non-runnable** implementation over the complete
+9,928-row, 218-whole-case MIDOG++ consumed-test surface. Registration and
+implementation leave `execution_authorized=false` and
+`consumed_test_reuse_authorized=false`; both direct admission and workspace
+dispatch must refuse before output, scratch, lock, run-state, or label-
+capability mutation. A future run requires a distinct executable identity and
+separate explicit authorization.
+
+For a held case `c` in center `H`, the only target-local calibration surface is
+`H minus c`, partitioned into four deterministic whole-case OOF folds. A
+support fold's labels cannot affect its own prediction. Target support may
+correct only the route-local `(H,c)` residual; it cannot update source experts,
+donor coefficients, global models, shared scalers or hyperparameters, or a
+route in another center. Donor priors exclude `H`; pseudo replays additionally
+exclude pseudo center `J` and scored held case `d`. Held-case terminal labels
+remain unavailable until a separately authorized implementation durably seals
+all preterminal decisions and passes fresh-process attestation.
+
+The donor and pseudo-replay universes derive from one sealed 218-case
+inventory with exact center counts; callers cannot omit unfavorable centers,
+cases, methods, or actions. Admission factory-seals all nine outer-`H` bundles
+and exactly 1,744 `(H,J,d)` contexts. For each context it executes the actual
+eight-method, six-action replay, derives action and policy evidence plus the
+safe-single/disjoint-pair oracle mechanically, measures rank agreement inside
+each case before equal-center aggregation, and requires every outer `H` to
+pass. Loose caller-supplied evidence, metrics, oracle values, and denominators
+are rejected. Terminal BACC denominators are derived from the complete exact
+`J` label population; one `J`-only population hash and denominator triple must
+agree across every held `d` and all eight valid outer-`H` values. Admission
+fail-closes on legacy inferiority, any harmful selected policy, or an active
+poison control.
+
+The primary action library boundary-projects each P-to-B/I/R crossing to the
+nearest binary32 value on the required side of `0.5`. Off-crossing values,
+no-crossing cases, unsupported actions, nonfinite estimates, ties, and failed
+safety or learnability gates emit byte-identical P. Sample-level BACC, Brier,
+and log-loss influence is corrected by route-local OOF residuals and
+donor-estimated empirical-Bayes shrinkage before direct case-action selection.
+The learned prefix layer is removed. Full endpoints remain sensitivity-only;
+donor-only, local-only, same-run legacy, support-label permutation, and cyclic
+action-identity controls cannot authorize the primary method.
+Every B/I/R endpoint and boundary projection is bound to the exact closed
+90-cell label-free physical surface receipt for its target center and case.
+
+The exact six registered inputs are the immutable original expert bank and
+generation lock plus fresh resolution-only aliases for the original label-free
+cache, label-capability manifest, parent ledger, and non-authorizing amendment.
+No P-DCAPS, PDSUR, PCSI, CBPUPR, other Stage-90 output, amendment, probability
+surface, checkpoint, scratch state, or execution history is an input. An AST
+source fence rejects imports of sibling diagnostic implementations and
+references to predecessor Stage-90 artifact paths. A checked-in recursive
+69-member byte manifest additionally seals exact Python membership and content;
+config loading validates it before any future GPU or label-capability access.
+
+The frozen workstation plan materializes 810 float32 physical cells once using
+two persistent RTX A5000 workers and exposes them as read-only memory maps.
+Before any map can open, a factory-issued bank receipt must map all canonical
+810 `(target, action, training-seed, generation-seed)` cells to regular,
+non-symlink files beneath one bank root, non-overlapping offsets, exact immutable
+slice hashes, population-row identity, cache identity, and row-order identity.
+Wrong-cell mappings, missing or duplicate cells, changed slices, symlinks, and
+out-of-root paths fail closed. The bank receipt hash propagates through case
+surfaces and endpoint evidence.
+Four CUDA-hidden spawn workers then process one complete outer `H` each with
+support folds sequential inside the worker, one BLAS thread, primitive frozen
+DTOs/hashes/offsets only, atomic per-center chunks, no nested pools, and no
+cross-run recovery. A case-level pseudo-learnability failure aborts before any
+held-case terminal-label capability could open.
+
+Even if a future distinct identity is authorized and routing is active, the
+consumed test set permits only `POST_HOC_CONSUMED_TEST_SENSITIVITY` and
+`TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`. SCALE-BP is fixed-composition
+probability-action routing, not CVAE/NELBO expert compatibility; therefore
+`nelbo_compatibility_claimed=false`, `fresh_evidence=false`, and
+`may_feed_another_experiment=false` remain binding.
+
+## SCALE-BP support-calibrated local-action routing v2
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router.v2`
+is the distinct, explicitly authorized, single-use executable identity. It is
+implemented and registered but not launched. It reuses the complete 9,928-row,
+218-whole-case MIDOG++ test surface only as a terminal post-hoc sensitivity;
+registration does not create its output or scratch root and no result exists.
+
+The implementation replaces prefix routing with complete six-action case
+rectangles anchored to protected P. Label-free case evidence exposes boundary
+geometry, entropy, seed dispersion, vote disagreement, crossing support, and
+provenance. A center-balanced donor model supplies the global action-value
+prior, a four-fold `H minus c` adapter contributes only an ephemeral route-local
+residual, empirical-Bayes shrinkage partially pools the two, and descriptive
+pre-argmax envelopes drive constrained direct selection. P is a first-class
+candidate and every unsupported, unsafe, tied, nonfinite, or failed-admission
+path emits exact P. Full endpoints, donor-only, local-only, support-permuted,
+and cyclic-action controls are attribution/sensitivity comparators and cannot
+authorize the primary method.
+
+Every donor surface is independently reconstructed under its exact exclusion
+scope: final fits exclude `H`, pseudo fits exclude `H/J`, and delete-center
+transport folds exclude `H/J/K` as both query and candidate source. Local OOF
+plans hash the union of outer held case `c` and the scored support fold. Donor
+labels close before route-support capabilities open. Terminal labels can open
+only after all 218 actions and every emitted method-probability vector are
+durably sealed and two fresh Python processes reproduce the preterminal
+attestation; aggregate terminal metrics persist no row-level labels.
+
+The dedicated v2 package is responsibility-partitioned into governance,
+physical evidence, utility, posterior, routing, capability, worker,
+artifact, terminal, validation, and lifecycle layers. A fresh-process spawn
+probe resolves and pickle-checks the canonical worker callback only after the
+closed-world source snapshot and direct-input identity pass read-only
+admission, but before the one-shot identity can be consumed. After all
+read-only source, input, callback, and host checks, an atomic authorization
+lease outside both output and scratch is claimed before any GPU or label work.
+That lease is never repaired, removed, or reused, so deletion of output and
+scratch cannot restore authority. Each spawned child re-hashes its exact
+read-only memmap slices, and capability scoring derives metric denominators
+from the same scoped label object rather than accepting caller-supplied
+denominators.
+
+The v2 audit schema is intentionally explicit about what this frozen input
+surface cannot support. P is represented as an implicit zero-utility,
+byte-exact candidate and wins whenever there is no unique robust-safe action
+with strictly positive estimated BACC utility. Calibrated convex blending is
+disabled as `DEFERRED_NO_LEGAL_CALIBRATION_SURFACE`; adding a learned blend
+weight on this consumed set would introduce an unjustified adaptive degree of
+freedom. Per-action threshold-switch counts are persisted, while harmful-
+switch counts remain null before terminal opening because their computation
+requires target labels. Latent distance, effective source-training support,
+and source calibration status are recorded as unavailable because they are
+absent from the six frozen direct-original inputs. V2 therefore implements the
+conservative SCALE-BP subset of the proposed architecture, not every optional
+evidence or composition extension.
+
+The frozen workstation layout matches the available host: two persistent RTX
+A5000 source-generation workers are followed by four spawn classifier workers
+with three BLAS threads each to materialize exactly 810 float32 probability
+cells once. A disjoint CUDA-hidden phase then uses four spawn workers with one
+BLAS thread each and one complete outer center per task. Support folds are
+sequential inside each outer worker; float64 is used for scientific reductions,
+primitive/hash-only DTOs cross process boundaries, nested pools and cross-run
+recovery are forbidden, and scratch is isolated under
+`/data/local/fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_v2`.
+
+The identity consumes exactly six direct-original inputs: the immutable expert
+bank and GenerationLock plus v2-fenced aliases for the immutable label-free
+cache, label manifest, original parent ledger, and single-use amendment. No v1
+output, amendment, capability history, checkpoint, scratch, probability
+surface, or other Stage-90 result is an input. Regardless of any eventual
+terminal numbers, the fixed claim remains
+`POST_HOC_CONSUMED_TEST_SENSITIVITY`, `fresh_evidence=false`, and
+`TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`; it cannot establish fresh routing,
+downstream utility, NELBO compatibility, confidence, significance, promotion,
+deployment, or evidence for another experiment.
+
 ## PCSI-PARC Boundary-Projected Whole-Policy Regret Router v1
 
 This Stage-90 experiment is planned but not runnable. It is designed as one final

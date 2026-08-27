@@ -3177,3 +3177,101 @@ experiments:
       - Target labels remain inaccessible until all method decisions and compositions are durably persisted and independently attested in fresh processes; undefined Admission_H statistics fail closed to byte-exact P.
       - Workstation topology is two persistent RTX A5000 generation workers, then four spawn prediction/classifier workers with three BLAS threads each, then a CUDA-hidden phase with four spawn-safe outer-H workers and one BLAS thread each; nested pools and cross-run recovery are forbidden.
       - Results remain POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE with fresh_evidence=false and may_feed_another_experiment=false.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router.v1
+    stage: 90_oracles_and_diagnostics
+    status: planned
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_test_cache_v1
+      - midogpp_stage90_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_test_manifest_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_parent_v1
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_amendment_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Immutable A1 generation geometry, exact-nine pairing, budgets, and classifier settings only; no routing, downstream, execution, or consumed-label authority is inherited.
+      midogpp_stage90_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_test_cache_v1: Planned single-consumer byte-exact label-free alias of the immutable original cache. It grants resolution only and exposes no prior Stage-90 output, probability surface, checkpoint, scratch, or run history.
+      midogpp_stage90_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_test_manifest_v1: Planned role-scoped label-capability alias. No source-support, pseudo-response, held-case, or terminal label capability may open under this identity.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_parent_v1: Planned byte-exact experiment-fenced alias of the immutable original ledger, read only for parent-hash validation.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_amendment_v1: Non-authorizing hash-chained registration amendment. It registers consumer resolution only and cannot authorize execution or consumed-test reuse.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-p-anchored-support-calibrated-local-action-empirical-bayes-boundary-projected-router
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_v1
+    notes:
+      - NEEDS EVIDENCE — SCALE-BP v1 is implemented and registered as a planned, non-runnable diagnostic. Neither implementation nor registration authorizes another consumed-test execution, output, scratch, lock, run-state, or label-capability mutation.
+      - Exactly six inputs resolve directly to the immutable original expert bank and generation lock plus fresh planning aliases for the original cache, manifest, parent ledger, and this non-authorizing amendment. No P-DCAPS, PDSUR, PCSI, CBPUPR, or other Stage-90 output or amendment is an input.
+      - Whole-case route-local support is H minus c under four deterministic OOF folds. It may correct only that H,c route; it cannot update source experts, donor coefficients, shared scalers, shared hyperparameters, or another outer center.
+      - Exact donor and pseudo universes derive from a sealed 218-case center inventory. Admission factory-seals all nine outer-H bundles and all 1,744 H,J,d contexts, runs the actual eight-method/six-action replay, derives oracle utility mechanically, and requires every H to pass.
+      - Terminal BACC denominators come only from the exact J-wide label population. One J-only population hash and denominator triple must agree across every d and all eight valid outer H values; callers cannot supply metrics, oracle values, denominators, or loose evidence rows.
+      - Primary actions are nearest-float32 boundary projections of P-to-B/I/R crossings with byte-exact P off-mask and on every unsupported, no-crossing, nonfinite, or failed-gate path. Full endpoints are sensitivity-only and no learned prefix is admitted.
+      - Every endpoint is derived from and bound to an exact 90-cell read-only-memmap physical-surface receipt. A factory-issued bank receipt maps all canonical 810 cells to non-symlink in-root files, offsets, immutable slice hashes, row identities, and cache lineage; its root propagates into endpoint evidence.
+      - The independent package is sealed by a recursive 69-member Python byte manifest validated during config load before any future GPU or label access.
+      - A separately authorized future executable identity would materialize 810 float32 cells once with two persistent RTX A5000 workers, then expose exact-slice-hashed read-only maps to four CUDA-hidden spawn outer-H workers with one BLAS thread each, sequential support folds, primitive DTOs, and no nested pools or cross-run recovery.
+      - Any future result remains POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE with fresh_evidence=false, nelbo_compatibility_claimed=false, and may_feed_another_experiment=false.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router.v2
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_v2.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_v2
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_test_cache_v2
+      - midogpp_stage90_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_test_manifest_v2
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_parent_v2
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_authorization_amendment_v2
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Immutable A1 generation geometry, exact-nine seed pairing, budgets, and classifier settings only; no routing, action, policy, downstream, promotion, deployment, or execution authority is inherited.
+      midogpp_stage90_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_test_cache_v2: Fresh v2 single-consumer byte-exact label-free alias of the original immutable cache; no v1 or other Stage-90 output, probability surface, checkpoint, scratch, run state, or capability history is exposed.
+      midogpp_stage90_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_test_manifest_v2: Fresh v2 single-consumer role-scoped label-capability alias; target terminal labels may open only after every decision and emitted probability vector is durably sealed and independently attested.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_parent_v2: Fresh v2 byte-exact experiment-fenced alias of the immutable original parent ledger, read only for parent-hash validation; it exposes no prior amendment or execution state.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_authorization_amendment_v2: Direct single-consumer authority for exactly one complete SCALE-BP v2 terminal consumed-test diagnostic execution; it creates no fresh evidence and cannot authorize another run or consumer.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-p-anchored-support-calibrated-local-action-empirical-bayes-boundary-projected-router-v2
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_v2
+    notes:
+      - Explicitly authorized, source-sealed, single-use executable identity over the already-consumed complete MIDOG++ test split (9,928 rows, 218 whole cases). Implementation and registration do not launch it or consume its authorization.
+      - Exactly six direct-original inputs are admitted: the immutable expert bank and GenerationLock plus fresh v2 cache, manifest, parent-ledger, and single-use authorization aliases. No v1 output, amendment, surface, scratch, checkpoint, run state, or capability history is an input.
+      - Protected P competes directly with six B/I/R directional actions; uncertainty-aware safety constraints, learnability admission, ties, unsupported states, and nonfinite states all fail closed to byte-exact P. Full endpoints are sensitivity-only.
+      - P is audited as the implicit zero-utility exact fallback. Calibrated convex blending is frozen off because no legal unconsumed calibration surface exists; latent distance, source-training support, and calibration status absent from the direct originals are reported unavailable, not inferred.
+      - Strict H/J/K deletion and H-minus-c whole-case OOF scopes prevent target, support-fold, pseudo-case, and candidate-source leakage. Terminal labels remain closed until all decisions and method probabilities are durably sealed and reproduced by two fresh processes.
+      - After every read-only source, direct-input, callback, and host preflight, v2 atomically claims a durable authorization lease outside output and scratch before GPU or label work. Any existing or partial lease means permanently exhausted; deleting output and scratch cannot restore authority.
+      - Workstation topology is two persistent RTX A5000 generation workers, four spawn classifier workers with three BLAS threads to materialize 810 float32 cells once, then a disjoint CUDA-hidden four-worker outer-H phase with one BLAS thread, sequential support folds, no nested pools, and no recovery.
+      - Any result remains POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE with fresh_evidence=false, may_feed_another_experiment=false, and no routing, downstream, NELBO, confidence, significance, promotion, or deployment claim.
