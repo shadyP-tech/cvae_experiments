@@ -1,0 +1,188 @@
+from __future__ import annotations
+
+import copy
+import pickle
+
+import pytest
+
+from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.execution.dto import (
+    PrimitiveWorkerResult,
+    PrimitiveWorkerTask,
+    assert_pickle_round_trip,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.identity import (
+    EXPECTED_TERMINAL_CASE_INVENTORY_SHA256,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.terminal import (
+    CaseRoutingDiagnostic,
+    build_manager_owned_terminal_evaluator,
+    issue_artifact_only_preterminal_attestation,
+    issue_terminal_aggregate_capability,
+    seal_guarded_preterminal_boundary,
+    seal_manager_owned_terminal_input,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.workstation import (
+    CPU_WORKER_ENVIRONMENT,
+    validate_workstation_observation,
+    workstation_plan_payload,
+)
+from midogpp_thesis.cvae.protocol import ProtocolError
+
+
+def test_workstation_requires_two_a5000_and_exact_spawn_cpu_contract() -> None:
+    receipt = validate_workstation_observation(
+        {
+            "gpu_count": 2,
+            "gpu_names": ["NVIDIA RTX A5000", "NVIDIA RTX A5000"],
+            "cpu_count": 32,
+            "start_method": "spawn",
+        },
+        dto_pickle_round_trip_validated=True,
+    )
+    payload = receipt.to_payload()
+    plan = workstation_plan_payload()
+    assert payload["persistent_gpu_worker_count"] == 2
+    assert payload["spawn_cpu_worker_count"] == 4
+    assert payload["cuda_visible_to_cpu_workers"] is False
+    assert payload["cpu_worker_environment"] == CPU_WORKER_ENVIRONMENT
+    assert plan["prediction_matrix_dtype"] == "<f4"
+    assert plan["reduction_dtype"] == "<f8"
+
+    with pytest.raises(ProtocolError, match="workstation plan drifted"):
+        validate_workstation_observation(
+            {
+                "gpu_count": 2,
+                "gpu_names": ["RTX 4090", "RTX 4090"],
+                "cpu_count": 32,
+                "start_method": "spawn",
+            },
+            dto_pickle_round_trip_validated=True,
+        )
+
+
+def test_primitive_worker_dtos_are_spawn_pickle_safe() -> None:
+    task = PrimitiveWorkerTask(
+        task_id="H0-fold0",
+        outer_center_id="0",
+        inner_fold_id=0,
+        row_start=0,
+        row_stop=12,
+        source_training_surface_hash="a" * 64,
+        candidate_pool_receipt_hash="b" * 64,
+        compiled_action_surface_hash="c" * 64,
+        random_seed=7,
+    )
+    result = PrimitiveWorkerResult(
+        task_id=task.task_id,
+        outer_center_id=task.outer_center_id,
+        inner_fold_id=task.inner_fold_id,
+        worker_pid=123,
+        model_receipt_hash="d" * 64,
+        source_ordering_receipt_hash="e" * 64,
+        ordered_case_ids=("case-1",),
+        ordered_action_ids=("P_PROTECTED",),
+        ordered_scores=(0.25,),
+        exact_p_required=False,
+        failure_reason=None,
+    )
+    assert assert_pickle_round_trip(task) == task
+    assert assert_pickle_round_trip(result) == result
+
+
+def _boundary():
+    ledger = "a" * 64
+    attestations = tuple(
+        issue_artifact_only_preterminal_attestation(
+            sealed_ledger_receipt_hash=ledger,
+            artifact_file_sha256="b" * 64,
+            artifact_file_identity_sha256="c" * 64,
+            validator_runtime_sha256=("d" if index == 0 else "e") * 64,
+            process_pid=100 + index,
+        )
+        for index in range(2)
+    )
+    return seal_guarded_preterminal_boundary(
+        seven_input_contract_hash="1" * 64,
+        source_seal_hash="2" * 64,
+        source_training_surface_receipt_hash="3" * 64,
+        decision_ledger_receipt_hash=ledger,
+        attestations=attestations,
+        case_inventory_sha256=EXPECTED_TERMINAL_CASE_INVENTORY_SHA256,
+        case_count=218,
+        exact_p_fallback_count=109,
+    )
+
+
+def test_terminal_requires_two_distinct_attestations() -> None:
+    ledger = "a" * 64
+    attestation = issue_artifact_only_preterminal_attestation(
+        sealed_ledger_receipt_hash=ledger,
+        artifact_file_sha256="b" * 64,
+        artifact_file_identity_sha256="c" * 64,
+        validator_runtime_sha256="d" * 64,
+        process_pid=100,
+    )
+    with pytest.raises(ProtocolError, match="two distinct artifact-only"):
+        seal_guarded_preterminal_boundary(
+            seven_input_contract_hash="1" * 64,
+            source_seal_hash="2" * 64,
+            source_training_surface_receipt_hash="3" * 64,
+            decision_ledger_receipt_hash=ledger,
+            attestations=(attestation, attestation),
+            case_inventory_sha256=EXPECTED_TERMINAL_CASE_INVENTORY_SHA256,
+            case_count=218,
+            exact_p_fallback_count=109,
+        )
+
+
+def test_concrete_terminal_evaluator_is_one_shot_and_aggregate_only() -> None:
+    boundary = _boundary()
+    row_case_ids = tuple(f"case-{index % 218:03d}" for index in range(9_928))
+    labels = tuple(index % 2 for index in range(9_928))
+    protected = tuple(0.8 if value else 0.2 for value in labels)
+    selected = protected
+    diagnostics = tuple(
+        CaseRoutingDiagnostic(
+            case_id=f"case-{index:03d}",
+            selected_action_id=(
+                "P_PROTECTED" if index < 109 else "B::zero_to_one"
+            ),
+            oracle_action_id="B::zero_to_one",
+            spearman_rank_correlation=0.25,
+            normalized_oracle_gap=0.1,
+        )
+        for index in range(218)
+    )
+    view = seal_manager_owned_terminal_input(
+        boundary,
+        row_case_ids=row_case_ids,
+        row_labels=labels,
+        selected_probabilities=selected,
+        protected_probabilities=protected,
+        case_diagnostics=diagnostics,
+    )
+    evaluator = build_manager_owned_terminal_evaluator(view)
+    capability = issue_terminal_aggregate_capability(
+        boundary,
+        evaluator=evaluator,
+    )
+    receipt = capability.score_aggregates()
+    payload = receipt.to_payload()
+
+    assert receipt.evaluated_case_count == 218
+    assert receipt.routed_case_count == 109
+    assert set(payload["aggregate_metrics"]) >= {
+        "selected_balanced_accuracy",
+        "selected_brier_score",
+        "selected_log_loss",
+        "top1_oracle_agreement",
+    }
+    assert payload["raw_labels_present"] is False
+    assert payload["per_row_values_present"] is False
+    assert payload["per_case_values_present"] is False
+    with pytest.raises(ProtocolError, match="replayed"):
+        capability.score_aggregates()
+    with pytest.raises(TypeError):
+        pickle.dumps(capability)
+    with pytest.raises(TypeError):
+        copy.copy(capability)

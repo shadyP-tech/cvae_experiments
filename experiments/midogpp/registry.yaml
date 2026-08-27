@@ -3458,3 +3458,103 @@ experiments:
       - After every read-only source, exact-input, workspace, and host preflight, v2 atomically claims a durable authorization lease outside output and scratch before GPU or label work. Any existing or partial lease means permanently exhausted; deleting output and scratch cannot restore authority.
       - Workstation topology is two persistent RTX A5000 generation workers followed by four spawn CPU classifier workers with one BLAS thread; prediction arrays are materialized once as float32 read-only memory maps and scientific reductions use float64. Nested pools and cross-run recovery are forbidden.
       - Downstream BACC, Brier, and log-loss are descriptive consumed-test diagnostics, not CVAE NELBO routing evidence. Any result remains POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE with fresh_evidence=false and may_feed_another_experiment=false.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_sceptre_router.v3
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_sceptre_router_v3.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_sceptre_router_v3
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_sceptre_source_inner_candidate_utility_reuse_v3
+      - midogpp_stage90_sceptre_source_inner_adaptive_reuse_amendment_v3
+      - midogpp_stage90_sceptre_test_cache_v3
+      - midogpp_stage90_sceptre_test_manifest_v3
+      - midogpp_uniform_b_test_consumption_ledger_sceptre_parent_v3
+      - midogpp_uniform_b_test_consumption_ledger_sceptre_execution_amendment_v3
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Immutable generation geometry, exact-nine source-family pairing, source and exact-B budgets, and classifier settings only; no routing, downstream, consumed-label, promotion, deployment, or execution authority is inherited.
+      midogpp_stage90_sceptre_source_inner_candidate_utility_reuse_v3: V3-only consumer fence resolving directly to the seven immutable original source-inner members, never through a v2 consumer alias. Reuse is adaptive descriptive development only under strict outer query-and-candidate-center exclusion.
+      midogpp_stage90_sceptre_source_inner_adaptive_reuse_amendment_v3: V3-only descriptive-development authority. It grants no target-label or execution authority and forbids every v2 output, lease, run state, scratch, checkpoint, consumer alias, and amendment.
+      midogpp_stage90_sceptre_test_cache_v3: V3-only byte-exact label-free alias of the already-consumed test cache. It is not fresh evidence and resolves directly to the canonical cache, not to a v2 Stage-90 alias.
+      midogpp_stage90_sceptre_test_manifest_v3: V3-only role-scoped consumed-test manifest alias. Selection, calibration, and evaluation labels remain whole-case disjoint and capability gated.
+      midogpp_uniform_b_test_consumption_ledger_sceptre_parent_v3: V3-only byte-exact alias of the immutable original parent ledger, carrying no reusable execution authority.
+      midogpp_uniform_b_test_consumption_ledger_sceptre_execution_amendment_v3: Separate authority for exactly one SCEPTRE v3 terminal consumed-test runtime-repair diagnostic. V2 authority is exhausted and is not reused.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-sceptre-router-v3
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_sceptre_router_v3
+    notes:
+      - SCOPE LIMITED — v3 is a separately sealed and separately authorized successor after v2 became FAILED_EXHAUSTED before target-label access. V2 is not retried, modified, or used as an input.
+      - Exactly eight inputs are admitted. The four v3 consumer aliases resolve directly to immutable original upstream artifacts; neither the v2 consumer aliases nor any v2 output, probability surface, run state, lease, scratch, checkpoint, capability history, or execution amendment may resolve as a fallback.
+      - Before the v3 lease, a label-free smoke starts the exact production initializer on both GPUs and submits two no-op tasks to each persistent worker. It performs no expert loading, embedding generation, target-data access, label access, output or scratch write, or scientific routing work. Its hash is bound into the lease admission and first run state.
+      - The production task never configures Torch thread pools. Inter-op and intra-op threads, device binding, deterministic precision, and TF32 settings are configured once in each fresh spawned GPU-worker initializer.
+      - Every outer target H still removes q=H and e=H before normalization, fitting, or tuning. Selection, calibration, and evaluation remain whole-case disjoint; the complete pre-label router and G proposals freeze before target-label access; all nonfinite, tie, or unsupported states fall back to exact B.
+      - Downstream BACC, Brier, and log-loss remain a descriptive sensitivity on the consumed test surface, not CVAE NELBO compatibility, fresh routing, unseen-center generalization, significance, promotion, deployment, or thesis-confirmatory evidence. The result is permanently POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router.v3
+    stage: 90_oracles_and_diagnostics
+    status: planned
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_oe_ppur_source_training_action_supervision_v3
+      - midogpp_stage90_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_test_cache_v3
+      - midogpp_stage90_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_test_manifest_v3
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_parent_v3
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_amendment_v3
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Immutable generation geometry and fixed expert-bank settings only; no routing, diagnostic, consumed-test, downstream, promotion, deployment, or execution authority is inherited.
+      midogpp_stage90_oe_ppur_source_training_action_supervision_v3: Planned v3-only source-supervision identity. It must be materialized from source rows and source labels with exact held-center pools before execution and grants no target-label or consumed-test authority.
+      midogpp_stage90_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_test_cache_v3: Planned v3-only label-free cache alias; no consumed-test reuse, target labels, predecessor Stage-90 state, probability surface, or execution authority is registered.
+      midogpp_stage90_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_test_manifest_v3: Planned v3-only canonical manifest alias. Target labels remain closed until all 218 decisions are frozen and a separately issued amendment is admitted.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_parent_v3: Planned v3-only byte-exact original-parent alias used solely to define the future amendment parent; it exposes no prior execution authority.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_amendment_v3: Placeholder identity for a future v3-only single-consumer amendment. No amendment file or authorization is issued by this implementation.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-p-anchored-opportunity-equivalence-pairwise-primitive-utility-router-v3
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3
+        - --scratch-root
+        - /data/local/fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3
+    notes:
+      - NEEDS EVIDENCE — OE-PPUR v3 is an implemented seven-input source-supervised successor, but its source-supervision bundle is not materialized and its v3-only consumed-test amendment is absent. Registration remains planned and non-runnable; implementation did not launch workers, create run roots, issue an amendment, or open labels.
+      - The ordered inputs are exact: immutable bank, immutable GenerationLock, v3-only source supervision, v3-only label-free cache alias, v3-only manifest alias, v3-only original parent-ledger alias, and an absent future v3-only amendment. OE-PPUR v2 and every other Stage-90 output, report, probability surface, checkpoint, scratch, lease, run state, amendment, and capability history are forbidden.
+      - Source pseudo-target q surfaces use exactly C-minus-{H,q}; final label-free target inference uses exactly C-minus-H. The same deterministic, label-free, permutation-equivariant action compiler is bound to both pool types, and any pool, lineage, support, calibration, or numerical failure selects exact P.
+      - Complete source-only H/J/K/L/d exclusions, rotating K model selection, held-L out-of-fold uncertainty calibration, and nominal manager-owned terminal capability boundaries are implemented. Target labels remain closed until every one of the 218 typed decisions is frozen and attested.
+      - Workstation execution is fixed to two persistent RTX A5000 GPU workers plus four CUDA-hidden spawn CPU workers with one BLAS thread, primitive pickle-safe DTOs, little-endian float32 prediction transport, float64 reductions, no nested pools, and no cross-run recovery.
+      - Any separately authorized result remains POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE. It cannot support fresh routing, downstream utility, CVAE/NELBO compatibility, significance, promotion, deployment, or another experiment.

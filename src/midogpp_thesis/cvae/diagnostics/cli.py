@@ -491,6 +491,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the mutation-free six-input/matrix implementation receipt.",
     )
 
+    opportunity_pairwise_v3 = sub.add_parser(
+        "fixed-bank-p-anchored-opportunity-equivalence-pairwise-primitive-"
+        "utility-router-v3",
+        help=(
+            "Inspect the planned OE-PPUR v3 seven-input source-supervised "
+            "successor. Its source bundle is not materialized, its amendment "
+            "is absent, and direct execution is refused before mutation."
+        ),
+    )
+    opportunity_pairwise_v3.add_argument("--config", required=True)
+    opportunity_pairwise_v3.add_argument("--artifact-root", required=True)
+    opportunity_pairwise_v3.add_argument("--scratch-root")
+    opportunity_pairwise_v3.add_argument(
+        "--inspect-plan",
+        action="store_true",
+        help="Emit the mutation-free seven-input scientific implementation receipt.",
+    )
+
     sceptre = sub.add_parser(
         "fixed-bank-sceptre-router-v1",
         help=(
@@ -517,6 +535,26 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Validate source, exact-eight inputs, workspace binding, and host "
             "admission without claiming authorization or opening labels."
+        ),
+    )
+
+    sceptre_v3 = sub.add_parser(
+        "fixed-bank-sceptre-router-v3",
+        help=(
+            "Run the separately authorized SCEPTRE v3 persistent-worker "
+            "repair diagnostic, or its pre-lease GPU-worker dry run. The "
+            "consumed-test result remains terminal and descriptive only."
+        ),
+    )
+    sceptre_v3.add_argument("--config", required=True)
+    sceptre_v3.add_argument("--artifact-root", required=True)
+    sceptre_v3.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "Validate exact-eight inputs, source seal, workstation, and two "
+            "repeated tasks per exact GPU initializer without claiming the "
+            "v3 authorization lease or opening labels."
         ),
     )
 
@@ -667,6 +705,45 @@ def main(argv: list[str] | None = None) -> int:
         print(output)
         return 0
 
+    if args.surface == (
+        "fixed-bank-p-anchored-opportunity-equivalence-pairwise-primitive-"
+        "utility-router-v3"
+    ):
+        import json
+
+        from .fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.config import (
+            load_config,
+        )
+        from .fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.runner import (
+            inspect_planned_router,
+            run_oe_ppur_v3,
+        )
+
+        config = load_config(args.config)
+        if args.inspect_plan:
+            print(
+                json.dumps(
+                    inspect_planned_router(config),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+            return 0
+        output = run_oe_ppur_v3(
+            config,
+            artifact_root=artifact_root,
+            scratch_root=(
+                args.scratch_root
+                if args.scratch_root is not None
+                else (
+                    "/data/local/fixed_bank_p_anchored_opportunity_"
+                    "equivalence_pairwise_primitive_utility_router_v3"
+                )
+            ),
+        )
+        print(output)
+        return 0
+
     if args.surface == "fixed-bank-sceptre-router-v1":
         from .fixed_bank_sceptre_router.config import load_config
         from .fixed_bank_sceptre_router.runner import run_planned_sceptre_router
@@ -696,6 +773,28 @@ def main(argv: list[str] | None = None) -> int:
             )
         else:
             print(run_sceptre_v2(config, artifact_root=artifact_root))
+        return 0
+
+    if args.surface == "fixed-bank-sceptre-router-v3":
+        import json
+
+        from .fixed_bank_sceptre_router_v3.config import load_config
+        from .fixed_bank_sceptre_router_v3.runner import (
+            dry_run_sceptre_v3,
+            run_sceptre_v3,
+        )
+
+        config = load_config(args.config)
+        if args.dry_run:
+            print(
+                json.dumps(
+                    dry_run_sceptre_v3(config, artifact_root=artifact_root),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+        else:
+            print(run_sceptre_v3(config, artifact_root=artifact_root))
         return 0
 
     if args.surface == (

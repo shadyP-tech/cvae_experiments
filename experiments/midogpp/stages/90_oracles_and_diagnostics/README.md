@@ -7,6 +7,45 @@ Every oracle row must be marked non-deployable. Diagnostic results may explain
 a failure or quantify headroom, but they must not tune or select a deployable
 policy and must remain separate from held-out utility claims.
 
+## SCEPTRE persistent-worker repair v3
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_sceptre_router.v3`
+is the separately authorized one-shot successor to the exhausted v2 attempt.
+The v2 workstation run failed before target-label access because each
+persistent GPU worker called `torch.set_num_interop_threads(1)` again for its
+second source-generation task. V2 remains `FAILED_EXHAUSTED`; its output,
+lease, run state, scratch, checkpoints, consumer aliases, amendment, and prior
+authorization are not v3 inputs and cannot be repaired or reused.
+
+V3 owns a new executable package, exact-eight input fence, output root,
+scratch root, external lease, source seal, aliases, and amendment. It shares
+only the explicitly sealed identity-neutral worker lifecycle and inherited
+scientific SCEPTRE modules. Torch intra-op/inter-op settings, device binding,
+precision, and TF32 policy now run exactly once in each spawned GPU-pool
+initializer. The repeated scientific task authenticates that binding and never
+reconfigures a Torch thread pool.
+
+Before claiming the v3 lease, both GPU pools run the exact production
+initializer and accept two no-op probes each. This smoke loads no expert,
+generates no embedding, opens no target cache, manifest, or label, and writes
+no output or scratch. Its receipt hash is bound into the launch admission,
+lease, first run state, input binding, runtime report, and final validation. A
+smoke failure therefore rejects safely without exhausting v3.
+
+All scientific firewalls remain unchanged: outer target `H` removes every
+`q=H` and `e=H` row before transformation, fitting, or tuning; seed cells are
+nuisance replications; selection, calibration, and evaluation are whole-case
+disjoint; the router and target-global G proposals freeze before target-label
+access; and ties, nonfinite states, or unsupported states return exact B.
+
+The complete 9,928-row, 218-case test surface is already consumed. Any v3
+result is permanently `POST_HOC_CONSUMED_TEST_SENSITIVITY` and
+`TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`. Downstream BACC, Brier, and log-loss
+remain descriptive sensitivity metrics, not CVAE/NELBO compatibility, fresh
+routing, unseen-center generalization, significance, promotion, deployment,
+or thesis-confirmatory evidence. Implementation and validation did not launch
+the workstation experiment.
+
 ## P-DCAPS donor-cross-fitted action and policy surfaces v1
 
 `midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router.v1`
