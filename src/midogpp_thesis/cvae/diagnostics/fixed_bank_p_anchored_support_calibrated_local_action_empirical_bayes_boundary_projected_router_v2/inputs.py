@@ -128,17 +128,7 @@ def load_label_free_test_frame(config: object) -> LabelFreeTestFrame:
     alignment = _read_json(root / "manifests/row_alignment.json")
     report = _read_json(root / "reports/cache_builder_report.json")
     validation = _read_json(root / "reports/validation_report.json")
-    if (
-        frozen.get("cache_name") != EXPECTED_TEST_CACHE_SEMANTIC_ID
-        or frozen.get("representation_id") != EXPECTED_TEST_CACHE_REPRESENTATION_ID
-        or frozen.get("manifest_sha256") != EXPECTED_TEST_MANIFEST_SHA256
-        or alignment.get("row_order_hash") != EXPECTED_TEST_CACHE_ROW_ORDER_HASH
-        or report.get("row_order_hash") != EXPECTED_TEST_CACHE_ROW_ORDER_HASH
-        or report.get("row_count") != EXPECTED_TEST_ROW_COUNT
-        or report.get("fresh_evidence") is not False
-        or validation.get("status") != "PASS"
-    ):
-        raise GovernanceError("SCALE-BP v2 test-cache protocol drifted.")
+    _validate_cache_protocol(frozen, alignment, report, validation)
 
     rows: list[TestRowIdentity] = []
     embeddings: list[np.ndarray] = []
@@ -426,6 +416,30 @@ def _validate_cache_content_index(root: Path) -> dict[str, object]:
     if indexed != actual:
         raise GovernanceError("SCALE-BP v2 cache member coverage drifted.")
     return payload
+
+
+def _validate_cache_protocol(
+    frozen: Mapping[str, object],
+    alignment: Mapping[str, object],
+    report: Mapping[str, object],
+    validation: Mapping[str, object],
+) -> None:
+    """Bind to the immutable cache builder's actual nested protocol schema."""
+
+    extractor = frozen.get("cache_extractor_protocol")
+    if (
+        not isinstance(extractor, Mapping)
+        or frozen.get("cache_name") != EXPECTED_TEST_CACHE_SEMANTIC_ID
+        or extractor.get("representation_id")
+        != EXPECTED_TEST_CACHE_REPRESENTATION_ID
+        or frozen.get("scoring_manifest_sha256") != EXPECTED_TEST_MANIFEST_SHA256
+        or alignment.get("row_order_hash") != EXPECTED_TEST_CACHE_ROW_ORDER_HASH
+        or report.get("row_order_hash") != EXPECTED_TEST_CACHE_ROW_ORDER_HASH
+        or report.get("row_count") != EXPECTED_TEST_ROW_COUNT
+        or report.get("fresh_evidence") is not False
+        or validation.get("status") != "PASS"
+    ):
+        raise GovernanceError("SCALE-BP v2 test-cache protocol drifted.")
 
 
 def _load_cache_shard(

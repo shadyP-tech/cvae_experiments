@@ -39,7 +39,7 @@ CONFIG = (
 )
 AMENDMENT = (
     ROOT
-    / "experiments/midogpp/stages/90_oracles_and_diagnostics/contracts"
+    / "experiments/midogpp/contracts/scale_bp_v2"
     / f"{STEM}_ledger_amendment_v2.json"
 )
 SOURCE_MANIFEST = (
@@ -107,6 +107,27 @@ def test_v2_authorization_and_source_snapshot_are_canonical() -> None:
     assert amendment["implementation_did_not_launch_execution"] is True
     assert amendment["fresh_evidence"] is False
     assert amendment["may_feed_another_experiment"] is False
+
+
+def test_v2_workspace_resolved_config_keeps_authorization_outside_predecessor_stage(
+    tmp_path: Path,
+) -> None:
+    workspace = MidogppWorkspace.load(ROOT)
+    rendered = workspace._render_run(
+        EXPERIMENT_ID,
+        require_inputs=False,
+        validate_workspace=True,
+        include_all_declared_inputs=True,
+    )
+    resolved_config = tmp_path / "config.resolved.yaml"
+    resolved_config.write_text(rendered.resolved_config_content, encoding="utf-8")
+
+    config = load_config(resolved_config)
+
+    assert config.ledger_amendment_path == AMENDMENT.resolve(strict=True)
+    assert "/90_oracles_and_diagnostics/" not in (
+        config.ledger_amendment_path.as_posix()
+    )
 
 
 def test_v2_catalog_aliases_are_single_consumer_and_non_promotable() -> None:

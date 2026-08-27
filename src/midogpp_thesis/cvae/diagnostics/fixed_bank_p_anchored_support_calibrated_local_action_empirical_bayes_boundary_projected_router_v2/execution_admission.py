@@ -13,12 +13,18 @@ from .config import ScaleBPV2Config
 from .experiment_contracts import validate_authorization_amendment
 from .hashing import canonical_hash
 from .identity import (
+    AUTHORIZATION_AMENDMENT_ARTIFACT_ID,
     DIRECT_INPUT_ARTIFACT_IDS,
     EXPECTED_PARENT_LEDGER_SHA256,
     EXPECTED_TEST_MANIFEST_SHA256,
     EXPERIMENT_ID,
+    EXPERT_BANK_ARTIFACT_ID,
+    GENERATION_LOCK_ARTIFACT_ID,
     GovernanceError,
     OUTPUT_ARTIFACT_ID,
+    TEST_CACHE_ARTIFACT_ID,
+    TEST_CONSUMPTION_LEDGER_ARTIFACT_ID,
+    TEST_MANIFEST_ARTIFACT_ID,
 )
 from .protocol import (
     validate_protocol_payload,
@@ -27,7 +33,11 @@ from .protocol import (
 from .source_fence import SourceFenceReceipt, validate_source_fence
 from .source_snapshot import package_source_root, validate_source_snapshot
 from .workstation import canonical_workstation_payload
-from .workspace_manifest import validate_workspace_manifest
+from .workspace_manifest import (
+    load_workspace_catalog_input_roots,
+    validate_workspace_input_bindings,
+    validate_workspace_manifest,
+)
 
 
 ADMISSION_SCHEMA = "scale_bp_v2_single_use_execution_admission_v1"
@@ -107,7 +117,13 @@ def admit_single_use_execution(
     )
     if artifact == scratch or _is_within(artifact, scratch) or _is_within(scratch, artifact):
         raise GovernanceError("SCALE-BP v2 output and scratch roots overlap.")
-    _require_pristine_or_workspace_launch_root(artifact, config=config)
+    workspace_manifest = _require_pristine_or_workspace_launch_root(
+        artifact, config=config
+    )
+    if workspace_manifest is None:
+        raise GovernanceError(
+            "SCALE-BP v2 requires a workspace-prepared launch manifest."
+        )
     _require_pristine_root(scratch, "scratch root")
 
     source_fence = run_read_only_source_preflight()
@@ -118,25 +134,53 @@ def admit_single_use_execution(
     )
 
     inputs = (
-        ("expert_bank", config.expert_bank_root, "directory"),
-        ("generation_lock", config.generation_lock_root, "directory"),
-        ("test_cache", config.test_cache_root, "directory"),
-        ("test_manifest", config.test_manifest_path, "file"),
-        ("parent_ledger", config.test_consumption_ledger_path, "file"),
-        ("authorization_amendment", config.ledger_amendment_path, "file"),
+        ("expert_bank", EXPERT_BANK_ARTIFACT_ID, config.expert_bank_root, "directory"),
+        (
+            "generation_lock",
+            GENERATION_LOCK_ARTIFACT_ID,
+            config.generation_lock_root,
+            "directory",
+        ),
+        ("test_cache", TEST_CACHE_ARTIFACT_ID, config.test_cache_root, "directory"),
+        ("test_manifest", TEST_MANIFEST_ARTIFACT_ID, config.test_manifest_path, "file"),
+        (
+            "parent_ledger",
+            TEST_CONSUMPTION_LEDGER_ARTIFACT_ID,
+            config.test_consumption_ledger_path,
+            "file",
+        ),
+        (
+            "authorization_amendment",
+            AUTHORIZATION_AMENDMENT_ARTIFACT_ID,
+            config.ledger_amendment_path,
+            "file",
+        ),
     )
     resolved_inputs: list[dict[str, object]] = []
     observed_paths: set[Path] = set()
-    for role, raw_path, kind in inputs:
+    for role, artifact_id, raw_path, kind in inputs:
         path = _resolved_existing_input(raw_path, role=role, kind=kind)
         if path in observed_paths or _is_within(path, artifact) or _is_within(path, scratch):
             raise GovernanceError("SCALE-BP v2 direct input topology drifted.")
         observed_paths.add(path)
-        _reject_predecessor_input_path(path, role)
-        row: dict[str, object] = {"role": role, "path": str(path), "kind": kind}
+        row: dict[str, object] = {
+            "role": role,
+            "artifact_id": artifact_id,
+            "path": str(path),
+            "kind": kind,
+        }
         if kind == "file":
             row["sha256"] = _sha256_file(path)
         resolved_inputs.append(row)
+
+    validate_workspace_input_bindings(
+        workspace_manifest,
+        catalog_roots_by_artifact_id=load_workspace_catalog_input_roots(artifact),
+        resolved_paths_by_artifact_id={
+            str(row["artifact_id"]): str(row["path"])
+            for row in resolved_inputs
+        },
+    )
 
     by_role = {str(row["role"]): row for row in resolved_inputs}
     if by_role["test_manifest"].get("sha256") != EXPECTED_TEST_MANIFEST_SHA256:
@@ -275,7 +319,7 @@ def _require_pristine_root(path: Path, role: str) -> None:
 
 def _require_pristine_or_workspace_launch_root(
     path: Path, *, config: ScaleBPV2Config
-) -> None:
+) -> Mapping[str, object] | None:
     """Accept either absence or the workspace runtime's exact launch envelope.
 
     ``midogpp_thesis workspace run`` resolves the config and records the exact
@@ -285,7 +329,7 @@ def _require_pristine_or_workspace_launch_root(
 
     if not path.exists() and not path.is_symlink():
         _require_pristine_root(path, "artifact root")
-        return
+        return None
     if path.is_symlink() or not path.is_dir():
         raise GovernanceError("SCALE-BP v2 artifact root is unsafe.")
     expected_config = path / "config.resolved.yaml"
@@ -328,6 +372,7 @@ def _require_pristine_or_workspace_launch_root(
     if not isinstance(payload, Mapping):
         raise GovernanceError("SCALE-BP v2 workspace launch manifest is malformed.")
     validate_workspace_manifest(payload)
+    return payload
 
 
 def _resolved_existing_input(value: Path, *, role: str, kind: str) -> Path:
@@ -343,24 +388,6 @@ def _resolved_existing_input(value: Path, *, role: str, kind: str) -> Path:
     ):
         raise GovernanceError(f"SCALE-BP v2 {role} input is unsafe.")
     return resolved
-
-
-def _reject_predecessor_input_path(path: Path, role: str) -> None:
-    lowered = path.as_posix().casefold()
-    if role in {"expert_bank", "generation_lock"}:
-        return
-    if any(
-        fragment in lowered
-        for fragment in (
-            "/90_oracles_and_diagnostics/",
-            "_router_v1/",
-            "_amendment_v1",
-            "/scratch/",
-            "/checkpoints/",
-            "/run_state",
-        )
-    ):
-        raise GovernanceError("SCALE-BP v2 predecessor input path detected.")
 
 
 def _is_within(path: Path, parent: Path) -> bool:

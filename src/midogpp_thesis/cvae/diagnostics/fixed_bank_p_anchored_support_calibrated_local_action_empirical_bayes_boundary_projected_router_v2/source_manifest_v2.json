@@ -1,6 +1,6 @@
 {
   "hash_algorithm": "sha256",
-  "manifest_sha256": "37bd9b1818de5009db54b007e5ea3b6fdf8e2f632585f7e47fd4ead7f1628bfb",
+  "manifest_sha256": "4d315da6f7c018bfca2fbd177affe8618aaff3aced94993cf60cc5a7818d0fe5",
   "member_count": 80,
   "member_pattern": "**/*.py",
   "members": [
@@ -51,8 +51,8 @@
     },
     {
       "member": "config.py",
-      "sha256": "04ac84ae85d76345c318db2f5bd11da262d400ef3a5a22556cd5d2d1f43f6e92",
-      "size_bytes": 20308
+      "sha256": "949ceaf5478221d7b6bb46904ffaa3ab68c4eb392c55cb2b2692b5963f38962b",
+      "size_bytes": 20440
     },
     {
       "member": "execution/__init__.py",
@@ -81,8 +81,8 @@
     },
     {
       "member": "execution_admission.py",
-      "sha256": "90166b7a30ab3e9573bf72238a78c6e0f7accad9351e2ab5c5d880ad1d950974",
-      "size_bytes": 15363
+      "sha256": "24c4a5e551fe594c0e8e75f967caef20846c3efbe00cea12ea9d90374959bd2d",
+      "size_bytes": 16074
     },
     {
       "member": "experiment_contracts.py",
@@ -111,8 +111,8 @@
     },
     {
       "member": "inputs.py",
-      "sha256": "0baa3f3365c06e7877d9223430898286cd8b27ff763efbe92d17442dcfdff76a",
-      "size_bytes": 21918
+      "sha256": "a9156b4cce53a24799c405d856b106c70e8a5eb875f818c7b71599bfd63a632d",
+      "size_bytes": 22372
     },
     {
       "member": "label_capabilities.py",
@@ -396,8 +396,8 @@
     },
     {
       "member": "workspace_manifest.py",
-      "sha256": "db5d27a641d49fe3dc2efd276d50b9614e960325a64c61bc8eb6f9458259274c",
-      "size_bytes": 2972
+      "sha256": "4c8594f9613f7535086fb1a3bc046455264af00de5aba0943600c0f830def936",
+      "size_bytes": 9728
     },
     {
       "member": "workstation.py",
@@ -407,5 +407,5 @@
   ],
   "schema_version": "scale_bp_v2_execution_source_snapshot_v1",
   "source_root_role": "scale_bp_v2_executable_python",
-  "tree_sha256": "b4a10ea0dbaf706f15e284cd81e92d4b6719a4457440c7a305ca7961e44515da"
+  "tree_sha256": "24251fa67dc1cc0b006f4bcd6b535cb7f56e0eb84c3016445dfeb5017ffb5b0b"
 }

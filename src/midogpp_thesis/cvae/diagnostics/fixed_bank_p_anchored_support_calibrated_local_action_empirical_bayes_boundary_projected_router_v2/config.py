@@ -9,7 +9,10 @@ from typing import Any
 
 import yaml
 
-from .experiment_contracts import LEDGER_AMENDMENT_FILENAME
+from .experiment_contracts import (
+    LEDGER_AMENDMENT_FILENAME,
+    validate_exact_input_fence,
+)
 from .hashing import canonical_hash, require_sha256
 from .identity import (
     AUTHORIZATION_AMENDMENT_ARTIFACT_ID,
@@ -487,6 +490,7 @@ def _validate_input_locations(inputs: Mapping[str, object]) -> None:
             LEDGER_AMENDMENT_FILENAME,
         ),
     )
+    resolved_values: list[str] = []
     for key, artifact_id, member in roles:
         value = _text(inputs[key], key)
         if value.startswith("artifact://"):
@@ -495,22 +499,22 @@ def _validate_input_locations(inputs: Mapping[str, object]) -> None:
                 raise GovernanceError(
                     f"SCALE-BP v2 direct input URI drifted: {key}."
                 )
-        lowered = value.casefold()
-        if any(
-            fragment in lowered
-            for fragment in (
-                "/v1/",
-                "_router_v1/",
-                "_router_amendment_v1",
-                "90_oracles_and_diagnostics/",
-                "/checkpoints/",
-                "/scratch/",
+        else:
+            path = Path(value)
+            if not path.is_absolute() or path == Path(path.anchor):
+                raise GovernanceError(
+                    f"SCALE-BP v2 resolved direct input is unsafe: {key}."
+                )
+            resolved_values.append(value)
+    if resolved_values:
+        if len(resolved_values) != len(roles):
+            raise GovernanceError(
+                "SCALE-BP v2 direct inputs mix artifact URIs and resolved paths."
             )
-        ) and value not in {
-            f"artifact://{EXPERT_BANK_ARTIFACT_ID}",
-            f"artifact://{GENERATION_LOCK_ARTIFACT_ID}",
-        }:
-            raise GovernanceError("SCALE-BP v2 predecessor input path detected.")
+        validate_exact_input_fence(
+            DIRECT_INPUT_ARTIFACT_IDS,
+            resolved_paths=resolved_values,
+        )
 
 
 def _resolve_output_root(source: Path, value: str) -> Path:

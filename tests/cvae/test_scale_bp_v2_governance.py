@@ -11,7 +11,15 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_support_calibrated_lo
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_v2.identity import (
     DIRECT_INPUT_ARTIFACT_IDS,
     EXPECTED_PHYSICAL_CELL_COUNT,
+    EXPECTED_TEST_CACHE_REPRESENTATION_ID,
+    EXPECTED_TEST_CACHE_ROW_ORDER_HASH,
+    EXPECTED_TEST_CACHE_SEMANTIC_ID,
+    EXPECTED_TEST_MANIFEST_SHA256,
+    EXPECTED_TEST_ROW_COUNT,
     GovernanceError,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_v2.inputs import (
+    _validate_cache_protocol,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_v2.physical.library import (
     build_action_library,
@@ -97,3 +105,34 @@ def test_physical_library_and_workstation_topology_are_frozen() -> None:
     changed["cpu_outer_workers"] = 8
     with pytest.raises(GovernanceError):
         validate_workstation_plan(changed)
+
+
+def test_cache_protocol_uses_the_immutable_builders_nested_schema() -> None:
+    frozen = {
+        "cache_name": EXPECTED_TEST_CACHE_SEMANTIC_ID,
+        "scoring_manifest_sha256": EXPECTED_TEST_MANIFEST_SHA256,
+        "cache_extractor_protocol": {
+            "representation_id": EXPECTED_TEST_CACHE_REPRESENTATION_ID,
+        },
+    }
+    alignment = {"row_order_hash": EXPECTED_TEST_CACHE_ROW_ORDER_HASH}
+    report = {
+        "row_order_hash": EXPECTED_TEST_CACHE_ROW_ORDER_HASH,
+        "row_count": EXPECTED_TEST_ROW_COUNT,
+        "fresh_evidence": False,
+    }
+    validation = {"status": "PASS"}
+
+    _validate_cache_protocol(frozen, alignment, report, validation)
+
+    legacy_flattened = copy.deepcopy(frozen)
+    legacy_flattened["representation_id"] = EXPECTED_TEST_CACHE_REPRESENTATION_ID
+    legacy_flattened["manifest_sha256"] = EXPECTED_TEST_MANIFEST_SHA256
+    del legacy_flattened["cache_extractor_protocol"]
+    with pytest.raises(GovernanceError, match="test-cache protocol drifted"):
+        _validate_cache_protocol(
+            legacy_flattened,
+            alignment,
+            report,
+            validation,
+        )

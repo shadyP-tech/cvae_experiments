@@ -14779,7 +14779,7 @@ artifacts:
 
   - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_authorization_amendment_v2
     stage: dataset_contract
-    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts
+    physical_path: experiments/midogpp/contracts/scale_bp_v2
     availability: local_and_workstation
     migration: hash_verified_move
     evidence_label: CONSUMED_TEST_SCALE_BP_V2_SINGLE_USE_EXECUTION_AUTHORIZATION
@@ -14787,7 +14787,7 @@ artifacts:
     semantic_identities:
       parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
       parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
-      amendment_sha256: 86f42908fcde9b6fe4ceaaac629f9300ccb4f6a39a6d5753e6bbe10813566db0
+      amendment_sha256: eac8b61409502d73d460b2ac858fcde2fa05a65e4667f932c7b4346837dd1469
       authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router.v2
       authorization_basis: explicit_user_authorization_2026_08_26_for_single_scale_bp_v2_consumed_test_terminal_diagnostic
       authorization_scope: one_complete_scale_bp_v2_execution_on_the_previously_consumed_midogpp_uniform_b_test_surface
@@ -14803,9 +14803,9 @@ artifacts:
       output_or_scratch_deletion_restores_authorization: 'false'
       lease_repair_removal_or_reuse_allowed: 'false'
       source_manifest_member: source_manifest_v2.json
-      source_manifest_file_sha256: 3b4452c9a2c180e0afd09e3102f67b5d1834ae527f0af8bc26367d1a63c109fd
-      source_snapshot_manifest_sha256: 37bd9b1818de5009db54b007e5ea3b6fdf8e2f632585f7e47fd4ead7f1628bfb
-      source_snapshot_tree_sha256: b4a10ea0dbaf706f15e284cd81e92d4b6719a4457440c7a305ca7961e44515da
+      source_manifest_file_sha256: 141d05ca31198b72f93590b75b70ad23d38a14f1542efb17e4e05f5546ee9b80
+      source_snapshot_manifest_sha256: 4d315da6f7c018bfca2fbd177affe8618aaff3aced94993cf60cc5a7818d0fe5
+      source_snapshot_tree_sha256: 24251fa67dc1cc0b006f4bcd6b535cb7f56e0eb84c3016445dfeb5017ffb5b0b
       source_snapshot_member_count: '80'
       v1_output_used: 'false'
       v1_amendment_used: 'false'
@@ -14837,7 +14837,7 @@ artifacts:
     expected_file_hashes:
       uniform_b_v2_consumed_test_fixed_bank_p_anchored_support_calibrated_local_action_empirical_bayes_boundary_projected_router_ledger_amendment_v2.json:
         algorithm: sha256
-        digest: 86f42908fcde9b6fe4ceaaac629f9300ccb4f6a39a6d5753e6bbe10813566db0
+        digest: eac8b61409502d73d460b2ac858fcde2fa05a65e4667f932c7b4346837dd1469
     forbidden_reuse: *scale_bp_forbidden_reuse
     may_feed_recipe_selection: false
     may_feed_deployable_selection: false
@@ -14947,13 +14947,13 @@ artifacts:
       terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
       bounded_interpretation: single_post_hoc_scale_bp_v2_sensitivity_on_the_previously_consumed_midogpp_uniform_b_test_surface_only
       architecture_family: context_adaptive_selective_utility_scale_bp_v2
-      config_contract_hash: b939d5d11f670bd647979fc1100846214f1b3e6194ce5661a36d2e0b7f4ae486
+      config_contract_hash: 465e61d1517b1e3f7efa386a5191d546548936c601dfd04431aa694b753b26ca
       protocol_contract_hash: 3829f50ef175a704baf37b9f9daea6eb9d58aca015c35c26485898873d0f3480
-      expected_ledger_amendment_sha256: 86f42908fcde9b6fe4ceaaac629f9300ccb4f6a39a6d5753e6bbe10813566db0
+      expected_ledger_amendment_sha256: eac8b61409502d73d460b2ac858fcde2fa05a65e4667f932c7b4346837dd1469
       source_manifest_member: source_manifest_v2.json
-      source_manifest_file_sha256: 3b4452c9a2c180e0afd09e3102f67b5d1834ae527f0af8bc26367d1a63c109fd
-      source_snapshot_manifest_sha256: 37bd9b1818de5009db54b007e5ea3b6fdf8e2f632585f7e47fd4ead7f1628bfb
-      source_snapshot_tree_sha256: b4a10ea0dbaf706f15e284cd81e92d4b6719a4457440c7a305ca7961e44515da
+      source_manifest_file_sha256: 141d05ca31198b72f93590b75b70ad23d38a14f1542efb17e4e05f5546ee9b80
+      source_snapshot_manifest_sha256: 4d315da6f7c018bfca2fbd177affe8618aaff3aced94993cf60cc5a7818d0fe5
+      source_snapshot_tree_sha256: 24251fa67dc1cc0b006f4bcd6b535cb7f56e0eb84c3016445dfeb5017ffb5b0b
       source_snapshot_member_count: '80'
       source_snapshot_checked_before_any_gpu_or_label_access: 'true'
       execution_authorization_basis: explicit_user_authorization_2026_08_26_for_single_scale_bp_v2_consumed_test_terminal_diagnostic
