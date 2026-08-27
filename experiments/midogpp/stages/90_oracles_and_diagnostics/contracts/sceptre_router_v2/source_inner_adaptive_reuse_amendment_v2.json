@@ -1,0 +1,77 @@
+{
+  "amendment_id": "midogpp_stage90_sceptre_source_inner_adaptive_reuse_amendment_v2",
+  "authorization_basis": "explicit_user_scope_limited_consumed_test_diagnostic_direction_2026_08_27",
+  "authorization_date": "2026-08-27",
+  "authorized_consumer_experiment_id": "midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_sceptre_router.v2",
+  "authorized_input_alias_id": "midogpp_stage90_sceptre_source_inner_candidate_utility_reuse_v2",
+  "authorized_use": "adaptive_architecture_development_and_descriptive_nested_lodo_replay_only",
+  "claim_boundary": {
+    "adaptive_comparisons_descriptive_only": true,
+    "confidence_or_significance_claim_allowed": false,
+    "deployment_claim_allowed": false,
+    "downstream_utility_claim_allowed": false,
+    "fresh_evidence": false,
+    "generalization_to_new_center_claim_allowed": false,
+    "may_feed_another_experiment": false,
+    "promotion_allowed": false,
+    "publication_status": "POST_HOC_CONSUMED_TEST_SENSITIVITY",
+    "routing_success_claim_allowed": false,
+    "terminal_decision": "TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE",
+    "thesis_confirmatory_claim_allowed": false
+  },
+  "development_protocol": {
+    "candidate_unit": "source_center_family",
+    "complete_nested_lodo_required": true,
+    "feature_normalization_fit_after_exclusion_only": true,
+    "hyperparameter_tuning_after_exclusion_only": true,
+    "nested_validation_center_candidate_rows_excluded": true,
+    "nested_validation_center_query_rows_excluded_from_fit": true,
+    "outer_target_candidate_rows_excluded": true,
+    "outer_target_query_rows_excluded": true,
+    "replication_interpretation": "training_generation_seed_cells_are_nuisance_replications_not_independent_observations",
+    "seed_selection_allowed": false,
+    "source_inner_self_pairs_forbidden": true,
+    "strict_order": "delete_q_or_e_equal_H_before_any_transform_normalization_fit_or_tuning"
+  },
+  "execution_authority": {
+    "consumed_test_reuse_authorized": false,
+    "execution_authorized": false,
+    "implementation_authorizes_execution": false,
+    "output_or_scratch_creation_allowed": false,
+    "separate_consumer_specific_execution_amendment_required": true,
+    "target_support_or_evaluation_labels_may_open": false,
+    "test_cache_or_manifest_resolution_authorized": false
+  },
+  "original_contract_treatment": {
+    "original_policy_consumption_lock_mutated": false,
+    "original_policy_consumption_lock_reinterpreted": false,
+    "original_stage60_artifact_mutated": false,
+    "scope": "separate_stage90_consumer_specific_governance_exception",
+    "source_inner_policy_lock_hash": "6c18c72a017403a7"
+  },
+  "schema_version": "midogpp_sceptre_source_inner_adaptive_reuse_amendment_v2",
+  "source_binding": {
+    "case_confusions_csv_sha256": "78f638c361282b322a145af492d53e1690002ab8a49de3f67883a4f579e7a81f",
+    "case_confusions_row_count": 3168,
+    "candidate_predictions_npz_sha256": "76d887b3181af8f31a825c2b877189e89c4fe74b029cb82bbbfed23a0437b0bc",
+    "classifier_fit_row_count": 81,
+    "classifier_fits_csv_sha256": "55564f32ed34977b05b2f6448148f0653a6e4bdb34bf8fcd93272f2ca1729bed",
+    "candidate_utility_csv_sha256": "91d750e04a0eb8a7b44a9abe629fbcc1565a1206b20f530b8a9171c39bba5de3",
+    "candidate_utility_row_count": 648,
+    "evaluation_row_count": 2615,
+    "evaluation_rows_csv_sha256": "400face5697a00a96593cbbc1031cbab03810895b07f174505d45396dedf61e7",
+    "original_artifact_id": "midogpp_output_uniform_b_v2_source_inner_candidate_utility_v1",
+    "prediction_index_json_sha256": "bfa96c50b0fae4ffd58f3354d95f00c9eb95e550ed0a96d3c28e620f6a05f62f",
+    "utility_lock_sha256": "cd50ea2420b332babc0788f2457e8e948410b8e88308d414d0c95db569ec6bac"
+  },
+  "test_evaluation_protocol": {
+        "prelabel_router_model_thresholds_and_G_frozen_before_test_label_access": true,
+        "per_fold_route_policy_formed_from_disjoint_selection_and_calibration_labels": true,
+        "route_policy_frozen_before_evaluation_label_access": true,
+        "support_metrics_are_downstream_classifier_utility_not_nelbo": true,
+    "disjoint_target_support_and_evaluation_cases_required": true,
+    "future_execution_result_remains_posthoc_consumed_test_sensitivity": true,
+    "this_amendment_authorizes_test_evaluation": false,
+    "whole_case_disjointness_required": true
+  }
+}

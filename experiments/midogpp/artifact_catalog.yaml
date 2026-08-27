@@ -15052,3 +15052,1066 @@ artifacts:
       - Authorized and registered but not launched. The first admitted execution attempt exhausts this identity; partial output or scratch is never recoverable.
       - The exhaustion transition is an atomic durable lease outside both run roots. Existing, partial, or malformed lease state rejects permanently, including after deletion or loss of output and scratch.
       - The complete consumed MIDOG++ test set is reused only for a terminal post-hoc sensitivity. No fresh routing, downstream utility, NELBO compatibility, confidence, significance, promotion, deployment, or transferable thesis evidence is permitted.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router/v1
+    availability: planned_execution_not_authorized
+    migration: canonical_output
+    evidence_label: NEEDS_EVIDENCE_EXECUTION_NOT_AUTHORIZED
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      claim_role: planned_opportunity_equivalence_pairwise_primitive_utility_routing_diagnostic
+      bounded_interpretation: planned_pairwise_action_ordering_diagnostic_on_consumed_MIDOGpp_test_only
+      architecture_family: fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router
+      config_contract_hash: 91565b330bf656fdfd79e266801ddb9c2039929d43a0d85b28e3796eacaa7870
+      protocol_contract_hash: e6ba865b909fae62f94a42caab2bb3c56cf17ede2e8d0c959fba465373a37f9f
+      adapter_source_member_count: '23'
+      adapter_source_tree_sha256: 9203373e3fee8c07ebc4c0b3c678691f1c0bd51acdbf0e37fbf5f8a018aa2f62
+      neutral_core_source_member_count: '26'
+      neutral_core_source_tree_sha256: 0f6e1f07861e61761c9bdbf7895ca8b14f311532aa023417a4a364ab3e793fe0
+      combined_source_member_count: '49'
+      combined_source_seal_sha256: eaaa8978ccf25f9862e6552380056f5d1a6fe6319bf4a567f72ee890b504c35f
+      combined_source_receipt_sha256: af41802ff0d08e56273dd82737f4c171eb696f9fd6d931520e105f9a100a2a1f
+      workspace_status: planned
+      execution_authorized: 'false'
+      implementation_authorizes_execution: 'false'
+      consumed_test_reuse_authorized: 'false'
+      separate_future_execution_identity_required: 'true'
+      direct_runner_rejects_before_mutation: 'true'
+      workspace_runner_rejects_before_mutation: 'true'
+      output_root_creation_allowed: 'false'
+      scratch_root_creation_allowed: 'false'
+      lock_creation_allowed: 'false'
+      target_terminal_labels_may_open: 'false'
+      registered_direct_input_count: '3'
+      registered_direct_inputs: EXPERT_BANK|GENERATION_LOCK|ANNOTATION_PATCH_MANIFEST
+      consumed_test_cache_resolution_present: 'false'
+      parent_consumption_ledger_resolution_present: 'false'
+      ledger_amendment_present: 'false'
+      consumed_test_cache_resolution_status: PENDING_SEPARATE_FUTURE_AUTHORIZATION
+      parent_consumption_ledger_resolution_status: PENDING_SEPARATE_FUTURE_AUTHORIZATION
+      authorization_amendment_status: ABSENT_NOT_AUTHORIZED
+      previous_stage90_outputs_used: 'false'
+      previous_stage90_reports_or_run_states_used: 'false'
+      previous_stage90_scratch_or_checkpoints_used: 'false'
+      previous_stage90_leases_or_amendments_used: 'false'
+      structural_noops_excluded_from_fit_and_rank: 'true'
+      identical_projected_surfaces_collapsed: 'true'
+      primitive_utility_responses: DELTA_TP|DELTA_TN|DELTA_BRIER_SUM|DELTA_LOG_SUM
+      primitive_computation_precedes_metric_normalization: 'true'
+      normalized_utility_policy: ACTION_INVARIANT_EXPECTED_CLASS_TOTALS_PER_CASE_SCOPE
+      pairwise_fit_response_type: NORMALIZED_UTILITY_EXPECTED_BACC_GAIN_ONLY
+      brier_and_log_roles: SELECTION_SAFETY_AND_TERMINAL_DIAGNOSTIC_ONLY
+      typed_row_posterior_prediction_required: 'true'
+      utility_action_and_probability_surface_lineage_exact_matched: 'true'
+      complete_opportunity_action_inventory_required: 'true'
+      annotation_manifest_member: manifest.csv
+      annotation_manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      canonical_terminal_row_count: '9928'
+      canonical_terminal_case_count: '218'
+      canonical_terminal_case_inventory_sha256: d22568075a287af71d0f4477ba5e6265e43278cba4865f7775741cdbcdf2bcc6
+      selection_ledger_uses_typed_case_specific_opportunity_receipts: 'true'
+      admission_recomputes_frozen_selection_from_typed_evidence: 'true'
+      source_only_row_posterior: 'true'
+      pairwise_action_contrasts: 'true'
+      action_specific_family_direction_interactions: 'true'
+      complete_C_minus_H_rotating_K_selection: 'true'
+      rotating_L_center_case_OOF_one_sided_residual_calibration: 'true'
+      residual_calibration_alpha: '0.20'
+      global_pooled_uncertainty_fallback_allowed: 'false'
+      prelabel_selection_decision_ledger_case_count: '218'
+      prelabel_selection_decision_ledger_manifest_bound: 'true'
+      preterminal_input_lineage_is_typed_and_factory_guarded: 'true'
+      raw_preterminal_hash_constructor_allowed: 'false'
+      gpu_to_cpu_candidate_surface_bytes_exact_matched: 'true'
+      parsed_probability_matrix_science_receipt_implemented: 'false'
+      exact_outer_selection_lineage_per_H: 'true'
+      canonical_per_H_preterminal_phase_binding: 'true'
+      finite_sample_coverage_claimed: 'false'
+      exact_P_fallback_required: 'true'
+      admission_requires_nonzero_safe_coverage: 'true'
+      admission_requires_zero_harmful_selected: 'true'
+      full_candidate_diagnostics_required_if_authorized: 'true'
+      raw_labels_may_be_persisted: 'false'
+      fresh_evidence: 'false'
+      routing_success_claimed: 'false'
+      downstream_utility_claimed: 'false'
+      nelbo_compatibility_claimed: 'false'
+      confidence_bound_claimed: 'false'
+      promotion_eligible: 'false'
+      deployment_claimed: 'false'
+      may_feed_stage50: 'false'
+      may_feed_stage60: 'false'
+      may_feed_stage70: 'false'
+      may_feed_another_stage90: 'false'
+      may_feed_another_experiment: 'false'
+      workstation_generation_devices: cuda:0|cuda:1
+      workstation_generation_topology: 2_PERSISTENT_GPU_WORKERS_ONE_PER_RTX_A5000
+      workstation_outer_topology: 4_SPAWN_OUTER_WORKERS_X1_BLAS_NO_NESTED_POOLS
+      workstation_probability_store: FLOAT32_READ_ONLY_MEMMAP_MATERIALIZED_ONCE
+      workstation_scientific_reductions: FLOAT64
+      workstation_threadpool_limiter_scope: WORKER_PROCESS_LIFETIME
+      workstation_threadpool_info_evidence_required: 'true'
+      process_boundary_payloads: PICKLE_SAFE_PRIMITIVE_DTOS_ONLY
+      cross_run_recovery_allowed: 'false'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - reports/run_state.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - synthetic_downstream_utility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Planned output identity only. Direct and workspace dispatch must refuse before creating this root, scratch, locks, run state, or label-capability state.
+      - Test-cache and parent-ledger resolution remain deliberately absent until a separate future consumed-test authorization is explicitly registered; no amendment or authorization is implied here.
+      - This output has no permitted downstream consumer and cannot be promoted into Stage 50, 60, 70, another Stage-90 experiment, recipe selection, or deployment selection.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_parent_v2
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: NEEDS_EVIDENCE_OE_PPUR_V2_RESOLUTION_ONLY_PARENT
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      split: test
+      row_count: '9928'
+      held_unit_count: '218'
+      registered_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router.v2
+      consumer_resolution_fence_only: 'true'
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      authorization_amendment_present: 'false'
+      previous_stage90_state_exposed: 'false'
+      fresh_evidence: 'false'
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    forbidden_reuse: *scale_bp_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Fresh v2 experiment-fenced alias of the immutable original parent ledger. Registration permits resolution checks only and does not authorize consumed-test reuse.
+
+  - artifact_id: midogpp_stage90_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_test_manifest_v2
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: NEEDS_EVIDENCE_OE_PPUR_V2_RESOLUTION_ONLY_MANIFEST
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      split: test
+      row_count: '9928'
+      held_unit_count: '218'
+      registered_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router.v2
+      consumer_resolution_fence_only: 'true'
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      labels_available_before_preterminal_attestation: 'false'
+      target_terminal_labels_may_open: 'false'
+      raw_labels_may_be_persisted: 'false'
+      fresh_evidence: 'false'
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse: *scale_bp_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Resolution-only alias. A separate v2 amendment must exist and bind the frozen source, config, and protocol before this manifest can become an ephemeral aggregate-only terminal capability.
+
+  - artifact_id: midogpp_stage90_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_test_cache_v2
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: NEEDS_EVIDENCE_OE_PPUR_V2_RESOLUTION_ONLY_LABEL_FREE_CACHE
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      split: test
+      row_count: '9928'
+      feature_dim: '3840'
+      registered_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router.v2
+      consumer_resolution_fence_only: 'true'
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      labels_absent: 'true'
+      previous_stage90_output_used: 'false'
+      previous_probability_surface_used: 'false'
+      previous_scratch_or_checkpoint_used: 'false'
+      fresh_evidence: 'false'
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse: *scale_bp_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Fresh byte-exact label-free alias over the original immutable cache. It exposes no predecessor router output, probability surface, checkpoint, scratch, lease, or run state.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_amendment_v2
+    stage: dataset_contract
+    physical_path: experiments/midogpp/contracts/oe_ppur_v2
+    availability: planned
+    migration: pointer_only
+    evidence_label: NEEDS_EVIDENCE_AUTHORIZATION_AMENDMENT_NOT_ISSUED
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      registered_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router.v2
+      consumer_resolution_fence_only: 'true'
+      amendment_status: ABSENT_NOT_ISSUED
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      single_use_execution_identity: 'false'
+      implementation_authorizes_execution: 'false'
+      authorization_exhausted: 'false'
+      fresh_evidence: 'false'
+      may_feed_another_experiment: 'false'
+    forbidden_reuse: *scale_bp_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Placeholder identity only. No amendment file was created or issued by this implementation, and this entry grants no test-cache, label, output, scratch, or lease capability.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v2
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router/v2
+    availability: planned_execution_not_authorized
+    migration: canonical_output
+    evidence_label: NEEDS_EVIDENCE_EXECUTION_NOT_AUTHORIZED
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      claim_role: planned_executable_successor_mechanics
+      architecture_family: fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router
+      config_contract_hash: e27f19e24a15aace334193399bc37e9207f9f2f8eb67c1bd77f51336336a015c
+      protocol_contract_hash: d6cd84f2734b62f7d3381456111ca9af35cb0ef62d72c7e8b59941024b16bc4b
+      adapter_source_member_count: '25'
+      adapter_source_tree_sha256: 14abf5773c2dfa5995d84ec93fa27d238d3128ce34a49977d932c1f92672e6c0
+      neutral_core_source_member_count: '26'
+      neutral_core_source_tree_sha256: 382200fd76ca4d26ab1462cecee636d9c1526b48909e1631421a99dfb37e9b65
+      shared_protocol_source_sha256: 6b64a9c71c84e7c2a66faac93dde4f159ddf029a8a79f0d9c48b386b68dc7845
+      combined_source_member_count: '52'
+      combined_source_seal_sha256: 7f7a19833c7baa4ba4f78fbdb1c447e926f423565c93f4e102158eac8ec9090c
+      combined_source_receipt_sha256: d115d62a2461092efe447f6cc93964683186c64e991a9102110304f4dccf9d2e
+      workspace_status: planned
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      single_use_execution_identity: 'false'
+      implementation_authorizes_execution: 'false'
+      amendment_status: ABSENT_NOT_ISSUED
+      exact_direct_input_count: '6'
+      exact_direct_input_order_guarded: 'true'
+      predecessor_stage90_state_allowed: 'false'
+      source_config_protocol_binding_required: 'true'
+      durable_external_single_use_lease_implemented: 'true'
+      failure_after_lease: FAILED_EXHAUSTED
+      output_or_scratch_deletion_restores_authorization: 'false'
+      probability_matrix_shape: 9928x7
+      probability_matrix_columns: P_PROTECTED|B::zero_to_one|B::one_to_zero|I::zero_to_one|I::one_to_zero|R::zero_to_one|R::one_to_zero
+      probability_matrix_dtype: <f4
+      parsed_probability_matrix_science_receipt_implemented: 'true'
+      probability_matrix_actual_bytes_parsed: 'true'
+      probability_matrix_finite_and_unit_bounded_required: 'true'
+      probability_matrix_per_column_hashes_required: 'true'
+      probability_shards_within_admitted_scratch_root_required: 'true'
+      worker_declared_row_count_is_scientific_evidence: 'false'
+      canonical_admitted_row_binding_implemented: 'true'
+      bank_complete_content_index_required: 'true'
+      generation_complete_content_index_required: 'true'
+      bank_content_index_file_sha256_pinned: 'true'
+      generation_content_index_file_sha256_pinned: 'true'
+      bank_content_index_file_sha256: 7fae389151618950102905f85c5fce300ef9821f15cf304d8469b5a147110279
+      generation_content_index_file_sha256: 6b74fe794bd30cf6c1e42190427e506d1ff50ecd9280b9dcfee2a7592ec6a318
+      admitted_input_location_binding_exact_matched_by_service_factory: 'true'
+      shared_protocol_source_member_sealed: 'true'
+      production_workstation_observations_caller_injectable: 'false'
+      preterminal_decision_count: '218'
+      typed_preterminal_decision_ledger_implemented: 'true'
+      two_fresh_preterminal_validators_required: 'true'
+      artifact_only_fresh_process_attestation_implemented: 'true'
+      terminal_labels_ephemeral_aggregate_only: 'true'
+      one_shot_terminal_aggregate_capability_implemented: 'true'
+      terminal_evaluated_case_count_required: '218'
+      terminal_receipt_exact_ledger_binding_required: 'true'
+      raw_labels_may_be_persisted: 'false'
+      exact_P_fallback_required: 'true'
+      structural_service_injection_allowed: 'false'
+      preterminal_service_manifest_path_exposed: 'false'
+      preterminal_service_resolved_config_path_exposed: 'false'
+      canonical_scientific_service_implemented: 'false'
+      canonical_terminal_evaluator_implemented: 'false'
+      authorized_execution_available: 'false'
+      workstation_generation_topology: 2_PERSISTENT_GPU_WORKERS_ONE_PER_RTX_A5000
+      workstation_outer_topology: 4_CUDA_HIDDEN_SPAWN_WORKERS_X1_BLAS_NO_NESTED_POOLS
+      workstation_probability_store: ROW_SHARDED_RAW_LITTLE_ENDIAN_FLOAT32_READ_ONLY_AFTER_PARSE
+      routing_success_claimed: 'false'
+      downstream_utility_claimed: 'false'
+      cvae_compatibility_claimed: 'false'
+      nelbo_compatibility_claimed: 'false'
+      fresh_evidence: 'false'
+      promotion_allowed: 'false'
+      deployment_claimed: 'false'
+      may_feed_stage50: 'false'
+      may_feed_stage60: 'false'
+      may_feed_stage70: 'false'
+      may_feed_another_stage90: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - provenance/authorization_consumption_lease.json
+      - provenance/execution_admission.json
+      - reports/launch_receipts.json
+      - reports/parsed_probability_matrix.json
+      - reports/outer_fold_execution.json
+      - manifests/preterminal_decision_ledger_receipt.json
+      - reports/preterminal_fresh_process_attestation.json
+      - reports/terminal_metrics.json
+      - reports/final_fresh_process_attestation.json
+      - reports/run_state.json
+    forbidden_reuse: *scale_bp_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Separate v2 executable mechanics are implemented and source-sealed, but the canonical scientific execution service and terminal evaluator are deliberately fail-closed and no v2-only consumed-test amendment was issued. The registered state therefore remains planned and non-runnable; no output, scratch, lease, worker, or label capability was created.
+      - Six-input read-only admission precedes host and callback preflight, then an external atomic lease irreversibly consumes authority. Every post-lease failure is FAILED_EXHAUSTED with no recovery or rerun.
+      - GPU shard bytes are parsed rather than trusted: exact 9,928x7 little-endian float32 extent, ordered P-plus-six columns, canonical rows, stable no-follow file identity, finite unit-bounded values, per-column hashes, and GPU worker/batch/surface lineage are required before CPU routing.
+      - The typed 218-case decision ledger binds every selected action to the admitted inputs, parsed matrix column, row inventory, source-only outer-fold result, candidate pool, pairwise model, uncertainty calibration, opportunity receipt, and ranking policy before a one-shot aggregate-only terminal capability can be issued.
+      - Any eventual execution remains terminal consumed-test sensitivity only and cannot establish fresh routing, downstream utility, CVAE/NELBO compatibility, promotion, deployment, or transferable thesis evidence.
+
+  - artifact_id: midogpp_stage90_sceptre_source_inner_candidate_utility_reuse_v1
+    stage: 60_routing_and_composition
+    physical_path: artifacts/midogpp/60_routing_and_composition/uniform_b_v2_source_inner_candidate_utility/v1
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: SCOPE_LIMITED_ADAPTIVE_DEVELOPMENT_ALIAS
+    claim_scope: routing_and_composition
+    semantic_identities:
+      alias_of_artifact_id: midogpp_output_uniform_b_v2_source_inner_candidate_utility_v1
+      utility_lock_contract: midogpp_uniform_b_v2_source_inner_utility_lock_v1
+      policy_consumption_lock_hash: 6c18c72a017403a7
+      utility_lock_sha256: cd50ea2420b332babc0788f2457e8e948410b8e88308d414d0c95db569ec6bac
+      candidate_utility_csv_sha256: 91d750e04a0eb8a7b44a9abe629fbcc1565a1206b20f530b8a9171c39bba5de3
+      candidate_utility_row_count: '648'
+      case_confusions_csv_sha256: 78f638c361282b322a145af492d53e1690002ab8a49de3f67883a4f579e7a81f
+      case_confusions_row_count: '3168'
+      candidate_predictions_npz_sha256: 76d887b3181af8f31a825c2b877189e89c4fe74b029cb82bbbfed23a0437b0bc
+      prediction_index_json_sha256: bfa96c50b0fae4ffd58f3354d95f00c9eb95e550ed0a96d3c28e620f6a05f62f
+      classifier_fits_csv_sha256: 55564f32ed34977b05b2f6448148f0653a6e4bdb34bf8fcd93272f2ca1729bed
+      classifier_fit_row_count: '81'
+      evaluation_rows_csv_sha256: 400face5697a00a96593cbbc1031cbab03810895b07f174505d45396dedf61e7
+      evaluation_row_count: '2615'
+      probability_array_sha256: 39a74d9148310d1cee361e58fcdfdced49f93af4417068e9df600a5c8b77a911
+      prediction_array_sha256: e786fd957accb4bfe544c128e778f9828e2158e9d2c8055f7df414835270e369
+      prediction_array_shape: 81x2615
+      prediction_packet_contains_labels: 'false'
+      prediction_packet_use: LABEL_FREE_PRELABEL_EVIDENCE_ONLY
+      registered_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_sceptre_router.v1
+      consumer_resolution_fence_only: 'true'
+      authorized_use: ADAPTIVE_ARCHITECTURE_DEVELOPMENT_AND_DESCRIPTIVE_NESTED_LODO_ONLY
+      strict_outer_query_and_candidate_center_exclusion: 'true'
+      seed_cells_are_nuisance_replications: 'true'
+      seed_selection_allowed: 'false'
+      original_policy_consumption_lock_mutated: 'false'
+      original_policy_consumption_lock_reinterpreted: 'false'
+      historical_source_inner_adaptive_reuse_authorized: 'true'
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      fresh_evidence: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - manifests/utility_lock.json
+      - tables/candidate_utility.csv
+      - tables/case_confusions.csv
+      - arrays/candidate_predictions.npz
+      - manifests/prediction_index.json
+      - tables/classifier_fits.csv
+      - tables/evaluation_rows.csv
+    expected_file_hashes:
+      manifests/utility_lock.json:
+        algorithm: sha256
+        digest: cd50ea2420b332babc0788f2457e8e948410b8e88308d414d0c95db569ec6bac
+      tables/candidate_utility.csv:
+        algorithm: sha256
+        digest: 91d750e04a0eb8a7b44a9abe629fbcc1565a1206b20f530b8a9171c39bba5de3
+      tables/case_confusions.csv:
+        algorithm: sha256
+        digest: 78f638c361282b322a145af492d53e1690002ab8a49de3f67883a4f579e7a81f
+      arrays/candidate_predictions.npz:
+        algorithm: sha256
+        digest: 76d887b3181af8f31a825c2b877189e89c4fe74b029cb82bbbfed23a0437b0bc
+      manifests/prediction_index.json:
+        algorithm: sha256
+        digest: bfa96c50b0fae4ffd58f3354d95f00c9eb95e550ed0a96d3c28e620f6a05f62f
+      tables/classifier_fits.csv:
+        algorithm: sha256
+        digest: 55564f32ed34977b05b2f6448148f0653a6e4bdb34bf8fcd93272f2ca1729bed
+      tables/evaluation_rows.csv:
+        algorithm: sha256
+        digest: 400face5697a00a96593cbbc1031cbab03810895b07f174505d45396dedf61e7
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Consumer-fenced alias over seven immutable members: the utility lock and tables plus the exact four-file label-free pre-label prediction packet. The original Stage-60 artifact and its policy-consumption lock are unchanged.
+      - Reuse is adaptive and descriptive. Every outer H must delete q=H and e=H before all transformations, normalization, fitting, tuning, or nested validation.
+      - This alias grants no test cache, test label, ledger, execution, output, scratch, promotion, deployment, or downstream-consumer authority.
+
+  - artifact_id: midogpp_stage90_sceptre_source_inner_adaptive_reuse_amendment_v1
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts/sceptre_router_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: SCOPE_LIMITED_SOURCE_INNER_REUSE_AMENDMENT
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      amendment_schema: midogpp_sceptre_source_inner_adaptive_reuse_amendment_v1
+      amendment_sha256: 344606a069eb2dae4e5b8e85298bdfc306d8cb974e4c96c199e2fd9b454f6caf
+      original_artifact_id: midogpp_output_uniform_b_v2_source_inner_candidate_utility_v1
+      policy_consumption_lock_hash: 6c18c72a017403a7
+      registered_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_sceptre_router.v1
+      consumer_resolution_fence_only: 'true'
+      authorization_basis: explicit_user_scope_limited_direction_2026_08_27
+      authorization_scope: ADAPTIVE_DESCRIPTIVE_DEVELOPMENT_ONLY
+      original_stage60_artifact_mutated: 'false'
+      original_policy_consumption_lock_mutated: 'false'
+      original_policy_consumption_lock_reinterpreted: 'false'
+      test_evaluation_authorized: 'false'
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      output_or_scratch_creation_allowed: 'false'
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      fresh_evidence: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - source_inner_adaptive_reuse_amendment_v1.json
+    expected_file_hashes:
+      source_inner_adaptive_reuse_amendment_v1.json:
+        algorithm: sha256
+        digest: 344606a069eb2dae4e5b8e85298bdfc306d8cb974e4c96c199e2fd9b454f6caf
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - synthetic_downstream_utility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Separate consumer-specific governance amendment; it does not edit or reinterpret the immutable Stage-60 artifact or its predeclared policy lock.
+      - It authorizes historical architecture development only and explicitly withholds test execution, label access, output creation, confirmatory inference, promotion, deployment, and downstream reuse.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_sceptre_router_v1
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_sceptre_router/v1
+    availability: planned_execution_not_authorized
+    migration: canonical_output
+    evidence_label: NEEDS_EVIDENCE_EXECUTION_NOT_AUTHORIZED
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      claim_role: planned_sceptre_adaptive_source_family_routing_diagnostic
+      bounded_interpretation: CAN_RECOVER_STRUCTURE_ALREADY_PRESENT_IN_OBSERVED_UTILITY_SURFACE_ONLY
+      architecture_family: SCEPTRE_SELECTIVE_SOURCE_FAMILY_ROUTER
+      config_contract_hash: c44a369bd508015646bd67b55a1125306ba9d102031a2a60c56596ffd2c3ce78
+      protocol_contract_hash: 4da143e05128c10a7b4efc9c79f9513f762f51be329ffb8be6cbc75afa0c5210
+      scientific_source_tree_sha256: 3d42350c5546fd35deecc8ca257aaa079b67c0aa50700a041b52af2bfd17a2a7
+      scientific_source_receipt_hash: dff5a028b033729707e8c38b61dd71647bf9513a87c7008414c386516b56dacb
+      scientific_source_member_count: '38'
+      workspace_status: planned
+      execution_authorized: 'false'
+      implementation_authorizes_execution: 'false'
+      consumed_test_reuse_authorized: 'false'
+      source_inner_adaptive_development_reuse_registered: 'true'
+      source_inner_reuse_amendment_sha256: 344606a069eb2dae4e5b8e85298bdfc306d8cb974e4c96c199e2fd9b454f6caf
+      source_inner_original_contract_mutated_or_reinterpreted: 'false'
+      strict_outer_q_and_e_exclusion_before_all_transforms: 'true'
+      complete_nested_lodo: 'true'
+      seed_cells_are_nuisance_replications: 'true'
+      label_free_core_imports_source_inner_utility: 'false'
+      source_inner_prelabel_prediction_packet_registered: 'true'
+      source_inner_prelabel_prediction_packet_contains_labels: 'false'
+      complete_nine_target_router_bundle_freeze_implemented: 'true'
+      target_global_g_proposal_bound_across_five_fold_attachments: 'true'
+      g_support_uncertainty_calibration_one_way_to_same_expert_or_B: 'true'
+      manager_owned_calibration_uncertainty_registration: 'true'
+      exact_45_fold_route_policy_serialization_and_replay: 'true'
+      terminal_capability_binds_route_policy_hash: 'true'
+      paired_whole_case_dirichlet_fixed_0_8_gate: 'true'
+      direct_runner_rejects_before_mutation: 'true'
+      workspace_runner_rejects_before_mutation: 'true'
+      output_root_creation_allowed: 'false'
+      scratch_root_creation_allowed: 'false'
+      target_support_or_evaluation_labels_may_open: 'false'
+      phase_capabilities_are_lineage_only: 'true'
+      one_shot_test_label_reader_implemented: 'false'
+      genuine_subprocess_attestation_implemented: 'false'
+      test_cache_resolution_present: 'false'
+      test_manifest_resolution_present: 'false'
+      parent_consumption_ledger_resolution_present: 'false'
+      test_execution_authorization_present: 'false'
+      candidate_unit: SOURCE_CENTER_FAMILY
+      candidate_inventory: EXACT_C_MINUS_H
+      seed_cell_geometry: 3_TRAINING_X_3_GENERATION
+      proxy_semantics: PROXY_ENERGY_RANK_NOT_EXACT_NELBO
+      exact_B_fallback_required: 'true'
+      exact_ties_fall_back_to_B: 'true'
+      whole_case_selection_calibration_evaluation_disjoint: 'true'
+      global_phase_barriers_required: 'true'
+      raw_labels_may_be_persisted: 'false'
+      adaptive_comparisons_descriptive_only: 'true'
+      new_center_generalization_claimed: 'false'
+      fresh_evidence: 'false'
+      routing_success_claimed: 'false'
+      downstream_utility_claimed: 'false'
+      nelbo_compatibility_claimed: 'false'
+      confidence_bound_claimed: 'false'
+      significance_claimed: 'false'
+      thesis_confirmatory_improvement_claimed: 'false'
+      promotion_eligible: 'false'
+      deployment_claimed: 'false'
+      may_feed_stage50: 'false'
+      may_feed_stage60: 'false'
+      may_feed_stage70: 'false'
+      may_feed_another_stage90: 'false'
+      may_feed_another_experiment: 'false'
+      workstation_generation_devices: cuda:0|cuda:1
+      workstation_generation_topology: 2_PERSISTENT_GPU_WORKERS_ONE_PER_RTX_A5000
+      workstation_outer_topology: 4_SPAWN_OUTER_H_WORKERS_X1_BLAS_NO_NESTED_POOLS
+      workstation_prediction_store: FLOAT32_READ_ONLY_MEMMAP_ONCE
+      workstation_scientific_reductions: FLOAT64
+      cross_run_recovery_allowed: 'false'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - reports/run_state.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - synthetic_downstream_utility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Planned architecture identity only. Direct and workspace dispatch reject before output/scratch resolution or mutation.
+      - The label-free core, adaptive development adapter, whole-case phase lifecycle, and workstation topology are implemented and source-sealed. Test cache, labels, ledger, and execution authority remain absent.
+      - Any future separately authorized execution remains permanently adaptive, post-hoc, terminal-only, and ineligible for fresh/new-center, confirmatory, promotion, deployment, or transferable claims.
+
+  - artifact_id: midogpp_stage90_sceptre_source_inner_candidate_utility_reuse_v2
+    stage: 60_routing_and_composition
+    physical_path: artifacts/midogpp/60_routing_and_composition/uniform_b_v2_source_inner_candidate_utility/v1
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: SCOPE_LIMITED_ADAPTIVE_DEVELOPMENT_ALIAS
+    claim_scope: routing_and_composition
+    semantic_identities:
+      alias_of_artifact_id: midogpp_output_uniform_b_v2_source_inner_candidate_utility_v1
+      utility_lock_contract: midogpp_uniform_b_v2_source_inner_utility_lock_v1
+      policy_consumption_lock_hash: 6c18c72a017403a7
+      utility_lock_sha256: cd50ea2420b332babc0788f2457e8e948410b8e88308d414d0c95db569ec6bac
+      candidate_utility_csv_sha256: 91d750e04a0eb8a7b44a9abe629fbcc1565a1206b20f530b8a9171c39bba5de3
+      candidate_utility_row_count: '648'
+      case_confusions_csv_sha256: 78f638c361282b322a145af492d53e1690002ab8a49de3f67883a4f579e7a81f
+      case_confusions_row_count: '3168'
+      candidate_predictions_npz_sha256: 76d887b3181af8f31a825c2b877189e89c4fe74b029cb82bbbfed23a0437b0bc
+      prediction_index_json_sha256: bfa96c50b0fae4ffd58f3354d95f00c9eb95e550ed0a96d3c28e620f6a05f62f
+      classifier_fits_csv_sha256: 55564f32ed34977b05b2f6448148f0653a6e4bdb34bf8fcd93272f2ca1729bed
+      classifier_fit_row_count: '81'
+      evaluation_rows_csv_sha256: 400face5697a00a96593cbbc1031cbab03810895b07f174505d45396dedf61e7
+      evaluation_row_count: '2615'
+      probability_array_sha256: 39a74d9148310d1cee361e58fcdfdced49f93af4417068e9df600a5c8b77a911
+      prediction_array_sha256: e786fd957accb4bfe544c128e778f9828e2158e9d2c8055f7df414835270e369
+      prediction_array_shape: 81x2615
+      prediction_packet_contains_labels: 'false'
+      prediction_packet_use: LABEL_FREE_PRELABEL_EVIDENCE_ONLY
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_sceptre_router.v2
+      authorized_use: ADAPTIVE_ARCHITECTURE_DEVELOPMENT_AND_DESCRIPTIVE_NESTED_LODO_ONLY
+      strict_outer_query_and_candidate_center_exclusion: 'true'
+      seed_cells_are_nuisance_replications: 'true'
+      seed_selection_allowed: 'false'
+      original_policy_consumption_lock_mutated: 'false'
+      original_policy_consumption_lock_reinterpreted: 'false'
+      execution_authorized_by_this_artifact: 'false'
+      test_label_access_authorized_by_this_artifact: 'false'
+      fresh_evidence: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - manifests/utility_lock.json
+      - tables/candidate_utility.csv
+      - tables/case_confusions.csv
+      - arrays/candidate_predictions.npz
+      - manifests/prediction_index.json
+      - tables/classifier_fits.csv
+      - tables/evaluation_rows.csv
+    expected_file_hashes:
+      manifests/utility_lock.json:
+        algorithm: sha256
+        digest: cd50ea2420b332babc0788f2457e8e948410b8e88308d414d0c95db569ec6bac
+      tables/candidate_utility.csv:
+        algorithm: sha256
+        digest: 91d750e04a0eb8a7b44a9abe629fbcc1565a1206b20f530b8a9171c39bba5de3
+      tables/case_confusions.csv:
+        algorithm: sha256
+        digest: 78f638c361282b322a145af492d53e1690002ab8a49de3f67883a4f579e7a81f
+      arrays/candidate_predictions.npz:
+        algorithm: sha256
+        digest: 76d887b3181af8f31a825c2b877189e89c4fe74b029cb82bbbfed23a0437b0bc
+      manifests/prediction_index.json:
+        algorithm: sha256
+        digest: bfa96c50b0fae4ffd58f3354d95f00c9eb95e550ed0a96d3c28e620f6a05f62f
+      tables/classifier_fits.csv:
+        algorithm: sha256
+        digest: 55564f32ed34977b05b2f6448148f0653a6e4bdb34bf8fcd93272f2ca1729bed
+      tables/evaluation_rows.csv:
+        algorithm: sha256
+        digest: 400face5697a00a96593cbbc1031cbab03810895b07f174505d45396dedf61e7
+    forbidden_reuse: &sceptre_v2_forbidden_reuse
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Consumer-fenced alias over exactly seven immutable source-inner members. The original Stage-60 artifact and its policy-consumption lock remain byte-identical and uninterpreted.
+      - Reuse is adaptive and descriptive. Every outer H deletes q=H and e=H before transformations, normalization, fitting, tuning, or nested validation.
+      - This alias grants no test cache, labels, ledger, execution, output, scratch, promotion, deployment, or downstream authority by itself.
+
+  - artifact_id: midogpp_stage90_sceptre_source_inner_adaptive_reuse_amendment_v2
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts/sceptre_router_v2
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: SCOPE_LIMITED_SOURCE_INNER_REUSE_AMENDMENT
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      amendment_schema: midogpp_sceptre_source_inner_adaptive_reuse_amendment_v2
+      amendment_sha256: c00124f8c1016e99dac6b576055322c37917775eadb4f288ec1e8b68c5307443
+      original_artifact_id: midogpp_output_uniform_b_v2_source_inner_candidate_utility_v1
+      policy_consumption_lock_hash: 6c18c72a017403a7
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_sceptre_router.v2
+      authorization_basis: explicit_user_scope_limited_direction_2026_08_27
+      authorization_scope: ADAPTIVE_DESCRIPTIVE_DEVELOPMENT_ONLY
+      original_stage60_artifact_mutated: 'false'
+      original_policy_consumption_lock_mutated: 'false'
+      original_policy_consumption_lock_reinterpreted: 'false'
+      test_evaluation_authorized: 'false'
+      execution_authorized_by_this_artifact: 'false'
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      fresh_evidence: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - source_inner_adaptive_reuse_amendment_v2.json
+    expected_file_hashes:
+      source_inner_adaptive_reuse_amendment_v2.json:
+        algorithm: sha256
+        digest: c00124f8c1016e99dac6b576055322c37917775eadb4f288ec1e8b68c5307443
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - synthetic_downstream_utility_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Consumer-specific source-inner development amendment only. It neither edits nor reinterprets the immutable Stage-60 policy lock.
+      - Test-label access and execution require the separate exact execution-amendment input and all remaining admission gates.
+
+  - artifact_id: midogpp_stage90_sceptre_test_cache_v2
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/uniform_b_v2_descriptive_test_cache_v1/seed42
+    availability: workstation_only
+    migration: canonical_derived_feature_cache
+    evidence_label: CONSUMED_TEST_SCEPTRE_V2_LABEL_FREE_CACHE_ONLY
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      cache_name: uniform_b_v2_descriptive_test_cache_v1
+      representation_id: annotation_jpeg_fixed_center_b_v3
+      split: test
+      row_count: '9928'
+      held_case_count: '218'
+      feature_dim: '3840'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      content_hash: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+      row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+      experiment_fenced: 'true'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_sceptre_router.v2
+      consumed_test_reuse_authorized: 'true'
+      labels_absent: 'true'
+      previous_stage90_output_used: 'false'
+      previous_probability_surface_used: 'false'
+      previous_scratch_or_checkpoint_used: 'false'
+      fresh_evidence: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - embeddings/by_center/center_0.pt
+      - embeddings/by_center/center_1.pt
+      - embeddings/by_center/center_2.pt
+      - embeddings/by_center/center_3.pt
+      - embeddings/by_center/center_5.pt
+      - embeddings/by_center/center_6.pt
+      - embeddings/by_center/center_7.pt
+      - embeddings/by_center/center_8.pt
+      - embeddings/by_center/center_9.pt
+      - manifests/content_index.json
+      - manifests/frozen_build_protocol.json
+      - manifests/row_alignment.json
+      - reports/cache_builder_report.json
+      - reports/validation_report.json
+    forbidden_reuse: *sceptre_v2_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Consumer-specific v2 byte-exact label-free alias of the immutable Stage-70 cache. This alias is not fresh evidence. SCEPTRE v2 recomputes every physical prediction surface from its direct inputs.
+
+  - artifact_id: midogpp_stage90_sceptre_test_manifest_v2
+    stage: dataset_contract
+    physical_path: datasets/midogpp/contract/annotation_patch_v1
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_SCEPTRE_V2_ROLE_SCOPED_LABELS
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+      split: test
+      row_count: '9928'
+      held_case_count: '218'
+      manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      experiment_fenced: 'true'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_sceptre_router.v2
+      consumed_test_reuse_authorized: 'true'
+      labels_present: 'true'
+      labels_available_before_execution_admission: 'false'
+      selection_calibration_evaluation_whole_case_disjoint: 'true'
+      prelabel_router_model_thresholds_and_G_frozen_before_any_target_label: 'true'
+      per_fold_policy_formed_from_disjoint_selection_and_calibration_labels: 'true'
+      route_policy_frozen_before_evaluation_labels: 'true'
+      selection_calibration_metrics_are_nelbo: 'false'
+      evaluation_labels_available_before_durable_attestation: 'false'
+      support_fallback_opens_calibration_labels: 'false'
+      target_terminal_labels_may_open_after_attestation: 'true'
+      raw_labels_may_be_persisted: 'false'
+      previous_label_capability_history_used: 'false'
+      fresh_evidence: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - manifest.csv
+    expected_file_hashes:
+      manifest.csv:
+        algorithm: sha256
+        digest: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    forbidden_reuse: *sceptre_v2_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Consumer-specific v2 role-scoped alias of the immutable consumed-test manifest. It is not fresh evidence. Label access is broker-owned, one-shot, exact-row and whole-case scoped, and phase ordered.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_sceptre_parent_v2
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: CONSUMED_TEST_SCEPTRE_V2_PARENT_LEDGER_ONLY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      alias_of_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      split: test
+      row_count: '9928'
+      held_case_count: '218'
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      experiment_fenced: 'true'
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_sceptre_router.v2
+      consumed_test_reuse_authorized: 'true'
+      single_use_execution_identity: 'true'
+      authorization_exhausted: 'false'
+      previous_stage90_outputs_used: 'false'
+      previous_stage90_amendments_used: 'false'
+      previous_stage90_run_state_used: 'false'
+      previous_stage90_scratch_used: 'false'
+      fresh_evidence: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    forbidden_reuse: *sceptre_v2_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Consumer-specific v2 byte-exact alias of the immutable original parent ledger, available only for exact parent-hash validation by this consumer; it is not fresh evidence.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_sceptre_execution_amendment_v2
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts/sceptre_router_v2
+    availability: local_and_workstation
+    migration: hash_verified_move
+    evidence_label: CONSUMED_TEST_SCEPTRE_V2_SINGLE_USE_EXECUTION_AUTHORIZATION
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+      amendment_sha256: b170f68bf19b4b95fcf58026694048ece76fe6016b46f2e6d1ab1a8c9b794684
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_sceptre_router.v2
+      authorization_basis: explicit_user_authorization_2026_08_27_for_sceptre_v2_terminal_consumed_test_diagnostic_runner
+      authorization_scope: one_terminal_consumed_test_fixed_bank_sceptre_router_v2_diagnostic
+      authorization_date: '2026-08-27'
+      execution_authorized: 'true'
+      consumed_test_reuse_authorized: 'true'
+      single_use_execution_identity: 'true'
+      authorization_exhausted: 'false'
+      implementation_did_not_launch_execution: 'true'
+      durable_external_authorization_lease_required: 'true'
+      lease_claimed_after_all_read_only_preflights: 'true'
+      lease_claimed_before_gpu_or_label_work: 'true'
+      output_or_scratch_deletion_restores_authorization: 'false'
+      lease_repair_removal_or_reuse_allowed: 'false'
+      source_snapshot_manifest_sha256: f4b82a57113490c025072e7cd5f29501a101a87769739fde8eae4938aea3a75b
+      source_snapshot_tree_sha256: 3383c20b7d7f2e2ffb6411f1a31803aeffd200dbfe1174c027dcda97829aee7e
+      source_snapshot_member_count: '67'
+      shared_runtime_dependencies_in_source_seal: 'false'
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      fresh_evidence: 'false'
+      routing_success_claimed: 'false'
+      downstream_utility_claimed: 'false'
+      nelbo_compatibility_claimed: 'false'
+      confidence_bound_claimed: 'false'
+      significance_claimed: 'false'
+      promotion_allowed: 'false'
+      deployment_claimed: 'false'
+      may_feed_stage50: 'false'
+      may_feed_stage60: 'false'
+      may_feed_stage70: 'false'
+      may_feed_another_stage90: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - sceptre_v2_execution_amendment.json
+    expected_file_hashes:
+      sceptre_v2_execution_amendment.json:
+        algorithm: sha256
+        digest: b170f68bf19b4b95fcf58026694048ece76fe6016b46f2e6d1ab1a8c9b794684
+    forbidden_reuse: *sceptre_v2_forbidden_reuse
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Deterministically byte-sealed to the SCEPTRE-owned executable and inherited scientific Python inventory. Shared repository runtime dependencies remain outside this package-local seal; any sealed-source drift invalidates admission before authorization is claimed.
+      - This artifact authorizes exactly one complete SCEPTRE v2 terminal consumed-test diagnostic execution. Registration and implementation do not claim it.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_sceptre_router_v2
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_sceptre_router/v2
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: AUTHORIZED_TERMINAL_CONSUMED_TEST_DIAGNOSTIC_PENDING_RUN
+    claim_scope: diagnostic_only
+    semantic_identities:
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      bounded_interpretation: adaptive_descriptive_sceptre_v2_sensitivity_on_the_previously_consumed_midogpp_test_surface_only
+      architecture_family: SCEPTRE_SELECTIVE_SOURCE_FAMILY_ROUTER_V2
+      config_contract_hash: 95585050625fdabf46079fbe26147e9d877cb6eca37d5898f931c66fb5619fc7
+      protocol_contract_hash: 2e3ea3596560cae017f76da869bbef171e865ffa0ffc02e430e7c5252ff1fd93
+      expected_execution_amendment_sha256: b170f68bf19b4b95fcf58026694048ece76fe6016b46f2e6d1ab1a8c9b794684
+      source_snapshot_manifest_sha256: f4b82a57113490c025072e7cd5f29501a101a87769739fde8eae4938aea3a75b
+      source_snapshot_tree_sha256: 3383c20b7d7f2e2ffb6411f1a31803aeffd200dbfe1174c027dcda97829aee7e
+      source_snapshot_member_count: '67'
+      shared_runtime_dependencies_in_source_seal: 'false'
+      workspace_status: diagnostic
+      execution_authorization_basis: explicit_user_authorization_2026_08_27_for_sceptre_v2_terminal_consumed_test_diagnostic_runner
+      authorization_scope: one_terminal_consumed_test_fixed_bank_sceptre_router_v2_diagnostic
+      execution_authorized: 'true'
+      consumed_test_reuse_authorized: 'true'
+      implementation_authorizes_execution: 'false'
+      single_use_execution_identity: 'true'
+      authorization_exhausted: 'false'
+      implementation_did_not_launch_execution: 'true'
+      durable_external_authorization_lease_required: 'true'
+      lease_claimed_after_all_read_only_preflights: 'true'
+      lease_claimed_before_gpu_or_label_work: 'true'
+      output_or_scratch_deletion_restores_authorization: 'false'
+      lease_repair_removal_or_reuse_allowed: 'false'
+      exact_direct_input_count: '8'
+      source_inner_adaptive_development_reuse_registered: 'true'
+      strict_outer_q_and_e_exclusion_before_all_transforms: 'true'
+      complete_nested_lodo: 'true'
+      seed_cells_are_nuisance_replications: 'true'
+      seed_selection_allowed: 'false'
+      target_global_G_frozen_before_target_labels: 'true'
+      prelabel_router_model_thresholds_frozen_before_target_labels: 'true'
+      per_fold_route_policy_uses_selection_and_calibration_labels: 'true'
+      route_policy_frozen_before_evaluation_labels: 'true'
+      candidate_target_rows_scored: 'false'
+      candidate_target_row_storage: SEALED_MINUS_ONE_SENTINEL
+      selection_calibration_evaluation_whole_case_disjoint: 'true'
+      exact_fold_count: '45'
+      same_G_or_exact_B_only_after_proposal: 'true'
+      exact_B_fallback_required: 'true'
+      target_evaluation_labels_open_only_after_durable_attestation: 'true'
+      fresh_preterminal_validation_process_count: '2'
+      postvalidation_index_authenticated_before_lease_finalization: 'true'
+      raw_labels_may_be_persisted: 'false'
+      previous_sceptre_v1_output_used: 'false'
+      previous_stage90_output_or_state_used: 'false'
+      cross_run_recovery_used: 'false'
+      evaluation_split: test
+      consumed_test_data: 'true'
+      eligible_test_row_count: '9928'
+      held_case_count: '218'
+      downstream_classifier_metrics_role: DESCRIPTIVE_DIAGNOSTIC_ONLY
+      downstream_classifier_metrics_are_nelbo_routing_evidence: 'false'
+      adaptive_comparisons_descriptive_only: 'true'
+      new_center_generalization_claimed: 'false'
+      fresh_evidence: 'false'
+      routing_success_claimed: 'false'
+      downstream_utility_claimed: 'false'
+      nelbo_compatibility_claimed: 'false'
+      confidence_bound_claimed: 'false'
+      significance_claimed: 'false'
+      thesis_confirmatory_improvement_claimed: 'false'
+      promotion_allowed: 'false'
+      promotion_eligible: 'false'
+      deployment_claimed: 'false'
+      may_feed_stage50: 'false'
+      may_feed_stage60: 'false'
+      may_feed_stage70: 'false'
+      may_feed_another_stage90: 'false'
+      may_feed_another_experiment: 'false'
+      workstation_profile: xeon_w2265_12c24t_125gb_2x_rtx_a5000_24gb
+      workstation_generation_devices: cuda:0|cuda:1
+      workstation_generation_topology: 2_PERSISTENT_GPU_WORKERS_ONE_PER_RTX_A5000
+      workstation_classifier_topology: 4_SPAWN_WORKERS_X1_BLAS
+      workstation_prediction_store: FLOAT32_READ_ONLY_MEMMAP_MATERIALIZED_ONCE
+      workstation_scientific_reductions: FLOAT64
+      workstation_scratch_root: /data/local/fixed_bank_sceptre_router_v2
+      nested_process_pools_allowed: 'false'
+      cross_run_recovery_allowed: 'false'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - provenance/input_binding.json
+      - provenance/source_snapshot.json
+      - provenance/authorization_consumption_lease.json
+      - manifests/prediction_store.json
+      - prediction_store/arrays/sceptre_candidate_probabilities.npy
+      - prediction_store/arrays/sceptre_exact_b_probabilities.npy
+      - prediction_store/manifests/sceptre_prediction_index.json
+      - prediction_store/manifests/sceptre_prediction_receipt.json
+      - models/frozen_prelabel_router.json
+      - models/g_proposals.json
+      - tables/development_replay.json
+      - manifests/partition.json
+      - tables/support_decisions.json
+      - tables/uncertainty_decisions.json
+      - tables/calibration_decisions.json
+      - manifests/g_seal.json
+      - manifests/selection_seal.json
+      - manifests/policy_seal.json
+      - manifests/frozen_route_policy.json
+      - reports/label_capability_journal.json
+      - manifests/preterminal_content_index.json
+      - reports/preterminal_fresh_process_attestation.json
+      - tables/terminal_result.json
+      - reports/diagnostic_summary.json
+      - reports/leakage_report.json
+      - reports/publication_decision.json
+      - reports/runtime_summary.json
+      - reports/claim_boundary.json
+      - manifests/content_index.json
+      - reports/final_fresh_process_attestation.json
+      - reports/validation_report.json
+      - manifests/validation_index.json
+      - reports/run_state.json
+    forbidden_reuse:
+      - real_feature_reference_evidence
+      - cvae_preservation_evidence
+      - expert_bank_evidence
+      - generation_evidence
+      - all_candidate_utility_diagnostic
+      - routing_evidence
+      - expert_selection_evidence
+      - nelbo_compatibility_evidence
+      - synthetic_downstream_utility_evidence
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - SCOPE LIMITED — authorized and registered but not launched. The first admitted execution attempt exhausts this identity; partial output or scratch is never recoverable.
+      - The complete consumed MIDOG++ test split is reused only for adaptive descriptive post-hoc sensitivity. Downstream BACC, Brier, and log-loss do not establish NELBO compatibility, fresh routing, unseen-center generalization, confidence, significance, promotion, deployment, or transferable thesis evidence.
+      - Source and execution-amendment byte seals are complete; the config contract hash is bound separately and must match before workstation preparation or execution.

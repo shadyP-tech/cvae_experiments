@@ -1,0 +1,491 @@
+experiment:
+  schema_version: oe_ppur_v1_planned_config_v1
+  id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router.v1
+  name: P-anchored opportunity-equivalence pairwise primitive-utility router v1
+  stage: 90_oracles_and_diagnostics
+  status: planned
+  claim_scope: diagnostic_only
+  publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+  fresh_evidence: false
+  execution_authorized: false
+  implementation_authorizes_execution: false
+  consumed_test_reuse_authorized: false
+  artifact_root: output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v1
+inputs:
+  schema_version: oe_ppur_v1_direct_input_policy_v1
+  direct_input_artifact_ids:
+  - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  - midogpp_output_uniform_b_v2_generation_lock_v1
+  - midogpp_dataset_contract_annotation_patch_v1
+  direct_input_count: 3
+  all_direct_input_artifact_ids_unique: true
+  allowed_direct_source_roles:
+  - frozen_source_expert_bank
+  - frozen_generation_lock
+  - dataset_contract_annotation_manifest_only
+  input_path_resolution_deferred: true
+  previous_stage90_outputs_used: false
+  previous_stage90_reports_used: false
+  previous_stage90_scratch_used: false
+  previous_stage90_leases_used: false
+  previous_stage90_amendments_used: false
+  predecessor_artifact_recovery_allowed: false
+  cross_run_recovery_allowed: false
+  ledger_amendment_execution_authorized: false
+  test_cache_capability_registered: false
+  test_label_capability_registered: false
+  test_consumption_ledger_capability_registered: false
+  test_cache_resolution_status: PENDING_SEPARATE_FUTURE_AUTHORIZATION
+  parent_consumption_ledger_resolution_status: PENDING_SEPARATE_FUTURE_AUTHORIZATION
+  authorization_amendment_status: ABSENT_NOT_AUTHORIZED
+  canonical_terminal_manifest_contract:
+    schema_version: oe_ppur_v1_canonical_terminal_manifest_contract_v1
+    receipt_type: CanonicalTerminalManifestReceipt
+    annotation_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+    manifest_member: manifest.csv
+    manifest_content_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    split_filter: test
+    eligible_center_ids:
+    - '0'
+    - '1'
+    - '2'
+    - '3'
+    - '5'
+    - '6'
+    - '7'
+    - '8'
+    - '9'
+    terminal_row_count: 9928
+    terminal_case_count: 218
+    terminal_row_counts_by_center:
+    - - '0'
+      - 1532
+    - - '1'
+      - 866
+    - - '2'
+      - 3210
+    - - '3'
+      - 1278
+    - - '5'
+      - 628
+    - - '6'
+      - 742
+    - - '7'
+      - 282
+    - - '8'
+      - 726
+    - - '9'
+      - 664
+    terminal_case_counts_by_center:
+    - - '0'
+      - 23
+    - - '1'
+      - 20
+    - - '2'
+      - 24
+    - - '3'
+      - 39
+    - - '5'
+      - 23
+    - - '6'
+      - 23
+    - - '7'
+      - 21
+    - - '8'
+      - 22
+    - - '9'
+      - 23
+    terminal_case_inventory_hash: d22568075a287af71d0f4477ba5e6265e43278cba4865f7775741cdbcdf2bcc6
+    input_resolution_authorized: false
+    manifest_labels_read: false
+protocol:
+  schema_version: oe_ppur_v1_terminal_protocol_v3
+  experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router.v1
+  dataset_family: MIDOG++
+  feature_backbone: Virchow2_3840
+  domain_axis: scanner_center
+  split: test
+  split_previously_consumed: true
+  fresh_evidence: false
+  eligible_test_row_count: 9928
+  held_case_route_count: 218
+  eligible_center_ids:
+  - '0'
+  - '1'
+  - '2'
+  - '3'
+  - '5'
+  - '6'
+  - '7'
+  - '8'
+  - '9'
+  excluded_center_ids:
+  - '4'
+  held_unit: whole_case_patient_slide_group
+  scope_roles:
+    H: FINAL_TARGET_CENTER
+    J: PSEUDO_TARGET_CENTER
+    K: HYPERPARAMETER_VALIDATION_ONLY_CENTER
+    L: RESIDUAL_CALIBRATION_ONLY_CENTER
+    d: WHOLE_HELD_PSEUDO_TARGET_CASE
+  FoldScope_role: PSEUDO_AND_NESTED_H_J_K_L_d_CONTEXT_ONLY
+  FinalOuterScope_role: FINAL_H_ONLY_AFTER_SOURCE_CHOICES_FROZEN
+  H_J_K_L_pairwise_distinct: true
+  H_J_K_L_excluded_from_estimator_fit: true
+  nested_scopes_share_one_outer_H: true
+  K_may_only_score_hyperparameters: true
+  nested_K_rotation_centers: EXACT_C_MINUS_H
+  nested_K_rotation_complete_once_per_source_center: true
+  L_may_only_calibrate_residuals: true
+  d_identity: EXPLICIT_CENTER_AND_WHOLE_CASE_TUPLE_WITH_AUDIT_HASH
+  d_excluded_from_nested_posterior_ranker_validation_and_residual_calibration: true
+  d_recovered_in_legal_final_source_refit: true
+  final_nested_K_L_choices_source_only_and_hash_frozen: true
+  final_estimator_fit_centers: EXACT_C_MINUS_H
+  final_H_excluded_from_every_learner_normalizer_calibrator_and_candidate_pool: true
+  target_H_labels_closed_preterminal: true
+  target_support_labels_for_final_routing: false
+  terminal_labels_transient_nonserializable: true
+  source_only_row_posterior: true
+  target_identity_feature_forbidden: true
+  candidate_action_ids:
+  - B::zero_to_one
+  - B::one_to_zero
+  - I::zero_to_one
+  - I::one_to_zero
+  - R::zero_to_one
+  - R::one_to_zero
+  candidate_pool_receipt_type: CandidatePoolReceipt
+  candidate_pool_receipt_required_at_pairwise_fit_and_selection: true
+  candidate_pool_inventory: EXACT_ONE_FROZEN_EXPERT_PER_C_MINUS_H_CENTER
+  protected_fallback: P_PROTECTED_BYTE_EXACT
+  structural_noops_excluded_from_fit_and_ranking: true
+  identical_projected_surfaces_collapsed: true
+  opportunity_receipt_type: OpportunityCaseReceipt
+  typed_opportunity_receipt_required_at_pairwise_fit_and_selection: true
+  opportunity_receipt_embeds_typed_canonical_opportunity_set: true
+  opportunity_candidate_action_inventory: EXACT_FROZEN_CANDIDATE_ACTION_IDS
+  opportunity_receipt_is_label_free_and_predecision: true
+  primitive_targets:
+  - delta_tp
+  - delta_tn
+  - delta_brier_sum
+  - delta_log_sum
+  primitive_computation_precedes_metric_normalization: true
+  primitive_expected_label_probability_type: RowPosteriorPrediction
+  typed_row_posterior_prediction_required_for_primitive_and_denominator: true
+  primitive_action_id_exact_match_to_opportunity_member: true
+  primitive_protected_baseline_probability_hash_exact_match_to_opportunity: true
+  primitive_candidate_probability_hash_exact_match_to_opportunity_member: true
+  normalization_policy: ACTION_INVARIANT_EXPECTED_CLASS_TOTALS_PER_CASE_SCOPE
+  primitive_denominator_row_count_exact_match: true
+  primitive_denominator_scope_id_exact_match: true
+  primitive_denominator_row_manifest_hash_exact_match: true
+  primitive_denominator_posterior_model_hash_exact_match: true
+  primitive_denominator_posterior_receipt_hash_exact_match: true
+  pairwise_fit_response_type: NormalizedUtility
+  pairwise_fit_response_metric: EXPECTED_BACC_GAIN_ONLY
+  pairwise_fit_exact_matches_utility_action_and_probability_surface_to_opportunity: true
+  brier_and_log_roles: SELECTION_SAFETY_AND_TERMINAL_DIAGNOSTIC_ONLY
+  brier_or_log_may_enter_pairwise_ranking_response: false
+  reported_metrics:
+  - bacc
+  - brier
+  - log
+  ranking_target: ANTISYMMETRIC_PAIRWISE_EXPECTED_BACC_GAIN_CONTRAST
+  absolute_action_value_ranking_forbidden: true
+  action_specific_family_direction_interactions_required: true
+  nested_complete_K_rotation_hyperparameter_selection_required: true
+  rotating_L_center_case_OOF_residual_calibration_required: true
+  residual_calibration_one_sided_alpha: 0.2
+  residual_calibration_minimum_distinct_L_centers: 4
+  infeasible_residual_quantile_result: UNCERTAINTY_UNAVAILABLE_AND_EXACT_P
+  global_pooled_uncertainty_fallback_allowed: false
+  uncertainty_action_specific: true
+  uncalibrated_descriptive_bound_may_not_authorize_selection: true
+  prelabel_selection_decision_type: SelectionDecision
+  prelabel_selection_decision_hash_frozen_before_terminal_label_open: true
+  selection_ledger_entry_opportunity_receipt_type: OpportunityCaseReceipt
+  selection_ledger_entry_requires_typed_opportunity_receipt: true
+  selection_ledger_entry_exact_matches_opportunity_receipt_center_and_case: true
+  selection_ledger_entry_exact_matches_decision_opportunity_receipt_hash: true
+  prelabel_selection_decision_ledger_type: SelectionDecisionLedger
+  prelabel_selection_decision_ledger_case_count: 218
+  prelabel_selection_decision_ledger_requires_exact_dataset_case_manifest_hash: true
+  canonical_terminal_manifest_contract:
+    schema_version: oe_ppur_v1_canonical_terminal_manifest_contract_v1
+    receipt_type: CanonicalTerminalManifestReceipt
+    annotation_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+    manifest_member: manifest.csv
+    manifest_content_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+    split_filter: test
+    eligible_center_ids:
+    - '0'
+    - '1'
+    - '2'
+    - '3'
+    - '5'
+    - '6'
+    - '7'
+    - '8'
+    - '9'
+    terminal_row_count: 9928
+    terminal_case_count: 218
+    terminal_row_counts_by_center:
+    - - '0'
+      - 1532
+    - - '1'
+      - 866
+    - - '2'
+      - 3210
+    - - '3'
+      - 1278
+    - - '5'
+      - 628
+    - - '6'
+      - 742
+    - - '7'
+      - 282
+    - - '8'
+      - 726
+    - - '9'
+      - 664
+    terminal_case_counts_by_center:
+    - - '0'
+      - 23
+    - - '1'
+      - 20
+    - - '2'
+      - 24
+    - - '3'
+      - 39
+    - - '5'
+      - 23
+    - - '6'
+      - 23
+    - - '7'
+      - 21
+    - - '8'
+      - 22
+    - - '9'
+      - 23
+    terminal_case_inventory_hash: d22568075a287af71d0f4477ba5e6265e43278cba4865f7775741cdbcdf2bcc6
+    input_resolution_authorized: false
+    manifest_labels_read: false
+  canonical_terminal_manifest_receipt_required_by_selection_ledger: true
+  canonical_terminal_manifest_receipt_hash_bound_in_preterminal_phase: true
+  terminal_label_gate_requires_canonical_terminal_manifest_receipt: true
+  preterminal_input_lineage_type: PreterminalInputLineage
+  preterminal_raw_hash_constructor_allowed: false
+  promoted_bank_validation_receipt_required: true
+  frozen_generation_lock_receipt_required: true
+  short_semantic_lock_ids_distinct_from_full_sha256_file_pins: true
+  candidate_probability_surface_receipt_type: CandidateProbabilitySurfaceReceipt
+  candidate_probability_surface_receipt_scope: GPU_TO_CPU_TRANSPORT_BYTES_AND_CANONICAL_ROWS_ONLY
+  cpu_outer_probability_input_hash_must_be_gpu_output_hash: true
+  parsed_probability_matrix_science_receipt_implemented: false
+  outer_selection_lineage_type: OuterSelectionLineage
+  outer_selection_lineage_inventory: EXACT_ONE_PER_ELIGIBLE_H
+  each_case_decision_must_match_its_H_specific_source_pool_model_and_calibration: true
+  preterminal_phase_uses_canonical_per_H_lineage_surface_hashes: true
+  preterminal_phase_receipt_type: PreterminalPhaseReceipt
+  preterminal_phase_direct_construction_allowed: false
+  preterminal_phase_binds_config_protocol_source_candidate_model_calibration_opportunity_hashes: true
+  terminal_label_capability_requires_exact_complete_decision_ledger_hash: true
+  terminal_label_capability_openable_in_current_contract: false
+  terminal_admission_joins_exact_selection_decision_lineage: true
+  selection_exact_matches_utility_action_and_probability_surface_to_opportunity: true
+  terminal_admission_aggregation: CASE_THEN_EQUAL_CENTER
+  zero_active_action_cases_in_admission_coverage_denominator: true
+  micro_pooled_terminal_admission_forbidden: true
+  exact_P_on_any_failed_gate: true
+  route_policy_proxy_role: DOWNSTREAM_ACTION_SELECTION_DIAGNOSTIC_PROXY
+  route_policy_proxy_is_true_utility: false
+  route_policy_proxy_is_cvae_compatibility: false
+  route_policy_proxy_is_nelbo_compatibility: false
+  execution_authorized: false
+  implementation_authorizes_execution: false
+  consumed_test_reuse_authorized: false
+  output_or_scratch_resolution_allowed: false
+  cross_run_recovery_allowed: false
+  predecessor_output_artifact_scratch_lease_or_report_recovery_allowed: false
+  combined_diagnostic_adapter_and_neutral_core_source_seal_required: true
+  combined_source_seal_recomputed_and_exact_matched_on_config_load: true
+  source_fence_checked_before_execution_rejection: true
+  publication_and_claim_boundary:
+    schema_version: oe_ppur_v1_claim_boundary_v1
+    publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+    terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+    claim_scope: diagnostic_only
+    fresh_evidence: false
+    execution_authorized: false
+    routing_success_claimed: false
+    downstream_utility_claimed: false
+    route_policy_proxy_is_cvae_compatibility: false
+    nelbo_compatibility_claimed: false
+    promotion_allowed: false
+    deployment_claimed: false
+    may_feed_stage50: false
+    may_feed_stage60: false
+    may_feed_stage70: false
+    may_feed_another_stage90: false
+    may_feed_another_experiment: false
+  direct_input_policy:
+    schema_version: oe_ppur_v1_direct_input_policy_v1
+    direct_input_artifact_ids:
+    - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+    - midogpp_output_uniform_b_v2_generation_lock_v1
+    - midogpp_dataset_contract_annotation_patch_v1
+    direct_input_count: 3
+    all_direct_input_artifact_ids_unique: true
+    allowed_direct_source_roles:
+    - frozen_source_expert_bank
+    - frozen_generation_lock
+    - dataset_contract_annotation_manifest_only
+    input_path_resolution_deferred: true
+    previous_stage90_outputs_used: false
+    previous_stage90_reports_used: false
+    previous_stage90_scratch_used: false
+    previous_stage90_leases_used: false
+    previous_stage90_amendments_used: false
+    predecessor_artifact_recovery_allowed: false
+    cross_run_recovery_allowed: false
+    ledger_amendment_execution_authorized: false
+    test_cache_capability_registered: false
+    test_label_capability_registered: false
+    test_consumption_ledger_capability_registered: false
+    test_cache_resolution_status: PENDING_SEPARATE_FUTURE_AUTHORIZATION
+    parent_consumption_ledger_resolution_status: PENDING_SEPARATE_FUTURE_AUTHORIZATION
+    authorization_amendment_status: ABSENT_NOT_AUTHORIZED
+    canonical_terminal_manifest_contract:
+      schema_version: oe_ppur_v1_canonical_terminal_manifest_contract_v1
+      receipt_type: CanonicalTerminalManifestReceipt
+      annotation_artifact_id: midogpp_dataset_contract_annotation_patch_v1
+      manifest_member: manifest.csv
+      manifest_content_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+      split_filter: test
+      eligible_center_ids:
+      - '0'
+      - '1'
+      - '2'
+      - '3'
+      - '5'
+      - '6'
+      - '7'
+      - '8'
+      - '9'
+      terminal_row_count: 9928
+      terminal_case_count: 218
+      terminal_row_counts_by_center:
+      - - '0'
+        - 1532
+      - - '1'
+        - 866
+      - - '2'
+        - 3210
+      - - '3'
+        - 1278
+      - - '5'
+        - 628
+      - - '6'
+        - 742
+      - - '7'
+        - 282
+      - - '8'
+        - 726
+      - - '9'
+        - 664
+      terminal_case_counts_by_center:
+      - - '0'
+        - 23
+      - - '1'
+        - 20
+      - - '2'
+        - 24
+      - - '3'
+        - 39
+      - - '5'
+        - 23
+      - - '6'
+        - 23
+      - - '7'
+        - 21
+      - - '8'
+        - 22
+      - - '9'
+        - 23
+      terminal_case_inventory_hash: d22568075a287af71d0f4477ba5e6265e43278cba4865f7775741cdbcdf2bcc6
+      input_resolution_authorized: false
+      manifest_labels_read: false
+  may_feed_stage50: false
+  may_feed_stage60: false
+  may_feed_stage70: false
+  may_feed_another_stage90: false
+  may_feed_another_experiment: false
+  protocol_hash: e6ba865b909fae62f94a42caab2bb3c56cf17ede2e8d0c959fba465373a37f9f
+source_provenance:
+  schema_version: oe_ppur_v1_source_provenance_config_v1
+  adapter_scope_role: diagnostic_adapter
+  adapter_member_count: 23
+  adapter_tree_sha256: 9203373e3fee8c07ebc4c0b3c678691f1c0bd51acdbf0e37fbf5f8a018aa2f62
+  adapter_receipt_hash: 564e3d5116e0a07b31154d5c1dcc1392ff33f5ee4373fc22c5c4badc41279fa3
+  core_scope_role: neutral_scientific_core
+  core_member_count: 26
+  core_tree_sha256: 0f6e1f07861e61761c9bdbf7895ca8b14f311532aa023417a4a364ab3e793fe0
+  core_receipt_hash: 35697b30a1c973cb3b3d83fd47a2bc26ef9a4886b91ec16391e693fa0dfb431f
+  source_scopes_are_disjoint: true
+  combined_member_count: 49
+  combined_source_seal_hash: eaaa8978ccf25f9862e6552380056f5d1a6fe6319bf4a567f72ee890b504c35f
+  combined_source_receipt_hash: af41802ff0d08e56273dd82737f4c171eb696f9fd6d931520e105f9a100a2a1f
+  recompute_and_exact_match_on_load: true
+runtime:
+  schema_version: oe_ppur_v1_planned_workstation_v1
+  profile: xeon_w2265_12c24t_125gb_2x_rtx_a5000_24gb
+  gpu_devices:
+  - cuda:0
+  - cuda:1
+  persistent_gpu_prediction_workers: 2
+  one_persistent_worker_per_physical_gpu: true
+  prediction_store_dtype: float32
+  prediction_store_mode: read_only_memmap
+  prediction_store_read_only_for_cpu_phase: true
+  reduction_dtype: float64
+  cpu_outer_workers: 4
+  blas_threads_per_worker: 1
+  native_threads_per_worker: 1
+  threadpool_limiter_scope: worker_process_lifetime
+  threadpool_info_evidence_required: true
+  multiprocessing_start_method: spawn
+  top_level_spawn_pool_only: true
+  nested_pools_allowed: false
+  process_transport:
+  - paths
+  - hashes
+  - tuples
+  - scalars
+  mappingproxy_cross_process_allowed: false
+  estimator_object_cross_process_allowed: false
+  memmap_object_cross_process_allowed: false
+  execution_authorized: false
+  output_root_resolution_allowed: false
+  scratch_root_resolution_allowed: false
+  output_or_scratch_creation_allowed: false
+  cross_run_recovery_allowed: false
+claim_boundary:
+  schema_version: oe_ppur_v1_claim_boundary_v1
+  publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+  terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+  claim_scope: diagnostic_only
+  fresh_evidence: false
+  execution_authorized: false
+  routing_success_claimed: false
+  downstream_utility_claimed: false
+  route_policy_proxy_is_cvae_compatibility: false
+  nelbo_compatibility_claimed: false
+  promotion_allowed: false
+  deployment_claimed: false
+  may_feed_stage50: false
+  may_feed_stage60: false
+  may_feed_stage70: false
+  may_feed_another_stage90: false
+  may_feed_another_experiment: false

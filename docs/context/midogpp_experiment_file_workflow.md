@@ -717,6 +717,34 @@ Source-inner labels were consumed for whole-bank adoption and may not be used
 again to select an expert, seed, or router. Consumers must bind bank lock
 `9972a41dcd4814cd` and control lock `cddbcc3b3343fe38`.
 
+One explicitly scoped exception is registered for SCEPTRE v1: a separate
+Stage-90 consumer-fenced alias and amendment may reuse the immutable
+source-inner candidate-utility bytes plus the exact label-free pre-label
+prediction packet (`candidate_predictions.npz`, its index, classifier-fit
+inventory, and evaluation-row inventory) for adaptive, descriptive architecture
+development only. For every outer target `H`, all rows with query `H` or
+candidate `H` must be removed before any transform, normalization, fit, or
+tuning operation; nested LODO repeats the same query/candidate exclusion for
+its training side before recomputing training transforms, while the held
+`q=K` validation rows are transformed separately after removing candidate
+`K` and never influence training transforms. The nine
+training/generation seed cells are nuisance replications, never independent
+samples or selectable candidates. The complete nine-target router, proposal
+policy, thresholds, case partition, and exact-B controls are frozen together.
+Labeled support and calibration may only preserve the label-free G proposal or
+abstain to exact B; no phase may switch to another expert or revive a rejected
+proposal. The phase manager owns the exact calibration-uncertainty decision
+and rejects any calibration record whose uncertainty hash, candidate, route,
+or acceptance flag differs. After all 45 decisions are sealed, it emits one
+canonical replayable route table and binds that table's hash into the terminal
+capability. This exception does not mutate or reinterpret the original
+policy-consumption lock, does not authorize consumed-test execution, and can
+only yield `POST_HOC_CONSUMED_TEST_SENSITIVITY` evidence. Phase capabilities in
+the development package record lineage only; the test-label reader, cache,
+manifest, ledger, and real subprocess attestation remain future-only. The
+result cannot support a new-center, confirmatory, promotion, deployment, or
+downstream-consumer claim.
+
 The canonical routing control is `uniform_b_v2_equal_union_ps`: exclude target
 `H`, use all eight remaining sources, allocate 128 generated rows per source
 and class for a 1,024-per-class total, cross training/generation seeds

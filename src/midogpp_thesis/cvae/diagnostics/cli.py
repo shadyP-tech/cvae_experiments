@@ -461,6 +461,65 @@ def build_parser() -> argparse.ArgumentParser:
     scale_bp.add_argument("--config", required=True)
     scale_bp.add_argument("--artifact-root", required=True)
 
+    opportunity_pairwise = sub.add_parser(
+        "fixed-bank-p-anchored-opportunity-equivalence-pairwise-primitive-"
+        "utility-router-v1",
+        help=(
+            "Inspect the planned, non-authorized opportunity-equivalence "
+            "pairwise primitive-utility router; direct execution is refused "
+            "before mutation."
+        ),
+    )
+    opportunity_pairwise.add_argument("--config", required=True)
+    opportunity_pairwise.add_argument("--artifact-root", required=True)
+
+    opportunity_pairwise_v2 = sub.add_parser(
+        "fixed-bank-p-anchored-opportunity-equivalence-pairwise-primitive-"
+        "utility-router-v2",
+        help=(
+            "Inspect the separately identified OE-PPUR v2 executable "
+            "successor. Its checked-in config remains non-authorized and "
+            "cannot claim the single-use lease or open terminal labels."
+        ),
+    )
+    opportunity_pairwise_v2.add_argument("--config", required=True)
+    opportunity_pairwise_v2.add_argument("--artifact-root", required=True)
+    opportunity_pairwise_v2.add_argument("--scratch-root")
+    opportunity_pairwise_v2.add_argument(
+        "--inspect-plan",
+        action="store_true",
+        help="Emit the mutation-free six-input/matrix implementation receipt.",
+    )
+
+    sceptre = sub.add_parser(
+        "fixed-bank-sceptre-router-v1",
+        help=(
+            "Inspect the scoped SCEPTRE post-hoc development architecture; "
+            "consumed-test execution is refused before mutation."
+        ),
+    )
+    sceptre.add_argument("--config", required=True)
+    sceptre.add_argument("--artifact-root", required=True)
+
+    sceptre_v2 = sub.add_parser(
+        "fixed-bank-sceptre-router-v2",
+        help=(
+            "Run the explicitly authorized single-use SCEPTRE v2 downstream-"
+            "utility consumed-test sensitivity diagnostic, or its mutation-"
+            "free dry run; this is not NELBO routing evidence."
+        ),
+    )
+    sceptre_v2.add_argument("--config", required=True)
+    sceptre_v2.add_argument("--artifact-root", required=True)
+    sceptre_v2.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "Validate source, exact-eight inputs, workspace binding, and host "
+            "admission without claiming authorization or opening labels."
+        ),
+    )
+
     pcsi_parc = sub.add_parser(
         "fixed-bank-p-anchored-boundary-projected-pcsi-policy-regret-router",
         help=(
@@ -537,6 +596,106 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
         print(output)
+        return 0
+
+    if args.surface == (
+        "fixed-bank-p-anchored-opportunity-equivalence-pairwise-primitive-"
+        "utility-router-v1"
+    ):
+        from .fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v1.config import (
+            load_config,
+        )
+        from .fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v1.runner import (
+            run_planned_router,
+        )
+
+        config = load_config(args.config)
+        output = run_planned_router(config, artifact_root=artifact_root)
+        print(output)
+        return 0
+
+    if args.surface == (
+        "fixed-bank-p-anchored-opportunity-equivalence-pairwise-primitive-"
+        "utility-router-v2"
+    ):
+        import json
+
+        from ..protocol import ProtocolError
+
+        from .fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v2.config import (
+            load_config,
+            load_resolved_config,
+        )
+        from .fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v2.runner import (
+            inspect_planned_router,
+            run_oe_ppur_v2,
+        )
+
+        if args.inspect_plan:
+            config = load_config(args.config)
+            print(
+                json.dumps(
+                    inspect_planned_router(config),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+            return 0
+        config_path = Path(args.config)
+        if config_path.name == "config.resolved.yaml":
+            resolved = load_resolved_config(config_path)
+            if Path(artifact_root) != resolved.artifact_root:
+                raise ProtocolError(
+                    "OE-PPUR v2 CLI artifact root differs from config.resolved.yaml."
+                )
+            run_input = resolved
+        else:
+            # The checked-in path-free config reaches the public runner only to
+            # reject before source, service, input, output, or scratch access.
+            run_input = load_config(config_path)
+        output = run_oe_ppur_v2(
+            run_input,
+            scratch_root=(
+                args.scratch_root
+                if args.scratch_root is not None
+                else (
+                    "/data/local/fixed_bank_p_anchored_opportunity_"
+                    "equivalence_pairwise_primitive_utility_router_v2"
+                )
+            ),
+        )
+        print(output)
+        return 0
+
+    if args.surface == "fixed-bank-sceptre-router-v1":
+        from .fixed_bank_sceptre_router.config import load_config
+        from .fixed_bank_sceptre_router.runner import run_planned_sceptre_router
+
+        config = load_config(args.config)
+        output = run_planned_sceptre_router(config, artifact_root=artifact_root)
+        print(output)
+        return 0
+
+    if args.surface == "fixed-bank-sceptre-router-v2":
+        import json
+
+        from .fixed_bank_sceptre_router_v2.config import load_config
+        from .fixed_bank_sceptre_router_v2.runner import (
+            dry_run_sceptre_v2,
+            run_sceptre_v2,
+        )
+
+        config = load_config(args.config)
+        if args.dry_run:
+            print(
+                json.dumps(
+                    dry_run_sceptre_v2(config, artifact_root=artifact_root),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+        else:
+            print(run_sceptre_v2(config, artifact_root=artifact_root))
         return 0
 
     if args.surface == (
