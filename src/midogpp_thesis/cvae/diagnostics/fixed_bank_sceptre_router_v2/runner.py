@@ -84,10 +84,12 @@ def dry_run_sceptre_v2(
 
     root = _artifact_root(config, artifact_root)
     admission = dry_run_admission(config)
-    preflight = run_workstation_preflight(
-        root,
-        admission.scratch.root.parent,
-        runtime=config.runtime,
+    preflight = dict(
+        run_workstation_preflight(
+            root,
+            admission.scratch.root.parent,
+            runtime=config.runtime,
+        )
     )
     provenance = validate_workspace_provenance(root, config)
     base = {
@@ -133,10 +135,12 @@ def run_sceptre_v2(
     # Every read-only launch, input, source, output, scratch and host gate runs
     # before the irreversible authorization directory is atomically created.
     admission = dry_run_admission(config, input_loader=_capture_inputs)
-    preflight = run_workstation_preflight(
-        root,
-        admission.scratch.root.parent,
-        runtime=config.runtime,
+    preflight = dict(
+        run_workstation_preflight(
+            root,
+            admission.scratch.root.parent,
+            runtime=config.runtime,
+        )
     )
     provenance = validate_workspace_provenance(root, config)
     validated = captured_inputs.get("validated")

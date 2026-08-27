@@ -15329,16 +15329,16 @@ artifacts:
       terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
       claim_role: planned_executable_successor_mechanics
       architecture_family: fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router
-      config_contract_hash: e27f19e24a15aace334193399bc37e9207f9f2f8eb67c1bd77f51336336a015c
+      config_contract_hash: 039cc66b9e7bebb35eacadf388f36f35aa62c8f867693a343583872f93084801
       protocol_contract_hash: d6cd84f2734b62f7d3381456111ca9af35cb0ef62d72c7e8b59941024b16bc4b
       adapter_source_member_count: '25'
-      adapter_source_tree_sha256: 14abf5773c2dfa5995d84ec93fa27d238d3128ce34a49977d932c1f92672e6c0
+      adapter_source_tree_sha256: d0b1ee53645511d487a2e47c57441691172bdb4b5ba989cc4b19952c1b1d3ef1
       neutral_core_source_member_count: '26'
       neutral_core_source_tree_sha256: 382200fd76ca4d26ab1462cecee636d9c1526b48909e1631421a99dfb37e9b65
       shared_protocol_source_sha256: 6b64a9c71c84e7c2a66faac93dde4f159ddf029a8a79f0d9c48b386b68dc7845
       combined_source_member_count: '52'
-      combined_source_seal_sha256: 7f7a19833c7baa4ba4f78fbdb1c447e926f423565c93f4e102158eac8ec9090c
-      combined_source_receipt_sha256: d115d62a2461092efe447f6cc93964683186c64e991a9102110304f4dccf9d2e
+      combined_source_seal_sha256: 96606a67071946a200a740dff2100bd2d45f16388530f60a646388555e492d54
+      combined_source_receipt_sha256: 0cd84d858df7296cc22ed306d29c6f7f354689e100ab634f252707e05ebc1827
       workspace_status: planned
       execution_authorized: 'false'
       consumed_test_reuse_authorized: 'false'
@@ -15927,7 +15927,7 @@ artifacts:
     semantic_identities:
       parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
       parent_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
-      amendment_sha256: b170f68bf19b4b95fcf58026694048ece76fe6016b46f2e6d1ab1a8c9b794684
+      amendment_sha256: 99dd6c0a945f1bfe17dd3a5b9444458e217327b70057235faac420446c6ee7e4
       authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_sceptre_router.v2
       authorization_basis: explicit_user_authorization_2026_08_27_for_sceptre_v2_terminal_consumed_test_diagnostic_runner
       authorization_scope: one_terminal_consumed_test_fixed_bank_sceptre_router_v2_diagnostic
@@ -15942,8 +15942,8 @@ artifacts:
       lease_claimed_before_gpu_or_label_work: 'true'
       output_or_scratch_deletion_restores_authorization: 'false'
       lease_repair_removal_or_reuse_allowed: 'false'
-      source_snapshot_manifest_sha256: f4b82a57113490c025072e7cd5f29501a101a87769739fde8eae4938aea3a75b
-      source_snapshot_tree_sha256: 3383c20b7d7f2e2ffb6411f1a31803aeffd200dbfe1174c027dcda97829aee7e
+      source_snapshot_manifest_sha256: 5fc06386668398df5930367e61dfe8c599140e0821ad10addfe7e7090c24f662
+      source_snapshot_tree_sha256: 73631f6b4f0c039d82c447da184cb503867ab89939de788295a9f2581ad8bcb9
       source_snapshot_member_count: '67'
       shared_runtime_dependencies_in_source_seal: 'false'
       publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
@@ -15966,7 +15966,7 @@ artifacts:
     expected_file_hashes:
       sceptre_v2_execution_amendment.json:
         algorithm: sha256
-        digest: b170f68bf19b4b95fcf58026694048ece76fe6016b46f2e6d1ab1a8c9b794684
+        digest: 99dd6c0a945f1bfe17dd3a5b9444458e217327b70057235faac420446c6ee7e4
     forbidden_reuse: *sceptre_v2_forbidden_reuse
     may_feed_recipe_selection: false
     may_feed_deployable_selection: false
@@ -15986,11 +15986,11 @@ artifacts:
       terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
       bounded_interpretation: adaptive_descriptive_sceptre_v2_sensitivity_on_the_previously_consumed_midogpp_test_surface_only
       architecture_family: SCEPTRE_SELECTIVE_SOURCE_FAMILY_ROUTER_V2
-      config_contract_hash: 95585050625fdabf46079fbe26147e9d877cb6eca37d5898f931c66fb5619fc7
+      config_contract_hash: 261f5dcbfec1f465c7a5235e7efcd52d8fae759441145b7e8ac92898766a8b34
       protocol_contract_hash: 2e3ea3596560cae017f76da869bbef171e865ffa0ffc02e430e7c5252ff1fd93
-      expected_execution_amendment_sha256: b170f68bf19b4b95fcf58026694048ece76fe6016b46f2e6d1ab1a8c9b794684
-      source_snapshot_manifest_sha256: f4b82a57113490c025072e7cd5f29501a101a87769739fde8eae4938aea3a75b
-      source_snapshot_tree_sha256: 3383c20b7d7f2e2ffb6411f1a31803aeffd200dbfe1174c027dcda97829aee7e
+      expected_execution_amendment_sha256: 99dd6c0a945f1bfe17dd3a5b9444458e217327b70057235faac420446c6ee7e4
+      source_snapshot_manifest_sha256: 5fc06386668398df5930367e61dfe8c599140e0821ad10addfe7e7090c24f662
+      source_snapshot_tree_sha256: 73631f6b4f0c039d82c447da184cb503867ab89939de788295a9f2581ad8bcb9
       source_snapshot_member_count: '67'
       shared_runtime_dependencies_in_source_seal: 'false'
       workspace_status: diagnostic

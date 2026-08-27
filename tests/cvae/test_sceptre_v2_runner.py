@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 import importlib
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
 
@@ -29,6 +30,11 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_sceptre_router_v2.run_state impo
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_sceptre_router_v2.scratch import (
     ScratchLease,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_sceptre_router_v2.workstation import (
+    GpuFact,
+    WorkstationFacts,
+    run_workstation_preflight,
 )
 from midogpp_thesis.cvae.runtime.artifact_io import read_json
 
@@ -156,6 +162,91 @@ def test_dry_run_performs_admission_and_preflight_without_mutation(
     assert result["target_labels_opened"] is False
     assert result["publication_status"] == PUBLICATION_STATUS
     assert result["terminal_decision"] == TERMINAL_DECISION
+    assert result["fresh_evidence"] is False
+
+
+def test_dry_run_hashes_immutable_receipts_without_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: production preflight receipts are immutable mappings."""
+
+    runner = importlib.import_module(RUNNER_MODULE)
+    config = _canonical_config(tmp_path)
+    admission = _admission(config, tmp_path)
+    events: list[str] = []
+
+    def fake_admission(value: object) -> DryRunAdmission:
+        assert value is config
+        events.append("admission")
+        return admission
+
+    def fake_preflight(*args: object, **kwargs: object) -> object:
+        assert args == (config.artifact_root, admission.scratch.root.parent)
+        assert kwargs == {"runtime": config.runtime}
+        events.append("preflight")
+        facts = WorkstationFacts(
+            logical_cpu_count=24,
+            physical_ram_bytes=128 * 1024**3,
+            artifact_free_bytes=64 * 1024**3,
+            scratch_free_bytes=64 * 1024**3,
+            gpus=(
+                GpuFact(0, "NVIDIA RTX A5000", 20_000),
+                GpuFact(1, "NVIDIA RTX A5000", 20_000),
+            ),
+        )
+        receipt = run_workstation_preflight(
+            config.artifact_root,
+            admission.scratch.root.parent,
+            runtime=config.runtime,
+            probe=lambda *_args: facts,
+        )
+        assert isinstance(receipt, MappingProxyType)
+        return receipt
+
+    def fake_provenance(root: Path, value: object) -> object:
+        assert root == config.artifact_root
+        assert value is config
+        events.append("workspace_provenance")
+        return {
+            "status": "PASS",
+            "target_labels_opened": False,
+            "input_receipt": {
+                "member_sha256": {"manifest.json": "b" * 64}
+            },
+        }
+
+    def forbidden_mutation(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("SCEPTRE v2 dry-run attempted a mutation")
+
+    monkeypatch.setattr(runner, "dry_run_admission", fake_admission)
+    monkeypatch.setattr(runner, "run_workstation_preflight", fake_preflight)
+    monkeypatch.setattr(runner, "validate_workspace_provenance", fake_provenance)
+    for name in (
+        "claim_authorization_lease",
+        "create_scratch",
+        "write_run_state",
+        "atomic_json",
+        "mark_authorization_complete",
+        "mark_authorization_failed",
+    ):
+        monkeypatch.setattr(runner, name, forbidden_mutation)
+
+    before = _tree_inventory(tmp_path)
+    result = runner.dry_run_sceptre_v2(
+        config,
+        artifact_root=config.artifact_root,
+    )
+
+    assert events == ["admission", "preflight", "workspace_provenance"]
+    assert _tree_inventory(tmp_path) == before
+    assert result["status"] == "PASS"
+    assert len(str(result["workstation_preflight_hash"])) == 64
+    assert len(str(result["workspace_provenance_hash"])) == 64
+    assert len(str(result["dry_run_hash"])) == 64
+    assert result["authorization_lease_claimed"] is False
+    assert result["filesystem_mutations"] == 0
+    assert result["target_labels_opened"] is False
     assert result["fresh_evidence"] is False
 
 

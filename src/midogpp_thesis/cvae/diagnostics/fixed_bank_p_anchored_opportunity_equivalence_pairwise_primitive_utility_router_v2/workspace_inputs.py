@@ -465,6 +465,7 @@ def _validate_indexed_directory(
 ) -> str:
     """Validate every immutable member named by a bank/GenerationLock index."""
 
+    _reject_tree_symlinks(root)
     expected_file_hash = require_sha256(
         expected_index_sha256, f"{role} expected content-index file hash"
     )
@@ -507,11 +508,11 @@ def _validate_indexed_directory(
             require_sha256(record["sha256"], f"{role} indexed member hash"),
             size,
         )
-    excluded = {
-        "manifests/content_index.json",
-        "reports/run_state.json",
-        "reports/validation_report.json",
-    }
+    # Only the self-referential index is outside its own member inventory.
+    # Run-state and validation reports are deliberately *not* exempt: the
+    # future scientific service receives the admitted directory, so allowing
+    # any unindexed file there would create an undeclared seventh input.
+    excluded = {"manifests/content_index.json"}
     try:
         actual = {
             path.relative_to(root).as_posix()

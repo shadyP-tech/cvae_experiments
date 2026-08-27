@@ -46,7 +46,7 @@ inputs:
   expected_test_cache_row_order_hash: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
   expected_manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
   expected_parent_ledger_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
-  expected_execution_amendment_sha256: b170f68bf19b4b95fcf58026694048ece76fe6016b46f2e6d1ab1a8c9b794684
+  expected_execution_amendment_sha256: 99dd6c0a945f1bfe17dd3a5b9444458e217327b70057235faac420446c6ee7e4
   execution_amendment_consumer_experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_sceptre_router.v2
   previous_stage90_output_or_state_used: false
   cross_run_recovery_allowed: false
@@ -173,8 +173,8 @@ classifier:
 source_provenance:
   schema_version: sceptre_v2_source_provenance_v1
   source_snapshot_schema: sceptre_v2_execution_source_snapshot_v2
-  source_snapshot_manifest_sha256: f4b82a57113490c025072e7cd5f29501a101a87769739fde8eae4938aea3a75b
-  source_snapshot_tree_sha256: 3383c20b7d7f2e2ffb6411f1a31803aeffd200dbfe1174c027dcda97829aee7e
+  source_snapshot_manifest_sha256: 5fc06386668398df5930367e61dfe8c599140e0821ad10addfe7e7090c24f662
+  source_snapshot_tree_sha256: 73631f6b4f0c039d82c447da184cb503867ab89939de788295a9f2581ad8bcb9
   source_snapshot_member_count: 67
   source_snapshot_member_pattern: midogpp_thesis/cvae/diagnostics/fixed_bank_sceptre_router_v2/**/*.py|midogpp_thesis/cvae/diagnostics/fixed_bank_sceptre_router/**/*.py|midogpp_thesis/cvae/routing/sceptre/**/*.py
   source_snapshot_excludes_bytecode_and_cache: true

@@ -387,6 +387,49 @@ def test_directory_content_index_covers_every_bank_and_generation_member(
 
 
 @pytest.mark.parametrize(
+    "relative",
+    ("reports/run_state.json", "reports/validation_report.json"),
+)
+def test_directory_content_index_rejects_unindexed_report_inputs(
+    tmp_path: Path,
+    relative: str,
+) -> None:
+    root = tmp_path / "indexed-input"
+    (root / "manifests").mkdir(parents=True)
+    member = root / "manifests/lock.json"
+    member.write_bytes(b'immutable\n')
+    payload: dict[str, object] = {
+        "schema_version": "midogpp_uniform_b_v2_expert_bank_content_index_v1",
+        "records": [
+            {
+                "relative_path": "manifests/lock.json",
+                "sha256": hashlib.sha256(member.read_bytes()).hexdigest(),
+                "size_bytes": member.stat().st_size,
+            }
+        ],
+    }
+    semantic = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    payload["content_hash"] = hashlib.sha256(semantic).hexdigest()[:16]
+    index = root / "manifests/content_index.json"
+    index.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+    report = root / relative
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text("undeclared input\n", encoding="utf-8")
+
+    with pytest.raises(ProtocolError, match="indexed member set"):
+        workspace_input_module._validate_indexed_directory(
+            root,
+            expected_schema="midogpp_uniform_b_v2_expert_bank_content_index_v1",
+            expected_index_sha256=hashlib.sha256(index.read_bytes()).hexdigest(),
+            role="test bank",
+        )
+
+
+@pytest.mark.parametrize(
     ("mutation", "value"),
     [
         ("missing", None),
