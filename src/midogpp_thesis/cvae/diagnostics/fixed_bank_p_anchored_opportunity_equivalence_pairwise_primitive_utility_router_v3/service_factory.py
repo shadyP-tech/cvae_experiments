@@ -13,14 +13,22 @@ import inspect
 from pathlib import Path
 
 from ...protocol import ProtocolError
-from .config import RouterV3Config, validate_planned_config
+from .config import (
+    RouterV3Config,
+    validate_authorization_ready_config,
+    validate_planned_config,
+)
 from .execution.services import (
     CanonicalScientificRouterService,
     _build_canonical_scientific_router_service,
 )
 from .hashing import canonical_hash, require_sha256
 from .identity import PACKAGE_NAME, SOURCE_SUPERVISION_ARTIFACT_ID
-from .source_seal import SourceSealReceipt, validate_source_seal
+from .source_seal import (
+    SourceSealReceipt,
+    validate_live_producer_seal_binding,
+    validate_source_seal,
+)
 from .source_supervision import SourceTrainingSurface
 
 
@@ -98,8 +106,10 @@ class CanonicalServiceFactoryIdentity:
             "source_training_surface_hash": self.source_training_surface_hash,
             "source_supervision_consumed_as_typed_surface": True,
             "source_supervision_direct_input_ordinal": 3,
-            "nominal_service_implemented": True,
-            "end_to_end_scientific_execution_implemented": False,
+            "service_shell_implemented": True,
+            "canonical_scientific_execution_service_implemented": True,
+            "end_to_end_preterminal_scientific_execution_implemented": True,
+            "terminal_evaluation_is_separate_capability": True,
             "caller_service_injection_allowed": False,
             "target_labels_opened": False,
             "mutation_performed": False,
@@ -113,13 +123,14 @@ class CanonicalServiceFactoryIdentity:
 class CanonicalScientificServiceFactory:
     """Prepared factory retaining a typed source surface, never target labels."""
 
-    __slots__ = ("_identity", "_source_surface")
+    __slots__ = ("_execution_authorized", "_identity", "_source_surface")
 
     def __init__(
         self,
         *,
         identity: CanonicalServiceFactoryIdentity,
         source_surface: SourceTrainingSurface,
+        execution_authorized: bool,
         _factory_token: object | None = None,
     ) -> None:
         if (
@@ -129,10 +140,12 @@ class CanonicalScientificServiceFactory:
             or identity.source_training_surface_receipt_hash
             != source_surface.receipt.receipt_hash
             or identity.source_training_surface_hash != source_surface.surface_hash
+            or type(execution_authorized) is not bool
         ):
             raise ProtocolError("OE-PPUR v3 canonical service factory drifted.")
         self._identity = identity
         self._source_surface = source_surface
+        self._execution_authorized = execution_authorized
 
     @property
     def identity(self) -> CanonicalServiceFactoryIdentity:
@@ -144,6 +157,7 @@ class CanonicalScientificServiceFactory:
             source_seal_hash=self._identity.source_seal_hash,
             seven_input_contract_hash=self._identity.seven_input_contract_hash,
             factory_identity_hash=self._identity.receipt_hash,
+            execution_authorized=self._execution_authorized,
         )
 
     def __reduce__(self):  # pragma: no cover - explicit safety seam
@@ -156,7 +170,11 @@ def prepare_canonical_scientific_service_factory(
     source_seal: SourceSealReceipt,
     source_surface: SourceTrainingSurface,
 ) -> CanonicalScientificServiceFactory:
-    config = validate_planned_config(config)
+    config = (
+        validate_authorization_ready_config(config)
+        if getattr(config, "execution_authorized", False) is True
+        else validate_planned_config(config)
+    )
     seal = validate_source_seal(source_seal)
     if (
         type(source_surface) is not SourceTrainingSurface
@@ -165,6 +183,27 @@ def prepare_canonical_scientific_service_factory(
         or source_surface.receipt.target_labels_used
     ):
         raise ProtocolError("OE-PPUR v3 source-training surface identity drifted.")
+    if config.execution_authorized:
+        validate_live_producer_seal_binding(
+            configured_sha256=config.source_supervision_producer_seal_sha256,
+            parsed_sha256=(
+                source_surface.receipt.contract.producer_source_seal_sha256
+            ),
+            source_seal=seal,
+        )
+    if config.execution_authorized and (
+        source_surface.receipt.receipt_hash
+        != config.source_supervision_content_sha256
+        or source_surface.receipt.row_order_sha256
+        != config.source_supervision_row_order_sha256
+        or source_surface.receipt.contract.producer_source_seal_sha256
+        != config.source_supervision_producer_seal_sha256
+        or source_surface.receipt.compiler_recomputation_receipt_sha256
+        != config.source_supervision_recomputation_receipt_sha256
+    ):
+        raise ProtocolError(
+            "OE-PPUR v3 parsed source supervision drifted from external admission."
+        )
     repository_root = Path(seal.repository_root)
     factory_path = Path(inspect.getsourcefile(CanonicalScientificServiceFactory) or "")
     service_path = Path(inspect.getsourcefile(CanonicalScientificRouterService) or "")
@@ -194,6 +233,7 @@ def prepare_canonical_scientific_service_factory(
     return CanonicalScientificServiceFactory(
         identity=identity,
         source_surface=source_surface,
+        execution_authorized=config.execution_authorized,
         _factory_token=_FACTORY_TOKEN,
     )
 

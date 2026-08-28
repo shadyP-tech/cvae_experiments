@@ -20,6 +20,11 @@ OUTPUT_ARTIFACT_ID = (
     "midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_"
     "opportunity_equivalence_pairwise_primitive_utility_router_v3"
 )
+CANONICAL_OUTPUT_RELATIVE_ROOT = (
+    "artifacts/midogpp/90_oracles_and_diagnostics/"
+    "uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_"
+    "equivalence_pairwise_primitive_utility_router/v3"
+)
 EXPERIMENT_NAME = (
     "P-anchored opportunity-equivalence pairwise primitive-utility router v3"
 )
@@ -49,6 +54,29 @@ P_ACTION_ID = "P_PROTECTED"
 PROBABILITY_COLUMN_IDS = (P_ACTION_ID, *ACTION_IDS)
 EXPECTED_TEST_ROW_COUNT = 9_928
 EXPECTED_CASE_COUNT = 218
+EXPECTED_TEST_ROWS_BY_CENTER = (
+    ("0", 1532),
+    ("1", 866),
+    ("2", 3210),
+    ("3", 1278),
+    ("5", 628),
+    ("6", 742),
+    ("7", 282),
+    ("8", 726),
+    ("9", 664),
+)
+EXPECTED_CASE_COUNTS_BY_CENTER = (
+    ("0", 23),
+    ("1", 20),
+    ("2", 24),
+    ("3", 39),
+    ("5", 23),
+    ("6", 23),
+    ("7", 21),
+    ("8", 22),
+    ("9", 23),
+)
+FEATURE_DIM = 3_840
 EXPECTED_PROBABILITY_MATRIX_SHAPE = (
     EXPECTED_TEST_ROW_COUNT,
     len(PROBABILITY_COLUMN_IDS),
@@ -130,10 +158,10 @@ SOURCE_SUPERVISION_REQUIRED_MEMBERS = (
 EXPECTED_BANK_LOCK_HASH = "9972a41dcd4814cd"
 EXPECTED_GENERATION_LOCK_HASH = "34e551425710362e"
 EXPECTED_BANK_CONTENT_INDEX_SHA256 = (
-    "7fae389151618950102905f85c5fce300ef9821f15cf304d8469b5a147110279"
+    "6b74fe794bd30cf6c1e42190427e506d1ff50ecd9280b9dcfee2a7592ec6a318"
 )
 EXPECTED_GENERATION_CONTENT_INDEX_SHA256 = (
-    "6b74fe794bd30cf6c1e42190427e506d1ff50ecd9280b9dcfee2a7592ec6a318"
+    "086eb106a11fd52df5fc1f692d17a33edccaf6f707b2b9dd0fba15895d891d86"
 )
 EXPECTED_TEST_CACHE_CONTENT_HASH = (
     "df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db"

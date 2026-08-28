@@ -1,68 +1,50 @@
 """Manager-owned terminal label reader and aggregate scoring for OE-PPUR v3.
 
-The physical manifest factory remains closed while the amendment is absent.
-The concrete evaluator is testable over an opaque, manager-owned input view.
-Raw row/case values have no return or persistence method and are destroyed
-immediately after the one authorized aggregate read.
+The physical factory is executable only from an authorization-ready resolved
+seven-input bundle and two independent artifact-only attestations. Raw row/case
+values have no return or persistence method and are destroyed immediately after
+the one authorized aggregate read.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+import hashlib
 import math
-from typing import NoReturn, Sequence
+from typing import Sequence
 
 from ....protocol import ProtocolError
+from ..config import ResolvedV3ConfigBundle, validate_authorization_ready_config
 from ..hashing import canonical_hash
 from ..identity import (
-    ACTION_IDS,
     EXPECTED_CASE_COUNT,
+    EXPECTED_TEST_MANIFEST_SHA256,
     EXPECTED_TEST_ROW_COUNT,
     P_ACTION_ID,
 )
+from .authority import _read_regular_file_bytes, validate_resolved_terminal_authority
 from .contracts import (
     ALLOWED_AGGREGATE_METRICS,
     AggregateOnlyTerminalReceipt,
     AggregateTerminalScoreRequest,
+    ArtifactOnlyPreterminalAttestationReceipt,
     GuardedPreterminalBoundary,
+    _TERMINAL_RECEIPT_TOKEN,
+    _issue_aggregate_only_terminal_receipt,
+)
+from .manifest_scoring import (
+    CaseRoutingDiagnostic,
+    _balanced_accuracy,
+    _brier,
+    _derive_terminal_values,
+    _log_loss,
+    _read_aligned_manifest_labels,
+    _validate_matrix_ledger_frame_linkage,
 )
 
 
 _READER_TOKEN = object()
 _VIEW_TOKEN = object()
-
-
-@dataclass(frozen=True, slots=True)
-class CaseRoutingDiagnostic:
-    case_id: str
-    selected_action_id: str
-    oracle_action_id: str
-    spearman_rank_correlation: float
-    normalized_oracle_gap: float
-
-    def __post_init__(self) -> None:
-        case_id = str(self.case_id)
-        selected = str(self.selected_action_id)
-        oracle = str(self.oracle_action_id)
-        spearman = float(self.spearman_rank_correlation)
-        gap = float(self.normalized_oracle_gap)
-        allowed = {P_ACTION_ID, *ACTION_IDS}
-        if (
-            not case_id
-            or selected not in allowed
-            or oracle not in allowed
-            or not math.isfinite(spearman)
-            or not -1.0 <= spearman <= 1.0
-            or not math.isfinite(gap)
-            or not 0.0 <= gap <= 1.0
-        ):
-            raise ProtocolError("OE-PPUR v3 terminal case diagnostic drifted.")
-        object.__setattr__(self, "case_id", case_id)
-        object.__setattr__(self, "selected_action_id", selected)
-        object.__setattr__(self, "oracle_action_id", oracle)
-        object.__setattr__(self, "spearman_rank_correlation", spearman)
-        object.__setattr__(self, "normalized_oracle_gap", gap)
 
 
 class _SealedTerminalInputView:
@@ -190,6 +172,11 @@ class ManagerOwnedManifestLabelReader(AggregateOnlyLabelReader):
             row.selected_action_id != P_ACTION_ID for row in view.case_diagnostics
         )
         exact_p_count = EXPECTED_CASE_COUNT - routed_count
+        available_ranks = tuple(
+            float(row.spearman_rank_correlation)
+            for row in view.case_diagnostics
+            if row.spearman_rank_correlation is not None
+        )
         metrics = (
             ("selected_balanced_accuracy", selected_bacc),
             ("protected_p_balanced_accuracy", protected_bacc),
@@ -210,12 +197,12 @@ class ManagerOwnedManifestLabelReader(AggregateOnlyLabelReader):
                 / EXPECTED_CASE_COUNT,
             ),
             (
-                "spearman_rank_correlation",
-                sum(
-                    row.spearman_rank_correlation for row in view.case_diagnostics
-                )
-                / EXPECTED_CASE_COUNT,
+                "available_case_mean_spearman_rank_correlation",
+                sum(available_ranks) / len(available_ranks)
+                if available_ranks
+                else 0.0,
             ),
+            ("rank_diagnostic_coverage", len(available_ranks) / EXPECTED_CASE_COUNT),
             (
                 "normalized_oracle_gap",
                 sum(row.normalized_oracle_gap for row in view.case_diagnostics)
@@ -225,13 +212,14 @@ class ManagerOwnedManifestLabelReader(AggregateOnlyLabelReader):
         )
         if tuple(key for key, _ in metrics) != ALLOWED_AGGREGATE_METRICS:
             raise ProtocolError("OE-PPUR v3 terminal metric inventory drifted.")
-        return AggregateOnlyTerminalReceipt(
+        return _issue_aggregate_only_terminal_receipt(
             boundary_receipt_hash=request.boundary_receipt_hash,
             decision_ledger_receipt_hash=request.decision_ledger_receipt_hash,
             evaluated_case_count=EXPECTED_CASE_COUNT,
             routed_case_count=routed_count,
             exact_p_fallback_count=exact_p_count,
             aggregate_metrics=metrics,
+            _manager_token=_TERMINAL_RECEIPT_TOKEN,
         )
 
 
@@ -304,66 +292,123 @@ def _seal_manager_owned_terminal_input(
     )
 
 
-def build_manager_owned_manifest_label_reader(
+def _build_manager_owned_manifest_label_reader(
     view: _SealedTerminalInputView,
 ) -> ManagerOwnedManifestLabelReader:
     return ManagerOwnedManifestLabelReader(view, _factory_token=_READER_TOKEN)
 
 
 def build_physical_manifest_label_reader(
-    *args: object, **kwargs: object
-) -> NoReturn:
-    """Remain closed until input #7 and resolved admission both exist."""
+    bundle: ResolvedV3ConfigBundle,
+    *,
+    boundary: GuardedPreterminalBoundary,
+    preterminal_result: object,
+    execution_request: object,
+    persisted_artifact: object,
+    attestations: Sequence[ArtifactOnlyPreterminalAttestationReceipt],
+) -> ManagerOwnedManifestLabelReader:
+    """Open canonical labels only after all physical authority is complete.
 
-    raise ProtocolError(
-        "OE-PPUR v3 physical terminal label reader is closed: the v3 amendment "
-        "and resolved seven-input admission are absent."
+    No caller supplies labels, selected probabilities, oracle decisions, ranks,
+    or case diagnostics.  All of those values are derived inside this manager
+    boundary from the attested result, canonical cache row bindings, and the
+    exact manifest.
+    """
+
+    from ..execution.preterminal_artifact import PersistedPreterminalArtifact
+    from ..execution.services import (
+        CanonicalPreterminalResult,
+        CanonicalRouterExecutionRequest,
     )
 
-
-def _balanced_accuracy(
-    labels: tuple[int, ...], probabilities: tuple[float, ...]
-) -> float:
-    positives = sum(labels)
-    negatives = len(labels) - positives
-    if positives == 0 or negatives == 0:
-        raise ProtocolError("OE-PPUR v3 terminal labels lack both binary classes.")
-    true_positive = sum(
-        label == 1 and probability >= 0.5
-        for label, probability in zip(labels, probabilities, strict=True)
+    if (
+        type(bundle) is not ResolvedV3ConfigBundle
+        or type(boundary) is not GuardedPreterminalBoundary
+        or type(preterminal_result) is not CanonicalPreterminalResult
+        or type(execution_request) is not CanonicalRouterExecutionRequest
+        or type(persisted_artifact) is not PersistedPreterminalArtifact
+    ):
+        raise ProtocolError("OE-PPUR v3 physical terminal boundary is untyped.")
+    config = validate_authorization_ready_config(bundle.config)
+    result = preterminal_result
+    request = execution_request
+    artifact = persisted_artifact
+    rows = tuple(attestations)
+    if (
+        len(rows) != 2
+        or any(type(row) is not ArtifactOnlyPreterminalAttestationReceipt for row in rows)
+        or tuple(row.receipt_hash for row in rows)
+        != boundary.preterminal_attestation_hashes
+        or len({row.process_pid for row in rows}) != 2
+        or any(
+            row.sealed_ledger_receipt_hash != result.decision_ledger.ledger_hash
+            or row.artifact_file_sha256 != artifact.artifact_file_sha256
+            or row.artifact_file_identity_sha256
+            != artifact.artifact_file_identity_sha256
+            for row in rows
+        )
+        or result.request_hash != request.request_hash
+        or result.result_hash != artifact.result_hash
+        or result.decision_ledger.ledger_hash != artifact.decision_ledger_hash
+        or result.decision_ledger.ledger_hash
+        != boundary.decision_ledger_receipt_hash
+        or result.seven_input_contract_hash != config.seven_input_contract_hash
+        or result.source_seal_hash != boundary.source_seal_hash
+        or result.source_training_surface_receipt_hash
+        != boundary.source_training_surface_receipt_hash
+        or boundary.seven_input_contract_hash != config.seven_input_contract_hash
+        or boundary.case_inventory_sha256
+        != EXPECTED_TERMINAL_CASE_INVENTORY_SHA256
+        or boundary.exact_p_fallback_count != result.decision_ledger.exact_p_count
+    ):
+        raise ProtocolError("OE-PPUR v3 terminal attestation lineage drifted.")
+    frame = request.frame
+    matrix = result.probability_matrix
+    ledger = result.decision_ledger
+    _validate_matrix_ledger_frame_linkage(matrix, ledger, frame)
+    validate_resolved_terminal_authority(
+        bundle,
+        source_training_surface_receipt_hash=(
+            result.source_training_surface_receipt_hash
+        ),
     )
-    true_negative = sum(
-        label == 0 and probability < 0.5
-        for label, probability in zip(labels, probabilities, strict=True)
+
+    manifest_path = bundle.input_bindings[4].path
+    raw = _read_regular_file_bytes(
+        manifest_path,
+        maximum_bytes=16 * 1024 * 1024,
+        role="canonical manifest",
     )
-    return 0.5 * (true_positive / positives + true_negative / negatives)
-
-
-def _brier(labels: tuple[int, ...], probabilities: tuple[float, ...]) -> float:
-    return sum(
-        (probability - label) ** 2
-        for label, probability in zip(labels, probabilities, strict=True)
-    ) / len(labels)
-
-
-def _log_loss(labels: tuple[int, ...], probabilities: tuple[float, ...]) -> float:
-    epsilon = 1e-7
-    return -sum(
-        label * math.log(min(1.0 - epsilon, max(epsilon, probability)))
-        + (1 - label)
-        * math.log(min(1.0 - epsilon, max(epsilon, 1.0 - probability)))
-        for label, probability in zip(labels, probabilities, strict=True)
-    ) / len(labels)
+    if hashlib.sha256(raw).hexdigest() != EXPECTED_TEST_MANIFEST_SHA256:
+        raise ProtocolError("OE-PPUR v3 canonical manifest bytes drifted.")
+    labels = _read_aligned_manifest_labels(raw, frame=frame)
+    selected, protected, diagnostics = _derive_terminal_values(
+        matrix,
+        ledger,
+        frame,
+        labels,
+    )
+    view = _seal_manager_owned_terminal_input(
+        boundary,
+        row_case_ids=tuple(row.case_id for row in frame.rows),
+        row_labels=labels,
+        selected_probabilities=selected,
+        protected_probabilities=protected,
+        case_diagnostics=diagnostics,
+        _manager_token=_VIEW_TOKEN,
+    )
+    return _build_manager_owned_manifest_label_reader(view)
 
 
 def _read_authorized_aggregates(
-    reader: AggregateOnlyLabelReader,
+    reader: ManagerOwnedManifestLabelReader,
     request: AggregateTerminalScoreRequest,
     *,
     _token: object,
 ) -> AggregateOnlyTerminalReceipt:
-    if _token is not _READER_TOKEN or not isinstance(
-        reader, AggregateOnlyLabelReader
+    if (
+        _token is not _READER_TOKEN
+        or type(reader) is not ManagerOwnedManifestLabelReader
     ):
         raise ProtocolError("OE-PPUR v3 terminal label read was not authorized.")
     result = reader._score_aggregate_only(request)
@@ -373,9 +418,6 @@ def _read_authorized_aggregates(
 
 
 __all__ = (
-    "AggregateOnlyLabelReader",
-    "CaseRoutingDiagnostic",
-    "ManagerOwnedManifestLabelReader",
-    "build_manager_owned_manifest_label_reader",
     "build_physical_manifest_label_reader",
+    "validate_resolved_terminal_authority",
 )

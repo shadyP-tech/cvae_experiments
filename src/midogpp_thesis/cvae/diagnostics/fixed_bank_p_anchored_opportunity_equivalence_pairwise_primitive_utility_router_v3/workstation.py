@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+import multiprocessing
+import os
+import subprocess
 
 from ...protocol import ProtocolError
 from .hashing import canonical_hash
@@ -135,6 +138,55 @@ def cpu_worker_environment() -> dict[str, str]:
     return dict(CPU_WORKER_ENVIRONMENT)
 
 
+def preflight_workstation() -> WorkstationPlanReceipt:
+    """Probe the production host; callers cannot inject workstation facts."""
+
+    # Import lazily so this module remains a leaf during package import.  This
+    # is the exact primitive DTO transported by the four spawn workers, rather
+    # than a truthy caller assertion about pickle compatibility.
+    from .execution.dto import PrimitiveWorkerTask, assert_pickle_round_trip
+
+    try:
+        completed = subprocess.run(
+            [
+                "nvidia-smi",
+                "--query-gpu=name",
+                "--format=csv,noheader,nounits",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ProtocolError("OE-PPUR v3 workstation GPU probe failed.") from exc
+    names = tuple(row.strip() for row in completed.stdout.splitlines() if row.strip())
+    cpu_count = os.cpu_count()
+    if cpu_count is None:
+        raise ProtocolError("OE-PPUR v3 workstation CPU topology is unavailable.")
+    probe = PrimitiveWorkerTask(
+        task_id="oe-ppur-v3-workstation-pickle-probe",
+        outer_center_id="0",
+        inner_fold_id=0,
+        row_start=0,
+        row_stop=1,
+        source_training_surface_hash="1" * 64,
+        candidate_pool_receipt_hash="2" * 64,
+        compiled_action_surface_hash="3" * 64,
+        random_seed=0,
+    )
+    dto_round_trip_validated = assert_pickle_round_trip(probe) == probe
+    return validate_workstation_observation(
+        {
+            "gpu_count": len(names),
+            "gpu_names": names,
+            "cpu_count": cpu_count,
+            "start_method": multiprocessing.get_context("spawn").get_start_method(),
+        },
+        dto_pickle_round_trip_validated=dto_round_trip_validated,
+    )
+
+
 __all__ = (
     "BLAS_THREADS_PER_CPU_WORKER",
     "CPU_SPAWN_WORKER_COUNT",
@@ -145,6 +197,7 @@ __all__ = (
     "REDUCTION_DTYPE",
     "WorkstationPlanReceipt",
     "cpu_worker_environment",
+    "preflight_workstation",
     "validate_workstation_observation",
     "workstation_plan_payload",
 )

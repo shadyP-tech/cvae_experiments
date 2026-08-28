@@ -15,9 +15,64 @@ from .identity import PACKAGE_NAME
 _ADAPTER_RELATIVE_ROOT = "src/midogpp_thesis/cvae/diagnostics/" + PACKAGE_NAME
 _NEUTRAL_RELATIVE_ROOT = "src/midogpp_thesis/cvae/routing/pairwise_primitive_utility"
 _SHARED_PROTOCOL_RELATIVE_PATH = "src/midogpp_thesis/cvae/protocol.py"
+_PRODUCTION_RELATIVE_MEMBERS = (
+    "src/midogpp_thesis/common/hashing.py",
+    "src/midogpp_thesis/common/midogpp.py",
+    "src/midogpp_thesis/cvae/block_frame.py",
+    "src/midogpp_thesis/cvae/expert_bank/uniform_b_v2_promotion/contracts.py",
+    "src/midogpp_thesis/cvae/expert_bank/uniform_b_v2_promotion/serialization.py",
+    "src/midogpp_thesis/cvae/geco.py",
+    "src/midogpp_thesis/cvae/generation/contracts.py",
+    "src/midogpp_thesis/cvae/generation/generation.py",
+    "src/midogpp_thesis/cvae/generation_samplers.py",
+    "src/midogpp_thesis/cvae/keyed_training.py",
+    "src/midogpp_thesis/cvae/latent_mixture_prior.py",
+    "src/midogpp_thesis/cvae/latent_priors.py",
+    "src/midogpp_thesis/cvae/models/__init__.py",
+    "src/midogpp_thesis/cvae/models/cvae.py",
+    "src/midogpp_thesis/cvae/models/learned_conditional_prior.py",
+    "src/midogpp_thesis/cvae/models/mixture_prior.py",
+    "src/midogpp_thesis/cvae/preservation/independent_source/__init__.py",
+    "src/midogpp_thesis/cvae/preservation/independent_source/crossfit.py",
+    "src/midogpp_thesis/cvae/preservation/independent_source/frame.py",
+    "src/midogpp_thesis/cvae/preservation/splits.py",
+    "src/midogpp_thesis/cvae/preservation/uniform_b_optimized_prior/config.py",
+    "src/midogpp_thesis/cvae/preservation/uniform_b_optimized_prior/contracts.py",
+    "src/midogpp_thesis/cvae/preservation/uniform_b_optimized_prior/core.py",
+    "src/midogpp_thesis/cvae/preservation/uniform_b_task_geometry/frame.py",
+    "src/midogpp_thesis/cvae/preservation/uniform_b_task_geometry/generation.py",
+    "src/midogpp_thesis/cvae/runtime/artifact_io.py",
+    "src/midogpp_thesis/cvae/runtime/fixed_bank_a1_prediction_contracts.py",
+    "src/midogpp_thesis/cvae/runtime/fixed_bank_a1_prediction_planning.py",
+    "src/midogpp_thesis/cvae/runtime/fixed_bank_a1_prediction_store.py",
+    "src/midogpp_thesis/cvae/runtime/fixed_bank_a1_prediction_worker.py",
+    "src/midogpp_thesis/cvae/runtime/frozen_source_streams.py",
+    "src/midogpp_thesis/cvae/schedules.py",
+    "src/midogpp_thesis/real_features/classifier_reference/artifacts/__init__.py",
+    "src/midogpp_thesis/real_features/classifier_reference/classifiers.py",
+    "src/midogpp_thesis/real_features/classifier_reference/protocol.py",
+    "src/midogpp_thesis/real_features/classifier_reference/real_feature_frame.py",
+    "src/midogpp_thesis/real_features/classifier_reference/schemas/__init__.py",
+    "src/midogpp_thesis/real_features/classifier_reference/schemas/midogpp.py",
+)
 _CURRENT_PREFIX = "midogpp_thesis.cvae.diagnostics." + PACKAGE_NAME
 _NEUTRAL_PREFIX = "midogpp_thesis.cvae.routing.pairwise_primitive_utility"
 _PROTOCOL_MODULE = "midogpp_thesis.cvae.protocol"
+_PRODUCTION_MODULES = frozenset(
+    (
+        relative.removeprefix("src/")
+        .removesuffix("/__init__.py")
+        .removesuffix(".py")
+        .replace("/", ".")
+    )
+    for relative in _PRODUCTION_RELATIVE_MEMBERS
+)
+_PRODUCTION_IMPORT_SYMBOLS = frozenset(
+    {
+        "midogpp_thesis.real_features.classifier_reference.schemas.DIAGNOSTIC_ONLY",
+        "midogpp_thesis.real_features.classifier_reference.schemas.SELECTION_ELIGIBLE",
+    }
+)
 _FACTORY_TOKEN = object()
 
 
@@ -28,6 +83,8 @@ class SourceSealReceipt:
     adapter_tree_sha256: str
     neutral_member_count: int
     neutral_tree_sha256: str
+    production_member_count: int
+    production_tree_sha256: str
     shared_protocol_sha256: str
     combined_source_sha256: str
     _factory_token: InitVar[object | None] = None
@@ -44,11 +101,13 @@ class SourceSealReceipt:
             or self.adapter_member_count <= 0
             or type(self.neutral_member_count) is not int
             or self.neutral_member_count <= 0
+            or self.production_member_count != len(_PRODUCTION_RELATIVE_MEMBERS)
         ):
             raise ProtocolError("OE-PPUR v3 source-seal topology drifted.")
         for role in (
             "adapter_tree_sha256",
             "neutral_tree_sha256",
+            "production_tree_sha256",
             "shared_protocol_sha256",
             "combined_source_sha256",
         ):
@@ -66,10 +125,14 @@ class SourceSealReceipt:
             "neutral_relative_root": _NEUTRAL_RELATIVE_ROOT,
             "neutral_member_count": self.neutral_member_count,
             "neutral_tree_sha256": self.neutral_tree_sha256,
+            "production_member_count": self.production_member_count,
+            "production_tree_sha256": self.production_tree_sha256,
+            "production_members": list(_PRODUCTION_RELATIVE_MEMBERS),
             "shared_protocol_relative_path": _SHARED_PROTOCOL_RELATIVE_PATH,
             "shared_protocol_sha256": self.shared_protocol_sha256,
             "combined_member_count": self.adapter_member_count
             + self.neutral_member_count
+            + self.production_member_count
             + 1,
             "combined_source_sha256": self.combined_source_sha256,
             "predecessor_imports_present": False,
@@ -86,11 +149,19 @@ def build_source_seal(
     root = _repository_root(repository_root)
     adapter = _source_members(root / _ADAPTER_RELATIVE_ROOT, root=root)
     neutral = _source_members(root / _NEUTRAL_RELATIVE_ROOT, root=root)
-    for relative, _ in (*adapter, *neutral):
+    production = _exact_source_members(
+        root,
+        relative_members=_PRODUCTION_RELATIVE_MEMBERS,
+    )
+    for relative, _ in (*adapter, *neutral, *production):
         _reject_unsealed_project_imports(root / relative, repository_root=root)
     shared_hash = _file_hash(root / _SHARED_PROTOCOL_RELATIVE_PATH)
     adapter_tree = _tree_hash(adapter, role="v3_adapter")
     neutral_tree = _tree_hash(neutral, role="neutral_pairwise_core")
+    production_tree = _tree_hash(
+        production,
+        role="reviewed_fixed_bank_probability_runtime",
+    )
     combined = canonical_hash(
         {
             "schema_version": "oe_ppur_v3_combined_source_tree_v1",
@@ -98,6 +169,8 @@ def build_source_seal(
             "adapter_member_count": len(adapter),
             "neutral_tree_sha256": neutral_tree,
             "neutral_member_count": len(neutral),
+            "production_tree_sha256": production_tree,
+            "production_member_count": len(production),
             "shared_protocol_sha256": shared_hash,
         }
     )
@@ -107,6 +180,8 @@ def build_source_seal(
         adapter_tree_sha256=adapter_tree,
         neutral_member_count=len(neutral),
         neutral_tree_sha256=neutral_tree,
+        production_member_count=len(production),
+        production_tree_sha256=production_tree,
         shared_protocol_sha256=shared_hash,
         combined_source_sha256=combined,
         _factory_token=_FACTORY_TOKEN,
@@ -128,6 +203,22 @@ def validate_source_seal(
         if expected not in {rebuilt.combined_source_sha256, rebuilt.receipt_hash}:
             raise ProtocolError("OE-PPUR v3 expected source seal drifted.")
     return rebuilt
+
+
+def validate_live_producer_seal_binding(
+    *,
+    configured_sha256: object,
+    parsed_sha256: object,
+    source_seal: SourceSealReceipt,
+) -> str:
+    """Require direct input #3 to have been produced by the live sealed tree."""
+
+    seal = validate_source_seal(source_seal)
+    configured = require_sha256(configured_sha256, "configured producer source seal")
+    parsed = require_sha256(parsed_sha256, "parsed producer source seal")
+    if configured != parsed or parsed != seal.combined_source_sha256:
+        raise ProtocolError("OE-PPUR v3 source producer seal is not live.")
+    return parsed
 
 
 def _repository_root(value: str | Path | None) -> Path:
@@ -163,6 +254,27 @@ def _source_members(directory: Path, *, root: Path) -> tuple[tuple[str, str], ..
         rows.append((path.relative_to(root).as_posix(), _file_hash(path)))
     if not rows:
         raise ProtocolError("OE-PPUR v3 source seal is empty.")
+    return tuple(rows)
+
+
+def _exact_source_members(
+    root: Path,
+    *,
+    relative_members: tuple[str, ...],
+) -> tuple[tuple[str, str], ...]:
+    if len(set(relative_members)) != len(relative_members):
+        raise ProtocolError("OE-PPUR v3 production source allowlist is duplicated.")
+    rows = []
+    for relative in relative_members:
+        path = root / relative
+        if (
+            Path(relative).is_absolute()
+            or ".." in Path(relative).parts
+            or path.is_symlink()
+            or not path.is_file()
+        ):
+            raise ProtocolError("OE-PPUR v3 production source member is unsafe.")
+        rows.append((relative, _file_hash(path)))
     return tuple(rows)
 
 
@@ -204,7 +316,7 @@ def _reject_unsealed_project_imports(path: Path, *, repository_root: Path) -> No
                 if name == _PROTOCOL_MODULE or any(
                     name == prefix or name.startswith(prefix + ".")
                     for prefix in (_CURRENT_PREFIX, _NEUTRAL_PREFIX)
-                ):
+                ) or name in _PRODUCTION_MODULES or name in _PRODUCTION_IMPORT_SYMBOLS:
                     continue
                 raise ProtocolError(
                     "OE-PPUR v3 source imports an unsealed project module."
@@ -240,4 +352,9 @@ def _resolve_import_from(node: ast.ImportFrom, *, package_name: str) -> tuple[st
     return tuple(".".join((*base, alias.name)) for alias in node.names)
 
 
-__all__ = ("SourceSealReceipt", "build_source_seal", "validate_source_seal")
+__all__ = (
+    "SourceSealReceipt",
+    "build_source_seal",
+    "validate_live_producer_seal_binding",
+    "validate_source_seal",
+)

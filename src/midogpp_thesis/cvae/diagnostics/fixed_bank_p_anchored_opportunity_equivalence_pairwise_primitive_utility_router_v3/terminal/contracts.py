@@ -14,6 +14,7 @@ from ..identity import EXPECTED_CASE_COUNT, EXPECTED_TERMINAL_CASE_INVENTORY_SHA
 _BOUNDARY_TOKEN = object()
 _REQUEST_TOKEN = object()
 _ATTESTATION_TOKEN = object()
+_TERMINAL_RECEIPT_TOKEN = object()
 ALLOWED_AGGREGATE_METRICS = (
     "selected_balanced_accuracy",
     "protected_p_balanced_accuracy",
@@ -26,7 +27,8 @@ ALLOWED_AGGREGATE_METRICS = (
     "p_minus_selected_log_loss",
     "routing_coverage",
     "top1_oracle_agreement",
-    "spearman_rank_correlation",
+    "available_case_mean_spearman_rank_correlation",
+    "rank_diagnostic_coverage",
     "normalized_oracle_gap",
     "exact_p_rate",
 )
@@ -142,6 +144,9 @@ class GuardedPreterminalBoundary:
             "raw_labels_present": False,
         }
 
+    def to_payload(self) -> dict[str, object]:
+        return {**self._payload(), "receipt_hash": self.receipt_hash}
+
 
 @dataclass(frozen=True, slots=True)
 class AggregateTerminalScoreRequest:
@@ -198,9 +203,12 @@ class AggregateOnlyTerminalReceipt:
     routed_case_count: int
     exact_p_fallback_count: int
     aggregate_metrics: tuple[tuple[str, float], ...]
+    _factory_token: InitVar[object | None] = None
     receipt_hash: str = field(init=False)
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, _factory_token: object | None) -> None:
+        if _factory_token is not _TERMINAL_RECEIPT_TOKEN:
+            raise ProtocolError("OE-PPUR v3 aggregate terminal receipt bypassed manager.")
         metrics = tuple((str(key), float(value)) for key, value in self.aggregate_metrics)
         if (
             self.evaluated_case_count != EXPECTED_CASE_COUNT
@@ -258,6 +266,9 @@ def seal_guarded_preterminal_boundary(
         or len({row.receipt_hash for row in rows}) != 2
         or len({row.process_pid for row in rows}) != 2
         or any(row.sealed_ledger_receipt_hash != decision_ledger_receipt_hash for row in rows)
+        or len({row.artifact_file_sha256 for row in rows}) != 1
+        or len({row.artifact_file_identity_sha256 for row in rows}) != 1
+        or len({row.validator_runtime_sha256 for row in rows}) != 1
     ):
         raise ProtocolError(
             "OE-PPUR v3 terminal boundary requires two distinct artifact-only attestations."
@@ -275,15 +286,19 @@ def seal_guarded_preterminal_boundary(
     )
 
 
-def issue_artifact_only_preterminal_attestation(
+def _issue_artifact_only_preterminal_attestation(
     *,
     sealed_ledger_receipt_hash: str,
     artifact_file_sha256: str,
     artifact_file_identity_sha256: str,
     validator_runtime_sha256: str,
     process_pid: int,
+    _validator_token: object,
 ) -> ArtifactOnlyPreterminalAttestationReceipt:
-    """Issue one hash-only receipt from an already-fresh validator process."""
+    """Manager-internal receipt factory used only by the spawn validator."""
+
+    if _validator_token is not _ATTESTATION_TOKEN:
+        raise ProtocolError("OE-PPUR v3 attestation issuance bypassed validation.")
 
     return ArtifactOnlyPreterminalAttestationReceipt(
         sealed_ledger_receipt_hash=sealed_ledger_receipt_hash,
@@ -311,6 +326,90 @@ def _issue_terminal_request(
     )
 
 
+def _issue_aggregate_only_terminal_receipt(
+    *,
+    boundary_receipt_hash: str,
+    decision_ledger_receipt_hash: str,
+    evaluated_case_count: int,
+    routed_case_count: int,
+    exact_p_fallback_count: int,
+    aggregate_metrics: tuple[tuple[str, float], ...],
+    _manager_token: object,
+) -> AggregateOnlyTerminalReceipt:
+    """Issue an aggregate receipt only from the concrete manifest reader."""
+
+    if _manager_token is not _TERMINAL_RECEIPT_TOKEN:
+        raise ProtocolError("OE-PPUR v3 terminal receipt issuance bypassed manager.")
+    return AggregateOnlyTerminalReceipt(
+        boundary_receipt_hash=boundary_receipt_hash,
+        decision_ledger_receipt_hash=decision_ledger_receipt_hash,
+        evaluated_case_count=evaluated_case_count,
+        routed_case_count=routed_case_count,
+        exact_p_fallback_count=exact_p_fallback_count,
+        aggregate_metrics=aggregate_metrics,
+        _factory_token=_TERMINAL_RECEIPT_TOKEN,
+    )
+
+
+def _reconstruct_persisted_aggregate_only_terminal_receipt(
+    payload: Mapping[str, object],
+) -> AggregateOnlyTerminalReceipt:
+    """Strictly reconstruct a persisted manager-issued aggregate receipt.
+
+    This is intentionally private: lifecycle validation may read a persisted
+    aggregate payload, but no caller receives a general-purpose receipt
+    constructor or a route to row-level terminal values.
+    """
+
+    if not isinstance(payload, Mapping):
+        raise ProtocolError("OE-PPUR v3 persisted terminal receipt is not a mapping.")
+    required = {
+        "schema_version",
+        "boundary_receipt_hash",
+        "decision_ledger_receipt_hash",
+        "evaluated_case_count",
+        "routed_case_count",
+        "exact_p_fallback_count",
+        "aggregate_metrics",
+        "raw_paths_present",
+        "raw_labels_present",
+        "per_row_values_present",
+        "per_case_values_present",
+        "receipt_hash",
+    }
+    if set(payload) != required or payload.get("schema_version") != (
+        "oe_ppur_v3_aggregate_only_terminal_receipt_v1"
+    ):
+        raise ProtocolError("OE-PPUR v3 persisted terminal receipt schema drifted.")
+    if any(
+        payload.get(key) is not False
+        for key in (
+            "raw_paths_present",
+            "raw_labels_present",
+            "per_row_values_present",
+            "per_case_values_present",
+        )
+    ):
+        raise ProtocolError("OE-PPUR v3 persisted terminal receipt exposed raw values.")
+    metrics = payload["aggregate_metrics"]
+    if not isinstance(metrics, Mapping) or set(metrics) != set(ALLOWED_AGGREGATE_METRICS):
+        raise ProtocolError("OE-PPUR v3 persisted terminal metric inventory drifted.")
+    receipt = _issue_aggregate_only_terminal_receipt(
+        boundary_receipt_hash=str(payload["boundary_receipt_hash"]),
+        decision_ledger_receipt_hash=str(payload["decision_ledger_receipt_hash"]),
+        evaluated_case_count=payload["evaluated_case_count"],  # type: ignore[arg-type]
+        routed_case_count=payload["routed_case_count"],  # type: ignore[arg-type]
+        exact_p_fallback_count=payload["exact_p_fallback_count"],  # type: ignore[arg-type]
+        aggregate_metrics=tuple(
+            (key, metrics[key]) for key in ALLOWED_AGGREGATE_METRICS
+        ),  # type: ignore[arg-type]
+        _manager_token=_TERMINAL_RECEIPT_TOKEN,
+    )
+    if receipt.to_payload() != dict(payload):
+        raise ProtocolError("OE-PPUR v3 persisted terminal receipt hash drifted.")
+    return receipt
+
+
 def assert_aggregate_only_payload(value: Mapping[str, object]) -> None:
     if not isinstance(value, Mapping):
         raise ProtocolError("OE-PPUR v3 terminal payload is not a mapping.")
@@ -333,11 +432,8 @@ def assert_aggregate_only_payload(value: Mapping[str, object]) -> None:
 
 __all__ = (
     "ALLOWED_AGGREGATE_METRICS",
-    "AggregateOnlyTerminalReceipt",
-    "AggregateTerminalScoreRequest",
     "ArtifactOnlyPreterminalAttestationReceipt",
     "GuardedPreterminalBoundary",
     "assert_aggregate_only_payload",
-    "issue_artifact_only_preterminal_attestation",
     "seal_guarded_preterminal_boundary",
 )

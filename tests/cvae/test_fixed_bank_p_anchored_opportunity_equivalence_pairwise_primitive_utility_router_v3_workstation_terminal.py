@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import pickle
+from types import SimpleNamespace
 
 import pytest
 
@@ -14,18 +15,28 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalen
     EXPECTED_TERMINAL_CASE_INVENTORY_SHA256,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.terminal import (
-    CaseRoutingDiagnostic,
-    build_manager_owned_terminal_evaluator,
-    issue_artifact_only_preterminal_attestation,
     issue_terminal_aggregate_capability,
     seal_guarded_preterminal_boundary,
 )
+from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.terminal.contracts import (
+    ALLOWED_AGGREGATE_METRICS,
+    AggregateOnlyTerminalReceipt,
+    _ATTESTATION_TOKEN,
+    _issue_artifact_only_preterminal_attestation,
+    _reconstruct_persisted_aggregate_only_terminal_receipt,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.terminal.evaluator import (
+    AggregateOnlyTerminalEvaluator,
+)
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.terminal.label_reader import (
+    CaseRoutingDiagnostic,
     _VIEW_TOKEN,
+    _build_manager_owned_manifest_label_reader,
     _seal_manager_owned_terminal_input,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.workstation import (
     CPU_WORKER_ENVIRONMENT,
+    preflight_workstation,
     validate_workstation_observation,
     workstation_plan_payload,
 )
@@ -63,6 +74,25 @@ def test_workstation_requires_two_a5000_and_exact_spawn_cpu_contract() -> None:
         )
 
 
+def test_live_preflight_performs_exact_primitive_dto_pickle_round_trip(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.workstation as workstation_module
+
+    monkeypatch.setattr(
+        workstation_module.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(
+            stdout="NVIDIA RTX A5000\nNVIDIA RTX A5000\n"
+        ),
+    )
+    monkeypatch.setattr(workstation_module.os, "cpu_count", lambda: 32)
+    receipt = preflight_workstation()
+
+    assert receipt.dto_pickle_round_trip_validated is True
+    assert receipt.gpu_names == ("NVIDIA RTX A5000", "NVIDIA RTX A5000")
+
+
 def test_primitive_worker_dtos_are_spawn_pickle_safe() -> None:
     task = PrimitiveWorkerTask(
         task_id="H0-fold0",
@@ -95,12 +125,13 @@ def test_primitive_worker_dtos_are_spawn_pickle_safe() -> None:
 def _boundary():
     ledger = "a" * 64
     attestations = tuple(
-        issue_artifact_only_preterminal_attestation(
+        _issue_artifact_only_preterminal_attestation(
             sealed_ledger_receipt_hash=ledger,
             artifact_file_sha256="b" * 64,
             artifact_file_identity_sha256="c" * 64,
-            validator_runtime_sha256=("d" if index == 0 else "e") * 64,
+            validator_runtime_sha256="d" * 64,
             process_pid=100 + index,
+            _validator_token=_ATTESTATION_TOKEN,
         )
         for index in range(2)
     )
@@ -118,12 +149,13 @@ def _boundary():
 
 def test_terminal_requires_two_distinct_attestations() -> None:
     ledger = "a" * 64
-    attestation = issue_artifact_only_preterminal_attestation(
+    attestation = _issue_artifact_only_preterminal_attestation(
         sealed_ledger_receipt_hash=ledger,
         artifact_file_sha256="b" * 64,
         artifact_file_identity_sha256="c" * 64,
         validator_runtime_sha256="d" * 64,
         process_pid=100,
+        _validator_token=_ATTESTATION_TOKEN,
     )
     with pytest.raises(ProtocolError, match="two distinct artifact-only"):
         seal_guarded_preterminal_boundary(
@@ -165,10 +197,14 @@ def test_concrete_terminal_evaluator_is_one_shot_and_aggregate_only() -> None:
         case_diagnostics=diagnostics,
         _manager_token=_VIEW_TOKEN,
     )
-    evaluator = build_manager_owned_terminal_evaluator(view)
+    reader = _build_manager_owned_manifest_label_reader(view)
+    with pytest.raises(ProtocolError, match="evaluator bypassed manager"):
+        AggregateOnlyTerminalEvaluator(reader)
+    with pytest.raises(ProtocolError, match="capability inputs are untyped"):
+        issue_terminal_aggregate_capability(boundary, reader=object())
     capability = issue_terminal_aggregate_capability(
         boundary,
-        evaluator=evaluator,
+        reader=reader,
     )
     receipt = capability.score_aggregates()
     payload = receipt.to_payload()
@@ -184,9 +220,41 @@ def test_concrete_terminal_evaluator_is_one_shot_and_aggregate_only() -> None:
     assert payload["raw_labels_present"] is False
     assert payload["per_row_values_present"] is False
     assert payload["per_case_values_present"] is False
+    assert _reconstruct_persisted_aggregate_only_terminal_receipt(payload) == receipt
+    tampered = dict(payload)
+    tampered["raw_labels_present"] = True
+    with pytest.raises(ProtocolError, match="exposed raw values"):
+        _reconstruct_persisted_aggregate_only_terminal_receipt(tampered)
     with pytest.raises(ProtocolError, match="replayed"):
         capability.score_aggregates()
     with pytest.raises(TypeError):
         pickle.dumps(capability)
     with pytest.raises(TypeError):
         copy.copy(capability)
+
+
+def test_terminal_receipt_cannot_be_injected_or_publicly_constructed() -> None:
+    boundary = _boundary()
+    with pytest.raises(ProtocolError, match="receipt bypassed manager"):
+        AggregateOnlyTerminalReceipt(
+            boundary_receipt_hash=boundary.receipt_hash,
+            decision_ledger_receipt_hash=boundary.decision_ledger_receipt_hash,
+            evaluated_case_count=218,
+            routed_case_count=109,
+            exact_p_fallback_count=109,
+            aggregate_metrics=tuple(
+                (metric, 0.0) for metric in ALLOWED_AGGREGATE_METRICS
+            ),
+        )
+
+    import midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.terminal as terminal
+
+    for unsafe_name in (
+        "AggregateOnlyTerminalReceipt",
+        "AggregateOnlyTerminalEvaluator",
+        "AggregateOnlyLabelReader",
+        "ManagerOwnedManifestLabelReader",
+        "build_manager_owned_manifest_label_reader",
+        "build_manager_owned_terminal_evaluator",
+    ):
+        assert not hasattr(terminal, unsafe_name)

@@ -87,4 +87,5 @@ def test_inspection_is_hardware_free_and_non_mutating() -> None:
     assert payload["hardware_probed"] is False
     assert payload["filesystem_mutation_performed"] is False
     assert payload["experiment_launched"] is False
-    assert payload["end_to_end_scientific_execution_implemented"] is False
+    assert payload["end_to_end_scientific_execution_implemented"] is True
+    assert payload["canonical_terminal_evaluator_implemented"] is True

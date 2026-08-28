@@ -80,10 +80,12 @@ inputs:
     direct_input_ordinal: 3
     content_sha256: null
     row_order_sha256: null
+    producer_source_seal_sha256: null
+    recomputation_receipt_sha256: null
   bank_lock_hash: 9972a41dcd4814cd
   generation_lock_hash: 34e551425710362e
-  bank_content_index_sha256: 7fae389151618950102905f85c5fce300ef9821f15cf304d8469b5a147110279
-  generation_content_index_sha256: 6b74fe794bd30cf6c1e42190427e506d1ff50ecd9280b9dcfee2a7592ec6a318
+  bank_content_index_sha256: 6b74fe794bd30cf6c1e42190427e506d1ff50ecd9280b9dcfee2a7592ec6a318
+  generation_content_index_sha256: 086eb106a11fd52df5fc1f692d17a33edccaf6f707b2b9dd0fba15895d891d86
   test_cache_semantic_id: uniform_b_v2_descriptive_test_cache_v1
   test_cache_representation_id: annotation_jpeg_fixed_center_b_v3
   test_cache_content_sha256: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
@@ -92,7 +94,7 @@ inputs:
   original_parent_ledger_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
   authorization_amendment_sha256: null
 protocol:
-  schema_version: oe_ppur_v3_planned_terminal_protocol_v1
+  schema_version: oe_ppur_v3_terminal_scientific_protocol_v2
   experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router.v3
   dataset_family: MIDOG++
   claim_dataset_family: MIDOG++
@@ -137,7 +139,7 @@ protocol:
   probability_storage_dtype: <f4
   reduction_dtype: <f8
   source_only_training_supervision_direct_input_ordinal: 3
-  source_supervision_materialized: false
+  source_supervision_materialization_required_before_execution: true
   source_supervision_required_members:
   - manifests/source_training_surface.json
   - manifests/source_pool_lineage.json
@@ -176,9 +178,11 @@ protocol:
   direct_input_order_exact: true
   direct_input_duplicates_forbidden: true
   authorization_amendment_input_ordinal: 7
-  authorization_amendment_issued: false
-  execution_authorized: false
-  planned_input_contract_hash: ab37cdfaa3595e978259bc03726fc4c2e15183f63e3ec38c38855438c4bf5551
+  authorization_amendment_required_before_execution: true
+  authorized_seven_input_contract_required_before_execution: true
+  current_authority_state_owned_by_config_not_protocol: true
+  planned_seven_input_contract_hash: ab37cdfaa3595e978259bc03726fc4c2e15183f63e3ec38c38855438c4bf5551
+  authorized_seven_input_contract_hash: 6a8e2ea0aaca968fca7ddbec1f9ba24063195877833ebe738977d6481624ad24
   predecessor_runtime_or_artifact_reuse: false
   structural_scientific_service_injection_allowed: false
   canonical_source_sealed_service_required: true
@@ -190,14 +194,12 @@ protocol:
     cuda_visible_to_cpu_workers: false
     blas_threads_per_cpu_worker: 1
     worker_transport: pickle_primitive_dto_only
-  publication_and_claim_boundary:
-    schema_version: oe_ppur_v3_terminal_claim_boundary_v1
+  publication_and_claim_restrictions:
+    schema_version: oe_ppur_v3_terminal_claim_restrictions_v1
     publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
     terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
     claim_scope: diagnostic_only
     fresh_evidence: false
-    execution_authorized: false
-    consumed_test_reuse_authorized: false
     routing_success_claimed: false
     downstream_utility_claimed: false
     cvae_compatibility_claimed: false
@@ -209,7 +211,7 @@ protocol:
     may_feed_stage70: false
     may_feed_another_stage90: false
     may_feed_another_experiment: false
-  protocol_hash: 31be4f7fd9144927f173367e277cd64446ffe97e64cf284a10354d0fe82f7dc8
+  protocol_hash: 0d552eb6404d15daa1073715cbda1a04fed8bf0ba6ff9d9d3f4f4e99a172d60c
 claim_boundary:
   schema_version: oe_ppur_v3_terminal_claim_boundary_v1
   publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
@@ -230,4 +232,4 @@ claim_boundary:
   may_feed_another_stage90: false
   may_feed_another_experiment: false
 paths_present: false
-config_contract_hash: 8a6ce95aeefb928fd1e85a6be029c40becd3e3fbdf51aa16f5c0b5d7c6c5c7e8
+config_contract_hash: 0294f0d869d42f9ff9eeda7926c85a2898e1625ec6aa13b92e5c665f68a012e0

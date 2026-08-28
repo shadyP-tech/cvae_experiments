@@ -27,6 +27,14 @@ from .recovery import (
     registration_errors,
     validate_preserved_snapshots,
 )
+from .preparation_authority import (
+    AuthorityMember,
+    PreparationAuthorityError,
+    PreparationAuthorityReceipt,
+    enforce_preparation_authority,
+    preparation_authority_registration_error,
+    validate_preparation_authority_gate_id,
+)
 
 
 ARTIFACT_URI_RE = re.compile(r"^(artifact|output)://([^/]+)(?:/(.*))?$")
@@ -89,6 +97,7 @@ class ExperimentEntry:
     input_artifact_ids: tuple[str, ...]
     input_claim_scope_exceptions: Mapping[str, str]
     notes: tuple[str, ...]
+    preparation_authority_gate: str | None = None
 
     @property
     def runnable(self) -> bool:
@@ -422,6 +431,12 @@ class MidogppWorkspace:
                     errors.append(f"{experiment.experiment_id}: config is outside repository")
             if not experiment.runner_argv:
                 errors.append(f"{experiment.experiment_id}: runner argv is empty")
+            authority_registration_error = preparation_authority_registration_error(
+                experiment.preparation_authority_gate,
+                experiment_id=experiment.experiment_id,
+            )
+            if authority_registration_error is not None:
+                errors.append(authority_registration_error)
             output_canonical_path = None if output is None else output.canonical_path
             errors.extend(
                 registration_errors(
@@ -531,11 +546,21 @@ class MidogppWorkspace:
         require_inputs: bool = True,
         force: bool = False,
     ) -> PreparedRun:
+        self.validate()
+        experiment = self.get_experiment(experiment_id)
+        if not experiment.runnable:
+            raise WorkspaceError(
+                f"Experiment {experiment_id} is status={experiment.status!r} and cannot be launched"
+            )
+        authority_receipt = self._enforce_preparation_authority(
+            experiment,
+        )
         rendered = self._render_run(
             experiment_id,
             require_inputs=require_inputs,
-            validate_workspace=True,
+            validate_workspace=False,
             include_all_declared_inputs=False,
+            authority_receipt=authority_receipt,
         )
         prepared = rendered.prepared
         for relative in ("manifests", "provenance", "reports", "tables"):
@@ -552,6 +577,67 @@ class MidogppWorkspace:
         )
         return prepared
 
+    def _enforce_preparation_authority(
+        self,
+        experiment: ExperimentEntry,
+    ) -> PreparationAuthorityReceipt | None:
+        if experiment.preparation_authority_gate is None:
+            return None
+        try:
+            return enforce_preparation_authority(
+                experiment.preparation_authority_gate,
+                repo_root=self.repo_root,
+                experiment_id=experiment.experiment_id,
+                config_path=experiment.config_path,
+                input_artifact_ids=experiment.input_artifact_ids,
+                resolve_authority_member=self._resolve_preparation_authority_member,
+            )
+        except PreparationAuthorityError as exc:
+            raise WorkspaceError(
+                f"{experiment.experiment_id}: preparation authority rejected: {exc}"
+            ) from exc
+
+    def _resolve_preparation_authority_member(
+        self,
+        artifact_id: str,
+        relative: str,
+    ) -> AuthorityMember:
+        """Resolve one catalog-pinned authority file, never a scientific input."""
+
+        artifact = self.artifacts.get(artifact_id)
+        if artifact is None:
+            raise WorkspaceError(f"Unknown MIDOG++ authority artifact_id: {artifact_id}")
+        if artifact.provenance_files != (relative,):
+            raise WorkspaceError(
+                f"Authority artifact {artifact_id} must expose only {relative!r}"
+            )
+        expectation = artifact.expected_file_hashes.get(relative)
+        if expectation is None or expectation.algorithm != "sha256":
+            raise WorkspaceError(
+                f"Authority artifact {artifact_id} lacks an exact sha256 expectation"
+            )
+        raw_root_value = artifact.canonical_path or artifact.physical_path
+        if raw_root_value is None:
+            raise WorkspaceError(
+                f"Authority artifact {artifact_id} has no resolvable path"
+            )
+        raw_root = self._repo_path(raw_root_value)
+        if raw_root.is_symlink():
+            raise WorkspaceError(
+                f"Authority artifact {artifact_id} root may not be a symlink"
+            )
+        root = raw_root.resolve()
+        member = self._safe_member(
+            root,
+            relative,
+            f"artifact://{artifact_id}/{relative}",
+        )
+        if member.is_symlink() or not member.is_file():
+            raise WorkspaceError(
+                f"Authority artifact {artifact_id} member is absent or unsafe: {member}"
+            )
+        return AuthorityMember(path=member, expected_sha256=expectation.digest)
+
     def _render_run(
         self,
         experiment_id: str,
@@ -559,6 +645,7 @@ class MidogppWorkspace:
         require_inputs: bool,
         validate_workspace: bool,
         include_all_declared_inputs: bool,
+        authority_receipt: PreparationAuthorityReceipt | None = None,
     ) -> _RenderedRun:
         """Resolve and serialize a run without creating or changing any file."""
 
@@ -569,6 +656,19 @@ class MidogppWorkspace:
             raise WorkspaceError(
                 f"Experiment {experiment_id} is status={experiment.status!r} and cannot be launched"
             )
+        if (
+            authority_receipt is None
+            and experiment.preparation_authority_gate is not None
+        ):
+            # Private provenance-replay callers cannot bypass the same gate.
+            # Public prepare/run paths already carry a receipt into this method.
+            if not validate_workspace:
+                self.validate()
+            authority_receipt = self._enforce_preparation_authority(experiment)
+        self._verify_preparation_authority_receipt(
+            experiment,
+            receipt=authority_receipt,
+        )
         artifact_root = self.resolve_artifact(
             experiment.output_artifact_id,
             for_output=True,
@@ -643,6 +743,43 @@ class MidogppWorkspace:
             input_manifest=input_manifest,
         )
 
+    def _verify_preparation_authority_receipt(
+        self,
+        experiment: ExperimentEntry,
+        *,
+        receipt: PreparationAuthorityReceipt | None,
+    ) -> None:
+        gate_id = experiment.preparation_authority_gate
+        if gate_id is None:
+            if receipt is not None:
+                raise WorkspaceError("Unexpected workspace preparation authority receipt")
+            return
+        if receipt is None:
+            raise WorkspaceError(
+                f"{experiment.experiment_id}: pre-render preparation authority receipt is required"
+            )
+        expected_config = (
+            None
+            if experiment.config_path is None
+            else self._repo_path(experiment.config_path).resolve()
+        )
+        if (
+            receipt.gate_id != gate_id
+            or receipt.experiment_id != experiment.experiment_id
+            or expected_config is None
+            or receipt.config_path != expected_config
+            or receipt.config_path.is_symlink()
+            or receipt.authority_path.is_symlink()
+            or not receipt.config_path.is_file()
+            or not receipt.authority_path.is_file()
+            or _hash_file(receipt.config_path, "sha256") != receipt.config_sha256
+            or _hash_file(receipt.authority_path, "sha256")
+            != receipt.authority_sha256
+        ):
+            raise WorkspaceError(
+                f"{experiment.experiment_id}: pre-render preparation authority bytes changed"
+            )
+
     def run(self, experiment_id: str, *, force: bool = False, extra_args: Sequence[str] = ()) -> int:
         self.validate()
         experiment = self.get_experiment(experiment_id)
@@ -650,6 +787,9 @@ class MidogppWorkspace:
             raise WorkspaceError(
                 f"Experiment {experiment_id} is status={experiment.status!r} and cannot be launched"
             )
+        authority_receipt = self._enforce_preparation_authority(
+            experiment,
+        )
         artifact_root = self.resolve_artifact(
             experiment.output_artifact_id,
             for_output=True,
@@ -681,6 +821,7 @@ class MidogppWorkspace:
                 require_inputs=True,
                 validate_workspace=False,
                 include_all_declared_inputs=True,
+                authority_receipt=authority_receipt,
             )
             prepared = rendered.prepared
             try:
@@ -1016,6 +1157,12 @@ class MidogppWorkspace:
                 raise WorkspaceError(
                     f"{experiment_id}: runner.run_recovery_strategy must be a non-empty string"
                 )
+            try:
+                preparation_authority_gate = validate_preparation_authority_gate_id(
+                    runner.get("preparation_authority_gate")
+                )
+            except PreparationAuthorityError as exc:
+                raise WorkspaceError(f"{experiment_id}: {exc}") from exc
             exceptions = raw.get("input_claim_scope_exceptions", {}) or {}
             if not isinstance(exceptions, Mapping):
                 raise WorkspaceError(
@@ -1031,6 +1178,7 @@ class MidogppWorkspace:
                 config_path=None if raw.get("config_path") in (None, "") else str(raw["config_path"]),
                 runner_argv=tuple(str(value) for value in runner.get("argv", ())),
                 runner_env={str(key): str(value) for key, value in environment.items()},
+                preparation_authority_gate=preparation_authority_gate,
                 run_recovery_strategy=raw_recovery_strategy,
                 input_artifact_ids=tuple(str(value) for value in raw.get("input_artifact_ids", ())),
                 input_claim_scope_exceptions={

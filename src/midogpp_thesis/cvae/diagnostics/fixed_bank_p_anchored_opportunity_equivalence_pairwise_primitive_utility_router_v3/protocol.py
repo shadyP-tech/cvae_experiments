@@ -1,11 +1,23 @@
-"""Frozen terminal-only protocol for the planned OE-PPUR v3 successor."""
+"""Frozen terminal-only scientific protocol for OE-PPUR v3.
+
+Authorization is a lifecycle state, not a scientific-method parameter.  The
+protocol therefore records the gates that *must* hold before execution while
+the current issuance state lives exclusively in the config's experiment,
+exact-input-contract, and claim-boundary projections.  Keeping those concerns
+separate gives planned and authorization-ready configs one immutable scientific
+protocol hash without allowing the protocol section to contradict either
+state.
+"""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 
 from ...protocol import ProtocolError
-from .execution.inputs import build_planned_seven_input_contract
+from .execution.inputs import (
+    build_authorized_seven_input_contract,
+    build_planned_seven_input_contract,
+)
 from .hashing import canonical_hash
 from .identity import (
     ACTION_IDS,
@@ -54,10 +66,34 @@ def claim_boundary_payload(
     }
 
 
-def _protocol_body() -> dict[str, object]:
-    input_contract = build_planned_seven_input_contract()
+def _claim_restrictions_payload() -> dict[str, object]:
+    """Return state-neutral restrictions shared by every lifecycle state."""
+
     return {
-        "schema_version": "oe_ppur_v3_planned_terminal_protocol_v1",
+        "schema_version": "oe_ppur_v3_terminal_claim_restrictions_v1",
+        "publication_status": PUBLICATION_STATUS,
+        "terminal_decision": TERMINAL_DECISION,
+        "claim_scope": CLAIM_SCOPE,
+        "fresh_evidence": FRESH_EVIDENCE,
+        "routing_success_claimed": False,
+        "downstream_utility_claimed": False,
+        "cvae_compatibility_claimed": False,
+        "nelbo_compatibility_claimed": False,
+        "deployment_claimed": False,
+        "promotion_allowed": False,
+        "may_feed_stage50": False,
+        "may_feed_stage60": False,
+        "may_feed_stage70": False,
+        "may_feed_another_stage90": False,
+        "may_feed_another_experiment": False,
+    }
+
+
+def _protocol_body() -> dict[str, object]:
+    planned_contract = build_planned_seven_input_contract()
+    authorized_contract = build_authorized_seven_input_contract()
+    return {
+        "schema_version": "oe_ppur_v3_terminal_scientific_protocol_v2",
         "experiment_id": EXPERIMENT_ID,
         "dataset_family": "MIDOG++",
         "claim_dataset_family": "MIDOG++",
@@ -77,7 +113,7 @@ def _protocol_body() -> dict[str, object]:
         "probability_storage_dtype": "<f4",
         "reduction_dtype": "<f8",
         "source_only_training_supervision_direct_input_ordinal": 3,
-        "source_supervision_materialized": False,
+        "source_supervision_materialization_required_before_execution": True,
         "source_supervision_required_members": list(
             SOURCE_SUPERVISION_REQUIRED_MEMBERS
         ),
@@ -98,9 +134,11 @@ def _protocol_body() -> dict[str, object]:
         "direct_input_order_exact": True,
         "direct_input_duplicates_forbidden": True,
         "authorization_amendment_input_ordinal": 7,
-        "authorization_amendment_issued": False,
-        "execution_authorized": False,
-        "planned_input_contract_hash": input_contract.receipt_hash,
+        "authorization_amendment_required_before_execution": True,
+        "authorized_seven_input_contract_required_before_execution": True,
+        "current_authority_state_owned_by_config_not_protocol": True,
+        "planned_seven_input_contract_hash": planned_contract.receipt_hash,
+        "authorized_seven_input_contract_hash": authorized_contract.receipt_hash,
         "predecessor_runtime_or_artifact_reuse": False,
         "structural_scientific_service_injection_allowed": False,
         "canonical_source_sealed_service_required": True,
@@ -113,7 +151,7 @@ def _protocol_body() -> dict[str, object]:
             "blas_threads_per_cpu_worker": 1,
             "worker_transport": "pickle_primitive_dto_only",
         },
-        "publication_and_claim_boundary": claim_boundary_payload(),
+        "publication_and_claim_restrictions": _claim_restrictions_payload(),
     }
 
 

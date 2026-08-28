@@ -3509,6 +3509,60 @@ experiments:
       - Every outer target H still removes q=H and e=H before normalization, fitting, or tuning. Selection, calibration, and evaluation remain whole-case disjoint; the complete pre-label router and G proposals freeze before target-label access; all nonfinite, tie, or unsupported states fall back to exact B.
       - Downstream BACC, Brier, and log-loss remain a descriptive sensitivity on the consumed test surface, not CVAE NELBO compatibility, fresh routing, unseen-center generalization, significance, promotion, deployment, or thesis-confirmatory evidence. The result is permanently POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE.
 
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_sceptre_router.v4
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_sceptre_router_v4.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_sceptre_router_v4
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_sceptre_source_inner_candidate_utility_reuse_v4
+      - midogpp_stage90_sceptre_source_inner_adaptive_reuse_amendment_v4
+      - midogpp_stage90_sceptre_test_cache_v4
+      - midogpp_stage90_sceptre_test_manifest_v4
+      - midogpp_uniform_b_test_consumption_ledger_sceptre_parent_v4
+      - midogpp_uniform_b_test_consumption_ledger_sceptre_execution_amendment_v4
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Immutable generation geometry, fixed expert-bank membership, and classifier settings only; no routing, downstream, consumed-label, promotion, deployment, or execution authority is inherited.
+      midogpp_stage90_sceptre_source_inner_candidate_utility_reuse_v4: V4-only authorized reuse of the immutable source-inner expert-versus-expert utility surface for a complete ranking prior. Exact-B advantage is neither observed nor invented, and this grants no target-label or promotion authority.
+      midogpp_stage90_sceptre_source_inner_adaptive_reuse_amendment_v4: Exact v4-only amendment authorizing adaptive descriptive development on the consumed source-inner surface; it grants no fresh-evidence, promotion, deployment, or predecessor execution authority.
+      midogpp_stage90_sceptre_test_cache_v4: V4-only authorized access to the canonical label-free consumed-test cache after the pre-render amendment gate. It remains consumed and supplies no target labels or fresh evidence.
+      midogpp_stage90_sceptre_test_manifest_v4: V4-only role-scoped consumed-test manifest access. The manager-owned broker opens selection, calibration, and evaluation labels only after their preceding global freeze barriers.
+      midogpp_uniform_b_test_consumption_ledger_sceptre_parent_v4: V4-only byte-exact parent-ledger binding. It carries no reusable predecessor authority and cannot itself authorize execution.
+      midogpp_uniform_b_test_consumption_ledger_sceptre_execution_amendment_v4: Exact single-consumer, single-use amendment authorizing one terminal v4 consumed-test diagnostic; first admitted post-lease mutation permanently exhausts it whether the run succeeds or fails.
+    runner:
+      preparation_authority_gate: sceptre_v4_consumed_test_execution_amendment_v1
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-sceptre-router-v4
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_sceptre_router_v4
+    notes:
+      - SCOPE LIMITED — one terminal consumed-test diagnostic is authorized by exact v4 source-inner and execution amendments. This is not fresh routing evidence, and implementation or registration bytes alone cannot replace either amendment or the external single-use lease.
+      - Exactly eight direct identities are declared. The v4 consumer aliases resolve directly to immutable original upstream artifacts and never through v1, v2, or v3 aliases, outputs, state, leases, scratch, checkpoints, probability surfaces, or amendments.
+      - Source-inner expert-versus-expert utility can identify a complete eight-member ranking prior G but cannot estimate advantage over exact B. Every expert is therefore retained; no top-k is chosen from consumed results.
+      - The frozen policy transition is G ranked full set to support-selected member to the same member or exact B. Whole-case support may select any sealed expert, while paired confirmation enforces BACC improvement and non-inferior Brier and log loss; every tie, unsupported, nonfinite, or unsafe state falls back to exact B.
+      - This is deliberately a target-label-assisted post-hoc utility-policy sensitivity. Selection and calibration consume disjoint consumed-test classifier labels, so v4 is not a label-blind deployable router and not a NELBO-compatibility experiment.
+      - All nine target proposals freeze before target-label access. The global phase manager completes all support decisions, then all confirmation decisions, then durably seals and reconstructs all 45 fold policies before terminal evaluation labels can open.
+      - The inspection path is mutation-free and path-free. The dry run authenticates all inputs and workstation requirements without claiming the lease; production claims the external irreversible lease as its first mutation.
+      - There is no cross-run recovery and no predecessor fallback. A post-claim failure is FAILED_EXHAUSTED and requires a separately reviewed successor identity and amendment; --force cannot restore authority.
+      - Every result is permanently POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE. It cannot establish fresh routing, unseen-center generalization, NELBO compatibility, significance, promotion, deployment, or thesis-confirmatory improvement.
+
   - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router.v3
     stage: 90_oracles_and_diagnostics
     status: planned

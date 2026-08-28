@@ -14,14 +14,14 @@ from .contracts import (
     assert_aggregate_only_payload,
 )
 from .label_reader import (
-    AggregateOnlyLabelReader,
+    ManagerOwnedManifestLabelReader,
     _READER_TOKEN,
     _read_authorized_aggregates,
-    build_manager_owned_manifest_label_reader,
 )
 
 
 _CAPABILITY_TOKEN = object()
+_EVALUATOR_TOKEN = object()
 
 
 class AggregateOnlyTerminalEvaluator:
@@ -29,9 +29,17 @@ class AggregateOnlyTerminalEvaluator:
 
     __slots__ = ("_reader",)
 
-    def __init__(self, reader: AggregateOnlyLabelReader) -> None:
-        if not isinstance(reader, AggregateOnlyLabelReader):
-            raise ProtocolError("OE-PPUR v3 terminal evaluator reader is untyped.")
+    def __init__(
+        self,
+        reader: ManagerOwnedManifestLabelReader,
+        *,
+        _factory_token: object | None = None,
+    ) -> None:
+        if (
+            _factory_token is not _EVALUATOR_TOKEN
+            or type(reader) is not ManagerOwnedManifestLabelReader
+        ):
+            raise ProtocolError("OE-PPUR v3 terminal evaluator bypassed manager.")
         self._reader = reader
 
     def _score(self, request):
@@ -125,10 +133,14 @@ class TerminalAggregateCapability:
 def issue_terminal_aggregate_capability(
     boundary: GuardedPreterminalBoundary,
     *,
-    evaluator: AggregateOnlyTerminalEvaluator,
+    reader: ManagerOwnedManifestLabelReader,
 ) -> TerminalAggregateCapability:
-    if type(boundary) is not GuardedPreterminalBoundary:
-        raise ProtocolError("OE-PPUR v3 terminal boundary is untyped.")
+    if (
+        type(boundary) is not GuardedPreterminalBoundary
+        or type(reader) is not ManagerOwnedManifestLabelReader
+    ):
+        raise ProtocolError("OE-PPUR v3 terminal capability inputs are untyped.")
+    evaluator = _build_manager_owned_terminal_evaluator(reader)
     return TerminalAggregateCapability(
         boundary,
         evaluator,
@@ -136,18 +148,16 @@ def issue_terminal_aggregate_capability(
     )
 
 
-def build_manager_owned_terminal_evaluator(
-    sealed_input_view: object,
+def _build_manager_owned_terminal_evaluator(
+    reader: ManagerOwnedManifestLabelReader,
 ) -> AggregateOnlyTerminalEvaluator:
-    """Build the exact concrete evaluator without accepting a callback."""
+    """Build a concrete evaluator only around the physical manifest reader."""
 
-    reader = build_manager_owned_manifest_label_reader(sealed_input_view)  # type: ignore[arg-type]
-    return AggregateOnlyTerminalEvaluator(reader)
+    if type(reader) is not ManagerOwnedManifestLabelReader:
+        raise ProtocolError("OE-PPUR v3 terminal evaluator reader is untyped.")
+    return AggregateOnlyTerminalEvaluator(reader, _factory_token=_EVALUATOR_TOKEN)
 
 
 __all__ = (
-    "AggregateOnlyTerminalEvaluator",
-    "TerminalAggregateCapability",
-    "build_manager_owned_terminal_evaluator",
     "issue_terminal_aggregate_capability",
 )

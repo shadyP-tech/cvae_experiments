@@ -1,9 +1,15 @@
-"""Path-free planned configuration for the OE-PPUR v3 successor."""
+"""Planned and authorization-ready configuration for OE-PPUR v3.
+
+The scientific protocol is lifecycle-state neutral.  Current authority is
+projected consistently through the experiment, exact seven-input contract,
+and claim-boundary sections and is never inferred from protocol metadata.
+"""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+import os
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +33,7 @@ from .identity import (
     EXPECTED_BANK_LOCK_HASH,
     EXPECTED_GENERATION_CONTENT_INDEX_SHA256,
     EXPECTED_GENERATION_LOCK_HASH,
+    EXPECTED_INPUT_KINDS,
     EXPECTED_ORIGINAL_PARENT_LEDGER_SHA256,
     EXPECTED_SOURCE_SUPERVISION_CONTENT_SHA256,
     EXPECTED_SOURCE_SUPERVISION_ROW_ORDER_SHA256,
@@ -35,10 +42,12 @@ from .identity import (
     EXPECTED_TEST_CACHE_ROW_ORDER_HASH,
     EXPECTED_TEST_CACHE_SEMANTIC_ID,
     EXPECTED_TEST_MANIFEST_SHA256,
+    FORBIDDEN_INPUT_PATH_FRAGMENTS,
     OUTPUT_ARTIFACT_ID,
     PUBLICATION_STATUS,
     TERMINAL_DECISION,
 )
+from .workspace_binding import assert_canonical_output_root
 from .protocol import claim_boundary_payload, frozen_protocol_payload
 
 
@@ -111,7 +120,9 @@ class RouterV3Config:
         object.__setattr__(
             self, "direct_input_artifact_ids", DIRECT_INPUT_ARTIFACT_IDS
         )
-        object.__setattr__(self, "contract_hash", canonical_hash(self._payload()))
+        payload = self._payload()
+        _validate_authority_projection(payload, execution_authorized=authorized)
+        object.__setattr__(self, "contract_hash", canonical_hash(payload))
 
     def _payload(self) -> dict[str, object]:
         authorized = self.execution_authorized
@@ -201,7 +212,7 @@ def build_authorization_ready_config(
     source_supervision_recomputation_receipt_sha256: str,
     authorization_amendment_sha256: str,
 ) -> RouterV3Config:
-    """Build a future external-amendment state; never called by preparation."""
+    """Bind a separately issued amendment and parsed source receipt."""
 
     protocol = frozen_protocol_payload()
     inputs = build_authorized_seven_input_contract()
@@ -305,6 +316,192 @@ def load_config(path: str | Path) -> RouterV3Config:
     return build_planned_config()
 
 
+def load_resolved_config(path: str | Path) -> ResolvedV3ConfigBundle:
+    """Load a future workspace-rendered authorization-ready seven-input file.
+
+    The only accepted path-bearing form is an absolute regular file named
+    ``config.resolved.yaml`` inside its declared output root.  Removing the two
+    path-only fields must yield the exact authorization-ready path-free config.
+    This loader does not open or hash any direct input.
+    """
+
+    source = Path(path)
+    candidate = Path(os.path.abspath(source))
+    if not source.is_absolute() or source != candidate:
+        raise ProtocolError("OE-PPUR v3 resolved config path is unsafe.")
+    _reject_symlink_chain(candidate)
+    try:
+        resolved = source.resolve(strict=True)
+    except OSError as exc:
+        raise ProtocolError("OE-PPUR v3 resolved config path is unsafe.") from exc
+    if (
+        source.name != "config.resolved.yaml"
+        or resolved != source
+        or source.is_symlink()
+        or not source.is_file()
+    ):
+        raise ProtocolError("OE-PPUR v3 resolved config path is unsafe.")
+    try:
+        raw: Any = yaml.safe_load(source.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        raise ProtocolError("OE-PPUR v3 resolved config could not be loaded.") from exc
+    return parse_resolved_config_payload(raw, source_path=source)
+
+
+def parse_resolved_config_payload(
+    raw: object,
+    *,
+    source_path: str | Path,
+) -> ResolvedV3ConfigBundle:
+    """Validate a path-bearing candidate without requiring published bytes."""
+
+    source = Path(source_path)
+    candidate = Path(os.path.abspath(source))
+    if (
+        not source.is_absolute()
+        or source != candidate
+        or source.name != "config.resolved.yaml"
+    ):
+        raise ProtocolError("OE-PPUR v3 resolved config path is unsafe.")
+    _reject_symlink_chain(source.parent)
+    if not isinstance(raw, Mapping):
+        raise ProtocolError("OE-PPUR v3 resolved config topology drifted.")
+    normalized = dict(raw)
+    experiment = normalized.get("experiment")
+    inputs = normalized.get("inputs")
+    if not isinstance(experiment, Mapping) or not isinstance(inputs, Mapping):
+        raise ProtocolError("OE-PPUR v3 resolved config sections drifted.")
+    experiment = dict(experiment)
+    inputs = dict(inputs)
+    artifact_root = _absolute_resolved_path(
+        experiment.pop("artifact_root", None), role="artifact root"
+    )
+    assert_canonical_output_root(artifact_root)
+    locations = inputs.pop("direct_input_locations", None)
+    if source.parent != artifact_root:
+        raise ProtocolError("OE-PPUR v3 resolved config escaped its artifact root.")
+    if not isinstance(locations, Mapping) or tuple(locations) != DIRECT_INPUT_ROLES:
+        raise ProtocolError("OE-PPUR v3 resolved input roles drifted.")
+    source_section = inputs.get("source_supervision")
+    if not isinstance(source_section, Mapping):
+        raise ProtocolError("OE-PPUR v3 resolved source supervision is absent.")
+    config = build_authorization_ready_config(
+        source_supervision_content_sha256=str(source_section.get("content_sha256")),
+        source_supervision_row_order_sha256=str(source_section.get("row_order_sha256")),
+        source_supervision_producer_seal_sha256=str(
+            source_section.get("producer_source_seal_sha256")
+        ),
+        source_supervision_recomputation_receipt_sha256=str(
+            source_section.get("recomputation_receipt_sha256")
+        ),
+        authorization_amendment_sha256=str(
+            inputs.get("authorization_amendment_sha256")
+        ),
+    )
+    normalized["experiment"] = experiment
+    normalized["inputs"] = inputs
+    if normalized != config.to_payload():
+        raise ProtocolError("OE-PPUR v3 resolved config contract drifted.")
+    paths = tuple(
+        _absolute_resolved_path(locations[role], role=role)
+        for role in DIRECT_INPUT_ROLES
+    )
+    bindings = tuple(
+        ResolvedDirectInput(role, artifact_id, kind, path_value)
+        for role, artifact_id, kind, path_value in zip(
+            DIRECT_INPUT_ROLES,
+            DIRECT_INPUT_ARTIFACT_IDS,
+            EXPECTED_INPUT_KINDS,
+            paths,
+            strict=True,
+        )
+    )
+    return ResolvedV3ConfigBundle(
+        config=config,
+        source_path=source,
+        artifact_root=artifact_root,
+        input_bindings=bindings,
+    )
+
+
+def _absolute_resolved_path(value: object, *, role: str) -> Path:
+    if not isinstance(value, str):
+        raise ProtocolError(f"OE-PPUR v3 resolved {role} is not a string.")
+    path = Path(value)
+    if (
+        not path.is_absolute()
+        or path == Path(path.anchor)
+        or ".." in path.parts
+        or value.startswith(("artifact://", "output://", "file://"))
+        or any(fragment in path.as_posix().lower() for fragment in FORBIDDEN_INPUT_PATH_FRAGMENTS)
+    ):
+        raise ProtocolError(f"OE-PPUR v3 resolved {role} is unsafe.")
+    return path
+
+
+def _reject_symlink_chain(path: Path) -> None:
+    current = path
+    while True:
+        if current.is_symlink():
+            raise ProtocolError("OE-PPUR v3 resolved config path contains a symlink.")
+        if current == current.parent:
+            return
+        current = current.parent
+
+
+def _validate_authority_projection(
+    payload: Mapping[str, object],
+    *,
+    execution_authorized: bool,
+) -> None:
+    """Reject cross-section authority contradictions before hashing a config."""
+
+    experiment = payload.get("experiment")
+    inputs = payload.get("inputs")
+    claim = payload.get("claim_boundary")
+    protocol = payload.get("protocol")
+    if not all(
+        isinstance(section, Mapping)
+        for section in (experiment, inputs, claim, protocol)
+    ):
+        raise ProtocolError("OE-PPUR v3 config authority sections drifted.")
+    exact = inputs.get("exact_seven_input_contract")
+    if not isinstance(exact, Mapping):
+        raise ProtocolError("OE-PPUR v3 exact authority projection is absent.")
+    if (
+        experiment.get("execution_authorized") is not execution_authorized
+        or exact.get("source_supervision_materialized")
+        is not execution_authorized
+        or exact.get("authorization_amendment_issued")
+        is not execution_authorized
+        or exact.get("execution_authorized") is not execution_authorized
+        or claim.get("execution_authorized") is not execution_authorized
+        or claim.get("consumed_test_reuse_authorized")
+        is not execution_authorized
+    ):
+        raise ProtocolError("OE-PPUR v3 config authority projection drifted.")
+    mutable_state_keys = {
+        "source_supervision_materialized",
+        "authorization_amendment_issued",
+        "execution_authorized",
+        "consumed_test_reuse_authorized",
+    }
+
+    def protocol_keys(value: object) -> set[str]:
+        if isinstance(value, Mapping):
+            return set(value).union(
+                *(protocol_keys(child) for child in value.values())
+            )
+        if isinstance(value, (list, tuple)):
+            return set().union(*(protocol_keys(child) for child in value))
+        return set()
+
+    if mutable_state_keys.intersection(protocol_keys(protocol)):
+        raise ProtocolError(
+            "OE-PPUR v3 scientific protocol contains mutable authority state."
+        )
+
+
 __all__ = (
     "AUTHORIZATION_READY_STATE",
     "PLANNED_STATE",
@@ -314,6 +511,8 @@ __all__ = (
     "build_planned_config",
     "frozen_config_contract_payload",
     "load_config",
+    "load_resolved_config",
+    "parse_resolved_config_payload",
     "validate_authorization_ready_config",
     "validate_planned_config",
 )

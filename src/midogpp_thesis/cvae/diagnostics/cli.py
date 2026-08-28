@@ -558,6 +558,39 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    sceptre_v4 = sub.add_parser(
+        "fixed-bank-sceptre-router-v4",
+        help=(
+            "Run the separately authorized, single-use SCEPTRE v4 candidate-"
+            "set consumed-test diagnostic, its read-only dry run, or inspect "
+            "its executable identities."
+        ),
+    )
+    sceptre_v4.add_argument("--config", required=True)
+    sceptre_v4.add_argument(
+        "--artifact-root",
+        default=".",
+        help="Prepared output root; ignored by the path-free inspection surface.",
+    )
+    sceptre_v4_mode = sceptre_v4.add_mutually_exclusive_group()
+    sceptre_v4_mode.add_argument(
+        "--inspect-plan",
+        action="store_true",
+        help=(
+            "Emit the mutation-free executable/source receipt without "
+            "resolving inputs, probing hardware, or opening target data."
+        ),
+    )
+    sceptre_v4_mode.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "Validate exact-eight inputs, source seal, workspace binding, "
+            "workstation capacity, and the exact GPU worker initializer "
+            "without claiming the single-use lease or opening labels."
+        ),
+    )
+
     pcsi_parc = sub.add_parser(
         "fixed-bank-p-anchored-boundary-projected-pcsi-policy-regret-router",
         help=(
@@ -711,26 +744,42 @@ def main(argv: list[str] | None = None) -> int:
     ):
         import json
 
+        from ..protocol import ProtocolError
+
         from .fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.config import (
             load_config,
+            load_resolved_config,
         )
         from .fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.runner import (
             inspect_planned_router,
             run_oe_ppur_v3,
         )
 
-        config = load_config(args.config)
+        config_path = Path(args.config)
+        if config_path.name == "config.resolved.yaml":
+            if args.inspect_plan:
+                raise ProtocolError(
+                    "OE-PPUR v3 inspection requires the path-free planned config."
+                )
+            resolved = load_resolved_config(config_path)
+            if Path(artifact_root) != resolved.artifact_root:
+                raise ProtocolError(
+                    "OE-PPUR v3 CLI artifact root differs from config.resolved.yaml."
+                )
+            run_input = resolved
+        else:
+            run_input = load_config(config_path)
         if args.inspect_plan:
             print(
                 json.dumps(
-                    inspect_planned_router(config),
+                    inspect_planned_router(run_input),
                     sort_keys=True,
                     separators=(",", ":"),
                 )
             )
             return 0
         output = run_oe_ppur_v3(
-            config,
+            run_input,
             artifact_root=artifact_root,
             scratch_root=(
                 args.scratch_root
@@ -795,6 +844,37 @@ def main(argv: list[str] | None = None) -> int:
             )
         else:
             print(run_sceptre_v3(config, artifact_root=artifact_root))
+        return 0
+
+    if args.surface == "fixed-bank-sceptre-router-v4":
+        import json
+
+        from .fixed_bank_sceptre_router_v4.config import load_config
+        from .fixed_bank_sceptre_router_v4.runner import (
+            dry_run_sceptre_v4,
+            inspect_planned_sceptre_v4,
+            run_sceptre_v4,
+        )
+
+        config = load_config(args.config)
+        if args.inspect_plan:
+            print(
+                json.dumps(
+                    inspect_planned_sceptre_v4(config),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+        elif args.dry_run:
+            print(
+                json.dumps(
+                    dry_run_sceptre_v4(config, artifact_root=artifact_root),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+        else:
+            print(run_sceptre_v4(config, artifact_root=artifact_root))
         return 0
 
     if args.surface == (

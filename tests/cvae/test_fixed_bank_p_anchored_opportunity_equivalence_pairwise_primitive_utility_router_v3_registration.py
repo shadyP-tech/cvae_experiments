@@ -24,15 +24,24 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalen
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.identity import (
     AUTHORIZATION_AMENDMENT_ARTIFACT_ID,
+    CANONICAL_OUTPUT_RELATIVE_ROOT,
     CLI_SURFACE,
     DIRECT_INPUT_ARTIFACT_IDS,
     EXPERIMENT_ID,
+    EXPECTED_BANK_CONTENT_INDEX_SHA256,
+    EXPECTED_GENERATION_CONTENT_INDEX_SHA256,
     OUTPUT_ARTIFACT_ID,
     SOURCE_SUPERVISION_ARTIFACT_ID,
     SOURCE_SUPERVISION_REQUIRED_MEMBERS,
 )
+from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.lifecycle_source_seal import (
+    build_lifecycle_source_seal,
+)
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.source_seal import (
     build_source_seal,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.workspace_binding import (
+    canonical_output_root,
 )
 from midogpp_thesis.cvae.protocol import ProtocolError
 from midogpp_thesis.workspace.runtime import MidogppWorkspace
@@ -112,6 +121,8 @@ def test_v3_registration_is_exact_seven_input_planned_successor() -> None:
     assert len(experiment.input_artifact_ids) == 7
     assert len(set(experiment.input_artifact_ids)) == 7
     assert output.availability == "planned_execution_not_authorized"
+    assert output.canonical_path == CANONICAL_OUTPUT_RELATIVE_ROOT
+    assert canonical_output_root() == ROOT / CANONICAL_OUTPUT_RELATIVE_ROOT
     assert output.semantic_identities["exact_direct_input_count"] == "7"
     assert output.semantic_identities["execution_authorized"] == "false"
     assert output.semantic_identities["consumed_test_reuse_authorized"] == "false"
@@ -200,6 +211,7 @@ def test_v3_catalog_config_protocol_and_source_seal_pins_match_live() -> None:
     semantics = workspace.artifacts[OUTPUT_ARTIFACT_ID].semantic_identities
     config = load_config(CONFIG)
     source = build_source_seal(ROOT)
+    lifecycle = build_lifecycle_source_seal(ROOT)
 
     assert semantics["config_contract_hash"] == config.contract_hash
     assert semantics["protocol_contract_hash"] == config.protocol_hash
@@ -213,16 +225,38 @@ def test_v3_catalog_config_protocol_and_source_seal_pins_match_live() -> None:
     assert semantics["neutral_core_source_tree_sha256"] == (
         source.neutral_tree_sha256
     )
+    assert int(semantics["production_source_member_count"]) == (
+        source.production_member_count
+    )
+    assert semantics["production_source_tree_sha256"] == (
+        source.production_tree_sha256
+    )
     assert semantics["shared_protocol_source_sha256"] == (
         source.shared_protocol_sha256
     )
     assert int(semantics["combined_source_member_count"]) == (
-        source.adapter_member_count + source.neutral_member_count + 1
+        source.adapter_member_count
+        + source.neutral_member_count
+        + source.production_member_count
+        + 1
     )
     assert semantics["combined_source_seal_sha256"] == (
         source.combined_source_sha256
     )
     assert semantics["combined_source_receipt_sha256"] == source.receipt_hash
+    assert int(semantics["lifecycle_source_member_count"]) == (
+        lifecycle.member_count
+    )
+    assert semantics["lifecycle_source_seal_sha256"] == (
+        lifecycle.lifecycle_source_seal_sha256
+    )
+    assert semantics["lifecycle_source_receipt_hash"] == lifecycle.receipt_hash
+    assert semantics["bank_content_index_file_sha256"] == (
+        EXPECTED_BANK_CONTENT_INDEX_SHA256
+    )
+    assert semantics["generation_content_index_file_sha256"] == (
+        EXPECTED_GENERATION_CONTENT_INDEX_SHA256
+    )
 
 
 def test_v3_cli_inspection_and_closed_run_are_mutation_free(
