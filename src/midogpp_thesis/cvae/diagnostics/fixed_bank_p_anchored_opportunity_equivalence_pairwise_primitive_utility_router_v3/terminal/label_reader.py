@@ -235,7 +235,7 @@ class ManagerOwnedManifestLabelReader(AggregateOnlyLabelReader):
         )
 
 
-def seal_manager_owned_terminal_input(
+def _seal_manager_owned_terminal_input(
     boundary: GuardedPreterminalBoundary,
     *,
     row_case_ids: Sequence[object],
@@ -243,10 +243,22 @@ def seal_manager_owned_terminal_input(
     selected_probabilities: Sequence[object],
     protected_probabilities: Sequence[object],
     case_diagnostics: Sequence[CaseRoutingDiagnostic],
+    _manager_token: object,
 ) -> _SealedTerminalInputView:
-    """Validate full coverage and return an opaque non-persistable view."""
+    """Manager-internal raw-value gate; never exported as a package API.
 
-    if type(boundary) is not GuardedPreterminalBoundary:
+    The production caller is the physical manifest reader after resolved
+    seven-input admission and the two independent artifact-only attestations.
+    Keeping the construction token explicit prevents a caller from turning an
+    arbitrary in-memory label vector into terminal authority.
+    """
+
+    if (
+        _manager_token is not _VIEW_TOKEN
+        or type(boundary) is not GuardedPreterminalBoundary
+        or len(boundary.preterminal_attestation_hashes) != 2
+        or len(set(boundary.preterminal_attestation_hashes)) != 2
+    ):
         raise ProtocolError("OE-PPUR v3 terminal input boundary is untyped.")
     cases = tuple(str(value) for value in row_case_ids)
     labels = tuple(int(value) for value in row_labels)
@@ -366,5 +378,4 @@ __all__ = (
     "ManagerOwnedManifestLabelReader",
     "build_manager_owned_manifest_label_reader",
     "build_physical_manifest_label_reader",
-    "seal_manager_owned_terminal_input",
 )

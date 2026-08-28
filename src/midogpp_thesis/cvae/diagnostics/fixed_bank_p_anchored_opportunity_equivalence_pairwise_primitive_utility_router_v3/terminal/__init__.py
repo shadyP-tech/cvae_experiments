@@ -22,7 +22,6 @@ from .label_reader import (
     ManagerOwnedManifestLabelReader,
     build_manager_owned_manifest_label_reader,
     build_physical_manifest_label_reader,
-    seal_manager_owned_terminal_input,
 )
 
 __all__ = (
@@ -43,5 +42,4 @@ __all__ = (
     "issue_artifact_only_preterminal_attestation",
     "issue_terminal_aggregate_capability",
     "seal_guarded_preterminal_boundary",
-    "seal_manager_owned_terminal_input",
 )

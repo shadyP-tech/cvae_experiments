@@ -19,7 +19,10 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalen
     issue_artifact_only_preterminal_attestation,
     issue_terminal_aggregate_capability,
     seal_guarded_preterminal_boundary,
-    seal_manager_owned_terminal_input,
+)
+from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.terminal.label_reader import (
+    _VIEW_TOKEN,
+    _seal_manager_owned_terminal_input,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3.workstation import (
     CPU_WORKER_ENVIRONMENT,
@@ -153,13 +156,14 @@ def test_concrete_terminal_evaluator_is_one_shot_and_aggregate_only() -> None:
         )
         for index in range(218)
     )
-    view = seal_manager_owned_terminal_input(
+    view = _seal_manager_owned_terminal_input(
         boundary,
         row_case_ids=row_case_ids,
         row_labels=labels,
         selected_probabilities=selected,
         protected_probabilities=protected,
         case_diagnostics=diagnostics,
+        _manager_token=_VIEW_TOKEN,
     )
     evaluator = build_manager_owned_terminal_evaluator(view)
     capability = issue_terminal_aggregate_capability(

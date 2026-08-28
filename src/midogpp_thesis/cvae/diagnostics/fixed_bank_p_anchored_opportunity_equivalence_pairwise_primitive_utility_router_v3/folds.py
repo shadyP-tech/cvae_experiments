@@ -132,11 +132,16 @@ class OuterFoldPlanV3:
     """Complete K/J/L rotations plus held and final pool lineages for one H."""
 
     outer_target_center: str
+    # One scope per K for frozen alpha selection and rotating-L calibration.
     scopes: tuple[NestedFoldScopeV3, ...]
+    # One whole-case scope for every legal source (J,d) query.
+    case_crossfit_scopes: tuple[NestedFoldScopeV3, ...]
+    source_case_inventory: tuple[tuple[str, str], ...]
     held_pool_receipts: tuple[HeldCenterCandidatePoolReceipt, ...]
     final_pool_receipt: FinalOuterCandidatePoolReceipt
     compiler: PoolInvariantActionCompilerReceipt
     source_supervision_contract_hash: str
+    source_case_inventory_hash: str = field(init=False)
     plan_hash: str = field(init=False)
 
     def __post_init__(self) -> None:
@@ -150,6 +155,15 @@ class OuterFoldPlanV3:
             raise ProtocolError("OE-PPUR v3 outer fold plan identity drifted.")
         source = tuple(center for center in CENTERS if center != h)
         scopes = tuple(sorted(self.scopes, key=lambda row: CENTERS.index(row.K)))
+        case_scopes = tuple(
+            sorted(
+                self.case_crossfit_scopes,
+                key=lambda row: (CENTERS.index(row.J), row.d),
+            )
+        )
+        source_cases = tuple(
+            sorted((str(center), str(case)) for center, case in self.source_case_inventory)
+        )
         pools = validate_complete_pool_lineage(
             self.held_pool_receipts,
             final_pool=self.final_pool_receipt,
@@ -168,11 +182,39 @@ class OuterFoldPlanV3:
             or set(scope.L for scope in scopes) != set(source)
             or len({scope.L for scope in scopes}) != len(source)
             or any(scope.source_supervision_contract_hash != contract_hash for scope in scopes)
+            or not case_scopes
+            or any(
+                not isinstance(scope, NestedFoldScopeV3)
+                or scope.H != h
+                or scope.source_supervision_contract_hash != contract_hash
+                for scope in case_scopes
+            )
+            or len({(scope.J, scope.d) for scope in case_scopes}) != len(case_scopes)
+            or not source_cases
+            or len(set(source_cases)) != len(source_cases)
+            or {center for center, _ in source_cases} != set(source)
+            or {(scope.J, scope.d) for scope in case_scopes} != set(source_cases)
+            or {
+                (scope.J, scope.K, scope.L)
+                for scope in case_scopes
+            }
+            != {(scope.J, scope.K, scope.L) for scope in scopes}
             or self.final_pool_receipt.source_supervision_contract_hash != contract_hash
         ):
             raise ProtocolError("OE-PPUR v3 K/J/L rotation or source lineage drifted.")
         object.__setattr__(self, "outer_target_center", h)
         object.__setattr__(self, "scopes", scopes)
+        object.__setattr__(self, "case_crossfit_scopes", case_scopes)
+        object.__setattr__(self, "source_case_inventory", source_cases)
+        source_case_hash = canonical_sha256(
+            {
+                "schema": "oe_ppur_v3_source_case_inventory_v1",
+                "H": h,
+                "source_case_keys": source_cases,
+                "target_H_cases_present": False,
+            }
+        )
+        object.__setattr__(self, "source_case_inventory_hash", source_case_hash)
         object.__setattr__(self, "held_pool_receipts", pools)
         object.__setattr__(self, "source_supervision_contract_hash", contract_hash)
         object.__setattr__(
@@ -183,6 +225,10 @@ class OuterFoldPlanV3:
                     "schema": "oe_ppur_v3_complete_outer_fold_plan_v1",
                     "H": h,
                     "scope_receipt_hashes": tuple(scope.receipt_hash for scope in scopes),
+                    "case_crossfit_scope_receipt_hashes": tuple(
+                        scope.receipt_hash for scope in case_scopes
+                    ),
+                    "source_case_inventory_hash": source_case_hash,
                     "held_pool_receipt_hashes": tuple(pool.receipt_hash for pool in pools),
                     "final_pool_receipt_hash": self.final_pool_receipt.receipt_hash,
                     "compiler_receipt_hash": self.compiler.receipt_hash,
@@ -190,6 +236,7 @@ class OuterFoldPlanV3:
                     "K_rotation": "EXACT_C_MINUS_H",
                     "J_rotation": "EXACT_C_MINUS_H",
                     "L_rotation": "EXACT_C_MINUS_H",
+                    "case_crossfit": "EVERY_LEGAL_SOURCE_J_d_EXACTLY_ONCE",
                     "target_labels_used": False,
                 }
             ),
@@ -198,6 +245,10 @@ class OuterFoldPlanV3:
     @property
     def neutral_scopes(self) -> tuple[SourceScopeReceipt, ...]:
         return tuple(scope.to_neutral() for scope in self.scopes)
+
+    @property
+    def neutral_case_crossfit_scopes(self) -> tuple[SourceScopeReceipt, ...]:
+        return tuple(scope.to_neutral() for scope in self.case_crossfit_scopes)
 
     def held_pool(self, center: object) -> HeldCenterCandidatePoolReceipt:
         q = str(center)
@@ -224,6 +275,7 @@ def build_outer_fold_plan(
     inventories = dict(_case_inventory(cases_by_center))
     source = tuple(center for center in CENTERS if center != h)
     scopes = []
+    case_scopes = []
     for index, k in enumerate(source):
         j = source[(index + 1) % len(source)]
         ell = source[(index + 2) % len(source)]
@@ -235,23 +287,29 @@ def build_outer_fold_plan(
             for center in training_centers
             for case in inventories[center]
         )
-        scopes.append(
-            NestedFoldScopeV3(
+        for d in inventories[j]:
+            case_scopes.append(NestedFoldScopeV3(
                 H=h,
                 J=j,
                 K=k,
                 L=ell,
-                d=inventories[j][0],
+                d=d,
                 training_center_ids=training_centers,
                 training_case_keys=training_cases,
                 source_supervision_contract_hash=str(
                     source_supervision_contract_hash
                 ),
-            )
-        )
+            ))
+        scopes.append(case_scopes[-len(inventories[j])])
     return OuterFoldPlanV3(
         outer_target_center=h,
         scopes=tuple(scopes),
+        case_crossfit_scopes=tuple(case_scopes),
+        source_case_inventory=tuple(
+            (center, case)
+            for center in source
+            for case in inventories[center]
+        ),
         held_pool_receipts=tuple(held_pool_receipts),
         final_pool_receipt=final_pool_receipt,
         compiler=compiler,
@@ -278,9 +336,47 @@ def cases_by_center_from_source_surface(
     }
 
 
+def build_outer_fold_plan_from_source_surface(
+    surface: SourceTrainingSurface,
+    *,
+    outer_target_center: object,
+    final_pool_receipt: FinalOuterCandidatePoolReceipt,
+) -> OuterFoldPlanV3:
+    """Bind case cross-fitting to the parsed source rows, never caller inventory."""
+
+    if not isinstance(surface, SourceTrainingSurface):
+        raise ProtocolError("OE-PPUR v3 outer plan requires parsed source supervision.")
+    h = str(outer_target_center)
+    held_pools = tuple(
+        pool for pool in surface.held_pool_receipts
+        if pool.outer_target_center == h
+    )
+    result = build_outer_fold_plan(
+        outer_target_center=h,
+        cases_by_center=cases_by_center_from_source_surface(surface),
+        held_pool_receipts=held_pools,
+        final_pool_receipt=final_pool_receipt,
+        compiler=surface.compiler,
+        source_supervision_contract_hash=surface.receipt.contract.contract_hash,
+    )
+    actual = tuple(
+        sorted(
+            {
+                (row.query_center, row.case_id)
+                for row in surface.rows_for_outer(h)
+            }
+        )
+    )
+    if result.source_case_inventory != actual:
+        raise ProtocolError("OE-PPUR v3 fold plan invented or omitted parsed source cases.")
+    return result
+
+
 validate_outer_fold_plan = lambda plan: OuterFoldPlanV3(
     outer_target_center=plan.outer_target_center,
     scopes=plan.scopes,
+    case_crossfit_scopes=plan.case_crossfit_scopes,
+    source_case_inventory=plan.source_case_inventory,
     held_pool_receipts=plan.held_pool_receipts,
     final_pool_receipt=plan.final_pool_receipt,
     compiler=plan.compiler,
@@ -292,6 +388,7 @@ __all__ = (
     "NestedFoldScopeV3",
     "OuterFoldPlanV3",
     "build_outer_fold_plan",
+    "build_outer_fold_plan_from_source_surface",
     "cases_by_center_from_source_surface",
     "validate_outer_fold_plan",
 )

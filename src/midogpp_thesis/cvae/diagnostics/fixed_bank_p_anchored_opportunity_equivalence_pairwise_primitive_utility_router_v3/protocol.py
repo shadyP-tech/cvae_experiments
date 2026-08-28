@@ -27,15 +27,19 @@ from .identity import (
 )
 
 
-def claim_boundary_payload() -> dict[str, object]:
+def claim_boundary_payload(
+    *, execution_authorized: bool = False
+) -> dict[str, object]:
+    if type(execution_authorized) is not bool:
+        raise ProtocolError("OE-PPUR v3 claim authority state is untyped.")
     return {
         "schema_version": "oe_ppur_v3_terminal_claim_boundary_v1",
         "publication_status": PUBLICATION_STATUS,
         "terminal_decision": TERMINAL_DECISION,
         "claim_scope": CLAIM_SCOPE,
         "fresh_evidence": FRESH_EVIDENCE,
-        "execution_authorized": False,
-        "consumed_test_reuse_authorized": False,
+        "execution_authorized": execution_authorized,
+        "consumed_test_reuse_authorized": execution_authorized,
         "routing_success_claimed": False,
         "downstream_utility_claimed": False,
         "cvae_compatibility_claimed": False,
@@ -73,6 +77,7 @@ def _protocol_body() -> dict[str, object]:
         "probability_storage_dtype": "<f4",
         "reduction_dtype": "<f8",
         "source_only_training_supervision_direct_input_ordinal": 3,
+        "source_supervision_materialized": False,
         "source_supervision_required_members": list(
             SOURCE_SUPERVISION_REQUIRED_MEMBERS
         ),
@@ -122,8 +127,14 @@ def validate_protocol_payload(payload: Mapping[str, object]) -> None:
         raise ProtocolError("OE-PPUR v3 protocol contract drifted.")
 
 
-def validate_claim_boundary(payload: Mapping[str, object]) -> None:
-    if not isinstance(payload, Mapping) or dict(payload) != claim_boundary_payload():
+def validate_claim_boundary(
+    payload: Mapping[str, object],
+    *,
+    execution_authorized: bool = False,
+) -> None:
+    if not isinstance(payload, Mapping) or dict(payload) != claim_boundary_payload(
+        execution_authorized=execution_authorized
+    ):
         raise ProtocolError("OE-PPUR v3 terminal claim firewall drifted.")
 
 

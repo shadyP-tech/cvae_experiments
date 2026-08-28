@@ -138,6 +138,7 @@ class SourceSupervisionContractReceipt:
 
     compiler_receipt_hash: str
     producer_source_seal_sha256: str
+    producer_compiler_recomputation_receipt_sha256: str
     artifact_id: str = SOURCE_SUPERVISION_ARTIFACT_ID
     split: str = SOURCE_SPLIT
     representation_id: str = SOURCE_REPRESENTATION_ID
@@ -168,6 +169,14 @@ class SourceSupervisionContractReceipt:
             self, "producer_source_seal_sha256",
             _sha256(self.producer_source_seal_sha256, role="producer source seal"),
         )
+        object.__setattr__(
+            self,
+            "producer_compiler_recomputation_receipt_sha256",
+            _sha256(
+                self.producer_compiler_recomputation_receipt_sha256,
+                role="producer compiler-recomputation receipt",
+            ),
+        )
         object.__setattr__(self, "all_center_ids", CENTERS)
         object.__setattr__(self, "exact_members", SOURCE_SUPERVISION_MEMBERS)
         object.__setattr__(self, "source_cache_file_hashes", SOURCE_CACHE_FILE_HASHES)
@@ -195,6 +204,9 @@ class SourceSupervisionContractReceipt:
                         EXPECTED_GENERATION_CONTENT_INDEX_SHA256,
                     ),
                     "producer_source_seal_sha256": self.producer_source_seal_sha256,
+                    "producer_compiler_recomputation_receipt_sha256": (
+                        self.producer_compiler_recomputation_receipt_sha256
+                    ),
                     "compiler_receipt_hash": self.compiler_receipt_hash,
                     "exact_members": SOURCE_SUPERVISION_MEMBERS,
                     "raw_counts": (RAW_SOURCE_ROW_COUNT, RAW_SOURCE_CASE_COUNT),
@@ -238,6 +250,9 @@ class SourceSupervisionContractReceipt:
             "generation_lock_hash": EXPECTED_GENERATION_LOCK_HASH,
             "generation_content_index_sha256": EXPECTED_GENERATION_CONTENT_INDEX_SHA256,
             "producer_source_seal_sha256": self.producer_source_seal_sha256,
+            "producer_compiler_recomputation_receipt_sha256": (
+                self.producer_compiler_recomputation_receipt_sha256
+            ),
             "compiler_receipt_hash": self.compiler_receipt_hash,
             "source_supervision_contract_hash": self.contract_hash,
             "action_ids": list(ALL_ACTION_IDS),

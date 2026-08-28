@@ -9,7 +9,6 @@ from typing import Sequence
 from ....protocol import ProtocolError
 from ..hashing import canonical_hash
 from ..identity import (
-    AUTHORIZATION_AMENDMENT_ISSUED,
     DIRECT_INPUT_ARTIFACT_IDS,
     DIRECT_INPUT_ROLES,
     EXPECTED_INPUT_KINDS,
@@ -70,9 +69,13 @@ class SevenInputContractReceipt:
         if _factory_token is not _CONTRACT_TOKEN:
             raise ProtocolError("OE-PPUR v3 seven-input contract bypassed factory.")
         rows = tuple(self.ordered_inputs)
-        if rows != _canonical_input_identities():
+        source_materialized = bool(rows) and rows[2].issued
+        if rows != _canonical_input_identities(
+            source_supervision_materialized=source_materialized,
+            amendment_issued=self.amendment_issued,
+        ):
             raise ProtocolError("OE-PPUR v3 seven-input order or identity drifted.")
-        if self.amendment_issued is not AUTHORIZATION_AMENDMENT_ISSUED:
+        if type(self.amendment_issued) is not bool:
             raise ProtocolError("OE-PPUR v3 amendment issuance state drifted.")
         object.__setattr__(self, "ordered_inputs", rows)
         object.__setattr__(self, "receipt_hash", canonical_hash(self._payload()))
@@ -83,7 +86,11 @@ class SevenInputContractReceipt:
 
     @property
     def execution_authorized(self) -> bool:
-        return self.amendment_issued
+        return self.source_supervision_materialized and self.amendment_issued
+
+    @property
+    def source_supervision_materialized(self) -> bool:
+        return self.ordered_inputs[2].issued
 
     def _payload(self) -> dict[str, object]:
         return {
@@ -93,6 +100,7 @@ class SevenInputContractReceipt:
             "order_is_semantic": True,
             "duplicates_forbidden": True,
             "source_supervision_direct_input_ordinal": 3,
+            "source_supervision_materialized": self.source_supervision_materialized,
             "authorization_amendment_input_ordinal": 7,
             "authorization_amendment_issued": self.amendment_issued,
             "execution_authorized": self.execution_authorized,
@@ -136,16 +144,40 @@ class ResolvedDirectInput:
 
 def build_planned_seven_input_contract() -> SevenInputContractReceipt:
     return SevenInputContractReceipt(
-        ordered_inputs=_canonical_input_identities(),
+        ordered_inputs=_canonical_input_identities(
+            source_supervision_materialized=False,
+            amendment_issued=False,
+        ),
         amendment_issued=False,
         _factory_token=_CONTRACT_TOKEN,
     )
 
 
-def validate_seven_input_contract(value: object) -> SevenInputContractReceipt:
+def build_authorized_seven_input_contract() -> SevenInputContractReceipt:
+    """Build the future state only after inputs three and seven exist."""
+
+    return SevenInputContractReceipt(
+        ordered_inputs=_canonical_input_identities(
+            source_supervision_materialized=True,
+            amendment_issued=True,
+        ),
+        amendment_issued=True,
+        _factory_token=_CONTRACT_TOKEN,
+    )
+
+
+def validate_seven_input_contract(
+    value: object,
+    *,
+    execution_authorized: bool = False,
+) -> SevenInputContractReceipt:
     if type(value) is not SevenInputContractReceipt:
         raise ProtocolError("OE-PPUR v3 seven-input contract is untyped.")
-    rebuilt = build_planned_seven_input_contract()
+    rebuilt = (
+        build_authorized_seven_input_contract()
+        if execution_authorized
+        else build_planned_seven_input_contract()
+    )
     if value != rebuilt:
         raise ProtocolError("OE-PPUR v3 seven-input contract drifted.")
     return value
@@ -183,7 +215,17 @@ def hash_resolved_input_locations(values: Sequence[ResolvedDirectInput]) -> str:
     )
 
 
-def _canonical_input_identities() -> tuple[DirectInputIdentity, ...]:
+def _canonical_input_identities(
+    *,
+    source_supervision_materialized: bool,
+    amendment_issued: bool,
+) -> tuple[DirectInputIdentity, ...]:
+    if (
+        type(source_supervision_materialized) is not bool
+        or type(amendment_issued) is not bool
+        or amendment_issued and not source_supervision_materialized
+    ):
+        raise ProtocolError("OE-PPUR v3 direct-input issuance state drifted.")
     rows = []
     for ordinal, (role, artifact_id, kind, member) in enumerate(
         zip(
@@ -205,7 +247,13 @@ def _canonical_input_identities() -> tuple[DirectInputIdentity, ...]:
                 required_members=(
                     SOURCE_SUPERVISION_REQUIRED_MEMBERS if ordinal == 3 else ()
                 ),
-                issued=(ordinal != 7),
+                issued=(
+                    source_supervision_materialized
+                    if ordinal == 3
+                    else amendment_issued
+                    if ordinal == 7
+                    else True
+                ),
             )
         )
     return tuple(rows)
@@ -215,6 +263,7 @@ __all__ = (
     "DirectInputIdentity",
     "ResolvedDirectInput",
     "SevenInputContractReceipt",
+    "build_authorized_seven_input_contract",
     "build_planned_seven_input_contract",
     "hash_resolved_input_locations",
     "validate_exact_resolved_input_bindings",

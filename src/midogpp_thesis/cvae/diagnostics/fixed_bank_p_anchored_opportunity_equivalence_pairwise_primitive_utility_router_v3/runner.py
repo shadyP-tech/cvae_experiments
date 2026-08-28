@@ -35,6 +35,7 @@ def inspect_planned_router(
         "direct_input_artifact_ids": list(planned.direct_input_artifact_ids),
         "source_supervision_direct_input_ordinal": 3,
         "source_supervision_content_hash_known": False,
+        "source_supervision_materialized": False,
         "authorization_amendment_input_ordinal": 7,
         "authorization_amendment_issued": False,
         "current_source_seal_hash": source.combined_source_sha256,

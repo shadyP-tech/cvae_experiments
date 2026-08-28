@@ -116,8 +116,8 @@ class GuardedPreterminalBoundary:
         if (
             len(attestations) != 2
             or len(set(attestations)) != 2
-            or
-            self.case_inventory_sha256 != EXPECTED_TERMINAL_CASE_INVENTORY_SHA256
+            or self.case_inventory_sha256
+            != EXPECTED_TERMINAL_CASE_INVENTORY_SHA256
             or self.case_count != EXPECTED_CASE_COUNT
             or type(self.exact_p_fallback_count) is not int
             or not 0 <= self.exact_p_fallback_count <= self.case_count

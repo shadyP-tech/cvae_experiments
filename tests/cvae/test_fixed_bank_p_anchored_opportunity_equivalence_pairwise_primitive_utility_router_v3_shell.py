@@ -35,6 +35,8 @@ def test_exact_seven_input_planned_contract_is_path_free() -> None:
     assert tuple(row.artifact_id for row in contract.ordered_inputs) == DIRECT_INPUT_ARTIFACT_IDS
     assert contract.ordered_inputs[2].artifact_id == SOURCE_SUPERVISION_ARTIFACT_ID
     assert contract.ordered_inputs[2].required_members == SOURCE_SUPERVISION_REQUIRED_MEMBERS
+    assert contract.ordered_inputs[2].issued is False
+    assert contract.source_supervision_materialized is False
     assert contract.ordered_inputs[6].artifact_id == AUTHORIZATION_AMENDMENT_ARTIFACT_ID
     assert contract.ordered_inputs[6].issued is False
     assert contract.amendment_issued is False
