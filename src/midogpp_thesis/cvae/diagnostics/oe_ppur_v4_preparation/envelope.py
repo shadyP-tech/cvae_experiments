@@ -103,7 +103,9 @@ def commit_marker_bytes(envelope: FinalAuthorizationEnvelope) -> bytes:
             "authorization_amendment_sha256": envelope.amendment_sha256,
             "member_writes_used_o_excl": True,
             "commit_marker_written_last": True,
-            "authorization_consumed": False,
+            "authorization_consumed": True,
+            "authorization_exhausted": True,
+            "preparation_commit_is_scientific_complete": False,
             "target_labels_opened": False,
             "experiment_launched": False,
         }

@@ -11,6 +11,10 @@ import yaml
 
 from ...protocol import ProtocolError
 from .hashing import canonical_hash, require_sha256
+from .execution.inputs import (
+    ResolvedDirectInput,
+    validate_exact_resolved_input_bindings,
+)
 from .identity import (
     DIRECT_INPUT_ARTIFACT_IDS,
     DIRECT_INPUT_ROLES,
@@ -164,6 +168,103 @@ class RouterV4Config:
     def to_payload(self) -> dict[str, object]:
         return {**self._payload(), "config_contract_hash": self.contract_hash}
 
+    @property
+    def source_supervision_content_sha256(self) -> str:
+        """Exact parsed source-training receipt bound by direct input #3."""
+
+        return EXPECTED_SOURCE_RECEIPT_SHA256
+
+    @property
+    def source_supervision_row_order_sha256(self) -> str:
+        return EXPECTED_SOURCE_ROW_ORDER_SHA256
+
+    @property
+    def source_supervision_producer_seal_sha256(self) -> str:
+        return EXPECTED_SOURCE_PRODUCER_SEAL_SHA256
+
+    @property
+    def source_supervision_recomputation_receipt_sha256(self) -> str:
+        return EXPECTED_SOURCE_RECOMPUTATION_RECEIPT_SHA256
+
+
+def validate_workspace_sealed_config(value: object) -> RouterV4Config:
+    """Validate amendment readiness without pretending it grants launch."""
+
+    if (
+        type(value) is not RouterV4Config
+        or value.authorization_state != SEALED_STATE
+        or value.execution_amendment_issued is not True
+        or value.launch_authorized is not False
+        or value.workspace_plan_sha256 is None
+        or value.authorization_amendment_sha256 is None
+        or value
+        != build_workspace_sealed_config(
+            workspace_plan_sha256=value.workspace_plan_sha256,
+            authorization_amendment_sha256=value.authorization_amendment_sha256,
+        )
+    ):
+        raise ProtocolError("OE-PPUR v4 workspace-sealed config drifted.")
+    return value
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedV4ConfigBundle:
+    """Prospective path bindings plus separately admitted launch authority.
+
+    The contained config deliberately remains ``launch_authorized=False``.
+    Execution permission is represented only by the type-gated run admission;
+    this bundle records its authority-file hash for end-to-end lineage.
+    """
+
+    config: RouterV4Config
+    source_path: Path
+    artifact_root: Path
+    input_bindings: tuple[ResolvedDirectInput, ...]
+    input_manifest_path: Path
+    final_envelope_path: Path
+    workspace_snapshot_sha256: str
+    workspace_plan_sha256: str
+    final_envelope_sha256: str
+    execution_launch_authority_sha256: str
+
+    def __post_init__(self) -> None:
+        config = validate_workspace_sealed_config(self.config)
+        source = Path(self.source_path)
+        artifact = Path(self.artifact_root)
+        manifest = Path(self.input_manifest_path)
+        envelope = Path(self.final_envelope_path)
+        bindings = validate_exact_resolved_input_bindings(self.input_bindings)
+        if (
+            not source.is_absolute()
+            or source.name != "config.resolved.yaml"
+            or not artifact.is_absolute()
+            or artifact == Path(artifact.anchor)
+            or source != artifact / "config.resolved.yaml"
+            or manifest != artifact / "provenance/input_artifacts.json"
+            or envelope
+            != artifact / "preparation/final_authorization_envelope.json"
+            or any(path.is_symlink() for path in (source, artifact, manifest, envelope))
+        ):
+            raise ProtocolError("OE-PPUR v4 resolved config bundle drifted.")
+        for role in (
+            "workspace_snapshot_sha256",
+            "workspace_plan_sha256",
+            "final_envelope_sha256",
+            "execution_launch_authority_sha256",
+        ):
+            digest = require_sha256(getattr(self, role), role.replace("_", " "))
+            if digest == "0" * 64:
+                raise ProtocolError("OE-PPUR v4 resolved authority is a placeholder.")
+            object.__setattr__(self, role, digest)
+        if self.workspace_plan_sha256 != config.workspace_plan_sha256:
+            raise ProtocolError("OE-PPUR v4 resolved workspace plan drifted.")
+        object.__setattr__(self, "config", config)
+        object.__setattr__(self, "source_path", source)
+        object.__setattr__(self, "artifact_root", artifact)
+        object.__setattr__(self, "input_bindings", bindings)
+        object.__setattr__(self, "input_manifest_path", manifest)
+        object.__setattr__(self, "final_envelope_path", envelope)
+
 
 def build_planned_config() -> RouterV4Config:
     protocol = frozen_protocol_payload()
@@ -222,10 +323,12 @@ def load_config(path: str | Path) -> RouterV4Config:
 
 __all__ = (
     "PLANNED_STATE",
+    "ResolvedV4ConfigBundle",
     "SEALED_STATE",
     "RouterV4Config",
     "build_planned_config",
     "build_workspace_sealed_config",
     "frozen_config_contract_payload",
     "load_config",
+    "validate_workspace_sealed_config",
 )

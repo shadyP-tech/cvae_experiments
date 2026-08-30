@@ -25,7 +25,6 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v1.config import (
     load_config,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v1.identity import (
-    AUTHORIZATION_SCOPE,
     EXPERIMENT_ID,
     PUBLICATION_STATUS,
     TERMINAL_DECISION,
@@ -70,7 +69,6 @@ from midogpp_thesis.cvae.routing.harp_portfolio import (
     HarpPolicyConfig,
     select_harp_portfolio,
 )
-from midogpp_thesis.cvae.routing.harp_protocol import canonical_hash
 from midogpp_thesis.cvae.routing.harp_replay.evaluation import (
     _case_equal_balanced_accuracy,
 )
@@ -385,24 +383,12 @@ def _authorized_config(tmp_path: Path):
         "evaluation_manifest_sha256": "c" * 64,
         "parent_ledger_sha256": "d" * 64,
     }
-    binding_config = replace(base, expected_hashes=expected_hashes)
-    amendment_base = {
-        "schema_version": "midogpp_harp_stage90_execution_amendment_v1",
-        "experiment_id": EXPERIMENT_ID,
-        "authorization_scope": AUTHORIZATION_SCOPE,
-        "execution_authorized": True,
-        "single_use": True,
-        "consumed_test_reuse": True,
-        "publication_status": PUBLICATION_STATUS,
-        "terminal_decision": TERMINAL_DECISION,
-        "fresh_evidence": False,
-        "predecessor_authority_reused": False,
-        "predecessor_output_or_policy_used": False,
-        "old_aggregate_utility_surface_used": False,
-        "output_deletion_restores_authority": False,
-        "authorized_input_binding": authorization._input_binding(binding_config),
-    }
-    amendment = {**amendment_base, "amendment_hash": canonical_hash(amendment_base)}
+    binding_config = replace(
+        base,
+        execution_authorized=True,
+        expected_hashes=expected_hashes,
+    )
+    amendment = authorization.canonical_execution_amendment_payload(binding_config)
     path = tmp_path / "amendment.json"
     path.write_text(json.dumps(amendment), encoding="utf-8")
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -421,7 +407,7 @@ def test_exhausted_authority_fails_before_output_creation(
     config = _authorized_config(tmp_path)
     lease = tmp_path / "already-consumed-lease"
     lease.mkdir()
-    monkeypatch.setattr(authorization, "lease_path", lambda: lease)
+    monkeypatch.setattr(authorization, "lease_path", lambda *_args: lease)
     destination = Path(config.artifact_root)
     with pytest.raises(ProtocolError, match="authorization is exhausted"):
         run_harp_stage90(config, artifact_root=destination)
@@ -439,7 +425,11 @@ def test_authority_is_bound_to_exact_prepared_input_hashes(
             "development_manifest_sha256": "e" * 64,
         },
     )
-    monkeypatch.setattr(authorization, "lease_path", lambda: tmp_path / "unused-lease")
+    monkeypatch.setattr(
+        authorization,
+        "lease_path",
+        lambda *_args: tmp_path / "unused-lease",
+    )
     with pytest.raises(ProtocolError, match="failed authentication"):
         authorization.load_authorization(drifted)
 

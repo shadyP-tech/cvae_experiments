@@ -23,6 +23,9 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalen
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v4.input_contract import (
     build_planned_seven_input_contract,
 )
+from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v4.output_persistence import (
+    COMPLETE_CATALOG_MEMBERS,
+)
 from midogpp_thesis.cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v4.protocol import (
     frozen_protocol_payload,
 )
@@ -99,10 +102,8 @@ def test_v4_registration_is_exact_seven_input_nonrunnable_successor() -> None:
     assert output.semantic_identities["nfs_safe_publication_topology"] == (
         "NFS_SAFE_IN_PLACE_COMMIT"
     )
-    assert output.required_files[-2:] == (
-        "preparation/final_authorization_envelope.json",
-        "COMMITTED",
-    )
+    assert set(output.required_files) == set(COMPLETE_CATALOG_MEMBERS)
+    assert len(output.required_files) == len(COMPLETE_CATALOG_MEMBERS)
 
 
 def test_v4_source_alias_binds_every_member_without_inheriting_authority() -> None:
@@ -233,7 +234,9 @@ def test_v4_documentation_keeps_the_terminal_no_launch_boundary() -> None:
     assert PRESERVED_V3_AMENDMENT_SHA256 in text
     assert "issued/unrendered/unclaimed/no-run" in text
     assert "NFS_SAFE_IN_PLACE_COMMIT" in text
-    assert "Scientific execution adapter: not implemented or runnable" in text
-    assert "sealing the fresh amendment alone still cannot" in text
-    assert "No launch command is documented" in text
-    assert "-m midogpp_thesis.oe_ppur_v4 run" not in text
+    assert "Scientific execution adapter: implemented" in text
+    assert "Preflight and amendment publication are preparation-only" in text
+    assert "They do\nnot authorize the `run` subcommand" in text
+    assert "RUN_TERMINAL_CONSUMED_TEST" in text
+    assert "-m midogpp_thesis.oe_ppur_v4 run" in text
+    assert "did not issue an\namendment, render an authority file" in text

@@ -4,7 +4,7 @@
 
 - Experiment: `midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router.v4`
 - Stage: `90_oracles_and_diagnostics`
-- Workspace registration: planned and deliberately non-runnable
+- Workspace registration: planned; generic workspace launch deliberately closed
 - Publication label: `POST_HOC_CONSUMED_TEST_SENSITIVITY`
 - Terminal decision: `TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`
 - Fresh evidence: `false`
@@ -12,8 +12,8 @@
 - Launch authority: absent
 - Execution launched by this successor authorization: no
 - FUSE required or activated: no
-- Current implementation scope: preparation only
-- Scientific execution adapter: not implemented or runnable
+- Current implementation scope: complete modular execution lifecycle
+- Scientific execution adapter: implemented behind sealed replay and typed launch admission
 
 OE-PPUR v4 is a lifecycle successor that closes the workspace-binding and NFS
 publication gaps found after the v3 amendment was issued. It does not revise or
@@ -107,25 +107,34 @@ authority.
 
 ## NFS-safe workstation publication
 
-V4 replaces the directory `RENAME_NOREPLACE` assumption with
+V4 replaces the directory `RENAME_NOREPLACE` assumption with a post-lease
 `NFS_SAFE_IN_PLACE_COMMIT`:
 
-1. acquire the absent canonical final root exclusively;
-2. create every member with no-follow `O_EXCL` semantics;
-3. fsync member files and their parent directories;
-4. validate the exact envelope bytes in place;
-5. write and fsync `COMMITTED` last.
+1. complete every read-only source, input, workspace, host, capacity, and
+   service gate;
+2. consume the separate single-use launch authority through the durable lease;
+3. acquire the absent canonical final root exclusively;
+4. create every preparation member with no-follow `O_EXCL` semantics;
+5. fsync member files and their parent directories;
+6. validate the exact config, input manifest, envelope, authority copy, and
+   replay receipt bytes in place;
+7. write and fsync preparation `COMMITTED` last.
 
-An output without the final marker is incomplete and inadmissible. Existing
-roots are never recovered or overwritten. The run scratch remains host-local,
-cross-run recovery is forbidden, and FUSE is not part of the v4 topology.
+An output without that marker is not prepared and is inadmissible. Preparation
+`COMMITTED` is not scientific `COMPLETE`: the latter is established only after
+label-free decisions, two independent fresh-process preterminal attestations,
+manager-owned aggregate-only terminal evaluation, two final aggregate
+attestations, a whole-artifact seal, the completion journal, and the exact
+terminal run state. Existing roots are never recovered or overwritten. The run
+scratch remains host-local, cross-run recovery is forbidden, and FUSE is not
+part of the v4 topology.
 
 The workstation compute topology remains two persistent RTX A5000 prediction
 workers plus four CUDA-hidden `spawn` CPU workers, one BLAS thread per worker,
 primitive pickle-safe process DTOs, little-endian float32 prediction transport,
 float64 scientific reductions, and no nested pools.
 
-## No-launch boundary
+## Executable boundary
 
 The implementation can be inspected without mutation:
 
@@ -138,9 +147,48 @@ OE_PPUR_PY=/home/stud/spark/.venvs/cvae-breakhis/bin/python
 ```
 
 Preflight and amendment publication are preparation-only operations. They do
-not authorize the `run` subcommand. The scientific execution adapter is not yet
-implemented or runnable, so sealing the fresh amendment alone still cannot
-create a run edge. Any future run edge requires a separately reviewed adapter,
-fresh replay validation, and explicit launch authorization after the preflight
-and amendment have both sealed. No launch command is documented under the
-current authorization.
+not authorize the `run` subcommand. The implemented real edge additionally
+requires an exact historical-preflight replay, a separate canonical launch
+authority file, a successful mutation-free dry run, and the exact terminal
+confirmation token. Launch authority is a control-plane capability and is not
+an eighth scientific input.
+
+The sequence below is documentation only; implementing it did not issue an
+amendment, render an authority file, claim a lease, or launch this experiment:
+
+```bash
+cd /home/stud/spark/cvae_experiments
+export PYTHONPATH="$PWD/src"
+OE_PPUR_PY=/home/stud/spark/.venvs/cvae-breakhis/bin/python
+PREFLIGHT=/tmp/oe_ppur_v4_preflight.json
+AUTHORITY=/tmp/oe_ppur_v4_launch_authority.json
+
+"$OE_PPUR_PY" -m midogpp_thesis.oe_ppur_v4 preflight \
+  --repository-root "$PWD" >"$PREFLIGHT"
+
+"$OE_PPUR_PY" -m midogpp_thesis.oe_ppur_v4 authorize \
+  --repository-root "$PWD" \
+  --preflight-receipt "$PREFLIGHT"
+
+"$OE_PPUR_PY" -m midogpp_thesis.oe_ppur_v4 render-launch-authority \
+  --repository-root "$PWD" \
+  --preflight-receipt "$PREFLIGHT" \
+  --authorization-phrase \
+  'Authorize OE-PPUR v4 terminal consumed-test diagnostic launch.' \
+  >"$AUTHORITY"
+
+"$OE_PPUR_PY" -m midogpp_thesis.oe_ppur_v4 dry-run \
+  --repository-root "$PWD" \
+  --preflight-receipt "$PREFLIGHT" \
+  --authority "$AUTHORITY"
+
+"$OE_PPUR_PY" -m midogpp_thesis.oe_ppur_v4 run \
+  --repository-root "$PWD" \
+  --preflight-receipt "$PREFLIGHT" \
+  --authority "$AUTHORITY" \
+  --confirm RUN_TERMINAL_CONSUMED_TEST
+```
+
+Even a successful run remains terminal consumed-test sensitivity evidence only.
+Its routing behavior may be analyzed diagnostically, but it cannot be promoted
+to a fresh-routing, deployment, downstream-CVAE, NELBO, or confirmatory claim.

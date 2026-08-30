@@ -3651,10 +3651,10 @@ experiments:
         - --repository-root
         - .
     notes:
-      - NEEDS EVIDENCE — v4 is a separately workspace-sealed mechanical successor. V3 amendment input #7 remains issued, unrendered, unclaimed, and no-run; it is a preservation witness only and cannot authorize v4.
+      - NEEDS EVIDENCE — v4 now has a modular real-execution adapter, but no v4 preflight, amendment, separate launch authority, lease, output, scratch, or run has been issued by this implementation turn. V3 amendment input #7 remains issued, unrendered, unclaimed, and no-run; it is a preservation witness only and cannot authorize v4.
       - The pre-amendment plan binds exact Git, dirty-content, config, registry, catalog, helper, direct-input, resolved-path, scientific/lifecycle, and NFS-safe publication topology identities before a v4 amendment can be issued.
       - Heavy computation remains workstation-local with two persistent RTX A5000 GPU workers, four CUDA-hidden spawn CPU workers, one BLAS thread, primitive pickle-safe DTOs, little-endian float32 transport, float64 reductions, and no nested pools.
-      - The current registration is deliberately non-runnable. Amendment preparation does not activate FUSE, claim a lease, start workers, open target labels, or imply launch authority.
+      - The generic workspace runner remains deliberately non-runnable because the real edge requires explicit external preflight and authority-file paths plus the exact terminal confirmation token. The dedicated CLI implements mutation-free replay/dry-run, post-lease NFS-safe preparation commit, label-free execution, two fresh attestations, manager-owned aggregate-only terminal evaluation, and monotone COMPLETE or FAILED_EXHAUSTED accounting.
       - Every future result remains POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE. It cannot establish fresh routing, unseen-center generalization, NELBO compatibility, significance, promotion, deployment, or thesis-confirmatory evidence.
 
   - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_sceptre_router.v5
@@ -3871,6 +3871,7 @@ experiments:
       midogpp_uniform_b_test_consumption_ledger_harp_parent_v1: Planned HARP-only byte binding to the original consumed-test parent ledger; it cannot authorize execution.
       midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v1: A new HARP-specific single-use amendment is required; no SCEPTRE or other predecessor authority may be aliased.
     runner:
+      preparation_authority_gate: harp_v1_consumed_test_execution_amendment_v1
       environment:
         CUBLAS_WORKSPACE_CONFIG: ":4096:8"
         CUDA_VISIBLE_DEVICES: "0,1"

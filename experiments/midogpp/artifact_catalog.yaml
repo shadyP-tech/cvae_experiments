@@ -13620,7 +13620,7 @@ artifacts:
   - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router_v1
     stage: 90_oracles_and_diagnostics
     canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_p_anchored_route_scoped_donor_crossfit_action_policy_surface_router/v1
-    availability: planned_execution_not_authorized
+    availability: planned_execution_adapter_implemented_authority_not_issued
     migration: canonical_output
     evidence_label: NEEDS_EVIDENCE_EXECUTION_NOT_AUTHORIZED
     claim_scope: diagnostic_only
@@ -17581,6 +17581,12 @@ artifacts:
       consumed_test_reuse_authorized: 'false'
       launch_authorized: 'false'
       amendment_status: FRESH_PREFLIGHT_AND_PUBLICATION_REQUIRED
+      real_execution_edge_implemented: 'true'
+      separate_control_plane_launch_authority_required: 'true'
+      launch_authority_is_scientific_input: 'false'
+      preparation_commit_is_scientific_complete: 'false'
+      aggregate_only_terminal_evaluator_implemented: 'true'
+      two_fresh_preterminal_attestations_implemented: 'true'
       implementation_did_not_launch_execution: 'true'
       target_labels_closed: 'true'
       routing_success_claimed: 'false'
@@ -17600,9 +17606,11 @@ artifacts:
     required_files:
       - config.resolved.yaml
       - provenance/input_artifacts.json
+      - preparation/final_authorization_envelope.json
+      - preparation/execution_launch_authority.json
+      - preparation/sealed_execution_replay.json
+      - COMMITTED
       - provenance/execution_admission.json
-      - provenance/workspace_plan.json
-      - provenance/workspace_plan_replay.json
       - provenance/authorization_consumption_lease.json
       - provenance/final_aggregate_binding.json
       - physical/source_streams/arrays/frozen_source_streams.npy
@@ -17626,9 +17634,8 @@ artifacts:
       - reports/final_fresh_process_attestation.json
       - reports/validation_report.json
       - manifests/validation_index.json
+      - manifests/complete_artifact_index.json
       - reports/run_state.json
-      - preparation/final_authorization_envelope.json
-      - COMMITTED
     forbidden_reuse:
       - real_feature_reference_evidence
       - cvae_preservation_evidence
@@ -17643,10 +17650,10 @@ artifacts:
     may_feed_recipe_selection: false
     may_feed_deployable_selection: false
     notes:
-      - NEEDS EVIDENCE — v4 is registered as a separately workspace-sealed successor. Fresh preflight and a v4 amendment must be sealed before any later launch authorization can be considered; this catalog entry itself authorizes nothing and no execution was launched.
-      - The current v4 implementation is preparation-only. Its scientific execution adapter is not implemented or runnable, and sealing the fresh amendment alone cannot create a run edge.
+      - NEEDS EVIDENCE — v4 is registered as a separately workspace-sealed successor with a modular real-execution adapter. Fresh preflight, v4 amendment publication, and a separately rendered hash-bound launch authority are still absent; this catalog entry itself authorizes nothing and no execution was launched.
+      - Sealing the fresh amendment alone cannot create a run edge. Execution additionally requires exact historical-preflight replay, an external canonical launch-authority file, full read-only dry-run admission, and the explicit terminal confirmation token before the lease can be claimed.
       - The exact immutable v3-produced source-only bytes are admitted only through the v4 alias with six member hashes and aggregate lineage receipts. V3 amendment #7 remains issued, unrendered, unclaimed, and no-run; it is a preservation witness, never v4 authority.
-      - The prospective artifact uses an NFS-safe in-place commit: acquire the absent final root exclusively, write every member with no-follow O_EXCL semantics and durability barriers, then publish COMMITTED last. FUSE is neither required nor activated by v4 preparation.
+      - The prospective artifact uses an NFS-safe post-lease in-place preparation commit: acquire the single-use lease, acquire the absent final root exclusively, write every preparation member with no-follow O_EXCL semantics and durability barriers, then publish preparation COMMITTED last. Scientific COMPLETE is a later append-only completion transaction, not the preparation marker. FUSE is neither required nor activated.
       - Any future separately authorized result remains POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE. It cannot establish fresh routing, unseen-center generalization, downstream utility, CVAE/NELBO compatibility, significance, promotion, deployment, or thesis-confirmatory evidence.
   - artifact_id: midogpp_stage90_sceptre_source_inner_candidate_utility_reuse_v5
     stage: 60_routing_and_composition

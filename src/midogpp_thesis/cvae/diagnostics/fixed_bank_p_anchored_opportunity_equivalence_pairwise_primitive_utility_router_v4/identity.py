@@ -30,6 +30,45 @@ TERMINAL_DECISION = "TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE"
 CLAIM_SCOPE = "diagnostic_only"
 FRESH_EVIDENCE = False
 
+# Frozen scientific geometry.  These identities are deliberately repeated in
+# the v4 lifecycle instead of being imported from a predecessor package: the
+# v3 amendment and every v3 operational surface remain preservation witnesses
+# only.
+CENTERS = ("0", "1", "2", "3", "5", "6", "7", "8", "9")
+EXCLUDED_CENTERS = ("4",)
+ACTION_FAMILIES = ("B", "I", "R")
+DIRECTIONS = ("zero_to_one", "one_to_zero")
+ACTION_IDS = tuple(
+    f"{family}::{direction}"
+    for family in ACTION_FAMILIES
+    for direction in DIRECTIONS
+)
+P_ACTION_ID = "P_PROTECTED"
+PROBABILITY_COLUMN_IDS = (P_ACTION_ID, *ACTION_IDS)
+EXPECTED_TEST_ROWS_BY_CENTER = (
+    ("0", 1532),
+    ("1", 866),
+    ("2", 3210),
+    ("3", 1278),
+    ("5", 628),
+    ("6", 742),
+    ("7", 282),
+    ("8", 726),
+    ("9", 664),
+)
+EXPECTED_CASE_COUNTS_BY_CENTER = (
+    ("0", 23),
+    ("1", 20),
+    ("2", 24),
+    ("3", 39),
+    ("5", 23),
+    ("6", 23),
+    ("7", 21),
+    ("8", 22),
+    ("9", 23),
+)
+FEATURE_DIM = 3_840
+
 EXPERT_BANK_ARTIFACT_ID = (
     "midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1"
 )
@@ -132,6 +171,8 @@ EXPECTED_SOURCE_RECOMPUTATION_RECEIPT_SHA256 = (
 EXPECTED_TEST_CACHE_CONTENT_HASH = (
     "df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db"
 )
+EXPECTED_TEST_CACHE_SEMANTIC_ID = "uniform_b_v2_descriptive_test_cache_v1"
+EXPECTED_TEST_CACHE_REPRESENTATION_ID = "annotation_jpeg_fixed_center_b_v3"
 EXPECTED_TEST_CACHE_ROW_ORDER_HASH = (
     "bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389"
 )
@@ -147,7 +188,10 @@ PRESERVED_V3_AMENDMENT_SHA256 = (
 
 EXPECTED_TEST_ROW_COUNT = 9_928
 EXPECTED_CASE_COUNT = 218
-EXPECTED_PROBABILITY_MATRIX_SHAPE = (9_928, 7)
+EXPECTED_PROBABILITY_MATRIX_SHAPE = (
+    EXPECTED_TEST_ROW_COUNT,
+    len(PROBABILITY_COLUMN_IDS),
+)
 EXPECTED_TERMINAL_CASE_INVENTORY_SHA256 = (
     "d22568075a287af71d0f4477ba5e6265e43278cba4865f7775741cdbcdf2bcc6"
 )
@@ -156,6 +200,12 @@ AUTHORIZATION_SCOPE = "one_terminal_consumed_test_oe_ppur_v4_run"
 AUTHORIZATION_BASIS = (
     "explicit_user_authorization_for_oe_ppur_v4_workspace_sealed_successor"
 )
+LAUNCH_AUTHORIZATION_SCOPE = "one_terminal_consumed_test_oe_ppur_v4_launch"
+LAUNCH_AUTHORIZATION_PHRASE = (
+    "Authorize OE-PPUR v4 terminal consumed-test diagnostic launch."
+)
+LAUNCH_AUTHORITY_SCHEMA = "oe_ppur_v4_execution_launch_authority_v1"
+LAUNCH_AUTHORITY_FILENAME = "oe_ppur_v4_launch_authority.json"
 LEASE_DIRECTORY_NAME = ".oe_ppur_v4_single_use_authorization_consumed"
 DEFAULT_SCRATCH_ROOT = (
     "/data/local/fixed_bank_p_anchored_opportunity_equivalence_pairwise_"
@@ -174,6 +224,10 @@ FORBIDDEN_OPERATIONAL_PATH_FRAGMENTS = (
     "/run_state/",
     "cross_run_recovery",
 )
+
+# Compatibility name used by v4-owned physical/path adapters ported from the
+# reviewed method implementation.  It denotes v4's stricter fence above.
+FORBIDDEN_INPUT_PATH_FRAGMENTS = FORBIDDEN_OPERATIONAL_PATH_FRAGMENTS
 
 __all__ = tuple(
     name for name in globals() if name.isupper() and not name.startswith("_")

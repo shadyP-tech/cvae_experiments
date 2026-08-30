@@ -6,10 +6,12 @@ never supplies a Python import path, callable, module name, or file path.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
+
+from ..cvae.protocol import ProtocolError
 
 
 SCEPTRE_V4_EXECUTION_AMENDMENT_GATE = (
@@ -24,13 +26,25 @@ SCEPTRE_V5_EXECUTION_AMENDMENT_GATE = (
 SCEPTRE_V5_EXPERIMENT_ID = (
     "midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_sceptre_router.v5"
 )
+HARP_V1_EXECUTION_AMENDMENT_GATE = (
+    "harp_v1_consumed_test_execution_amendment_v1"
+)
+HARP_V1_EXPERIMENT_ID = (
+    "midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v1"
+)
 KNOWN_PREPARATION_AUTHORITY_GATES = frozenset(
     {
+        HARP_V1_EXECUTION_AMENDMENT_GATE,
         SCEPTRE_V4_EXECUTION_AMENDMENT_GATE,
         SCEPTRE_V5_EXECUTION_AMENDMENT_GATE,
     }
 )
 _AUTHORITY_MODULE_BY_GATE = {
+    HARP_V1_EXECUTION_AMENDMENT_GATE: (
+        "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v1."
+        "workspace_preparation_authority",
+        "HarpV1WorkspaceAuthorityError",
+    ),
     SCEPTRE_V4_EXECUTION_AMENDMENT_GATE: (
         "midogpp_thesis.cvae.diagnostics.fixed_bank_sceptre_router_v4."
         "execution.workspace_preparation_authority",
@@ -66,9 +80,79 @@ class PreparationAuthorityReceipt:
     config_sha256: str
     authority_path: Path
     authority_sha256: str
+    workspace_registration_contract_hash: str | None = None
+    registry_path: Path | None = None
+    registry_sha256: str | None = None
+    artifact_catalog_path: Path | None = None
+    artifact_catalog_sha256: str | None = None
 
 
 AuthorityMemberResolver = Callable[[str, str], AuthorityMember]
+
+
+def expected_workspace_registration_contract_hash(
+    gate_id: str | None,
+) -> str | None:
+    """Reconstruct a consumer registration hash from a closed module table."""
+
+    if gate_id != HARP_V1_EXECUTION_AMENDMENT_GATE:
+        return None
+    authority = import_module(
+        "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v1.authorization"
+    )
+    contract = authority.workspace_registration_execution_contract()
+    value = contract.get("workspace_registration_execution_contract_hash")
+    if type(value) is not str:
+        raise PreparationAuthorityError(
+            "HARP v1 workspace registration contract hash is malformed."
+        )
+    return value
+
+
+def validate_preparation_authority_extra_args(
+    gate_id: str | None,
+    extra_args: Sequence[str],
+    *,
+    force: bool = False,
+) -> tuple[str, ...]:
+    """Apply consumer-specific closed-world runner argument constraints."""
+
+    normalized = tuple(extra_args)
+    if gate_id == HARP_V1_EXECUTION_AMENDMENT_GATE:
+        if force:
+            raise PreparationAuthorityError(
+                "HARP v1 workspace preparation and execution reject --force."
+            )
+        if normalized not in {(), ("--dry-run",)}:
+            raise PreparationAuthorityError(
+                "HARP v1 workspace execution accepts only no extra arguments or "
+                "the exact '--dry-run' argument."
+            )
+    return normalized
+
+
+def validate_preparation_authority_registration_projection(
+    gate_id: str | None,
+    registration_projection: Mapping[str, object] | None,
+) -> str | None:
+    """Validate a runnable consumer's frozen registration projection.
+
+    Non-HARP consumers retain their existing behavior.  The HARP validator is
+    imported from a closed module name and is the same pure function called by
+    its pre-render authority gate.
+    """
+
+    if gate_id != HARP_V1_EXECUTION_AMENDMENT_GATE:
+        return None
+    authority = import_module(
+        "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v1.authorization"
+    )
+    try:
+        return authority.validate_workspace_registration_execution_projection(
+            registration_projection
+        )
+    except ProtocolError as exc:
+        raise PreparationAuthorityError(str(exc)) from exc
 
 
 def validate_preparation_authority_gate_id(value: object) -> str | None:
@@ -95,6 +179,7 @@ def preparation_authority_registration_error(
     """Return a closed-world registry-binding error, if any."""
 
     required = {
+        HARP_V1_EXPERIMENT_ID: HARP_V1_EXECUTION_AMENDMENT_GATE,
         SCEPTRE_V4_EXPERIMENT_ID: SCEPTRE_V4_EXECUTION_AMENDMENT_GATE,
         SCEPTRE_V5_EXPERIMENT_ID: SCEPTRE_V5_EXECUTION_AMENDMENT_GATE,
     }.get(experiment_id)
@@ -109,6 +194,13 @@ def preparation_authority_registration_error(
         return (
             f"{experiment_id}: runner.preparation_authority_gate "
             f"{gate_id!r} is bound only to {SCEPTRE_V4_EXPERIMENT_ID}"
+        )
+    if gate_id == HARP_V1_EXECUTION_AMENDMENT_GATE and (
+        experiment_id != HARP_V1_EXPERIMENT_ID
+    ):
+        return (
+            f"{experiment_id}: runner.preparation_authority_gate "
+            f"{gate_id!r} is bound only to {HARP_V1_EXPERIMENT_ID}"
         )
     if gate_id == SCEPTRE_V5_EXECUTION_AMENDMENT_GATE and (
         experiment_id != SCEPTRE_V5_EXPERIMENT_ID
@@ -127,6 +219,7 @@ def enforce_preparation_authority(
     experiment_id: str,
     config_path: str | None,
     input_artifact_ids: Sequence[str],
+    registration_projection: Mapping[str, object] | None = None,
     resolve_authority_member: AuthorityMemberResolver,
 ) -> PreparationAuthorityReceipt | None:
     """Run the named gate without resolving any normal experiment input.
@@ -150,12 +243,17 @@ def enforce_preparation_authority(
     authority = import_module(module_name)
     authority_error = getattr(authority, error_name)
     try:
+        call_kwargs = {
+            "repo_root": repo_root,
+            "experiment_id": experiment_id,
+            "config_path": config_path,
+            "input_artifact_ids": tuple(input_artifact_ids),
+            "resolve_authority_member": resolve_authority_member,
+        }
+        if gate_id == HARP_V1_EXECUTION_AMENDMENT_GATE:
+            call_kwargs["registration_projection"] = registration_projection
         receipt = authority.validate_workspace_preparation_authority(
-            repo_root=repo_root,
-            experiment_id=experiment_id,
-            config_path=config_path,
-            input_artifact_ids=tuple(input_artifact_ids),
-            resolve_authority_member=resolve_authority_member,
+            **call_kwargs,
         )
     except authority_error as exc:
         raise PreparationAuthorityError(str(exc)) from exc
@@ -166,17 +264,35 @@ def enforce_preparation_authority(
         config_sha256=receipt.config_sha256,
         authority_path=receipt.amendment_path,
         authority_sha256=receipt.amendment_sha256,
+        workspace_registration_contract_hash=getattr(
+            receipt,
+            "workspace_registration_contract_hash",
+            None,
+        ),
+        registry_path=getattr(receipt, "registry_path", None),
+        registry_sha256=getattr(receipt, "registry_sha256", None),
+        artifact_catalog_path=getattr(receipt, "artifact_catalog_path", None),
+        artifact_catalog_sha256=getattr(
+            receipt,
+            "artifact_catalog_sha256",
+            None,
+        ),
     )
 
 
 __all__ = (
     "AuthorityMember",
+    "HARP_V1_EXECUTION_AMENDMENT_GATE",
+    "HARP_V1_EXPERIMENT_ID",
     "KNOWN_PREPARATION_AUTHORITY_GATES",
     "PreparationAuthorityError",
     "PreparationAuthorityReceipt",
     "SCEPTRE_V4_EXECUTION_AMENDMENT_GATE",
     "SCEPTRE_V5_EXECUTION_AMENDMENT_GATE",
     "enforce_preparation_authority",
+    "expected_workspace_registration_contract_hash",
     "preparation_authority_registration_error",
     "validate_preparation_authority_gate_id",
+    "validate_preparation_authority_extra_args",
+    "validate_preparation_authority_registration_projection",
 )

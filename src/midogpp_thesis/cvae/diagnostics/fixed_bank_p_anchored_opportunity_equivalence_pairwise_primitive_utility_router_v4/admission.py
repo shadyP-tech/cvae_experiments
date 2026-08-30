@@ -135,11 +135,14 @@ def _reject_operational_predecessor_paths(paths: Sequence[Path]) -> None:
 
 
 def assert_no_v3_authority_payload(payload: Mapping[str, object]) -> None:
-    rendered = repr(dict(payload))
-    if (
-        AUTHORIZATION_AMENDMENT_ARTIFACT_ID not in rendered
-        or "amendment_v3" in rendered
-        or "output_" in rendered and "router_v3" in rendered
+    rendered = repr(dict(payload)).lower()
+    if any(
+        fragment in rendered
+        for fragment in (
+            "amendment_v3",
+            "router_v3",
+            "oe_ppur_v3_preparation",
+        )
     ):
         raise ProtocolError("OE-PPUR v4 authority payload contains predecessor state.")
 

@@ -31,6 +31,7 @@ from ...routing.harp_replay import (
 )
 from ...runtime.artifact_io import atomic_json, read_json, sha256_file
 from .authorization import (
+    HarpAuthorization,
     HarpAuthorizationLease,
     claim_authorization,
     finalize_authorization,
@@ -152,7 +153,7 @@ def dry_run_harp_stage90(
         "config_hash": config.config_hash,
         "artifact_root": str(root),
         "execution_authorized": True,
-        "execution_amendment_sha256": authorization.amendment_sha256,
+        **_authorization_provenance(authorization),
         "cache_hash": cache.cache_hash,
         "physical_input_receipt_hash": physical_inputs.receipt_hash,
         "physical_plan_hash": plan["plan_hash"],
@@ -187,7 +188,7 @@ def run_harp_stage90(
         "experiment_id": EXPERIMENT_ID,
         "config_hash": config.config_hash,
         "artifact_root": str(root),
-        "execution_amendment_sha256": authorization.amendment_sha256,
+        **_authorization_provenance(authorization),
         "parent_ledger_sha256": ledger_hash,
         "cache_hash": cache.cache_hash,
         "physical_input_receipt_hash": physical_inputs.receipt_hash,
@@ -212,6 +213,9 @@ def run_harp_stage90(
                 "config_hash": config.config_hash,
                 "protocol": dict(config.protocol),
                 "claim_boundary": dict(config.claim_boundary),
+                "authorization_identity": _authorization_provenance(
+                    authorization
+                ),
                 "authorization_lease_hash": lease.lease_hash,
             },
         )
@@ -458,6 +462,7 @@ def run_harp_stage90(
             "publication_status": PUBLICATION_STATUS,
             "terminal_decision": TERMINAL_DECISION,
             "fresh_evidence": False,
+            "authorization_identity": _authorization_provenance(authorization),
         }
         atomic_json(root / "reports/validation_report.json", validation)
         # The global lease is finalized and durably mirrored before the output
@@ -481,6 +486,15 @@ def run_harp_stage90(
                 "status": "COMPLETE_EXHAUSTED",
                 "phase": "TERMINAL_DIAGNOSTIC_COMPLETE",
                 "authorization_lease_hash": lease.lease_hash,
+                "execution_amendment_sha256": authorization.amendment_sha256,
+                "execution_amendment_hash": authorization.amendment_hash,
+                "scientific_contract_hash": authorization.scientific_contract_hash,
+                "workspace_registration_execution_contract_hash": (
+                    authorization.workspace_registration_execution_contract_hash
+                ),
+                "source_snapshot_tree_sha256": (
+                    authorization.source_snapshot_tree_sha256
+                ),
                 "authorization_finalization_sha256": sha256_file(
                     root / "manifests/authorization_finalization.json"
                 ),
@@ -504,6 +518,9 @@ def run_harp_stage90(
                         "error": str(exc)[:2000],
                         "publication_status": PUBLICATION_STATUS,
                         "terminal_decision": TERMINAL_DECISION,
+                        "authorization_identity": _authorization_provenance(
+                            authorization
+                        ),
                     },
                 )
                 lease = finalize_authorization(
@@ -512,6 +529,30 @@ def run_harp_stage90(
             except BaseException:
                 pass
         raise
+
+
+def _authorization_provenance(
+    authorization: HarpAuthorization,
+) -> dict[str, object]:
+    """Return the exact amendment, science, and source identity for artifacts."""
+
+    if not isinstance(authorization, HarpAuthorization):
+        raise ProtocolError("HARP Stage-90 authorization provenance is untyped.")
+    return {
+        "execution_amendment_sha256": authorization.amendment_sha256,
+        "execution_amendment_hash": authorization.amendment_hash,
+        "authorized_input_binding_hash": authorization.input_binding_hash,
+        "scientific_contract_hash": authorization.scientific_contract_hash,
+        "workspace_registration_execution_contract_hash": (
+            authorization.workspace_registration_execution_contract_hash
+        ),
+        "source_snapshot_schema": authorization.source_snapshot_schema,
+        "source_snapshot_manifest_sha256": (
+            authorization.source_snapshot_manifest_sha256
+        ),
+        "source_snapshot_tree_sha256": authorization.source_snapshot_tree_sha256,
+        "source_snapshot_member_count": authorization.source_snapshot_member_count,
+    }
 
 
 def _exact_output_root(config: HarpStage90Config, value: str | Path) -> Path:

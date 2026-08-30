@@ -1,6 +1,8 @@
-"""Thin no-launch lifecycle coordinator for OE-PPUR v4."""
+"""Thin public lifecycle coordinator for OE-PPUR v4."""
 
 from __future__ import annotations
+
+from pathlib import Path
 
 from ...protocol import ProtocolError
 from .admission import LaunchAuthority, SealedEnvelopeAdmission, validate_launch_authority
@@ -27,6 +29,12 @@ def inspect_planned_router(config: RouterV4Config | None = None) -> dict[str, ob
         "workspace_seal_required": True,
         "pre_amendment_plan_required": True,
         "nfs_safe_in_place_commit_required": True,
+        "separate_hash_bound_launch_authority_required": True,
+        "real_execution_edge_implemented": True,
+        "canonical_scientific_execution_service_implemented": True,
+        "aggregate_only_terminal_evaluator_implemented": True,
+        "two_fresh_preterminal_attestations_implemented": True,
+        "preparation_commit_is_scientific_complete": False,
         "v3_amendment_preservation_witness_only": True,
         "v3_operational_state_reuse": False,
         "filesystem_mutation_performed": False,
@@ -61,9 +69,30 @@ def run_oe_ppur_v4(
         )
     validate_launch_authority(admission, launch_authority)
     raise ProtocolError(
-        "OE-PPUR v4 launch edge remains closed pending separate execution "
-        "authorization and workstation topology validation."
+        "OE-PPUR v4 launch edge remains closed to legacy preparation authority; "
+        "use the sealed replay plus ExecutionLaunchAuthority runner."
     )
 
 
-__all__ = ("inspect_planned_router", "run_oe_ppur_v4")
+def run_real_oe_ppur_v4(
+    repository_root: str | Path,
+    *,
+    preflight_receipt_path: str | Path,
+    launch_authority_path: str | Path,
+    scratch_root: str | Path,
+    host_id: str | None = None,
+) -> Path:
+    """Delegate to the modular, type-gated single-use orchestrator."""
+
+    from .execution.orchestrator import run_sealed_oe_ppur_v4
+
+    return run_sealed_oe_ppur_v4(
+        repository_root,
+        preflight_receipt_path=preflight_receipt_path,
+        launch_authority_path=launch_authority_path,
+        scratch_root=scratch_root,
+        host_id=host_id,
+    )
+
+
+__all__ = ("inspect_planned_router", "run_oe_ppur_v4", "run_real_oe_ppur_v4")

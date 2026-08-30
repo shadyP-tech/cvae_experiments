@@ -1,4 +1,4 @@
-"""Import-light, preparation-only executable for OE-PPUR v4."""
+"""Import-light preparation and explicit real-launch executable for OE-PPUR v4."""
 
 from __future__ import annotations
 
@@ -33,9 +33,35 @@ def build_parser() -> argparse.ArgumentParser:
     authorize.add_argument("--preflight-receipt", type=Path, required=True)
     authorize.add_argument("--scratch-root", type=Path)
     authorize.add_argument("--host-id")
-    run = commands.add_parser("run", help="Fail closed without separate launch authority.")
+    render = commands.add_parser(
+        "render-launch-authority",
+        help="Render a separate hash-bound launch capability to stdout.",
+    )
+    render.add_argument("--repository-root", type=Path, required=True)
+    render.add_argument("--preflight-receipt", type=Path, required=True)
+    render.add_argument("--authorization-phrase", required=True)
+    render.add_argument("--authorization-nonce")
+    render.add_argument("--scratch-root", type=Path)
+    render.add_argument("--host-id")
+    dry_run = commands.add_parser(
+        "dry-run",
+        help="Replay every read-only launch gate without claiming the lease.",
+    )
+    dry_run.add_argument("--repository-root", type=Path, required=True)
+    dry_run.add_argument("--preflight-receipt", type=Path, required=True)
+    dry_run.add_argument("--authority", type=Path, required=True)
+    dry_run.add_argument("--scratch-root", type=Path)
+    dry_run.add_argument("--host-id")
+    run = commands.add_parser(
+        "run",
+        help="Consume the single-use authority and execute the terminal diagnostic.",
+    )
     run.add_argument("--repository-root", type=Path, required=True)
+    run.add_argument("--preflight-receipt", type=Path)
     run.add_argument("--authority", type=Path)
+    run.add_argument("--scratch-root", type=Path)
+    run.add_argument("--host-id")
+    run.add_argument("--confirm")
     return parser
 
 
@@ -97,10 +123,89 @@ def main(argv: Sequence[str] | None = None) -> int:
             context,
             preflight_raw=preflight_raw,
         ).to_payload()
-    elif args.command == "run":
-        raise RuntimeError(
-            "OE-PPUR v4 execution is outside the current authorization."
+    elif args.command == "render-launch-authority":
+        from .cvae.diagnostics.oe_ppur_v4_preparation.workspace import (
+            DEFAULT_SCRATCH_ROOT,
         )
+        from .cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v4.execution.sealed_replay import (
+            build_launch_authority_from_replay,
+            replay_sealed_execution,
+        )
+
+        replay = replay_sealed_execution(
+            args.repository_root,
+            preflight_receipt_path=args.preflight_receipt,
+            scratch_root=(
+                DEFAULT_SCRATCH_ROOT
+                if args.scratch_root is None
+                else args.scratch_root
+            ),
+            host_id=args.host_id,
+        )
+        payload = build_launch_authority_from_replay(
+            replay,
+            authorization_phrase=args.authorization_phrase,
+            authorization_nonce=args.authorization_nonce,
+        ).to_payload()
+    elif args.command == "dry-run":
+        from .cvae.diagnostics.oe_ppur_v4_preparation.workspace import (
+            DEFAULT_SCRATCH_ROOT,
+        )
+        from .cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v4.execution.dry_run import (
+            dry_run_real_launch,
+        )
+
+        payload = dry_run_real_launch(
+            args.repository_root,
+            preflight_receipt_path=args.preflight_receipt,
+            launch_authority_path=args.authority,
+            scratch_root=(
+                DEFAULT_SCRATCH_ROOT
+                if args.scratch_root is None
+                else args.scratch_root
+            ),
+            host_id=args.host_id,
+        ).to_payload()
+    elif args.command == "run":
+        if (
+            args.preflight_receipt is None
+            or args.authority is None
+            or args.confirm is None
+        ):
+            raise RuntimeError(
+                "OE-PPUR v4 execution is outside the current authorization: "
+                "sealed preflight, separate launch authority, and explicit "
+                "terminal confirmation are required."
+            )
+        if args.confirm != "RUN_TERMINAL_CONSUMED_TEST":
+            raise RuntimeError(
+                "OE-PPUR v4 run requires --confirm RUN_TERMINAL_CONSUMED_TEST."
+            )
+        from .cvae.diagnostics.oe_ppur_v4_preparation.workspace import (
+            DEFAULT_SCRATCH_ROOT,
+        )
+        from .cvae.diagnostics.fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v4.runner import (
+            run_real_oe_ppur_v4,
+        )
+
+        root = run_real_oe_ppur_v4(
+            args.repository_root,
+            preflight_receipt_path=args.preflight_receipt,
+            launch_authority_path=args.authority,
+            scratch_root=(
+                DEFAULT_SCRATCH_ROOT
+                if args.scratch_root is None
+                else args.scratch_root
+            ),
+            host_id=args.host_id,
+        )
+        payload = {
+            "schema_version": "oe_ppur_v4_real_launch_result_v1",
+            "artifact_root": root.as_posix(),
+            "status": "COMPLETE",
+            "publication_status": "POST_HOC_CONSUMED_TEST_SENSITIVITY",
+            "terminal_decision": "TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE",
+        }
     else:  # pragma: no cover
         raise AssertionError(args.command)
     print(

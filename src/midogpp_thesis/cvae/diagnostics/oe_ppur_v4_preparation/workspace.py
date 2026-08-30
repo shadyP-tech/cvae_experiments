@@ -536,10 +536,19 @@ def _workspace_allowlist(root: Path, v3_amendment: Path) -> tuple[Path, ...]:
     )
     preparation_root = root / "src/midogpp_thesis/cvae/diagnostics/oe_ppur_v4_preparation"
     relative_members.extend(
-        path.relative_to(root) for path in sorted(router_root.glob("*.py"))
+        path.relative_to(root) for path in sorted(router_root.rglob("*.py"))
     )
     relative_members.extend(
-        path.relative_to(root) for path in sorted(preparation_root.glob("*.py"))
+        path.relative_to(root) for path in sorted(preparation_root.rglob("*.py"))
+    )
+    test_root = root / "tests/cvae"
+    relative_members.extend(
+        path.relative_to(root)
+        for pattern in (
+            "test_oe_ppur_v4_*.py",
+            "test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v4*.py",
+        )
+        for path in sorted(test_root.glob(pattern))
     )
     paths = [root / member for member in relative_members]
     paths.append(v3_amendment)
@@ -567,31 +576,19 @@ def _tree_seal(root: Path, paths: tuple[Path, ...], role: str) -> str:
 
 
 def _scientific_seal(root: Path) -> str:
-    neutral = root / "src/midogpp_thesis/cvae/routing/pairwise_primitive_utility"
-    paths = tuple(sorted(neutral.rglob("*.py")))
-    if not paths or any(path.is_symlink() for path in paths):
-        raise ProtocolError("OE-PPUR v4 neutral scientific core is unavailable.")
-    return _tree_seal(root, paths, "neutral_pairwise_primitive_utility_core")
+    from ..fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v4.source_seal import (
+        build_source_seal,
+    )
+
+    return build_source_seal(root).combined_source_sha256
 
 
 def _lifecycle_seal(root: Path) -> str:
-    roots = (
-        root
-        / (
-            "src/midogpp_thesis/cvae/diagnostics/fixed_bank_p_anchored_"
-            "opportunity_equivalence_pairwise_primitive_utility_router_v4"
-        ),
-        root / "src/midogpp_thesis/cvae/diagnostics/oe_ppur_v4_preparation",
+    from ..fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v4.lifecycle_source_seal import (
+        build_lifecycle_source_seal,
     )
-    paths = tuple(
-        sorted(
-            (
-                root / "src/midogpp_thesis/oe_ppur_v4.py",
-                *(path for source_root in roots for path in source_root.glob("*.py")),
-            )
-        )
-    )
-    return _tree_seal(root, paths, "oe_ppur_v4_lifecycle")
+
+    return build_lifecycle_source_seal(root).lifecycle_source_seal_sha256
 
 
 __all__ = (

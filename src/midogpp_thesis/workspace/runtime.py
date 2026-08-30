@@ -29,11 +29,15 @@ from .recovery import (
 )
 from .preparation_authority import (
     AuthorityMember,
+    HARP_V1_EXECUTION_AMENDMENT_GATE,
     PreparationAuthorityError,
     PreparationAuthorityReceipt,
     enforce_preparation_authority,
+    expected_workspace_registration_contract_hash,
     preparation_authority_registration_error,
+    validate_preparation_authority_extra_args,
     validate_preparation_authority_gate_id,
+    validate_preparation_authority_registration_projection,
 )
 
 
@@ -438,6 +442,21 @@ class MidogppWorkspace:
             if authority_registration_error is not None:
                 errors.append(authority_registration_error)
             output_canonical_path = None if output is None else output.canonical_path
+            if (
+                experiment.runnable
+                and experiment.preparation_authority_gate
+                == HARP_V1_EXECUTION_AMENDMENT_GATE
+                and output is not None
+            ):
+                try:
+                    validate_preparation_authority_registration_projection(
+                        experiment.preparation_authority_gate,
+                        self._preparation_authority_registration_projection(
+                            experiment
+                        ),
+                    )
+                except (PreparationAuthorityError, WorkspaceError) as exc:
+                    errors.append(f"{experiment.experiment_id}: {exc}")
             errors.extend(
                 registration_errors(
                     experiment.run_recovery_strategy,
@@ -552,6 +571,14 @@ class MidogppWorkspace:
             raise WorkspaceError(
                 f"Experiment {experiment_id} is status={experiment.status!r} and cannot be launched"
             )
+        try:
+            validate_preparation_authority_extra_args(
+                experiment.preparation_authority_gate,
+                (),
+                force=force,
+            )
+        except PreparationAuthorityError as exc:
+            raise WorkspaceError(f"{experiment_id}: {exc}") from exc
         authority_receipt = self._enforce_preparation_authority(
             experiment,
         )
@@ -590,12 +617,45 @@ class MidogppWorkspace:
                 experiment_id=experiment.experiment_id,
                 config_path=experiment.config_path,
                 input_artifact_ids=experiment.input_artifact_ids,
+                registration_projection=(
+                    self._preparation_authority_registration_projection(
+                        experiment
+                    )
+                ),
                 resolve_authority_member=self._resolve_preparation_authority_member,
             )
         except PreparationAuthorityError as exc:
             raise WorkspaceError(
                 f"{experiment.experiment_id}: preparation authority rejected: {exc}"
             ) from exc
+
+    def _preparation_authority_registration_projection(
+        self,
+        experiment: ExperimentEntry,
+    ) -> Mapping[str, object] | None:
+        """Project the frozen entry and catalog target that will execute."""
+
+        if experiment.preparation_authority_gate != HARP_V1_EXECUTION_AMENDMENT_GATE:
+            return None
+        output = self.artifacts.get(experiment.output_artifact_id)
+        if output is None:
+            raise WorkspaceError(
+                f"{experiment.experiment_id}: HARP output artifact is absent"
+            )
+        return {
+            "experiment_id": experiment.experiment_id,
+            "stage": experiment.stage,
+            "status": experiment.status,
+            "claim_scope": experiment.claim_scope,
+            "config_path": experiment.config_path,
+            "output_artifact_id": experiment.output_artifact_id,
+            "output_canonical_path": output.canonical_path,
+            "input_artifact_ids": list(experiment.input_artifact_ids),
+            "preparation_authority_gate": experiment.preparation_authority_gate,
+            "run_recovery_strategy": experiment.run_recovery_strategy,
+            "runner_argv": list(experiment.runner_argv),
+            "runner_environment": dict(experiment.runner_env),
+        }
 
     def _resolve_preparation_authority_member(
         self,
@@ -779,6 +839,39 @@ class MidogppWorkspace:
             raise WorkspaceError(
                 f"{experiment.experiment_id}: pre-render preparation authority bytes changed"
             )
+        if gate_id == HARP_V1_EXECUTION_AMENDMENT_GATE:
+            try:
+                expected_registration_hash = (
+                    expected_workspace_registration_contract_hash(gate_id)
+                )
+            except PreparationAuthorityError as exc:
+                raise WorkspaceError(str(exc)) from exc
+            if (
+                type(receipt.workspace_registration_contract_hash) is not str
+                or re.fullmatch(
+                    r"[0-9a-f]{64}",
+                    receipt.workspace_registration_contract_hash,
+                )
+                is None
+                or receipt.workspace_registration_contract_hash
+                != expected_registration_hash
+                or receipt.registry_path is None
+                or receipt.registry_sha256 is None
+                or receipt.artifact_catalog_path is None
+                or receipt.artifact_catalog_sha256 is None
+                or receipt.registry_path.is_symlink()
+                or receipt.artifact_catalog_path.is_symlink()
+                or not receipt.registry_path.is_file()
+                or not receipt.artifact_catalog_path.is_file()
+                or _hash_file(receipt.registry_path, "sha256")
+                != receipt.registry_sha256
+                or _hash_file(receipt.artifact_catalog_path, "sha256")
+                != receipt.artifact_catalog_sha256
+            ):
+                raise WorkspaceError(
+                    f"{experiment.experiment_id}: HARP workspace registration "
+                    "authority bytes changed"
+                )
 
     def run(self, experiment_id: str, *, force: bool = False, extra_args: Sequence[str] = ()) -> int:
         self.validate()
@@ -787,6 +880,14 @@ class MidogppWorkspace:
             raise WorkspaceError(
                 f"Experiment {experiment_id} is status={experiment.status!r} and cannot be launched"
             )
+        try:
+            extra_args = validate_preparation_authority_extra_args(
+                experiment.preparation_authority_gate,
+                extra_args,
+                force=force,
+            )
+        except PreparationAuthorityError as exc:
+            raise WorkspaceError(f"{experiment_id}: {exc}") from exc
         authority_receipt = self._enforce_preparation_authority(
             experiment,
         )

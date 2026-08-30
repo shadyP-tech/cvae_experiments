@@ -657,6 +657,32 @@ def build_parser() -> argparse.ArgumentParser:
     harp_prepare.add_argument("--cache-root", required=True)
     harp_prepare.add_argument("--development-manifest", required=True)
     harp_prepare.add_argument("--evaluation-manifest", required=True)
+    harp_publish = sub.add_parser(
+        "publish-fixed-bank-harp-router-v1-amendment",
+        help=(
+            "Independently validate the exact prepared HARP inputs and issue "
+            "the HARP-only terminal amendment once. This does not activate "
+            "registration, claim the lease, create output, or launch HARP."
+        ),
+    )
+    harp_publish.add_argument("--config", required=True)
+    harp_publish.add_argument("--expert-bank-root", required=True)
+    harp_publish.add_argument("--generation-lock-root", required=True)
+    harp_publish.add_argument("--prepared-cache-root", required=True)
+    harp_publish.add_argument("--development-manifest", required=True)
+    harp_publish.add_argument("--evaluation-manifest", required=True)
+    harp_publish.add_argument("--parent-ledger", required=True)
+    harp_publish.add_argument("--amendment-path", required=True)
+    harp_publish.add_argument("--authorization-basis", required=True)
+    harp_publish.add_argument("--authorization-date", required=True)
+    harp_publish.add_argument(
+        "--repository-root",
+        required=True,
+        help=(
+            "Exact checkout root that owns the registered amendment member and "
+            "the transitive source snapshot."
+        ),
+    )
     sceptre_v5_mode.add_argument(
         "--dry-run",
         action="store_true",
@@ -707,6 +733,29 @@ def main(argv: list[str] | None = None) -> int:
             evaluation_manifest_path=args.evaluation_manifest,
         )
         print(json.dumps(prepared.to_payload(), sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.surface == "publish-fixed-bank-harp-router-v1-amendment":
+        import json
+
+        from .fixed_bank_harp_router_v1.amendment_publisher import (
+            publish_harp_execution_amendment,
+        )
+        from .fixed_bank_harp_router_v1.config import load_config
+
+        receipt = publish_harp_execution_amendment(
+            load_config(args.config),
+            expert_bank_root=args.expert_bank_root,
+            generation_lock_root=args.generation_lock_root,
+            prepared_cache_root=args.prepared_cache_root,
+            development_manifest_path=args.development_manifest,
+            evaluation_manifest_path=args.evaluation_manifest,
+            parent_ledger_path=args.parent_ledger,
+            amendment_path=args.amendment_path,
+            authorization_basis=args.authorization_basis,
+            authorization_date=args.authorization_date,
+            repository_root=args.repository_root,
+        )
+        print(json.dumps(receipt.to_payload(), sort_keys=True, separators=(",", ":")))
         return 0
     artifact_root = Path(args.artifact_root)
 
