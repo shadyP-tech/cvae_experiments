@@ -6,14 +6,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ...protocol import ProtocolError
-from .artifact.contracts import CompleteArtifactSealReceipt, CompletionCommitReceipt
 from .authorization_outcome_contracts import (
     AuthorizationOutcomeReceipt,
     build_authorization_outcome_payload,
     safe_text,
 )
 from .authorization_outcome_store import persist_authorization_outcome
+from .complete_artifact_validation import CompleteArtifactSealReceipt
 from .complete_run_validation import reopen_complete_run_evidence
+from .completion_transaction import CompletionCommitReceipt
 from .lease_claim import AuthorizationLeaseClaim, validate_authorization_lease
 from .output_validation import FinalAggregateBundleReceipt
 from .run_state import (

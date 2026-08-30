@@ -5,12 +5,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from ...protocol import ProtocolError
-from .artifact.contracts import COMPLETION_ABORT_MEMBER
 from .authorization_outcome_contracts import (
     OUTCOME_MEMBER,
     AuthorizationOutcomeReceipt,
     outcome_receipt,
 )
+from .completion_transaction import COMPLETION_ABORT_MEMBER
 from .lease_claim import AuthorizationLeaseClaim, validate_authorization_lease
 from .lease_io import (
     fsync_directory,

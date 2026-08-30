@@ -8,17 +8,14 @@ import hashlib
 from pathlib import Path
 
 from ...protocol import ProtocolError
-from .artifact.contracts import (
-    COMPLETION_ABORT_MEMBER,
-    FINAL_ATTESTATION_MEMBER,
-    FINAL_BINDING_MEMBER,
-    TERMINAL_METRICS_MEMBER,
-    CompleteArtifactSealReceipt,
-)
 from .authorization_outcome_contracts import AuthorizationOutcomeReceipt
 from .authorization_outcome_store import validate_authorization_outcome
-from .complete_artifact_validation import validate_complete_artifact_seal
+from .complete_artifact_validation import (
+    CompleteArtifactSealReceipt,
+    validate_complete_artifact_seal,
+)
 from .completion_transaction import (
+    COMPLETION_ABORT_MEMBER,
     CompletionCommitReceipt,
     validate_completion_commit,
 )
@@ -28,7 +25,10 @@ from .lease_claim import AuthorizationLeaseClaim, validate_authorization_lease
 from .lease_io import pending_publications, read_json_regular
 from .lifecycle_lineage import validate_complete_lifecycle_evidence
 from .output_persistence import _read_regular_bytes_nofollow
-from .output_validation import (
+from .output_artifact import (
+    FINAL_ATTESTATION_MEMBER,
+    FINAL_BINDING_MEMBER,
+    TERMINAL_METRICS_MEMBER,
     FinalAggregateBundleReceipt,
     validate_final_aggregate_bundle,
 )
