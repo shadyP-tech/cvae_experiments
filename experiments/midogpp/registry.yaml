@@ -3579,11 +3579,11 @@ experiments:
       - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_amendment_v3
     input_claim_scope_exceptions:
       midogpp_output_uniform_b_v2_generation_lock_v1: Immutable generation geometry and fixed expert-bank settings only; no routing, diagnostic, consumed-test, downstream, promotion, deployment, or execution authority is inherited.
-      midogpp_stage90_oe_ppur_source_training_action_supervision_v3: Planned v3-only source-supervision identity. It must be materialized from source rows and source labels with exact held-center pools before execution and grants no target-label or consumed-test authority.
+      midogpp_stage90_oe_ppur_source_training_action_supervision_v3: Materialized, hash-verified v3-only source-supervision identity containing source rows and source labels with exact held-center pools. It contains no target-test rows or labels and grants no target-label or execution authority by itself.
       midogpp_stage90_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_test_cache_v3: Planned v3-only label-free cache alias; no consumed-test reuse, target labels, predecessor Stage-90 state, probability surface, or execution authority is registered.
       midogpp_stage90_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_test_manifest_v3: Planned v3-only canonical manifest alias. Target labels remain closed until all 218 decisions are frozen and a separately issued amendment is admitted.
       midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_parent_v3: Planned v3-only byte-exact original-parent alias used solely to define the future amendment parent; it exposes no prior execution authority.
-      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_amendment_v3: Placeholder identity for a future v3-only single-consumer amendment. No amendment file or authorization is issued by this implementation.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_amendment_v3: Exact v3-only amendment #7 is issued at SHA-256 56269322ead01ef683c985d8f295b0369fb35ddef04d12115704f1df18a0c425 but remains unrendered, unclaimed, unconsumed, and no-run. Registration remains planned and no authority transfers to v4.
     runner:
       environment:
         CUBLAS_WORKSPACE_CONFIG: ":4096:8"
@@ -3606,9 +3606,295 @@ experiments:
         - --scratch-root
         - /data/local/fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v3
     notes:
-      - NEEDS EVIDENCE — OE-PPUR v3 is an implemented seven-input source-supervised successor, but its source-supervision bundle is not materialized and its v3-only consumed-test amendment is absent. Registration remains planned and non-runnable; implementation did not launch workers, create run roots, issue an amendment, or open labels.
-      - The ordered inputs are exact: immutable bank, immutable GenerationLock, v3-only source supervision, v3-only label-free cache alias, v3-only manifest alias, v3-only original parent-ledger alias, and an absent future v3-only amendment. OE-PPUR v2 and every other Stage-90 output, report, probability surface, checkpoint, scratch, lease, run state, amendment, and capability history are forbidden.
+      - NEEDS EVIDENCE — OE-PPUR v3 source supervision is materialized and amendment #7 is issued byte-exact, but the launch envelope remains unrendered and the single-use authority remains unclaimed and unconsumed. Registration stays planned and non-runnable; no output, lease, scratch, worker launch, or target-label access occurred.
+      - The ordered inputs are exact: immutable bank, immutable GenerationLock, materialized v3-only source supervision, v3-only label-free cache alias, v3-only manifest alias, v3-only original parent-ledger alias, and issued amendment #7. OE-PPUR v2 and every other predecessor Stage-90 output, report, probability surface, checkpoint, scratch, lease, run state, amendment, and capability history are forbidden.
       - Source pseudo-target q surfaces use exactly C-minus-{H,q}; final label-free target inference uses exactly C-minus-H. The same deterministic, label-free, permutation-equivariant action compiler is bound to both pool types, and any pool, lineage, support, calibration, or numerical failure selects exact P.
       - Complete source-only H/J/K/L/d exclusions, rotating K model selection, held-L out-of-fold uncertainty calibration, and nominal manager-owned terminal capability boundaries are implemented. Target labels remain closed until every one of the 218 typed decisions is frozen and attested.
       - Workstation execution is fixed to two persistent RTX A5000 GPU workers plus four CUDA-hidden spawn CPU workers with one BLAS thread, primitive pickle-safe DTOs, little-endian float32 prediction transport, float64 reductions, no nested pools, and no cross-run recovery.
       - Any separately authorized result remains POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE. It cannot support fresh routing, downstream utility, CVAE/NELBO compatibility, significance, promotion, deployment, or another experiment.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router.v4
+    stage: 90_oracles_and_diagnostics
+    status: planned
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v4.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v4
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_oe_ppur_source_training_action_supervision_v4
+      - midogpp_stage90_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_test_cache_v4
+      - midogpp_stage90_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_test_manifest_v4
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_parent_v4
+      - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_amendment_v4
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Immutable generation geometry and fixed expert-bank settings only; no routing, diagnostic, consumed-test, downstream, promotion, deployment, or execution authority is inherited.
+      midogpp_stage90_oe_ppur_source_training_action_supervision_v4: V4-only alias of the exact immutable source-only supervision bytes. Its v3 producer lineage is content provenance only; no v3 amendment, output, lease, scratch, run state, target labels, or execution authority is inherited.
+      midogpp_stage90_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_test_cache_v4: V4-only label-free alias resolving directly to the canonical cache. It grants no target-label, consumed-test execution, or fresh-evidence authority.
+      midogpp_stage90_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_test_manifest_v4: V4-only canonical manifest alias. Target labels remain closed until the complete preterminal boundary and fresh attestations are sealed.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_parent_v4: V4-only byte-exact original-parent alias. It cannot itself authorize execution.
+      midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_amendment_v4: Planned v4-only amendment that must bind the complete pre-amendment workspace, path, input, config-template, manifest-template, scientific, lifecycle, and publication-topology plan.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis.oe_ppur_v4
+        - run
+        - --repository-root
+        - .
+    notes:
+      - NEEDS EVIDENCE — v4 is a separately workspace-sealed mechanical successor. V3 amendment input #7 remains issued, unrendered, unclaimed, and no-run; it is a preservation witness only and cannot authorize v4.
+      - The pre-amendment plan binds exact Git, dirty-content, config, registry, catalog, helper, direct-input, resolved-path, scientific/lifecycle, and NFS-safe publication topology identities before a v4 amendment can be issued.
+      - Heavy computation remains workstation-local with two persistent RTX A5000 GPU workers, four CUDA-hidden spawn CPU workers, one BLAS thread, primitive pickle-safe DTOs, little-endian float32 transport, float64 reductions, and no nested pools.
+      - The current registration is deliberately non-runnable. Amendment preparation does not activate FUSE, claim a lease, start workers, open target labels, or imply launch authority.
+      - Every future result remains POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE. It cannot establish fresh routing, unseen-center generalization, NELBO compatibility, significance, promotion, deployment, or thesis-confirmatory evidence.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_sceptre_router.v5
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_sceptre_router_v5.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_sceptre_router_v5
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_sceptre_source_inner_candidate_utility_reuse_v5
+      - midogpp_stage90_sceptre_source_inner_adaptive_reuse_amendment_v5
+      - midogpp_stage90_sceptre_test_cache_v5
+      - midogpp_stage90_sceptre_test_manifest_v5
+      - midogpp_uniform_b_test_consumption_ledger_sceptre_parent_v5
+      - midogpp_uniform_b_test_consumption_ledger_sceptre_execution_amendment_v5
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Immutable generation geometry, fixed expert-bank membership, and classifier settings only; no routing, downstream, consumed-label, promotion, deployment, or execution authority is inherited.
+      midogpp_stage90_sceptre_source_inner_candidate_utility_reuse_v5: V5-only direct alias of the immutable source-inner expert-versus-expert utility surface for a complete ranking prior; it does not expose exact-B advantage or target labels.
+      midogpp_stage90_sceptre_source_inner_adaptive_reuse_amendment_v5: Exact v5-only amendment for adaptive descriptive source-inner development; it grants no test-execution or fresh-evidence authority.
+      midogpp_stage90_sceptre_test_cache_v5: V5-only direct alias of the canonical label-free consumed-test cache; it supplies no labels or fresh evidence.
+      midogpp_stage90_sceptre_test_manifest_v5: V5-only role-scoped manifest access after the corresponding global freeze barriers.
+      midogpp_uniform_b_test_consumption_ledger_sceptre_parent_v5: V5-only byte-exact original parent-ledger binding; it cannot authorize execution.
+      midogpp_uniform_b_test_consumption_ledger_sceptre_execution_amendment_v5: Exact single-consumer, single-use amendment authorizing one terminal v5 consumed-test diagnostic; the first admitted post-lease mutation permanently exhausts it.
+    runner:
+      preparation_authority_gate: sceptre_v5_consumed_test_execution_amendment_v1
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-sceptre-router-v5
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_sceptre_router_v5
+    notes:
+      - SCOPE LIMITED — v5 is a fresh single-use terminal identity correcting the v4 producer-validator fit-semantics mismatch; v4 remains FAILED_EXHAUSTED and is neither retried nor used as input.
+      - Exactly eight v5-scoped inputs resolve directly to immutable upstream bank, GenerationLock, source-inner, cache, manifest, and original-ledger bytes plus fresh consumer-specific amendments. No v4 output, lease, run state, scratch, checkpoint, prediction surface, route policy, validation, or amendment is reusable.
+      - One canonical v5 fit-semantics contract hashes the worker receipt without publication ordinals, validates those ordinals separately, scores single-source fits on all rows outside the source center, and scores exact B only on the target center.
+      - The complete eight-member proposal set freezes before labels; whole-case-disjoint support may select any sealed expert, paired confirmation may retain only that expert or exact B, and all 45 policies pass two fresh preterminal reconstructions before evaluation labels open.
+      - Every result remains POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE. It is target-label-assisted downstream utility policy sensitivity, not fresh routing, unseen-center generalization, NELBO compatibility, significance, promotion, deployment, or thesis-confirmatory evidence.
+
+  - experiment_id: midogpp.routing_and_composition.uniform_b_v2_harp_action_surface.v1
+    stage: 60_routing_and_composition
+    status: planned
+    claim_scope: routing_and_composition
+    config_path: experiments/midogpp/stages/60_routing_and_composition/configs/uniform_b_v2_harp_action_surface_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_harp_action_surface_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_harp_router_development_reservation_v1
+      - midogpp_harp_router_development_cache_v1
+      - midogpp_harp_router_development_manifest_v1
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "3"
+        MKL_NUM_THREADS: "3"
+        OPENBLAS_NUM_THREADS: "3"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-routing
+        - uniform-b-v2-harp-action-surface
+        - --config
+        - "{resolved_config}"
+    notes:
+      - NEEDS EVIDENCE — HARP is a new Stage-60 family and remains planned until a new family-specific source-inner reservation, label-blind cache, and scoring-only manifest are hash-bound and ready. Existing source-inner utility labels, Stage-50 artifacts, every SCEPTRE output, and every Stage-90 artifact are forbidden.
+      - For each outer target H, every probability menu, label-surface hash, normalization, tuning fold, response denominator, model, and delete-donor replay removes H from both pseudo-query q and candidate e roles before any transform. Candidate e is also excluded from the inner donor role; changing H-only development labels cannot change the H response receipts, H model bank, action decision, or routed probability bytes.
+      - The supervised response is source-standardized weighted correctness, with separate Brier and log-loss deltas. It is not balanced-accuracy gain. All probability actions are sealed before the one-way source-development label capability can open.
+      - Physical U and H-by-e actions have the same class-balanced synthetic budget: U distributes the residual top-up uniformly and H-by-e assigns it to one legal expert. Source utility deltas are defined against U, so they do not confound source routing with the extra-data budget. Exact B remains the lower-budget byte-identical abstention and operational baseline.
+      - Lambda is explicitly post-classifier predictive probability ensembling from U to one physical H-by-e endpoint; it is not a lambda-weighted CVAE prior or generated-embedding composition. Lambda 1 is the required physical expert-routing ablation.
+      - The primary policy uses a label-free, case-equal q95 delete-donor design-leverage envelope only as a post-selection rejection gate for the source-model winner; rejection returns exact B and never reranks to another expert. The separate CVAE variational-energy compatibility ablation remains disabled and is not called exact NELBO or downstream utility.
+
+  - experiment_id: midogpp.routing_and_composition.uniform_b_v2_harp_target_support_surface.v1
+    stage: 60_routing_and_composition
+    status: planned
+    claim_scope: routing_compatibility_only
+    config_path: experiments/midogpp/stages/60_routing_and_composition/configs/uniform_b_v2_harp_target_support_surface_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_harp_target_support_surface_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_harp_target_support_reservation_v1
+      - midogpp_harp_target_support_cache_v1
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "3"
+        MKL_NUM_THREADS: "3"
+        OPENBLAS_NUM_THREADS: "3"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-routing
+        - uniform-b-v2-harp-target-support-surface
+        - --config
+        - "{resolved_config}"
+    notes:
+      - NEEDS EVIDENCE — the target-support producer remains planned until at least eight independent, case-disjoint, unlabeled support cases per target are reserved and their Virchow2 cache is closed-world and hash-bound.
+      - This surface exposes aligned exact-B, matched-budget U, and legal candidate probability menus, U-relative directional margins, and seed dispersion. The primary v1 policy reduces these label-free features to a case-equal q95 delete-donor design-leverage envelope that may only reject the already selected source-model winner and force exact B; it cannot rerank or authorize. CVAE compatibility energy remains a disabled ablation. The surface accepts no target labels and cannot itself rank, select, weight, or claim downstream utility.
+
+  - experiment_id: midogpp.routing_and_composition.uniform_b_v2_harp_policy_lock.v1
+    stage: 60_routing_and_composition
+    status: planned
+    claim_scope: routing_and_composition
+    config_path: experiments/midogpp/stages/60_routing_and_composition/configs/uniform_b_v2_harp_policy_lock_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_harp_policy_lock_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_harp_action_surface_v1
+      - midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+      - midogpp_output_uniform_b_v2_harp_target_support_surface_v1
+      - midogpp_harp_target_support_reservation_v1
+      - midogpp_harp_fresh_target_reservation_v1
+    runner:
+      environment:
+        CUDA_VISIBLE_DEVICES: ""
+        OMP_NUM_THREADS: "3"
+        MKL_NUM_THREADS: "3"
+        OPENBLAS_NUM_THREADS: "3"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-routing
+        - uniform-b-v2-harp-policy-lock
+        - --config
+        - "{resolved_config}"
+    notes:
+      - NEEDS EVIDENCE — this CPU-only policy lock stays planned until both HARP surfaces and a disjoint future Stage-70 reservation are ready. Implementation does not authorize label access, output creation, a MIDOG++ test rerun, or a routing claim.
+      - Nested center LODO tunes ridge penalties with strict q/e exclusions; delete-donor predictions are retained as the uncertainty ensemble. For every row, all legal candidates and lambda in 0.25, 0.5, 0.75, and 1 are evaluated using conservative median-minus-MAD gain and proper-loss noninferiority gates.
+      - All learned gain, Brier, and log-loss deltas compare the predictive U-to-H-by-e action against physical matched-budget U. Lambda 1 is the physical expert-routing endpoint; smaller lambdas are predictive-ensemble actions only.
+      - The selection API is label-free. It first ranks source-model-admissible actions without target-support influence, then applies the frozen label-free leverage envelope only to that winner; rejection returns the exact immutable equal-union B probability bytes without trying another expert. The separate CVAE compatibility-energy gate remains disabled and may only be activated by a separately sealed held-query ablation.
+
+  - experiment_id: midogpp.frozen_policy_downstream.uniform_b_v2_harp_fresh.v1
+    stage: 70_frozen_policy_downstream
+    status: planned
+    claim_scope: synthetic_downstream_utility
+    config_path: experiments/midogpp/stages/70_frozen_policy_downstream/configs/uniform_b_v2_harp_fresh_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_harp_fresh_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_output_uniform_b_v2_harp_policy_lock_v1
+      - midogpp_harp_fresh_target_reservation_v1
+      - midogpp_harp_fresh_target_cache_v1
+      - midogpp_harp_fresh_target_scoring_manifest_v1
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "3"
+        MKL_NUM_THREADS: "3"
+        OPENBLAS_NUM_THREADS: "3"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-frozen-policy-downstream
+        - evaluate-harp-fresh
+        - --config
+        - "{resolved_config}"
+        - --enable-local-scratch
+    notes:
+      - NEEDS EVIDENCE — the production evaluator is registered but deliberately non-runnable until the HARP policy, a newly reserved case-disjoint MIDOG++ target surface, its label-blind cache, and its role-scoped scoring manifest are complete and hash-bound.
+      - All 810 exact-B, matched-budget U, and legal H-by-e seed cells, all per-row decisions, and all nine routed probability vectors must be durably sealed and independently reconstructed twice before the one-shot evaluation-label capability can open.
+      - The primary endpoint is the exact-nine probability-ensemble balanced accuracy with target center as the inference unit; cases are equally weighted within center and seed cells are descriptive technical repeats only. Brier and log-loss deltas remain co-primary safety diagnostics.
+      - No unsupported action is forced. Every coverage, leverage, gain, proper-loss, compatibility, numerical, or lineage failure returns the exact immutable B probability bytes. A completed negative result remains scientifically valid.
+      - Target-support geometry cannot choose or rerank an expert. Stage 70 applies the frozen per-target/source leverage envelope only to the source-model winner and falls directly back to exact B when that post-selection safety check fails.
+      - After the route seal and label opening, a diagnostic-only full action matrix separates U-minus-B budget lift, physical H-by-e lambda-1-minus-U routing lift, selected predictive-lambda-minus-U lift, and final-policy-minus-B operational lift. Oracle agreement, regret, and rank diagnostics are persisted but can never feed the policy or thresholds.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v1
+    stage: 90_oracles_and_diagnostics
+    status: planned
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_harp_router_v1.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v1
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_harp_consumed_test_cache_v1
+      - midogpp_stage90_harp_consumed_test_development_manifest_v1
+      - midogpp_stage90_harp_consumed_test_evaluation_manifest_v1
+      - midogpp_uniform_b_test_consumption_ledger_harp_parent_v1
+      - midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v1
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Immutable fixed-bank generation geometry and classifier settings only; it grants no routing, consumed-label, fresh-evidence, promotion, deployment, or execution authority.
+      midogpp_stage90_harp_consumed_test_cache_v1: Planned HARP-only resolution fence for the canonical consumed-test label-blind Virchow2 cache; it grants no label, execution, fresh-evidence, or downstream authority.
+      midogpp_stage90_harp_consumed_test_development_manifest_v1: Planned role-pure whole-case development label capability; it may open only after the complete physical menu is durable and grants no evaluation-label authority.
+      midogpp_stage90_harp_consumed_test_evaluation_manifest_v1: Planned role-pure evaluation label capability; it may open once only after all global routes and vectors are durably reconstructed twice.
+      midogpp_uniform_b_test_consumption_ledger_harp_parent_v1: Planned HARP-only byte binding to the original consumed-test parent ledger; it cannot authorize execution.
+      midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v1: A new HARP-specific single-use amendment is required; no SCEPTRE or other predecessor authority may be aliased.
+    runner:
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "3"
+        MKL_NUM_THREADS: "3"
+        OPENBLAS_NUM_THREADS: "3"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-harp-router-v1
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v1
+    notes:
+      - The registered cvae-diagnostics prepare-fixed-bank-harp-router-v1-inputs command deterministically creates the consumer-scoped label-blind cache and role-pure manifests from the canonical consumed MIDOG++ test artifacts; it cannot issue an amendment or activate execution. A new HARP-specific one-shot amendment is still not issued, so registration remains planned and non-runnable.
+      - Preparation emits the exact path-free expert-bank, GenerationLock, cache, role-manifest, and parent-ledger input binding that a future HARP-only amendment must reproduce byte-for-byte.
+      - The runner physically regenerates all 81 frozen source streams from the authoritative expert bank and GenerationLock, then seals all 738 exact-B/matched-U/legal H-by-e actions and all 6,642 exact-nine probability cells from label-blind consumed-test embeddings. It consumes no SCEPTRE output, policy, rank, utility surface, lease, or amendment.
+      - U and every H-by-e endpoint have the same physical class-balanced budget; source utility is U-relative, lambda 1 is the physical expert-routing ablation, and smaller lambdas are explicitly predictive-probability ensembles. Exact B remains the byte-identical terminal fallback and operational baseline.
+      - The frozen lambda-1 policy additionally seals a reference-preserving diagnostic vector before labels: admitted rows use physical H-by-e and rejected rows retain U. This isolates physical routing from the U-minus-B budget effect; the operational policy still falls back to exact B.
+      - For each outer H, every q, e, donor row, normalization, nested LODO fold, fit, and tune excludes H. Seed cells are technical replications; cases are equally weighted within target center and centers are equally weighted in the terminal descriptive summary.
+      - All actions, policy decisions, and routed vectors are durable and independently reconstructed twice before the one-shot evaluation-label capability opens. Every failed gate returns exact-B bytes.
+      - Any future authorized result is permanently POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE. It cannot feed Stage 60, Stage 70, any other experiment, fresh routing, unseen-center generalization, significance, promotion, deployment, or thesis-confirmatory evidence.

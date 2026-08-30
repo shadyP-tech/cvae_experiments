@@ -1,0 +1,95 @@
+schema_version: midogpp_harp_stage60_config_v1
+surface: uniform-b-v2-harp-policy-lock
+experiment:
+  id: midogpp.routing_and_composition.uniform_b_v2_harp_policy_lock.v1
+  artifact_root: output://midogpp_output_uniform_b_v2_harp_policy_lock_v1
+  output_artifact_id: midogpp_output_uniform_b_v2_harp_policy_lock_v1
+inputs:
+  artifact_ids:
+    - midogpp_output_uniform_b_v2_harp_action_surface_v1
+    - midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+    - midogpp_output_uniform_b_v2_harp_target_support_surface_v1
+    - midogpp_harp_target_support_reservation_v1
+    - midogpp_harp_fresh_target_reservation_v1
+  paths:
+    action_surface_root: artifact://midogpp_output_uniform_b_v2_harp_action_surface_v1
+    exact_b_policy_root: artifact://midogpp_output_uniform_b_v2_equal_union_policy_lock_v1
+    target_support_surface_root: artifact://midogpp_output_uniform_b_v2_harp_target_support_surface_v1
+    target_support_reservation_root: artifact://midogpp_harp_target_support_reservation_v1
+    fresh_target_reservation_root: artifact://midogpp_harp_fresh_target_reservation_v1
+    readiness_attestation_path: artifact://midogpp_harp_fresh_target_reservation_v1/manifests/harp_policy_inputs_attestation.json
+protocol:
+  dataset_family: MIDOG++
+  stage: 60_routing_and_composition
+  input_status: planned
+  center_universe: ['0', '1', '2', '3', '5', '6', '7', '8', '9']
+  strict_outer_target_query_source_exclusion: true
+  outer_target_excluded_before_transform: true
+  source_labels_opened_after_global_prediction_seal: false
+  policy_api_accepts_labels: false
+  policy_locked_before_target_evaluation_cache: true
+  target_support_labels_used: false
+  target_evaluation_labels_used: false
+  stage50_artifacts_used: false
+  stage90_artifacts_used: false
+model:
+  family: harp_directional_partial_pool_ridge_v1
+  lambda_grid: [0.25, 0.5, 0.75, 1.0]
+  response: source_standardized_weighted_correctness_surrogate
+  probability_endpoint: exact_nine_seed_ensemble
+  routing_estimand: frozen_predictive_probability_ensemble_over_frozen_generative_expert_actions
+  matched_budget_reference_action: U
+  matched_budget_reference_composition: equal_union_plus_uniform_class_balanced_topup
+  utility_deltas_reference_action: U
+  exact_b_role: byte_identical_abstention_and_operational_baseline
+  lambda_semantics: post_classifier_predictive_probability_ensemble_not_generated_distribution
+  physical_expert_routing_primary_lambda: 1.0
+  seed_cells_may_feed_model: false
+  case_equal_weighting: true
+  uncertainty_units: [query_center, source_center, independent_case]
+  proper_loss_constraints: brier_and_log_loss_noninferiority
+  nested_center_lodo: true
+  delete_donor_predictions: true
+  direction_bins: [zero_to_one, one_to_zero, all_margins]
+  compatibility_role: optional_shrink_or_abstain_only
+  compatibility_default_enabled: false
+  compatibility_ablation: held_query_source_only_required
+  target_support_envelope_enabled_in_policy: true
+  target_support_envelope_method: case_equal_q95_delete_donor_design_leverage_cap
+  target_support_envelope_role: monotone_shrink_or_abstain_only
+  target_support_envelope_labels_used: false
+  target_support_envelope_predicted_outcomes_used: false
+  target_support_envelope_may_rank_or_authorize: false
+  ridge_alphas: [0.01, 0.1, 1.0, 10.0]
+  conservative_gain_kappa: 1.0
+  conservative_loss_kappa: 1.0
+  minimum_paired_cases: 16
+  minimum_donor_centers: 4
+  minimum_truth_classes: 2
+  minimum_positive_gain: 0.0
+  maximum_brier_delta: 0.0
+  maximum_log_loss_delta: 0.0
+  maximum_leverage: 1.0
+  minimum_compatibility_shrinkage: 0.0
+runtime:
+  workstation_profile: xeon_w2265_12c24t_125gb_2x_rtx_a5000_24gb
+  generation_devices: []
+  persistent_workers_per_gpu: 0
+  classifier_workers: 0
+  classifier_threads_per_worker: 1
+  model_workers: 4
+  model_threads_per_worker: 3
+  multiprocessing_start_method: spawn
+  parent_cuda_context_forbidden: true
+  scientific_reductions_dtype: float64
+  probability_transport_dtype: float32
+  generated_cache_storage: none
+  nested_process_pools_allowed: false
+claim_boundary:
+  claim_scope: routing_and_composition
+  action_learnability_surface_only: false
+  routing_improvement_claimed: false
+  target_downstream_utility_claimed: false
+  consumed_test_sensitivity: false
+  exact_b_byte_identical_fallback: true
+  proxy_is_downstream_utility: false

@@ -84,6 +84,24 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     utility_aligned_policy.add_argument("--config", required=True)
+    harp_action = sub.add_parser(
+        "uniform-b-v2-harp-action-surface",
+        help=(
+            "Build the fresh HARP source-inner directional action-response "
+            "surface after globally sealing all probability menus."
+        ),
+    )
+    harp_action.add_argument("--config", required=True)
+    harp_support = sub.add_parser(
+        "uniform-b-v2-harp-target-support-surface",
+        help="Build the fresh label-free HARP target-support feature surface.",
+    )
+    harp_support.add_argument("--config", required=True)
+    harp_policy = sub.add_parser(
+        "uniform-b-v2-harp-policy-lock",
+        help="Fit and freeze the nested-LODO HARP label-free routing policy.",
+    )
+    harp_policy.add_argument("--config", required=True)
     args = parser.parse_args(argv)
     if args.surface == "uniform-b-v2-equal-union-policy-lock":
         from .config import load_equal_union_policy_config
@@ -227,6 +245,36 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_utility_aligned_residual_policy_config(args.config)
         print(run_utility_aligned_residual_policy_lock(config))
+        return 0
+    if args.surface in {
+        "uniform-b-v2-harp-action-surface",
+        "uniform-b-v2-harp-target-support-surface",
+        "uniform-b-v2-harp-policy-lock",
+    }:
+        from .harp_stage60 import (
+            load_harp_stage60_config,
+            run_harp_stage60_surface,
+        )
+
+        config = load_harp_stage60_config(
+            args.config,
+            expected_surface=args.surface,
+        )
+        receipt = run_harp_stage60_surface(config)
+        print(
+            json.dumps(
+                {
+                    "schema_version": "midogpp_harp_stage60_cli_receipt_v1",
+                    "surface": receipt.surface,
+                    "artifact_root": str(receipt.artifact_root),
+                    "product_hash": receipt.product_hash,
+                    "validation_hash": receipt.validation_hash,
+                    "status": receipt.status,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
         return 0
     raise AssertionError(f"Unknown routing surface: {args.surface}")
 

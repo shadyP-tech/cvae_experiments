@@ -1,0 +1,248 @@
+"""Deterministic v5 source inventory and predecessor import fence."""
+
+from __future__ import annotations
+
+import ast
+from pathlib import Path
+from types import MappingProxyType
+from typing import Mapping
+
+from midogpp_thesis.cvae.protocol import ProtocolError
+
+from ..fixed_bank_sceptre_router.hashing import canonical_hash, file_sha256
+
+
+SOURCE_SNAPSHOT_SCHEMA = "sceptre_v5_implementation_source_snapshot_v1"
+SOURCE_ROOT_PATTERNS = (
+    "midogpp_thesis/cvae/diagnostics/fixed_bank_sceptre_router_v5/**/*.py",
+    "midogpp_thesis/cvae/diagnostics/fixed_bank_sceptre_router/**/*.py",
+    "midogpp_thesis/cvae/diagnostics/sceptre_runtime/**/*.py",
+    "midogpp_thesis/cvae/routing/sceptre/**/*.py",
+)
+SOURCE_CLOSURE_DESCRIPTION = "transitive_python_imports_under_src_midogpp_thesis"
+FORBIDDEN_EXECUTABLE_IMPORT_FRAGMENTS = (
+    "fixed_bank_sceptre_router_v1",
+    "fixed_bank_sceptre_router_v2",
+    "fixed_bank_sceptre_router_v3",
+    "fixed_bank_sceptre_router_v4",
+)
+
+
+def repository_root() -> Path:
+    return Path(__file__).resolve().parents[5]
+
+
+def source_members(root: Path | None = None) -> tuple[Path, ...]:
+    repository = repository_root() if root is None else Path(root).resolve()
+    source = repository / "src"
+    members = set()
+    for pattern in SOURCE_ROOT_PATTERNS:
+        candidates = tuple(source.glob(pattern))
+        if any(path.is_symlink() for path in candidates):
+            raise ProtocolError("SCEPTRE v5 source inventory contains a symlink.")
+        namespace_members = tuple(
+            path
+            for path in candidates
+            if path.is_file()
+            and "__pycache__" not in path.parts
+            and path.suffix == ".py"
+        )
+        if not namespace_members:
+            raise ProtocolError("SCEPTRE v5 sealed source namespace is empty.")
+        members.update(namespace_members)
+    if not members:
+        raise ProtocolError("SCEPTRE v5 source inventory is empty.")
+    members = _transitive_local_import_closure(source, members)
+    ordered = tuple(
+        sorted(members, key=lambda path: path.relative_to(source).as_posix())
+    )
+    _validate_predecessor_import_fence(ordered)
+    return ordered
+
+
+def build_source_snapshot_payload(root: Path | None = None) -> Mapping[str, object]:
+    repository = repository_root() if root is None else Path(root).resolve()
+    source = repository / "src"
+    rows = tuple(
+        {
+            "relative_path": path.relative_to(source).as_posix(),
+            "sha256": file_sha256(path),
+            "size_bytes": path.stat().st_size,
+        }
+        for path in source_members(repository)
+    )
+    manifest_hash = canonical_hash(
+        {
+            "schema_version": SOURCE_SNAPSHOT_SCHEMA,
+            "members": list(rows),
+        }
+    )
+    tree_hash = canonical_hash(
+        {
+            "schema_version": "sceptre_v5_source_tree_v1",
+            "member_sha256": [
+                [row["relative_path"], row["sha256"]] for row in rows
+            ],
+        }
+    )
+    return MappingProxyType(
+        {
+            "source_snapshot_schema": SOURCE_SNAPSHOT_SCHEMA,
+            "source_snapshot_manifest_sha256": manifest_hash,
+            "source_snapshot_tree_sha256": tree_hash,
+            "source_snapshot_member_count": len(rows),
+            "source_snapshot_member_pattern": (
+                "roots="
+                + "|".join(SOURCE_ROOT_PATTERNS)
+                + f";closure={SOURCE_CLOSURE_DESCRIPTION}"
+            ),
+            "source_snapshot_excludes_bytecode_and_cache": True,
+            "v5_owned_source_sealed": True,
+            "shared_read_only_science_dependencies_sealed": True,
+            "transitive_local_import_closure_sealed": True,
+            "predecessor_executable_imports_forbidden": True,
+            "members": list(rows),
+        }
+    )
+
+
+def source_snapshot_identity(root: Path | None = None) -> Mapping[str, object]:
+    payload = build_source_snapshot_payload(root)
+    return MappingProxyType(
+        {
+            key: payload[key]
+            for key in (
+                "source_snapshot_schema",
+                "source_snapshot_manifest_sha256",
+                "source_snapshot_tree_sha256",
+                "source_snapshot_member_count",
+                "source_snapshot_member_pattern",
+                "source_snapshot_excludes_bytecode_and_cache",
+            )
+        }
+    )
+
+
+def validate_source_snapshot(
+    expected: Mapping[str, object], root: Path | None = None
+) -> Mapping[str, object]:
+    observed = source_snapshot_identity(root)
+    if dict(observed) != dict(expected):
+        raise ProtocolError("SCEPTRE v5 source snapshot drifted.")
+    return observed
+
+
+def _validate_predecessor_import_fence(paths: tuple[Path, ...]) -> None:
+    for path in paths:
+        if any(
+            fragment in path.as_posix()
+            for fragment in FORBIDDEN_EXECUTABLE_IMPORT_FRAGMENTS
+        ):
+            raise ProtocolError(
+                "SCEPTRE v5 source closure contains predecessor executable code."
+            )
+        # Shared sealed dependencies predate v5 and are not subject to the v5
+        # executable-import fence; only v5-owned code must remain predecessor-free.
+        if "fixed_bank_sceptre_router_v5" not in path.parts:
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        except (OSError, UnicodeDecodeError, SyntaxError) as exc:
+            raise ProtocolError("Cannot inspect SCEPTRE v5 source imports.") from exc
+        modules = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                modules.extend(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                modules.append(node.module or "")
+        if any(
+            fragment in module
+            for module in modules
+            for fragment in FORBIDDEN_EXECUTABLE_IMPORT_FRAGMENTS
+        ):
+            raise ProtocolError("SCEPTRE v5 imports predecessor executable code.")
+
+
+def _transitive_local_import_closure(
+    source_root: Path,
+    roots: set[Path],
+) -> set[Path]:
+    """Seal every repository Python module reachable from the executable roots."""
+
+    members = set(roots)
+    pending = list(roots)
+    while pending:
+        path = pending.pop()
+        for module in _imported_modules(path, source_root):
+            for candidate in _module_members(module, source_root):
+                if candidate.is_symlink():
+                    raise ProtocolError(
+                        "SCEPTRE v5 source import closure contains a symlink."
+                    )
+                if candidate not in members:
+                    members.add(candidate)
+                    pending.append(candidate)
+    return members
+
+
+def _imported_modules(path: Path, source_root: Path) -> tuple[str, ...]:
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    except (OSError, UnicodeDecodeError, SyntaxError) as exc:
+        raise ProtocolError("Cannot inspect SCEPTRE v5 source imports.") from exc
+    relative = path.relative_to(source_root).with_suffix("")
+    parts = relative.parts
+    package = parts[:-1]
+    modules: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            modules.update(alias.name for alias in node.names)
+            continue
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        if node.level:
+            drop = node.level - 1
+            if drop > len(package):
+                continue
+            anchor = package[: len(package) - drop]
+            suffix = tuple((node.module or "").split(".")) if node.module else ()
+            base = ".".join((*anchor, *suffix))
+        else:
+            base = node.module or ""
+        if base:
+            modules.add(base)
+        for alias in node.names:
+            if base and alias.name != "*":
+                modules.add(f"{base}.{alias.name}")
+    return tuple(sorted(modules))
+
+
+def _module_members(module: str, source_root: Path) -> tuple[Path, ...]:
+    if not module.startswith("midogpp_thesis"):
+        return ()
+    parts = tuple(part for part in module.split(".") if part)
+    candidates: set[Path] = set()
+    module_path = source_root.joinpath(*parts)
+    for member in (module_path.with_suffix(".py"), module_path / "__init__.py"):
+        if member.is_file():
+            candidates.add(member)
+    for depth in range(1, len(parts) + 1):
+        package_init = source_root.joinpath(*parts[:depth]) / "__init__.py"
+        if package_init.is_file():
+            candidates.add(package_init)
+    return tuple(
+        sorted(candidates, key=lambda path: path.relative_to(source_root).as_posix())
+    )
+
+
+__all__ = (
+    "FORBIDDEN_EXECUTABLE_IMPORT_FRAGMENTS",
+    "SOURCE_CLOSURE_DESCRIPTION",
+    "SOURCE_ROOT_PATTERNS",
+    "SOURCE_SNAPSHOT_SCHEMA",
+    "build_source_snapshot_payload",
+    "repository_root",
+    "source_members",
+    "source_snapshot_identity",
+    "validate_source_snapshot",
+)

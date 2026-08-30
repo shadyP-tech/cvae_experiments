@@ -591,6 +591,82 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    sceptre_v5 = sub.add_parser(
+        "fixed-bank-sceptre-router-v5",
+        help=(
+            "Run the separately authorized, single-use SCEPTRE v5 fit-"
+            "semantics repair diagnostic, its read-only dry run, or inspect "
+            "its executable identities."
+        ),
+    )
+    sceptre_v5.add_argument("--config", required=True)
+    sceptre_v5.add_argument(
+        "--artifact-root",
+        default=".",
+        help="Prepared output root; ignored by the path-free inspection surface.",
+    )
+    sceptre_v5_mode = sceptre_v5.add_mutually_exclusive_group()
+    sceptre_v5_mode.add_argument(
+        "--inspect-plan",
+        action="store_true",
+        help=(
+            "Emit the mutation-free executable/source receipt without "
+            "resolving inputs, probing hardware, or opening target data."
+        ),
+    )
+
+    harp_stage90 = sub.add_parser(
+        "fixed-bank-harp-router-v1",
+        help=(
+            "Inspect, dry-run, or execute the separately authorized terminal "
+            "HARP consumed-test sensitivity. The physical probability menu is "
+            "rebuilt from the frozen bank, GenerationLock, and label-blind cache."
+        ),
+    )
+    harp_stage90.add_argument("--config", required=True)
+    harp_stage90.add_argument(
+        "--artifact-root",
+        default=".",
+        help="Prepared output root; ignored by path-free planned inspection.",
+    )
+    harp_stage90_mode = harp_stage90.add_mutually_exclusive_group()
+    harp_stage90_mode.add_argument(
+        "--inspect-plan",
+        action="store_true",
+        help="Inspect identities and complete physical topology without resolving inputs.",
+    )
+    harp_stage90_mode.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "Validate authorized inputs and the physical plan without claiming "
+            "the HARP lease, generating sources, or opening labels."
+        ),
+    )
+    harp_prepare = sub.add_parser(
+        "prepare-fixed-bank-harp-router-v1-inputs",
+        help=(
+            "Materialize the HARP-only consumed-test label-blind cache and "
+            "deterministic whole-case role manifests. This does not create "
+            "or activate execution authority."
+        ),
+    )
+    harp_prepare.add_argument("--canonical-cache-root", required=True)
+    harp_prepare.add_argument("--canonical-manifest", required=True)
+    harp_prepare.add_argument("--parent-ledger", required=True)
+    harp_prepare.add_argument("--cache-root", required=True)
+    harp_prepare.add_argument("--development-manifest", required=True)
+    harp_prepare.add_argument("--evaluation-manifest", required=True)
+    sceptre_v5_mode.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "Validate exact-eight inputs, source seal, workspace binding, "
+            "workstation capacity, and the exact GPU worker initializer "
+            "without claiming the single-use lease or opening labels."
+        ),
+    )
+
     pcsi_parc = sub.add_parser(
         "fixed-bank-p-anchored-boundary-projected-pcsi-policy-regret-router",
         help=(
@@ -615,6 +691,23 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.surface == "prepare-fixed-bank-harp-router-v1-inputs":
+        import json
+
+        from .fixed_bank_harp_router_v1.preparation import (
+            prepare_harp_consumed_test_inputs,
+        )
+
+        prepared = prepare_harp_consumed_test_inputs(
+            canonical_cache_root=args.canonical_cache_root,
+            canonical_manifest_path=args.canonical_manifest,
+            parent_ledger_path=args.parent_ledger,
+            cache_root=args.cache_root,
+            development_manifest_path=args.development_manifest,
+            evaluation_manifest_path=args.evaluation_manifest,
+        )
+        print(json.dumps(prepared.to_payload(), sort_keys=True, separators=(",", ":")))
+        return 0
     artifact_root = Path(args.artifact_root)
 
     if args.surface == (
@@ -875,6 +968,68 @@ def main(argv: list[str] | None = None) -> int:
             )
         else:
             print(run_sceptre_v4(config, artifact_root=artifact_root))
+        return 0
+
+    if args.surface == "fixed-bank-sceptre-router-v5":
+        import json
+
+        from .fixed_bank_sceptre_router_v5.config import load_config
+        from .fixed_bank_sceptre_router_v5.runner import (
+            dry_run_sceptre_v5,
+            inspect_planned_sceptre_v5,
+            run_sceptre_v5,
+        )
+
+        config = load_config(args.config)
+        if args.inspect_plan:
+            print(
+                json.dumps(
+                    inspect_planned_sceptre_v5(config),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+        elif args.dry_run:
+            print(
+                json.dumps(
+                    dry_run_sceptre_v5(config, artifact_root=artifact_root),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+        else:
+            print(run_sceptre_v5(config, artifact_root=artifact_root))
+        return 0
+
+    if args.surface == "fixed-bank-harp-router-v1":
+        import json
+
+        from .fixed_bank_harp_router_v1.config import load_config
+        from .fixed_bank_harp_router_v1.runner import (
+            dry_run_harp_stage90,
+            inspect_harp_stage90,
+            run_harp_stage90,
+        )
+
+        config = load_config(args.config)
+        if args.inspect_plan:
+            print(
+                json.dumps(
+                    inspect_harp_stage90(config),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+        elif args.dry_run:
+            print(
+                json.dumps(
+                    dry_run_harp_stage90(config, artifact_root=artifact_root),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+        else:
+            print(run_harp_stage90(config, artifact_root=artifact_root))
         return 0
 
     if args.surface == (

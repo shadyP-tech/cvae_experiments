@@ -1,0 +1,193 @@
+schema_version: oe_ppur_v4_planned_config_v1
+experiment:
+  id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router.v4
+  name: P-anchored opportunity-equivalence pairwise primitive-utility router v4
+  output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_v4
+  authorization_state: PLANNED_WORKSPACE_SEAL_REQUIRED
+  execution_amendment_issued: false
+  launch_authorized: false
+  publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+  terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+inputs:
+  exact_seven_input_contract:
+    schema_version: oe_ppur_v4_exact_seven_input_contract_v1
+    ordered_inputs:
+    - ordinal: 1
+      role: frozen_source_expert_bank
+      artifact_id: midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      kind: directory
+      relative_member: ''
+      required_members: []
+      issued: true
+    - ordinal: 2
+      role: frozen_generation_lock
+      artifact_id: midogpp_output_uniform_b_v2_generation_lock_v1
+      kind: directory
+      relative_member: ''
+      required_members: []
+      issued: true
+    - ordinal: 3
+      role: oe_v4_immutable_source_only_supervision_alias
+      artifact_id: midogpp_stage90_oe_ppur_source_training_action_supervision_v4
+      kind: directory
+      relative_member: ''
+      required_members:
+      - manifests/source_training_surface.json
+      - manifests/source_pool_lineage.json
+      - tables/source_rows.csv
+      - arrays/source_action_probabilities.npy
+      - manifests/content_index.json
+      - reports/validation_report.json
+      issued: true
+    - ordinal: 4
+      role: fresh_oe_v4_label_free_test_cache_alias
+      artifact_id: midogpp_stage90_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_test_cache_v4
+      kind: directory
+      relative_member: ''
+      required_members: []
+      issued: true
+    - ordinal: 5
+      role: fresh_oe_v4_canonical_manifest_alias
+      artifact_id: midogpp_stage90_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_test_manifest_v4
+      kind: file
+      relative_member: manifest.csv
+      required_members: []
+      issued: true
+    - ordinal: 6
+      role: fresh_oe_v4_original_parent_consumption_ledger_alias
+      artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_parent_v4
+      kind: file
+      relative_member: reports/test_consumption_ledger.json
+      required_members: []
+      issued: true
+    - ordinal: 7
+      role: oe_v4_workspace_sealed_single_consumer_authorization_amendment
+      artifact_id: midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_amendment_v4
+      kind: file
+      relative_member: uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_ledger_amendment_v4.json
+      required_members: []
+      issued: false
+    direct_input_count: 7
+    order_is_semantic: true
+    duplicates_forbidden: true
+    source_supervision_direct_input_ordinal: 3
+    source_supervision_materialized: true
+    authorization_amendment_input_ordinal: 7
+    authorization_amendment_issued: false
+    execution_authorized: false
+    separate_launch_authority_required: true
+    paths_present: false
+    receipt_hash: 2e0d7011ba3d9b1e2821d657aa6f9bc2cae7c5210434f2bcf51cce6b96093d5c
+  source_supervision:
+    direct_input_ordinal: 3
+    content_lineage: IMMUTABLE_SOURCE_ONLY_SUCCESSOR_ALIAS
+    receipt_sha256: e9b6a05a6f4a4c982ce51eff7606b4ca303fd4c9df7dc466a6a3cc88fd93fe66
+    surface_sha256: 51084af5dfdf9ab7a34ccac2524b664c3df0860bdf02589b55c6d94310f968dd
+    row_order_sha256: 73bd8ade9944cbcf2e2dd9c4a8f4f247190ca68e880819a1f810a78ac64ae9bb
+    producer_source_seal_sha256: 74bf5b5c01d50190a6a0639533f298cea7ece8d381fdbbd578fa82537c48ab91
+    recomputation_receipt_sha256: e6b641a605ecd85774ef7a6ad06c1f47c0abe68ecf6448f1aa3f0b4eee353241
+    target_rows_present: false
+    target_labels_used: false
+    authority_inherited: false
+  bank_lock_hash: 9972a41dcd4814cd
+  generation_lock_hash: 34e551425710362e
+  bank_content_index_sha256: 6b74fe794bd30cf6c1e42190427e506d1ff50ecd9280b9dcfee2a7592ec6a318
+  generation_content_index_sha256: 086eb106a11fd52df5fc1f692d17a33edccaf6f707b2b9dd0fba15895d891d86
+  test_cache_content_sha256: df0bdbf64881ee000fe7c56bc486724313accf373ef8e90896344f8d03d187db
+  test_cache_row_order_sha256: bd1a85b95496203500bfe2dc5232f8bfb383e73d222a8ba083e81b2c6b33c389
+  test_manifest_sha256: db661ac7e3dbafde8e283528de6706ab35f2c26629b389706c4504e458cc5869
+  original_parent_ledger_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+  preserved_v3_amendment_sha256: 56269322ead01ef683c985d8f295b0369fb35ddef04d12115704f1df18a0c425
+  workspace_plan_sha256: null
+  authorization_amendment_sha256: null
+protocol:
+  schema_version: oe_ppur_v4_terminal_scientific_protocol_v1
+  experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router.v4
+  dataset_family: MIDOG++
+  claim_dataset_family: MIDOG++
+  feature_backbone: Virchow2_3840
+  domain_axis: scanner_center
+  split: test
+  split_previously_consumed: true
+  fresh_evidence: false
+  eligible_test_row_count: 9928
+  held_case_route_count: 218
+  probability_matrix_shape:
+  - 9928
+  - 7
+  scientific_method: OE_PPUR_PAIRWISE_PRIMITIVE_UTILITY_UNCHANGED
+  source_only_supervision_reuse: EXACT_IMMUTABLE_SOURCE_ONLY_CONTENT_ALIAS_NO_AUTHORITY_INHERITED
+  source_only_supervision_reuse_exception: USER_AUTHORIZED_V4_ONLY_HASH_EXACT_CONTENT_PROVENANCE
+  predecessor_no_feed_fence_acknowledged: true
+  source_supervision_target_test_rows_present: false
+  source_supervision_target_test_labels_present: false
+  target_H_excluded_from_every_fit_normalizer_calibrator_and_candidate_pool: true
+  source_inner_cross_fitting_required: true
+  query_to_compatibility_to_decision_to_expert_to_true_utility_order: true
+  proxy_is_not_true_utility: true
+  terminal_labels_closed_preterminal: true
+  terminal_labels_ephemeral_aggregate_only: true
+  exact_P_on_any_failed_gate: true
+  direct_input_count: 7
+  direct_input_roles:
+  - frozen_source_expert_bank
+  - frozen_generation_lock
+  - oe_v4_immutable_source_only_supervision_alias
+  - fresh_oe_v4_label_free_test_cache_alias
+  - fresh_oe_v4_canonical_manifest_alias
+  - fresh_oe_v4_original_parent_consumption_ledger_alias
+  - oe_v4_workspace_sealed_single_consumer_authorization_amendment
+  direct_input_artifact_ids:
+  - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+  - midogpp_output_uniform_b_v2_generation_lock_v1
+  - midogpp_stage90_oe_ppur_source_training_action_supervision_v4
+  - midogpp_stage90_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_test_cache_v4
+  - midogpp_stage90_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_test_manifest_v4
+  - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_parent_v4
+  - midogpp_uniform_b_test_consumption_ledger_fixed_bank_p_anchored_opportunity_equivalence_pairwise_primitive_utility_router_amendment_v4
+  workspace_plan_bound_before_amendment: true
+  resolved_config_template_bound_before_amendment: true
+  input_manifest_template_bound_before_amendment: true
+  git_head_tree_index_and_dirty_content_bound: true
+  nfs_safe_in_place_commit_required: true
+  v3_operational_state_reuse: false
+  separate_launch_authority_required: true
+  publication_and_claim_restrictions:
+    schema_version: oe_ppur_v4_terminal_claim_boundary_v1
+    publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+    terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+    claim_scope: diagnostic_only
+    fresh_evidence: false
+    execution_authorized: false
+    routing_success_claimed: false
+    downstream_utility_claimed: false
+    cvae_compatibility_claimed: false
+    nelbo_compatibility_claimed: false
+    deployment_claimed: false
+    promotion_allowed: false
+    may_feed_stage50: false
+    may_feed_stage60: false
+    may_feed_stage70: false
+    may_feed_another_stage90: false
+    may_feed_another_experiment: false
+  protocol_hash: 2bb395c7d851c6b4169cbada998bc8928979d4c28b452fe554db9e5494f57ac8
+claim_boundary:
+  schema_version: oe_ppur_v4_terminal_claim_boundary_v1
+  publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+  terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+  claim_scope: diagnostic_only
+  fresh_evidence: false
+  execution_authorized: false
+  routing_success_claimed: false
+  downstream_utility_claimed: false
+  cvae_compatibility_claimed: false
+  nelbo_compatibility_claimed: false
+  deployment_claimed: false
+  promotion_allowed: false
+  may_feed_stage50: false
+  may_feed_stage60: false
+  may_feed_stage70: false
+  may_feed_another_stage90: false
+  may_feed_another_experiment: false
+paths_present: false
+config_contract_hash: 8739d9f044a8eaaba960ea6d0cc750126de20d2a21cd9061a5f3601c714aa8bb

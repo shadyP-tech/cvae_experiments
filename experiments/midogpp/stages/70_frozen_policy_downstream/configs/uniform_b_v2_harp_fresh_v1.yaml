@@ -1,0 +1,100 @@
+schema_version: midogpp_harp_fresh_stage70_config_v1
+experiment:
+  id: midogpp.frozen_policy_downstream.uniform_b_v2_harp_fresh.v1
+  artifact_root: output://midogpp_output_uniform_b_v2_harp_fresh_v1
+  output_artifact_id: midogpp_output_uniform_b_v2_harp_fresh_v1
+inputs:
+  artifact_ids:
+    - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+    - midogpp_output_uniform_b_v2_generation_lock_v1
+    - midogpp_output_uniform_b_v2_harp_policy_lock_v1
+    - midogpp_harp_fresh_target_reservation_v1
+    - midogpp_harp_fresh_target_cache_v1
+    - midogpp_harp_fresh_target_scoring_manifest_v1
+  paths:
+    expert_bank_root: artifact://midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+    generation_lock_root: artifact://midogpp_output_uniform_b_v2_generation_lock_v1
+    policy_root: artifact://midogpp_output_uniform_b_v2_harp_policy_lock_v1
+    reservation_root: artifact://midogpp_harp_fresh_target_reservation_v1
+    target_cache_root: artifact://midogpp_harp_fresh_target_cache_v1
+    scoring_manifest_path: artifact://midogpp_harp_fresh_target_scoring_manifest_v1/manifest.csv
+protocol:
+  dataset_family: MIDOG++
+  stage: 70_frozen_policy_downstream
+  centers: ['0', '1', '2', '3', '5', '6', '7', '8', '9']
+  training_seeds: [17, 42, 101]
+  generation_seeds: [17, 42, 101]
+  fresh_reservation_frozen_before_target_cache: true
+  harp_policy_frozen_before_target_cache: true
+  support_evaluation_cases_globally_disjoint: true
+  outer_target_expert_excluded: true
+  complete_B_U_and_Hxe_menu_before_routing: true
+  all_routes_and_routed_vectors_sealed_before_labels: true
+  evaluation_labels_used_for_scoring_only_after_global_seal: true
+  evaluation_labels_available_to_generation_prediction_or_routing: false
+  policy_update_after_scoring_forbidden: true
+classifier:
+  family: sklearn_logistic_regression
+  C: 0.01
+  penalty: l2
+  solver: lbfgs
+  max_iter: 3000
+  class_weight: null
+  random_state: 23
+  l1_ratio: null
+  threshold_policy: predict
+  scaler_fit: synthetic_train_only
+runtime:
+  workstation_profile: xeon_w2265_12c24t_125gb_2x_rtx_a5000_24gb
+  generation_devices: [cuda:0, cuda:1]
+  cuda_visible_devices: '0,1'
+  generation_workers_per_device: 1
+  source_block_per_class: 270
+  classifier_workers: 4
+  classifier_threads_per_worker: 3
+  multiprocessing_start_method: spawn
+  tf32_disabled_in_gpu_workers: true
+  amp_enabled: false
+  parent_cuda_context_forbidden: true
+  gpu_and_cpu_phases_disjoint: true
+  source_cache_format: frozen_source_streams_single_float32_npy_memmap_lock_index
+  prediction_cache_format: float32_npy_memmap
+  persistent_cache_policy: hash_validated_resume
+  optional_local_scratch_root: /data/local
+  canonical_publication_requires_validated_atomic_copy: true
+  minimum_logical_cpu_count: 12
+  minimum_physical_ram_bytes: 107374182400
+  minimum_artifact_disk_free_bytes: 8589934592
+  minimum_gpu_free_mib_per_device: 18000
+evaluation:
+  primary_endpoint: exact_nine_probability_ensemble_balanced_accuracy
+  baseline_action: B
+  matched_budget_reference_action: U
+  candidate_action_namespace: Hxe
+  lambda_grid: [0.25, 0.5, 0.75, 1.0]
+  lambda_semantics: post_classifier_predictive_probability_ensemble_not_generated_distribution
+  physical_expert_routing_primary_lambda: 1.0
+  report_budget_effect_U_minus_B: true
+  report_physical_routing_effect_Hxe_lambda1_minus_U: true
+  report_predictive_routing_effect_selected_lambda_minus_U: true
+  report_full_sealed_action_oracle_diagnostics: true
+  oracle_diagnostics_may_feed_policy: false
+  threshold: 0.5
+  inference_unit: target_center
+  inference_unit_count: 9
+  case_equal_weighting_within_center: true
+  center_equal_weighting: true
+  seed_cells_independent_inference_units: false
+  report_two_sided_95_percent_t_interval: true
+  report_one_sided_95_percent_lower_bound: true
+  report_wins_ties_losses: true
+  proper_losses: [brier, log_loss]
+claim_boundary:
+  claim_scope: synthetic_downstream_utility
+  fresh_reserved_surface_only: true
+  consumed_test_used: false
+  consumed_validation_used: false
+  consumed_stage90_used: false
+  policy_selection_after_target_labels_forbidden: true
+  success_claim_requires_completed_validated_bundle: true
+  negative_result_is_valid: true

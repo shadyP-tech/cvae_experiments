@@ -78,6 +78,23 @@ def main(argv: list[str] | None = None) -> int:
             "canonical outputs remain hash-validated workspace artifacts."
         ),
     )
+    harp_fresh = sub.add_parser(
+        "evaluate-harp-fresh",
+        help=(
+            "Evaluate the fully frozen HARP action policy on its fresh, "
+            "case-disjoint MIDOG++ target surface."
+        ),
+    )
+    harp_fresh.add_argument("--config", required=True)
+    harp_fresh.add_argument(
+        "--enable-local-scratch",
+        action="store_true",
+        help=(
+            "Use the predeclared workstation-local scratch for resumable "
+            "label-free caches; canonical outputs remain hash-validated "
+            "workspace artifacts."
+        ),
+    )
 
     args = parser.parse_args(argv)
     if args.surface == "reserve-consumed-test":
@@ -152,6 +169,20 @@ def main(argv: list[str] | None = None) -> int:
         config = load_utility_aligned_residual_fresh_config(args.config)
         print(
             run_utility_aligned_residual_fresh(
+                config,
+                enable_optional_local_scratch=args.enable_local_scratch,
+            )
+        )
+        return 0
+    if args.surface == "evaluate-harp-fresh":
+        from .harp_fresh import (
+            load_harp_fresh_stage70_config,
+            run_harp_fresh_stage70,
+        )
+
+        config = load_harp_fresh_stage70_config(args.config)
+        print(
+            run_harp_fresh_stage70(
                 config,
                 enable_optional_local_scratch=args.enable_local_scratch,
             )
