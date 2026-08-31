@@ -11,6 +11,7 @@ import numpy as np
 from ...protocol import ProtocolError
 from .actions import BASE_ACTION_ID, UNIFORM_ACTION_ID, HarpActionSpec
 from .hashing import canonical_sha256, raw_array_sha256, require_digest, require_sha256
+from .indexed import HarpValidatedTargetMenuView
 from .predictions import HarpPredictionMenuSeal
 
 
@@ -323,15 +324,12 @@ class HarpRoutedVectorSeal:
             raise ProtocolError("HARP routed vector seal drifted.")
 
 
-def route_harp_probability_vector(
-    menu: HarpPredictionMenuSeal,
+def _route_harp_probability_vector_from_accessor(
+    menu: HarpPredictionMenuSeal | HarpValidatedTargetMenuView,
     decisions: Sequence[HarpRouteDecision],
 ) -> HarpRoutedVectorSeal:
-    """Route one query only after its entire prediction menu is sealed."""
+    """Shared implementation after a caller-owned validation boundary."""
 
-    if not isinstance(menu, HarpPredictionMenuSeal):
-        raise ProtocolError("HARP routing requires a complete prediction-menu seal.")
-    menu.assert_valid()
     rows = tuple(decisions)
     if not rows or any(not isinstance(row, HarpRouteDecision) for row in rows):
         raise ProtocolError("HARP routing requires typed row decisions.")
@@ -400,6 +398,30 @@ def route_harp_probability_vector(
         prediction_menu_seal_hash=menu.seal_hash,
         policy_hash=next(iter(policy_hashes)),
     )
+
+
+def route_harp_probability_vector(
+    menu: HarpPredictionMenuSeal,
+    decisions: Sequence[HarpRouteDecision],
+) -> HarpRoutedVectorSeal:
+    """Public fail-closed route over a freshly validated complete menu seal."""
+
+    if not isinstance(menu, HarpPredictionMenuSeal):
+        raise ProtocolError("HARP routing requires a complete prediction-menu seal.")
+    menu.assert_valid()
+    return _route_harp_probability_vector_from_accessor(menu, decisions)
+
+
+def _route_harp_probability_vector_from_validated_target_view(
+    view: HarpValidatedTargetMenuView,
+    decisions: Sequence[HarpRouteDecision],
+) -> HarpRoutedVectorSeal:
+    """Private phase-local fast path; its owner must fully validate at exit."""
+
+    if not isinstance(view, HarpValidatedTargetMenuView):
+        raise ProtocolError("HARP private routing requires a validated target view.")
+    view.assert_bound()
+    return _route_harp_probability_vector_from_accessor(view, decisions)
 
 
 __all__ = (

@@ -15,6 +15,7 @@ from ...expert_bank.uniform_b_v2_promotion.contracts import CENTERS
 from ...protocol import ProtocolError
 from ...routing.harp_action_model import (
     LAMBDA_GRID,
+    HarpActionScore,
     HarpActionModelBank,
     HarpTargetAction,
     HarpTrainingObservation,
@@ -35,7 +36,13 @@ from ...runtime.harp_probability_menu import (
     HarpPredictionMenuSeal,
     HarpRouteDecision,
     HarpRoutedVectorSeal,
-    route_harp_probability_vector,
+)
+from ...runtime.harp_probability_menu.indexed import (
+    HarpValidatedTargetMenuView,
+    validated_target_menu_view,
+)
+from ...runtime.harp_probability_menu.routing import (
+    _route_harp_probability_vector_from_validated_target_view,
 )
 
 
@@ -101,21 +108,112 @@ def policy_hash(
     )
 
 
-def select_and_route(
+def _route_scored_portfolio(
+    view: HarpValidatedTargetMenuView,
+    *,
+    outer: str,
+    scoped_actions: tuple[HarpTargetAction, ...],
+    scores: tuple[HarpActionScore, ...],
+    policy: HarpPolicyConfig,
+    fitted_policy_hash: str,
+    physical_lambda_one_only: bool,
+) -> tuple[tuple[HarpPortfolioDecision, ...], HarpRoutedVectorSeal]:
+    portfolio = (
+        select_harp_physical_portfolio(
+            tuple(
+                score
+                for score in scores
+                if score.action.lambda_value == 1.0
+            ),
+            config=policy,
+        )
+        if physical_lambda_one_only
+        else select_harp_portfolio(scores, config=policy)
+    )
+    by_sample = {row.sample_id: row for row in portfolio}
+    action_lookup = {
+        (row.sample_id, row.candidate_source_id, row.lambda_value): row
+        for row in scoped_actions
+    }
+    baseline_action = view.action_for(
+        surface_kind=TARGET_SURFACE,
+        outer_target_id=outer,
+        query_center_id=outer,
+        selected_source_id=None,
+        action_id=BASE_ACTION_ID,
+    )
+    row_ids, case_ids = view.identities_for(baseline_action)
+    route_rows: list[HarpRouteDecision] = []
+    ordered_portfolio: list[HarpPortfolioDecision] = []
+    for sample_id, case_id in zip(row_ids, case_ids, strict=True):
+        decision = by_sample.get(sample_id)
+        if decision is None or decision.case_id != case_id:
+            raise ProtocolError("HARP Stage-90 portfolio lacks a sealed target row.")
+        if decision.routed:
+            assert decision.selected_source_id is not None
+            assert decision.selected_lambda is not None
+            action = action_lookup[
+                (sample_id, decision.selected_source_id, decision.selected_lambda)
+            ]
+            source = decision.selected_source_id
+            lam = decision.selected_lambda
+            direction = action.direction
+        else:
+            if decision.output_probability_bytes != decision.baseline_probability_bytes:
+                raise ProtocolError("HARP Stage-90 exact-B fallback changed bytes.")
+            source, lam, direction = None, 0.0, "NO_DISAGREEMENT"
+        route_rows.append(
+            HarpRouteDecision(
+                surface_kind=TARGET_SURFACE,
+                outer_target_id=outer,
+                query_center_id=outer,
+                row_id=sample_id,
+                case_id=case_id,
+                eligible=decision.routed,
+                selected_source_id=source,
+                lambda_value=lam,
+                direction=direction,
+                decision_reason=decision.reason,
+                policy_hash=fitted_policy_hash,
+                prediction_menu_seal_hash=view.seal_hash,
+            )
+        )
+        ordered_portfolio.append(decision)
+    vector = _route_harp_probability_vector_from_validated_target_view(
+        view, route_rows
+    )
+    if physical_lambda_one_only and any(
+        row.eligible and row.lambda_value != 1.0 for row in vector.decisions
+    ):
+        raise ProtocolError("HARP Stage-90 physical ablation escaped lambda=1.")
+    for ordinal, decision in enumerate(ordered_portfolio):
+        observed = struct.pack("<d", float(vector.routed_probabilities[ordinal]))
+        if observed != decision.output_probability_bytes:
+            raise ProtocolError("HARP Stage-90 portfolio/vector probability bytes drifted.")
+    vector.assert_valid()
+    return tuple(ordered_portfolio), vector
+
+
+def _select_and_route_modes(
     menu: HarpPredictionMenuSeal,
     banks: Sequence[HarpActionModelBank],
     target_actions: Sequence[HarpTargetAction],
     *,
     policy: HarpPolicyConfig,
     fitted_policy_hash: str,
-    physical_lambda_one_only: bool = False,
-) -> tuple[tuple[HarpPortfolioDecision, ...], tuple[HarpRoutedVectorSeal, ...]]:
+    modes: tuple[bool, ...],
+) -> dict[
+    bool, tuple[tuple[HarpPortfolioDecision, ...], tuple[HarpRoutedVectorSeal, ...]]
+]:
+    if not modes or len(set(modes)) != len(modes):
+        raise ProtocolError("HARP Stage-90 routing modes must be unique and nonempty.")
     bank_by_outer = {bank.outer_target_id: bank for bank in banks}
     actions_by_outer: dict[str, list[HarpTargetAction]] = defaultdict(list)
     for action in target_actions:
         actions_by_outer[action.outer_target_id].append(action)
-    all_decisions: list[HarpPortfolioDecision] = []
-    vectors: list[HarpRoutedVectorSeal] = []
+    scoped_by_outer: dict[str, tuple[HarpTargetAction, ...]] = {}
+    # Preserve the original fail-fast ordering: reject an incomplete action
+    # universe before probing or validating the physical probability menu.
     for outer in CENTERS:
         scoped_actions = tuple(actions_by_outer[outer])
         expected_sources = set(CENTERS) - {outer}
@@ -131,89 +229,102 @@ def select_and_route(
             raise ProtocolError(
                 "HARP Stage-90 target action menu lacks the complete legal candidate universe."
             )
+        scoped_by_outer[outer] = scoped_actions
+
+    view = validated_target_menu_view(menu)
+    all_decisions: dict[bool, list[HarpPortfolioDecision]] = {
+        mode: [] for mode in modes
+    }
+    vectors: dict[bool, list[HarpRoutedVectorSeal]] = {mode: [] for mode in modes}
+    for outer in CENTERS:
+        scoped_actions = scoped_by_outer[outer]
         scores = score_harp_actions(bank_by_outer[outer], scoped_actions)
-        portfolio = (
-            select_harp_physical_portfolio(
-                tuple(
-                    score
-                    for score in scores
-                    if score.action.lambda_value == 1.0
-                ),
-                config=policy,
+        for mode in modes:
+            scoped_decisions, vector = _route_scored_portfolio(
+                view,
+                outer=outer,
+                scoped_actions=scoped_actions,
+                scores=scores,
+                policy=policy,
+                fitted_policy_hash=fitted_policy_hash,
+                physical_lambda_one_only=mode,
             )
-            if physical_lambda_one_only
-            else select_harp_portfolio(scores, config=policy)
-        )
-        by_sample = {row.sample_id: row for row in portfolio}
-        action_lookup = {
-            (row.sample_id, row.candidate_source_id, row.lambda_value): row
-            for row in actions_by_outer[outer]
-        }
-        baseline_action = menu.action_for(
-            surface_kind=TARGET_SURFACE,
-            outer_target_id=outer,
-            query_center_id=outer,
-            selected_source_id=None,
-            action_id=BASE_ACTION_ID,
-        )
-        row_ids, case_ids = menu.identities_for(baseline_action)
-        route_rows: list[HarpRouteDecision] = []
-        ordered_portfolio: list[HarpPortfolioDecision] = []
-        for sample_id, case_id in zip(row_ids, case_ids, strict=True):
-            decision = by_sample.get(sample_id)
-            if decision is None or decision.case_id != case_id:
-                raise ProtocolError("HARP Stage-90 portfolio lacks a sealed target row.")
-            if decision.routed:
-                assert decision.selected_source_id is not None
-                assert decision.selected_lambda is not None
-                action = action_lookup[
-                    (sample_id, decision.selected_source_id, decision.selected_lambda)
-                ]
-                source = decision.selected_source_id
-                lam = decision.selected_lambda
-                direction = action.direction
-            else:
-                if decision.output_probability_bytes != decision.baseline_probability_bytes:
-                    raise ProtocolError("HARP Stage-90 exact-B fallback changed bytes.")
-                source, lam, direction = None, 0.0, "NO_DISAGREEMENT"
-            route_rows.append(
-                HarpRouteDecision(
-                    surface_kind=TARGET_SURFACE,
-                    outer_target_id=outer,
-                    query_center_id=outer,
-                    row_id=sample_id,
-                    case_id=case_id,
-                    eligible=decision.routed,
-                    selected_source_id=source,
-                    lambda_value=lam,
-                    direction=direction,
-                    decision_reason=decision.reason,
-                    policy_hash=fitted_policy_hash,
-                    prediction_menu_seal_hash=menu.seal_hash,
-                )
-            )
-            ordered_portfolio.append(decision)
-        vector = route_harp_probability_vector(menu, route_rows)
-        if physical_lambda_one_only and any(
-            row.eligible and row.lambda_value != 1.0 for row in vector.decisions
+            all_decisions[mode].extend(scoped_decisions)
+            vectors[mode].append(vector)
+
+    output: dict[
+        bool,
+        tuple[tuple[HarpPortfolioDecision, ...], tuple[HarpRoutedVectorSeal, ...]],
+    ] = {}
+    for mode in modes:
+        decisions = tuple(sorted(all_decisions[mode], key=lambda row: row.row_key))
+        if any(
+            not row.routed
+            and row.output_probability_bytes != row.baseline_probability_bytes
+            for row in decisions
         ):
-            raise ProtocolError(
-                "HARP Stage-90 physical ablation escaped lambda=1."
-            )
-        for ordinal, decision in enumerate(ordered_portfolio):
-            observed = struct.pack("<d", float(vector.routed_probabilities[ordinal]))
-            if observed != decision.output_probability_bytes:
-                raise ProtocolError("HARP Stage-90 portfolio/vector probability bytes drifted.")
-        vector.assert_valid()
-        vectors.append(vector)
-        all_decisions.extend(ordered_portfolio)
-    decisions = tuple(sorted(all_decisions, key=lambda row: row.row_key))
-    if any(
-        not row.routed and row.output_probability_bytes != row.baseline_probability_bytes
-        for row in decisions
-    ):
-        raise ProtocolError("HARP Stage-90 fallback byte identity failed.")
-    return decisions, tuple(vectors)
+            raise ProtocolError("HARP Stage-90 fallback byte identity failed.")
+        output[mode] = decisions, tuple(vectors[mode])
+
+    # This is the second and final full validation for the whole phase.  The
+    # predictive and physical projections share scores, but validator A and B
+    # each call this function independently and build their own view/scores.
+    view.assert_fully_valid()
+    return output
 
 
-__all__ = ("fit_outer_model_banks", "policy_hash", "select_and_route")
+def select_and_route(
+    menu: HarpPredictionMenuSeal,
+    banks: Sequence[HarpActionModelBank],
+    target_actions: Sequence[HarpTargetAction],
+    *,
+    policy: HarpPolicyConfig,
+    fitted_policy_hash: str,
+    physical_lambda_one_only: bool = False,
+) -> tuple[tuple[HarpPortfolioDecision, ...], tuple[HarpRoutedVectorSeal, ...]]:
+    """Select one route role with a fresh validated target-menu view."""
+
+    return _select_and_route_modes(
+        menu,
+        banks,
+        target_actions,
+        policy=policy,
+        fitted_policy_hash=fitted_policy_hash,
+        modes=(physical_lambda_one_only,),
+    )[physical_lambda_one_only]
+
+
+def select_and_route_pair(
+    menu: HarpPredictionMenuSeal,
+    banks: Sequence[HarpActionModelBank],
+    target_actions: Sequence[HarpTargetAction],
+    *,
+    policy: HarpPolicyConfig,
+    fitted_policy_hash: str,
+) -> tuple[
+    tuple[HarpPortfolioDecision, ...],
+    tuple[HarpRoutedVectorSeal, ...],
+    tuple[HarpPortfolioDecision, ...],
+    tuple[HarpRoutedVectorSeal, ...],
+]:
+    """Score once, then derive predictive and physical policies independently."""
+
+    output = _select_and_route_modes(
+        menu,
+        banks,
+        target_actions,
+        policy=policy,
+        fitted_policy_hash=fitted_policy_hash,
+        modes=(False, True),
+    )
+    decisions, vectors = output[False]
+    physical_decisions, physical_vectors = output[True]
+    return decisions, vectors, physical_decisions, physical_vectors
+
+
+__all__ = (
+    "fit_outer_model_banks",
+    "policy_hash",
+    "select_and_route",
+    "select_and_route_pair",
+)

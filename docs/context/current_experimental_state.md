@@ -1,6 +1,6 @@
 # Current Experimental State
 
-Last updated: 2026-08-22
+Last updated: 2026-08-31
 
 This page records verified evidence and canonical availability after the
 completed MIDOG++ repository migration. The canonical contract, feature
@@ -85,6 +85,18 @@ policy promotion, deployment utility, or new-center generalization.
   routing result and cannot feed any later experiment. V3 is now registered as
   a separately authorized one-shot global-and-center-surface-lineage mechanical
   repair with direct-original inputs. It has not run and is not evidence.
+- HARP v1 is `FAILED_EXHAUSTED`: its workstation lease was consumed, the run
+  opened development labels, and an external `KeyboardInterrupt` stopped it
+  during target-action/route construction before evaluation labels or terminal
+  metrics opened. The isolated optimized HARP v2 successor completed, but all
+  4,407 case-action decisions returned exact B. Its absolute raw-leverage cap
+  was the decisive routing veto. HARP v3 is now implemented and registered as
+  a planned, separately fenced case-level physical router. It replaces raw
+  leverage with statistic-matched source-LODO ensemble-max geometry, uses a shared three-endpoint
+  model and donor-calibrated joint harm envelope, and hierarchically tests
+  physical H-by-e versus U and B before U versus B. V3 has no amendment or
+  launch authority. Any future run still reuses a consumed MIDOG++ test surface
+  only as terminal post-hoc sensitivity, never fresh routing evidence.
 - The planned successor now aligns its Stage-60 response with the Stage-70
   endpoint: one `(H,q,e)` observation is BACC after averaging all nine positive
   probability vectors and thresholding once. The old 4,536 seed cells are

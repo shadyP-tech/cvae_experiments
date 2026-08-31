@@ -1,0 +1,329 @@
+Experiments continued
+How good does support-NELBO translate to downstream quality?
+
+
+
+
+Stephanus Park, 04.06.2026 — Experiments continued
+Agenda
+What shall we talk about?
+
+Recap
+Downstream evaluation
+Bottleneck hunting
+Key takeaways
+
+
+
+
+Stephanus Park, 04.06.2026 — Experiments continued
+
+                                              2
+                                              Recap
+                                              Where we left o last time
+
+                                              • Metadata and source-only proxies were useful diagnostics, but unstable
+                                                routing signals
+
+                                              • Direct support-NELBO gave the strongest leakage-safe compatibility estimate
+                                              • New question: does support-NELBO-selected generation improve held-out
+                                                downstream utility?
+
+
+
+
+                                              Stephanus Park, 04.06.2026 — Experiments continued              (Zhao et al., 2024)
+
+                                                                                            3
+
+
+
+
+The previous presentation ended with a positive result at the compatibility-estimation level.
+
+Direct support-NELBO was the rst method that made expert-target compatibility look measurable under the protocol.
+
+But that result was still at the routing stage.
+It told us which expert looks most compatible with a target support set, not whether the generated embeddings from that expert are useful for a downstream classi er.
+
+So the translation test is:
+I take the support-NELBO ranking, select one or several experts, generate synthetic embeddings, train downstream classi ers, and evaluate only on the held-out target
+set.
+
+This asks whether compatibility estimation survives the full downstream pipeline.
+
+
+
+
+                                                                                                                                                            fi
+                                                                                                                     fi
+                                                                       ff
+                           fi
+Downstream evaluation pipeline
+How do I evaluate downstream utility
+
+
+
+
+Stephanus Park, 04.06.2026 — Experiments continued
+
+                                              4
+                                               Downstream utility evaluation
+                                               Support-NELBO on the held-out target set
+
+
+
+
+                                               Stephanus Park, 04.06.2026 — Experiments continued
+
+                                                                                             5
+
+
+
+
+Support-NELBO top-1 only slightly improves over random.
+
+That means the signal that looked strong for compatibility does not directly become a reliable sparse downstream selector.
+
+But the top-k and dense variants improve the picture.
+
+Top-2 and top-3 geometric aggregation move upward, and all4 geometric composition reaches 0.589.
+
+But even the diagnostic single-expert downstream oracle only reaches about 0.677 BACC.
+
+So even perfect selection within this sparse single-expert setup would still fall below the desired utility level.
+
+BRIDGE:
+That turns the next section into a bottleneck-localization problem: where is downstream signal being lost?
+Bottleneck hunting
+
+
+Stephanus Park, 04.06.2026 — Experiments continued
+
+                                              6
+                                                 Three possible bottlenecks
+                                                 Where can downstream utility be lost?
+
+
+                                                       Representation                    Generation
+                                                                                                          Sparse routing
+                                                           space                           step
+
+                                                     Are the 758-D                   Does the CVAE       Is Top-1 support-
+                                                     DINOv2 embeddings               preserve class-     NELBO selection too
+                                                     too noisy for                   relevant geometry   brittle?
+                                                     downstream utility?             after generation?
+
+
+
+
+                                                 Stephanus Park, 04.06.2026 — Experiments continued
+
+                                                                                               7
+
+
+
+
+I do not treat the low downstream result as one failure.
+
+I split it into three possible failure points.
+
+First, the representation may not contain enough signal.
+Before testing any CVAE or router, the real embedding space must contain class-relevant and domain-relevant structure.
+If DINOv2 embeddings are noisy or insu cient for histopathology, generation and routing cannot recover the lost signal.
+
+Second, the CVAE may not preserve the useful structure during generation.
+Even if the real embeddings are useful, the CVAE may fail to preserve the class-conditional geometry after sampling.
+This is a legitimate bottleneck because VAEs/CVAEs optimize a variational objective, not downstream balanced accuracy directly.
+
+Third, the signal may exist, but sparse top-1 routing may select the wrong component.
+This is exactly the sparse expert-selection problem: sparse routing is e cient, but it requires accurate routing; otherwise, useful complementary experts are discarded.
+
+The next slides test these bottlenecks one by one.
+
+
+
+
+                                                                        ffi
+                                       ffi
+                                              Check 1: Representation space
+                                              758-Dimensions of DINOv2 too noisy?
+
+
+
+
+                                              Stephanus Park, 04.06.2026 — Experiments continued                (Courty et al., 2017)
+
+                                                                                            8
+
+
+
+
+The key point is that the 0.677 oracle does not end the analysis.
+
+It tells me the sparse generated-expert setup has a ceiling.
+
+To locate the ceiling, I rst test whether the foundation embedding space itself is too noisy.
+
+The PCA64 reconstruction upper reaches 0.862, so the information needed for the downstream task is still present.
+
+Therefore the failure is not caused by the feature representation alone; it is introduced later by CVAE generation, class preservation, or sparse expert routing.
+
+Note:
+The reported 0.862 is not the plain mean over all reconstructed experts. It is the best reconstructed-source candidate per evaluation cell, then averaged at center level.
+
+
+
+
+                 fi
+                                                   Check 2: CVAE generation step
+                                                   Do CVAE experts preserve relevant structure?
+
+
+
+
+                                                   Stephanus Park, 04.06.2026 — Experiments continued                    (Wen et al., 2025)
+                                                                                                                 (Whitman & Latypov, 2025)
+                                                                                                 9
+
+
+
+
+     This slide tests the second bottleneck: whether the CVAE generation step preserves the useful structure that was still present after PCA64 reconstruction.
+
+     The rst two bars show the unconditioned PCA64 CVAE.
+     Even the diagnostic oracle only reaches 0.609, and the selected expert drops to 0.476. So without class structure, generation loses a large part of the utility signal.
+
+     The class-conditioned pivot tested whether making the label an explicit decoder condition could preserve class geometry better.
+     The selected result rises to 0.711, and the oracle reaches 0.769. That tells me the generation process can preserve more useful downstream structure when class
+     information is injected.
+
+     But this is still below the PCA64 reconstruction upper of 0.862, and still below the 0.80 utility gate. So the synthesis is: generation is a real bottleneck, but not a complete
+     dead end.
+
+     Bridge:
+     Class conditioning recovers part of the lost signal, while the remaining gap points to preservation quality and routing as the next issues.
+
+     Note:
+     Unconditioned PCA64 CVAE means the decoder had no explicit class condition. Class information could only enter indirectly through class-strati ed source reference
+     posterior samples, not through a decoder call of the form d(z, y). The class-conditioned pivot tested whether making the label an explicit decoder condition could
+     preserve class geometry better.
+
+                                                                                                                                                      fi
+fi
+                                              Check 3: Sparse routing
+                                              Is Top-1 selection too brittle?
+
+
+
+
+                                              Stephanus Park, 04.06.2026 — Experiments continued                (Yadav et al., 2025)
+
+                                                                                           10
+
+
+
+
+After the CVAE generation check, I wanted to know whether the problem is unavoidable for synthetic embeddings, or whether it is speci c to the CVAE generator.
+
+The PCA64 GMM is a simpler diagnostic sampler. It removes the CVAE encoder-decoder bottleneck and asks: if I model the source distribution more directly in PCA64
+space, can synthetic embeddings support downstream classi cation?
+
+The answer is yes. The selected GMM reaches 0.807, and the diagnostic oracle reaches 0.844. So the downstream pipeline itself is not doomed. A simpler sampler can
+preserve enough geometry to cross the 0.80 gate.
+
+But the GMM is not the thesis method. It is a diagnostic control. It tells me that useful synthetic distributions are possible, and that the remaining CVAE problem is not
+only “which expert do I select”, but also how much useful structure each generated component preserves.
+
+This motivates C6.3. Instead of trusting one sparse CVAE-generated expert, C6.3 keeps multiple frozen CVAE components, trains component-speci c classi ers, and
+combines their probabilities with a geometric ensemble.
+
+The key connection is: the GMM result shows that strong synthetic downstream utility is achievable when the generated distribution is clean enough. C6.3 asks whether I
+can recover part of that bene t while staying inside the CVAE/MoErging setting by reducing sparse-routing risk.
+
+The result is 0.814 BACC. So the synthesis is: sparse top-1 routing is too brittle, but dense post-hoc CVAE composition can recover enough complementary signal to
+cross the utility gate.
+
+                                                                                                                                                           fi
+                                                                                                                                                  fi
+                                                                                                                                       fi
+                                                           fi
+                        fi
+                                              Comparison of aggregation strategies
+
+
+
+
+                                              Stephanus Park, 04.06.2026 — Experiments continued                 (Yadav et al., 2025)
+
+                                                                                           11
+
+
+
+
+This slide isolates the aggregation rule inside the dense CVAE composition result.
+
+Up to this point, the story was: representation is not the main bottleneck, generation quality matters, and sparse top-1 routing is too brittle. C6.2 already responds to that
+by avoiding one selected expert: it trains component-speci c classi ers and averages their probabilities.
+
+Here, C6.3 changes only the nal aggregation rule. Instead of arithmetic probability averaging, it uses geometric pooling, which is more consensus-sensitive. So this is
+not a new generator and not a new compatibility estimator. It asks whether dense CVAE composition should behave more like a consensus across components.
+
+The plot shows that geometric pooling improves mean BACC by about +0.026. Four out of ve centers improve: center 1 gains the most, about +0.051, and centers 0, 3,
+and 4 also move upward. Center 2 slightly decreases by about -0.006, so the gain is not perfectly uniform.
+
+The synthesis is that dense composition is useful, but the aggregation rule matters. Simple averaging already reduces sparse-routing risk, but geometric pooling recovers
+more utility by rewarding agreement across frozen CVAE components and reducing the in uence of weaker or overcon dent members.
+
+This supports the thesis-facing claim cautiously: the strongest result is not better top-1 routing, but post-hoc dense composition of independently trained CVAE experts.
+
+
+
+
+                                                                                                                     fi
+                                                                                                fi
+                                                                                           fl
+                                                                  fi
+                                                        fi
+                        fi
+Key takeaways
+
+
+Stephanus Park, 04.06.2026 — Experiments continued
+
+                                             12
+Stephanus Park, 04.06.2026 — Experiments continued
+
+                                             13
+     References
+     Courty, N., Flamary, R., Tuia, D., & Rakotomamonjy, A. (2017). Optimal transport for domain adaptation. IEEE
+       Transactions on Pattern Analysis and Machine Intelligence, 39(9), 1853–1865. https://doi.org/10.1109/
+       TPAMI.2016.2615921
+
+     Wen, X., Zhao, B., Elezi, I., Deng, J., & Qi, X. (2025). “Principal Components” Enable A New Language of Images
+       (Version 2). arXiv. https://doi.org/10.48550/ARXIV.2503.08685
+
+     Whitman, S. E., & Latypov, M. I. (2025). Machine learning of microstructure–property relationships in materials
+       leveraging microstructure representation from foundational vision transformers. Acta Materialia, 296, 121217.
+       https://doi.org/10.1016/j.actamat.2025.121217
+
+     Yadav, P., Ra el, C., Muqeeth, M., Caccia, L., Liu, H., Chen, T., Bansal, M., Choshen, L., & Sordoni, A. (2025). A
+        Survey on Model MoErging: Recycling and Routing Among Specialized Experts for Collaborative Learning
+        (arXiv:2408.07057). arXiv. https://doi.org/10.48550/arXiv.2408.07057
+
+     Zhao, Z., Xu, Y., Zhang, J., Zhao, R., Chen, Z., & Jiao, Y. (2024). A Semi-supervised Gaussian Mixture Variational
+        Autoencoder method for few-shot ne-grained fault diagnosis. Neural Networks, 178, 106482. https://doi.org/
+        10.1016/j.neunet.2024.106482
+
+
+
+     Stephanus Park, 04.06.2026 — Experiments continued
+
+                                                                    14
+
+
+
+
+                                                               fi
+ff
+

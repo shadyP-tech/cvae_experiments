@@ -1,0 +1,98 @@
+"""HARP v3: calibrated, case-level routing among B, U, and physical Hxe."""
+
+from .calibration import ConservativeBounds, DonorResidualCalibration
+from .compatibility import GeometryAssessment, GeometryCalibration
+from .contracts import (
+    OUTCOME_NAMES,
+    ActionKind,
+    CaseTargetAction,
+    CaseTrainingObservation,
+    Comparison,
+    EffectVector,
+    PolicyConfig,
+    SupportSummary,
+)
+from .fitting import (
+    AlphaFoldScore,
+    AlphaSelection,
+    DeleteDonorFit,
+    HarpV3Fit,
+    fit_harp_v3,
+)
+from .metrics import (
+    CASE_CONTRIBUTION_METRIC_NAME,
+    PRIMARY_ESTIMAND,
+    PRIMARY_METRIC_NAME,
+    SINGLE_CLASS_CASE_RULE,
+    CaseMetrics,
+    aggregate_case_equal_metrics,
+    case_class_support_counts,
+    case_effects,
+    case_metrics,
+)
+from .policy import ActionAudit, CaseActionSet, CaseRoutingDecision, route_case
+from .ridge import SharedDesignRidge, fit_shared_design_ridge
+from .scoring import ConservativeScore, score_comparison
+from .serialization import (
+    decision_from_payload,
+    decision_to_payload,
+    deserialize_decision,
+    deserialize_fit,
+    deserialize_fit_collection,
+    fit_collection_from_payload,
+    fit_collection_to_payload,
+    fit_from_payload,
+    fit_to_payload,
+    serialize_decision,
+    serialize_fit,
+    serialize_fit_collection,
+)
+
+__all__ = (
+    "OUTCOME_NAMES",
+    "ActionAudit",
+    "ActionKind",
+    "AlphaFoldScore",
+    "AlphaSelection",
+    "CaseActionSet",
+    "CaseMetrics",
+    "CASE_CONTRIBUTION_METRIC_NAME",
+    "CaseRoutingDecision",
+    "CaseTargetAction",
+    "CaseTrainingObservation",
+    "Comparison",
+    "ConservativeBounds",
+    "ConservativeScore",
+    "DeleteDonorFit",
+    "DonorResidualCalibration",
+    "EffectVector",
+    "GeometryAssessment",
+    "GeometryCalibration",
+    "HarpV3Fit",
+    "PolicyConfig",
+    "PRIMARY_ESTIMAND",
+    "PRIMARY_METRIC_NAME",
+    "SINGLE_CLASS_CASE_RULE",
+    "SharedDesignRidge",
+    "SupportSummary",
+    "fit_harp_v3",
+    "fit_shared_design_ridge",
+    "decision_from_payload",
+    "decision_to_payload",
+    "deserialize_decision",
+    "deserialize_fit",
+    "deserialize_fit_collection",
+    "fit_collection_from_payload",
+    "fit_collection_to_payload",
+    "fit_from_payload",
+    "fit_to_payload",
+    "aggregate_case_equal_metrics",
+    "case_class_support_counts",
+    "case_effects",
+    "case_metrics",
+    "route_case",
+    "score_comparison",
+    "serialize_decision",
+    "serialize_fit",
+    "serialize_fit_collection",
+)

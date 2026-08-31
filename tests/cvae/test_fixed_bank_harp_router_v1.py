@@ -260,7 +260,11 @@ def test_exact_b_fallback_preserves_the_same_bytes_object() -> None:
 
 
 def test_inspection_and_planned_dry_run_are_mutation_free(tmp_path: Path) -> None:
-    config = load_config(CONFIG)
+    # The checked-in v1 config is historical and its one-shot authority is
+    # exhausted.  Exercise the mutation-free planned branch with an explicitly
+    # synthetic typed state instead of pretending the authenticated v1 record
+    # is still planned.
+    config = replace(load_config(CONFIG), execution_authorized=False)
     destination = tmp_path / "must-not-exist"
     inspection = inspect_harp_stage90(config)
     dry = dry_run_harp_stage90(config, artifact_root=destination)
@@ -367,7 +371,7 @@ def test_terminal_action_diagnostics_score_full_sealed_matrix_without_feedback()
 
 
 def test_missing_authority_fails_before_output_creation(tmp_path: Path) -> None:
-    config = load_config(CONFIG)
+    config = replace(load_config(CONFIG), execution_authorized=False)
     destination = tmp_path / "output"
     with pytest.raises(ProtocolError, match="new HARP-specific"):
         run_harp_stage90(config, artifact_root=destination)
@@ -589,6 +593,13 @@ def test_source_menu_and_two_route_reconstructions_precede_label_capabilities() 
         "load_development_labels"
     )
     assert source.count("_validate_route_reconstruction(") == 2
+    building = source.index('GLOBAL_TARGET_ACTIONS_AND_ROUTES_BUILDING')
+    target_build = source.index("build_target_actions(menu)")
+    route_sealed = source.index(
+        'GLOBAL_TARGET_ACTIONS_AND_ROUTES_DURABLY_SEALED'
+    )
+    assert building < target_build
+    assert source.rindex("_validate_route_reconstruction(") < route_sealed
     assert source.index("_validate_route_reconstruction(") < source.index(
         "load_evaluation_truth"
     )
@@ -621,7 +632,7 @@ def test_final_commit_follows_authorization_and_content_index(tmp_path: Path) ->
     assert success.index("_write_content_index") < success.index('root / "reports/run_state.json"')
 
 
-def test_cli_registry_and_catalog_are_planned_terminal_and_nonfeeding() -> None:
+def test_cli_registry_and_catalog_record_exhausted_terminal_nonfeeding_run() -> None:
     parser = build_parser()
     args = parser.parse_args(
         ["fixed-bank-harp-router-v1", "--config", str(CONFIG), "--inspect-plan"]
@@ -636,7 +647,8 @@ def test_cli_registry_and_catalog_are_planned_terminal_and_nonfeeding() -> None:
     experiment = next(
         row for row in registry["experiments"] if row["experiment_id"] == EXPERIMENT_ID
     )
-    assert experiment["status"] == "planned"
+    assert experiment["status"] == "diagnostic"
+    assert any("FAILED_EXHAUSTED" in note for note in experiment["notes"])
     assert tuple(experiment["input_artifact_ids"]) == INPUT_ARTIFACT_IDS
     assert "fixed-bank-harp-router-v1" in experiment["runner"]["argv"]
     output = next(
@@ -645,9 +657,12 @@ def test_cli_registry_and_catalog_are_planned_terminal_and_nonfeeding() -> None:
         if row["artifact_id"] == experiment["output_artifact_id"]
     )
     identities = output["semantic_identities"]
-    assert output["availability"] == "planned"
+    assert output["availability"] == "generated_on_run"
+    assert output["evidence_label"].endswith("FAILED_EXHAUSTED")
     assert identities["publication_status"] == PUBLICATION_STATUS
     assert identities["terminal_decision"] == TERMINAL_DECISION
+    assert identities["authorization_exhausted"] == "true"
+    assert identities["amendment_status"] == "FAILED_EXHAUSTED"
     assert identities["fresh_evidence"] == "false"
     assert identities["may_feed_stage60"] == "false"
     assert identities["may_feed_stage70"] == "false"
@@ -730,9 +745,16 @@ def test_preparation_is_label_blind_whole_case_and_manifest_open_is_after_barrie
     original_validate = preparation._independently_validate_label_blind_barrier
     original_publish = preparation._publish_role_pure_manifests
 
-    def validate_barrier(root: Path, *, expected_partition_hash: str):
+    def validate_barrier(
+        root: Path,
+        *,
+        expected_partition_hash: str,
+        identity: preparation.HarpPreparationIdentity,
+    ):
         result = original_validate(
-            root, expected_partition_hash=expected_partition_hash
+            root,
+            expected_partition_hash=expected_partition_hash,
+            identity=identity,
         )
         events.append("label_free_barrier_validated")
         return result

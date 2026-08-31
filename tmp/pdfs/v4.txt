@@ -1,0 +1,39 @@
+Further experiments
+Synthesis of previous experiments up to current results
+
+
+
+
+Stephanus Park — DD.MM.YYYY
+Topics
+Key points to talk about
+
+Recap
+MIDOG++
+Results
+  • Exact-B
+  • SCEPTRE-HARP
+Conclusion
+
+Stephanus Park — DD.MM.YYYY
+
+                              2
+Recap
+Composition was better than Top-1 routing
+
+
+
+
+Stephanus Park — DD.MM.YYYY
+
+                               3
+MIDOG++ dataset
+A more suitable dataset for LODO research objectives
+
+
+
+
+Stephanus Park — DD.MM.YYYY
+
+                               4
+

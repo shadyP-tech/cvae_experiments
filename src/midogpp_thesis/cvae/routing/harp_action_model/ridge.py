@@ -89,6 +89,38 @@ class HarpRidgeModel:
         leverage.setflags(write=False)
         return mean, leverage
 
+    def predict_singleton_equivalent_batch(
+        self,
+        features: Sequence[Sequence[float]] | np.ndarray,
+        candidates: Sequence[str],
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Batch rows while preserving the legacy ``(1, p) @ (p,)`` bytes.
+
+        A plain multirow matrix-vector product may select a different BLAS
+        reduction and change low float64 bits.  The leading singleton axis
+        retains the frozen per-row matmul geometry while sharing one validated
+        design construction across the batch.
+        """
+
+        design = self._design(features, candidates)
+        mean = np.matmul(
+            design[:, np.newaxis, :], self.coefficients
+        ).reshape(len(design))
+        leverage = np.einsum(
+            "ij,jk,ik->i", design, self.normal_inverse, design
+        )
+        if (
+            not np.isfinite(mean).all()
+            or not np.isfinite(leverage).all()
+            or np.any(leverage < -1e-10)
+        ):
+            raise ProtocolError("HARP ridge produced invalid predictions or leverage.")
+        mean = np.asarray(mean, dtype=np.float64)
+        leverage = np.maximum(np.asarray(leverage, dtype=np.float64), 0.0)
+        mean.setflags(write=False)
+        leverage.setflags(write=False)
+        return mean, leverage
+
 
 def fit_partial_pool_ridge(
     features: Sequence[Sequence[float]] | np.ndarray,

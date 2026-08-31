@@ -6,7 +6,7 @@ routing, support-utility, or label-access module is reachable from this file.
 
 from __future__ import annotations
 
-from concurrent.futures import Future, ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from functools import cached_property
 import gc
@@ -37,6 +37,7 @@ from ..generation.contracts import COMMON_OUTPUT_DIM, GenerationLock, SourceGene
 from ..generation.generation import generate_source_block, source_generation_plan
 from ..protocol import ProtocolError
 from .artifact_io import atomic_copy, atomic_json, read_json, sha256_array, sha256_file
+from .bounded_futures import execute_bounded
 
 
 SOURCE_ROWS_PER_CLASS = 270
@@ -160,7 +161,12 @@ def materialize_frozen_source_streams(
         else:
             pending.append(task)
     pending_by_key = {_task_key(task): task for task in pending}
-    for payload in _execute_generation_tasks(pending):
+    max_inflight = int(
+        config.runtime.get("bounded_inflight_batches_per_gpu", max(1, len(pending)))
+    )
+    for payload in _execute_generation_tasks(
+        pending, max_inflight_per_device=max_inflight
+    ):
         key = (str(payload["source_center"]), int(payload["training_seed"]))
         task = pending_by_key[key]
         verified = _load_checkpoint(Path(str(task["checkpoint_path"])), task=task)
@@ -341,6 +347,13 @@ def _assert_runtime(runtime: Mapping[str, object]) -> None:
         or runtime.get("generated_cache_format") != "float32_npy_memmap"
         or int(runtime.get("source_prefix_rows_per_class", -1))
         != SOURCE_ROWS_PER_CLASS
+        or (
+            "bounded_inflight_batches_per_gpu" in runtime
+            and (
+                type(runtime.get("bounded_inflight_batches_per_gpu")) is not int
+                or int(runtime["bounded_inflight_batches_per_gpu"]) < 1
+            )
+        )
     ):
         raise ProtocolError("Frozen source generation requires two exact float32 GPU streams.")
     torch_module = sys.modules.get("torch")
@@ -546,17 +559,27 @@ def _build_tasks(
     return tuple(tasks)
 
 
-def _execute_generation_tasks(tasks: Sequence[Mapping[str, object]]) -> tuple[Mapping[str, object], ...]:
+def _execute_generation_tasks(
+    tasks: Sequence[Mapping[str, object]], *, max_inflight_per_device: int
+) -> tuple[Mapping[str, object], ...]:
     if not tasks:
         return ()
     context = mp.get_context("spawn")
     executors = [ProcessPoolExecutor(max_workers=1, mp_context=context) for _ in GENERATION_DEVICES]
-    futures: dict[Future[dict[str, object]], Mapping[str, object]] = {}
     try:
-        for task in tasks:
-            index = GENERATION_DEVICES.index(str(task["device"]))
-            futures[executors[index].submit(_generate_task, task)] = task
-        return tuple(future.result() for future in as_completed(futures))
+        bounded = execute_bounded(
+            executors,
+            tasks,
+            _generate_task,
+            executor_index=lambda task: GENERATION_DEVICES.index(str(task["device"])),
+            max_inflight_per_executor=max_inflight_per_device,
+        )
+        if any(
+            observed > max_inflight_per_device
+            for observed in bounded.stats.max_inflight_by_executor
+        ):
+            raise ProtocolError("Frozen source GPU submission bound drifted.")
+        return bounded.values
     finally:
         for executor in executors:
             executor.shutdown(wait=True, cancel_futures=True)

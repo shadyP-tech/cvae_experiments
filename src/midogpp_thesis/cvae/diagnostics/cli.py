@@ -683,6 +683,147 @@ def build_parser() -> argparse.ArgumentParser:
             "the transitive source snapshot."
         ),
     )
+    harp_stage90_v2 = sub.add_parser(
+        "fixed-bank-harp-router-v2",
+        help=(
+            "Inspect, dry-run, or execute the separately authorized optimized "
+            "HARP v2 terminal consumed-test sensitivity. It remains post-hoc "
+            "diagnostic evidence and cannot be promoted as fresh routing."
+        ),
+    )
+    harp_stage90_v2.add_argument("--config", required=True)
+    harp_stage90_v2.add_argument(
+        "--artifact-root",
+        default=".",
+        help="Prepared v2 output root; ignored by path-free planned inspection.",
+    )
+    harp_stage90_v2_mode = harp_stage90_v2.add_mutually_exclusive_group()
+    harp_stage90_v2_mode.add_argument(
+        "--inspect-plan",
+        action="store_true",
+        help=(
+            "Inspect the v2 identities and optimized physical topology without "
+            "resolving inputs."
+        ),
+    )
+    harp_stage90_v2_mode.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "Validate authorized v2 inputs and the optimized physical plan "
+            "without claiming the v2 lease, generating sources, or opening labels."
+        ),
+    )
+    harp_prepare_v2 = sub.add_parser(
+        "prepare-fixed-bank-harp-router-v2-inputs",
+        help=(
+            "Materialize the HARP v2 consumed-test label-blind cache and "
+            "deterministic whole-case role manifests. This does not create "
+            "or activate v2 execution authority."
+        ),
+    )
+    harp_prepare_v2.add_argument("--canonical-cache-root", required=True)
+    harp_prepare_v2.add_argument("--canonical-manifest", required=True)
+    harp_prepare_v2.add_argument("--parent-ledger", required=True)
+    harp_prepare_v2.add_argument("--cache-root", required=True)
+    harp_prepare_v2.add_argument("--development-manifest", required=True)
+    harp_prepare_v2.add_argument("--evaluation-manifest", required=True)
+    harp_publish_v2 = sub.add_parser(
+        "publish-fixed-bank-harp-router-v2-amendment",
+        help=(
+            "Independently validate the exact prepared HARP v2 inputs and issue "
+            "its terminal amendment once. This does not activate registration, "
+            "claim the v2 lease, create output, or launch HARP v2."
+        ),
+    )
+    harp_publish_v2.add_argument("--config", required=True)
+    harp_publish_v2.add_argument("--expert-bank-root", required=True)
+    harp_publish_v2.add_argument("--generation-lock-root", required=True)
+    harp_publish_v2.add_argument("--prepared-cache-root", required=True)
+    harp_publish_v2.add_argument("--development-manifest", required=True)
+    harp_publish_v2.add_argument("--evaluation-manifest", required=True)
+    harp_publish_v2.add_argument("--parent-ledger", required=True)
+    harp_publish_v2.add_argument("--amendment-path", required=True)
+    harp_publish_v2.add_argument("--authorization-basis", required=True)
+    harp_publish_v2.add_argument("--authorization-date", required=True)
+    harp_publish_v2.add_argument(
+        "--repository-root",
+        required=True,
+        help=(
+            "Exact checkout root that owns the registered v2 amendment member "
+            "and the optimized transitive source snapshot."
+        ),
+    )
+    harp_stage90_v3 = sub.add_parser(
+        "fixed-bank-harp-router-v3",
+        help=(
+            "Inspect, dry-run, or execute the separately authorized case-level "
+            "HARP v3 terminal consumed-test sensitivity. V3 uses only physical "
+            "lambda-1 B/U/H-by-e actions and calibrated source-LODO geometry."
+        ),
+    )
+    harp_stage90_v3.add_argument("--config", required=True)
+    harp_stage90_v3.add_argument(
+        "--artifact-root",
+        default=".",
+        help="Prepared v3 output root; ignored by path-free planned inspection.",
+    )
+    harp_stage90_v3_mode = harp_stage90_v3.add_mutually_exclusive_group()
+    harp_stage90_v3_mode.add_argument(
+        "--inspect-plan",
+        action="store_true",
+        help=(
+            "Inspect the fenced v3 identities and optimized physical topology "
+            "without resolving inputs or opening labels."
+        ),
+    )
+    harp_stage90_v3_mode.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "Validate authorized v3 inputs and the physical plan without "
+            "claiming the single-use lease, generating sources, or opening labels."
+        ),
+    )
+    harp_prepare_v3 = sub.add_parser(
+        "prepare-fixed-bank-harp-router-v3-inputs",
+        help=(
+            "Materialize the v3-only consumed-test label-blind cache and "
+            "whole-case role manifests. This issues no execution authority."
+        ),
+    )
+    harp_prepare_v3.add_argument("--canonical-cache-root", required=True)
+    harp_prepare_v3.add_argument("--canonical-manifest", required=True)
+    harp_prepare_v3.add_argument("--parent-ledger", required=True)
+    harp_prepare_v3.add_argument("--cache-root", required=True)
+    harp_prepare_v3.add_argument("--development-manifest", required=True)
+    harp_prepare_v3.add_argument("--evaluation-manifest", required=True)
+    harp_publish_v3 = sub.add_parser(
+        "publish-fixed-bank-harp-router-v3-amendment",
+        help=(
+            "Independently validate the exact prepared v3 inputs and issue its "
+            "terminal single-use amendment. This does not activate registration, "
+            "claim the lease, create output, or launch v3."
+        ),
+    )
+    harp_publish_v3.add_argument("--config", required=True)
+    harp_publish_v3.add_argument("--expert-bank-root", required=True)
+    harp_publish_v3.add_argument("--generation-lock-root", required=True)
+    harp_publish_v3.add_argument("--prepared-cache-root", required=True)
+    harp_publish_v3.add_argument("--development-manifest", required=True)
+    harp_publish_v3.add_argument("--evaluation-manifest", required=True)
+    harp_publish_v3.add_argument("--parent-ledger", required=True)
+    harp_publish_v3.add_argument("--amendment-path", required=True)
+    harp_publish_v3.add_argument("--authorization-basis", required=True)
+    harp_publish_v3.add_argument("--authorization-date", required=True)
+    harp_publish_v3.add_argument(
+        "--repository-root",
+        required=True,
+        help=(
+            "Exact checkout root that owns the registered v3 amendment member "
+            "and transitive source snapshot."
+        ),
+    )
     sceptre_v5_mode.add_argument(
         "--dry-run",
         action="store_true",
@@ -743,6 +884,86 @@ def main(argv: list[str] | None = None) -> int:
         from .fixed_bank_harp_router_v1.config import load_config
 
         receipt = publish_harp_execution_amendment(
+            load_config(args.config),
+            expert_bank_root=args.expert_bank_root,
+            generation_lock_root=args.generation_lock_root,
+            prepared_cache_root=args.prepared_cache_root,
+            development_manifest_path=args.development_manifest,
+            evaluation_manifest_path=args.evaluation_manifest,
+            parent_ledger_path=args.parent_ledger,
+            amendment_path=args.amendment_path,
+            authorization_basis=args.authorization_basis,
+            authorization_date=args.authorization_date,
+            repository_root=args.repository_root,
+        )
+        print(json.dumps(receipt.to_payload(), sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.surface == "prepare-fixed-bank-harp-router-v2-inputs":
+        import json
+
+        from .fixed_bank_harp_router_v2.preparation import (
+            prepare_harp_consumed_test_inputs_v2,
+        )
+
+        prepared = prepare_harp_consumed_test_inputs_v2(
+            canonical_cache_root=args.canonical_cache_root,
+            canonical_manifest_path=args.canonical_manifest,
+            parent_ledger_path=args.parent_ledger,
+            cache_root=args.cache_root,
+            development_manifest_path=args.development_manifest,
+            evaluation_manifest_path=args.evaluation_manifest,
+        )
+        print(json.dumps(prepared.to_payload(), sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.surface == "publish-fixed-bank-harp-router-v2-amendment":
+        import json
+
+        from .fixed_bank_harp_router_v2.amendment_publisher import (
+            publish_harp_v2_execution_amendment,
+        )
+        from .fixed_bank_harp_router_v2.config import load_config
+
+        receipt = publish_harp_v2_execution_amendment(
+            load_config(args.config),
+            expert_bank_root=args.expert_bank_root,
+            generation_lock_root=args.generation_lock_root,
+            prepared_cache_root=args.prepared_cache_root,
+            development_manifest_path=args.development_manifest,
+            evaluation_manifest_path=args.evaluation_manifest,
+            parent_ledger_path=args.parent_ledger,
+            amendment_path=args.amendment_path,
+            authorization_basis=args.authorization_basis,
+            authorization_date=args.authorization_date,
+            repository_root=args.repository_root,
+        )
+        print(json.dumps(receipt.to_payload(), sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.surface == "prepare-fixed-bank-harp-router-v3-inputs":
+        import json
+
+        from .fixed_bank_harp_router_v3.preparation import (
+            prepare_harp_consumed_test_inputs_v3,
+        )
+
+        prepared = prepare_harp_consumed_test_inputs_v3(
+            canonical_cache_root=args.canonical_cache_root,
+            canonical_manifest_path=args.canonical_manifest,
+            parent_ledger_path=args.parent_ledger,
+            cache_root=args.cache_root,
+            development_manifest_path=args.development_manifest,
+            evaluation_manifest_path=args.evaluation_manifest,
+        )
+        print(json.dumps(prepared.to_payload(), sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.surface == "publish-fixed-bank-harp-router-v3-amendment":
+        import json
+
+        from .fixed_bank_harp_router_v3.amendment_publisher import (
+            publish_harp_v3_execution_amendment,
+        )
+        from .fixed_bank_harp_router_v3.config import load_config
+
+        receipt = publish_harp_v3_execution_amendment(
             load_config(args.config),
             expert_bank_root=args.expert_bank_root,
             generation_lock_root=args.generation_lock_root,
@@ -1079,6 +1300,68 @@ def main(argv: list[str] | None = None) -> int:
             )
         else:
             print(run_harp_stage90(config, artifact_root=artifact_root))
+        return 0
+
+    if args.surface == "fixed-bank-harp-router-v2":
+        import json
+
+        from .fixed_bank_harp_router_v2.config import load_config
+        from .fixed_bank_harp_router_v2.runner import (
+            dry_run_harp_stage90_v2,
+            inspect_harp_stage90_v2,
+            run_harp_stage90_v2,
+        )
+
+        config = load_config(args.config)
+        if args.inspect_plan:
+            print(
+                json.dumps(
+                    inspect_harp_stage90_v2(config),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+        elif args.dry_run:
+            print(
+                json.dumps(
+                    dry_run_harp_stage90_v2(config, artifact_root=artifact_root),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+        else:
+            print(run_harp_stage90_v2(config, artifact_root=artifact_root))
+        return 0
+
+    if args.surface == "fixed-bank-harp-router-v3":
+        import json
+
+        from .fixed_bank_harp_router_v3.config import load_config
+        from .fixed_bank_harp_router_v3.runner import (
+            dry_run_harp_stage90_v3,
+            inspect_harp_stage90_v3,
+            run_harp_stage90_v3,
+        )
+
+        config = load_config(args.config)
+        if args.inspect_plan:
+            print(
+                json.dumps(
+                    inspect_harp_stage90_v3(config),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+        elif args.dry_run:
+            print(
+                json.dumps(
+                    dry_run_harp_stage90_v3(config, artifact_root=artifact_root),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+        else:
+            print(run_harp_stage90_v3(config, artifact_root=artifact_root))
         return 0
 
     if args.surface == (

@@ -229,31 +229,101 @@ def fit_harp_action_model_bank(observations: Sequence[HarpTrainingObservation], 
 def score_harp_actions(bank: HarpActionModelBank, actions: Sequence[HarpTargetAction]) -> tuple[HarpActionScore, ...]:
     if not isinstance(bank, HarpActionModelBank):
         raise ProtocolError("HARP scoring requires a typed frozen model bank.")
-    output: list[HarpActionScore] = []
-    for action in actions:
+
+    # Build immutable-bank lookups once.  The former singleton scoring loop
+    # rebuilt both of these dictionaries for every target action through
+    # ``bank.model`` and ``bank.support``.
+    model_lookup = {(row.outcome, row.direction): row for row in bank.models}
+    available_directions = {row.direction for row in bank.models}
+    support_lookup = {
+        (row.candidate_source_id, row.lambda_value, row.direction): row
+        for row in bank.support_cells
+    }
+
+    def outcome_model(outcome: str, direction: str) -> HarpOutcomeModel:
+        model = model_lookup.get((outcome, direction))
+        if model is not None:
+            return model
+        try:
+            return model_lookup[(outcome, "ALL_MARGINS")]
+        except KeyError as exc:
+            raise ProtocolError("HARP model bank lacks its ALL_MARGINS core.") from exc
+
+    # Preserve the caller's exact action order while grouping only the numeric
+    # prediction work.  Each delete-donor ridge model can then score the whole
+    # direction group in one call instead of receiving one singleton matrix per
+    # action.
+    grouped: dict[str, list[tuple[int, HarpTargetAction, tuple[float, ...]]]] = {}
+    action_rows = tuple(actions)
+    for index, action in enumerate(action_rows):
         if not isinstance(action, HarpTargetAction) or action.outer_target_id != bank.outer_target_id or action.feature_names != bank.feature_names:
             raise ProtocolError("HARP target action drifted from its model bank.")
-        direction = action.direction if any(model.direction == action.direction for model in bank.models) else "ALL_MARGINS"
-        values: dict[str, tuple[tuple[float, ...], tuple[float, ...], tuple[str, ...]]] = {}
-        model_names = bank.model("gain", direction).full_model.feature_names
+        direction = action.direction if action.direction in available_directions else "ALL_MARGINS"
+        model_names = outcome_model("gain", direction).full_model.feature_names
         values_row = action.feature_values if "action_lambda" in action.feature_names else (*action.feature_values, action.lambda_value)
         if len(values_row) != len(model_names):
             raise ProtocolError("HARP target action model feature geometry drifted.")
-        matrix = np.asarray([values_row], dtype=np.float64)
+        grouped.setdefault(direction, []).append((index, action, values_row))
+
+    ordered: list[HarpActionScore | None] = [None] * len(action_rows)
+    for direction, group in grouped.items():
+        matrix = np.asarray([values_row for _index, _action, values_row in group], dtype=np.float64)
+        candidates = tuple(action.candidate_source_id for _index, action, _values_row in group)
+        values: dict[str, tuple[np.ndarray, np.ndarray, tuple[str, ...]]] = {}
         for outcome in ("gain", "brier", "log_loss"):
-            model = bank.model(outcome, direction)
-            predictions: list[float] = []
-            leverages: list[float] = []
-            donors: list[str] = []
-            for donor, deleted in model.delete_donor_models:
-                prediction, leverage = deleted.predict(matrix, (action.candidate_source_id,))
-                predictions.append(float(prediction[0])); leverages.append(float(leverage[0])); donors.append(donor)
-            values[outcome] = (tuple(predictions), tuple(leverages), tuple(donors))
+            model = outcome_model(outcome, direction)
+            donor_ids = tuple(donor for donor, _deleted in model.delete_donor_models)
+            predictions = np.empty((len(group), len(donor_ids)), dtype=np.float64)
+            leverages = np.empty_like(predictions)
+            for donor_index, (_donor, deleted) in enumerate(model.delete_donor_models):
+                prediction, leverage = deleted.predict_singleton_equivalent_batch(
+                    matrix, candidates
+                )
+                predictions[:, donor_index] = prediction
+                leverages[:, donor_index] = leverage
+            values[outcome] = (predictions, leverages, donor_ids)
+
         donor_ids = values["gain"][2]
         if values["brier"][2] != donor_ids or values["log_loss"][2] != donor_ids:
             raise ProtocolError("HARP delete-donor outcome banks drifted.")
-        output.append(HarpActionScore(action, values["gain"][0], values["brier"][0], values["log_loss"][0], tuple(max(a, b, c) for a, b, c in zip(values["gain"][1], values["brier"][1], values["log_loss"][1], strict=True)), bank.support(action, direction), donor_ids))
-    return tuple(output)
+
+        for group_index, (output_index, action, _values_row) in enumerate(group):
+            support = support_lookup.get(
+                (action.candidate_source_id, action.lambda_value, direction)
+            )
+            if support is None:
+                support = support_lookup.get(
+                    (action.candidate_source_id, action.lambda_value, "ALL_MARGINS")
+                )
+            if support is None:
+                support = HarpSupportCell(
+                    action.candidate_source_id,
+                    action.lambda_value,
+                    "ALL_MARGINS",
+                    0,
+                    0,
+                    (),
+                )
+            ordered[output_index] = HarpActionScore(
+                action,
+                tuple(float(value) for value in values["gain"][0][group_index]),
+                tuple(float(value) for value in values["brier"][0][group_index]),
+                tuple(float(value) for value in values["log_loss"][0][group_index]),
+                tuple(
+                    max(float(a), float(b), float(c))
+                    for a, b, c in zip(
+                        values["gain"][1][group_index],
+                        values["brier"][1][group_index],
+                        values["log_loss"][1][group_index],
+                        strict=True,
+                    )
+                ),
+                support,
+                donor_ids,
+            )
+    if any(row is None for row in ordered):
+        raise ProtocolError("HARP batched scoring lost an ordered target action.")
+    return tuple(row for row in ordered if row is not None)
 
 
 __all__ = ("DEFAULT_ALPHAS", "HarpActionModelBank", "HarpLodoFoldAudit", "HarpOutcomeModel", "fit_harp_action_model_bank", "score_harp_actions")

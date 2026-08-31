@@ -3,12 +3,12 @@ experiment:
   id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v1
   name: uniform_b_v2_consumed_test_fixed_bank_harp_router_v1
   stage: 90_oracles_and_diagnostics
-  status: planned
+  status: diagnostic
   claim_scope: diagnostic_only
   publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
   terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
   fresh_evidence: false
-  execution_authorized: false
+  execution_authorized: true
   implementation_authorizes_execution: false
   single_use_execution_identity: true
   consumed_test_reuse: true
@@ -25,11 +25,11 @@ inputs:
     - midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v1
   expert_bank_lock_hash: 9972a41dcd4814cd
   generation_lock_hash: 34e551425710362e
-  test_cache_content_sha256: null
-  development_manifest_sha256: null
-  evaluation_manifest_sha256: null
-  parent_ledger_sha256: null
-  execution_amendment_sha256: null
+  test_cache_content_sha256: f8135aa905d3500642c551fa06a801feba07b5b68c4e9c62e2d6ed7d2f81794a
+  development_manifest_sha256: 4ffffe5dfd9edea7ca6da8605bc597d4e75c6ae4b50852fb897494c84bface78
+  evaluation_manifest_sha256: 7e52f5f8cd260fc71017b04252bb449fff4069f0ec83a4bc48921f12bff17d5a
+  parent_ledger_sha256: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+  execution_amendment_sha256: 0f27ff48ecafa7629ee4557bc520f50eabbb888c998eb0843ba3536d2dc9ecd2
   expert_bank_root: artifact://midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
   generation_lock_root: artifact://midogpp_output_uniform_b_v2_generation_lock_v1
   test_cache_root: artifact://midogpp_stage90_harp_consumed_test_cache_v1
@@ -100,7 +100,7 @@ claim_boundary:
   publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
   terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
   fresh_evidence: false
-  execution_authorized: false
+  execution_authorized: true
   implementation_authorizes_execution: false
   consumed_test_reuse: true
   architecture_recovery_is_descriptive_only: true
@@ -110,4 +110,4 @@ claim_boundary:
   deployment_or_promotion_allowed: false
   may_feed_stage60_or_stage70: false
   may_feed_any_other_experiment: false
-  claim_boundary_hash: 4758084106f604e967f35a3e8514a797366b9608ef37241f42a73537100c55fb
+  claim_boundary_hash: 590f917a3e3540d423bdf3ceed88f2a4a2c18a7d2551f99dbad55521553eaebe

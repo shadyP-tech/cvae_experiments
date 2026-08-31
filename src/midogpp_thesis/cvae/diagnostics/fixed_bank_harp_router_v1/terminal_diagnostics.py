@@ -26,6 +26,7 @@ from ...runtime.harp_probability_menu import (
     HarpRoutedVectorSeal,
 )
 from ...runtime.harp_probability_menu.hashing import require_sha256
+from ...runtime.harp_probability_menu.indexed import validated_target_menu_view
 
 
 _EPSILON = 1.0e-7
@@ -103,7 +104,7 @@ def build_terminal_action_diagnostics(
 ) -> dict[str, object]:
     """Score the complete sealed action matrix without emitting policy state."""
 
-    menu.assert_valid()
+    view = validated_target_menu_view(menu)
     prelabel_hash = require_sha256(
         prelabel_bundle_hash, name="HARP prelabel bundle hash"
     )
@@ -147,27 +148,27 @@ def build_terminal_action_diagnostics(
         except KeyError as exc:
             raise ProtocolError("HARP terminal diagnostic truth is incomplete.") from exc
         cases = np.asarray([row.case_id for row in vector.decisions], dtype=str)
-        baseline_action = menu.action_for(
+        baseline_action = view.action_for(
             surface_kind=TARGET_SURFACE,
             outer_target_id=center,
             query_center_id=center,
             selected_source_id=None,
             action_id=BASE_ACTION_ID,
         )
-        reference_action = menu.action_for(
+        reference_action = view.action_for(
             surface_kind=TARGET_SURFACE,
             outer_target_id=center,
             query_center_id=center,
             selected_source_id=None,
             action_id=UNIFORM_ACTION_ID,
         )
-        baseline = menu.exact_nine(baseline_action)
-        reference = menu.exact_nine(reference_action)
+        baseline = view.exact_nine(baseline_action)
+        reference = view.exact_nine(reference_action)
         if (
-            menu.identities_for(baseline_action)
-            != menu.identities_for(reference_action)
-            or menu.identities_for(baseline_action)[0] != vector.row_ids
-            or menu.identities_for(baseline_action)[1] != vector.case_ids
+            view.identities_for(baseline_action)
+            != view.identities_for(reference_action)
+            or view.identities_for(baseline_action)[0] != vector.row_ids
+            or view.identities_for(baseline_action)[1] != vector.case_ids
         ):
             raise ProtocolError("HARP terminal diagnostic B/U/vector rows drifted.")
         baseline_metric = _metric(truth, baseline, cases)
@@ -231,14 +232,14 @@ def build_terminal_action_diagnostics(
         for source in CENTERS:
             if source == center:
                 continue
-            physical_action = menu.action_for(
+            physical_action = view.action_for(
                 surface_kind=TARGET_SURFACE,
                 outer_target_id=center,
                 query_center_id=center,
                 selected_source_id=source,
             )
-            expert = menu.exact_nine(physical_action)
-            if menu.identities_for(physical_action) != menu.identities_for(baseline_action):
+            expert = view.exact_nine(physical_action)
+            if view.identities_for(physical_action) != view.identities_for(baseline_action):
                 raise ProtocolError("HARP terminal candidate rows drifted from B/U.")
             for lam in LAMBDA_GRID:
                 probability = np.ascontiguousarray(
@@ -380,7 +381,7 @@ def build_terminal_action_diagnostics(
         "schema_version": "midogpp_harp_stage90_action_oracle_diagnostics_v1",
         "prelabel_bundle_hash": prelabel_hash,
         "physical_reference_preserving_surface_hash": physical_reference_hash,
-        "prediction_menu_seal_hash": menu.seal_hash,
+        "prediction_menu_seal_hash": view.seal_hash,
         "action_matrix_row_count": len(action_rows),
         "center_diagnostics": center_rows,
         "action_matrix": action_rows,
@@ -398,7 +399,9 @@ def build_terminal_action_diagnostics(
         "publication_status": "POST_HOC_CONSUMED_TEST_SENSITIVITY",
         "terminal_decision": "TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE",
     }
-    return {**base, "diagnostic_hash": canonical_hash(base)}
+    output = {**base, "diagnostic_hash": canonical_hash(base)}
+    view.assert_fully_valid()
+    return output
 
 
 __all__ = ("build_terminal_action_diagnostics",)

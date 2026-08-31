@@ -10,6 +10,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
+import yaml
 
 from midogpp_thesis.cvae.diagnostics.cli import build_parser, main as diagnostics_main
 from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v1 import (
@@ -47,8 +48,34 @@ CONFIG = (
 )
 
 
+def _as_synthetic_planned_config(
+    config,
+    *,
+    clear_prepared_hashes: bool = False,
+):
+    expected_hashes = {
+        **dict(config.expected_hashes),
+        "execution_amendment_sha256": None,
+    }
+    if clear_prepared_hashes:
+        expected_hashes.update(
+            {
+                "test_cache_content_sha256": None,
+                "development_manifest_sha256": None,
+                "evaluation_manifest_sha256": None,
+                "parent_ledger_sha256": None,
+            }
+        )
+    return replace(
+        config,
+        expected_hashes=expected_hashes,
+        execution_authorized=False,
+        claim_boundary=claim_boundary_payload(execution_authorized=False),
+    )
+
+
 def _bound_config():
-    planned = load_config(CONFIG)
+    planned = _as_synthetic_planned_config(load_config(CONFIG))
     return replace(
         planned,
         expected_hashes={
@@ -62,21 +89,30 @@ def _bound_config():
     )
 
 
-def _place_registered_config(repository: Path, config):
+def _synthetic_planned_yaml() -> str:
+    raw = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
+    raw["experiment"]["status"] = "planned"
+    raw["experiment"]["execution_authorized"] = False
+    raw["inputs"]["execution_amendment_sha256"] = None
+    raw["claim_boundary"] = claim_boundary_payload(execution_authorized=False)
+    return yaml.safe_dump(raw, sort_keys=False)
+
+
+def _place_synthetic_planned_config(repository: Path):
     path = (
         repository
         / "experiments/midogpp/stages/90_oracles_and_diagnostics/configs"
         / "uniform_b_v2_consumed_test_fixed_bank_harp_router_v1.yaml"
     )
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(CONFIG.read_bytes())
-    return replace(config, source_path=path)
+    path.write_text(_synthetic_planned_yaml(), encoding="utf-8")
+    return load_config(path)
 
 
 def test_publisher_creates_exactly_one_canonical_file_without_activating(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    config = _place_registered_config(tmp_path, load_config(CONFIG))
+    config = _place_synthetic_planned_config(tmp_path)
     bound_config = replace(
         config,
         expected_hashes=dict(_bound_config().expected_hashes),
@@ -189,7 +225,7 @@ def test_publisher_requires_exact_explicit_authorization_before_validation(
     monkeypatch.setattr(publisher, "_validate_inputs", forbidden)
     with pytest.raises(ProtocolError, match=message):
         publisher.publish_harp_execution_amendment(
-            load_config(CONFIG),
+            _as_synthetic_planned_config(load_config(CONFIG)),
             expert_bank_root=tmp_path / "bank",
             generation_lock_root=tmp_path / "generation",
             prepared_cache_root=tmp_path / "cache",
@@ -216,7 +252,7 @@ def test_publisher_rejects_nonregistered_path_and_existing_lease_before_inputs(
         raise AssertionError("unreachable")
 
     monkeypatch.setattr(publisher, "_validate_inputs", forbidden)
-    config = _place_registered_config(tmp_path, load_config(CONFIG))
+    config = _place_synthetic_planned_config(tmp_path)
     outside = tmp_path / publisher.AMENDMENT_FILENAME
     with pytest.raises(ProtocolError, match="registered contract member"):
         publisher.publish_harp_execution_amendment(
@@ -267,8 +303,8 @@ def test_publisher_rejects_arbitrary_planned_config_before_inputs_or_mutation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     copied = tmp_path / "altered-policy-config.yaml"
-    copied.write_bytes(CONFIG.read_bytes())
-    config = replace(load_config(CONFIG), source_path=copied)
+    copied.write_text(_synthetic_planned_yaml(), encoding="utf-8")
+    config = load_config(copied)
     called = False
 
     def forbidden(*_args, **_kwargs):
@@ -304,7 +340,7 @@ def test_publisher_rejects_arbitrary_planned_config_before_inputs_or_mutation(
 def test_publisher_reloads_registered_yaml_and_rejects_forged_typed_config(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    registered = _place_registered_config(tmp_path, load_config(CONFIG))
+    registered = _place_synthetic_planned_config(tmp_path)
     forged = replace(
         registered,
         policy=replace(registered.policy, gain_threshold=0.125),
@@ -463,7 +499,10 @@ def test_publisher_revalidates_preparation_content_roles_and_physical_lineage(
             AssertionError("publisher must remain label-blind")
         ),
     )
-    config = load_config(CONFIG)
+    config = _as_synthetic_planned_config(
+        load_config(CONFIG),
+        clear_prepared_hashes=True,
+    )
     validated = publisher._validate_inputs(
         config,
         expert_bank_root=bank,
@@ -577,6 +616,39 @@ def test_cli_dispatches_only_to_the_amendment_publisher(
         str(tmp_path),
     ]
     assert diagnostics_main(arguments) == 0
-    assert observed["config"].execution_authorized is False
+    assert observed["config"].execution_authorized is True
     assert observed["repository_root"] == str(tmp_path)
     assert json.loads(capsys.readouterr().out)["only_amendment_file_created"] is True
+
+
+def test_historical_v1_publisher_cli_is_fail_closed_before_mutation(
+    tmp_path: Path,
+) -> None:
+    arguments = [
+        "publish-fixed-bank-harp-router-v1-amendment",
+        "--config",
+        str(CONFIG),
+        "--expert-bank-root",
+        str(tmp_path / "bank"),
+        "--generation-lock-root",
+        str(tmp_path / "generation"),
+        "--prepared-cache-root",
+        str(tmp_path / "cache"),
+        "--development-manifest",
+        str(tmp_path / "development.csv"),
+        "--evaluation-manifest",
+        str(tmp_path / "evaluation.csv"),
+        "--parent-ledger",
+        str(tmp_path / "parent.json"),
+        "--amendment-path",
+        str(tmp_path / publisher.AMENDMENT_FILENAME),
+        "--authorization-basis",
+        publisher.AUTHORIZATION_BASIS,
+        "--authorization-date",
+        publisher.AUTHORIZATION_DATE,
+        "--repository-root",
+        str(tmp_path),
+    ]
+    with pytest.raises(ProtocolError, match="requires the planned config"):
+        diagnostics_main(arguments)
+    assert tuple(tmp_path.iterdir()) == ()

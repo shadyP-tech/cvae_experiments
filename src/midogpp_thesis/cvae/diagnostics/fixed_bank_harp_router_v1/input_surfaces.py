@@ -6,6 +6,7 @@ from collections.abc import Mapping
 import csv
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 import numpy as np
 
@@ -14,14 +15,37 @@ from ...generation.contracts import COMMON_OUTPUT_DIM
 from ...protocol import ProtocolError
 from ...routing.harp_protocol import HarpSourceLabelRow, canonical_hash
 from ...runtime.artifact_io import read_json, sha256_file
-from .config import HarpStage90Config
-
-
 DEVELOPMENT_ROLE = "harp_consumed_test_development"
 EVALUATION_ROLE = "harp_consumed_test_evaluation"
 CACHE_INDEX = Path("manifests/cache_index.json")
 CONTENT_INDEX = Path("manifests/content_index.json")
 CACHE_ROWS = Path("tables/row_index.csv")
+
+
+class HarpStage90ConfigLike(Protocol):
+    """Identity-neutral config surface needed by cache readers."""
+
+    expected_hashes: Mapping[str, str | None]
+
+    def resolved_path(self, role: str) -> Path: ...
+
+
+@dataclass(frozen=True, slots=True)
+class HarpConsumedCacheIdentity:
+    """Closed cache-format identity for one execution revision."""
+
+    artifact_id: str
+    cache_schema: str
+    row_schema: str
+    content_schema: str
+
+
+V1_CACHE_IDENTITY = HarpConsumedCacheIdentity(
+    artifact_id="midogpp_stage90_harp_consumed_test_cache_v1",
+    cache_schema="midogpp_harp_consumed_test_label_blind_frame_cache_v1",
+    row_schema="midogpp_harp_consumed_test_frame_row_v1",
+    content_schema="midogpp_harp_consumed_test_content_index_v1",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,14 +97,18 @@ class HarpConsumedCacheIndex:
         return result
 
 
-def _expected(config: HarpStage90Config, role: str) -> str:
+def _expected(config: HarpStage90ConfigLike, role: str) -> str:
     value = config.expected_hashes.get(role)
     if value is None:
         raise ProtocolError(f"HARP Stage-90 authorized input hash is absent: {role}.")
     return value
 
 
-def load_cache_index(config: HarpStage90Config) -> HarpConsumedCacheIndex:
+def load_cache_index(
+    config: HarpStage90ConfigLike,
+    *,
+    cache_identity: HarpConsumedCacheIdentity = V1_CACHE_IDENTITY,
+) -> HarpConsumedCacheIndex:
     root = config.resolved_path("test_cache_root")
     index_path = root / CACHE_INDEX
     content_path = root / CONTENT_INDEX
@@ -94,7 +122,7 @@ def load_cache_index(config: HarpStage90Config) -> HarpConsumedCacheIndex:
     if (
         not isinstance(members, Mapping)
         or content.get("schema_version")
-        != "midogpp_harp_consumed_test_content_index_v1"
+        != cache_identity.content_schema
         or content.get("content_index_hash") != canonical_hash(content_base)
         or content.get("content_index_hash")
         != _expected(config, "test_cache_content_sha256")
@@ -126,8 +154,8 @@ def load_cache_index(config: HarpStage90Config) -> HarpConsumedCacheIndex:
             "row_index_member", "shards", "cache_index_hash",
         }
         or index.get("schema_version")
-        != "midogpp_harp_consumed_test_label_blind_frame_cache_v1"
-        or index.get("artifact_id") != "midogpp_stage90_harp_consumed_test_cache_v1"
+        != cache_identity.cache_schema
+        or index.get("artifact_id") != cache_identity.artifact_id
         or index.get("dataset_family") != "MIDOG++"
         or index.get("representation_id")
         != "midogpp_virchow2_common_3840_float32_v1"
@@ -167,7 +195,7 @@ def load_cache_index(config: HarpStage90Config) -> HarpConsumedCacheIndex:
         if array.dtype != np.float32 or array.shape != (int(shape[0]), int(shape[1])):
             raise ProtocolError("HARP Stage-90 cache shard header drifted.")
         shards[relative] = (int(shape[0]), int(shape[1]))
-    rows = _read_cache_rows(row_path, shards)
+    rows = _read_cache_rows(row_path, shards, cache_identity=cache_identity)
     for center in CENTERS:
         for role in (DEVELOPMENT_ROLE, EVALUATION_ROLE):
             if not any(row.center == center and row.split_role == role for row in rows):
@@ -188,7 +216,10 @@ def load_cache_index(config: HarpStage90Config) -> HarpConsumedCacheIndex:
 
 
 def _read_cache_rows(
-    path: Path, shards: Mapping[str, tuple[int, int]]
+    path: Path,
+    shards: Mapping[str, tuple[int, int]],
+    *,
+    cache_identity: HarpConsumedCacheIdentity = V1_CACHE_IDENTITY,
 ) -> tuple[HarpCacheRow, ...]:
     expected_header = (
         "schema_version", "row_id", "center", "case_id", "split_role",
@@ -201,7 +232,7 @@ def _read_cache_rows(
                 raise ProtocolError("HARP Stage-90 cache row-index schema drifted.")
             output: list[HarpCacheRow] = []
             for raw in reader:
-                if raw["schema_version"] != "midogpp_harp_consumed_test_frame_row_v1":
+                if raw["schema_version"] != cache_identity.row_schema:
                     raise ProtocolError("HARP Stage-90 cache row schema version drifted.")
                 output.append(
                     HarpCacheRow(
@@ -239,7 +270,7 @@ def _read_cache_rows(
 
 
 def load_development_labels(
-    config: HarpStage90Config, cache: HarpConsumedCacheIndex
+    config: HarpStage90ConfigLike, cache: HarpConsumedCacheIndex
 ) -> tuple[HarpSourceLabelRow, ...]:
     rows = _read_label_manifest(
         config.resolved_path("development_manifest_path"),
@@ -253,7 +284,7 @@ def load_development_labels(
 
 
 def load_evaluation_truth(
-    config: HarpStage90Config, cache: HarpConsumedCacheIndex
+    config: HarpStage90ConfigLike, cache: HarpConsumedCacheIndex
 ) -> dict[tuple[str, str, str], int]:
     return {
         (center, case, sample): label
@@ -327,7 +358,8 @@ def _safe_member(root: Path, relative: str) -> Path:
 
 
 __all__ = (
-    "DEVELOPMENT_ROLE", "EVALUATION_ROLE", "HarpCacheRow",
-    "HarpConsumedCacheIndex", "load_cache_index", "load_development_labels",
-    "load_evaluation_truth",
+    "CACHE_INDEX", "CACHE_ROWS", "CONTENT_INDEX", "DEVELOPMENT_ROLE",
+    "EVALUATION_ROLE", "HarpCacheRow", "HarpConsumedCacheIdentity",
+    "HarpConsumedCacheIndex", "HarpStage90ConfigLike", "V1_CACHE_IDENTITY",
+    "load_cache_index", "load_development_labels", "load_evaluation_truth",
 )

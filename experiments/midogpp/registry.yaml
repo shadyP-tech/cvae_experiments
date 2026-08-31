@@ -3851,7 +3851,7 @@ experiments:
 
   - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v1
     stage: 90_oracles_and_diagnostics
-    status: planned
+    status: diagnostic
     claim_scope: diagnostic_only
     config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_harp_router_v1.yaml
     output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v1
@@ -3865,11 +3865,11 @@ experiments:
       - midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v1
     input_claim_scope_exceptions:
       midogpp_output_uniform_b_v2_generation_lock_v1: Immutable fixed-bank generation geometry and classifier settings only; it grants no routing, consumed-label, fresh-evidence, promotion, deployment, or execution authority.
-      midogpp_stage90_harp_consumed_test_cache_v1: Planned HARP-only resolution fence for the canonical consumed-test label-blind Virchow2 cache; it grants no label, execution, fresh-evidence, or downstream authority.
-      midogpp_stage90_harp_consumed_test_development_manifest_v1: Planned role-pure whole-case development label capability; it may open only after the complete physical menu is durable and grants no evaluation-label authority.
-      midogpp_stage90_harp_consumed_test_evaluation_manifest_v1: Planned role-pure evaluation label capability; it may open once only after all global routes and vectors are durably reconstructed twice.
-      midogpp_uniform_b_test_consumption_ledger_harp_parent_v1: Planned HARP-only byte binding to the original consumed-test parent ledger; it cannot authorize execution.
-      midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v1: A new HARP-specific single-use amendment is required; no SCEPTRE or other predecessor authority may be aliased.
+      midogpp_stage90_harp_consumed_test_cache_v1: HARP-only prepared role-split label-free Virchow2 cache authorized for this terminal consumed-test sensitivity; it contains no labels and grants no execution, fresh-evidence, or downstream authority.
+      midogpp_stage90_harp_consumed_test_development_manifest_v1: Consumer-authorized role-pure whole-case development label capability; it may open only after the complete physical menu is durable and grants no evaluation-label authority.
+      midogpp_stage90_harp_consumed_test_evaluation_manifest_v1: Consumer-authorized role-pure evaluation label capability; it may open once only after all global routes and vectors are durably reconstructed twice.
+      midogpp_uniform_b_test_consumption_ledger_harp_parent_v1: HARP-only byte-exact binding to the original consumed-test parent ledger; it cannot authorize execution by itself.
+      midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v1: Exact HARP-specific single-consumer, single-use amendment authorizing one terminal diagnostic; no SCEPTRE or other predecessor authority is aliased.
     runner:
       preparation_authority_gate: harp_v1_consumed_test_execution_amendment_v1
       environment:
@@ -3891,11 +3891,112 @@ experiments:
         - --artifact-root
         - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v1
     notes:
-      - The registered cvae-diagnostics prepare-fixed-bank-harp-router-v1-inputs command deterministically creates the consumer-scoped label-blind cache and role-pure manifests from the canonical consumed MIDOG++ test artifacts; it cannot issue an amendment or activate execution. A new HARP-specific one-shot amendment is still not issued, so registration remains planned and non-runnable.
-      - Preparation emits the exact path-free expert-bank, GenerationLock, cache, role-manifest, and parent-ledger input binding that a future HARP-only amendment must reproduce byte-for-byte.
+      - FAILED_EXHAUSTED — the v1 lease was irreversibly claimed and the workstation run was externally interrupted by KeyboardInterrupt during target-action and route construction. Development labels opened; evaluation labels did not; no terminal result exists. V1 cannot be resumed, forced, deleted-and-recreated, or rerun.
+      - The amendment binds the exact path-free expert-bank, GenerationLock, prepared-cache content identity, role-manifest hashes, parent-ledger hash, frozen scientific contract, and transitive local source snapshot. The pre-render workspace gate authenticates it before resolving protected inputs or creating output snapshots.
       - The runner physically regenerates all 81 frozen source streams from the authoritative expert bank and GenerationLock, then seals all 738 exact-B/matched-U/legal H-by-e actions and all 6,642 exact-nine probability cells from label-blind consumed-test embeddings. It consumes no SCEPTRE output, policy, rank, utility surface, lease, or amendment.
       - U and every H-by-e endpoint have the same physical class-balanced budget; source utility is U-relative, lambda 1 is the physical expert-routing ablation, and smaller lambdas are explicitly predictive-probability ensembles. Exact B remains the byte-identical terminal fallback and operational baseline.
       - The frozen lambda-1 policy additionally seals a reference-preserving diagnostic vector before labels: admitted rows use physical H-by-e and rejected rows retain U. This isolates physical routing from the U-minus-B budget effect; the operational policy still falls back to exact B.
       - For each outer H, every q, e, donor row, normalization, nested LODO fold, fit, and tune excludes H. Seed cells are technical replications; cases are equally weighted within target center and centers are equally weighted in the terminal descriptive summary.
       - All actions, policy decisions, and routed vectors are durable and independently reconstructed twice before the one-shot evaluation-label capability opens. Every failed gate returns exact-B bytes.
       - Any future authorized result is permanently POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE. It cannot feed Stage 60, Stage 70, any other experiment, fresh routing, unseen-center generalization, significance, promotion, deployment, or thesis-confirmatory evidence.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v2
+    stage: 90_oracles_and_diagnostics
+    status: diagnostic
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_harp_router_v2.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v2
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_harp_consumed_test_cache_v2
+      - midogpp_stage90_harp_consumed_test_development_manifest_v2
+      - midogpp_stage90_harp_consumed_test_evaluation_manifest_v2
+      - midogpp_uniform_b_test_consumption_ledger_harp_parent_v2
+      - midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v2
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Immutable fixed-bank generation geometry and classifier settings only; it grants no routing, consumed-label, fresh-evidence, promotion, deployment, or execution authority.
+      midogpp_stage90_harp_consumed_test_cache_v2: New HARP-v2-only label-free cache rebuilt from the immutable canonical consumed MIDOG++ test cache under the unchanged whole-case partition; it grants no execution or evidential authority.
+      midogpp_stage90_harp_consumed_test_development_manifest_v2: New v2 role-pure development-label capability rebuilt from the canonical manifest; it may open only after the complete physical probability menu is durable.
+      midogpp_stage90_harp_consumed_test_evaluation_manifest_v2: New v2 role-pure evaluation-label capability rebuilt from the canonical manifest; it may open once only after all global routes and vectors are durable and independently reconstructed twice.
+      midogpp_uniform_b_test_consumption_ledger_harp_parent_v2: New v2 consumer fence over the immutable original consumed-test ledger; it cannot authorize execution by itself.
+      midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v2: A separately hashed HARP v2 single-use amendment is required; v1 amendment, lease, output, scratch, capability state, and route artifacts are forbidden aliases.
+    runner:
+      preparation_authority_gate: harp_v2_consumed_test_execution_amendment_v1
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "3"
+        MKL_NUM_THREADS: "3"
+        OPENBLAS_NUM_THREADS: "3"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-harp-router-v2
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v2
+    notes:
+      - SCOPE LIMITED — the optimized byte-equivalent HARP v2 runtime is separately authorized for one terminal consumed-test diagnostic. Its new consumer-scoped cache, role manifests, source snapshot, physical inputs, and single-use amendment are hash-bound; the lease remains unclaimed until launch.
+      - V1 is FAILED_EXHAUSTED after an external KeyboardInterrupt during target-action and route construction. Development labels opened; evaluation labels did not. V2 never consumes v1 output, action menu, fitted models, routes, amendment, lease, scratch, or label-capability state.
+      - V2 preserves the v1 whole-case partition namespace, outer-center exclusion, nested LODO, policy thresholds, action library, exact-nine reduction, and byte-identical exact-B fallback. Its only intended change is the validated O(1) target-menu index plus byte-equivalent batched and shared scoring execution path.
+      - The same already-consumed MIDOG++ test dataset is reused only for a repeatable post-hoc diagnostic. Every outcome remains POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE with fresh_evidence=false.
+      - No HARP v2 artifact or decision may feed Stage 60, Stage 70, another experiment, routing promotion, deployment, unseen-center generalization, significance, or thesis-confirmatory claims.
+
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v3
+    stage: 90_oracles_and_diagnostics
+    status: planned
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_harp_router_v3.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v3
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_harp_consumed_test_cache_v3
+      - midogpp_stage90_harp_consumed_test_development_manifest_v3
+      - midogpp_stage90_harp_consumed_test_evaluation_manifest_v3
+      - midogpp_uniform_b_test_consumption_ledger_harp_parent_v3
+      - midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v3
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Immutable fixed-bank generation geometry and classifier settings only; it grants no routing, consumed-label, fresh-evidence, promotion, deployment, or execution authority.
+      midogpp_stage90_harp_consumed_test_cache_v3: Fenced v3-only label-free Virchow2 cache rebuilt from the immutable canonical consumed MIDOG++ test cache; it grants no execution or evidential authority.
+      midogpp_stage90_harp_consumed_test_development_manifest_v3: V3 role-pure whole-case development-label capability; it may open only after the complete physical B/U/H-by-e menu is durable.
+      midogpp_stage90_harp_consumed_test_evaluation_manifest_v3: V3 role-pure evaluation-label capability; it may open once only after all case routes and exact-B fallback vectors are durable and independently reconstructed twice.
+      midogpp_uniform_b_test_consumption_ledger_harp_parent_v3: V3-only byte-exact binding to the original consumed-test parent ledger; it cannot authorize execution by itself.
+      midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v3: A separately published HARP v3 single-use amendment is required; every v1/v2 authority, output, scratch, cache, route, and capability state is a forbidden alias.
+    runner:
+      preparation_authority_gate: harp_v3_consumed_test_execution_amendment_v1
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "3"
+        MKL_NUM_THREADS: "3"
+        OPENBLAS_NUM_THREADS: "3"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+        PYTHONHASHSEED: "0"
+        OMP_DYNAMIC: "FALSE"
+        MKL_DYNAMIC: "FALSE"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-harp-router-v3
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v3
+    notes:
+      - SCOPE LIMITED — v3 is implemented and registered as a new planned identity, but implementation creates no amendment, claims no lease, opens no labels, and does not authorize a workstation run.
+      - V3 repairs the failed raw-leverage veto by calibrating the maximum target delete-donor leverage against matched maximum-over-ensemble source pseudo-target blocks, never against an absolute raw leverage threshold or an individual-leverage q95. Every normalization, fit, tune, residual bound, geometry reference, and donor row excludes the outer target center; the source D-1 versus target D limitation is explicit and no formal conformal coverage is claimed.
+      - Decisions are case-level and use only physical lambda-1 actions. The hierarchy first tests H-by-e against matched-budget U and exact B jointly, then tests U against B; any incomplete, unsafe, incompatible, or unsupported action returns exact-B bytes.
+      - The normalized additive contribution to exact case-equal BACC, Brier delta, and log-loss delta are fitted jointly with shared design. Exact case-equal BACC balances classes first and then supporting cases within class. A single-class source case contributes its sole-class recall weighted by total cases divided by twice that class's supporting-case count; averaging case contributions reconstructs the terminal center BACC exactly. The same contribution estimand is used for policy thresholds and oracle diagnostics.
+      - Joint-harm residual calibration first takes the worst candidate residual inside each donor/case block, gives equal total mass to each donor and equal mass to cases within donor, and uses the maximum donor-specific finite-sample upper quantile. Seed cells remain technical replications rather than independent observations, and no formal conformal guarantee is claimed.
+      - The runner uses compact NumPy stores, bounded GPU and CPU work queues, persistent spawned CUDA workers, shared multi-output CPU fits, deterministic threading, lease-bound local scratch, hash-validated intra-attempt label-free checkpoints, and independently reconstructed route seals. Cross-process or cross-attempt recovery is forbidden by the single-use authority.
+      - The same already-consumed MIDOG++ test cases may be reused only after separately preparing v3 inputs and publishing/activating separate authority. Any result remains POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE with fresh_evidence=false and may feed no other experiment.

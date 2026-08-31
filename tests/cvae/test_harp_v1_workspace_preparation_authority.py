@@ -542,12 +542,38 @@ def test_harp_workspace_rejects_force_and_unlisted_extra_args_before_gate(
         workspace.run(EXPERIMENT_ID, extra_args=("--not-allowed",))
 
 
-def test_workspace_validate_preserves_planned_harp_registration() -> None:
-    """The checked-in planned entry remains valid but stays non-runnable."""
+def test_workspace_validate_preserves_failed_exhausted_harp_registration() -> None:
+    """The interrupted historical entry stays diagnostic and exhausted."""
 
     workspace = MidogppWorkspace.load(ROOT)
-    assert workspace.experiments[EXPERIMENT_ID].status == "planned"
+    experiment = workspace.experiments[EXPERIMENT_ID]
+    assert experiment.status == "diagnostic"
+    assert any("FAILED_EXHAUSTED" in note for note in experiment.notes)
+    output = workspace.artifacts[experiment.output_artifact_id]
+    assert output.evidence_label.endswith("FAILED_EXHAUSTED")
+    assert output.semantic_identities["authorization_exhausted"] == "true"
+    assert output.semantic_identities["amendment_status"] == "FAILED_EXHAUSTED"
     workspace.validate()
+
+
+def test_failed_exhausted_harp_run_rejects_before_input_or_output_resolution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Runnable history metadata must not restore the consumed v1 lease."""
+
+    workspace = MidogppWorkspace.load(ROOT)
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("exhausted v1 resolved an input or output")
+
+    monkeypatch.setattr(
+        workspace,
+        "_resolve_preparation_authority_member",
+        forbidden,
+    )
+    monkeypatch.setattr(workspace, "resolve_artifact", forbidden)
+    with pytest.raises(WorkspaceError, match="authorization is exhausted"):
+        workspace.run(EXPERIMENT_ID)
 
 
 @pytest.mark.parametrize("surface", ("runner_argv", "output_canonical_path"))

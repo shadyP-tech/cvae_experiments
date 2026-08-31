@@ -32,9 +32,23 @@ HARP_V1_EXECUTION_AMENDMENT_GATE = (
 HARP_V1_EXPERIMENT_ID = (
     "midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v1"
 )
+HARP_V2_EXECUTION_AMENDMENT_GATE = (
+    "harp_v2_consumed_test_execution_amendment_v1"
+)
+HARP_V2_EXPERIMENT_ID = (
+    "midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v2"
+)
+HARP_V3_EXECUTION_AMENDMENT_GATE = (
+    "harp_v3_consumed_test_execution_amendment_v1"
+)
+HARP_V3_EXPERIMENT_ID = (
+    "midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v3"
+)
 KNOWN_PREPARATION_AUTHORITY_GATES = frozenset(
     {
         HARP_V1_EXECUTION_AMENDMENT_GATE,
+        HARP_V2_EXECUTION_AMENDMENT_GATE,
+        HARP_V3_EXECUTION_AMENDMENT_GATE,
         SCEPTRE_V4_EXECUTION_AMENDMENT_GATE,
         SCEPTRE_V5_EXECUTION_AMENDMENT_GATE,
     }
@@ -44,6 +58,16 @@ _AUTHORITY_MODULE_BY_GATE = {
         "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v1."
         "workspace_preparation_authority",
         "HarpV1WorkspaceAuthorityError",
+    ),
+    HARP_V2_EXECUTION_AMENDMENT_GATE: (
+        "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v2."
+        "workspace_preparation_authority",
+        "HarpV2WorkspaceAuthorityError",
+    ),
+    HARP_V3_EXECUTION_AMENDMENT_GATE: (
+        "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v3."
+        "workspace_preparation_authority",
+        "HarpV3WorkspaceAuthorityError",
     ),
     SCEPTRE_V4_EXECUTION_AMENDMENT_GATE: (
         "midogpp_thesis.cvae.diagnostics.fixed_bank_sceptre_router_v4."
@@ -55,6 +79,16 @@ _AUTHORITY_MODULE_BY_GATE = {
         "execution.workspace_preparation_authority",
         "SceptreV5WorkspaceAuthorityError",
     ),
+}
+_HARP_VERSION_BY_GATE = {
+    HARP_V1_EXECUTION_AMENDMENT_GATE: "v1",
+    HARP_V2_EXECUTION_AMENDMENT_GATE: "v2",
+    HARP_V3_EXECUTION_AMENDMENT_GATE: "v3",
+}
+_HARP_EXPERIMENT_BY_GATE = {
+    HARP_V1_EXECUTION_AMENDMENT_GATE: HARP_V1_EXPERIMENT_ID,
+    HARP_V2_EXECUTION_AMENDMENT_GATE: HARP_V2_EXPERIMENT_ID,
+    HARP_V3_EXECUTION_AMENDMENT_GATE: HARP_V3_EXPERIMENT_ID,
 }
 
 
@@ -95,16 +129,32 @@ def expected_workspace_registration_contract_hash(
 ) -> str | None:
     """Reconstruct a consumer registration hash from a closed module table."""
 
-    if gate_id != HARP_V1_EXECUTION_AMENDMENT_GATE:
+    if gate_id == HARP_V1_EXECUTION_AMENDMENT_GATE:
+        module_name = (
+            "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v1."
+            "authorization"
+        )
+    elif gate_id == HARP_V2_EXECUTION_AMENDMENT_GATE:
+        module_name = (
+            "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v2."
+            "authorization"
+        )
+    elif gate_id == HARP_V3_EXECUTION_AMENDMENT_GATE:
+        module_name = (
+            "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v3."
+            "authorization"
+        )
+    else:
         return None
-    authority = import_module(
-        "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v1.authorization"
-    )
+    # Both names are source constants selected by exact gate equality; no
+    # registry value is ever interpreted as a Python module or symbol.
+    authority = import_module(module_name)
     contract = authority.workspace_registration_execution_contract()
     value = contract.get("workspace_registration_execution_contract_hash")
     if type(value) is not str:
         raise PreparationAuthorityError(
-            "HARP v1 workspace registration contract hash is malformed."
+            f"HARP {_HARP_VERSION_BY_GATE[gate_id]} workspace registration "
+            "contract hash is malformed."
         )
     return value
 
@@ -118,14 +168,17 @@ def validate_preparation_authority_extra_args(
     """Apply consumer-specific closed-world runner argument constraints."""
 
     normalized = tuple(extra_args)
-    if gate_id == HARP_V1_EXECUTION_AMENDMENT_GATE:
+    harp_version = _HARP_VERSION_BY_GATE.get(gate_id)
+    if harp_version is not None:
         if force:
             raise PreparationAuthorityError(
-                "HARP v1 workspace preparation and execution reject --force."
+                f"HARP {harp_version} workspace preparation and execution "
+                "reject --force."
             )
         if normalized not in {(), ("--dry-run",)}:
             raise PreparationAuthorityError(
-                "HARP v1 workspace execution accepts only no extra arguments or "
+                f"HARP {harp_version} workspace execution accepts only no "
+                "extra arguments or "
                 "the exact '--dry-run' argument."
             )
     return normalized
@@ -142,11 +195,24 @@ def validate_preparation_authority_registration_projection(
     its pre-render authority gate.
     """
 
-    if gate_id != HARP_V1_EXECUTION_AMENDMENT_GATE:
+    if gate_id == HARP_V1_EXECUTION_AMENDMENT_GATE:
+        module_name = (
+            "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v1."
+            "authorization"
+        )
+    elif gate_id == HARP_V2_EXECUTION_AMENDMENT_GATE:
+        module_name = (
+            "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v2."
+            "authorization"
+        )
+    elif gate_id == HARP_V3_EXECUTION_AMENDMENT_GATE:
+        module_name = (
+            "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v3."
+            "authorization"
+        )
+    else:
         return None
-    authority = import_module(
-        "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v1.authorization"
-    )
+    authority = import_module(module_name)
     try:
         return authority.validate_workspace_registration_execution_projection(
             registration_projection
@@ -180,6 +246,8 @@ def preparation_authority_registration_error(
 
     required = {
         HARP_V1_EXPERIMENT_ID: HARP_V1_EXECUTION_AMENDMENT_GATE,
+        HARP_V2_EXPERIMENT_ID: HARP_V2_EXECUTION_AMENDMENT_GATE,
+        HARP_V3_EXPERIMENT_ID: HARP_V3_EXECUTION_AMENDMENT_GATE,
         SCEPTRE_V4_EXPERIMENT_ID: SCEPTRE_V4_EXECUTION_AMENDMENT_GATE,
         SCEPTRE_V5_EXPERIMENT_ID: SCEPTRE_V5_EXECUTION_AMENDMENT_GATE,
     }.get(experiment_id)
@@ -195,12 +263,11 @@ def preparation_authority_registration_error(
             f"{experiment_id}: runner.preparation_authority_gate "
             f"{gate_id!r} is bound only to {SCEPTRE_V4_EXPERIMENT_ID}"
         )
-    if gate_id == HARP_V1_EXECUTION_AMENDMENT_GATE and (
-        experiment_id != HARP_V1_EXPERIMENT_ID
-    ):
+    harp_experiment_id = _HARP_EXPERIMENT_BY_GATE.get(gate_id)
+    if harp_experiment_id is not None and experiment_id != harp_experiment_id:
         return (
             f"{experiment_id}: runner.preparation_authority_gate "
-            f"{gate_id!r} is bound only to {HARP_V1_EXPERIMENT_ID}"
+            f"{gate_id!r} is bound only to {harp_experiment_id}"
         )
     if gate_id == SCEPTRE_V5_EXECUTION_AMENDMENT_GATE and (
         experiment_id != SCEPTRE_V5_EXPERIMENT_ID
@@ -250,7 +317,7 @@ def enforce_preparation_authority(
             "input_artifact_ids": tuple(input_artifact_ids),
             "resolve_authority_member": resolve_authority_member,
         }
-        if gate_id == HARP_V1_EXECUTION_AMENDMENT_GATE:
+        if gate_id in _HARP_VERSION_BY_GATE:
             call_kwargs["registration_projection"] = registration_projection
         receipt = authority.validate_workspace_preparation_authority(
             **call_kwargs,
@@ -284,6 +351,10 @@ __all__ = (
     "AuthorityMember",
     "HARP_V1_EXECUTION_AMENDMENT_GATE",
     "HARP_V1_EXPERIMENT_ID",
+    "HARP_V2_EXECUTION_AMENDMENT_GATE",
+    "HARP_V2_EXPERIMENT_ID",
+    "HARP_V3_EXECUTION_AMENDMENT_GATE",
+    "HARP_V3_EXPERIMENT_ID",
     "KNOWN_PREPARATION_AUTHORITY_GATES",
     "PreparationAuthorityError",
     "PreparationAuthorityReceipt",

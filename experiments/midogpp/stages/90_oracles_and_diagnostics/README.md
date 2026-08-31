@@ -7,6 +7,84 @@ Every oracle row must be marked non-deployable. Diagnostic results may explain
 a failure or quantify headroom, but they must not tune or select a deployable
 policy and must remain separate from held-out utility claims.
 
+## HARP byte-equivalent optimized replay v2
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v2` is the
+isolated successor to the exhausted HARP v1 attempt. V1 was externally
+interrupted by `KeyboardInterrupt` during target-action and route construction
+after development-label access but before evaluation-label access. Its lease,
+output, scratch, amendment, fitted state, route state, and capability history
+are immutable failed provenance and are not v2 inputs.
+
+V2 rebuilds its own label-blind cache and role-pure manifests directly from
+the canonical consumed MIDOG++ test cache, manifest, and parent ledger. It
+retains the exact v1 whole-case partition namespace, outer-center and
+delete-donor exclusions, nested LODO, action set, model, thresholds, reduction
+order, and exact-B fallback. The execution revision changes only the hot path:
+one immutable O(1) target-menu index replaces repeated full-menu scans, action
+scores are computed in singleton-byte-equivalent batches, and predictive and
+physical projections share each independently reconstructed scoring pass.
+
+The v2 experiment, output, scratch, lease, source snapshot, cache, manifests,
+parent-ledger fence, and amendment are all distinct. `--force` and recovery are
+forbidden. The v2 inputs were prepared and the explicit 2026-08-31 single-use
+amendment was published and hash-bound before launch. The mutation-free
+workstation dry run passed with both label capabilities closed. The authorized
+run then completed, but all 4,407 case-action decisions fell back to exact B;
+it is a completed negative routing diagnostic, not an active run.
+
+The entire 9,928-row MIDOG++ test surface is already consumed. Every v2 output
+is permanently `POST_HOC_CONSUMED_TEST_SENSITIVITY`,
+`TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`, and `fresh_evidence=false`. It may
+describe whether the optimized implementation recovers routing structure on
+the observed surface; it cannot establish fresh routing, unseen-center
+generalization, confirmatory improvement, significance, promotion,
+deployment, or a Stage-60/70 input.
+
+## HARP case-level calibrated physical router v3
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v3` is the
+new fenced architecture for diagnosing the v2 zero-route bottleneck. It is
+implemented and registered as `planned`; no v3 amendment exists, no lease is
+claimed, no consumed label capability is open, and source code alone does not
+authorize execution.
+
+V3 removes the invalid absolute raw-leverage veto. It calibrates the maximum
+target delete-donor leverage against the same maximum statistic from strict
+leave-{pseudo-target, donor} source blocks, then expresses the gate as a
+dimensionless source-calibrated ratio. The source blocks contain D-1 members
+while a target block contains D; that limitation is persisted and the gate is
+not described as formal conformal coverage. It uses case-level observations,
+equal case and source-center mass, strict outer-target removal from query and
+candidate roles, nested source-center LODO tuning, delete-donor predictions,
+and a shared-design three-response ridge for balanced-correctness gain, Brier
+delta, and log-loss delta. Its donor-calibrated joint harm envelope is an
+exploratory source-only bound, explicitly not a formal conformal guarantee.
+
+Only physical lambda-1 actions are primary. The policy admits H-by-e only when
+it is jointly safe relative to both matched-budget U and exact B; otherwise it
+may admit U only when U is jointly safe relative to B; every incomplete,
+unsupported, extrapolative, or unsafe state returns the exact physical B bytes.
+The physical bank and GenerationLock remain immutable and independently
+trained; target actions contain no labels or outcomes.
+
+The production runner is modular: compact NumPy stores replace hundreds of
+megabytes of row-wise JSON, multi-output fits share one design matrix, target
+menus are indexed, GPU work is bounded across two persistent spawned workers,
+BLAS threading is deterministic, scratch is v3-specific and lease-bound,
+phase progress is durable, and two fresh-process reconstructions gate
+evaluation-label access. A prelabel rejection report records every geometry,
+support, shrinkage, gain, Brier, and log-loss veto without opening evaluation
+truth.
+
+The v3 cache, role manifests, parent fence, amendment, output, scratch, source
+snapshot, and lease must all be new. If separately authorized, it may reuse the
+same already-consumed MIDOG++ test cases only as
+`POST_HOC_CONSUMED_TEST_SENSITIVITY` and
+`TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`; it cannot establish fresh routing,
+generalization, significance, promotion, deployment, or thesis-confirmatory
+improvement, and it may feed no other experiment.
+
 ## SCEPTRE persistent-worker repair v3
 
 `midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_sceptre_router.v3`

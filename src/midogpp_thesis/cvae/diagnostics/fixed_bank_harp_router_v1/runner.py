@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 import hashlib
 import os
 from pathlib import Path
 import sys
-from typing import Mapping, Sequence
+from typing import Any, Callable, Mapping, Protocol, Sequence
 
 import numpy as np
 
@@ -49,7 +49,11 @@ from .input_surfaces import (
     load_development_labels,
     load_evaluation_truth,
 )
-from .modeling import fit_outer_model_banks, policy_hash, select_and_route
+from .modeling import (
+    fit_outer_model_banks,
+    policy_hash,
+    select_and_route_pair,
+)
 from .physical_menu import (
     build_physical_plan,
     materialize_physical_harp_menu,
@@ -70,11 +74,14 @@ IMPLEMENTED_COMPONENTS = (
     "physical_probability_menu_from_bank_generation_lock_and_label_blind_cache",
     "strict_outer_H_query_candidate_and_delete_donor_exclusion",
     "exact_nine_per_sample_float64_reduction",
+    "phase_local_prevalidated_O1_target_probability_menu_index",
     "source_standardized_correctness_and_separate_proper_loss_responses",
     "matched_budget_uniform_U_reference_for_all_candidate_utility_deltas",
     "predictive_probability_ensembling_with_required_lambda_one_physical_ablation",
     "prelabel_sealed_lambda_one_reference_preserving_U_ablation_vector",
     "nested_center_lodo_partial_pool_ridge",
+    "singleton_byte_equivalent_batched_delete_donor_scoring",
+    "shared_scoring_for_predictive_and_lambda_one_projections_per_reconstruction",
     "conservative_gain_loss_coverage_and_leverage_gates",
     "label_free_support_envelope_as_post_selection_veto_only",
     "globally_durable_route_vectors_before_evaluation_labels",
@@ -83,10 +90,74 @@ IMPLEMENTED_COMPONENTS = (
 )
 
 
-def inspect_harp_stage90(config: HarpStage90Config) -> Mapping[str, object]:
+class HarpStage90RunnerConfig(Protocol):
+    artifact_root: str
+    config_hash: str
+    execution_authorized: bool
+    input_artifact_ids: tuple[str, ...]
+    expected_hashes: Mapping[str, str | None]
+    protocol: Mapping[str, object]
+    claim_boundary: Mapping[str, object]
+    alpha_grid: tuple[float, ...]
+    runtime: Mapping[str, object]
+    policy: object
+
+    def resolved_path(self, role: str) -> Path: ...
+
+
+@dataclass(frozen=True, slots=True)
+class HarpStage90RunnerServices:
+    """Execution identity and effect edges around the shared numerical core."""
+
+    config_type: type
+    authorization_type: type
+    lease_type: type
+    experiment_id: str
+    publication_status: str
+    terminal_decision: str
+    execution_revision: str
+    phase_prefix: str
+    load_authorization: Callable[[Any], Any]
+    claim_authorization: Callable[..., Any]
+    finalize_authorization: Callable[..., Any]
+    load_cache_index: Callable[[Any], HarpConsumedCacheIndex]
+    load_development_labels: Callable[[Any, HarpConsumedCacheIndex], Any]
+    load_evaluation_truth: Callable[[Any, HarpConsumedCacheIndex], Any]
+
+
+V1_RUNNER_SERVICES = HarpStage90RunnerServices(
+    config_type=HarpStage90Config,
+    authorization_type=HarpAuthorization,
+    lease_type=HarpAuthorizationLease,
+    experiment_id=EXPERIMENT_ID,
+    publication_status=PUBLICATION_STATUS,
+    terminal_decision=TERMINAL_DECISION,
+    execution_revision="v1_original_execution",
+    phase_prefix="harp-stage90-v1",
+    load_authorization=load_authorization,
+    claim_authorization=claim_authorization,
+    finalize_authorization=finalize_authorization,
+    load_cache_index=load_cache_index,
+    load_development_labels=load_development_labels,
+    load_evaluation_truth=load_evaluation_truth,
+)
+
+
+def _services_or_v1(
+    services: HarpStage90RunnerServices | None,
+) -> HarpStage90RunnerServices:
+    return V1_RUNNER_SERVICES if services is None else services
+
+
+def inspect_harp_stage90(
+    config: HarpStage90RunnerConfig,
+    *,
+    services: HarpStage90RunnerServices | None = None,
+) -> Mapping[str, object]:
     """Inspect the planned or authorized identity without resolving inputs."""
 
-    if not isinstance(config, HarpStage90Config):
+    active = _services_or_v1(services)
+    if not isinstance(config, active.config_type):
         raise ProtocolError("HARP Stage-90 inspection requires a typed config.")
     body = {
         "schema_version": "midogpp_harp_stage90_implementation_inspection_v1",
@@ -95,7 +166,8 @@ def inspect_harp_stage90(config: HarpStage90Config) -> Mapping[str, object]:
             if config.execution_authorized
             else "PLANNED_NEEDS_NEW_EXECUTION_AMENDMENT"
         ),
-        "experiment_id": EXPERIMENT_ID,
+        "experiment_id": active.experiment_id,
+        "execution_revision": active.execution_revision,
         "config_hash": config.config_hash,
         "implemented_components": list(IMPLEMENTED_COMPONENTS),
         "physical_plan": dict(build_physical_plan()),
@@ -108,8 +180,8 @@ def inspect_harp_stage90(config: HarpStage90Config) -> Mapping[str, object]:
         "evaluation_labels_opened": False,
         "old_aggregate_utility_surface_used": False,
         "predecessor_policy_or_authority_used": False,
-        "publication_status": PUBLICATION_STATUS,
-        "terminal_decision": TERMINAL_DECISION,
+        "publication_status": active.publication_status,
+        "terminal_decision": active.terminal_decision,
         "fresh_evidence": False,
         "may_feed_another_experiment": False,
     }
@@ -117,15 +189,22 @@ def inspect_harp_stage90(config: HarpStage90Config) -> Mapping[str, object]:
 
 
 def dry_run_harp_stage90(
-    config: HarpStage90Config, *, artifact_root: str | Path
+    config: HarpStage90RunnerConfig,
+    *,
+    artifact_root: str | Path,
+    services: HarpStage90RunnerServices | None = None,
 ) -> Mapping[str, object]:
     """Mutation-free readiness check; planned configs remain inspectable."""
 
+    active = _services_or_v1(services)
+    if not isinstance(config, active.config_type):
+        raise ProtocolError("HARP Stage-90 dry run requires a typed config.")
     if not config.execution_authorized:
         body = {
             "schema_version": "midogpp_harp_stage90_mutation_free_dry_run_v1",
             "status": "NEEDS_EXECUTION_AMENDMENT",
-            "experiment_id": EXPERIMENT_ID,
+            "experiment_id": active.experiment_id,
+            "execution_revision": active.execution_revision,
             "config_hash": config.config_hash,
             "artifact_root_argument": str(artifact_root),
             "execution_authorized": False,
@@ -134,22 +213,23 @@ def dry_run_harp_stage90(
             "filesystem_mutations": 0,
             "development_labels_opened": False,
             "evaluation_labels_opened": False,
-            "publication_status": PUBLICATION_STATUS,
-            "terminal_decision": TERMINAL_DECISION,
+            "publication_status": active.publication_status,
+            "terminal_decision": active.terminal_decision,
             "fresh_evidence": False,
         }
         return {**body, "dry_run_hash": canonical_hash(body)}
-    authorization = load_authorization(config)
+    authorization = active.load_authorization(config)
     root = _exact_output_root(config, artifact_root)
     _assert_pristine_output(root)
     _validate_parent_ledger(config)
-    cache = load_cache_index(config)
+    cache = active.load_cache_index(config)
     physical_inputs = validate_physical_inputs(config, cache)
     plan = build_physical_plan()
     body = {
         "schema_version": "midogpp_harp_stage90_mutation_free_dry_run_v1",
         "status": "PASS",
-        "experiment_id": EXPERIMENT_ID,
+        "experiment_id": active.experiment_id,
+        "execution_revision": active.execution_revision,
         "config_hash": config.config_hash,
         "artifact_root": str(root),
         "execution_authorized": True,
@@ -163,29 +243,36 @@ def dry_run_harp_stage90(
         "filesystem_mutations": 0,
         "development_labels_opened": False,
         "evaluation_labels_opened": False,
-        "publication_status": PUBLICATION_STATUS,
-        "terminal_decision": TERMINAL_DECISION,
+        "publication_status": active.publication_status,
+        "terminal_decision": active.terminal_decision,
         "fresh_evidence": False,
     }
     return {**body, "dry_run_hash": canonical_hash(body)}
 
 
 def run_harp_stage90(
-    config: HarpStage90Config, *, artifact_root: str | Path
+    config: HarpStage90RunnerConfig,
+    *,
+    artifact_root: str | Path,
+    services: HarpStage90RunnerServices | None = None,
 ) -> str:
     """Execute one authorized, terminal consumed-test HARP sensitivity run."""
 
     # Authority is deliberately checked before output paths or scientific inputs.
-    authorization = load_authorization(config)
+    active = _services_or_v1(services)
+    if not isinstance(config, active.config_type):
+        raise ProtocolError("HARP Stage-90 execution requires a typed config.")
+    authorization = active.load_authorization(config)
     root = _exact_output_root(config, artifact_root)
     _assert_pristine_output(root)
     ledger_hash = _validate_parent_ledger(config)
-    cache = load_cache_index(config)
+    cache = active.load_cache_index(config)
     physical_inputs = validate_physical_inputs(config, cache)
     physical_plan = build_physical_plan()
     admission = {
         "schema_version": "midogpp_harp_stage90_execution_admission_v1",
-        "experiment_id": EXPERIMENT_ID,
+        "experiment_id": active.experiment_id,
+        "execution_revision": active.execution_revision,
         "config_hash": config.config_hash,
         "artifact_root": str(root),
         **_authorization_provenance(authorization),
@@ -200,16 +287,19 @@ def run_harp_stage90(
         "evaluation_labels_opened": False,
     }
     admission_hash = canonical_hash(admission)
-    lease: HarpAuthorizationLease | None = None
+    lease: Any | None = None
     try:
-        lease = claim_authorization(authorization, admission_hash=admission_hash)
-        _announce("BEGIN")
+        lease = active.claim_authorization(
+            authorization, admission_hash=admission_hash
+        )
+        _announce("BEGIN", prefix=active.phase_prefix)
         atomic_json(root / "manifests/admission.json", {**admission, "admission_hash": admission_hash})
         atomic_json(
             root / "manifests/protocol_manifest.json",
             {
                 "schema_version": "midogpp_harp_stage90_protocol_manifest_v1",
-                "experiment_id": EXPERIMENT_ID,
+                "experiment_id": active.experiment_id,
+                "execution_revision": active.execution_revision,
                 "config_hash": config.config_hash,
                 "protocol": dict(config.protocol),
                 "claim_boundary": dict(config.claim_boundary),
@@ -220,14 +310,20 @@ def run_harp_stage90(
             },
         )
 
-        _announce("FRESH_PHYSICAL_SOURCE_STREAMS_AND_PROBABILITY_MENU")
+        _announce(
+            "FRESH_PHYSICAL_SOURCE_STREAMS_AND_PROBABILITY_MENU",
+            prefix=active.phase_prefix,
+        )
         menu = materialize_physical_harp_menu(
             config,
             cache,
             root=root,
             expected_input_receipt_hash=physical_inputs.receipt_hash,
         )
-        _announce("GLOBAL_LABEL_FREE_PROBABILITY_MENU_DURABLY_SEALED")
+        _announce(
+            "GLOBAL_LABEL_FREE_PROBABILITY_MENU_DURABLY_SEALED",
+            prefix=active.phase_prefix,
+        )
         features = build_development_feature_surface(menu)
         feature_payload = _feature_surface_payload(features)
         feature_path = root / "surfaces/development_action_features.json"
@@ -242,13 +338,16 @@ def run_harp_stage90(
         atomic_json(source_seal_path, source_seal.to_payload())
         _fsync_tree(root)
 
-        _announce("DEVELOPMENT_LABEL_CAPABILITY_OPENED_AFTER_SEAL")
+        _announce(
+            "DEVELOPMENT_LABEL_CAPABILITY_OPENED_AFTER_SEAL",
+            prefix=active.phase_prefix,
+        )
         development_capability = HarpSourceLabelCapability(
             centers=CENTERS,
             seal=source_seal,
             seal_path=source_seal_path,
             prediction_artifact_path=feature_path,
-            label_loader=lambda: load_development_labels(config, cache),
+            label_loader=lambda: active.load_development_labels(config, cache),
         )
         opened_development = development_capability.open()
         responses = build_directional_response_surface(features, opened_development)
@@ -261,7 +360,10 @@ def run_harp_stage90(
         atomic_json(root / "surfaces/training_observations.json", observation_payload)
         atomic_json(root / "reports/development_label_access.json", dict(development_capability.access_report()))
 
-        _announce("NESTED_CENTER_LODO_MODEL_BANKS_FIT")
+        _announce(
+            "NESTED_CENTER_LODO_MODEL_BANKS_FIT",
+            prefix=active.phase_prefix,
+        )
         banks = fit_outer_model_banks(
             observations,
             alphas=config.alpha_grid,
@@ -282,24 +384,24 @@ def run_harp_stage90(
         }
         atomic_json(root / "manifests/model_lock.json", model_payload)
 
-        _announce("GLOBAL_TARGET_ACTIONS_AND_ROUTES_SEALED")
+        _announce(
+            "GLOBAL_TARGET_ACTIONS_AND_ROUTES_BUILDING",
+            prefix=active.phase_prefix,
+        )
         target_actions = build_target_actions(menu)
         target_action_payload = _target_action_surface_payload(target_actions, menu.seal_hash)
         atomic_json(root / "surfaces/target_actions.json", target_action_payload)
-        decisions, vectors = select_and_route(
+        (
+            decisions,
+            vectors,
+            physical_decisions,
+            physical_vectors,
+        ) = select_and_route_pair(
             menu,
             banks,
             target_actions,
             policy=config.policy,
             fitted_policy_hash=fitted_policy_hash,
-        )
-        physical_decisions, physical_vectors = select_and_route(
-            menu,
-            banks,
-            target_actions,
-            policy=config.policy,
-            fitted_policy_hash=fitted_policy_hash,
-            physical_lambda_one_only=True,
         )
         routed_vector_payload = _routed_vector_surface_payload(
             vectors, vector_role="predictive_primary"
@@ -321,7 +423,8 @@ def run_harp_stage90(
         prelabel = {
             "schema_version": "midogpp_harp_stage90_prelabel_bundle_v2",
             "status": "DURABLE_ALL_ROUTES_SEALED_BEFORE_EVALUATION_LABELS",
-            "experiment_id": EXPERIMENT_ID,
+            "experiment_id": active.experiment_id,
+            "execution_revision": active.execution_revision,
             "config_hash": config.config_hash,
             "prediction_menu_seal_hash": menu.seal_hash,
             "development_feature_surface_hash": features.surface_hash,
@@ -348,8 +451,8 @@ def run_harp_stage90(
             "physical_ablation_selection_labels_used": False,
             "decisions": decision_payload(decisions),
             "route_reason_summary": route_reason_summary(decisions),
-            "publication_status": PUBLICATION_STATUS,
-            "terminal_decision": TERMINAL_DECISION,
+            "publication_status": active.publication_status,
+            "terminal_decision": active.terminal_decision,
             "fresh_evidence": False,
             "evaluation_labels_opened": False,
             "exact_b_fallback_byte_identity": True,
@@ -387,6 +490,10 @@ def run_harp_stage90(
                 validator_id="fresh_route_reconstruction_B",
             ),
         )
+        _announce(
+            "GLOBAL_TARGET_ACTIONS_AND_ROUTES_DURABLY_SEALED",
+            prefix=active.phase_prefix,
+        )
         frozen = freeze_harp_predictions(
             decisions,
             prediction_surface_hash=menu.prediction_store_hash,
@@ -402,8 +509,11 @@ def run_harp_stage90(
         if read_json(frozen_path) != frozen_payload:
             raise ProtocolError("HARP Stage-90 frozen prediction seal did not round-trip.")
 
-        _announce("ONE_SHOT_EVALUATION_LABEL_CAPABILITY_OPENED")
-        evaluation_truth = load_evaluation_truth(config, cache)
+        _announce(
+            "ONE_SHOT_EVALUATION_LABEL_CAPABILITY_OPENED",
+            prefix=active.phase_prefix,
+        )
+        evaluation_truth = active.load_evaluation_truth(config, cache)
         evaluation_capability = issue_harp_replay_capability(
             frozen,
             target_truth=evaluation_truth,
@@ -459,8 +569,8 @@ def run_harp_stage90(
                 physical_reference_payload["surface_hash"]
             ),
             "exact_b_fallback_byte_identity": reasons["exact_b_fallback_byte_identity"],
-            "publication_status": PUBLICATION_STATUS,
-            "terminal_decision": TERMINAL_DECISION,
+            "publication_status": active.publication_status,
+            "terminal_decision": active.terminal_decision,
             "fresh_evidence": False,
             "authorization_identity": _authorization_provenance(authorization),
         }
@@ -468,7 +578,9 @@ def run_harp_stage90(
         # The global lease is finalized and durably mirrored before the output
         # COMPLETE marker.  A failure in any preceding step therefore cannot
         # leave a scientifically complete-looking artifact.
-        lease = finalize_authorization(lease, status="COMPLETE_EXHAUSTED")
+        lease = active.finalize_authorization(
+            lease, status="COMPLETE_EXHAUSTED"
+        )
         authorization_finalization = read_json(lease.root / "lease.json")
         if authorization_finalization.get("status") != "COMPLETE_EXHAUSTED":
             raise ProtocolError("HARP Stage-90 authorization did not finalize.")
@@ -476,7 +588,11 @@ def run_harp_stage90(
             root / "manifests/authorization_finalization.json",
             authorization_finalization,
         )
-        _write_content_index(root)
+        _write_content_index(
+            root,
+            publication_status=active.publication_status,
+            terminal_decision=active.terminal_decision,
+        )
         _fsync_tree(root)
         content_index_path = root / "manifests/content_index.json"
         atomic_json(
@@ -516,14 +632,14 @@ def run_harp_stage90(
                         "status": "FAILED_EXHAUSTED",
                         "error_class": exc.__class__.__name__,
                         "error": str(exc)[:2000],
-                        "publication_status": PUBLICATION_STATUS,
-                        "terminal_decision": TERMINAL_DECISION,
+                        "publication_status": active.publication_status,
+                        "terminal_decision": active.terminal_decision,
                         "authorization_identity": _authorization_provenance(
                             authorization
                         ),
                     },
                 )
-                lease = finalize_authorization(
+                lease = active.finalize_authorization(
                     lease, status="FAILED_EXHAUSTED", error=str(exc)
                 )
             except BaseException:
@@ -531,12 +647,21 @@ def run_harp_stage90(
         raise
 
 
-def _authorization_provenance(
-    authorization: HarpAuthorization,
-) -> dict[str, object]:
+def _authorization_provenance(authorization: object) -> dict[str, object]:
     """Return the exact amendment, science, and source identity for artifacts."""
 
-    if not isinstance(authorization, HarpAuthorization):
+    required = (
+        "amendment_sha256",
+        "amendment_hash",
+        "input_binding_hash",
+        "scientific_contract_hash",
+        "workspace_registration_execution_contract_hash",
+        "source_snapshot_schema",
+        "source_snapshot_manifest_sha256",
+        "source_snapshot_tree_sha256",
+        "source_snapshot_member_count",
+    )
+    if any(not hasattr(authorization, role) for role in required):
         raise ProtocolError("HARP Stage-90 authorization provenance is untyped.")
     return {
         "execution_amendment_sha256": authorization.amendment_sha256,
@@ -555,7 +680,7 @@ def _authorization_provenance(
     }
 
 
-def _exact_output_root(config: HarpStage90Config, value: str | Path) -> Path:
+def _exact_output_root(config: HarpStage90RunnerConfig, value: str | Path) -> Path:
     text = str(value)
     if "://" in text:
         raise ProtocolError("HARP Stage-90 runner requires a resolved output path.")
@@ -577,7 +702,7 @@ def _assert_pristine_output(root: Path) -> None:
             raise ProtocolError("HARP Stage-90 output contains prior scientific state.")
 
 
-def _validate_parent_ledger(config: HarpStage90Config) -> str:
+def _validate_parent_ledger(config: HarpStage90RunnerConfig) -> str:
     expected = config.expected_hashes["parent_ledger_sha256"]
     if expected is None:
         raise ProtocolError("HARP Stage-90 parent-ledger hash is absent.")
@@ -773,7 +898,12 @@ def _validate_route_reconstruction(
         raise ProtocolError(
             "HARP Stage-90 physical reference artifact binding drifted."
         )
-    decisions, vectors = select_and_route(
+    (
+        decisions,
+        vectors,
+        physical_decisions,
+        physical_vectors,
+    ) = select_and_route_pair(
         menu,
         banks,
         target_actions,
@@ -782,14 +912,6 @@ def _validate_route_reconstruction(
     )
     reconstructed = _routed_vector_surface_payload(
         vectors, vector_role="predictive_primary"
-    )
-    physical_decisions, physical_vectors = select_and_route(
-        menu,
-        banks,
-        target_actions,
-        policy=policy,
-        fitted_policy_hash=fitted_policy_hash,
-        physical_lambda_one_only=True,
     )
     reconstructed_physical = _routed_vector_surface_payload(
         physical_vectors, vector_role="physical_lambda_one_ablation"
@@ -851,7 +973,12 @@ def _frozen_seal_payload(frozen: object, validations: Sequence[str]) -> dict[str
     return {**payload, "persistence_hash": canonical_hash(payload)}
 
 
-def _write_content_index(root: Path) -> None:
+def _write_content_index(
+    root: Path,
+    *,
+    publication_status: str = PUBLICATION_STATUS,
+    terminal_decision: str = TERMINAL_DECISION,
+) -> None:
     members = []
     for path in sorted(root.rglob("*")):
         if path.is_file() and path.relative_to(root).as_posix() not in {
@@ -867,8 +994,8 @@ def _write_content_index(root: Path) -> None:
     payload = {
         "schema_version": "midogpp_harp_stage90_content_index_v1",
         "members": members,
-        "publication_status": PUBLICATION_STATUS,
-        "terminal_decision": TERMINAL_DECISION,
+        "publication_status": publication_status,
+        "terminal_decision": terminal_decision,
         "may_feed_another_experiment": False,
         "run_state_excluded_as_final_commit": True,
     }
@@ -897,11 +1024,14 @@ def _fsync_tree(root: Path) -> None:
             os.close(descriptor)
 
 
-def _announce(phase: str) -> None:
-    print(f"[harp-stage90-v1] phase={phase}", file=sys.stderr, flush=True)
+def _announce(phase: str, *, prefix: str = "harp-stage90-v1") -> None:
+    print(f"[{prefix}] phase={phase}", file=sys.stderr, flush=True)
 
 
 __all__ = (
+    "HarpStage90RunnerConfig",
+    "HarpStage90RunnerServices",
+    "V1_RUNNER_SERVICES",
     "dry_run_harp_stage90",
     "inspect_harp_stage90",
     "run_harp_stage90",

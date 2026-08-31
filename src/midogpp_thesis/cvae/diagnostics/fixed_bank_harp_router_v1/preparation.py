@@ -39,6 +39,8 @@ from .input_surfaces import (
     DEVELOPMENT_ROLE,
     EVALUATION_ROLE,
     HarpCacheRow,
+    HarpConsumedCacheIdentity,
+    V1_CACHE_IDENTITY,
     _read_label_manifest,
     load_cache_index,
 )
@@ -97,6 +99,51 @@ _METADATA_FIELDS = {
     "split",
 }
 _LEGACY_LABEL = re.compile(r"(?:^|_)y[01](?=$|[^0-9])", re.IGNORECASE)
+
+
+@dataclass(frozen=True, slots=True)
+class HarpPreparationIdentity:
+    """Closed execution-revision identity for deterministic cache preparation."""
+
+    experiment_id: str
+    publication_status: str
+    terminal_decision: str
+    prepared_inputs_schema: str
+    partition_schema: str
+    preparation_receipt_schema: str
+    label_free_barrier_schema: str
+    cache_identity: HarpConsumedCacheIdentity
+    preparation_receipt: Path = PREPARATION_RECEIPT
+    label_free_barrier: Path = LABEL_FREE_BARRIER
+    label_free_content_index: Path = LABEL_FREE_CONTENT_INDEX
+    case_partition: Path = CASE_PARTITION
+
+
+V1_PREPARATION_IDENTITY = HarpPreparationIdentity(
+    experiment_id=EXPERIMENT_ID,
+    publication_status=PUBLICATION_STATUS,
+    terminal_decision=TERMINAL_DECISION,
+    prepared_inputs_schema="midogpp_harp_consumed_test_prepared_inputs_v1",
+    partition_schema="midogpp_harp_consumed_test_case_partition_v1",
+    preparation_receipt_schema="midogpp_harp_consumed_test_preparation_receipt_v1",
+    label_free_barrier_schema="midogpp_harp_consumed_test_label_free_barrier_v1",
+    cache_identity=V1_CACHE_IDENTITY,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class HarpPreparedInputData:
+    """Identity-neutral prepared-input receipt fields shared by v1 and v2."""
+
+    cache_root: Path
+    development_manifest_path: Path
+    evaluation_manifest_path: Path
+    cache_content_sha256: str
+    development_manifest_sha256: str
+    evaluation_manifest_sha256: str
+    parent_ledger_sha256: str
+    partition_hash: str
+    preparation_receipt_hash: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,7 +239,29 @@ def deterministic_case_partition(
     return output
 
 
-def prepare_harp_consumed_test_inputs(
+def build_case_partition_payload(
+    rows_by_center: Mapping[str, Sequence[CanonicalFrameRow]],
+    *,
+    identity: HarpPreparationIdentity = V1_PREPARATION_IDENTITY,
+) -> tuple[Mapping[tuple[str, str], str], dict[str, object], str]:
+    """Build the byte-stable label-free partition contract for one revision."""
+
+    partition = deterministic_case_partition(rows_by_center)
+    payload: dict[str, object] = {
+        "schema_version": identity.partition_schema,
+        "namespace": PARTITION_NAMESPACE,
+        "assignments": [
+            {"center": center, "case_id": case, "split_role": role}
+            for (center, case), role in sorted(partition.items())
+        ],
+        "whole_case_disjoint": True,
+        "label_values_available": False,
+        "canonical_scoring_manifest_opened": False,
+    }
+    return partition, payload, canonical_hash(payload)
+
+
+def prepare_harp_consumed_test_inputs_with_identity(
     *,
     canonical_cache_root: str | Path,
     canonical_manifest_path: str | Path,
@@ -200,9 +269,10 @@ def prepare_harp_consumed_test_inputs(
     cache_root: str | Path,
     development_manifest_path: str | Path,
     evaluation_manifest_path: str | Path,
+    identity: HarpPreparationIdentity,
     expected_manifest_sha256: str = CANONICAL_MANIFEST_SHA256,
     expected_parent_ledger_sha256: str = CANONICAL_PARENT_LEDGER_SHA256,
-) -> HarpPreparedInputs:
+) -> HarpPreparedInputData:
     """Materialize the terminal HARP cache and role-pure label capabilities."""
 
     destination = Path(cache_root).resolve()
@@ -220,30 +290,23 @@ def prepare_harp_consumed_test_inputs(
 
     # No scoring manifest path is passed into this loader.
     frame = load_canonical_label_blind_cache(Path(canonical_cache_root))
-    partition = deterministic_case_partition(frame.rows_by_center)
-    partition_payload = {
-        "schema_version": "midogpp_harp_consumed_test_case_partition_v1",
-        "namespace": PARTITION_NAMESPACE,
-        "assignments": [
-            {"center": center, "case_id": case, "split_role": role}
-            for (center, case), role in sorted(partition.items())
-        ],
-        "whole_case_disjoint": True,
-        "label_values_available": False,
-        "canonical_scoring_manifest_opened": False,
-    }
-    partition_hash = canonical_hash(partition_payload)
+    partition, partition_payload, partition_hash = build_case_partition_payload(
+        frame.rows_by_center,
+        identity=identity,
+    )
     prepared_rows = _persist_label_blind_cache(
         destination,
         frame=frame,
         partition=partition,
         partition_payload=partition_payload,
         partition_hash=partition_hash,
+        identity=identity,
     )
     _fsync_tree(destination)
     cache = _independently_validate_label_blind_barrier(
         destination,
         expected_partition_hash=partition_hash,
+        identity=identity,
     )
 
     # This is the first operation allowed to open the canonical scoring
@@ -255,6 +318,7 @@ def prepare_harp_consumed_test_inputs(
         frame=frame,
         development_path=development_path,
         evaluation_path=evaluation_path,
+        identity=identity,
     )
     _fsync_file(development_path)
     _fsync_file(evaluation_path)
@@ -271,17 +335,19 @@ def prepare_harp_consumed_test_inputs(
         cache=cache,
     )
     receipt_base: dict[str, object] = {
-        "schema_version": "midogpp_harp_consumed_test_preparation_receipt_v1",
-        "experiment_id": EXPERIMENT_ID,
+        "schema_version": identity.preparation_receipt_schema,
+        "experiment_id": identity.experiment_id,
         "status": "PREPARED_INPUTS_NO_EXECUTION_AUTHORITY",
         "canonical_cache_content_hash": frame.cache_content_hash,
         "canonical_cache_row_order_hash": frame.row_order_hash,
         "canonical_manifest_sha256": expected_manifest_sha256,
         "parent_ledger_sha256": expected_parent_ledger_sha256,
         "partition_hash": partition_hash,
-        "label_free_barrier_sha256": sha256_file(destination / LABEL_FREE_BARRIER),
+        "label_free_barrier_sha256": sha256_file(
+            destination / identity.label_free_barrier
+        ),
         "label_free_content_index_sha256": sha256_file(
-            destination / LABEL_FREE_CONTENT_INDEX
+            destination / identity.label_free_content_index
         ),
         "pre_manifest_cache_content_sha256": cache.content_sha256,
         "prepared_cache_index_hash": cache.cache_hash,
@@ -294,19 +360,19 @@ def prepare_harp_consumed_test_inputs(
         "cache_fsynced_and_independently_validated_before_manifest_open": True,
         "execution_amendment_created": False,
         "execution_authorized": False,
-        "publication_status": PUBLICATION_STATUS,
-        "terminal_decision": TERMINAL_DECISION,
+        "publication_status": identity.publication_status,
+        "terminal_decision": identity.terminal_decision,
         "fresh_evidence": False,
         "may_feed_stage60_or_stage70": False,
         "may_feed_another_experiment": False,
     }
     receipt = {**receipt_base, "receipt_hash": canonical_hash(receipt_base)}
-    atomic_json(destination / PREPARATION_RECEIPT, receipt)
-    _fsync_file(destination / PREPARATION_RECEIPT)
-    _write_final_content_index(destination)
+    atomic_json(destination / identity.preparation_receipt, receipt)
+    _fsync_file(destination / identity.preparation_receipt)
+    _write_final_content_index(destination, identity=identity)
     _fsync_tree(destination)
-    cache = _validate_final_prepared_cache(destination)
-    return HarpPreparedInputs(
+    cache = _validate_final_prepared_cache(destination, identity=identity)
+    return HarpPreparedInputData(
         cache_root=destination,
         development_manifest_path=development_path,
         evaluation_manifest_path=evaluation_path,
@@ -316,6 +382,43 @@ def prepare_harp_consumed_test_inputs(
         parent_ledger_sha256=expected_parent_ledger_sha256,
         partition_hash=partition_hash,
         preparation_receipt_hash=str(receipt["receipt_hash"]),
+    )
+
+
+def prepare_harp_consumed_test_inputs(
+    *,
+    canonical_cache_root: str | Path,
+    canonical_manifest_path: str | Path,
+    parent_ledger_path: str | Path,
+    cache_root: str | Path,
+    development_manifest_path: str | Path,
+    evaluation_manifest_path: str | Path,
+    expected_manifest_sha256: str = CANONICAL_MANIFEST_SHA256,
+    expected_parent_ledger_sha256: str = CANONICAL_PARENT_LEDGER_SHA256,
+) -> HarpPreparedInputs:
+    """Materialize the v1 terminal HARP cache and label capabilities."""
+
+    prepared = prepare_harp_consumed_test_inputs_with_identity(
+        canonical_cache_root=canonical_cache_root,
+        canonical_manifest_path=canonical_manifest_path,
+        parent_ledger_path=parent_ledger_path,
+        cache_root=cache_root,
+        development_manifest_path=development_manifest_path,
+        evaluation_manifest_path=evaluation_manifest_path,
+        identity=V1_PREPARATION_IDENTITY,
+        expected_manifest_sha256=expected_manifest_sha256,
+        expected_parent_ledger_sha256=expected_parent_ledger_sha256,
+    )
+    return HarpPreparedInputs(
+        cache_root=prepared.cache_root,
+        development_manifest_path=prepared.development_manifest_path,
+        evaluation_manifest_path=prepared.evaluation_manifest_path,
+        cache_content_sha256=prepared.cache_content_sha256,
+        development_manifest_sha256=prepared.development_manifest_sha256,
+        evaluation_manifest_sha256=prepared.evaluation_manifest_sha256,
+        parent_ledger_sha256=prepared.parent_ledger_sha256,
+        partition_hash=prepared.partition_hash,
+        preparation_receipt_hash=prepared.preparation_receipt_hash,
     )
 
 
@@ -463,6 +566,7 @@ def _persist_label_blind_cache(
     partition: Mapping[tuple[str, str], str],
     partition_payload: Mapping[str, object],
     partition_hash: str,
+    identity: HarpPreparationIdentity,
 ) -> tuple[HarpCacheRow, ...]:
     root.mkdir(parents=True, exist_ok=False)
     shard_rows: list[dict[str, object]] = []
@@ -506,11 +610,15 @@ def _persist_label_blind_cache(
                 )
     if canonical_hash(partition_payload) != partition_hash:
         raise ProtocolError("HARP preparation partition payload drifted before write.")
-    atomic_json(root / CASE_PARTITION, partition_payload)
-    _write_cache_rows(root / CACHE_ROWS, prepared)
+    atomic_json(root / identity.case_partition, partition_payload)
+    _write_cache_rows(
+        root / CACHE_ROWS,
+        prepared,
+        row_schema=identity.cache_identity.row_schema,
+    )
     index_base: dict[str, object] = {
-        "schema_version": "midogpp_harp_consumed_test_label_blind_frame_cache_v1",
-        "artifact_id": "midogpp_stage90_harp_consumed_test_cache_v1",
+        "schema_version": identity.cache_identity.cache_schema,
+        "artifact_id": identity.cache_identity.artifact_id,
         "dataset_family": "MIDOG++",
         "representation_id": "midogpp_virchow2_common_3840_float32_v1",
         "feature_dim": COMMON_OUTPUT_DIM,
@@ -524,18 +632,20 @@ def _persist_label_blind_cache(
     member_hashes = {
         CACHE_INDEX.as_posix(): sha256_file(root / CACHE_INDEX),
         CACHE_ROWS.as_posix(): sha256_file(root / CACHE_ROWS),
-        CASE_PARTITION.as_posix(): sha256_file(root / CASE_PARTITION),
+        identity.case_partition.as_posix(): sha256_file(
+            root / identity.case_partition
+        ),
         **shard_hashes,
     }
     barrier_base: dict[str, object] = {
-        "schema_version": "midogpp_harp_consumed_test_label_free_barrier_v1",
+        "schema_version": identity.label_free_barrier_schema,
         "status": "DURABLE_LABEL_FREE_CACHE_BEFORE_SCORING_MANIFEST_OPEN",
         "canonical_cache_content_hash": frame.cache_content_hash,
         "canonical_cache_row_order_hash": frame.row_order_hash,
         "partition_hash": partition_hash,
         "cache_index_sha256": sha256_file(root / CACHE_INDEX),
         "row_index_sha256": sha256_file(root / CACHE_ROWS),
-        "case_partition_sha256": sha256_file(root / CASE_PARTITION),
+        "case_partition_sha256": sha256_file(root / identity.case_partition),
         "embedding_shard_sha256": dict(sorted(shard_hashes.items())),
         "row_count": len(prepared),
         "case_count": len(partition),
@@ -544,26 +654,39 @@ def _persist_label_blind_cache(
         "canonical_scoring_manifest_opened": False,
         "mixed_patch_labels_within_case_supported": True,
     }
-    atomic_json(root / LABEL_FREE_BARRIER, {**barrier_base, "barrier_hash": canonical_hash(barrier_base)})
+    atomic_json(
+        root / identity.label_free_barrier,
+        {**barrier_base, "barrier_hash": canonical_hash(barrier_base)},
+    )
     label_free_members = {
         **member_hashes,
-        LABEL_FREE_BARRIER.as_posix(): sha256_file(root / LABEL_FREE_BARRIER),
+        identity.label_free_barrier.as_posix(): sha256_file(
+            root / identity.label_free_barrier
+        ),
     }
-    _write_content_index(root / LABEL_FREE_CONTENT_INDEX, label_free_members)
+    _write_content_index(
+        root / identity.label_free_content_index,
+        label_free_members,
+        content_schema=identity.cache_identity.content_schema,
+    )
     _write_content_index(
         root / CONTENT_INDEX,
         {
             **label_free_members,
-            LABEL_FREE_CONTENT_INDEX.as_posix(): sha256_file(
-                root / LABEL_FREE_CONTENT_INDEX
+            identity.label_free_content_index.as_posix(): sha256_file(
+                root / identity.label_free_content_index
             ),
         },
+        content_schema=identity.cache_identity.content_schema,
     )
     return tuple(prepared)
 
 
 def _independently_validate_label_blind_barrier(
-    root: Path, *, expected_partition_hash: str
+    root: Path,
+    *,
+    expected_partition_hash: str,
+    identity: HarpPreparationIdentity = V1_PREPARATION_IDENTITY,
 ):
     content = read_json(root / CONTENT_INDEX)
     expected_content_hash = str(content.get("content_index_hash"))
@@ -571,10 +694,13 @@ def _independently_validate_label_blind_barrier(
         resolved_path=lambda role: root if role == "test_cache_root" else None,
         expected_hashes={"test_cache_content_sha256": expected_content_hash},
     )
-    cache = load_cache_index(config)  # type: ignore[arg-type]
-    barrier = read_json(root / LABEL_FREE_BARRIER)
-    partition = read_json(root / CASE_PARTITION)
-    label_free_content = read_json(root / LABEL_FREE_CONTENT_INDEX)
+    cache = load_cache_index(  # type: ignore[arg-type]
+        config,
+        cache_identity=identity.cache_identity,
+    )
+    barrier = read_json(root / identity.label_free_barrier)
+    partition = read_json(root / identity.case_partition)
+    label_free_content = read_json(root / identity.label_free_content_index)
     barrier_base = {key: value for key, value in barrier.items() if key != "barrier_hash"}
     label_free_base = {
         key: value
@@ -585,12 +711,14 @@ def _independently_validate_label_blind_barrier(
     expected_members = {
         CACHE_INDEX.as_posix(),
         CACHE_ROWS.as_posix(),
-        CASE_PARTITION.as_posix(),
-        LABEL_FREE_BARRIER.as_posix(),
-        LABEL_FREE_CONTENT_INDEX.as_posix(),
+        identity.case_partition.as_posix(),
+        identity.label_free_barrier.as_posix(),
+        identity.label_free_content_index.as_posix(),
         *(f"embeddings/by_center/center_{center}.npy" for center in CENTERS),
     }
-    label_free_expected = expected_members - {LABEL_FREE_CONTENT_INDEX.as_posix()}
+    label_free_expected = expected_members - {
+        identity.label_free_content_index.as_posix()
+    }
     assignments = partition.get("assignments")
     partition_roles = {
         (str(row.get("center")), str(row.get("case_id"))): str(
@@ -624,6 +752,7 @@ def _publish_role_pure_manifests(
     frame: CanonicalLabelBlindFrame,
     development_path: Path,
     evaluation_path: Path,
+    identity: HarpPreparationIdentity,
 ) -> tuple[str, str]:
     if (
         not canonical_manifest.is_file()
@@ -647,7 +776,7 @@ def _publish_role_pure_manifests(
     }
     if len(source_by_sample) != len(cache.rows):
         raise ProtocolError("HARP canonical label-blind identity coverage drifted.")
-    barrier = read_json(cache.root / LABEL_FREE_BARRIER)
+    barrier = read_json(cache.root / identity.label_free_barrier)
     if barrier.get("canonical_scoring_manifest_opened") is not False:
         raise ProtocolError("HARP scoring manifest opened before the label-free barrier.")
 
@@ -711,7 +840,12 @@ def _assert_fresh_destinations(
             raise ProtocolError("HARP role manifest destination already exists.")
 
 
-def _write_cache_rows(path: Path, rows: Sequence[HarpCacheRow]) -> None:
+def _write_cache_rows(
+    path: Path,
+    rows: Sequence[HarpCacheRow],
+    *,
+    row_schema: str = V1_CACHE_IDENTITY.row_schema,
+) -> None:
     buffer = io.StringIO(newline="")
     writer = csv.writer(buffer, lineterminator="\n")
     writer.writerow(
@@ -723,7 +857,7 @@ def _write_cache_rows(path: Path, rows: Sequence[HarpCacheRow]) -> None:
     for row in rows:
         writer.writerow(
             (
-                "midogpp_harp_consumed_test_frame_row_v1", row.sample_id,
+                row_schema, row.sample_id,
                 row.center, row.case_id, row.split_role, row.split_row_index,
                 row.embedding_file, row.embedding_row_index,
             )
@@ -731,24 +865,41 @@ def _write_cache_rows(path: Path, rows: Sequence[HarpCacheRow]) -> None:
     _atomic_text(path, buffer.getvalue())
 
 
-def _write_content_index(path: Path, members: Mapping[str, str]) -> None:
+def _write_content_index(
+    path: Path,
+    members: Mapping[str, str],
+    *,
+    content_schema: str = V1_CACHE_IDENTITY.content_schema,
+) -> None:
     base: dict[str, object] = {
-        "schema_version": "midogpp_harp_consumed_test_content_index_v1",
+        "schema_version": content_schema,
         "members": dict(sorted(members.items())),
     }
     atomic_json(path, {**base, "content_index_hash": canonical_hash(base)})
 
 
-def _write_final_content_index(root: Path) -> None:
+def _write_final_content_index(
+    root: Path,
+    *,
+    identity: HarpPreparationIdentity = V1_PREPARATION_IDENTITY,
+) -> None:
     members = {
         path.relative_to(root).as_posix(): sha256_file(path)
         for path in root.rglob("*")
         if path.is_file() and path.relative_to(root) != CONTENT_INDEX
     }
-    _write_content_index(root / CONTENT_INDEX, members)
+    _write_content_index(
+        root / CONTENT_INDEX,
+        members,
+        content_schema=identity.cache_identity.content_schema,
+    )
 
 
-def _validate_final_prepared_cache(root: Path):
+def _validate_final_prepared_cache(
+    root: Path,
+    *,
+    identity: HarpPreparationIdentity = V1_PREPARATION_IDENTITY,
+):
     content = read_json(root / CONTENT_INDEX)
     config = SimpleNamespace(
         resolved_path=lambda role: root if role == "test_cache_root" else None,
@@ -756,8 +907,11 @@ def _validate_final_prepared_cache(root: Path):
             "test_cache_content_sha256": str(content.get("content_index_hash"))
         },
     )
-    cache = load_cache_index(config)  # type: ignore[arg-type]
-    if PREPARATION_RECEIPT.as_posix() not in cache.member_sha256:
+    cache = load_cache_index(  # type: ignore[arg-type]
+        config,
+        cache_identity=identity.cache_identity,
+    )
+    if identity.preparation_receipt.as_posix() not in cache.member_sha256:
         raise ProtocolError("HARP final prepared cache lacks its preparation receipt.")
     return cache
 
@@ -833,8 +987,13 @@ def _fsync_tree(root: Path) -> None:
 __all__ = (
     "CanonicalFrameRow",
     "CanonicalLabelBlindFrame",
+    "HarpPreparationIdentity",
+    "HarpPreparedInputData",
     "HarpPreparedInputs",
+    "V1_PREPARATION_IDENTITY",
+    "build_case_partition_payload",
     "deterministic_case_partition",
     "load_canonical_label_blind_cache",
     "prepare_harp_consumed_test_inputs",
+    "prepare_harp_consumed_test_inputs_with_identity",
 )

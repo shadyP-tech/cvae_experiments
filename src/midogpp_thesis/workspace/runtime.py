@@ -30,6 +30,8 @@ from .recovery import (
 from .preparation_authority import (
     AuthorityMember,
     HARP_V1_EXECUTION_AMENDMENT_GATE,
+    HARP_V2_EXECUTION_AMENDMENT_GATE,
+    HARP_V3_EXECUTION_AMENDMENT_GATE,
     PreparationAuthorityError,
     PreparationAuthorityReceipt,
     enforce_preparation_authority,
@@ -46,6 +48,13 @@ RUNNABLE_STATUSES = {"active", "diagnostic"}
 BLOCKED_EVIDENCE_LABELS = {"REJECTED"}
 ALLOWED_FILE_HASH_ALGORITHMS = {"sha256", "sha512", "blake2b"}
 REPOSITORY_MARKER = Path("experiments/midogpp/registry.yaml")
+HARP_EXECUTION_AMENDMENT_GATES = frozenset(
+    {
+        HARP_V1_EXECUTION_AMENDMENT_GATE,
+        HARP_V2_EXECUTION_AMENDMENT_GATE,
+        HARP_V3_EXECUTION_AMENDMENT_GATE,
+    }
+)
 
 
 class WorkspaceError(ValueError):
@@ -445,7 +454,7 @@ class MidogppWorkspace:
             if (
                 experiment.runnable
                 and experiment.preparation_authority_gate
-                == HARP_V1_EXECUTION_AMENDMENT_GATE
+                in HARP_EXECUTION_AMENDMENT_GATES
                 and output is not None
             ):
                 try:
@@ -635,7 +644,10 @@ class MidogppWorkspace:
     ) -> Mapping[str, object] | None:
         """Project the frozen entry and catalog target that will execute."""
 
-        if experiment.preparation_authority_gate != HARP_V1_EXECUTION_AMENDMENT_GATE:
+        if (
+            experiment.preparation_authority_gate
+            not in HARP_EXECUTION_AMENDMENT_GATES
+        ):
             return None
         output = self.artifacts.get(experiment.output_artifact_id)
         if output is None:
@@ -839,7 +851,7 @@ class MidogppWorkspace:
             raise WorkspaceError(
                 f"{experiment.experiment_id}: pre-render preparation authority bytes changed"
             )
-        if gate_id == HARP_V1_EXECUTION_AMENDMENT_GATE:
+        if gate_id in HARP_EXECUTION_AMENDMENT_GATES:
             try:
                 expected_registration_hash = (
                     expected_workspace_registration_contract_hash(gate_id)
