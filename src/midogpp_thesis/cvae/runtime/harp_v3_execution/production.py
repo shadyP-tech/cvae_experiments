@@ -56,6 +56,7 @@ from .physical import (
     materialize_physical_outer_menus,
     validate_physical_inputs,
 )
+from .workstation import inspect_harp_v3_workstation
 
 
 FEATURE_NAMES = (
@@ -175,16 +176,28 @@ def _fit_worker(
         tuple[float, ...],
         float,
         float,
+        int,
     ]
 ) -> object:
-    outer, rows, alphas, residual, geometry = payload
-    return fit_harp_v3(
-        rows,
-        outer_target_id=outer,
-        alpha_grid=alphas,
-        residual_quantile=residual,
-        geometry_quantile=geometry,
-    )
+    outer, rows, alphas, residual, geometry, threads = payload
+    if type(threads) is not int or threads <= 0:
+        raise ProtocolError("HARP v3 fit-worker BLAS limit is malformed.")
+    try:
+        from threadpoolctl import threadpool_limits
+    except ModuleNotFoundError as exc:  # pragma: no cover - workstation dependency
+        raise RuntimeError("HARP v3 fit workers require threadpoolctl.") from exc
+    # The process topology is part of the sealed workstation contract.  Set
+    # the native-library limit around the complete nested LODO fit so four
+    # spawned workers cannot silently oversubscribe the twelve assigned CPU
+    # threads through OpenBLAS/MKL defaults inherited from the login shell.
+    with threadpool_limits(limits=threads):
+        return fit_harp_v3(
+            rows,
+            outer_target_id=outer,
+            alpha_grid=alphas,
+            residual_quantile=residual,
+            geometry_quantile=geometry,
+        )
 
 
 class HarpV3ProductionPipeline:
@@ -199,23 +212,12 @@ class HarpV3ProductionPipeline:
         receipt = validate_physical_inputs(config, cache)
         plan = build_physical_plan()
         _model_parameters(config)
+        live = dict(inspect_harp_v3_workstation(getattr(config, "runtime")))
         return {
-            "schema_version": "midogpp_harp_v3_workstation_preflight_v1",
-            "status": "PASS",
+            **live,
+            "schema_version": "midogpp_harp_v3_workstation_preflight_v2",
             "physical_input_receipt": receipt.public_payload(),
             "physical_plan": plan,
-            "persistent_gpu_workers": 2,
-            "gpu_devices": ["cuda:0", "cuda:1"],
-            "cpu_fit_workers": 4,
-            "blas_threads_per_worker": 3,
-            "probability_transport_dtype": "float32",
-            "scientific_reduction_dtype": "float64",
-            "physical_expert_weight": 1.0,
-            "tf32_enabled": False,
-            "amp_enabled": False,
-            "parent_cuda_context_created": False,
-            "shared_validated_menu_index": True,
-            "labels_consumed": False,
         }
 
     def materialize_label_free_outer_menus(
@@ -397,6 +399,7 @@ class HarpV3ProductionPipeline:
                 alphas,
                 residual,
                 geometry,
+                int(getattr(config, "runtime")["blas_threads_per_worker"]),
             )
             for outer in centers
         )

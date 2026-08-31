@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import ast
+from dataclasses import replace
 from pathlib import Path
 import shutil
 
+import numpy as np
 import pytest
 
 from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v3 import authorization
@@ -21,9 +23,11 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v3.identity import (
     TERMINAL_DECISION,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v3.input_surfaces import (
+    HarpConsumedCacheIndex,
     HarpCacheRow,
     V3_CACHE_IDENTITY,
 )
+from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v3 import input_surfaces
 from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v3.preparation import (
     CanonicalFrameRow,
     DEVELOPMENT_ROLE,
@@ -95,6 +99,12 @@ def test_revision_owned_identities_are_unique() -> None:
     assert "harp_router_v3" in authorization.WORKSPACE_AMENDMENT_RELATIVE_PATH
 
 
+def test_clean_checkout_contains_only_the_inert_v3_contract_parent() -> None:
+    amendment = REPOSITORY / authorization.WORKSPACE_AMENDMENT_RELATIVE_PATH
+    assert amendment.parent.is_dir()
+    assert not amendment.exists()
+
+
 def test_package_has_no_predecessor_diagnostic_imports() -> None:
     predecessor_prefix = "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v"
     for path in PACKAGE.glob("*.py"):
@@ -156,6 +166,65 @@ def test_label_blind_cache_row_has_no_label_capability() -> None:
     )
 
 
+def test_cache_batch_reader_opens_each_shard_once_and_preserves_row_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    shard_root = tmp_path / "cache" / "shards"
+    shard_root.mkdir(parents=True)
+    width = 3840
+    first = np.stack(
+        (
+            np.full(width, 1.0, dtype=np.float32),
+            np.full(width, 2.0, dtype=np.float32),
+        )
+    )
+    second = np.stack(
+        (
+            np.full(width, 3.0, dtype=np.float32),
+            np.full(width, 4.0, dtype=np.float32),
+        )
+    )
+    np.save(shard_root / "a.npy", first, allow_pickle=False)
+    np.save(shard_root / "b.npy", second, allow_pickle=False)
+    rows = tuple(
+        HarpCacheRow(
+            center="0",
+            case_id=f"case-{index}",
+            sample_id=f"sample-{index}",
+            split_role="harp_consumed_test_development",
+            split_row_index=index,
+            embedding_file=relative,
+            embedding_row_index=row_index,
+        )
+        for index, (relative, row_index) in enumerate(
+            (("shards/a.npy", 0), ("shards/b.npy", 1), ("shards/a.npy", 1))
+        )
+    )
+    cache = HarpConsumedCacheIndex(
+        root=tmp_path / "cache",
+        rows=rows,
+        shards={"shards/a.npy": first.shape, "shards/b.npy": second.shape},
+        member_sha256={},
+        content_sha256="0" * 64,
+        cache_hash="1" * 64,
+    )
+    original_load = np.load
+    opened: list[str] = []
+
+    def counted_load(path: object, *args: object, **kwargs: object):
+        opened.append(Path(path).name)
+        return original_load(path, *args, **kwargs)
+
+    monkeypatch.setattr(input_surfaces.np, "load", counted_load)
+    observed = cache.load_embeddings((rows[2], rows[0], rows[1]))
+
+    assert opened == ["a.npy", "b.npy"]
+    assert observed.dtype == np.float32
+    assert np.array_equal(observed[:, 0], np.asarray((2.0, 1.0, 4.0), dtype=np.float32))
+    with pytest.raises(ProtocolError, match="escaped the cache index"):
+        cache.load_embeddings((replace(rows[0], embedding_row_index=1),))
+
+
 def test_safe_member_rejects_traversal_and_each_symlink_component(
     tmp_path: Path,
 ) -> None:
@@ -178,11 +247,11 @@ def test_safe_member_rejects_traversal_and_each_symlink_component(
         safe_existing_member(root, "file-alias.bin", role="test cache")
 
 
-def test_amendment_publisher_rejects_planned_config_without_mutation(tmp_path: Path) -> None:
+def test_amendment_publisher_rejects_wrong_publication_path_without_mutation(tmp_path: Path) -> None:
     config = load_config(CONFIG)
     target = tmp_path / "never-created.json"
     before = tuple(tmp_path.iterdir())
-    with pytest.raises(ProtocolError, match="explicitly activated"):
+    with pytest.raises(ProtocolError, match="publication path drifted"):
         publish_harp_v3_execution_amendment(
             config,
             expert_bank_root=tmp_path / "bank",

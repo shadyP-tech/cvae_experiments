@@ -638,6 +638,27 @@ class MidogppWorkspace:
                 f"{experiment.experiment_id}: preparation authority rejected: {exc}"
             ) from exc
 
+    def validate_preparation_authority(
+        self,
+        experiment_id: str,
+    ) -> PreparationAuthorityReceipt | None:
+        """Validate one registered authority through the real catalog resolver.
+
+        This is the public, read-only counterpart of the pre-render gate.  It
+        lets an administrative transaction authenticate its committed
+        registry/catalog/config projection without fabricating an authority
+        member or preparing an output snapshot.
+        """
+
+        self.validate()
+        experiment = self.get_experiment(experiment_id)
+        if not experiment.runnable:
+            raise WorkspaceError(
+                f"Experiment {experiment_id} is status={experiment.status!r} "
+                "and has no executable preparation authority"
+            )
+        return self._enforce_preparation_authority(experiment)
+
     def _preparation_authority_registration_projection(
         self,
         experiment: ExperimentEntry,

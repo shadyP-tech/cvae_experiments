@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 import hashlib
-import json
 import os
 from pathlib import Path
+from types import MappingProxyType
 
 from ...protocol import ProtocolError
 from ...routing.harp_protocol import canonical_bytes, canonical_hash
@@ -19,8 +19,9 @@ from .preparation import (
     CANONICAL_MANIFEST_SHA256,
 )
 from . import authorization
+from .activation_paths import RepositoryBoundary
 from .config import HarpStage90V3Config, load_config
-from .identity import EXPERIMENT_ID
+from .identity import EXPERIMENT_ID, claim_boundary_payload
 from .input_surfaces import (
     CONTENT_INDEX,
     V3_CACHE_IDENTITY,
@@ -109,6 +110,63 @@ class HarpV3AmendmentPublicationReceipt:
         return {**self._base_payload(), "receipt_hash": self.receipt_hash}
 
 
+@dataclass(frozen=True, slots=True)
+class HarpV3AmendmentDraft:
+    """Read-only, fully validated bytes for the one-shot v3 amendment."""
+
+    repository_root: Path
+    amendment_path: Path
+    amendment_raw: bytes
+    amendment_sha256: str
+    amendment_payload: Mapping[str, object]
+    authorized_config: HarpStage90V3Config
+    computed_hashes: Mapping[str, str]
+    cache_index_sha256: str
+    content_index_sha256: str
+    preparation_receipt_sha256: str
+    partition_hash: str
+    preparation_receipt_hash: str
+    physical_input_receipt_hash: str
+
+    def __post_init__(self) -> None:
+        if hashlib.sha256(self.amendment_raw).hexdigest() != self.amendment_sha256:
+            raise ProtocolError("HARP v3 amendment draft byte identity drifted.")
+        if self.amendment_raw != canonical_bytes(self.amendment_payload) + b"\n":
+            raise ProtocolError("HARP v3 amendment draft is not canonical JSON.")
+
+    def to_payload(self) -> dict[str, object]:
+        source = self.amendment_payload.get("source_snapshot_identity")
+        binding = self.amendment_payload.get("authorized_input_binding")
+        if not isinstance(source, Mapping) or not isinstance(binding, Mapping):
+            raise ProtocolError("HARP v3 amendment draft metadata is malformed.")
+        return {
+            "schema_version": "midogpp_harp_stage90_amendment_draft_v3",
+            "experiment_id": EXPERIMENT_ID,
+            "amendment_sha256": self.amendment_sha256,
+            "amendment_hash": self.amendment_payload["amendment_hash"],
+            "input_binding_hash": binding["input_binding_hash"],
+            "scientific_contract_hash": self.amendment_payload[
+                "scientific_contract_hash"
+            ],
+            "workspace_registration_execution_contract_hash": (
+                self.amendment_payload[
+                    "workspace_registration_execution_contract_hash"
+                ]
+            ),
+            "source_snapshot_manifest_sha256": source[
+                "source_snapshot_manifest_sha256"
+            ],
+            "source_snapshot_tree_sha256": source[
+                "source_snapshot_tree_sha256"
+            ],
+            "preparation_receipt_hash": self.preparation_receipt_hash,
+            "physical_input_receipt_hash": self.physical_input_receipt_hash,
+            "filesystem_mutations": 0,
+            "labels_opened": False,
+            "output_created": False,
+        }
+
+
 def publish_harp_v3_execution_amendment(
     config: HarpStage90V3Config,
     *,
@@ -123,29 +181,101 @@ def publish_harp_v3_execution_amendment(
     authorization_date: str,
     repository_root: str | Path,
 ) -> HarpV3AmendmentPublicationReceipt:
-    if type(config) is not HarpStage90V3Config or not config.execution_authorized:
-        raise ProtocolError("HARP v3 amendment publication requires an explicitly activated config.")
+    """Reject legacy direct publication after validating the requested draft.
+
+    V3 amendment bytes may now be installed only by the durable activation
+    transaction, which journals all rollback and final workspace bytes first.
+    Keeping this validation surface fail-closed avoids a second unjournaled
+    authority path while preserving useful diagnostics for stale callers.
+    """
+
+    draft = build_harp_v3_execution_amendment_draft(
+        config,
+        expert_bank_root=expert_bank_root,
+        generation_lock_root=generation_lock_root,
+        prepared_cache_root=prepared_cache_root,
+        development_manifest_path=development_manifest_path,
+        evaluation_manifest_path=evaluation_manifest_path,
+        parent_ledger_path=parent_ledger_path,
+        amendment_path=amendment_path,
+        authorization_basis=authorization_basis,
+        authorization_date=authorization_date,
+        repository_root=repository_root,
+    )
+    return publish_harp_v3_amendment_draft_exclusive(draft)
+
+
+def build_harp_v3_execution_amendment_draft(
+    config: HarpStage90V3Config,
+    *,
+    expert_bank_root: str | Path,
+    generation_lock_root: str | Path,
+    prepared_cache_root: str | Path,
+    development_manifest_path: str | Path,
+    evaluation_manifest_path: str | Path,
+    parent_ledger_path: str | Path,
+    amendment_path: str | Path,
+    authorization_basis: str,
+    authorization_date: str,
+    repository_root: str | Path,
+) -> HarpV3AmendmentDraft:
+    """Authenticate planned inputs and render amendment bytes without writing."""
+
+    if type(config) is not HarpStage90V3Config or config.execution_authorized:
+        raise ProtocolError("HARP v3 amendment drafting requires the planned config.")
     authorization.validate_activation_metadata(authorization_basis, authorization_date)
     if config.expected_execution_amendment_sha256 is not None:
         raise ProtocolError("HARP v3 amendment is already bound in configuration.")
-    repository = _existing_directory(repository_root)
-    if config.source_path != (repository / authorization.WORKSPACE_CONFIG_RELATIVE_PATH).resolve():
+    boundary = RepositoryBoundary.open(repository_root)
+    repository = boundary.resolved_root
+    registered_config = boundary.member(
+        authorization.WORKSPACE_CONFIG_RELATIVE_PATH,
+        label="registered config",
+        kind="file",
+    )
+    if config.source_path != registered_config:
         raise ProtocolError("HARP v3 publisher config is not the registered source.")
     if load_config(config.source_path) != config:
         raise ProtocolError("HARP v3 publisher config changed after load.")
-    publication_path = Path(amendment_path).resolve()
-    expected_path = (repository / authorization.WORKSPACE_AMENDMENT_RELATIVE_PATH).resolve()
-    if publication_path != expected_path or not publication_path.parent.is_dir() or publication_path.parent.is_symlink():
+    try:
+        publication_path = boundary.path(
+            amendment_path,
+            label="execution amendment",
+            kind="optional",
+        )
+    except ProtocolError as exc:
+        raise ProtocolError(
+            "HARP v3 amendment publication path drifted from its catalog identity."
+        ) from exc
+    expected_path = boundary.member(
+        authorization.WORKSPACE_AMENDMENT_RELATIVE_PATH,
+        label="registered execution amendment",
+        kind="optional",
+    )
+    if publication_path != expected_path:
         raise ProtocolError("HARP v3 amendment publication path drifted from its catalog identity.")
-    if os.path.lexists(publication_path) or os.path.lexists(authorization.lease_path(repository)):
-        raise ProtocolError("HARP v3 amendment or authorization lease already exists.")
+    lease = boundary.path(
+        authorization.lease_path(repository),
+        label="authorization lease",
+        kind="absent",
+    )
+    if os.path.lexists(lease):
+        raise ProtocolError("HARP v3 authorization lease already exists.")
 
-    bank = _existing_directory(expert_bank_root)
-    generation = _existing_directory(generation_lock_root)
-    cache_root = _existing_directory(prepared_cache_root)
-    development = _existing_file(development_manifest_path)
-    evaluation = _existing_file(evaluation_manifest_path)
-    parent = _existing_file(parent_ledger_path)
+    bank = boundary.path(expert_bank_root, label="expert bank", kind="directory")
+    generation = boundary.path(
+        generation_lock_root, label="generation lock", kind="directory"
+    )
+    cache_root = boundary.path(
+        prepared_cache_root, label="prepared cache", kind="directory"
+    )
+    development = boundary.path(
+        development_manifest_path, label="development manifest", kind="file"
+    )
+    evaluation = boundary.path(
+        evaluation_manifest_path, label="evaluation manifest", kind="file"
+    )
+    parent = boundary.path(parent_ledger_path, label="parent ledger", kind="file")
     paths = {bank, generation, cache_root, development, evaluation, parent, publication_path}
     if len(paths) != 7:
         raise ProtocolError("HARP v3 amendment input paths overlap.")
@@ -161,10 +291,8 @@ def publish_harp_v3_execution_amendment(
         "parent_ledger_sha256": sha256_file(parent),
     }
     read_json(parent)
-    if any(
-        config.expected_hashes.get(role) != value for role, value in computed.items()
-    ):
-        raise ProtocolError("HARP v3 activated config and prepared-input receipt disagree.")
+    if any(config.expected_hashes.get(role) is not None for role in computed):
+        raise ProtocolError("HARP v3 planned config pre-binds prepared-input hashes.")
     bound = replace(
         config,
         input_locations={
@@ -174,38 +302,66 @@ def publish_harp_v3_execution_amendment(
             "evaluation_manifest_path": evaluation.as_posix(), "parent_ledger_path": parent.as_posix(),
             "execution_amendment_path": publication_path.as_posix(),
         },
+        expected_hashes={
+            **dict(config.expected_hashes),
+            **computed,
+            "execution_amendment_sha256": None,
+        },
     )
     cache = load_cache_index(bound)
     preparation_hash = _validate_preparation_receipt(cache, computed)
     physical = validate_physical_inputs(bound, cache)
+    authorized = replace(
+        config,
+        expected_hashes={
+            **dict(config.expected_hashes),
+            **computed,
+            "execution_amendment_sha256": None,
+        },
+        execution_authorized=True,
+        claim_boundary=claim_boundary_payload(execution_authorized=True),
+    )
     payload = authorization.canonical_execution_amendment_payload(
-        bound,
+        authorized,
         authorization_basis=authorization_basis,
         authorization_date=authorization_date,
         repo_root=repository,
     )
-    authorization.validate_execution_amendment_payload(payload, bound, repo_root=repository)
-    raw = canonical_bytes(payload) + b"\n"
-    _write_exclusive(publication_path, raw)
-    if publication_path.read_bytes() != raw:
-        raise ProtocolError("HARP v3 amendment bytes changed after publication.")
-    observed = json.loads(raw.decode("utf-8"))
-    validated = authorization.validate_execution_amendment_payload(
-        observed, bound, repo_root=repository
+    authorization.validate_execution_amendment_payload(
+        payload, authorized, repo_root=repository
     )
-    source = observed["source_snapshot_identity"]
-    binding = observed["authorized_input_binding"]
-    return HarpV3AmendmentPublicationReceipt(
+    raw = canonical_bytes(payload) + b"\n"
+    preparation = read_json(cache.root / PREPARATION_RECEIPT)
+    partition_hash = preparation.get("partition_hash")
+    if type(partition_hash) is not str:
+        raise ProtocolError("HARP v3 preparation partition hash is absent.")
+    return HarpV3AmendmentDraft(
+        repository_root=repository,
         amendment_path=publication_path,
+        amendment_raw=raw,
         amendment_sha256=hashlib.sha256(raw).hexdigest(),
-        amendment_hash=validated.amendment_hash,
-        input_binding_hash=str(binding["input_binding_hash"]),
-        scientific_contract_hash=validated.scientific_contract_hash,
-        workspace_registration_execution_contract_hash=validated.workspace_registration_execution_contract_hash,
-        source_snapshot_manifest_sha256=str(source["source_snapshot_manifest_sha256"]),
-        source_snapshot_tree_sha256=str(source["source_snapshot_tree_sha256"]),
+        amendment_payload=MappingProxyType(dict(payload)),
+        authorized_config=authorized,
+        computed_hashes=MappingProxyType(dict(computed)),
+        cache_index_sha256=sha256_file(cache.root / "manifests/cache_index.json"),
+        content_index_sha256=sha256_file(cache.root / CONTENT_INDEX),
+        preparation_receipt_sha256=sha256_file(cache.root / PREPARATION_RECEIPT),
+        partition_hash=partition_hash,
         preparation_receipt_hash=preparation_hash,
         physical_input_receipt_hash=str(physical.receipt_hash),
+    )
+
+
+def publish_harp_v3_amendment_draft_exclusive(
+    draft: HarpV3AmendmentDraft,
+) -> HarpV3AmendmentPublicationReceipt:
+    """Reject direct amendment mutation outside the durable transaction."""
+
+    if type(draft) is not HarpV3AmendmentDraft:
+        raise ProtocolError("HARP v3 exclusive publisher requires a typed draft.")
+    raise ProtocolError(
+        "HARP v3 direct amendment publication is disabled; use the durable "
+        "activate-fixed-bank-harp-router-v3 transaction."
     )
 
 
@@ -299,32 +455,10 @@ def _validate_preparation_receipt(
     return str(receipt["receipt_hash"])
 
 
-def _existing_directory(value: str | Path) -> Path:
-    path = Path(value).resolve()
-    if not path.is_dir() or path.is_symlink():
-        raise ProtocolError("HARP v3 required directory is absent or unsafe.")
-    return path
-
-
-def _existing_file(value: str | Path) -> Path:
-    path = Path(value).resolve()
-    if not path.is_file() or path.is_symlink():
-        raise ProtocolError("HARP v3 required file is absent or unsafe.")
-    return path
-
-
-def _write_exclusive(path: Path, raw: bytes) -> None:
-    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    try:
-        with os.fdopen(descriptor, "wb") as handle:
-            handle.write(raw)
-            handle.flush()
-            os.fsync(handle.fileno())
-    except BaseException:
-        raise
-
-
 __all__ = (
     "AMENDMENT_FILENAME", "AUTHORIZATION_BASIS",
-    "HarpV3AmendmentPublicationReceipt", "publish_harp_v3_execution_amendment",
+    "HarpV3AmendmentDraft", "HarpV3AmendmentPublicationReceipt",
+    "build_harp_v3_execution_amendment_draft",
+    "publish_harp_v3_amendment_draft_exclusive",
+    "publish_harp_v3_execution_amendment",
 )

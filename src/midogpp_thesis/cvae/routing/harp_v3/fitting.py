@@ -26,6 +26,96 @@ _EFFECT_ATOL = 5e-12
 _EFFECT_RTOL = 1e-10
 
 
+class _RidgeFitMemo:
+    """Per-bundle memo for byte-equivalent source-only ridge fits.
+
+    Nested delete-donor and pair-LODO calibration reaches the same training
+    surface through several exclusion paths.  The ridge solve is deterministic,
+    so repeating a solve whose ordered case identities, penalty, and normalized
+    exclusion set are identical only wastes workstation CPU time.  Binding every
+    identity to the immutable observation from the admitted outer-H surface
+    prevents a matching row key with different contents from aliasing a cached
+    model.
+    """
+
+    def __init__(self, source_rows: tuple[CaseTrainingObservation, ...]) -> None:
+        if not source_rows or any(
+            not isinstance(row, CaseTrainingObservation) for row in source_rows
+        ):
+            raise ProtocolError("HARP v3 ridge memo requires typed source rows.")
+        outer_ids = {row.outer_target_id for row in source_rows}
+        if len(outer_ids) != 1:
+            raise ProtocolError("HARP v3 ridge memo crossed outer-target surfaces.")
+        self._outer_target_id = next(iter(outer_ids))
+        self._source_rows: dict[
+            tuple[str, str, str, str, str], CaseTrainingObservation
+        ] = {}
+        for row in source_rows:
+            if row.row_key in self._source_rows:
+                raise ProtocolError("HARP v3 ridge memo row identity is ambiguous.")
+            self._source_rows[row.row_key] = row
+        self._models: dict[
+            tuple[
+                tuple[tuple[str, str, str, str, str], ...],
+                float,
+                tuple[str, ...],
+            ],
+            SharedDesignRidge,
+        ] = {}
+
+    def fit(
+        self,
+        rows: tuple[CaseTrainingObservation, ...],
+        *,
+        alpha: float,
+        excluded_center_ids: Sequence[str],
+    ) -> SharedDesignRidge:
+        if not rows:
+            raise ProtocolError("HARP v3 ridge memo cannot fit an empty surface.")
+        identities: list[tuple[str, str, str, str, str]] = []
+        for row in rows:
+            if not isinstance(row, CaseTrainingObservation):
+                raise ProtocolError("HARP v3 ridge memo received an untyped row.")
+            identity = row.row_key
+            admitted = self._source_rows.get(identity)
+            if admitted is None or admitted != row:
+                raise ProtocolError("HARP v3 ridge memo row identity is ambiguous.")
+            identities.append(identity)
+        ordered_identities = tuple(identities)
+        if len(set(ordered_identities)) != len(ordered_identities):
+            raise ProtocolError("HARP v3 ridge memo row identity is ambiguous.")
+        try:
+            penalty = float(alpha)
+        except (TypeError, ValueError) as exc:
+            raise ProtocolError("HARP v3 ridge memo alpha is invalid.") from exc
+        excluded = tuple(sorted({str(value) for value in excluded_center_ids}))
+        if (
+            not math.isfinite(penalty)
+            or penalty <= 0
+            or not excluded
+            or self._outer_target_id not in excluded
+            or any(
+                row.pseudo_query_id in excluded
+                or row.candidate_source_id in excluded
+                for row in rows
+            )
+        ):
+            raise ProtocolError("HARP v3 ridge memo exclusion contract is invalid.")
+        key = (ordered_identities, penalty, excluded)
+        cached = self._models.get(key)
+        if cached is not None:
+            return cached
+        model = fit_shared_design_ridge(
+            rows,
+            alpha=penalty,
+            excluded_center_ids=excluded,
+        )
+        if model.alpha != penalty or model.excluded_center_ids != excluded:
+            raise ProtocolError("HARP v3 ridge memo fit binding drifted.")
+        self._models[key] = model
+        return model
+
+
 @dataclass(frozen=True)
 class AlphaFoldScore:
     heldout_donor_id: str
@@ -183,6 +273,7 @@ def _select_alpha(
     *,
     outer_target_id: str,
     alpha_grid: tuple[float, ...],
+    ridge_memo: _RidgeFitMemo,
     permanently_excluded: tuple[str, ...] = (),
 ) -> AlphaSelection:
     donors = tuple(sorted(set(row.pseudo_query_id for row in rows)))
@@ -201,7 +292,7 @@ def _select_alpha(
         scale[scale <= np.sqrt(np.finfo(np.float64).eps)] = 1.0
         observed = np.asarray([row.effects.as_tuple() for row in validation], dtype=np.float64)
         for alpha in alpha_grid:
-            model = fit_shared_design_ridge(
+            model = ridge_memo.fit(
                 training,
                 alpha=alpha,
                 excluded_center_ids=tuple(sorted({outer_target_id, donor, *permanent})),
@@ -228,6 +319,7 @@ def _fit_pair_deleted_geometry_models(
     outer_target_id: str,
     donors: tuple[str, ...],
     alpha_grid: tuple[float, ...],
+    ridge_memo: _RidgeFitMemo,
 ) -> dict[tuple[str, str], SharedDesignRidge]:
     """Fit each unordered source exclusion pair once for geometry only."""
 
@@ -243,9 +335,10 @@ def _fit_pair_deleted_geometry_models(
             deleted_rows,
             outer_target_id=outer_target_id,
             alpha_grid=alpha_grid,
+            ridge_memo=ridge_memo,
             permanently_excluded=pair,
         )
-        model = fit_shared_design_ridge(
+        model = ridge_memo.fit(
             deleted_rows,
             alpha=selection.selected_alpha,
             excluded_center_ids=tuple(sorted((outer_target_id, *pair))),
@@ -456,10 +549,14 @@ def fit_harp_v3(
     if set(row.comparison for row in rows) != set(Comparison):
         raise ProtocolError("HARP v3 fitting requires all three hierarchical comparisons.")
 
+    ridge_memo = _RidgeFitMemo(rows)
     outer_selection = _select_alpha(
-        rows, outer_target_id=target, alpha_grid=grid
+        rows,
+        outer_target_id=target,
+        alpha_grid=grid,
+        ridge_memo=ridge_memo,
     )
-    full_model = fit_shared_design_ridge(
+    full_model = ridge_memo.fit(
         rows,
         alpha=outer_selection.selected_alpha,
         excluded_center_ids=(target,),
@@ -479,9 +576,10 @@ def fit_harp_v3(
             deleted_rows,
             outer_target_id=target,
             alpha_grid=grid,
+            ridge_memo=ridge_memo,
             permanently_excluded=(donor,),
         )
-        model = fit_shared_design_ridge(
+        model = ridge_memo.fit(
             deleted_rows,
             alpha=inner.selected_alpha,
             excluded_center_ids=tuple(sorted((target, donor))),
@@ -493,6 +591,7 @@ def fit_harp_v3(
         outer_target_id=target,
         donors=donors,
         alpha_grid=grid,
+        ridge_memo=ridge_memo,
     )
     geometry_raw, geometry_donors, geometry_blocks = _matched_geometry_inputs(
         rows, donors=donors, pair_models=pair_models

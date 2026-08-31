@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 import csv
 from dataclasses import dataclass
 from pathlib import Path
@@ -69,22 +69,51 @@ class HarpConsumedCacheIndex:
         return tuple(row for row in self.rows if row.center == center and row.split_role == role)
 
     def load_embedding(self, row: HarpCacheRow) -> np.ndarray:
-        path = _safe_member(self.root, row.embedding_file)
-        try:
-            values = np.load(path, mmap_mode="r", allow_pickle=False)
-        except (OSError, ValueError) as exc:
-            raise ProtocolError("Cannot load HARP v3 embedding shard.") from exc
-        if (
-            values.dtype != np.float32
-            or values.ndim != 2
-            or values.shape[1] != COMMON_OUTPUT_DIM
-            or not 0 <= row.embedding_row_index < len(values)
-        ):
-            raise ProtocolError("HARP v3 embedding shard geometry drifted.")
-        result = np.asarray(values[row.embedding_row_index], dtype=np.float32)
-        if result.shape != (COMMON_OUTPUT_DIM,) or not np.isfinite(result).all():
-            raise ProtocolError("HARP v3 embedding row is malformed.")
-        return result
+        return self.load_embeddings((row,))[0].copy()
+
+    def load_embeddings(self, rows: Sequence[HarpCacheRow]) -> np.ndarray:
+        """Load ordered cache rows while opening each immutable shard once.
+
+        The content index and every shard hash are authenticated when this
+        object is built.  Grouping only the mmap handles here removes thousands
+        of redundant ``np.load`` header parses during workstation staging; the
+        requested row order remains the sole output order.
+        """
+
+        ordered = tuple(rows)
+        if not ordered or any(type(row) is not HarpCacheRow for row in ordered):
+            raise ProtocolError("HARP v3 embedding batch is malformed.")
+        known = {row.key: row for row in self.rows}
+        if any(known.get(row.key) != row for row in ordered):
+            raise ProtocolError("HARP v3 embedding batch escaped the cache index.")
+
+        opened: dict[str, np.ndarray] = {}
+        result = np.empty((len(ordered), COMMON_OUTPUT_DIM), dtype=np.float32)
+        for index, row in enumerate(ordered):
+            values = opened.get(row.embedding_file)
+            if values is None:
+                path = _safe_member(self.root, row.embedding_file)
+                try:
+                    values = np.load(path, mmap_mode="r", allow_pickle=False)
+                except (OSError, ValueError) as exc:
+                    raise ProtocolError("Cannot load HARP v3 embedding shard.") from exc
+                expected_shape = self.shards.get(row.embedding_file)
+                if (
+                    expected_shape is None
+                    or values.dtype != np.float32
+                    or values.shape != expected_shape
+                    or values.ndim != 2
+                    or values.shape[1] != COMMON_OUTPUT_DIM
+                ):
+                    raise ProtocolError("HARP v3 embedding shard geometry drifted.")
+                opened[row.embedding_file] = values
+            if not 0 <= row.embedding_row_index < len(values):
+                raise ProtocolError("HARP v3 embedding shard geometry drifted.")
+            vector = np.asarray(values[row.embedding_row_index], dtype=np.float32)
+            if vector.shape != (COMMON_OUTPUT_DIM,) or not np.isfinite(vector).all():
+                raise ProtocolError("HARP v3 embedding row is malformed.")
+            result[index] = vector
+        return np.ascontiguousarray(result, dtype=np.float32)
 
 
 def _expected(config: HarpStage90V3Config, role: str) -> str:

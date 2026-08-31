@@ -801,9 +801,9 @@ def build_parser() -> argparse.ArgumentParser:
     harp_publish_v3 = sub.add_parser(
         "publish-fixed-bank-harp-router-v3-amendment",
         help=(
-            "Independently validate the exact prepared v3 inputs and issue its "
-            "terminal single-use amendment. This does not activate registration, "
-            "claim the lease, create output, or launch v3."
+            "Legacy validation-only surface. Direct v3 amendment publication is "
+            "disabled; use activate-fixed-bank-harp-router-v3 so the durable "
+            "recovery journal precedes every authority mutation."
         ),
     )
     harp_publish_v3.add_argument("--config", required=True)
@@ -822,6 +822,30 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Exact checkout root that owns the registered v3 amendment member "
             "and transitive source snapshot."
+        ),
+    )
+    harp_activate_v3 = sub.add_parser(
+        "activate-fixed-bank-harp-router-v3",
+        help=(
+            "Render a mutation-free v3 activation plan from exact prepared "
+            "inputs, or commit it only with the exact confirmation token."
+        ),
+    )
+    harp_activate_v3.add_argument("--config", required=True)
+    harp_activate_v3.add_argument("--expert-bank-root", required=True)
+    harp_activate_v3.add_argument("--generation-lock-root", required=True)
+    harp_activate_v3.add_argument("--prepared-cache-root", required=True)
+    harp_activate_v3.add_argument("--development-manifest", required=True)
+    harp_activate_v3.add_argument("--evaluation-manifest", required=True)
+    harp_activate_v3.add_argument("--parent-ledger", required=True)
+    harp_activate_v3.add_argument("--authorization-basis", required=True)
+    harp_activate_v3.add_argument("--authorization-date", required=True)
+    harp_activate_v3.add_argument("--repository-root", required=True)
+    harp_activate_v3.add_argument(
+        "--confirm",
+        help=(
+            "Exact activation confirmation token. Omit to emit the fully "
+            "validated mutation-free plan."
         ),
     )
     sceptre_v5_mode.add_argument(
@@ -977,6 +1001,47 @@ def main(argv: list[str] | None = None) -> int:
             repository_root=args.repository_root,
         )
         print(json.dumps(receipt.to_payload(), sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.surface == "activate-fixed-bank-harp-router-v3":
+        import json
+
+        from .fixed_bank_harp_router_v3.activation import (
+            activate_harp_v3,
+            inspect_harp_v3_activation_recovery,
+            plan_harp_v3_activation,
+            recover_harp_v3_activation,
+        )
+        from .fixed_bank_harp_router_v3.config import load_config
+
+        recovery = inspect_harp_v3_activation_recovery(args.repository_root)
+        if recovery is not None:
+            result = (
+                recovery
+                if args.confirm is None
+                else recover_harp_v3_activation(
+                    args.repository_root,
+                    confirmation=args.confirm,
+                ).to_payload()
+            )
+        else:
+            plan = plan_harp_v3_activation(
+                load_config(args.config),
+                expert_bank_root=args.expert_bank_root,
+                generation_lock_root=args.generation_lock_root,
+                prepared_cache_root=args.prepared_cache_root,
+                development_manifest_path=args.development_manifest,
+                evaluation_manifest_path=args.evaluation_manifest,
+                parent_ledger_path=args.parent_ledger,
+                repository_root=args.repository_root,
+                authorization_basis=args.authorization_basis,
+                authorization_date=args.authorization_date,
+            )
+            result = (
+                plan.to_payload()
+                if args.confirm is None
+                else activate_harp_v3(plan, confirmation=args.confirm).to_payload()
+            )
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
         return 0
     artifact_root = Path(args.artifact_root)
 

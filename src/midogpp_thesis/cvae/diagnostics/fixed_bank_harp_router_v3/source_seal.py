@@ -28,12 +28,6 @@ SOURCE_ENTRYPOINT_PATTERNS = (
     "midogpp_thesis/workspace/preparation_authority.py",
     "midogpp_thesis/workspace/runtime.py",
     "midogpp_thesis/workspace/cli.py",
-    "midogpp_thesis/__main__.py",
-    "midogpp_thesis/cli.py",
-    "midogpp_thesis/cvae/diagnostics/cli.py",
-    "midogpp_thesis/workspace/cli.py",
-    "midogpp_thesis/workspace/preparation_authority.py",
-    "midogpp_thesis/workspace/runtime.py",
 )
 
 

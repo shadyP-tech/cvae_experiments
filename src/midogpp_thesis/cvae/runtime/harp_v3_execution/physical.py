@@ -26,10 +26,10 @@ from ...protocol import ProtocolError
 from ...routing.harp_protocol import canonical_hash
 from ...runtime.artifact_io import atomic_json, atomic_npy, atomic_npz, read_json, sha256_file
 from ...runtime.frozen_source_streams import (
+    SOURCE_INDEX_MEMBER,
     SOURCE_ROWS_PER_CLASS,
     FrozenSourceStreamCache,
     materialize_frozen_source_streams,
-    source_block_sha256,
 )
 from ...runtime.harp_probability_menu import (
     BASE_ACTION_ID,
@@ -48,6 +48,12 @@ from ....real_features.classifier_reference.classifiers import (
     fit_logistic_classifier,
 )
 from ..bounded_futures import execute_bounded
+from .classifier_worker_cache import (
+    initialize_classifier_worker as _initialize_classifier_worker,
+    load_source_blocks as _load_source_blocks,
+    load_worker_arrays as _load_worker_arrays,
+    require_sha256 as _require_sha256,
+)
 from .contracts import ActionKind, LabelFreeActionBlock, LabelFreeOuterMenu
 
 
@@ -387,14 +393,22 @@ def _stage_frames(cache: object, *, scratch_root: Path, roles: tuple[str, str]) 
     cases: dict[tuple[str, str], tuple[str, ...]] = {}
     values: list[np.ndarray] = []
     cursor = 0
+    load_embeddings = getattr(cache, "load_embeddings", None)
+    if not callable(load_embeddings):
+        raise ProtocolError("HARP v3 cache lacks the typed grouped-shard reader.")
     for role in roles:
         for center in CENTERS:
             rows = tuple(cache.rows_for(center, role))
             if not rows or tuple(row.split_row_index for row in rows) != tuple(range(len(rows))):
                 raise ProtocolError("HARP v3 cache role geometry drifted.")
-            matrix = np.ascontiguousarray(
-                np.stack([cache.load_embedding(row) for row in rows]), dtype=np.float32
-            )
+            matrix = np.asarray(load_embeddings(rows))
+            if (
+                matrix.dtype != np.float32
+                or matrix.shape != (len(rows), COMMON_OUTPUT_DIM)
+                or not np.isfinite(matrix).all()
+            ):
+                raise ProtocolError("HARP v3 grouped frame geometry drifted.")
+            matrix = np.ascontiguousarray(matrix, dtype=np.float32)
             contexts[(role, center)] = (cursor, cursor + len(rows))
             samples[(role, center)] = tuple(row.sample_id for row in rows)
             cases[(role, center)] = tuple(row.case_id for row in rows)
@@ -451,6 +465,15 @@ def _build_tasks(
     for action in _all_actions():
         by_context[(action.surface_kind, action.outer_target_id, action.query_center_id)].append(action)
     source_records = [record.to_payload() for record in source_cache.records]
+    source_array_sha256 = _require_sha256(
+        source_cache.lock_payload.get("source_array_sha256"),
+        name="source-array hash",
+    )
+    source_index_sha256 = _require_sha256(
+        source_cache.lock_payload.get("source_stream_index_sha256"),
+        name="source-index hash",
+    )
+    source_index_path = (source_cache.root / SOURCE_INDEX_MEMBER).resolve()
     checkpoint_root = scratch_root / "classifier_checkpoints"
     tasks: list[dict[str, object]] = []
     for surface, outer, query in sorted(by_context):
@@ -469,8 +492,12 @@ def _build_tasks(
                 "generation_seed": generation_seed,
                 "actions": [row.to_payload() for row in by_context[(surface, outer, query)]],
                 "source_array_path": str(source_cache.source_array_path.resolve()),
+                "source_array_sha256": source_array_sha256,
+                "source_index_path": str(source_index_path),
+                "source_index_sha256": source_index_sha256,
                 "source_records": source_records,
                 "frame_array_path": str(frames.path.resolve()),
+                "frame_array_sha256": frames.sha256,
                 "frame_start": start,
                 "frame_stop": stop,
                 "sample_ids": list(frames.sample_ids[(role, query)]),
@@ -511,6 +538,8 @@ def _execute_tasks(
         with ProcessPoolExecutor(
             max_workers=workstation.cpu_fit_workers,
             mp_context=mp.get_context(workstation.multiprocessing_start_method),
+            initializer=_initialize_classifier_worker,
+            initargs=(workstation.blas_threads_per_worker,),
         ) as pool:
             def accept_checkpoint(
                 _position: int, task: Mapping[str, object], _result: None
@@ -565,30 +594,22 @@ def _classifier_task(task: Mapping[str, object]) -> None:
         )
         for raw in task["actions"]
     )
-    records = {
-        (str(raw["source_center"]), int(raw["training_seed"]), int(raw["generation_seed"])): raw
-        for raw in task["source_records"]
-    }
-    source_values = np.load(Path(str(task["source_array_path"])), mmap_mode="r", allow_pickle=False)
-    source_blocks: dict[str, dict[str, np.ndarray]] = {}
-    for source in sorted({value for action in actions for value in action.source_order}):
-        record = records[(source, int(task["training_seed"]), int(task["generation_seed"]))]
-        block = np.asarray(source_values[int(record["block_ordinal"])], dtype=np.float32)
-        if source_block_sha256(block) != record["output_sha256"]:
-            raise ProtocolError("HARP v3 source-stream bytes drifted in classifier worker.")
-        source_blocks[source] = {
-            "embeddings": block,
-            "labels": np.concatenate(
-                (
-                    np.zeros(SOURCE_ROWS_PER_CLASS, dtype=np.int64),
-                    np.ones(SOURCE_ROWS_PER_CLASS, dtype=np.int64),
-                )
-            ),
-        }
-    frame = np.load(Path(str(task["frame_array_path"])), mmap_mode="r", allow_pickle=False)
-    evaluation = np.ascontiguousarray(
-        frame[int(task["frame_start"]): int(task["frame_stop"])], dtype=np.float32
+    source_values, frame, source_key = _load_worker_arrays(task)
+    source_blocks = _load_source_blocks(
+        actions,
+        task,
+        source_values=source_values,
+        source_key=source_key,
     )
+    start = int(task["frame_start"])
+    stop = int(task["frame_stop"])
+    if start < 0 or stop <= start or stop > len(frame):
+        raise ProtocolError("HARP v3 frame slice geometry drifted.")
+    evaluation = np.ascontiguousarray(
+        frame[start:stop], dtype=np.float32
+    )
+    if not np.isfinite(evaluation).all():
+        raise ProtocolError("HARP v3 frame slice contains nonfinite values.")
     classifier = ClassifierSpec(**dict(task["classifier"]))
     probabilities: list[np.ndarray] = []
     records_out: list[dict[str, object]] = []

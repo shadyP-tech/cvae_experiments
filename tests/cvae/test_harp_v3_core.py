@@ -7,6 +7,7 @@ import struct
 import pytest
 
 from midogpp_thesis.cvae.protocol import ProtocolError
+from midogpp_thesis.cvae.routing.harp_v3 import fitting as harp_v3_fitting
 from midogpp_thesis.cvae.routing.harp_v3 import (
     ActionKind,
     CaseActionSet,
@@ -179,6 +180,103 @@ def test_outer_and_nested_delete_donor_exclusion_is_structural(fitted) -> None:
     assert set(geometry.heldout_block_sizes) == {len(DONORS) - 1}
     assert not geometry.formal_conformal_claimed
     assert "d_minus_1" in geometry.calibration_method
+
+
+def test_per_fit_ridge_memo_reuses_only_the_exact_bound_surface(monkeypatch) -> None:
+    rows = _training_rows()
+    memo = harp_v3_fitting._RidgeFitMemo(rows)
+    deleted = tuple(
+        row
+        for row in rows
+        if row.pseudo_query_id != "0" and row.candidate_source_id != "0"
+    )
+    real_fit = harp_v3_fitting.fit_shared_design_ridge
+    calls = 0
+
+    def counted_fit(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return real_fit(*args, **kwargs)
+
+    monkeypatch.setattr(harp_v3_fitting, "fit_shared_design_ridge", counted_fit)
+    first = memo.fit(deleted, alpha=0.01, excluded_center_ids=("H", "0"))
+    equivalent = memo.fit(
+        deleted,
+        alpha=0.01,
+        excluded_center_ids=("0", "H", "0"),
+    )
+    assert equivalent is first
+    assert calls == 1
+
+    # Row order, alpha, and normalized exclusions are all scientific cache-key
+    # dimensions; changing any one must trigger a distinct deterministic fit.
+    assert memo.fit(
+        tuple(reversed(deleted)),
+        alpha=0.01,
+        excluded_center_ids=("H", "0"),
+    ) is not first
+    assert memo.fit(
+        deleted,
+        alpha=0.1,
+        excluded_center_ids=("H", "0"),
+    ) is not first
+    assert memo.fit(
+        deleted,
+        alpha=0.01,
+        excluded_center_ids=("H", "0", "unused"),
+    ) is not first
+    assert calls == 4
+
+    counterfeit = list(deleted)
+    counterfeit[0] = replace(
+        counterfeit[0],
+        feature_values=(
+            counterfeit[0].feature_values[0] + 0.01,
+            *counterfeit[0].feature_values[1:],
+        ),
+    )
+    with pytest.raises(ProtocolError, match="identity is ambiguous"):
+        memo.fit(
+            tuple(counterfeit),
+            alpha=0.01,
+            excluded_center_ids=("H", "0"),
+        )
+    with pytest.raises(ProtocolError, match="exclusion contract"):
+        memo.fit(deleted, alpha=0.01, excluded_center_ids=("0",))
+    assert calls == 4
+
+
+def test_memoized_fit_is_payload_identical_and_reduces_ridge_solves(monkeypatch) -> None:
+    rows = _training_rows()
+    real_fit = harp_v3_fitting.fit_shared_design_ridge
+    memoized_fit = harp_v3_fitting._RidgeFitMemo.fit
+    calls = 0
+
+    def counted_fit(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return real_fit(*args, **kwargs)
+
+    def uncached_fit(_memo, fit_rows, *, alpha, excluded_center_ids):
+        return harp_v3_fitting.fit_shared_design_ridge(
+            fit_rows,
+            alpha=alpha,
+            excluded_center_ids=excluded_center_ids,
+        )
+
+    monkeypatch.setattr(harp_v3_fitting, "fit_shared_design_ridge", counted_fit)
+    monkeypatch.setattr(harp_v3_fitting._RidgeFitMemo, "fit", uncached_fit)
+    reference = fit_harp_v3(rows, outer_target_id="H", alpha_grid=(0.001, 0.01))
+    uncached_calls = calls
+
+    calls = 0
+    monkeypatch.setattr(harp_v3_fitting._RidgeFitMemo, "fit", memoized_fit)
+    optimized = fit_harp_v3(rows, outer_target_id="H", alpha_grid=(0.001, 0.01))
+    optimized_calls = calls
+
+    assert fit_to_payload(optimized) == fit_to_payload(reference)
+    assert uncached_calls == 214
+    assert optimized_calls == 83
 
 
 def test_incomplete_or_incoherent_training_hierarchy_fails_closed() -> None:

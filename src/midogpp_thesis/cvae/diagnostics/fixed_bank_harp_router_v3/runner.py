@@ -57,13 +57,18 @@ from .input_surfaces import (
 
 IMPLEMENTED_COMPONENTS = (
     "separate_single_use_v3_authority_before_all_output_or_input_mutation",
+    "mutation_free_activation_plan_with_resumable_amendment_and_registry_last_commit",
     "v3_owned_label_blind_cache_and_physical_generation_lineage",
     "two_persistent_gpu_source_workers_closed_before_cpu_classifier_pool",
+    "four_spawned_cuda_blind_cpu_workers_with_enforced_three_thread_blas_limits",
+    "process_local_verified_source_frame_memmaps_and_source_block_hash_cache",
+    "grouped_once_per_shard_consumed_frame_staging",
     "physical_lambda_one_B_U_Hxe_action_slate_without_probability_blends",
     "strict_outer_H_query_candidate_exclusion",
     "float32_probability_transport_and_float64_scientific_reductions",
     "deterministic_compact_npz_stores_with_chunk_hashes",
     "case_level_source_only_joint_multioutput_model",
+    "per_outer_exact_identity_ridge_memo_with_byte_identical_fit_payload",
     "source_lodo_statistic_matched_ensemble_max_geometry_not_raw_leverage",
     "hierarchical_B_then_U_then_Hxe_joint_endpoint_policy",
     "byte_identical_exact_B_case_fallback",
@@ -73,6 +78,7 @@ IMPLEMENTED_COMPONENTS = (
     "disk_reconstructed_frozen_routes_are_the_only_terminal_input",
     "evaluation_labels_opened_only_after_frozen_route_seal",
     "single_content_index_and_atomic_fsync_completion_commit",
+    "mutation_free_live_cpu_ram_gpu_scratch_and_dependency_preflight",
 )
 
 
