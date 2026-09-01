@@ -127,6 +127,39 @@ def load_cache_index(config: HarpStage90V3Config) -> HarpConsumedCacheIndex:
     if type(config) is not HarpStage90V3Config:
         raise ProtocolError("HARP v3 cache reader requires typed configuration.")
     root = config.resolved_path("test_cache_root")
+    return _load_cache_index_from_root(
+        root,
+        expected_content_sha256=_expected(config, "test_cache_content_sha256"),
+    )
+
+
+def _load_cache_index_from_root(
+    root: Path,
+    *,
+    expected_content_sha256: str,
+) -> HarpConsumedCacheIndex:
+    """Authenticate one fixed-identity v3 cache at an already bound root.
+
+    The executable reader above remains restricted to the typed activated
+    configuration.  Preparation uses this internal entry point only for its
+    owned staging and final roots, before those paths can be represented by an
+    activated configuration.  Cache identity is intentionally not a caller
+    argument: every path is parsed as ``V3_CACHE_IDENTITY``.
+    """
+
+    if (
+        not isinstance(root, Path)
+        or not root.is_absolute()
+        or root.is_symlink()
+        or not root.is_dir()
+        or type(expected_content_sha256) is not str
+        or len(expected_content_sha256) != 64
+        or any(
+            character not in "0123456789abcdef"
+            for character in expected_content_sha256
+        )
+    ):
+        raise ProtocolError("HARP v3 cache root or expected identity is invalid.")
     index_path = root / CACHE_INDEX
     content_path = root / CONTENT_INDEX
     row_path = root / CACHE_ROWS
@@ -138,7 +171,7 @@ def load_cache_index(config: HarpStage90V3Config) -> HarpConsumedCacheIndex:
         not isinstance(members, Mapping)
         or content.get("schema_version") != V3_CACHE_IDENTITY.content_schema
         or content.get("content_index_hash") != canonical_hash(content_base)
-        or content.get("content_index_hash") != _expected(config, "test_cache_content_sha256")
+        or content.get("content_index_hash") != expected_content_sha256
     ):
         raise ProtocolError("HARP v3 cache content index drifted.")
     member_sha = {str(key): str(value) for key, value in members.items()}

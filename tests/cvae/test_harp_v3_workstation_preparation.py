@@ -1,14 +1,22 @@
 from __future__ import annotations
 
+import csv
+import hashlib
 import json
 from pathlib import Path
 import shutil
+from types import SimpleNamespace
 
+import numpy as np
 import pytest
 import yaml
 
 from midogpp_thesis.cvae.diagnostics import cli
+from midogpp_thesis.cvae.expert_bank.uniform_b_v2_promotion.contracts import (
+    CENTERS,
+)
 from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v3 import authorization
+from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v3 import input_surfaces
 from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v3 import (
     preparation as cache_preparation,
 )
@@ -117,6 +125,163 @@ def _fake_builder(plan, *, cache_root, development_manifest_path, evaluation_man
         partition_hash="1" * 64,
         preparation_receipt_hash=str(receipt["receipt_hash"]),
     )
+
+
+def _tiny_preparation_fixture(tmp_path: Path):
+    raw_rows: list[dict[str, str]] = []
+    row_specs: list[tuple[str, str, int, int]] = []
+    contract_index = 0
+    for center in CENTERS:
+        center_index = 0
+        for case_ordinal in range(4):
+            case = f"case-{center}-{case_ordinal}"
+            for label in (0, 1):
+                raw_rows.append(
+                    {
+                        "case_id": case,
+                        "center": center,
+                        "split": "test",
+                        "label": str(label),
+                    }
+                )
+                row_specs.append((center, case, contract_index, center_index))
+                contract_index += 1
+                center_index += 1
+    manifest = tmp_path / "canonical.csv"
+    with manifest.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=("case_id", "center", "split", "label"),
+        )
+        writer.writeheader()
+        writer.writerows(raw_rows)
+    manifest_sha = hashlib.sha256(manifest.read_bytes()).hexdigest()
+    rows_by_center: dict[
+        str, tuple[cache_preparation.CanonicalFrameRow, ...]
+    ] = {}
+    embeddings_by_center: dict[str, np.ndarray] = {}
+    for center in CENTERS:
+        rows = tuple(
+            cache_preparation.CanonicalFrameRow(
+                center=center,
+                case_id=case,
+                sample_id=cache_preparation._evaluation_row_id(
+                    manifest_sha,
+                    global_index,
+                ),
+                contract_row_index=global_index,
+                center_row_index=center_index,
+            )
+            for center_, case, global_index, center_index in row_specs
+            if center_ == center
+        )
+        rows_by_center[center] = rows
+        embeddings_by_center[center] = np.arange(
+            len(rows) * 3840,
+            dtype=np.float32,
+        ).reshape(len(rows), 3840)
+    frame = cache_preparation.CanonicalLabelBlindFrame(
+        rows_by_center=rows_by_center,
+        embeddings_by_center=embeddings_by_center,
+        cache_content_hash="c" * 64,
+        row_order_hash="d" * 64,
+        source_member_sha256={},
+    )
+    ledger = tmp_path / "parent_ledger.json"
+    ledger.write_text("{}\n", encoding="utf-8")
+    ledger_sha = hashlib.sha256(ledger.read_bytes()).hexdigest()
+    return frame, manifest, manifest_sha, ledger, ledger_sha
+
+
+def test_real_v3_preparation_reloads_barrier_and_final_cache_without_labels(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    frame, manifest, manifest_sha, ledger, ledger_sha = _tiny_preparation_fixture(
+        tmp_path
+    )
+    monkeypatch.setattr(cache_preparation, "EXPECTED_ROW_COUNT", 72)
+    events: list[str] = []
+
+    def load_frame(_root: Path):
+        events.append("label_blind_cache_loaded")
+        return frame
+
+    original_validate = cache_preparation._independently_validate_label_blind_barrier
+    original_publish = cache_preparation._publish_role_pure_manifests
+
+    def validate_barrier(root: Path, *, expected_partition_hash: str, identity):
+        result = original_validate(
+            root,
+            expected_partition_hash=expected_partition_hash,
+            identity=identity,
+        )
+        events.append("label_free_barrier_validated")
+        return result
+
+    def publish_manifest(path: Path, **kwargs):
+        assert events == [
+            "label_blind_cache_loaded",
+            "label_free_barrier_validated",
+        ]
+        assert not (
+            kwargs["cache"].root / cache_preparation.PREPARATION_RECEIPT
+        ).exists()
+        events.append("canonical_scoring_manifest_opened")
+        return original_publish(path, **kwargs)
+
+    monkeypatch.setattr(
+        cache_preparation,
+        "load_canonical_label_blind_cache",
+        load_frame,
+    )
+    monkeypatch.setattr(
+        cache_preparation,
+        "_independently_validate_label_blind_barrier",
+        validate_barrier,
+    )
+    monkeypatch.setattr(
+        cache_preparation,
+        "_publish_role_pure_manifests",
+        publish_manifest,
+    )
+    cache_root = tmp_path / "prepared-cache"
+    development = tmp_path / "development" / "manifest.csv"
+    evaluation = tmp_path / "evaluation" / "manifest.csv"
+    prepared = cache_preparation._prepare_harp_consumed_test_inputs(
+        canonical_cache_root=tmp_path / "unused-canonical-cache",
+        canonical_manifest_path=manifest,
+        parent_ledger_path=ledger,
+        cache_root=cache_root,
+        development_manifest_path=development,
+        evaluation_manifest_path=evaluation,
+        identity=cache_preparation.V3_PREPARATION_IDENTITY,
+        expected_manifest_sha256=manifest_sha,
+        expected_parent_ledger_sha256=ledger_sha,
+    )
+
+    assert events == [
+        "label_blind_cache_loaded",
+        "label_free_barrier_validated",
+        "canonical_scoring_manifest_opened",
+    ]
+    assert prepared.cache_content_sha256 == json.loads(
+        (cache_root / CONTENT_INDEX).read_text(encoding="utf-8")
+    )["content_index_hash"]
+    assert cache_preparation._validate_final_prepared_cache(cache_root).rows
+    assert development.is_file()
+    assert evaluation.is_file()
+
+
+def test_runtime_cache_reader_remains_typed_after_preparation_repair(
+    tmp_path: Path,
+) -> None:
+    untyped = SimpleNamespace(
+        resolved_path=lambda _role: tmp_path,
+        expected_hashes={"test_cache_content_sha256": "0" * 64},
+    )
+    with pytest.raises(ProtocolError, match="requires typed configuration"):
+        input_surfaces.load_cache_index(untyped)  # type: ignore[arg-type]
 
 
 def test_plan_is_catalog_bound_and_never_opens_or_hashes_manifest(
@@ -342,6 +507,45 @@ def test_ordinary_failure_cleans_all_owned_preparation_state(
     assert not paths.evaluation_manifest_path.parent.exists()
     assert not paths.transaction_path.exists()
     assert not paths.staging_root.exists()
+
+
+def test_prejournal_builder_failure_removes_all_owned_staging(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = _repository(tmp_path)
+    plan = preparation.plan_harp_v3_workstation_preparation(repository)
+
+    def fail_before_journal(
+        _plan,
+        *,
+        cache_root: Path,
+        development_manifest_path: Path,
+        evaluation_manifest_path: Path,
+    ):
+        del development_manifest_path, evaluation_manifest_path
+        cache_root.mkdir(parents=True)
+        (cache_root / "partial.bin").write_bytes(b"not-published")
+        raise TypeError("synthetic staged-cache API mismatch")
+
+    monkeypatch.setattr(
+        preparation,
+        "_prepare_staged_inputs",
+        fail_before_journal,
+    )
+    with pytest.raises(TypeError, match="staged-cache API mismatch"):
+        preparation.prepare_harp_v3_workstation_inputs(
+            plan,
+            confirmation=preparation.PREPARATION_CONFIRMATION,
+        )
+
+    paths = plan.paths
+    assert not paths.staging_root.exists()
+    assert not paths.transaction_path.exists()
+    assert not paths.lock_path.exists()
+    assert not paths.prepared_cache_root.exists()
+    assert not paths.development_manifest_path.parent.exists()
+    assert not paths.evaluation_manifest_path.parent.exists()
 
 
 def test_completed_outputs_are_returned_idempotently_without_rebuilding(

@@ -17,7 +17,6 @@ import json
 import os
 from pathlib import Path
 import re
-from types import SimpleNamespace
 
 import numpy as np
 
@@ -41,8 +40,8 @@ from .input_surfaces import (
     HarpCacheRow,
     HarpConsumedCacheIdentity,
     V3_CACHE_IDENTITY,
+    _load_cache_index_from_root,
     _read_label_manifest,
-    load_cache_index,
 )
 from .safe_paths import safe_existing_member
 
@@ -708,13 +707,11 @@ def _independently_validate_label_blind_barrier(
 ):
     content = read_json(root / CONTENT_INDEX)
     expected_content_hash = str(content.get("content_index_hash"))
-    config = SimpleNamespace(
-        resolved_path=lambda role: root if role == "test_cache_root" else None,
-        expected_hashes={"test_cache_content_sha256": expected_content_hash},
-    )
-    cache = load_cache_index(  # type: ignore[arg-type]
-        config,
-        cache_identity=identity.cache_identity,
+    if identity.cache_identity != V3_CACHE_IDENTITY:
+        raise ProtocolError("HARP v3 preparation cache identity drifted.")
+    cache = _load_cache_index_from_root(
+        root,
+        expected_content_sha256=expected_content_hash,
     )
     barrier = read_json(root / identity.label_free_barrier)
     partition = read_json(root / identity.case_partition)
@@ -920,15 +917,11 @@ def _validate_final_prepared_cache(
     identity: HarpPreparationIdentity = V3_PREPARATION_IDENTITY,
 ):
     content = read_json(root / CONTENT_INDEX)
-    config = SimpleNamespace(
-        resolved_path=lambda role: root if role == "test_cache_root" else None,
-        expected_hashes={
-            "test_cache_content_sha256": str(content.get("content_index_hash"))
-        },
-    )
-    cache = load_cache_index(  # type: ignore[arg-type]
-        config,
-        cache_identity=identity.cache_identity,
+    if identity.cache_identity != V3_CACHE_IDENTITY:
+        raise ProtocolError("HARP v3 preparation cache identity drifted.")
+    cache = _load_cache_index_from_root(
+        root,
+        expected_content_sha256=str(content.get("content_index_hash")),
     )
     if identity.preparation_receipt.as_posix() not in cache.member_sha256:
         raise ProtocolError("HARP final prepared cache lacks its preparation receipt.")
