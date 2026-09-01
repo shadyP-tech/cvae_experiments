@@ -4053,6 +4053,57 @@ experiments:
       - The runner uses compact NumPy stores, bounded GPU and CPU work queues, persistent spawned CUDA workers, shared multi-output CPU fits, deterministic threading, lease-bound local scratch, hash-validated intra-attempt label-free checkpoints, and independently reconstructed route seals. Cross-process or cross-attempt recovery is forbidden by the single-use authority.
       - V4 physically rebuilds its cache, manifests, source streams, and classifier checkpoints from immutable upstream MIDOG++ inputs. No v3 cache, output, scratch, amendment, lease, checkpoint, route, or result is an input.
       - The same already-consumed MIDOG++ test cases may be reused only after separately preparing v4 inputs and publishing/activating separate authority. Any result remains POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE with fresh_evidence=false and may feed no other experiment.
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v6
+    stage: 90_oracles_and_diagnostics
+    status: planned
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_harp_router_v6.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v6
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_harp_consumed_test_cache_v6
+      - midogpp_stage90_harp_consumed_test_development_manifest_v6
+      - midogpp_stage90_harp_consumed_test_evaluation_manifest_v6
+      - midogpp_uniform_b_test_consumption_ledger_harp_parent_v6
+      - midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v6
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Immutable fixed-bank generation geometry and classifier settings only; it grants no routing, consumed-label, fresh-evidence, promotion, deployment, or execution authority.
+      midogpp_stage90_harp_consumed_test_cache_v6: Fenced v6-only label-free Virchow2 cache rebuilt from the immutable canonical consumed MIDOG++ test cache; it grants no execution or evidential authority.
+      midogpp_stage90_harp_consumed_test_development_manifest_v6: V6 role-pure whole-case development-label capability; it may open only after the complete physical B/U/H-by-e menu is durable.
+      midogpp_stage90_harp_consumed_test_evaluation_manifest_v6: V6 role-pure evaluation-label capability; it may open once only after all case routes and exact-B fallback vectors are durable and independently reconstructed twice.
+      midogpp_uniform_b_test_consumption_ledger_harp_parent_v6: V6-only byte-exact binding to the original consumed-test parent ledger; it cannot authorize execution by itself.
+      midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v6: A separately published HARP v6 single-use amendment is required; every v1/v2/v3/v4/v5 authority, output, scratch, cache, route, and capability state is a forbidden alias.
+    runner:
+      preparation_authority_gate: harp_v6_consumed_test_execution_amendment_v1
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+        PYTHONHASHSEED: "0"
+        OMP_DYNAMIC: "FALSE"
+        MKL_DYNAMIC: "FALSE"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-harp-router-v6
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v6
+    notes:
+      - SCOPE LIMITED - v6 is implemented and registered as a new planned identity, but implementation creates no amendment, claims no lease, opens no labels, and does not authorize a workstation run.
+      - V6 preserves the v5 scientific router and repairs only the deterministic durable-JSON boundary by recursively projecting immutable mappings and sequences to strict plain JSON before comparison and publication.
+      - Compatibility remains label-free and is computed from disjoint target-support embeddings while each expert is resident. It is a proxy feature, neither exact NELBO nor observed downstream utility.
+      - The workstation profile uses two persistent GPU workers, a globally one-threaded parent, four spawned classifier workers with three BLAS threads each, and a separate CUDA-hidden four-worker science pool with one BLAS thread each. Pools are phase-disjoint and never nested.
+      - V6 physically rebuilds its cache, capabilities, source streams, compatibility surface, model, route, scratch, amendment, and lease. No v1/v2/v3/v4/v5 cache, output, policy, checkpoint, route, scratch, or authority is an input.
+      - The already-consumed MIDOG++ test cases are reused only for a terminal sensitivity diagnostic. Results remain POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE with fresh_evidence=false and may feed no other experiment.
   - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v5
     stage: 90_oracles_and_diagnostics
     status: planned
