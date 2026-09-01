@@ -22,6 +22,11 @@ from .activation_transaction import (
     inspect_activation_recovery,
     recover_activation,
 )
+from .activation_supersession import (
+    SUPERSESSION_CONFIRMATION,
+    recovery_source_snapshot_changed,
+    require_harp_v6_recovery_source_current,
+)
 from .activation_workspace import render_activation_workspace
 from .amendment_publisher import (
     HarpV6AmendmentDraft,
@@ -256,6 +261,9 @@ def recover_harp_v6_activation(
 ) -> HarpV6ActivationReceipt:
     """Resume an interrupted transaction from its immutable journal."""
 
+    if confirmation != ACTIVATION_CONFIRMATION:
+        raise ProtocolError("HARP v6 activation confirmation is absent or drifted.")
+    require_harp_v6_recovery_source_current(repository_root)
     return recover_activation(
         repository_root,
         confirmation=confirmation,
@@ -268,7 +276,19 @@ def inspect_harp_v6_activation_recovery(
     repository_root: str | Path,
 ) -> dict[str, object] | None:
     payload = inspect_activation_recovery(repository_root)
-    return None if payload is None else dict(payload)
+    if payload is None:
+        return None
+    rendered = dict(payload)
+    if recovery_source_snapshot_changed(repository_root):
+        rendered.update(
+            {
+                "status": "SUPERSESSION_REQUIRED_SOURCE_SNAPSHOT_DRIFT",
+                "confirmation_required": SUPERSESSION_CONFIRMATION,
+                "normal_recovery_allowed": False,
+                "filesystem_mutations": 0,
+            }
+        )
+    return rendered
 
 
 def _verify_plan_source_state(plan: HarpV6ActivationPlan) -> None:

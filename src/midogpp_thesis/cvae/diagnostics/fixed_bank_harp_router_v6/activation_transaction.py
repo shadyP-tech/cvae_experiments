@@ -261,7 +261,7 @@ def commit_activation(
         raise ProtocolError("HARP v6 activation confirmation is absent or drifted.")
     journal = build_journal(plan)
     boundary = RepositoryBoundary.open(plan.repository_root)
-    with _activation_lock(boundary):
+    with activation_lock(boundary):
         _install_or_validate_journal(boundary, journal)
         _inject(fault_injector, "journal_durable")
         return _resume(
@@ -282,7 +282,7 @@ def recover_activation(
     if confirmation != expected_confirmation:
         raise ProtocolError("HARP v6 activation confirmation is absent or drifted.")
     boundary = RepositoryBoundary.open(repository_root)
-    with _activation_lock(boundary):
+    with activation_lock(boundary):
         journal = load_journal(boundary)
         return _resume(
             boundary,
@@ -652,7 +652,9 @@ def _install_or_validate_journal(
 
 
 @contextmanager
-def _activation_lock(boundary: RepositoryBoundary):
+def activation_lock(boundary: RepositoryBoundary):
+    """Serialize every transition that owns the v6 activation journal."""
+
     path = boundary.member(
         LOCK_RELATIVE_PATH,
         label="activation lock",
@@ -732,10 +734,13 @@ def _inject(fault_injector: FaultInjector | None, point: str) -> None:
 
 
 __all__ = (
+    "ActivationJournal",
     "HarpV6ActivationReceipt",
     "TRANSACTION_RELATIVE_PATH",
+    "activation_lock",
     "commit_activation",
     "inspect_activation_recovery",
     "journal_path",
+    "load_journal",
     "recover_activation",
 )

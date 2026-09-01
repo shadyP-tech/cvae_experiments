@@ -29,11 +29,7 @@ from .recovery import (
 )
 from .preparation_authority import (
     AuthorityMember,
-    HARP_V1_EXECUTION_AMENDMENT_GATE,
-    HARP_V2_EXECUTION_AMENDMENT_GATE,
-    HARP_V3_EXECUTION_AMENDMENT_GATE,
-    HARP_V4_EXECUTION_AMENDMENT_GATE,
-    HARP_V5_EXECUTION_AMENDMENT_GATE,
+    HARP_EXECUTION_AMENDMENT_GATES,
     PreparationAuthorityError,
     PreparationAuthorityReceipt,
     enforce_preparation_authority,
@@ -51,15 +47,6 @@ RUNNABLE_STATUSES = {"active", "diagnostic"}
 BLOCKED_EVIDENCE_LABELS = {"REJECTED"}
 ALLOWED_FILE_HASH_ALGORITHMS = {"sha256", "sha512", "blake2b"}
 REPOSITORY_MARKER = Path("experiments/midogpp/registry.yaml")
-HARP_EXECUTION_AMENDMENT_GATES = frozenset(
-    {
-        HARP_V1_EXECUTION_AMENDMENT_GATE,
-        HARP_V2_EXECUTION_AMENDMENT_GATE,
-        HARP_V3_EXECUTION_AMENDMENT_GATE,
-        HARP_V4_EXECUTION_AMENDMENT_GATE,
-        HARP_V5_EXECUTION_AMENDMENT_GATE,
-    }
-)
 
 
 class WorkspaceError(ValueError):

@@ -136,6 +136,7 @@ _HARP_VERSION_BY_GATE = {
     HARP_V5_EXECUTION_AMENDMENT_GATE: "v5",
     HARP_V6_EXECUTION_AMENDMENT_GATE: "v6",
 }
+HARP_EXECUTION_AMENDMENT_GATES = frozenset(_HARP_VERSION_BY_GATE)
 _HARP_EXPERIMENT_BY_GATE = {
     HARP_V1_EXECUTION_AMENDMENT_GATE: HARP_V1_EXPERIMENT_ID,
     HARP_V2_EXECUTION_AMENDMENT_GATE: HARP_V2_EXPERIMENT_ID,
@@ -144,6 +145,16 @@ _HARP_EXPERIMENT_BY_GATE = {
     HARP_V5_EXECUTION_AMENDMENT_GATE: HARP_V5_EXPERIMENT_ID,
     HARP_V6_EXECUTION_AMENDMENT_GATE: HARP_V6_EXPERIMENT_ID,
 }
+_REQUIRED_GATE_BY_EXPERIMENT = {
+    experiment_id: gate_id
+    for gate_id, experiment_id in _HARP_EXPERIMENT_BY_GATE.items()
+}
+_REQUIRED_GATE_BY_EXPERIMENT.update(
+    {
+        SCEPTRE_V4_EXPERIMENT_ID: SCEPTRE_V4_EXECUTION_AMENDMENT_GATE,
+        SCEPTRE_V5_EXPERIMENT_ID: SCEPTRE_V5_EXECUTION_AMENDMENT_GATE,
+    }
+)
 _HARP_AUTHORIZATION_MODULE_BY_GATE = {
     gate: (
         "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_"
@@ -313,15 +324,7 @@ def preparation_authority_registration_error(
 ) -> str | None:
     """Return a closed-world registry-binding error, if any."""
 
-    required = {
-        HARP_V1_EXPERIMENT_ID: HARP_V1_EXECUTION_AMENDMENT_GATE,
-        HARP_V2_EXPERIMENT_ID: HARP_V2_EXECUTION_AMENDMENT_GATE,
-        HARP_V3_EXPERIMENT_ID: HARP_V3_EXECUTION_AMENDMENT_GATE,
-        HARP_V4_EXPERIMENT_ID: HARP_V4_EXECUTION_AMENDMENT_GATE,
-        HARP_V5_EXPERIMENT_ID: HARP_V5_EXECUTION_AMENDMENT_GATE,
-        SCEPTRE_V4_EXPERIMENT_ID: SCEPTRE_V4_EXECUTION_AMENDMENT_GATE,
-        SCEPTRE_V5_EXPERIMENT_ID: SCEPTRE_V5_EXECUTION_AMENDMENT_GATE,
-    }.get(experiment_id)
+    required = _REQUIRED_GATE_BY_EXPERIMENT.get(experiment_id)
     if required is not None and gate_id != required:
         return (
             f"{experiment_id}: runner.preparation_authority_gate must remain "
@@ -436,6 +439,7 @@ __all__ = (
     "HARP_V6_EXECUTION_AMENDMENT_GATE",
     "HARP_V6_EXPERIMENT_ID",
     "HARP_V6_RUN_CONFIRMATION_TOKEN",
+    "HARP_EXECUTION_AMENDMENT_GATES",
     "KNOWN_PREPARATION_AUTHORITY_GATES",
     "PreparationAuthorityError",
     "PreparationAuthorityReceipt",

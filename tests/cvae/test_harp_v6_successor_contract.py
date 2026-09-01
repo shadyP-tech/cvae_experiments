@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -23,12 +24,14 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v6.source_seal impor
 )
 from midogpp_thesis.cvae.protocol import ProtocolError
 from midogpp_thesis.workspace.preparation_authority import (
+    HARP_EXECUTION_AMENDMENT_GATES,
     HARP_V6_EXECUTION_AMENDMENT_GATE,
     HARP_V6_EXPERIMENT_ID,
     HARP_V6_RUN_CONFIRMATION_TOKEN,
     KNOWN_PREPARATION_AUTHORITY_GATES,
     PreparationAuthorityError,
     harp_run_confirmation_token,
+    preparation_authority_registration_error,
     validate_preparation_authority_extra_args,
 )
 from midogpp_thesis.workspace.runtime import MidogppWorkspace, WorkspaceError
@@ -160,6 +163,29 @@ def test_v6_workspace_registration_is_closed_and_non_runnable() -> None:
     assert tuple(experiment.runner_argv) == authorization.WORKSPACE_RUNNER_ARGV
     assert dict(experiment.runner_env) == dict(authorization.WORKSPACE_RUNNER_ENV)
     assert HARP_V6_EXECUTION_AMENDMENT_GATE in KNOWN_PREPARATION_AUTHORITY_GATES
+    assert HARP_V6_EXECUTION_AMENDMENT_GATE in HARP_EXECUTION_AMENDMENT_GATES
+    projection = workspace._preparation_authority_registration_projection(
+        replace(experiment, status="diagnostic")
+    )
+    assert authorization.validate_workspace_registration_execution_projection(
+        projection
+    ) == authorization.workspace_registration_execution_contract()[
+        "workspace_registration_execution_contract_hash"
+    ]
+    assert preparation_authority_registration_error(
+        None,
+        experiment_id=EXPERIMENT_ID,
+    ) == (
+        f"{EXPERIMENT_ID}: runner.preparation_authority_gate must remain "
+        f"{HARP_V6_EXECUTION_AMENDMENT_GATE!r}"
+    )
+    assert preparation_authority_registration_error(
+        HARP_V6_EXECUTION_AMENDMENT_GATE,
+        experiment_id="wrong.consumer",
+    ) == (
+        "wrong.consumer: runner.preparation_authority_gate "
+        f"{HARP_V6_EXECUTION_AMENDMENT_GATE!r} is bound only to {EXPERIMENT_ID}"
+    )
     with pytest.raises(WorkspaceError, match="status='planned'"):
         workspace.run(EXPERIMENT_ID)
 

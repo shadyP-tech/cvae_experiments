@@ -1088,6 +1088,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--confirm",
         help="Exact v6 activation token; omit for a mutation-free plan.",
     )
+    harp_supersede_v6 = sub.add_parser(
+        "supersede-fixed-bank-harp-router-v6-activation",
+        help=(
+            "Archive an authenticated, fully rolled-back v6 activation whose "
+            "source seal predates a repair; this never creates run authority."
+        ),
+    )
+    harp_supersede_v6.add_argument("--repository-root", required=True)
+    harp_supersede_v6.add_argument(
+        "--confirm",
+        help="Exact v6 supersession token; omit for a mutation-free plan.",
+    )
     sceptre_v5_mode.add_argument(
         "--dry-run",
         action="store_true",
@@ -1476,6 +1488,25 @@ def main(argv: list[str] | None = None) -> int:
                 if args.confirm is None
                 else activate_harp_v6(plan, confirmation=args.confirm).to_payload()
             )
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.surface == "supersede-fixed-bank-harp-router-v6-activation":
+        import json
+
+        from .fixed_bank_harp_router_v6.activation_supersession import (
+            plan_harp_v6_activation_supersession,
+            supersede_harp_v6_activation,
+        )
+
+        plan = plan_harp_v6_activation_supersession(args.repository_root)
+        result = (
+            plan.to_payload()
+            if args.confirm is None
+            else supersede_harp_v6_activation(
+                plan,
+                confirmation=args.confirm,
+            ).to_payload()
+        )
         print(json.dumps(result, sort_keys=True, separators=(",", ":")))
         return 0
     artifact_root = Path(args.artifact_root)
