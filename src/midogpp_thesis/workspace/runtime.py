@@ -33,6 +33,7 @@ from .preparation_authority import (
     HARP_V2_EXECUTION_AMENDMENT_GATE,
     HARP_V3_EXECUTION_AMENDMENT_GATE,
     HARP_V4_EXECUTION_AMENDMENT_GATE,
+    HARP_V5_EXECUTION_AMENDMENT_GATE,
     PreparationAuthorityError,
     PreparationAuthorityReceipt,
     enforce_preparation_authority,
@@ -56,6 +57,7 @@ HARP_EXECUTION_AMENDMENT_GATES = frozenset(
         HARP_V2_EXECUTION_AMENDMENT_GATE,
         HARP_V3_EXECUTION_AMENDMENT_GATE,
         HARP_V4_EXECUTION_AMENDMENT_GATE,
+        HARP_V5_EXECUTION_AMENDMENT_GATE,
     }
 )
 

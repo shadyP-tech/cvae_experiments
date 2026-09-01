@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="650" viewBox="0 0 1200 650">
+<rect width="1200" height="650" fill="#ffffff"/>
+<text x="1110" y="34" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#666666" text-anchor="end">Source-inner validation  |  seven-source tasks  |  no target expert</text>
+<line x1="150" y1="476.0" x2="1110" y2="476.0" stroke="#bdbdbd" stroke-width="1.5"/>
+<text x="130" y="481.0" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="end">0.750</text>
+<line x1="150" y1="399.2" x2="1110" y2="399.2" stroke="#d9d9d9" stroke-width="0.9"/>
+<text x="130" y="404.2" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="end">0.755</text>
+<line x1="150" y1="322.4" x2="1110" y2="322.4" stroke="#d9d9d9" stroke-width="0.9"/>
+<text x="130" y="327.4" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="end">0.760</text>
+<line x1="150" y1="245.6" x2="1110" y2="245.6" stroke="#d9d9d9" stroke-width="0.9"/>
+<text x="130" y="250.6" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="end">0.765</text>
+<line x1="150" y1="168.8" x2="1110" y2="168.8" stroke="#d9d9d9" stroke-width="0.9"/>
+<text x="130" y="173.8" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="end">0.770</text>
+<line x1="150" y1="92.0" x2="1110" y2="92.0" stroke="#d9d9d9" stroke-width="0.9"/>
+<text x="130" y="97.0" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="end">0.775</text>
+<text x="38" y="284.0" transform="rotate(-90 38 284.0)" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#111111" text-anchor="middle">Mean source-inner BACC</text>
+<line x1="300" y1="363.1" x2="650" y2="167.1" stroke="#0b1f3a" stroke-width="4" stroke-linecap="round"/>
+<line x1="650" y1="167.1" x2="1000" y2="144.7" stroke="#6f879d" stroke-width="3" stroke-linecap="round" stroke-dasharray="9 7"/>
+<rect x="383" y="226.10719999999986" width="184" height="29" fill="#ffffff"/>
+<text x="475" y="247.10719999999986" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#4da000" text-anchor="middle">+0.0128 over P0</text>
+<rect x="713" y="178.87456000000006" width="224" height="29" fill="#ffffff"/>
+<text x="825" y="199.87456000000006" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#6f879d" text-anchor="middle">0.0015 below ceiling</text>
+<circle cx="300" cy="363.1" r="13" fill="#c66a1a" stroke="#a65110" stroke-width="2.4"/>
+<text x="300" y="336.1" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#c66a1a" text-anchor="middle">0.7573</text>
+<text x="300" y="530" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#111111" text-anchor="middle">Standard prior (P0)</text>
+<text x="300" y="554" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#666666" text-anchor="middle">standard-normal prior</text>
+<circle cx="650" cy="167.1" r="13" fill="#63c900" stroke="#111111" stroke-width="2.4"/>
+<text x="650" y="140.1" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#4da000" text-anchor="middle">0.7701</text>
+<text x="650" y="530" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#111111" text-anchor="middle">Aggregate posterior (PS)</text>
+<text x="650" y="554" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#666666" text-anchor="middle">full-shrinkage sampler</text>
+<circle cx="1000" cy="144.7" r="13" fill="#ffffff" stroke="#8a8a8a" stroke-width="2.4"/>
+<text x="1000" y="117.7" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#111111" text-anchor="middle">0.7716</text>
+<text x="1000" y="530" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#111111" text-anchor="middle">Posterior ceiling (Q)</text>
+<text x="1000" y="554" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#666666" text-anchor="middle">diagnostic posterior sample</text>
+<text x="1110" y="615" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#666666" text-anchor="end">Magnified y-axis shows within-protocol differences.</text>
+</svg>

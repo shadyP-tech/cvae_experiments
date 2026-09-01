@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="650" viewBox="0 0 1200 650">
+<rect width="1200" height="650" fill="#ffffff"/>
+<text x="1128" y="34" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#666666" text-anchor="end">Same nine held-out centers  |  target labels used for scoring only</text>
+<line x1="420.0" y1="92" x2="420.0" y2="540" stroke="#bdbdbd" stroke-width="1.5"/>
+<text x="420.0" y="574" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="middle">0.00</text>
+<line x1="641.3" y1="92" x2="641.3" y2="540" stroke="#d9d9d9" stroke-width="0.9"/>
+<text x="641.3" y="574" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="middle">0.25</text>
+<line x1="862.5" y1="92" x2="862.5" y2="540" stroke="#d9d9d9" stroke-width="0.9"/>
+<text x="862.5" y="574" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="middle">0.50</text>
+<line x1="1083.8" y1="92" x2="1083.8" y2="540" stroke="#d9d9d9" stroke-width="0.9"/>
+<text x="1083.8" y="574" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#666666" text-anchor="middle">0.75</text>
+<line x1="862.5" y1="76" x2="862.5" y2="540" stroke="#8a8a8a" stroke-width="1.4" stroke-dasharray="9 7"/>
+<text x="862.5" y="62" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#666666" text-anchor="middle">chance = 0.50</text>
+<text x="48" y="122" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" fill="#111111">Real Virchow2 reference</text>
+<text x="48" y="144" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#666666">real-feature reference</text>
+<rect x="420" y="109" width="655.2" height="34" fill="#0d2848" stroke="#0d2848" stroke-width="1.2"/>
+<text x="1088.2" y="132" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#0d2848" text-anchor="start">0.7403</text>
+<text x="48" y="210" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" fill="#111111">Real PCA128 reference</text>
+<text x="48" y="232" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#666666">PCA compression control</text>
+<rect x="420" y="197" width="637.7" height="34" fill="#ffffff" stroke="#8a8a8a" stroke-width="2"/>
+<text x="1070.7" y="220" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#111111" text-anchor="start">0.7205</text>
+<text x="48" y="298" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" fill="#111111">CVAE decode mean</text>
+<text x="48" y="320" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#666666">reconstruction mean  |  preservation ratio 0.919</text>
+<rect x="420" y="285" width="636.9" height="34" fill="#7fb2cc" stroke="#2468b3" stroke-width="1.2"/>
+<text x="1069.9" y="308" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#111111" text-anchor="start">0.7197</text>
+<text x="48" y="386" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" fill="#111111">CVAE posterior sample</text>
+<text x="48" y="408" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#666666">stochastic reconstruction</text>
+<rect x="420" y="373" width="634.2" height="34" fill="#3e86b3" stroke="#2468b3" stroke-width="1.2"/>
+<text x="1067.2" y="396" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#111111" text-anchor="start">0.7166</text>
+<text x="48" y="474" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#111111">CVAE prior sample</text>
+<text x="48" y="496" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#666666">generative prior  |  bottleneck</text>
+<rect x="420" y="461" width="564.2" height="34" fill="#c66a1a" stroke="#a65110" stroke-width="1.2"/>
+<text x="997.2" y="484" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#c66a1a" text-anchor="start">0.6376</text>
+<text x="774.0" y="622" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#111111" text-anchor="middle">Mean held-out target BACC</text>
+</svg>
