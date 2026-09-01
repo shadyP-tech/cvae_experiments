@@ -32,6 +32,7 @@ from .preparation_authority import (
     HARP_V1_EXECUTION_AMENDMENT_GATE,
     HARP_V2_EXECUTION_AMENDMENT_GATE,
     HARP_V3_EXECUTION_AMENDMENT_GATE,
+    HARP_V3_RUN_CONFIRMATION_TOKEN,
     PreparationAuthorityError,
     PreparationAuthorityReceipt,
     enforce_preparation_authority,
@@ -573,6 +574,7 @@ class MidogppWorkspace:
         *,
         require_inputs: bool = True,
         force: bool = False,
+        _run_admitted: bool = False,
     ) -> PreparedRun:
         self.validate()
         experiment = self.get_experiment(experiment_id)
@@ -585,6 +587,7 @@ class MidogppWorkspace:
                 experiment.preparation_authority_gate,
                 (),
                 force=force,
+                preparation_only=_run_admitted,
             )
         except PreparationAuthorityError as exc:
             raise WorkspaceError(f"{experiment_id}: {exc}") from exc
@@ -981,7 +984,12 @@ class MidogppWorkspace:
                 f"refusing normal preparation for strategy {strategy!r}."
             )
 
-        prepared = self.prepare(experiment_id, require_inputs=True, force=force)
+        prepared = self.prepare(
+            experiment_id,
+            require_inputs=True,
+            force=force,
+            _run_admitted=True,
+        )
         return self._execute(prepared, extra_args=extra_args)
 
     def _execute(
@@ -1024,10 +1032,18 @@ class MidogppWorkspace:
             raise WorkspaceError(f"Unknown MIDOG++ experiment_id: {experiment_id}") from exc
 
     def central_command(self, experiment_id: str) -> str:
-        self.get_experiment(experiment_id)
-        return shlex.join(
-            [sys.executable, "-m", "midogpp_thesis", "workspace", "run", experiment_id]
-        )
+        experiment = self.get_experiment(experiment_id)
+        argv = [
+            sys.executable,
+            "-m",
+            "midogpp_thesis",
+            "workspace",
+            "run",
+            experiment_id,
+        ]
+        if experiment.preparation_authority_gate == HARP_V3_EXECUTION_AMENDMENT_GATE:
+            argv.extend(("--", "--confirm", HARP_V3_RUN_CONFIRMATION_TOKEN))
+        return shlex.join(argv)
 
     def _input_manifest(
         self,

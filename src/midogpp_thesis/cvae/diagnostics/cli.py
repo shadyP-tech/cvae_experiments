@@ -785,24 +785,38 @@ def build_parser() -> argparse.ArgumentParser:
             "claiming the single-use lease, generating sources, or opening labels."
         ),
     )
+    harp_stage90_v3_mode.add_argument(
+        "--confirm",
+        help=(
+            "Exact single-use launch confirmation token. The token is checked "
+            "before authority, input paths, scratch, labels, or output are accessed."
+        ),
+    )
     harp_prepare_v3 = sub.add_parser(
         "prepare-fixed-bank-harp-router-v3-inputs",
         help=(
-            "Materialize the v3-only consumed-test label-blind cache and "
-            "whole-case role manifests. This issues no execution authority."
+            "Plan the catalog-bound v3-only consumed-test cache and whole-case "
+            "role manifests, or materialize them with the exact confirmation. "
+            "This issues no execution authority."
         ),
     )
-    harp_prepare_v3.add_argument("--canonical-cache-root", required=True)
-    harp_prepare_v3.add_argument("--canonical-manifest", required=True)
-    harp_prepare_v3.add_argument("--parent-ledger", required=True)
-    harp_prepare_v3.add_argument("--cache-root", required=True)
-    harp_prepare_v3.add_argument("--development-manifest", required=True)
-    harp_prepare_v3.add_argument("--evaluation-manifest", required=True)
+    harp_prepare_v3.add_argument(
+        "--repository-root",
+        required=True,
+        help="Checkout root owning the exact MIDOG++ workspace catalog.",
+    )
+    harp_prepare_v3.add_argument(
+        "--confirm",
+        help=(
+            "Exact preparation confirmation token. Omit for a mutation-free, "
+            "label-blind plan."
+        ),
+    )
     harp_publish_v3 = sub.add_parser(
         "publish-fixed-bank-harp-router-v3-amendment",
         help=(
-            "Legacy validation-only surface. Direct v3 amendment publication is "
-            "disabled; use activate-fixed-bank-harp-router-v3 so the durable "
+            "Retired fail-closed surface. It rejects before config or input "
+            "access; use activate-fixed-bank-harp-router-v3 so the durable "
             "recovery journal precedes every authority mutation."
         ),
     )
@@ -831,16 +845,16 @@ def build_parser() -> argparse.ArgumentParser:
             "inputs, or commit it only with the exact confirmation token."
         ),
     )
-    harp_activate_v3.add_argument("--config", required=True)
-    harp_activate_v3.add_argument("--expert-bank-root", required=True)
-    harp_activate_v3.add_argument("--generation-lock-root", required=True)
-    harp_activate_v3.add_argument("--prepared-cache-root", required=True)
-    harp_activate_v3.add_argument("--development-manifest", required=True)
-    harp_activate_v3.add_argument("--evaluation-manifest", required=True)
-    harp_activate_v3.add_argument("--parent-ledger", required=True)
     harp_activate_v3.add_argument("--authorization-basis", required=True)
     harp_activate_v3.add_argument("--authorization-date", required=True)
-    harp_activate_v3.add_argument("--repository-root", required=True)
+    harp_activate_v3.add_argument(
+        "--repository-root",
+        required=True,
+        help=(
+            "Checkout root from which the config and every activation input "
+            "are resolved through the exact workspace catalog."
+        ),
+    )
     harp_activate_v3.add_argument(
         "--confirm",
         help=(
@@ -965,43 +979,29 @@ def main(argv: list[str] | None = None) -> int:
     if args.surface == "prepare-fixed-bank-harp-router-v3-inputs":
         import json
 
-        from .fixed_bank_harp_router_v3.preparation import (
-            prepare_harp_consumed_test_inputs_v3,
+        from .fixed_bank_harp_router_v3.workstation_preparation import (
+            plan_harp_v3_workstation_preparation,
+            prepare_harp_v3_workstation_inputs,
         )
 
-        prepared = prepare_harp_consumed_test_inputs_v3(
-            canonical_cache_root=args.canonical_cache_root,
-            canonical_manifest_path=args.canonical_manifest,
-            parent_ledger_path=args.parent_ledger,
-            cache_root=args.cache_root,
-            development_manifest_path=args.development_manifest,
-            evaluation_manifest_path=args.evaluation_manifest,
+        plan = plan_harp_v3_workstation_preparation(args.repository_root)
+        result = (
+            plan.to_payload()
+            if args.confirm is None
+            else prepare_harp_v3_workstation_inputs(
+                plan,
+                confirmation=args.confirm,
+            ).to_payload()
         )
-        print(json.dumps(prepared.to_payload(), sort_keys=True, separators=(",", ":")))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
         return 0
     if args.surface == "publish-fixed-bank-harp-router-v3-amendment":
-        import json
+        from ..protocol import ProtocolError
 
-        from .fixed_bank_harp_router_v3.amendment_publisher import (
-            publish_harp_v3_execution_amendment,
+        raise ProtocolError(
+            "HARP v3 direct amendment publication is disabled before config or "
+            "input access; use activate-fixed-bank-harp-router-v3."
         )
-        from .fixed_bank_harp_router_v3.config import load_config
-
-        receipt = publish_harp_v3_execution_amendment(
-            load_config(args.config),
-            expert_bank_root=args.expert_bank_root,
-            generation_lock_root=args.generation_lock_root,
-            prepared_cache_root=args.prepared_cache_root,
-            development_manifest_path=args.development_manifest,
-            evaluation_manifest_path=args.evaluation_manifest,
-            parent_ledger_path=args.parent_ledger,
-            amendment_path=args.amendment_path,
-            authorization_basis=args.authorization_basis,
-            authorization_date=args.authorization_date,
-            repository_root=args.repository_root,
-        )
-        print(json.dumps(receipt.to_payload(), sort_keys=True, separators=(",", ":")))
-        return 0
     if args.surface == "activate-fixed-bank-harp-router-v3":
         import json
 
@@ -1012,6 +1012,9 @@ def main(argv: list[str] | None = None) -> int:
             recover_harp_v3_activation,
         )
         from .fixed_bank_harp_router_v3.config import load_config
+        from .fixed_bank_harp_router_v3.workspace_paths import (
+            resolve_harp_v3_workspace_paths,
+        )
 
         recovery = inspect_harp_v3_activation_recovery(args.repository_root)
         if recovery is not None:
@@ -1024,14 +1027,13 @@ def main(argv: list[str] | None = None) -> int:
                 ).to_payload()
             )
         else:
+            paths = resolve_harp_v3_workspace_paths(
+                args.repository_root,
+                require_prepared=True,
+            )
             plan = plan_harp_v3_activation(
-                load_config(args.config),
-                expert_bank_root=args.expert_bank_root,
-                generation_lock_root=args.generation_lock_root,
-                prepared_cache_root=args.prepared_cache_root,
-                development_manifest_path=args.development_manifest,
-                evaluation_manifest_path=args.evaluation_manifest,
-                parent_ledger_path=args.parent_ledger,
+                load_config(paths.config_path),
+                **paths.activation_kwargs(),
                 repository_root=args.repository_root,
                 authorization_basis=args.authorization_basis,
                 authorization_date=args.authorization_date,
@@ -1401,13 +1403,24 @@ def main(argv: list[str] | None = None) -> int:
     if args.surface == "fixed-bank-harp-router-v3":
         import json
 
+        from ..protocol import ProtocolError
         from .fixed_bank_harp_router_v3.config import load_config
         from .fixed_bank_harp_router_v3.runner import (
+            HARP_V3_RUN_CONFIRMATION_TOKEN,
             dry_run_harp_stage90_v3,
             inspect_harp_stage90_v3,
             run_harp_stage90_v3,
         )
 
+        if (
+            not args.inspect_plan
+            and not args.dry_run
+            and args.confirm != HARP_V3_RUN_CONFIRMATION_TOKEN
+        ):
+            raise ProtocolError(
+                "HARP v3 execution requires the exact confirmation token "
+                f"{HARP_V3_RUN_CONFIRMATION_TOKEN}."
+            )
         config = load_config(args.config)
         if args.inspect_plan:
             print(
@@ -1426,7 +1439,13 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         else:
-            print(run_harp_stage90_v3(config, artifact_root=artifact_root))
+            print(
+                run_harp_stage90_v3(
+                    config,
+                    artifact_root=artifact_root,
+                    confirmation_token=args.confirm,
+                )
+            )
         return 0
 
     if args.surface == (

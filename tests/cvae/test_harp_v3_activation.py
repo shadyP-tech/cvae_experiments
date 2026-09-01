@@ -16,6 +16,7 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v3 import (
 from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v3 import (
     amendment_publisher,
     authorization,
+    preparation as preparation_module,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v3.config import (
     load_config,
@@ -30,12 +31,46 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v3.input_surfaces im
 from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v3.preparation import (
     PREPARATION_RECEIPT,
 )
+from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v3.workspace_paths import (
+    resolve_harp_v3_workspace_paths,
+)
 from midogpp_thesis.cvae.protocol import ProtocolError
 from midogpp_thesis.cvae.routing.harp_protocol import canonical_hash
 from midogpp_thesis.cvae.runtime.artifact_io import atomic_json, sha256_file
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+_BANK = Path(
+    "artifacts/midogpp/30_expert_bank/"
+    "uniform_b_v2_routing_authorized_expert_bank_v1"
+)
+_GENERATION = Path(
+    "artifacts/midogpp/40_prior_and_generation/"
+    "uniform_b_v2_generation_lock/v1"
+)
+_CANONICAL_CACHE = Path(
+    "datasets/midogpp/derived/features/virchow2/"
+    "uniform_b_v2_descriptive_test_cache_v1/seed42"
+)
+_CANONICAL_MANIFEST = Path(
+    "datasets/midogpp/contract/annotation_patch_v1/manifest.csv"
+)
+_PREPARED_CACHE = Path(
+    "datasets/midogpp/derived/features/virchow2/harp_consumed_test_cache_v3"
+)
+_DEVELOPMENT = Path(
+    "datasets/midogpp/contract/harp_consumed_test_development_v3/manifest.csv"
+)
+_EVALUATION = Path(
+    "datasets/midogpp/contract/harp_consumed_test_evaluation_v3/manifest.csv"
+)
+_PARENT = Path(
+    "artifacts/midogpp/10_real_feature_reference/"
+    "uniform_b_canonical_real_feature_reference_v1/seed42/"
+    "reports/test_consumption_ledger.json"
+)
 
 
 def _synthetic_plan(
@@ -52,14 +87,20 @@ def _synthetic_plan(
     )
     config = load_config(repository / authorization.WORKSPACE_CONFIG_RELATIVE_PATH)
 
-    bank = repository / "synthetic/bank"
-    generation = repository / "synthetic/generation"
-    cache = repository / "synthetic/cache"
-    for path in (bank, generation, cache / "manifests"):
+    bank = repository / _BANK
+    generation = repository / _GENERATION
+    cache = repository / _PREPARED_CACHE
+    canonical_cache = repository / _CANONICAL_CACHE
+    canonical_manifest = repository / _CANONICAL_MANIFEST
+    for path in (bank, generation, canonical_cache, cache / "manifests"):
         path.mkdir(parents=True, exist_ok=True)
-    development = repository / "synthetic/development.csv"
-    evaluation = repository / "synthetic/evaluation.csv"
-    parent = repository / "synthetic/parent.json"
+    canonical_manifest.parent.mkdir(parents=True, exist_ok=True)
+    canonical_manifest.write_text("sample_id,label\nsource,0\n", encoding="utf-8")
+    development = repository / _DEVELOPMENT
+    evaluation = repository / _EVALUATION
+    parent = repository / _PARENT
+    for path in (development, evaluation, parent):
+        path.parent.mkdir(parents=True, exist_ok=True)
     development.write_text("sample_id,label\ndev,0\n", encoding="utf-8")
     evaluation.write_text("sample_id,label\neval,1\n", encoding="utf-8")
     atomic_json(parent, {"schema_version": "synthetic_harp_v3_parent"})
@@ -139,12 +180,9 @@ def test_activation_plan_is_deterministic_and_mutation_free(
     }
     second = activation.plan_harp_v3_activation(
         load_config(plan.config_path),
-        expert_bank_root=repository / "synthetic/bank",
-        generation_lock_root=repository / "synthetic/generation",
-        prepared_cache_root=repository / "synthetic/cache",
-        development_manifest_path=repository / "synthetic/development.csv",
-        evaluation_manifest_path=repository / "synthetic/evaluation.csv",
-        parent_ledger_path=repository / "synthetic/parent.json",
+        **resolve_harp_v3_workspace_paths(
+            repository, require_prepared=True
+        ).activation_kwargs(),
         repository_root=repository,
         authorization_basis=authorization.AUTHORIZATION_BASIS,
         authorization_date="2026-09-01",
@@ -210,6 +248,52 @@ def test_confirmation_mismatch_leaves_everything_planned(
     )
 
 
+def test_retired_arbitrary_path_preparation_rejects_without_path_access(
+    tmp_path: Path,
+) -> None:
+    class PoisonPath:
+        def __fspath__(self) -> str:
+            raise AssertionError("retired preparation touched a path")
+
+    poison = PoisonPath()
+    with pytest.raises(ProtocolError, match="arbitrary-path preparation is disabled"):
+        preparation_module.prepare_harp_consumed_test_inputs_v3(
+            canonical_cache_root=poison,  # type: ignore[arg-type]
+            canonical_manifest_path=poison,  # type: ignore[arg-type]
+            parent_ledger_path=poison,  # type: ignore[arg-type]
+            cache_root=tmp_path / "cache-must-remain-absent",
+            development_manifest_path=tmp_path / "dev-must-remain-absent.csv",
+            evaluation_manifest_path=tmp_path / "eval-must-remain-absent.csv",
+        )
+    assert tuple(tmp_path.iterdir()) == ()
+
+
+def test_retired_direct_publisher_rejects_before_draft_or_input_access(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        amendment_publisher,
+        "build_harp_v3_execution_amendment_draft",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("retired publisher constructed a draft")
+        ),
+    )
+    with pytest.raises(ProtocolError, match="direct amendment publication is disabled"):
+        amendment_publisher.publish_harp_v3_execution_amendment(
+            object(),  # type: ignore[arg-type]
+            expert_bank_root="unread-bank",
+            generation_lock_root="unread-generation",
+            prepared_cache_root="unread-cache",
+            development_manifest_path="unread-development",
+            evaluation_manifest_path="unread-evaluation",
+            parent_ledger_path="unread-parent",
+            amendment_path="unwritten-amendment",
+            authorization_basis="unread-basis",
+            authorization_date="unread-date",
+            repository_root="unread-repository",
+        )
+
+
 def test_explicit_transaction_commits_registry_last_and_remains_terminal_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -266,12 +350,9 @@ def test_failed_commit_restores_planned_metadata_and_exact_amendment_resumes(
 
     resumed = activation.plan_harp_v3_activation(
         load_config(plan.config_path),
-        expert_bank_root=repository / "synthetic/bank",
-        generation_lock_root=repository / "synthetic/generation",
-        prepared_cache_root=repository / "synthetic/cache",
-        development_manifest_path=repository / "synthetic/development.csv",
-        evaluation_manifest_path=repository / "synthetic/evaluation.csv",
-        parent_ledger_path=repository / "synthetic/parent.json",
+        **resolve_harp_v3_workspace_paths(
+            repository, require_prepared=True
+        ).activation_kwargs(),
         repository_root=repository,
         authorization_basis=authorization.AUTHORIZATION_BASIS,
         authorization_date="2026-09-01",
@@ -382,20 +463,6 @@ def test_cli_recovers_before_loading_partially_committed_config(
     code = cli.main(
         [
             "activate-fixed-bank-harp-router-v3",
-            "--config",
-            str(plan.config_path),
-            "--expert-bank-root",
-            str(repository / "synthetic/bank"),
-            "--generation-lock-root",
-            str(repository / "synthetic/generation"),
-            "--prepared-cache-root",
-            str(repository / "synthetic/cache"),
-            "--development-manifest",
-            str(repository / "synthetic/development.csv"),
-            "--evaluation-manifest",
-            str(repository / "synthetic/evaluation.csv"),
-            "--parent-ledger",
-            str(repository / "synthetic/parent.json"),
             "--authorization-basis",
             authorization.AUTHORIZATION_BASIS,
             "--authorization-date",
@@ -417,14 +484,15 @@ def test_lexical_symlink_and_predecessor_input_paths_are_rejected(
 ) -> None:
     plan, repository = _synthetic_plan(tmp_path, monkeypatch)
     cache_link = repository / "synthetic/cache_link"
-    cache_link.symlink_to(repository / "synthetic/cache", target_is_directory=True)
+    cache_link.parent.mkdir(parents=True, exist_ok=True)
+    cache_link.symlink_to(repository / _PREPARED_CACHE, target_is_directory=True)
     common = {
         "config": load_config(plan.config_path),
-        "expert_bank_root": repository / "synthetic/bank",
-        "generation_lock_root": repository / "synthetic/generation",
-        "development_manifest_path": repository / "synthetic/development.csv",
-        "evaluation_manifest_path": repository / "synthetic/evaluation.csv",
-        "parent_ledger_path": repository / "synthetic/parent.json",
+        "expert_bank_root": repository / _BANK,
+        "generation_lock_root": repository / _GENERATION,
+        "development_manifest_path": repository / _DEVELOPMENT,
+        "evaluation_manifest_path": repository / _EVALUATION,
+        "parent_ledger_path": repository / _PARENT,
         "repository_root": repository,
         "authorization_basis": authorization.AUTHORIZATION_BASIS,
         "authorization_date": "2026-09-01",
@@ -443,7 +511,28 @@ def test_lexical_symlink_and_predecessor_input_paths_are_rejected(
                 **common,
                 "expert_bank_root": predecessor,
             },
-            prepared_cache_root=repository / "synthetic/cache",
+            prepared_cache_root=repository / _PREPARED_CACHE,
+        )
+
+
+def test_byte_identical_alternate_input_location_is_not_activation_authority(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan, repository = _synthetic_plan(tmp_path, monkeypatch)
+    alternate = repository / "alternate/v3_cache_clone"
+    alternate.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(repository / _PREPARED_CACHE, alternate)
+    exact = resolve_harp_v3_workspace_paths(
+        repository, require_prepared=True
+    ).activation_kwargs()
+
+    with pytest.raises(ProtocolError, match="catalog identities"):
+        activation.plan_harp_v3_activation(
+            load_config(plan.config_path),
+            **{**exact, "prepared_cache_root": alternate},
+            repository_root=repository,
+            authorization_basis=authorization.AUTHORIZATION_BASIS,
+            authorization_date="2026-09-01",
         )
 
 
@@ -455,12 +544,9 @@ def test_existing_nonmatching_amendment_fails_closed(
     with pytest.raises(ProtocolError, match="does not match"):
         activation.plan_harp_v3_activation(
             load_config(plan.config_path),
-            expert_bank_root=repository / "synthetic/bank",
-            generation_lock_root=repository / "synthetic/generation",
-            prepared_cache_root=repository / "synthetic/cache",
-            development_manifest_path=repository / "synthetic/development.csv",
-            evaluation_manifest_path=repository / "synthetic/evaluation.csv",
-            parent_ledger_path=repository / "synthetic/parent.json",
+            **resolve_harp_v3_workspace_paths(
+                repository, require_prepared=True
+            ).activation_kwargs(),
             repository_root=repository,
             authorization_basis=authorization.AUTHORIZATION_BASIS,
             authorization_date="2026-09-01",
@@ -472,13 +558,6 @@ def test_activation_cli_is_plan_by_default_and_requires_exact_confirm() -> None:
     args = parser.parse_args(
         [
             "activate-fixed-bank-harp-router-v3",
-            "--config", "config.yaml",
-            "--expert-bank-root", "bank",
-            "--generation-lock-root", "generation",
-            "--prepared-cache-root", "cache",
-            "--development-manifest", "development.csv",
-            "--evaluation-manifest", "evaluation.csv",
-            "--parent-ledger", "parent.json",
             "--authorization-basis", authorization.AUTHORIZATION_BASIS,
             "--authorization-date", "2026-09-01",
             "--repository-root", ".",

@@ -296,9 +296,55 @@ def test_planned_inspection_and_dry_run_are_path_free_and_mutation_free(
     assert dry["filesystem_mutations"] == 0
     assert str(secret) not in repr(dry)
     assert not secret.exists()
-    with pytest.raises(ProtocolError, match="not authorized"):
+    with pytest.raises(ProtocolError, match="exact confirmation token"):
         runner.run_harp_stage90_v3(config, artifact_root=secret)
     assert not secret.exists()
+
+
+@pytest.mark.parametrize(
+    "confirmation_token",
+    (None, "", "RUN_HARP_V3_TERMINAL_CONSUMED_TEST_DIAGNOSTIC ", "wrong"),
+)
+def test_launch_confirmation_rejects_before_every_sensitive_surface(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    confirmation_token: str | None,
+) -> None:
+    config = _planned_config()
+    output = tmp_path / "must-remain-absent"
+    events: list[str] = []
+
+    def forbidden(name: str):
+        def fail(*_args: object, **_kwargs: object) -> object:
+            events.append(name)
+            raise AssertionError(f"sensitive surface reached: {name}")
+
+        return fail
+
+    monkeypatch.setattr(
+        runner,
+        "V3_RUNNER_SERVICES",
+        replace(
+            runner.V3_RUNNER_SERVICES,
+            load_authorization=forbidden("authorization"),
+            claim_authorization=forbidden("lease"),
+            load_cache_index=forbidden("input"),
+            load_development_labels=forbidden("development_labels"),
+            load_evaluation_truth=forbidden("evaluation_labels"),
+        ),
+    )
+    monkeypatch.setattr(runner, "_exact_output_root", forbidden("output_path"))
+    monkeypatch.setattr(runner, "_dedicated_scratch", forbidden("scratch"))
+
+    with pytest.raises(ProtocolError, match="exact confirmation token"):
+        runner.run_harp_stage90_v3(
+            config,
+            artifact_root=output,
+            confirmation_token=confirmation_token,
+        )
+
+    assert events == []
+    assert not output.exists()
 
 
 def test_compact_npz_is_deterministic_and_chunk_bound(tmp_path: Path) -> None:
@@ -541,13 +587,20 @@ def test_runner_end_to_end_seals_before_eval_and_reconstructs_twice(
     monkeypatch.setattr(runner, "durable_barrier", record_barrier)
     pipeline = _SyntheticPipeline()
     result = runner.run_harp_stage90_v3(
-        config, artifact_root=output, pipeline=pipeline
+        config,
+        artifact_root=output,
+        pipeline=pipeline,
+        confirmation_token=runner.HARP_V3_RUN_CONFIRMATION_TOKEN,
     )
     assert result == str(output.resolve())
     state = read_json(output / "reports/run_state.json")
+    admission = read_json(output / "manifests/admission.json")
     validation = read_json(output / "reports/validation_report.json")
     terminal = read_json(output / "reports/terminal_result.json")
     assert state["phase_order"] == list(runner.PHASE_ORDER)
+    assert admission["launch_confirmation_validated"] is True
+    assert admission["launch_confirmation_token_persisted"] is False
+    assert runner.HARP_V3_RUN_CONFIRMATION_TOKEN not in repr(admission)
     assert len(validation["independent_validation_hashes"]) == 2
     assert validation["exact_b_fallback_byte_identity"] is True
     assert terminal["utility_kind"] == "downstream_classifier_utility_not_NELBO"

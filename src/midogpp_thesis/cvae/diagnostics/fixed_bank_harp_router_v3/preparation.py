@@ -168,6 +168,15 @@ class CanonicalLabelBlindFrame:
 
 
 @dataclass(frozen=True, slots=True)
+class CanonicalLabelBlindCacheIdentity:
+    """Closed-world byte identity of the immutable consumed-test cache."""
+
+    root: Path
+    content_hash: str
+    member_sha256: Mapping[str, str]
+
+
+@dataclass(frozen=True, slots=True)
 class HarpV3PreparedInputs:
     cache_root: Path
     development_manifest_path: Path
@@ -399,70 +408,25 @@ def prepare_harp_consumed_test_inputs_v3(
     expected_manifest_sha256: str = CANONICAL_MANIFEST_SHA256,
     expected_parent_ledger_sha256: str = CANONICAL_PARENT_LEDGER_SHA256,
 ) -> HarpV3PreparedInputs:
-    """Materialize the v3 terminal HARP cache and label capabilities."""
+    """Reject the retired arbitrary-path v3 preparation surface.
 
-    prepared = _prepare_harp_consumed_test_inputs(
-        canonical_cache_root=canonical_cache_root,
-        canonical_manifest_path=canonical_manifest_path,
-        parent_ledger_path=parent_ledger_path,
-        cache_root=cache_root,
-        development_manifest_path=development_manifest_path,
-        evaluation_manifest_path=evaluation_manifest_path,
-        identity=V3_PREPARATION_IDENTITY,
-        expected_manifest_sha256=expected_manifest_sha256,
-        expected_parent_ledger_sha256=expected_parent_ledger_sha256,
-    )
-    return HarpV3PreparedInputs(
-        cache_root=prepared.cache_root,
-        development_manifest_path=prepared.development_manifest_path,
-        evaluation_manifest_path=prepared.evaluation_manifest_path,
-        cache_content_sha256=prepared.cache_content_sha256,
-        development_manifest_sha256=prepared.development_manifest_sha256,
-        evaluation_manifest_sha256=prepared.evaluation_manifest_sha256,
-        parent_ledger_sha256=prepared.parent_ledger_sha256,
-        partition_hash=prepared.partition_hash,
-        preparation_receipt_hash=prepared.preparation_receipt_hash,
+    Only ``prepare_harp_v3_workstation_inputs`` may invoke the private builder,
+    after catalog resolution and the exact preparation confirmation.  Keep this
+    fail-closed shim so stale callers cannot silently bypass that lifecycle.
+    """
+
+    raise ProtocolError(
+        "HARP v3 arbitrary-path preparation is disabled; use the catalog-bound "
+        "prepare-fixed-bank-harp-router-v3-inputs workstation lifecycle."
     )
 
 
 def load_canonical_label_blind_cache(root: Path) -> CanonicalLabelBlindFrame:
     """Authenticate and load the canonical consumed-test PT shards."""
 
-    if root.is_symlink():
-        raise ProtocolError("HARP canonical cache root is unsafe.")
-    try:
-        cache_root = root.resolve(strict=True)
-    except OSError as exc:
-        raise ProtocolError("HARP canonical cache root is absent.") from exc
-    if not cache_root.is_dir():
-        raise ProtocolError("HARP canonical cache root is unsafe.")
-    content = read_json(cache_root / "manifests/content_index.json")
-    files = content.get("files")
-    content_base = {key: value for key, value in content.items() if key != "content_hash"}
-    if (
-        set(content) != {"schema_version", "files", "content_hash"}
-        or not isinstance(files, list)
-        or content.get("content_hash") != canonical_hash(content_base)
-        or content.get("content_hash") != CANONICAL_CACHE_CONTENT_HASH
-    ):
-        raise ProtocolError("HARP canonical cache content index drifted.")
-    indexed: dict[str, str] = {}
-    for row in files:
-        if not isinstance(row, Mapping) or set(row) != {"path", "sha256"}:
-            raise ProtocolError("HARP canonical cache content member is malformed.")
-        relative = str(row["path"])
-        member = _safe_member(cache_root, relative)
-        if relative in indexed or sha256_file(member) != row["sha256"]:
-            raise ProtocolError("HARP canonical cache member bytes drifted.")
-        indexed[relative] = str(row["sha256"])
-    actual = {
-        path.relative_to(cache_root).as_posix()
-        for path in cache_root.rglob("*")
-        if path.is_file()
-        and path.relative_to(cache_root).as_posix() != "manifests/content_index.json"
-    }
-    if actual != set(indexed):
-        raise ProtocolError("HARP canonical cache closed-world inventory drifted.")
+    source_identity = validate_canonical_label_blind_cache_identity(root)
+    cache_root = source_identity.root
+    indexed = dict(source_identity.member_sha256)
     frozen = read_json(cache_root / "manifests/frozen_build_protocol.json")
     alignment = read_json(cache_root / "manifests/row_alignment.json")
     report = read_json(cache_root / "reports/cache_builder_report.json")
@@ -556,9 +520,60 @@ def load_canonical_label_blind_cache(root: Path) -> CanonicalLabelBlindFrame:
     return CanonicalLabelBlindFrame(
         rows_by_center=rows_by_center,
         embeddings_by_center=embeddings_by_center,
-        cache_content_hash=CANONICAL_CACHE_CONTENT_HASH,
+        cache_content_hash=source_identity.content_hash,
         row_order_hash=CANONICAL_CACHE_ROW_ORDER_HASH,
         source_member_sha256=indexed,
+    )
+
+
+def validate_canonical_label_blind_cache_identity(
+    root: Path,
+) -> CanonicalLabelBlindCacheIdentity:
+    """Reauthenticate every canonical source byte without loading tensors."""
+
+    if root.is_symlink():
+        raise ProtocolError("HARP canonical cache root is unsafe.")
+    try:
+        cache_root = root.resolve(strict=True)
+    except OSError as exc:
+        raise ProtocolError("HARP canonical cache root is absent.") from exc
+    if not cache_root.is_dir():
+        raise ProtocolError("HARP canonical cache root is unsafe.")
+    content = read_json(cache_root / "manifests/content_index.json")
+    files = content.get("files")
+    content_base = {key: value for key, value in content.items() if key != "content_hash"}
+    if (
+        set(content) != {"schema_version", "files", "content_hash"}
+        or not isinstance(files, list)
+        or content.get("content_hash") != canonical_hash(content_base)
+        or content.get("content_hash") != CANONICAL_CACHE_CONTENT_HASH
+    ):
+        raise ProtocolError("HARP canonical cache content index drifted.")
+    indexed: dict[str, str] = {}
+    for row in files:
+        if not isinstance(row, Mapping) or set(row) != {"path", "sha256"}:
+            raise ProtocolError("HARP canonical cache content member is malformed.")
+        relative = str(row["path"])
+        member = _safe_member(cache_root, relative)
+        if relative in indexed or sha256_file(member) != row["sha256"]:
+            raise ProtocolError("HARP canonical cache member bytes drifted.")
+        indexed[relative] = str(row["sha256"])
+    # Take one closed-world snapshot.  The previous implementation traversed
+    # the same large tree repeatedly while checking files and directories.
+    inventory = _single_inventory(cache_root, role="canonical cache")
+    actual = {
+        path.relative_to(cache_root).as_posix()
+        for path in inventory
+        if path.is_file()
+        and path.relative_to(cache_root).as_posix()
+        != "manifests/content_index.json"
+    }
+    if actual != set(indexed):
+        raise ProtocolError("HARP canonical cache closed-world inventory drifted.")
+    return CanonicalLabelBlindCacheIdentity(
+        root=cache_root,
+        content_hash=str(content["content_hash"]),
+        member_sha256=indexed,
     )
 
 
@@ -886,9 +901,10 @@ def _write_final_content_index(
     *,
     identity: HarpPreparationIdentity = V3_PREPARATION_IDENTITY,
 ) -> None:
+    inventory = _single_inventory(root, role="prepared cache")
     members = {
         path.relative_to(root).as_posix(): sha256_file(path)
-        for path in root.rglob("*")
+        for path in inventory
         if path.is_file() and path.relative_to(root) != CONTENT_INDEX
     }
     _write_content_index(
@@ -963,12 +979,13 @@ def _fsync_directory(path: Path) -> None:
 
 
 def _fsync_tree(root: Path) -> None:
-    for path in sorted(root.rglob("*")):
+    inventory = _single_inventory(root, role="fsync tree")
+    for path in inventory:
         if path.is_file():
             _fsync_file(path)
     directories = tuple(
         sorted(
-            (path for path in root.rglob("*") if path.is_dir()),
+            (path for path in inventory if path.is_dir()),
             key=lambda path: len(path.parts),
             reverse=True,
         )
@@ -977,13 +994,23 @@ def _fsync_tree(root: Path) -> None:
         _fsync_directory(path)
 
 
+def _single_inventory(root: Path, *, role: str) -> tuple[Path, ...]:
+    """Return one deterministic, symlink-free recursive inventory snapshot."""
+
+    entries = tuple(sorted(root.rglob("*")))
+    if any(path.is_symlink() for path in entries):
+        raise ProtocolError(f"HARP {role} inventory contains a symlink.")
+    return entries
+
+
 __all__ = (
     "CanonicalFrameRow",
+    "CanonicalLabelBlindCacheIdentity",
     "CanonicalLabelBlindFrame",
     "HarpV3PreparedInputs",
     "V3_PREPARATION_IDENTITY",
     "build_case_partition_payload",
     "deterministic_case_partition",
     "load_canonical_label_blind_cache",
-    "prepare_harp_consumed_test_inputs_v3",
+    "validate_canonical_label_blind_cache_identity",
 )

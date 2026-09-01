@@ -34,6 +34,7 @@ from .preparation import (
     LABEL_FREE_CONTENT_INDEX,
     PREPARATION_RECEIPT,
 )
+from .workspace_paths import resolve_harp_v3_workspace_paths
 
 
 AUTHORIZATION_BASIS = authorization.AUTHORIZATION_BASIS
@@ -181,28 +182,12 @@ def publish_harp_v3_execution_amendment(
     authorization_date: str,
     repository_root: str | Path,
 ) -> HarpV3AmendmentPublicationReceipt:
-    """Reject legacy direct publication after validating the requested draft.
+    """Reject the retired unjournaled publisher before any input access."""
 
-    V3 amendment bytes may now be installed only by the durable activation
-    transaction, which journals all rollback and final workspace bytes first.
-    Keeping this validation surface fail-closed avoids a second unjournaled
-    authority path while preserving useful diagnostics for stale callers.
-    """
-
-    draft = build_harp_v3_execution_amendment_draft(
-        config,
-        expert_bank_root=expert_bank_root,
-        generation_lock_root=generation_lock_root,
-        prepared_cache_root=prepared_cache_root,
-        development_manifest_path=development_manifest_path,
-        evaluation_manifest_path=evaluation_manifest_path,
-        parent_ledger_path=parent_ledger_path,
-        amendment_path=amendment_path,
-        authorization_basis=authorization_basis,
-        authorization_date=authorization_date,
-        repository_root=repository_root,
+    raise ProtocolError(
+        "HARP v3 direct amendment publication is disabled; use the durable "
+        "activate-fixed-bank-harp-router-v3 transaction."
     )
-    return publish_harp_v3_amendment_draft_exclusive(draft)
 
 
 def build_harp_v3_execution_amendment_draft(
@@ -279,6 +264,39 @@ def build_harp_v3_execution_amendment_draft(
     paths = {bank, generation, cache_root, development, evaluation, parent, publication_path}
     if len(paths) != 7:
         raise ProtocolError("HARP v3 amendment input paths overlap.")
+    catalog_paths = resolve_harp_v3_workspace_paths(
+        repository,
+        require_prepared=True,
+    )
+    expected_paths = {
+        "expert bank": catalog_paths.expert_bank_root,
+        "generation lock": catalog_paths.generation_lock_root,
+        "prepared cache": catalog_paths.prepared_cache_root,
+        "development manifest": catalog_paths.development_manifest_path,
+        "evaluation manifest": catalog_paths.evaluation_manifest_path,
+        "parent ledger": catalog_paths.parent_ledger_path,
+        "execution amendment": catalog_paths.amendment_path,
+    }
+    observed_paths = {
+        "expert bank": bank,
+        "generation lock": generation,
+        "prepared cache": cache_root,
+        "development manifest": development,
+        "evaluation manifest": evaluation,
+        "parent ledger": parent,
+        "execution amendment": publication_path,
+    }
+    drifted = [
+        label
+        for label, expected in expected_paths.items()
+        if observed_paths[label] != expected
+    ]
+    if drifted:
+        raise ProtocolError(
+            "HARP v3 activation inputs drifted from catalog identities: "
+            + ", ".join(drifted)
+            + "."
+        )
     content = read_json(cache_root / CONTENT_INDEX)
     content_base = {key: value for key, value in content.items() if key != "content_index_hash"}
     cache_content = content.get("content_index_hash")

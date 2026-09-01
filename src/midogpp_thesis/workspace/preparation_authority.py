@@ -44,6 +44,9 @@ HARP_V3_EXECUTION_AMENDMENT_GATE = (
 HARP_V3_EXPERIMENT_ID = (
     "midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v3"
 )
+HARP_V3_RUN_CONFIRMATION_TOKEN = (
+    "RUN_HARP_V3_TERMINAL_CONSUMED_TEST_DIAGNOSTIC"
+)
 KNOWN_PREPARATION_AUTHORITY_GATES = frozenset(
     {
         HARP_V1_EXECUTION_AMENDMENT_GATE,
@@ -164,6 +167,7 @@ def validate_preparation_authority_extra_args(
     extra_args: Sequence[str],
     *,
     force: bool = False,
+    preparation_only: bool = False,
 ) -> tuple[str, ...]:
     """Apply consumer-specific closed-world runner argument constraints."""
 
@@ -175,7 +179,27 @@ def validate_preparation_authority_extra_args(
                 f"HARP {harp_version} workspace preparation and execution "
                 "reject --force."
             )
-        if normalized not in {(), ("--dry-run",)}:
+        if gate_id == HARP_V3_EXECUTION_AMENDMENT_GATE:
+            allowed = (
+                {()}
+                if preparation_only
+                else {
+                    ("--dry-run",),
+                    ("--confirm", HARP_V3_RUN_CONFIRMATION_TOKEN),
+                }
+            )
+            if normalized not in allowed:
+                if preparation_only:
+                    requirement = "no runner arguments during internal preparation"
+                else:
+                    requirement = (
+                        "the exact '--dry-run' argument or the exact "
+                        f"'--confirm {HARP_V3_RUN_CONFIRMATION_TOKEN}' arguments"
+                    )
+                raise PreparationAuthorityError(
+                    "HARP v3 workspace execution accepts only " + requirement + "."
+                )
+        elif normalized not in {(), ("--dry-run",)}:
             raise PreparationAuthorityError(
                 f"HARP {harp_version} workspace execution accepts only no "
                 "extra arguments or "
@@ -355,6 +379,7 @@ __all__ = (
     "HARP_V2_EXPERIMENT_ID",
     "HARP_V3_EXECUTION_AMENDMENT_GATE",
     "HARP_V3_EXPERIMENT_ID",
+    "HARP_V3_RUN_CONFIRMATION_TOKEN",
     "KNOWN_PREPARATION_AUTHORITY_GATES",
     "PreparationAuthorityError",
     "PreparationAuthorityReceipt",

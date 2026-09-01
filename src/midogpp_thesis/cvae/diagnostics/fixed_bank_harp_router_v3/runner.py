@@ -31,6 +31,7 @@ from ...runtime.harp_v3_execution.stores import (
     write_prelabel_routes,
 )
 from ...runtime.harp_v3_execution.validation import run_two_fresh_validations
+from ....workspace.preparation_authority import HARP_V3_RUN_CONFIRMATION_TOKEN
 from .authorization import (
     HarpV3Authorization,
     HarpV3AuthorizationLease,
@@ -57,6 +58,8 @@ from .input_surfaces import (
 
 IMPLEMENTED_COMPONENTS = (
     "separate_single_use_v3_authority_before_all_output_or_input_mutation",
+    "exact_launch_confirmation_before_authority_input_path_or_output_access",
+    "catalog_bound_crash_recoverable_v3_input_preparation_before_activation",
     "mutation_free_activation_plan_with_resumable_amendment_and_registry_last_commit",
     "v3_owned_label_blind_cache_and_physical_generation_lineage",
     "two_persistent_gpu_source_workers_closed_before_cpu_classifier_pool",
@@ -214,9 +217,18 @@ def run_harp_stage90_v3(
     *,
     artifact_root: str | Path,
     pipeline: HarpV3Pipeline | None = None,
+    confirmation_token: str | None = None,
 ) -> str:
     """Run one separately authorized terminal consumed-test diagnostic."""
 
+    # Keep this check before the typed-config guard and, critically, before any
+    # authority probe, path resolution, cache/input access, scratch creation,
+    # lease claim, label access, or output mutation.
+    if confirmation_token != HARP_V3_RUN_CONFIRMATION_TOKEN:
+        raise ProtocolError(
+            "HARP v3 execution requires the exact confirmation token "
+            f"{HARP_V3_RUN_CONFIRMATION_TOKEN}."
+        )
     if type(config) is not HarpStage90V3Config:
         raise ProtocolError("HARP v3 execution requires a typed configuration.")
     # This is deliberately first.  A planned config cannot resolve an output,
@@ -240,6 +252,8 @@ def run_harp_stage90_v3(
         "preflight_hash": canonical_hash(preflight),
         "all_gates_read_only": True,
         "filesystem_mutations_before_lease": 0,
+        "launch_confirmation_validated": True,
+        "launch_confirmation_token_persisted": False,
         "development_labels_opened": False,
         "evaluation_labels_opened": False,
     }
@@ -1137,6 +1151,7 @@ def _announce(phase: str) -> None:
 __all__ = (
     "IMPLEMENTED_COMPONENTS",
     "HarpV3RunnerServices",
+    "HARP_V3_RUN_CONFIRMATION_TOKEN",
     "V3_RUNNER_SERVICES",
     "dry_run_harp_stage90_v3",
     "inspect_harp_stage90_v3",

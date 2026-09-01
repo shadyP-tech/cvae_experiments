@@ -17,7 +17,15 @@ from .identity import (
     PUBLICATION_STATUS,
     TERMINAL_DECISION,
 )
-from .preparation import HarpV3PreparedInputs, prepare_harp_consumed_test_inputs_v3
+from .preparation import HarpV3PreparedInputs
+from .workstation_preparation import (
+    PREPARATION_CONFIRMATION,
+    HarpV3WorkstationPreparationPlan,
+    inspect_harp_v3_workstation_preparation,
+    plan_harp_v3_workstation_preparation,
+    prepare_harp_v3_workstation_inputs,
+    recover_harp_v3_workstation_preparation,
+)
 
 
 __all__ = (
@@ -29,12 +37,17 @@ __all__ = (
     "HarpV3ActivationReceipt",
     "HarpV3PreparedInputs",
     "OUTPUT_ARTIFACT_ID",
+    "PREPARATION_CONFIRMATION",
     "PUBLICATION_STATUS",
     "TERMINAL_DECISION",
+    "HarpV3WorkstationPreparationPlan",
     "activate_harp_v3",
     "inspect_harp_v3_activation_recovery",
+    "inspect_harp_v3_workstation_preparation",
     "load_config",
     "plan_harp_v3_activation",
-    "prepare_harp_consumed_test_inputs_v3",
+    "plan_harp_v3_workstation_preparation",
+    "prepare_harp_v3_workstation_inputs",
     "recover_harp_v3_activation",
+    "recover_harp_v3_workstation_preparation",
 )
