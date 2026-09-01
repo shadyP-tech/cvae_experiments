@@ -59,7 +59,10 @@ CANONICAL_PARENT_LEDGER_SHA256 = (
     "8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16"
 )
 CANONICAL_CACHE_NAME = "uniform_b_v2_descriptive_test_cache_v1"
-CANONICAL_REPRESENTATION = "annotation_jpeg_fixed_center_b_v4"
+# This is the immutable physical source-frame identity, not the HARP execution
+# revision.  HARP v4 owns a distinct derived cache below, while deliberately
+# reusing the byte-identical Uniform-B source representation produced as v3.
+CANONICAL_REPRESENTATION = "annotation_jpeg_fixed_center_b_v3"
 CANONICAL_EXPERT_BANK_LOCK_HASH = "9972a41dcd4814cd"
 CANONICAL_GENERATION_LOCK_HASH = "34e551425710362e"
 EXPECTED_ROW_COUNT = 9928
