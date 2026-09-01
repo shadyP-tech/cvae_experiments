@@ -1,6 +1,6 @@
 schema_version: 2
 catalog_kind: midogpp_artifact_catalog
-last_reviewed: 2026-08-31
+last_reviewed: 2026-09-01
 path_base: repository_root
 
 catalog_policy:
@@ -19326,5 +19326,291 @@ artifacts:
     may_feed_deployable_selection: false
     notes:
       - V3 must reconstruct its complete physical menu and all case-level development observations from its own seven direct inputs. It cannot read v1/v2 output, model, route, scratch, cache, authority, or capability state.
+      - Target actions contain no outcome or target-label fields. The outer target is excluded before normalization, nested tuning, calibration, fitting, and donor uncertainty construction.
+      - This repeated-test diagnostic can answer only whether the repaired architecture recovers routing structure on the observed consumed MIDOG++ surface. It cannot establish fresh routing success, unseen-center generalization, significance, promotion, deployment, or thesis-confirmatory improvement.
+  - artifact_id: midogpp_stage90_harp_consumed_test_cache_v4
+    stage: derived_features
+    canonical_path: datasets/midogpp/derived/features/virchow2/harp_consumed_test_cache_v4
+    availability: planned
+    migration: canonical_derived_feature_cache
+    evidence_label: SCOPE_LIMITED_HARP_V4_PLANNED_LABEL_FREE_CONSUMED_TEST_CACHE
+    claim_scope: feature_cache_provenance
+    semantic_identities:
+      source_artifact_id: midogpp_virchow2_uniform_b_v2_descriptive_test_cache_seed42
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v4
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      dataset_family: MIDOG++
+      representation_id: midogpp_virchow2_common_3840_float32_v1
+      labels_stored: 'false'
+      whole_case_disjoint_roles: 'true'
+      predecessor_cache_or_output_used: 'false'
+      old_aggregate_utility_surface_used: 'false'
+      fresh_evidence: 'false'
+      may_feed_stage60_or_stage70: 'false'
+      may_feed_another_experiment: 'false'
+      preparation_cli: cvae-diagnostics prepare-fixed-bank-harp-router-v4-inputs
+      preparation_issues_execution_authority: 'false'
+    required_files:
+      - manifests/cache_index.json
+      - manifests/content_index.json
+      - manifests/harp_v4_case_partition.json
+      - manifests/harp_v4_label_free_partition_barrier.json
+      - manifests/harp_v4_label_free_content_index.json
+      - manifests/harp_v4_consumed_test_preparation_receipt.json
+      - tables/row_index.csv
+      - embeddings/by_center/center_0.npy
+      - embeddings/by_center/center_1.npy
+      - embeddings/by_center/center_2.npy
+      - embeddings/by_center/center_3.npy
+      - embeddings/by_center/center_5.npy
+      - embeddings/by_center/center_6.npy
+      - embeddings/by_center/center_7.npy
+      - embeddings/by_center/center_8.npy
+      - embeddings/by_center/center_9.npy
+    forbidden_reuse:
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - This is a v4-only planned cache identity. It must be rebuilt label-blind from the immutable canonical MIDOG++ test cache and may never alias v1/v2/v3 cache, output, checkpoint, or scratch bytes.
+
+  - artifact_id: midogpp_stage90_harp_consumed_test_development_manifest_v4
+    stage: dataset_contract
+    canonical_path: datasets/midogpp/contract/harp_consumed_test_development_v4
+    availability: planned
+    migration: canonical_dataset_contract
+    evidence_label: SCOPE_LIMITED_HARP_V4_PLANNED_DEVELOPMENT_LABEL_CAPABILITY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v4
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      split_role: harp_consumed_test_development
+      contains_evaluation_rows: 'false'
+      labels_available_before_physical_menu_seal: 'false'
+      case_equal_modeling: 'true'
+      predecessor_capability_state_used: 'false'
+      fresh_evidence: 'false'
+      may_feed_stage60_or_stage70: 'false'
+      may_feed_another_experiment: 'false'
+      preparation_cli: cvae-diagnostics prepare-fixed-bank-harp-router-v4-inputs
+      preparation_issues_execution_authority: 'false'
+    required_files:
+      - manifest.csv
+    forbidden_reuse:
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Development labels remain a one-way role capability and may open only after the complete label-free physical menu is sealed.
+
+  - artifact_id: midogpp_stage90_harp_consumed_test_evaluation_manifest_v4
+    stage: dataset_contract
+    canonical_path: datasets/midogpp/contract/harp_consumed_test_evaluation_v4
+    availability: planned
+    migration: canonical_dataset_contract
+    evidence_label: SCOPE_LIMITED_HARP_V4_PLANNED_EVALUATION_LABEL_CAPABILITY
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v4
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      split_role: harp_consumed_test_evaluation
+      contains_development_rows: 'false'
+      labels_available_before_global_route_seal: 'false'
+      two_route_reconstructions_required: 'true'
+      predecessor_capability_state_used: 'false'
+      fresh_evidence: 'false'
+      may_feed_stage60_or_stage70: 'false'
+      may_feed_another_experiment: 'false'
+      preparation_cli: cvae-diagnostics prepare-fixed-bank-harp-router-v4-inputs
+      preparation_issues_execution_authority: 'false'
+    required_files:
+      - manifest.csv
+    forbidden_reuse:
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - Evaluation labels may open once only after the complete case route set and exact-B fallback vectors are durable and reconstructed in two fresh processes.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_harp_parent_v4
+    stage: dataset_contract
+    physical_path: artifacts/midogpp/10_real_feature_reference/uniform_b_canonical_real_feature_reference_v1/seed42
+    availability: workstation_only
+    migration: pointer_only
+    evidence_label: SCOPE_LIMITED_HARP_V4_PLANNED_CONSUMED_TEST_PARENT_BINDING
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v4
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      predecessor_execution_authority_reused: 'false'
+      predecessor_output_or_state_used: 'false'
+      fresh_evidence: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - reports/test_consumption_ledger.json
+    expected_file_hashes:
+      reports/test_consumption_ledger.json:
+        algorithm: sha256
+        digest: 8b16eae7bfdb5d20945e8ba3e02447ec74ab857adae441e493b2e37114feab16
+    forbidden_reuse:
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - This v4 consumer fence binds the immutable original consumption ledger but grants no right to reopen consumed labels or execute the experiment.
+
+  - artifact_id: midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v4
+    stage: dataset_contract
+    physical_path: experiments/midogpp/stages/90_oracles_and_diagnostics/contracts/harp_router_v4
+    availability: planned_execution_not_authorized
+    migration: hash_verified_move
+    evidence_label: SCOPE_LIMITED_HARP_V4_EXECUTION_AMENDMENT_NOT_ISSUED
+    claim_scope: dataset_contract_and_split_provenance
+    semantic_identities:
+      parent_artifact_id: midogpp_uniform_b_test_consumption_ledger_v1
+      authorized_consumer_experiment_ids: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v4
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      single_use_execution_identity: 'true'
+      authorization_exhausted: 'false'
+      amendment_status: NOT_ISSUED
+      implementation_request_alone_authorizes_execution: 'false'
+      predecessor_authority_reused: 'false'
+      predecessor_output_or_state_used: 'false'
+      output_deletion_restores_authority: 'false'
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      fresh_evidence: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - harp_stage90_execution_amendment_v4.json
+    authoritative_files:
+      - harp_stage90_execution_amendment_v4.json
+    forbidden_reuse:
+      - oracle_and_diagnostic_evidence
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - No amendment is checked in. A separate explicit authorization step must bind the prepared v4 inputs, exact source snapshot, activated registry projection, and workstation contract before any run can start.
+
+  - artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v4
+    stage: 90_oracles_and_diagnostics
+    canonical_path: artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_harp_router/v4
+    availability: generated_on_run
+    migration: canonical_output
+    evidence_label: SCOPE_LIMITED_HARP_V4_PLANNED_CASE_LEVEL_PHYSICAL_ROUTING_DIAGNOSTIC
+    claim_scope: diagnostic_only
+    semantic_identities:
+      architecture_family: HARP_V4_HASH_TYPED_CASE_LEVEL_PHYSICAL_JOINT_RISK_GEOMETRY_CALIBRATED
+      execution_revision: v4_hash_typed_case_physical_joint_risk_geometry_calibrated
+      utility_kind: downstream_classifier_utility_not_NELBO
+      routing_stage_compatibility_estimated: 'false'
+      generative_expert_compatibility_claimed: 'false'
+      publication_status: POST_HOC_CONSUMED_TEST_SENSITIVITY
+      terminal_decision: TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE
+      execution_authorized: 'false'
+      consumed_test_reuse_authorized: 'false'
+      single_use_execution_identity: 'true'
+      amendment_status: NOT_ISSUED
+      predecessor_authority_reused: 'false'
+      predecessor_output_or_state_used: 'false'
+      semantic_hash_algorithm: stable_hash_sha256_prefix_16_lower_hex
+      semantic_hash_width: '16'
+      content_hash_algorithm: sha256_64_lower_hex
+      content_hash_width: '64'
+      canonical_hash_algorithm: canonical_json_sha256_64_lower_hex
+      source_lock_index_and_frame_receipt_roles_separate: 'true'
+      ambiguous_source_cache_hash_allowed: 'false'
+      physical_lambda_one_only: 'true'
+      decision_unit: case
+      primary_estimand: equal_centers_equal_classes_equal_supporting_cases_recall_at_threshold_0_5
+      single_class_case_rule: sole_class_recall_weighted_by_total_cases_over_twice_class_supporting_cases
+      joint_multioutput_effect_model: 'true'
+      residual_calibration_weighting: equal_donor_then_equal_case_within_donor
+      residual_calibration_tail: worst_donor_finite_sample_upper_quantile
+      strict_outer_center_exclusion: 'true'
+      nested_source_center_lodo: 'true'
+      delete_donor_ensemble: 'true'
+      source_lodo_geometry_calibration: 'true'
+      geometry_statistic: delete_donor_ensemble_maximum
+      geometry_reference_statistic_matched: 'true'
+      geometry_source_target_cardinality_limitation: source_D_minus_1_vs_target_D
+      formal_conformal_geometry_claimed: 'false'
+      raw_absolute_leverage_veto_used: 'false'
+      exact_B_fallback_byte_identical: 'true'
+      compact_memory_mapped_surfaces: 'true'
+      bounded_gpu_work_queue: 'true'
+      bounded_cpu_work_queue: 'true'
+      all_routes_and_vectors_durable_before_evaluation_labels: 'true'
+      two_route_reconstructions_before_evaluation_labels: 'true'
+      fresh_evidence: 'false'
+      unseen_center_generalization_claimed: 'false'
+      confirmatory_improvement_claimed: 'false'
+      routing_success_claimed: 'false'
+      promotion_allowed: 'false'
+      deployment_claimed: 'false'
+      may_feed_stage60: 'false'
+      may_feed_stage70: 'false'
+      may_feed_another_stage90: 'false'
+      may_feed_another_experiment: 'false'
+    required_files:
+      - config.resolved.yaml
+      - provenance/input_artifacts.json
+      - manifests/admission.json
+      - manifests/protocol_manifest.json
+      - manifests/label_free_progress_journal.json
+      - manifests/development_surface_seal.json
+      - manifests/model_lock.json
+      - manifests/target_action_seal.json
+      - manifests/prelabel_route_bundle.json
+      - manifests/fresh_validations.json
+      - manifests/frozen_route_seal.json
+      - stores/physical_menu/outer_0/manifest.json
+      - stores/physical_menu/outer_0/arrays.npz
+      - stores/physical_menu/outer_1/manifest.json
+      - stores/physical_menu/outer_1/arrays.npz
+      - stores/physical_menu/outer_2/manifest.json
+      - stores/physical_menu/outer_2/arrays.npz
+      - stores/physical_menu/outer_3/manifest.json
+      - stores/physical_menu/outer_3/arrays.npz
+      - stores/physical_menu/outer_5/manifest.json
+      - stores/physical_menu/outer_5/arrays.npz
+      - stores/physical_menu/outer_6/manifest.json
+      - stores/physical_menu/outer_6/arrays.npz
+      - stores/physical_menu/outer_7/manifest.json
+      - stores/physical_menu/outer_7/arrays.npz
+      - stores/physical_menu/outer_8/manifest.json
+      - stores/physical_menu/outer_8/arrays.npz
+      - stores/physical_menu/outer_9/manifest.json
+      - stores/physical_menu/outer_9/arrays.npz
+      - stores/development_case_surface/manifest.json
+      - stores/development_case_surface/arrays.npz
+      - stores/source_only_model/manifest.json
+      - stores/source_only_model/arrays.npz
+      - stores/target_case_actions/manifest.json
+      - stores/target_case_actions/arrays.npz
+      - stores/prelabel_routes/manifest.json
+      - stores/prelabel_routes/arrays.npz
+      - reports/development_label_access.json
+      - reports/prelabel_rejection_diagnostics.json
+      - reports/evaluation_label_access.json
+      - reports/terminal_result.json
+      - reports/action_oracle_diagnostics.json
+      - reports/route_and_fallback_reasons.json
+      - reports/leakage_report.json
+      - reports/validation_report.json
+      - manifests/authorization_finalization.json
+      - manifests/content_index.json
+      - reports/run_state.json
+    may_feed_recipe_selection: false
+    may_feed_deployable_selection: false
+    notes:
+      - V4 must reconstruct its complete physical menu and all case-level development observations from its own seven direct inputs. It cannot read v1/v2/v3 output, model, route, scratch, cache, authority, checkpoint, or capability state.
+      - The scientific HARP routing estimand is unchanged from v3; v4 is an execution-contract successor that separates 16-hex semantic identities from full SHA-256 byte identities and validates the producer-to-worker-to-checkpoint path before authorization.
       - Target actions contain no outcome or target-label fields. The outer target is excluded before normalization, nested tuning, calibration, fitting, and donor uncertainty construction.
       - This repeated-test diagnostic can answer only whether the repaired architecture recovers routing structure on the observed consumed MIDOG++ surface. It cannot establish fresh routing success, unseen-center generalization, significance, promotion, deployment, or thesis-confirmatory improvement.

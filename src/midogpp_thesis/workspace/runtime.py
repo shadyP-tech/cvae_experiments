@@ -32,11 +32,12 @@ from .preparation_authority import (
     HARP_V1_EXECUTION_AMENDMENT_GATE,
     HARP_V2_EXECUTION_AMENDMENT_GATE,
     HARP_V3_EXECUTION_AMENDMENT_GATE,
-    HARP_V3_RUN_CONFIRMATION_TOKEN,
+    HARP_V4_EXECUTION_AMENDMENT_GATE,
     PreparationAuthorityError,
     PreparationAuthorityReceipt,
     enforce_preparation_authority,
     expected_workspace_registration_contract_hash,
+    harp_run_confirmation_token,
     preparation_authority_registration_error,
     validate_preparation_authority_extra_args,
     validate_preparation_authority_gate_id,
@@ -54,6 +55,7 @@ HARP_EXECUTION_AMENDMENT_GATES = frozenset(
         HARP_V1_EXECUTION_AMENDMENT_GATE,
         HARP_V2_EXECUTION_AMENDMENT_GATE,
         HARP_V3_EXECUTION_AMENDMENT_GATE,
+        HARP_V4_EXECUTION_AMENDMENT_GATE,
     }
 )
 
@@ -1041,8 +1043,11 @@ class MidogppWorkspace:
             "run",
             experiment_id,
         ]
-        if experiment.preparation_authority_gate == HARP_V3_EXECUTION_AMENDMENT_GATE:
-            argv.extend(("--", "--confirm", HARP_V3_RUN_CONFIRMATION_TOKEN))
+        confirmation_token = harp_run_confirmation_token(
+            experiment.preparation_authority_gate
+        )
+        if confirmation_token is not None:
+            argv.extend(("--", "--confirm", confirmation_token))
         return shlex.join(argv)
 
     def _input_manifest(

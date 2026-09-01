@@ -247,11 +247,11 @@ def test_safe_member_rejects_traversal_and_each_symlink_component(
         safe_existing_member(root, "file-alias.bin", role="test cache")
 
 
-def test_amendment_publisher_rejects_wrong_publication_path_without_mutation(tmp_path: Path) -> None:
+def test_retired_amendment_publisher_rejects_without_mutation(tmp_path: Path) -> None:
     config = load_config(CONFIG)
     target = tmp_path / "never-created.json"
     before = tuple(tmp_path.iterdir())
-    with pytest.raises(ProtocolError, match="publication path drifted"):
+    with pytest.raises(ProtocolError, match="direct amendment publication is disabled"):
         publish_harp_v3_execution_amendment(
             config,
             expert_bank_root=tmp_path / "bank",

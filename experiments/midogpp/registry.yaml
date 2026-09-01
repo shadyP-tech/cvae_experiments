@@ -4000,3 +4000,56 @@ experiments:
       - Joint-harm residual calibration first takes the worst candidate residual inside each donor/case block, gives equal total mass to each donor and equal mass to cases within donor, and uses the maximum donor-specific finite-sample upper quantile. Seed cells remain technical replications rather than independent observations, and no formal conformal guarantee is claimed.
       - The runner uses compact NumPy stores, bounded GPU and CPU work queues, persistent spawned CUDA workers, shared multi-output CPU fits, deterministic threading, lease-bound local scratch, hash-validated intra-attempt label-free checkpoints, and independently reconstructed route seals. Cross-process or cross-attempt recovery is forbidden by the single-use authority.
       - The same already-consumed MIDOG++ test cases may be reused only after separately preparing v3 inputs and publishing/activating separate authority. Any result remains POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE with fresh_evidence=false and may feed no other experiment.
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v4
+    stage: 90_oracles_and_diagnostics
+    status: planned
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_harp_router_v4.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v4
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_harp_consumed_test_cache_v4
+      - midogpp_stage90_harp_consumed_test_development_manifest_v4
+      - midogpp_stage90_harp_consumed_test_evaluation_manifest_v4
+      - midogpp_uniform_b_test_consumption_ledger_harp_parent_v4
+      - midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v4
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Immutable fixed-bank generation geometry and classifier settings only; it grants no routing, consumed-label, fresh-evidence, promotion, deployment, or execution authority.
+      midogpp_stage90_harp_consumed_test_cache_v4: Fenced v4-only label-free Virchow2 cache rebuilt from the immutable canonical consumed MIDOG++ test cache; it grants no execution or evidential authority.
+      midogpp_stage90_harp_consumed_test_development_manifest_v4: V4 role-pure whole-case development-label capability; it may open only after the complete physical B/U/H-by-e menu is durable.
+      midogpp_stage90_harp_consumed_test_evaluation_manifest_v4: V4 role-pure evaluation-label capability; it may open once only after all case routes and exact-B fallback vectors are durable and independently reconstructed twice.
+      midogpp_uniform_b_test_consumption_ledger_harp_parent_v4: V4-only byte-exact binding to the original consumed-test parent ledger; it cannot authorize execution by itself.
+      midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v4: A separately published HARP v4 single-use amendment is required; every v1/v2/v3 authority, output, scratch, cache, route, and capability state is a forbidden alias.
+    runner:
+      preparation_authority_gate: harp_v4_consumed_test_execution_amendment_v1
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "3"
+        MKL_NUM_THREADS: "3"
+        OPENBLAS_NUM_THREADS: "3"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+        PYTHONHASHSEED: "0"
+        OMP_DYNAMIC: "FALSE"
+        MKL_DYNAMIC: "FALSE"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-harp-router-v4
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v4
+    notes:
+      - SCOPE LIMITED — v4 is implemented and registered as a new planned identity, but implementation creates no amendment, claims no lease, opens no labels, and does not authorize a workstation run.
+      - V4 is the separately fenced execution repair after v3 failed exhausted before label access. It keeps the v3 routing estimand and geometry unchanged, but gives semantic 16-hex identities and byte-level 64-hex SHA-256 digests distinct typed fields and validators.
+      - Decisions are case-level and use only physical lambda-1 actions. The hierarchy first tests H-by-e against matched-budget U and exact B jointly, then tests U against B; any incomplete, unsafe, incompatible, or unsupported action returns exact-B bytes.
+      - The normalized additive contribution to exact case-equal BACC, Brier delta, and log-loss delta are fitted jointly with shared design. Exact case-equal BACC balances classes first and then supporting cases within class. A single-class source case contributes its sole-class recall weighted by total cases divided by twice that class's supporting-case count; averaging case contributions reconstructs the terminal center BACC exactly. The same contribution estimand is used for policy thresholds and oracle diagnostics.
+      - Joint-harm residual calibration first takes the worst candidate residual inside each donor/case block, gives equal total mass to each donor and equal mass to cases within donor, and uses the maximum donor-specific finite-sample upper quantile. Seed cells remain technical replications rather than independent observations, and no formal conformal guarantee is claimed.
+      - The runner uses compact NumPy stores, bounded GPU and CPU work queues, persistent spawned CUDA workers, shared multi-output CPU fits, deterministic threading, lease-bound local scratch, hash-validated intra-attempt label-free checkpoints, and independently reconstructed route seals. Cross-process or cross-attempt recovery is forbidden by the single-use authority.
+      - V4 physically rebuilds its cache, manifests, source streams, and classifier checkpoints from immutable upstream MIDOG++ inputs. No v3 cache, output, scratch, amendment, lease, checkpoint, route, or result is an input.
+      - The same already-consumed MIDOG++ test cases may be reused only after separately preparing v4 inputs and publishing/activating separate authority. Any result remains POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE with fresh_evidence=false and may feed no other experiment.

@@ -47,11 +47,21 @@ HARP_V3_EXPERIMENT_ID = (
 HARP_V3_RUN_CONFIRMATION_TOKEN = (
     "RUN_HARP_V3_TERMINAL_CONSUMED_TEST_DIAGNOSTIC"
 )
+HARP_V4_EXECUTION_AMENDMENT_GATE = (
+    "harp_v4_consumed_test_execution_amendment_v1"
+)
+HARP_V4_EXPERIMENT_ID = (
+    "midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v4"
+)
+HARP_V4_RUN_CONFIRMATION_TOKEN = (
+    "RUN_HARP_V4_TERMINAL_CONSUMED_TEST_DIAGNOSTIC"
+)
 KNOWN_PREPARATION_AUTHORITY_GATES = frozenset(
     {
         HARP_V1_EXECUTION_AMENDMENT_GATE,
         HARP_V2_EXECUTION_AMENDMENT_GATE,
         HARP_V3_EXECUTION_AMENDMENT_GATE,
+        HARP_V4_EXECUTION_AMENDMENT_GATE,
         SCEPTRE_V4_EXECUTION_AMENDMENT_GATE,
         SCEPTRE_V5_EXECUTION_AMENDMENT_GATE,
     }
@@ -72,6 +82,11 @@ _AUTHORITY_MODULE_BY_GATE = {
         "workspace_preparation_authority",
         "HarpV3WorkspaceAuthorityError",
     ),
+    HARP_V4_EXECUTION_AMENDMENT_GATE: (
+        "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v4."
+        "workspace_preparation_authority",
+        "HarpV4WorkspaceAuthorityError",
+    ),
     SCEPTRE_V4_EXECUTION_AMENDMENT_GATE: (
         "midogpp_thesis.cvae.diagnostics.fixed_bank_sceptre_router_v4."
         "execution.workspace_preparation_authority",
@@ -87,11 +102,24 @@ _HARP_VERSION_BY_GATE = {
     HARP_V1_EXECUTION_AMENDMENT_GATE: "v1",
     HARP_V2_EXECUTION_AMENDMENT_GATE: "v2",
     HARP_V3_EXECUTION_AMENDMENT_GATE: "v3",
+    HARP_V4_EXECUTION_AMENDMENT_GATE: "v4",
 }
 _HARP_EXPERIMENT_BY_GATE = {
     HARP_V1_EXECUTION_AMENDMENT_GATE: HARP_V1_EXPERIMENT_ID,
     HARP_V2_EXECUTION_AMENDMENT_GATE: HARP_V2_EXPERIMENT_ID,
     HARP_V3_EXECUTION_AMENDMENT_GATE: HARP_V3_EXPERIMENT_ID,
+    HARP_V4_EXECUTION_AMENDMENT_GATE: HARP_V4_EXPERIMENT_ID,
+}
+_HARP_AUTHORIZATION_MODULE_BY_GATE = {
+    gate: (
+        "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_"
+        f"{version}.authorization"
+    )
+    for gate, version in _HARP_VERSION_BY_GATE.items()
+}
+_HARP_RUN_CONFIRMATION_BY_GATE = {
+    HARP_V3_EXECUTION_AMENDMENT_GATE: HARP_V3_RUN_CONFIRMATION_TOKEN,
+    HARP_V4_EXECUTION_AMENDMENT_GATE: HARP_V4_RUN_CONFIRMATION_TOKEN,
 }
 
 
@@ -127,27 +155,19 @@ class PreparationAuthorityReceipt:
 AuthorityMemberResolver = Callable[[str, str], AuthorityMember]
 
 
+def harp_run_confirmation_token(gate_id: str | None) -> str | None:
+    """Return the source-owned exact launch token for a closed HARP gate."""
+
+    return _HARP_RUN_CONFIRMATION_BY_GATE.get(gate_id)
+
+
 def expected_workspace_registration_contract_hash(
     gate_id: str | None,
 ) -> str | None:
     """Reconstruct a consumer registration hash from a closed module table."""
 
-    if gate_id == HARP_V1_EXECUTION_AMENDMENT_GATE:
-        module_name = (
-            "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v1."
-            "authorization"
-        )
-    elif gate_id == HARP_V2_EXECUTION_AMENDMENT_GATE:
-        module_name = (
-            "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v2."
-            "authorization"
-        )
-    elif gate_id == HARP_V3_EXECUTION_AMENDMENT_GATE:
-        module_name = (
-            "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v3."
-            "authorization"
-        )
-    else:
+    module_name = _HARP_AUTHORIZATION_MODULE_BY_GATE.get(gate_id)
+    if module_name is None:
         return None
     # Both names are source constants selected by exact gate equality; no
     # registry value is ever interpreted as a Python module or symbol.
@@ -179,13 +199,14 @@ def validate_preparation_authority_extra_args(
                 f"HARP {harp_version} workspace preparation and execution "
                 "reject --force."
             )
-        if gate_id == HARP_V3_EXECUTION_AMENDMENT_GATE:
+        confirmation_token = _HARP_RUN_CONFIRMATION_BY_GATE.get(gate_id)
+        if confirmation_token is not None:
             allowed = (
                 {()}
                 if preparation_only
                 else {
                     ("--dry-run",),
-                    ("--confirm", HARP_V3_RUN_CONFIRMATION_TOKEN),
+                    ("--confirm", confirmation_token),
                 }
             )
             if normalized not in allowed:
@@ -194,10 +215,12 @@ def validate_preparation_authority_extra_args(
                 else:
                     requirement = (
                         "the exact '--dry-run' argument or the exact "
-                        f"'--confirm {HARP_V3_RUN_CONFIRMATION_TOKEN}' arguments"
+                        f"'--confirm {confirmation_token}' arguments"
                     )
                 raise PreparationAuthorityError(
-                    "HARP v3 workspace execution accepts only " + requirement + "."
+                    f"HARP {harp_version} workspace execution accepts only "
+                    + requirement
+                    + "."
                 )
         elif normalized not in {(), ("--dry-run",)}:
             raise PreparationAuthorityError(
@@ -219,22 +242,8 @@ def validate_preparation_authority_registration_projection(
     its pre-render authority gate.
     """
 
-    if gate_id == HARP_V1_EXECUTION_AMENDMENT_GATE:
-        module_name = (
-            "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v1."
-            "authorization"
-        )
-    elif gate_id == HARP_V2_EXECUTION_AMENDMENT_GATE:
-        module_name = (
-            "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v2."
-            "authorization"
-        )
-    elif gate_id == HARP_V3_EXECUTION_AMENDMENT_GATE:
-        module_name = (
-            "midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v3."
-            "authorization"
-        )
-    else:
+    module_name = _HARP_AUTHORIZATION_MODULE_BY_GATE.get(gate_id)
+    if module_name is None:
         return None
     authority = import_module(module_name)
     try:
@@ -272,6 +281,7 @@ def preparation_authority_registration_error(
         HARP_V1_EXPERIMENT_ID: HARP_V1_EXECUTION_AMENDMENT_GATE,
         HARP_V2_EXPERIMENT_ID: HARP_V2_EXECUTION_AMENDMENT_GATE,
         HARP_V3_EXPERIMENT_ID: HARP_V3_EXECUTION_AMENDMENT_GATE,
+        HARP_V4_EXPERIMENT_ID: HARP_V4_EXECUTION_AMENDMENT_GATE,
         SCEPTRE_V4_EXPERIMENT_ID: SCEPTRE_V4_EXECUTION_AMENDMENT_GATE,
         SCEPTRE_V5_EXPERIMENT_ID: SCEPTRE_V5_EXECUTION_AMENDMENT_GATE,
     }.get(experiment_id)
@@ -380,6 +390,9 @@ __all__ = (
     "HARP_V3_EXECUTION_AMENDMENT_GATE",
     "HARP_V3_EXPERIMENT_ID",
     "HARP_V3_RUN_CONFIRMATION_TOKEN",
+    "HARP_V4_EXECUTION_AMENDMENT_GATE",
+    "HARP_V4_EXPERIMENT_ID",
+    "HARP_V4_RUN_CONFIRMATION_TOKEN",
     "KNOWN_PREPARATION_AUTHORITY_GATES",
     "PreparationAuthorityError",
     "PreparationAuthorityReceipt",
@@ -387,6 +400,7 @@ __all__ = (
     "SCEPTRE_V5_EXECUTION_AMENDMENT_GATE",
     "enforce_preparation_authority",
     "expected_workspace_registration_contract_hash",
+    "harp_run_confirmation_token",
     "preparation_authority_registration_error",
     "validate_preparation_authority_gate_id",
     "validate_preparation_authority_extra_args",

@@ -862,6 +862,88 @@ def build_parser() -> argparse.ArgumentParser:
             "validated mutation-free plan."
         ),
     )
+    harp_stage90_v4 = sub.add_parser(
+        "fixed-bank-harp-router-v4",
+        help=(
+            "Inspect, dry-run, or execute the separately authorized HARP v4 "
+            "terminal consumed-test sensitivity. V4 preserves the v3 science "
+            "while using typed semantic and byte-level hash contracts."
+        ),
+    )
+    harp_stage90_v4.add_argument("--config", required=True)
+    harp_stage90_v4.add_argument(
+        "--artifact-root",
+        default=".",
+        help="Prepared v4 output root; ignored by path-free planned inspection.",
+    )
+    harp_stage90_v4_mode = harp_stage90_v4.add_mutually_exclusive_group()
+    harp_stage90_v4_mode.add_argument(
+        "--inspect-plan",
+        action="store_true",
+        help=(
+            "Inspect the fenced v4 identities, hash contracts, and optimized "
+            "physical topology without resolving inputs or opening labels."
+        ),
+    )
+    harp_stage90_v4_mode.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "Validate authorized v4 inputs and physical/hash contracts without "
+            "claiming the single-use lease, generating sources, or opening labels."
+        ),
+    )
+    harp_stage90_v4_mode.add_argument(
+        "--confirm",
+        help=(
+            "Exact single-use launch confirmation token. It is checked before "
+            "authority, inputs, scratch, labels, or output are accessed."
+        ),
+    )
+    harp_prepare_v4 = sub.add_parser(
+        "prepare-fixed-bank-harp-router-v4-inputs",
+        help=(
+            "Plan or materialize the catalog-bound v4-only label-blind cache "
+            "and disjoint whole-case role manifests. This issues no authority."
+        ),
+    )
+    harp_prepare_v4.add_argument("--repository-root", required=True)
+    harp_prepare_v4.add_argument(
+        "--confirm",
+        help="Exact preparation token; omit for a mutation-free plan.",
+    )
+    harp_publish_v4 = sub.add_parser(
+        "publish-fixed-bank-harp-router-v4-amendment",
+        help=(
+            "Retired fail-closed surface. Use activate-fixed-bank-harp-router-v4 "
+            "so the recovery journal precedes every authority mutation."
+        ),
+    )
+    harp_publish_v4.add_argument("--config", required=True)
+    harp_publish_v4.add_argument("--expert-bank-root", required=True)
+    harp_publish_v4.add_argument("--generation-lock-root", required=True)
+    harp_publish_v4.add_argument("--prepared-cache-root", required=True)
+    harp_publish_v4.add_argument("--development-manifest", required=True)
+    harp_publish_v4.add_argument("--evaluation-manifest", required=True)
+    harp_publish_v4.add_argument("--parent-ledger", required=True)
+    harp_publish_v4.add_argument("--amendment-path", required=True)
+    harp_publish_v4.add_argument("--authorization-basis", required=True)
+    harp_publish_v4.add_argument("--authorization-date", required=True)
+    harp_publish_v4.add_argument("--repository-root", required=True)
+    harp_activate_v4 = sub.add_parser(
+        "activate-fixed-bank-harp-router-v4",
+        help=(
+            "Render a mutation-free v4 activation plan from exact prepared "
+            "inputs, or commit it only with the exact confirmation token."
+        ),
+    )
+    harp_activate_v4.add_argument("--authorization-basis", required=True)
+    harp_activate_v4.add_argument("--authorization-date", required=True)
+    harp_activate_v4.add_argument("--repository-root", required=True)
+    harp_activate_v4.add_argument(
+        "--confirm",
+        help="Exact activation token; omit for a mutation-free plan.",
+    )
     sceptre_v5_mode.add_argument(
         "--dry-run",
         action="store_true",
@@ -1042,6 +1124,75 @@ def main(argv: list[str] | None = None) -> int:
                 plan.to_payload()
                 if args.confirm is None
                 else activate_harp_v3(plan, confirmation=args.confirm).to_payload()
+            )
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.surface == "prepare-fixed-bank-harp-router-v4-inputs":
+        import json
+
+        from .fixed_bank_harp_router_v4.workstation_preparation import (
+            plan_harp_v4_workstation_preparation,
+            prepare_harp_v4_workstation_inputs,
+        )
+
+        plan = plan_harp_v4_workstation_preparation(args.repository_root)
+        result = (
+            plan.to_payload()
+            if args.confirm is None
+            else prepare_harp_v4_workstation_inputs(
+                plan,
+                confirmation=args.confirm,
+            ).to_payload()
+        )
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.surface == "publish-fixed-bank-harp-router-v4-amendment":
+        from ..protocol import ProtocolError
+
+        raise ProtocolError(
+            "HARP v4 direct amendment publication is disabled before config or "
+            "input access; use activate-fixed-bank-harp-router-v4."
+        )
+    if args.surface == "activate-fixed-bank-harp-router-v4":
+        import json
+
+        from .fixed_bank_harp_router_v4.activation import (
+            activate_harp_v4,
+            inspect_harp_v4_activation_recovery,
+            plan_harp_v4_activation,
+            recover_harp_v4_activation,
+        )
+        from .fixed_bank_harp_router_v4.config import load_config
+        from .fixed_bank_harp_router_v4.workspace_paths import (
+            resolve_harp_v4_workspace_paths,
+        )
+
+        recovery = inspect_harp_v4_activation_recovery(args.repository_root)
+        if recovery is not None:
+            result = (
+                recovery
+                if args.confirm is None
+                else recover_harp_v4_activation(
+                    args.repository_root,
+                    confirmation=args.confirm,
+                ).to_payload()
+            )
+        else:
+            paths = resolve_harp_v4_workspace_paths(
+                args.repository_root,
+                require_prepared=True,
+            )
+            plan = plan_harp_v4_activation(
+                load_config(paths.config_path),
+                **paths.activation_kwargs(),
+                repository_root=args.repository_root,
+                authorization_basis=args.authorization_basis,
+                authorization_date=args.authorization_date,
+            )
+            result = (
+                plan.to_payload()
+                if args.confirm is None
+                else activate_harp_v4(plan, confirmation=args.confirm).to_payload()
             )
         print(json.dumps(result, sort_keys=True, separators=(",", ":")))
         return 0
@@ -1441,6 +1592,54 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(
                 run_harp_stage90_v3(
+                    config,
+                    artifact_root=artifact_root,
+                    confirmation_token=args.confirm,
+                )
+            )
+        return 0
+
+    if args.surface == "fixed-bank-harp-router-v4":
+        import json
+
+        from ..protocol import ProtocolError
+        from .fixed_bank_harp_router_v4.config import load_config
+        from .fixed_bank_harp_router_v4.runner import (
+            HARP_V4_RUN_CONFIRMATION_TOKEN,
+            dry_run_harp_stage90_v4,
+            inspect_harp_stage90_v4,
+            run_harp_stage90_v4,
+        )
+
+        if (
+            not args.inspect_plan
+            and not args.dry_run
+            and args.confirm != HARP_V4_RUN_CONFIRMATION_TOKEN
+        ):
+            raise ProtocolError(
+                "HARP v4 execution requires the exact confirmation token "
+                f"{HARP_V4_RUN_CONFIRMATION_TOKEN}."
+            )
+        config = load_config(args.config)
+        if args.inspect_plan:
+            print(
+                json.dumps(
+                    inspect_harp_stage90_v4(config),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+        elif args.dry_run:
+            print(
+                json.dumps(
+                    dry_run_harp_stage90_v4(config, artifact_root=artifact_root),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+        else:
+            print(
+                run_harp_stage90_v4(
                     config,
                     artifact_root=artifact_root,
                     confirmation_token=args.confirm,
