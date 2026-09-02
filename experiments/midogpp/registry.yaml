@@ -4053,6 +4053,58 @@ experiments:
       - The runner uses compact NumPy stores, bounded GPU and CPU work queues, persistent spawned CUDA workers, shared multi-output CPU fits, deterministic threading, lease-bound local scratch, hash-validated intra-attempt label-free checkpoints, and independently reconstructed route seals. Cross-process or cross-attempt recovery is forbidden by the single-use authority.
       - V4 physically rebuilds its cache, manifests, source streams, and classifier checkpoints from immutable upstream MIDOG++ inputs. No v3 cache, output, scratch, amendment, lease, checkpoint, route, or result is an input.
       - The same already-consumed MIDOG++ test cases may be reused only after separately preparing v4 inputs and publishing/activating separate authority. Any result remains POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE with fresh_evidence=false and may feed no other experiment.
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v7
+    stage: 90_oracles_and_diagnostics
+    status: planned
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_harp_router_v7.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v7
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_harp_consumed_test_cache_v7
+      - midogpp_stage90_harp_consumed_test_development_manifest_v7
+      - midogpp_stage90_harp_consumed_test_evaluation_manifest_v7
+      - midogpp_uniform_b_test_consumption_ledger_harp_parent_v7
+      - midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v7
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Immutable fixed-bank generation geometry and classifier settings only; it grants no routing, consumed-label, fresh-evidence, promotion, deployment, or execution authority.
+      midogpp_stage90_harp_consumed_test_cache_v7: Fenced v7-only label-free Virchow2 cache rebuilt from the immutable canonical consumed MIDOG++ test cache; it grants no execution or evidential authority.
+      midogpp_stage90_harp_consumed_test_development_manifest_v7: V7 role-pure whole-case development-label capability; it may open only after the complete physical menu and shared label-free effective-menu membership are durable.
+      midogpp_stage90_harp_consumed_test_evaluation_manifest_v7: V7 role-pure evaluation-label capability; it may open once only after every exact top-1 route or exact-B fallback is durable and independently reconstructed twice.
+      midogpp_uniform_b_test_consumption_ledger_harp_parent_v7: V7-only byte-exact binding to the original consumed-test parent ledger; it cannot authorize execution by itself.
+      midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v7: A separately published HARP v7 single-use amendment is required; every v1/v2/v3/v4/v5/v6 authority, output, scratch, cache, route, model, and capability state is a forbidden alias.
+    runner:
+      preparation_authority_gate: harp_v7_consumed_test_execution_amendment_v1
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+        PYTHONHASHSEED: "0"
+        OMP_DYNAMIC: "FALSE"
+        MKL_DYNAMIC: "FALSE"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-harp-router-v7
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v7
+    notes:
+      - SCOPE LIMITED - v7 is registered only as a planned terminal consumed-test sensitivity. Implementation creates no amendment, claims no lease, opens no labels, and does not itself authorize a workstation run.
+      - V7 uses one shared label-free effective-menu transform on source and target surfaces, retaining exact B and only physical D01/D10 actions that cross the frozen decision threshold, excluding ALL_MARGINS and structural no-ops from the BACC routing lane, and persisting exact-byte duplicate aliases.
+      - The source-only hurdle predicts case opportunity and the conditional tie-aware ranker orders active physical actions only. Every preprocessing, fit, threshold, and hyperparameter choice is nested inside strict held-center LODO; conditional-rank admission is local to each outer center and only positive-opportunity source cases rather than a global kill switch.
+      - Nested whole-policy source-OOF replay separately evaluates the actual case-local hurdle, ranker, exact top-1 action, and exact-B abstention policy over all held-source cases. Numeric source replays and fold bindings remain durable before target decisions.
+      - Two persistent GPU workers are followed by phase-disjoint bounded CPU pools. The globally one-threaded parent prevents oversubscription; classifier workers receive three BLAS threads and CUDA-hidden science workers receive one.
+      - V7 physically rebuilds its cache, manifests, source streams, effective menus, source model, OOF policy replay, routes, scratch, amendment, and lease. No v1-v6 cache, output, route, checkpoint, policy, threshold, scratch, authority, or result is an input.
+      - The already-consumed MIDOG++ test cases are reused only for POST_HOC_CONSUMED_TEST_SENSITIVITY. Results remain TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE with fresh_evidence=false and may feed no other experiment.
   - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v6
     stage: 90_oracles_and_diagnostics
     status: planned
