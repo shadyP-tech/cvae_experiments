@@ -1154,6 +1154,60 @@ def build_parser() -> argparse.ArgumentParser:
         "--confirm",
         help="Exact v7 activation token; omit for a mutation-free plan.",
     )
+    harp_stage90_v8 = sub.add_parser(
+        "fixed-bank-harp-router-v8",
+        help=(
+            "Inspect, dry-run, or execute the separately authorized HARP v8 "
+            "baseline-inclusive action-safety-then-ranking successor router."
+        ),
+    )
+    harp_stage90_v8.add_argument("--config", required=True)
+    harp_stage90_v8.add_argument(
+        "--artifact-root",
+        default=".",
+        help="Prepared v8 output root; ignored by path-free planned inspection.",
+    )
+    harp_stage90_v8_mode = harp_stage90_v8.add_mutually_exclusive_group()
+    harp_stage90_v8_mode.add_argument(
+        "--inspect-plan",
+        action="store_true",
+        help="Inspect v8 identities and architecture without resolving inputs.",
+    )
+    harp_stage90_v8_mode.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validate authorized v8 inputs without claiming the single-use lease.",
+    )
+    harp_stage90_v8_mode.add_argument(
+        "--confirm",
+        help="Exact single-use v8 launch confirmation token.",
+    )
+    harp_prepare_v8 = sub.add_parser(
+        "prepare-fixed-bank-harp-router-v8-inputs",
+        help=(
+            "Plan or materialize the catalog-bound v8-only label-blind cache "
+            "and disjoint whole-case role manifests; this issues no authority."
+        ),
+    )
+    harp_prepare_v8.add_argument("--repository-root", required=True)
+    harp_prepare_v8.add_argument(
+        "--confirm",
+        help="Exact v8 preparation token; omit for a mutation-free plan.",
+    )
+    harp_activate_v8 = sub.add_parser(
+        "activate-fixed-bank-harp-router-v8",
+        help=(
+            "Render a mutation-free v8 activation plan from exact prepared "
+            "inputs, or commit it only with the exact confirmation token."
+        ),
+    )
+    harp_activate_v8.add_argument("--authorization-basis", required=True)
+    harp_activate_v8.add_argument("--authorization-date", required=True)
+    harp_activate_v8.add_argument("--repository-root", required=True)
+    harp_activate_v8.add_argument(
+        "--confirm",
+        help="Exact v8 activation token; omit for a mutation-free plan.",
+    )
     sceptre_v5_mode.add_argument(
         "--dry-run",
         action="store_true",
@@ -1622,6 +1676,68 @@ def main(argv: list[str] | None = None) -> int:
                 plan.to_payload()
                 if args.confirm is None
                 else activate_harp_v7(plan, confirmation=args.confirm).to_payload()
+            )
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.surface == "prepare-fixed-bank-harp-router-v8-inputs":
+        import json
+
+        from .fixed_bank_harp_router_v8.workstation_preparation import (
+            plan_harp_v8_workstation_preparation,
+            prepare_harp_v8_workstation_inputs,
+        )
+
+        plan = plan_harp_v8_workstation_preparation(args.repository_root)
+        result = (
+            plan.to_payload()
+            if args.confirm is None
+            else prepare_harp_v8_workstation_inputs(
+                plan,
+                confirmation=args.confirm,
+            ).to_payload()
+        )
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.surface == "activate-fixed-bank-harp-router-v8":
+        import json
+
+        from .fixed_bank_harp_router_v8.activation import (
+            activate_harp_v8,
+            inspect_harp_v8_activation_recovery,
+            plan_harp_v8_activation,
+            recover_harp_v8_activation,
+        )
+        from .fixed_bank_harp_router_v8.config import load_config
+        from .fixed_bank_harp_router_v8.workspace_paths import (
+            resolve_harp_v8_workspace_paths,
+        )
+
+        recovery = inspect_harp_v8_activation_recovery(args.repository_root)
+        if recovery is not None:
+            result = (
+                recovery
+                if args.confirm is None
+                else recover_harp_v8_activation(
+                    args.repository_root,
+                    confirmation=args.confirm,
+                ).to_payload()
+            )
+        else:
+            paths = resolve_harp_v8_workspace_paths(
+                args.repository_root,
+                require_prepared=True,
+            )
+            plan = plan_harp_v8_activation(
+                load_config(paths.config_path),
+                **paths.activation_kwargs(),
+                repository_root=args.repository_root,
+                authorization_basis=args.authorization_basis,
+                authorization_date=args.authorization_date,
+            )
+            result = (
+                plan.to_payload()
+                if args.confirm is None
+                else activate_harp_v8(plan, confirmation=args.confirm).to_payload()
             )
         print(json.dumps(result, sort_keys=True, separators=(",", ":")))
         return 0
@@ -2213,6 +2329,54 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(
                 run_harp_stage90_v7(
+                    config,
+                    artifact_root=artifact_root,
+                    confirmation_token=args.confirm,
+                )
+            )
+        return 0
+
+    if args.surface == "fixed-bank-harp-router-v8":
+        import json
+
+        from ..protocol import ProtocolError
+        from .fixed_bank_harp_router_v8.config import load_config
+        from .fixed_bank_harp_router_v8.runner import (
+            HARP_V8_RUN_CONFIRMATION_TOKEN,
+            dry_run_harp_stage90_v8,
+            inspect_harp_stage90_v8,
+            run_harp_stage90_v8,
+        )
+
+        if (
+            not args.inspect_plan
+            and not args.dry_run
+            and args.confirm != HARP_V8_RUN_CONFIRMATION_TOKEN
+        ):
+            raise ProtocolError(
+                "HARP v8 execution requires the exact confirmation token "
+                f"{HARP_V8_RUN_CONFIRMATION_TOKEN}."
+            )
+        config = load_config(args.config)
+        if args.inspect_plan:
+            print(
+                json.dumps(
+                    inspect_harp_stage90_v8(config),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+        elif args.dry_run:
+            print(
+                json.dumps(
+                    dry_run_harp_stage90_v8(config, artifact_root=artifact_root),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+        else:
+            print(
+                run_harp_stage90_v8(
                     config,
                     artifact_root=artifact_root,
                     confirmation_token=args.confirm,

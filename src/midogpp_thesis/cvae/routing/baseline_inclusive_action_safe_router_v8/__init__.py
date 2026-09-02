@@ -1,0 +1,91 @@
+"""Baseline-inclusive, action-certified HARP v8 routing science core."""
+
+from .admission import AdmissionConfig, OuterAdmission, evaluate_outer_admission
+from .calibration import (
+    DISABLED_CERTIFICATE_CONFIDENCE_THRESHOLD,
+    PolicyReplay,
+    RiskCoverageConfig,
+    SelectiveCalibration,
+    calibrate_policy_risk_coverage,
+)
+from .certification import (
+    ResidualCalibration,
+    ResidualCalibrationCell,
+    ResidualObservation,
+    calibrate_center_group_residuals,
+    certify_action,
+)
+from .contracts import (
+    ActionCertificate,
+    ActionEstimate,
+    CasePrediction,
+    Direction,
+    LabelFreeAction,
+    SourceActionOutcome,
+    action_group,
+    float32_probability_hex,
+    probability_bytes_to_hex,
+    probability_hex_to_bytes,
+)
+from .effective_menu import EffectiveMenu, build_effective_menu, group_effective_menus
+from .model import (
+    ActionHeads,
+    BaselineInclusiveRouterModel,
+    ConfigSelection,
+    ConfigTuningScore,
+    FitConfig,
+    LinearHead,
+    NestedPolicyFold,
+    SourceLODOResult,
+    Standardizer,
+    fit_baseline_inclusive_router,
+    fit_source_lodo,
+    predict_case,
+    predict_target_actions,
+)
+from .policy import RouteDecision, select_exact_top1
+
+
+__all__ = (
+    "ActionCertificate",
+    "ActionEstimate",
+    "ActionHeads",
+    "AdmissionConfig",
+    "BaselineInclusiveRouterModel",
+    "CasePrediction",
+    "ConfigSelection",
+    "ConfigTuningScore",
+    "DISABLED_CERTIFICATE_CONFIDENCE_THRESHOLD",
+    "Direction",
+    "EffectiveMenu",
+    "FitConfig",
+    "LabelFreeAction",
+    "LinearHead",
+    "NestedPolicyFold",
+    "OuterAdmission",
+    "PolicyReplay",
+    "ResidualCalibration",
+    "ResidualCalibrationCell",
+    "ResidualObservation",
+    "RiskCoverageConfig",
+    "RouteDecision",
+    "SelectiveCalibration",
+    "SourceActionOutcome",
+    "SourceLODOResult",
+    "Standardizer",
+    "action_group",
+    "build_effective_menu",
+    "calibrate_center_group_residuals",
+    "calibrate_policy_risk_coverage",
+    "certify_action",
+    "evaluate_outer_admission",
+    "fit_baseline_inclusive_router",
+    "fit_source_lodo",
+    "float32_probability_hex",
+    "group_effective_menus",
+    "predict_case",
+    "predict_target_actions",
+    "probability_bytes_to_hex",
+    "probability_hex_to_bytes",
+    "select_exact_top1",
+)
