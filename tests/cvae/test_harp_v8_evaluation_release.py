@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 
 import numpy as np
@@ -15,6 +16,7 @@ from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v8.input_surfaces im
     HarpCacheRow,
     HarpConsumedCacheIndex,
     V8_CACHE_IDENTITY,
+    _read_label_manifest,
     evaluation_row_id,
     load_evaluation_truth,
 )
@@ -41,8 +43,13 @@ def _prepared_release(tmp_path: Path):
     )
     manifest.parent.mkdir(parents=True)
     raw_rows: list[tuple[str, str, str, int]] = []
-    for center in CENTERS:
+    manifest_ordinals: dict[tuple[str, int], int] = {}
+    # The canonical scoring contract is not grouped in prepared-cache center
+    # order.  Reverse centers here so this fixture exercises the production
+    # ordering boundary instead of accidentally making both surfaces equal.
+    for center in reversed(CENTERS):
         for index in range(4):
+            manifest_ordinals[(center, index)] = len(raw_rows)
             raw_rows.append((f"case-{center}-{index}", center, "test", index % 2))
     with manifest.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.writer(handle, lineterminator="\n")
@@ -55,13 +62,14 @@ def _prepared_release(tmp_path: Path):
         DEVELOPMENT_ROLE: [],
         EVALUATION_ROLE: [],
     }
-    ordinal = 0
+    expected_development_labels: dict[str, int] = {}
     for center in CENTERS:
         source_rows: list[CanonicalFrameRow] = []
         role_offsets = {DEVELOPMENT_ROLE: 0, EVALUATION_ROLE: 0}
         for center_index in range(4):
             role = DEVELOPMENT_ROLE if center_index < 2 else EVALUATION_ROLE
             case_id = f"case-{center}-{center_index}"
+            ordinal = manifest_ordinals[(center, center_index)]
             sample_id = evaluation_row_id(manifest_sha, ordinal)
             source_rows.append(
                 CanonicalFrameRow(
@@ -83,8 +91,9 @@ def _prepared_release(tmp_path: Path):
                     embedding_row_index=center_index,
                 )
             )
+            if role == DEVELOPMENT_ROLE:
+                expected_development_labels[sample_id] = center_index % 2
             role_offsets[role] += 1
-            ordinal += 1
         by_center[center] = tuple(source_rows)
     rows = tuple(rows_by_role[DEVELOPMENT_ROLE] + rows_by_role[EVALUATION_ROLE])
     cache_root = repository / "prepared-cache"
@@ -189,6 +198,7 @@ def _prepared_release(tmp_path: Path):
         "manifest": manifest,
         "release": release_path,
         "development_sha": development_sha,
+        "expected_development_labels": expected_development_labels,
         "cache": final_cache,
         "config": config,
         "receipt": receipt,
@@ -231,3 +241,37 @@ def test_preparation_publishes_no_readable_evaluation_truth_and_requires_receipt
     assert tuple(truth) == tuple(row.key for row in evaluation_rows)
     assert set(truth.values()) == {0, 1}
 
+
+def test_development_manifest_is_emitted_in_authenticated_cache_order(
+    tmp_path: Path,
+) -> None:
+    prepared = _prepared_release(tmp_path)
+    development_path = (
+        prepared["release"].parents[1]
+        / "harp_consumed_test_development_v8/manifest.csv"
+    )
+
+    rows = _read_label_manifest(
+        development_path,
+        expected_sha256=prepared["development_sha"],
+        expected_role=DEVELOPMENT_ROLE,
+        cache=prepared["cache"],
+    )
+
+    expected_keys = tuple(
+        row.key
+        for row in prepared["rows"]
+        if row.split_role == DEVELOPMENT_ROLE
+    )
+    assert tuple(row[:3] for row in rows) == expected_keys
+    assert {row[2]: row[3] for row in rows} == prepared[
+        "expected_development_labels"
+    ]
+
+    release_payload = json.loads(prepared["release"].read_text(encoding="utf-8"))
+    expected_evaluation_keys = [
+        list(row.key)
+        for row in prepared["rows"]
+        if row.split_role == EVALUATION_ROLE
+    ]
+    assert release_payload["ordered_cache_keys"] == expected_evaluation_keys

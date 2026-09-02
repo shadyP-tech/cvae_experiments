@@ -60,8 +60,7 @@ def publish_role_pure_manifests(
     if barrier.get("canonical_scoring_manifest_opened") is not False:
         raise ProtocolError("HARP scoring manifest opened before the label-free barrier.")
 
-    development_rows: list[tuple[str, str, str, int]] = []
-    evaluation_keys: list[tuple[str, str, str]] = []
+    development_labels: dict[str, int] = {}
     expected_by_ordinal: dict[int, tuple[object, object]] = {}
     for cache_row in cache.rows:
         source = source_by_sample.get(cache_row.sample_id)
@@ -111,14 +110,15 @@ def publish_role_pure_manifests(
                 if row.split_role == DEVELOPMENT_ROLE:
                     if str(raw_value) not in {"0", "1"}:
                         raise ProtocolError("HARP development truth is malformed.")
-                    development_rows.append(
-                        (row.center, row.case_id, row.sample_id, int(raw_value))
-                    )
+                    if row.sample_id in development_labels:
+                        raise ProtocolError(
+                            "HARP development truth identity is duplicated."
+                        )
+                    development_labels[row.sample_id] = int(raw_value)
                 elif row.split_role == EVALUATION_ROLE:
                     # Do not parse, retain, or publish the erased evaluation
                     # value. The row identity alone binds terminal release.
                     del raw_value
-                    evaluation_keys.append((row.center, row.case_id, row.sample_id))
                 else:  # pragma: no cover - cache reader closes this set
                     raise ProtocolError("HARP preparation split role drifted.")
     except ProtocolError:
@@ -127,6 +127,31 @@ def publish_role_pure_manifests(
         raise ProtocolError("HARP canonical scoring manifest is unreadable.") from exc
     if len(used_manifest_rows) != len(cache.rows):
         raise ProtocolError("HARP cache/manifest row coverage drifted.")
+    development_cache_rows = tuple(
+        row for row in cache.rows if row.split_role == DEVELOPMENT_ROLE
+    )
+    evaluation_cache_rows = tuple(
+        row for row in cache.rows if row.split_role == EVALUATION_ROLE
+    )
+    if set(development_labels) != {
+        row.sample_id for row in development_cache_rows
+    }:
+        raise ProtocolError("HARP development truth coverage drifted.")
+    # The canonical manifest is streamed in contract-row order so evaluation
+    # outcomes can be erased immediately.  The prepared cache has a different,
+    # role/center-scoped canonical order.  Reconstruct the permitted
+    # development capability in cache order only after the streaming identity
+    # audit has completed.
+    development_rows = [
+        (
+            row.center,
+            row.case_id,
+            row.sample_id,
+            development_labels[row.sample_id],
+        )
+        for row in development_cache_rows
+    ]
+    evaluation_keys = [row.key for row in evaluation_cache_rows]
     if not development_rows or not evaluation_keys:
         raise ProtocolError("HARP role publication is empty.")
 

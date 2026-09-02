@@ -4053,6 +4053,63 @@ experiments:
       - The runner uses compact NumPy stores, bounded GPU and CPU work queues, persistent spawned CUDA workers, shared multi-output CPU fits, deterministic threading, lease-bound local scratch, hash-validated intra-attempt label-free checkpoints, and independently reconstructed route seals. Cross-process or cross-attempt recovery is forbidden by the single-use authority.
       - V4 physically rebuilds its cache, manifests, source streams, and classifier checkpoints from immutable upstream MIDOG++ inputs. No v3 cache, output, scratch, amendment, lease, checkpoint, route, or result is an input.
       - The same already-consumed MIDOG++ test cases may be reused only after separately preparing v4 inputs and publishing/activating separate authority. Any result remains POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE with fresh_evidence=false and may feed no other experiment.
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v9
+    stage: 90_oracles_and_diagnostics
+    status: planned
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_harp_router_v9.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v9
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_harp_source_train_full_test_cache_v9
+      - midogpp_stage90_harp_source_train_label_capability_v9
+      - midogpp_stage90_harp_full_test_evaluation_release_v9
+      - midogpp_uniform_b_test_consumption_ledger_harp_parent_v9
+      - midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v9
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Immutable fixed-bank generation geometry and classifier settings only; it grants no routing, consumed-label, fresh-evidence, promotion, deployment, or execution authority.
+      midogpp_stage90_harp_source_train_full_test_cache_v9: Fenced v9-only label-free composite cache rebuilt from the immutable canonical MIDOG++ train and test caches with physically separate source-development and target-evaluation shards; it grants no execution or evidential authority.
+      midogpp_stage90_harp_source_train_label_capability_v9: V9 source-train-only center-sharded label capability covering 9,648 rows and 216 cases; each clean H/q fit process may open only C-minus-H-minus-q shards after its fold-conditioned physical/effective surface is durable. Its heldout-q shard is unauthorized and is not opened by the typed loader in that worker, no fold model or prediction state is shared, and q outcomes are joined to same-fold scoring only after every q prediction is sealed. No global source-label open order is claimed.
+      midogpp_stage90_harp_full_test_evaluation_release_v9: V9 label-free release descriptor covering all 9,928 test rows and 218 cases; canonical truth may be reopened once only after every route or exact-B fallback is durable, independently reconstructed twice, and represented by a typed frozen-route receipt.
+      midogpp_uniform_b_test_consumption_ledger_harp_parent_v9: V9-only byte-exact binding to the original consumed-test parent ledger; it cannot authorize execution by itself.
+      midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v9: A separately published HARP v9 single-use amendment is required; every v1-v8 authority, output, scratch, cache, route, model, certificate, threshold, and capability state is a forbidden alias.
+    runner:
+      preparation_authority_gate: harp_v9_consumed_test_execution_amendment_v1
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+        PYTHONHASHSEED: "0"
+        OMP_DYNAMIC: "FALSE"
+        MKL_DYNAMIC: "FALSE"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-harp-router-v9
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v9
+    notes:
+      - SCOPE LIMITED - v9 is registered only as a planned terminal consumed-test sensitivity. Implementation creates no amendment, claims no lease, opens no labels, and does not itself authorize a workstation run.
+      - V9 preserves the complete physical B/U/Hxe action menu and exact-B fallback, then separates matched-budget U-minus-B effects from expert-allocation Hxe-minus-U effects before ranking.
+      - Router development uses all 216 canonical training cases under strict outer-H and pseudo-target-q cross-fitting. No test case is allocated to router development; all 218 test cases remain target evaluation cases.
+      - Each test case may supply only its own label-free embeddings to compute its case-local routing features. V9 uses no separate target-support partition, and target-case features may neither fit nor calibrate the frozen source-trained router; test labels remain sealed until the global route seal.
+      - A virtual-B, tie-aware, center-and-case-balanced pairwise ranker orders the label-free effective action menu. A separate acceptor is fitted only on inner source-LODO out-of-fold actions actually selected by the cross-fitted ranker.
+      - Ranker, residual, and acceptor regularization are predeclared at alpha 1.0 before source LODO; only the one-dimensional accept-or-B threshold is selected inside nested source-center LODO.
+      - The one-dimensional accept-or-B policy threshold is calibrated by nested source-center LODO on complete held-source policy replays. Risk and coverage apply to the selected policy; v9 makes no per-action worst-center certificate or individual-action safety claim.
+      - Every source action is physically keyed by outer H, held-out q, and current query r. Q-prediction menus use C-minus-H-minus-q; inner calibration menus use C-minus-H-minus-q-minus-r and explicitly retain the diagnostic six-source 1008-plus-126 geometry without claiming the generic quarter-weight or six-effective-source bound.
+      - All preprocessing, pairwise and residual fits, selected-action acceptor fitting, thresholds, and policy admission remain inside strict outer-center exclusion. Clean spawned H/q workers open only C-minus-H-minus-q label shards; the heldout-q shard is unauthorized and is not opened by the typed loader in its own worker, no model or prediction state crosses workers, and every q prediction is durable before aggregate same-fold outcome joining. Target evaluation outcomes cannot enter a rank, accept, threshold, tie, or fallback decision.
+      - Two persistent GPU workers are followed by phase-disjoint bounded CPU pools. The globally one-threaded parent prevents oversubscription; classifier workers receive three BLAS threads and CUDA-hidden science workers receive one.
+      - V9 physically rebuilds a label-free source-train projection, a physically separate all-test projection, source action supervision, source streams, effective menus, pairwise/residual models, acceptor OOF replay, policy thresholds, routes, scratch, amendment, and lease. No v1-v8 or OE-PPUR probability surface, route, model, checkpoint, authority, or result is an input.
+      - The already-consumed MIDOG++ test cases are reused only for POST_HOC_CONSUMED_TEST_SENSITIVITY. Results remain TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE with fresh_evidence=false and may feed no Stage 60, Stage 70, other Stage 90, or any other experiment.
   - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v8
     stage: 90_oracles_and_diagnostics
     status: planned
