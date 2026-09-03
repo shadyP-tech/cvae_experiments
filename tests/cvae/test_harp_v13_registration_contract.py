@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from copy import deepcopy
 import json
+import os
 from pathlib import Path
 
 import pytest
 import yaml
 
 from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v13.activation_paths import (
+    RepositoryBoundary,
     reject_predecessor_path,
 )
 from midogpp_thesis.cvae.diagnostics.fixed_bank_harp_router_v13.activation_workspace import (
@@ -60,6 +62,11 @@ CONFIG = (
 )
 REGISTRY = REPOSITORY_ROOT / "experiments/midogpp/registry.yaml"
 CATALOG = REPOSITORY_ROOT / "experiments/midogpp/artifact_catalog.yaml"
+AMENDMENT_ROOT = (
+    REPOSITORY_ROOT
+    / "experiments/midogpp/stages/90_oracles_and_diagnostics/contracts/"
+    "harp_router_v13"
+)
 
 
 def _yaml(path: Path) -> dict[str, object]:
@@ -167,6 +174,29 @@ def test_v13_preparation_authority_is_closed_world_and_token_bound() -> None:
     ) is not None
 
 
+def test_v13_planned_amendment_root_is_scaffolded_without_authority() -> None:
+    """A clean checkout can plan preparation before an amendment exists."""
+
+    scaffold = AMENDMENT_ROOT / ".gitkeep"
+    assert AMENDMENT_ROOT.is_dir()
+    assert not AMENDMENT_ROOT.is_symlink()
+    assert scaffold.is_file()
+    assert not scaffold.is_symlink()
+    assert scaffold.read_bytes() == b"\n"
+    boundary = RepositoryBoundary.open(REPOSITORY_ROOT)
+    assert boundary.member(
+        AMENDMENT_ROOT.relative_to(REPOSITORY_ROOT),
+        label="amendment artifact",
+        kind="directory",
+    ) == AMENDMENT_ROOT.resolve()
+    for name in (
+        "harp_stage90_execution_amendment_v13.json",
+        ".harp_v13_activation_transaction.json",
+        ".harp_v13_activation.lock",
+    ):
+        assert not os.path.lexists(AMENDMENT_ROOT / name)
+
+
 def test_v13_path_fence_rejects_every_predecessor_without_matching_v13() -> None:
     reject_predecessor_path(
         "datasets/midogpp/derived/features/virchow2/"
@@ -211,6 +241,12 @@ def test_v13_catalog_and_registry_bind_center_shards_and_crossfit_outputs() -> N
     )
     assert experiment["status"] == "planned"
     assert experiment["input_artifact_ids"] == list(INPUT_ARTIFACT_IDS)
+
+    amendment = _row(
+        catalog["artifacts"], INPUT_ARTIFACT_IDS[6], key="artifact_id"
+    )
+    assert amendment["availability"] == "planned_execution_not_authorized"
+    assert amendment["semantic_identities"]["execution_authorized"] == "false"
 
     development = _row(
         catalog["artifacts"], INPUT_ARTIFACT_IDS[3], key="artifact_id"
