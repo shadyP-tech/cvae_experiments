@@ -164,7 +164,12 @@ def require_exact_regular(path: Path, raw: bytes, *, label: str) -> None:
 
 def _require_rolled_back_metadata(journal: ActivationJournal) -> None:
     for path, original, final, label in (
-        (journal.config_path, journal.original_config_bytes, journal.final_config_bytes, "config"),
+        (
+            journal.config_path,
+            journal.original_config_bytes,
+            journal.final_config_bytes,
+            "config",
+        ),
         (
             journal.catalog_path,
             journal.original_catalog_bytes,

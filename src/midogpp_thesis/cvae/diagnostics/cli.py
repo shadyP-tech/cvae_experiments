@@ -1424,6 +1424,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--confirm",
         help="Exact v13 activation token; omit for a mutation-free plan.",
     )
+    harp_supersede_v13 = sub.add_parser(
+        "supersede-fixed-bank-harp-router-v13-activation",
+        help=(
+            "Archive and retire an authenticated, active, unconsumed pre-lease "
+            "v13 activation before replanning; this never creates run authority."
+        ),
+    )
+    harp_supersede_v13.add_argument("--repository-root", required=True)
+    harp_supersede_v13.add_argument(
+        "--confirm",
+        help="Exact v13 supersession token; omit for a mutation-free plan.",
+    )
     harp_stage90_v9 = sub.add_parser(
         "fixed-bank-harp-router-v9",
         help=(
@@ -2214,6 +2226,25 @@ def main(argv: list[str] | None = None) -> int:
                 if args.confirm is None
                 else activate_harp_v13(plan, confirmation=args.confirm).to_payload()
             )
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.surface == "supersede-fixed-bank-harp-router-v13-activation":
+        import json
+
+        from .fixed_bank_harp_router_v13.activation_supersession import (
+            plan_harp_v13_active_activation_supersession,
+            supersede_harp_v13_active_activation,
+        )
+
+        plan = plan_harp_v13_active_activation_supersession(args.repository_root)
+        result = (
+            plan.to_payload()
+            if args.confirm is None
+            else supersede_harp_v13_active_activation(
+                plan,
+                confirmation=args.confirm,
+            ).to_payload()
+        )
         print(json.dumps(result, sort_keys=True, separators=(",", ":")))
         return 0
     if args.surface == "activate-fixed-bank-harp-router-v10":

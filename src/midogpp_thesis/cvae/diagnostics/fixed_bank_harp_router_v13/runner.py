@@ -39,6 +39,7 @@ from .authorization import (
     claim_authorization,
     finalize_authorization,
     load_authorization,
+    repository_root as authorization_repository_root,
 )
 from .config import HarpStage90V13Config
 from .execution import (
@@ -411,7 +412,9 @@ def run_harp_stage90_v13(
     ledger = PhaseLedger()
     try:
         lease = V13_RUNNER_SERVICES.claim_authorization(
-            authority, admission_hash=admission_hash
+            authority,
+            admission_hash=admission_hash,
+            repo_root=authorization_repository_root(),
         )
         ledger.advance("AUTHORITY_ADMISSION")
         _announce("AUTHORITY_ADMISSION")

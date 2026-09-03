@@ -10,9 +10,7 @@ from __future__ import annotations
 
 import base64
 from collections.abc import Callable, Mapping, Sequence
-from contextlib import contextmanager
 from dataclasses import dataclass, field
-import fcntl
 import hashlib
 import json
 import os
@@ -25,6 +23,7 @@ from ...routing.harp_protocol import canonical_bytes, canonical_hash
 from ...runtime.artifact_io import sha256_file
 from ....workspace.runtime import MidogppWorkspace, WorkspaceError
 from . import authorization
+from .activation_lock import LOCK_RELATIVE_PATH, activation_lock
 from .activation_paths import RepositoryBoundary
 from .activation_workspace import validate_rendered_workspace, yaml_mapping
 from .config import HarpStage90V13Config, load_config
@@ -41,11 +40,6 @@ TRANSACTION_RELATIVE_PATH = (
     "experiments/midogpp/stages/90_oracles_and_diagnostics/contracts/"
     "harp_router_v13/.harp_v13_activation_transaction.json"
 )
-LOCK_RELATIVE_PATH = (
-    "experiments/midogpp/stages/90_oracles_and_diagnostics/contracts/"
-    "harp_router_v13/.harp_v13_activation.lock"
-)
-
 FaultInjector = Callable[[str], None]
 
 
@@ -651,29 +645,6 @@ def _install_or_validate_journal(
         temporary.unlink(missing_ok=True)
 
 
-@contextmanager
-def activation_lock(boundary: RepositoryBoundary):
-    """Serialize every transition that owns the v13 activation journal."""
-
-    path = boundary.member(
-        LOCK_RELATIVE_PATH,
-        label="activation lock",
-        kind="optional",
-    )
-    descriptor = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
-    try:
-        try:
-            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as exc:
-            raise ProtocolError("HARP v13 activation is already in progress.") from exc
-        yield
-    finally:
-        try:
-            fcntl.flock(descriptor, fcntl.LOCK_UN)
-        finally:
-            os.close(descriptor)
-
-
 def _atomic_replace(path: Path, raw: bytes, token: str) -> None:
     temporary = path.parent / f".{path.name}.harp-v13-{token}.tmp"
     if os.path.lexists(temporary):
@@ -736,6 +707,7 @@ def _inject(fault_injector: FaultInjector | None, point: str) -> None:
 __all__ = (
     "ActivationJournal",
     "HarpV13ActivationReceipt",
+    "LOCK_RELATIVE_PATH",
     "TRANSACTION_RELATIVE_PATH",
     "activation_lock",
     "commit_activation",

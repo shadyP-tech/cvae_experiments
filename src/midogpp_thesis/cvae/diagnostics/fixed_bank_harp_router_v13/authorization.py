@@ -16,6 +16,8 @@ from ...runtime.harp_v13_execution.action_capacity import (
     build_action_capacity_certificate,
     validate_action_capacity_certificate,
 )
+from .activation_lock import activation_lock
+from .activation_paths import RepositoryBoundary
 from .config import HarpStage90V13Config, INPUT_ARTIFACT_IDS
 from .identity import (
     AUTHORIZATION_SCOPE,
@@ -318,51 +320,146 @@ def load_authorization(
 
 
 def claim_authorization(
-    authorization: HarpV13Authorization, *, admission_hash: str,
+    authorization: HarpV13Authorization,
+    *,
+    admission_hash: str,
+    repo_root: Path | None = None,
 ) -> HarpV13AuthorizationLease:
     if type(authorization) is not HarpV13Authorization:
         raise ProtocolError("HARP v13 lease lacks typed authorization.")
     admission = require_sha256(admission_hash, name="admission_hash")
-    root = lease_path()
-    if root.exists() and not root.is_symlink():
-        raw = _validate_active_lease(
-            root,
-            amendment_sha256=authorization.amendment_sha256,
-            amendment_hash=authorization.amendment_hash,
-            input_binding_hash=authorization.input_binding_hash,
-            admission_hash=admission,
-        )
-        owner = int(raw["process_id"])
-        if owner != os.getpid() and _process_is_alive(owner):
-            raise ProtocolError("HARP v13 active authorization lease is owned by a live process.")
-        return HarpV13AuthorizationLease(root, str(raw["lease_hash"]), os.getpid())
+    repository = repository_root() if repo_root is None else Path(repo_root).resolve()
+
+    boundary = RepositoryBoundary.open(repository)
+    with activation_lock(boundary):
+        # This is intentionally inside the lock and immediately before the
+        # lease operation. A delayed runner may not use an authority object
+        # loaded before an activation supersession changed canonical state.
+        current = _reload_canonical_authorization(boundary.resolved_root)
+        if current != authorization:
+            raise ProtocolError(
+                "HARP v13 authorization changed between admission and lease claim."
+            )
+        root = lease_path(boundary.resolved_root)
+        if root.exists() and not root.is_symlink():
+            raw = _validate_active_lease(
+                root,
+                amendment_sha256=authorization.amendment_sha256,
+                amendment_hash=authorization.amendment_hash,
+                input_binding_hash=authorization.input_binding_hash,
+                admission_hash=admission,
+            )
+            owner = int(raw["process_id"])
+            if owner != os.getpid() and _process_is_alive(owner):
+                raise ProtocolError(
+                    "HARP v13 active authorization lease is owned by a live process."
+                )
+            return HarpV13AuthorizationLease(root, str(raw["lease_hash"]), os.getpid())
+        try:
+            root.mkdir(mode=0o700, parents=False, exist_ok=False)
+        except FileExistsError as exc:
+            raise ProtocolError("HARP v13 single-use authorization is exhausted.") from exc
+        except OSError as exc:
+            raise ProtocolError("Cannot claim HARP v13 authorization lease.") from exc
+        payload = {
+            "schema_version": "midogpp_harp_stage90_authorization_lease_v13",
+            "experiment_id": EXPERIMENT_ID, "execution_revision": EXECUTION_REVISION,
+            "status": "CLAIMED_IN_PROGRESS", "process_id": os.getpid(),
+            "admission_hash": admission, "amendment_sha256": authorization.amendment_sha256,
+            "amendment_hash": authorization.amendment_hash,
+            "input_binding_hash": authorization.input_binding_hash,
+            "scientific_contract_hash": authorization.scientific_contract_hash,
+            "workspace_registration_execution_contract_hash": authorization.workspace_registration_execution_contract_hash,
+            "source_snapshot_schema": authorization.source_snapshot_schema,
+            "source_snapshot_manifest_sha256": authorization.source_snapshot_manifest_sha256,
+            "source_snapshot_tree_sha256": authorization.source_snapshot_tree_sha256,
+            "source_snapshot_member_count": authorization.source_snapshot_member_count,
+            "authorization_scope": AUTHORIZATION_SCOPE, "authorization_exhausted": True,
+            "recovery_allowed": True,
+            "recovery_scope": "same_active_lease_label_free_only",
+            "output_deletion_restores_authority": False,
+        }
+        sealed = {**payload, "lease_hash": canonical_hash(payload)}
+        atomic_json(root / "lease.json", sealed)
+        return HarpV13AuthorizationLease(root, str(sealed["lease_hash"]), os.getpid())
+
+
+def _reload_canonical_authorization(repo_root: Path) -> HarpV13Authorization:
+    """Re-authenticate every live authority-bearing surface at claim time."""
+
+    from ....workspace.runtime import MidogppWorkspace, WorkspaceError
+    from .config import load_config
+
+    boundary = RepositoryBoundary.open(repo_root)
+    config_path = boundary.member(
+        WORKSPACE_CONFIG_RELATIVE_PATH,
+        label="canonical authorization config",
+        kind="file",
+    )
+    amendment_path = boundary.member(
+        WORKSPACE_AMENDMENT_RELATIVE_PATH,
+        label="canonical execution amendment",
+        kind="file",
+    )
+    config = load_config(config_path)
+    expected = config.expected_execution_amendment_sha256
+    registry_path = boundary.member(
+        WORKSPACE_REGISTRY_RELATIVE_PATH,
+        label="registry",
+        kind="file",
+    )
+    catalog_path = boundary.member(
+        WORKSPACE_ARTIFACT_CATALOG_RELATIVE_PATH,
+        label="artifact catalog",
+        kind="file",
+    )
+    if (
+        not config.execution_authorized
+        or type(expected) is not str
+        or sha256_file(amendment_path) != expected
+    ):
+        raise ProtocolError("HARP v13 canonical execution authority is inactive.")
+    amendment = validate_execution_amendment_payload(
+        read_json(amendment_path),
+        config,
+        repo_root=boundary.resolved_root,
+    )
     try:
-        root.mkdir(mode=0o700, parents=False, exist_ok=False)
-    except FileExistsError as exc:
-        raise ProtocolError("HARP v13 single-use authorization is exhausted.") from exc
-    except OSError as exc:
-        raise ProtocolError("Cannot claim HARP v13 authorization lease.") from exc
-    payload = {
-        "schema_version": "midogpp_harp_stage90_authorization_lease_v13",
-        "experiment_id": EXPERIMENT_ID, "execution_revision": EXECUTION_REVISION,
-        "status": "CLAIMED_IN_PROGRESS", "process_id": os.getpid(),
-        "admission_hash": admission, "amendment_sha256": authorization.amendment_sha256,
-        "amendment_hash": authorization.amendment_hash,
-        "input_binding_hash": authorization.input_binding_hash,
-        "scientific_contract_hash": authorization.scientific_contract_hash,
-        "workspace_registration_execution_contract_hash": authorization.workspace_registration_execution_contract_hash,
-        "source_snapshot_schema": authorization.source_snapshot_schema,
-        "source_snapshot_manifest_sha256": authorization.source_snapshot_manifest_sha256,
-        "source_snapshot_tree_sha256": authorization.source_snapshot_tree_sha256,
-        "source_snapshot_member_count": authorization.source_snapshot_member_count,
-        "authorization_scope": AUTHORIZATION_SCOPE, "authorization_exhausted": True,
-        "recovery_allowed": True,
-        "recovery_scope": "same_active_lease_label_free_only",
-        "output_deletion_restores_authority": False,
-    }
-    sealed = {**payload, "lease_hash": canonical_hash(payload)}
-    atomic_json(root / "lease.json", sealed)
-    return HarpV13AuthorizationLease(root, str(sealed["lease_hash"]), os.getpid())
+        receipt = MidogppWorkspace.load(
+            boundary.resolved_root
+        ).validate_preparation_authority(EXPERIMENT_ID)
+    except WorkspaceError as exc:
+        raise ProtocolError(
+            "HARP v13 canonical registry authority failed authentication."
+        ) from exc
+    if (
+        receipt is None
+        or receipt.config_path != config_path
+        or receipt.config_sha256 != sha256_file(config_path)
+        or receipt.authority_path != amendment_path
+        or receipt.authority_sha256 != expected
+        or receipt.workspace_registration_contract_hash
+        != amendment.workspace_registration_execution_contract_hash
+        or receipt.registry_path != registry_path
+        or receipt.registry_sha256 != sha256_file(registry_path)
+        or receipt.artifact_catalog_path != catalog_path
+        or receipt.artifact_catalog_sha256 != sha256_file(catalog_path)
+    ):
+        raise ProtocolError("HARP v13 canonical registry authority drifted.")
+    return HarpV13Authorization(
+        amendment_path=amendment_path,
+        amendment_sha256=expected,
+        amendment_hash=amendment.amendment_hash,
+        input_binding_hash=amendment.input_binding_hash,
+        scientific_contract_hash=amendment.scientific_contract_hash,
+        workspace_registration_execution_contract_hash=(
+            amendment.workspace_registration_execution_contract_hash
+        ),
+        source_snapshot_schema=amendment.source_snapshot_schema,
+        source_snapshot_manifest_sha256=amendment.source_snapshot_manifest_sha256,
+        source_snapshot_tree_sha256=amendment.source_snapshot_tree_sha256,
+        source_snapshot_member_count=amendment.source_snapshot_member_count,
+    )
 
 
 def validate_active_recovery_surface(

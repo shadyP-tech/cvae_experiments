@@ -156,11 +156,11 @@ def validate_model_config(config: object) -> None:
         or model.get("whole_policy_admission_scope")
         != "all_held_source_cases_nested_route_or_exact_B"
         or model.get("case_outcome_inventory")
-        != "typed_outer_H_query_q_case_identity"
+        != "typed_outer_H_heldout_q_query_r_case_exact_fold_menu_identity"
         or model.get("exact_b_control_outcome_rule")
         != "implicit_zero_no_synthetic_action_outcome"
         or model.get("active_menu_outcome_rule")
-        != "exact_menu_prediction_outcome_action_id_and_hash_match"
+        != "exact_fold_menu_prediction_outcome_action_id_and_hash_match"
         or model.get("policy_calibration")
         != "nested_source_center_lodo_complete_rank_accept_route_or_B_replay"
         or model.get("selection_rule")

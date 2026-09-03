@@ -8,11 +8,9 @@ from pathlib import Path
 
 from ....protocol import ProtocolError
 from ....routing.harp_protocol import canonical_bytes
+from ..activation_lock import activation_lock
 from ..activation_paths import RepositoryBoundary
-from ..activation_transaction import (
-    TRANSACTION_RELATIVE_PATH,
-    activation_lock,
-)
+from ..activation_transaction import TRANSACTION_RELATIVE_PATH
 from .audit import build_supersession_plan, require_exact_regular
 from .contracts import (
     ARCHIVED_AMENDMENT,
