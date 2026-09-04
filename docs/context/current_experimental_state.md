@@ -1,6 +1,6 @@
 # Current Experimental State
 
-Last updated: 2026-08-31
+Last updated: 2026-09-04
 
 This page records verified evidence and canonical availability after the
 completed MIDOG++ repository migration. The canonical contract, feature
@@ -97,6 +97,16 @@ policy promotion, deployment utility, or new-center generalization.
   physical H-by-e versus U and B before U versus B. V3 has no amendment or
   launch authority. Any future run still reuses a consumed MIDOG++ test surface
   only as terminal post-hoc sensitivity, never fresh routing evidence.
+- HARP v14 is registered as a separately fenced `planned` mechanical
+  successor. It replaces positional fresh-validation menu transport with an
+  exact center-keyed, canonical-root bijection and durable menu readback before
+  validator processes spawn, then reconstructs and revalidates the receipt- and
+  candidate-inventory-bound payload inside each validator. V14 has no
+  amendment, lease, opened label
+  capability, or result. The repair does not change the policy family or imply
+  that routing or utility will improve. Any future output remains
+  `POST_HOC_CONSUMED_TEST_SENSITIVITY` and
+  `TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE` and may not feed another experiment.
 - The planned successor now aligns its Stage-60 response with the Stage-70
   endpoint: one `(H,q,e)` observation is BACC after averaging all nine positive
   probability vectors and thresholding once. The old 4,536 seed cells are

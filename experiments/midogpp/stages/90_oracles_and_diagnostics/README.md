@@ -85,6 +85,32 @@ same already-consumed MIDOG++ test cases only as
 generalization, significance, promotion, deployment, or thesis-confirmatory
 improvement, and it may feed no other experiment.
 
+## HARP center-keyed validation transport successor v14
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v14` is a
+separately fenced, planned mechanical successor. Its identity and registration
+do not depend on any asserted v13 execution state. V14 requires the complete
+physical menu to cross the fresh-validation boundary as an exact center-keyed
+binding: every configured center is paired bijectively with its canonical menu
+root, and the manifest, NPZ, chunk, receipt, reconstructed-menu, and complete
+B/U/Hxe inventory identities are read back before spawning. The canonical
+binding payload is then reconstructed and checked again inside each validator
+process. A positional tuple cannot satisfy this contract.
+
+This repair does not change the fitted policy family, action menu, thresholds,
+fallback, or downstream estimand, and it does not imply that any case will
+route or that utility will improve. No v14 execution amendment or lease is
+present, no v14 label capability has been opened, and no v14 result exists.
+Implementation, workspace validation, and path-free inspection do not grant
+workstation execution authority.
+
+Any separately authorized future run would still evaluate an already-consumed
+MIDOG++ test surface. Its maximum evidential status is permanently
+`POST_HOC_CONSUMED_TEST_SENSITIVITY` and
+`TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`; it cannot establish fresh routing,
+new-center generalization, confirmatory improvement, significance, promotion,
+deployment, or a Stage-60/70 input.
+
 ## SCEPTRE persistent-worker repair v3
 
 `midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_sceptre_router.v3`
