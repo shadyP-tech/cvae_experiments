@@ -107,6 +107,15 @@ policy promotion, deployment utility, or new-center generalization.
   that routing or utility will improve. Any future output remains
   `POST_HOC_CONSUMED_TEST_SENSITIVITY` and
   `TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE` and may not feed another experiment.
+- HARP v17 is `FAILED_EXHAUSTED` after valid scientific nonadmission:
+  all 81 classifier tasks completed, but all five outer folds selected exact B
+  and 0/216 source cases routed. Target actions and test truth never opened.
+  HARP v18 implements a separately fenced, planned case-conditional composite
+  successor with branch-preserving actions, fully nested signed outcome
+  modeling, aligned class-support metrics and durable rejection frontiers.
+  It has no execution amendment or MIDOG++ result. Its source OOF is
+  conditional on the frozen bank and any test result remains terminal consumed
+  sensitivity. See `docs/wiki/03-experiments/midogpp-harp-v18-case-conditional-composite-router.md`.
 - The planned successor now aligns its Stage-60 response with the Stage-70
   endpoint: one `(H,q,e)` observation is BACC after averaging all nine positive
   probability vectors and thresholding once. The old 4,536 seed cells are

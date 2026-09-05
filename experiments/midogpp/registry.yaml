@@ -4108,6 +4108,61 @@ experiments:
       - Router development uses all 216 canonical training cases under strict outer-H and pseudo-target-q cross-fitting. No test case is allocated to router development; all 218 already-consumed test cases remain target evaluation cases whose labels stay sealed until the global route seal.
       - Two persistent GPU workers generate each 294-row source/seed stream once. Memory-mapped resident arrays are shared by bounded phase-disjoint classifier workers; case inventories add zero GPU or classifier tasks and are reused by admission, calibration, and OOF replay while preserving deterministic float32 transport and float64 scientific reduction.
       - Results remain POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE with fresh_evidence=false and may feed no Stage 60, Stage 70, other Stage 90, or any other experiment.
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v18
+    stage: 90_oracles_and_diagnostics
+    status: planned
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_harp_router_v18.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v18
+    input_artifact_ids:
+      - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+      - midogpp_output_uniform_b_v2_generation_lock_v1
+      - midogpp_stage90_harp_source_train_support_full_test_cache_v18
+      - midogpp_stage90_harp_source_train_label_capability_v18
+      - midogpp_stage90_harp_full_test_evaluation_release_v18
+      - midogpp_uniform_b_test_consumption_ledger_harp_parent_v18
+      - midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v18
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Immutable fixed-bank generation geometry and classifier settings only; it grants no routing, consumed-label, fresh-evidence, promotion, deployment, or execution authority.
+      midogpp_stage90_harp_source_train_support_full_test_cache_v18: Fenced v18-only label-free cache with physically separate canonical train-development and full-test evaluation shards; it grants no label or execution authority.
+      midogpp_stage90_harp_source_train_label_capability_v18: Center-sharded train-label capability. Every one of the nine q shards remains closed until all source-train q menus, all target-test H menus, and all C-minus-center bank attestations are durable and globally fenced.
+      midogpp_stage90_harp_full_test_evaluation_release_v18: Label-free release covering all 9,928 test rows and 218 cases; canonical truth remains sealed until every route or exact-B fallback is durable and freshly reconstructed twice.
+      midogpp_uniform_b_test_consumption_ledger_harp_parent_v18: V18-only byte-exact binding to the original consumed-test ledger; it grants no execution authority.
+      midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v18: A separately published single-use amendment is required; no v1-v17 authority, output, scratch, cache, route, model, seal, threshold, capability, or decision state may be reused.
+    runner:
+      preparation_authority_gate: harp_v18_consumed_test_execution_amendment_v1
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+        CUDA_VISIBLE_DEVICES: "0,1"
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        NUMEXPR_NUM_THREADS: "1"
+        PYTHONUNBUFFERED: "1"
+        PYTHONHASHSEED: "0"
+        OMP_DYNAMIC: "FALSE"
+        MKL_DYNAMIC: "FALSE"
+      argv:
+        - "{python}"
+        - -m
+        - midogpp_thesis
+        - cvae-diagnostics
+        - fixed-bank-harp-router-v18
+        - --config
+        - "{resolved_config}"
+        - --artifact-root
+        - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v18
+    notes:
+      - V18 is planned, separately fenced and terminal diagnostic only; implementation grants no execution authority.
+      - Train 216 known-center cases with C-minus-q proposals; test 218 cases with C-minus-H proposals. No v1-v17 state is reused.
+      - Case-specific B, exact U, D01-only, D10-only and BOTH composites compete using shared signed-utility and risk heads; inactive branches retain exact B bytes.
+      - One aligned equal-center equal-class equal-supporting-case metric is used throughout nested stacking and scoring, with fold-scoped class normalization after prediction seals.
+      - Ranker and transforms are cross-fitted inside every inner and outer training fold; only abstention is tuned. Candidate eligibility and exact-B fallback are case-local in every phase.
+      - All source and target component menus and bank attestations seal before source truth. All target selected composites seal and reconstruct twice before test truth.
+      - Complete source candidate-frontier and headroom diagnostics persist before admission, including all failed constraints. Zero source OOF coverage exhausts the lease before target actions.
+      - 81 physical classifier tasks and 810 fits use two persistent GPUs and four classifier workers. Composite construction and nested stacking reuse physical probabilities and add no physical fits.
+      - Bootstrap bounds are approximate, conditional on fixed centers and fitted OOF records, and are not individual safety or final-refit guarantees.
+      - Results may feed no other experiment and cannot establish fresh routing, promotion, deployment or unseen-center generalization.
   - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v17
     stage: 90_oracles_and_diagnostics
     status: planned

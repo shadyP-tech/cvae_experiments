@@ -1791,11 +1791,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pcsi_racr.add_argument("--config", required=True)
     pcsi_racr.add_argument("--artifact-root", required=True)
+    from .harp_v18_cli import register_commands
+
+    register_commands(sub)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    from .harp_v18_cli import dispatch
+
+    handled = dispatch(args)
+    if handled is not None:
+        return handled
     if args.surface == "prepare-fixed-bank-harp-router-v1-inputs":
         import json
 

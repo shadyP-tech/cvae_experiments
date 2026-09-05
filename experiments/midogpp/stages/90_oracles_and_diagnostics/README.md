@@ -113,9 +113,18 @@ deployment, or a Stage-60/70 input.
 
 ## HARP pooled source-train selected-policy router v17
 
-`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v17` is a
-planned, separately fenced successor for the known-center diagnostic regime.
-It develops one pooled case-level policy from all 216 MIDOG++ training cases
+The implemented successor is HARP v18, registered as planned with a new cache,
+source capability, amendment and output namespace. Its case-conditional B/U/
+D01_ONLY/D10_ONLY/BOTH policy, full nested stack, aligned outcomes, workstation
+reuse and fail-closed reporting are documented in
+`docs/wiki/03-experiments/midogpp-harp-v18-case-conditional-composite-router.md`.
+V18 has not been activated or evaluated on MIDOG++.
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v17` is
+`FAILED_EXHAUSTED`: all five outer folds selected B, and zero of 216 source
+OOF cases routed. Its admission gate stopped before bootstrap bounds, target
+actions, or test labels. The following describes its historical design.
+It developed one pooled case-level policy from all 216 MIDOG++ training cases
 and reserves all 218 test cases for terminal evaluation. For a source context
 `q`, the baseline, uniform action, and donor menu use exactly `C - {q}`; for a
 test context `H`, they use exactly `C - {H}`. The predecessor seven-expert
