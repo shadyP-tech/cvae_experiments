@@ -1,0 +1,2331 @@
+{
+  "admission_seal": {
+    "approximate_source_oof_bounds_only": true,
+    "config_hash": "22da9e6b2dee90e7efce59de9c0edad7674beadb996ad6130d3432afe3606509",
+    "evaluation_labels_used": false,
+    "model_hash": "db98d87f7a63493017f42f42b5a7f50aa99ce3a61333046f17853ab417376da3",
+    "no_nonzero_safe_oof_coverage_aborts_before_target_actions": true,
+    "other_nonadmission_uses_exact_b_fallback": true,
+    "policy_hash": "9784b9edd327f081adfbb75a32f766eef6f3f827467fc46754fb436c5814f48e",
+    "pooled_known_center_policy_count": 1,
+    "route_threshold": 0.95,
+    "schema_version": "midogpp_harp_v19_source_policy_admission_seal_v1",
+    "seal_hash": "8e4526f7034da2b6d49dfdc00c8dbdfef0264d54818354305d636e1d684c8e78",
+    "selected_arm_id": "B",
+    "source_only_admission": {
+      "admission_hash": "9e2df86c8080cd1f3f6f27ee04739074be29d43f77e651d5a004aa3387ad82f9",
+      "admitted": false,
+      "approximate_bounds_are_not_final_refit_safety": true,
+      "bootstrap_performed": false,
+      "bounds": null,
+      "nested_oof_evaluates_selection_algorithm": true,
+      "no_forced_routes": true,
+      "qualifying_routed_center_count": 0,
+      "routed_case_count": 0,
+      "routed_cases_by_center": [],
+      "routed_center_count": 0,
+      "routed_risk_moments": {
+        "brier_moment_all_cases": 0.0,
+        "equal_center_route_coverage": 0.0,
+        "gain": 0.0,
+        "harm_moment_all_cases": 0.0,
+        "logloss_moment_all_cases": 0.0,
+        "routed_brier_delta": 0.0,
+        "routed_harm": 0.0,
+        "routed_logloss_delta": 0.0
+      },
+      "schema_version": "pooled_pairwise_source_only_admission_v19",
+      "status": "NO_NONZERO_SAFE_OOF_COVERAGE",
+      "total_case_count": 216,
+      "total_center_count": 9
+    },
+    "whole_policy_source_oof_replayed": true
+  },
+  "audit_date": "2026-09-05",
+  "audit_does_not_fit_or_select_a_new_policy": true,
+  "audit_does_not_open_raw_labels": true,
+  "claim_boundary": "SOURCE_ONLY_POST_HOC_DIAGNOSTIC; not a new selected policy or target test result",
+  "diagnostic_frontier_is_not_admitted_oof_routing": true,
+  "failure_report": {
+    "error": "HARP v19 source policy has no nonzero safe OOF coverage; target action construction is forbidden.",
+    "error_class": "ProtocolError",
+    "phase_order": [
+      "AUTHORITY_ADMISSION",
+      "LABEL_FREE_SOURCE_TARGET_PHYSICAL_MENUS",
+      "SOURCE_TARGET_MENUS_SEALED",
+      "FIXED_BANK_INDEPENDENCE_ATTESTED",
+      "SOURCE_TRAIN_LABEL_CAPABILITIES_OPENED",
+      "POOLED_SOURCE_ROUTER_FIT",
+      "SOURCE_ONLY_POLICY_RISK_COVERAGE_ADMISSION"
+    ],
+    "publication_status": "POST_HOC_CONSUMED_TEST_SENSITIVITY",
+    "schema_version": "midogpp_harp_v19_failure_report_v1",
+    "source_train_label_access_begun": true,
+    "source_train_label_access_fence_member": "manifests/source_train_label_access_begun.json",
+    "status": "FAILED_EXHAUSTED",
+    "terminal_decision": "TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE"
+  },
+  "final_enabled": false,
+  "final_threshold": 0.95,
+  "fold_choices": [
+    {
+      "enabled": false,
+      "fold": 0,
+      "threshold": 0.95
+    },
+    {
+      "enabled": false,
+      "fold": 1,
+      "threshold": 0.95
+    },
+    {
+      "enabled": false,
+      "fold": 2,
+      "threshold": 0.95
+    },
+    {
+      "enabled": false,
+      "fold": 3,
+      "threshold": 0.95
+    },
+    {
+      "enabled": true,
+      "fold": 4,
+      "threshold": 0.95
+    }
+  ],
+  "gate_auc_weighting": "Unweighted case-level ROC AUC; calibration means use all-case equal-center weights conditioned on the selected population.",
+  "headroom": {
+    "actual_outer_oracle": {
+      "case_count": 216,
+      "diagnostic_hash": "236d8c550c72bd3853c86b035db997041398b47aff3346552de0ed6c1515e4dd",
+      "equal_center_proper_loss_safe_oracle_gain": 0.021832981074035404,
+      "oracle_used_for_selection": false,
+      "pretruth_candidate_prediction_seal_hash": "187f9001239dfbde2528c35011f8122a936ddfff5c39eae8e5851519d0a49c11",
+      "raw_labels_persisted": false,
+      "safe_positive_case_count": 88,
+      "stage": "ALL_OUTER_OOF_DIAGNOSTIC"
+    },
+    "primitive_case_count": 216,
+    "primitive_positive_case_count": 101,
+    "primitive_proper_loss_safe_positive_case_count": 100,
+    "primitive_proper_loss_safe_positive_cases_by_family": {
+      "D01": 73,
+      "D10": 50,
+      "FULL": 11
+    },
+    "primitive_safe_oracle_gain": 0.024117005559342566
+  },
+  "nonadmission": {
+    "config_hash": "22da9e6b2dee90e7efce59de9c0edad7674beadb996ad6130d3432afe3606509",
+    "lease_must_be_exhausted": true,
+    "schema_version": "midogpp_harp_v19_source_policy_nonadmission_v1",
+    "source_policy_admission_seal_hash": "8e4526f7034da2b6d49dfdc00c8dbdfef0264d54818354305d636e1d684c8e78",
+    "status": "NO_NONZERO_SAFE_OOF_COVERAGE",
+    "target_actions_constructed": false,
+    "target_evaluation_labels_opened": false,
+    "terminal_fallback_allowed": false
+  },
+  "outer_candidate_counts": {
+    "cases": 216,
+    "eligible_candidates": 2091,
+    "harmful_winner_despite_safe_alternative": 22,
+    "missed_safe_opportunity_cases": 35,
+    "safe_candidate_cases": 88,
+    "safe_opportunity_with_positive_score_candidate": 47,
+    "safe_winner_with_nonpositive_score": 18,
+    "winner_is_safe_positive": 53
+  },
+  "policy_frontier": [
+    {
+      "center_coverage": 9,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0013678368636316311,
+        "predicted_gain": 0.03344419736948405,
+        "predicted_harm": 0.5363010973658517,
+        "predicted_logloss_delta": -0.00254883419422223,
+        "safe_benefit_score": 0.020688441520200652,
+        "safe_positive_probability": 0.3618719376825028
+      },
+      "route_count": 74,
+      "stage": "HARP_V19_OUTER_0_INNER_ALL_INNER_OOF",
+      "threshold": 0.0,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.00026909640697806055,
+        "equal_center_route_coverage": 0.4388575561646403,
+        "gain": -0.004149333053662639,
+        "harm_moment_all_cases": 0.1631163322557219,
+        "logloss_moment_all_cases": -0.00033023736281010546,
+        "routed_brier_delta": 0.0013868251709511245,
+        "routed_harm": 0.6216840007980351,
+        "routed_logloss_delta": 0.004247506717905946
+      }
+    },
+    {
+      "center_coverage": 9,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0021298006966570166,
+        "predicted_gain": 0.041273221485515516,
+        "predicted_harm": 0.24817103019827666,
+        "predicted_logloss_delta": -0.003854453625412102,
+        "safe_benefit_score": 0.025314960776431503,
+        "safe_positive_probability": 0.6124259712348598
+      },
+      "route_count": 31,
+      "stage": "HARP_V19_OUTER_0_INNER_ALL_INNER_OOF",
+      "threshold": 0.5,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 0.0002379025783042642,
+        "equal_center_route_coverage": 0.19146549300723875,
+        "gain": -0.002914869031054093,
+        "harm_moment_all_cases": 0.1059357210626186,
+        "logloss_moment_all_cases": 0.0009357639559440191,
+        "routed_brier_delta": 0.0032425350101872915,
+        "routed_harm": 0.803288842802674,
+        "routed_logloss_delta": 0.009887376525380688
+      }
+    },
+    {
+      "center_coverage": 9,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.002058721840864646,
+        "predicted_gain": 0.040561924088238464,
+        "predicted_harm": 0.21067900855335925,
+        "predicted_logloss_delta": -0.0035069053310465234,
+        "safe_benefit_score": 0.024169633890227627,
+        "safe_positive_probability": 0.6257300603744935
+      },
+      "route_count": 26,
+      "stage": "HARP_V19_OUTER_0_INNER_ALL_INNER_OOF",
+      "threshold": 0.6,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 0.00039170207821694774,
+        "equal_center_route_coverage": 0.16008386628247478,
+        "gain": -0.0036733112968493006,
+        "harm_moment_all_cases": 0.0889354487314639,
+        "logloss_moment_all_cases": 0.0012776855537547098,
+        "routed_brier_delta": 0.004446855434674302,
+        "routed_harm": 0.8055553523084802,
+        "routed_logloss_delta": 0.012981351171892483
+      }
+    },
+    {
+      "center_coverage": 8,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0022156427380308845,
+        "predicted_gain": 0.04923287745704236,
+        "predicted_harm": 0.16261346098322807,
+        "predicted_logloss_delta": -0.0036366136926560587,
+        "safe_benefit_score": 0.031764029641086856,
+        "safe_positive_probability": 0.6177040290172807
+      },
+      "route_count": 19,
+      "stage": "HARP_V19_OUTER_0_INNER_ALL_INNER_OOF",
+      "threshold": 0.7,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 0.0004517444040904997,
+        "equal_center_route_coverage": 0.11445024246257643,
+        "gain": -0.0031222047535440483,
+        "harm_moment_all_cases": 0.06124617857895847,
+        "logloss_moment_all_cases": 0.0014429584943170914,
+        "routed_brier_delta": 0.005947081232599517,
+        "routed_harm": 0.7851336725999954,
+        "routed_logloss_delta": 0.017607736456206443
+      }
+    },
+    {
+      "center_coverage": 8,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.002511408600304266,
+        "predicted_gain": 0.05835450378490739,
+        "predicted_harm": 0.11855170458229773,
+        "predicted_logloss_delta": -0.004005618809381137,
+        "safe_benefit_score": 0.03808884209271618,
+        "safe_positive_probability": 0.592192888970411
+      },
+      "route_count": 14,
+      "stage": "HARP_V19_OUTER_0_INNER_ALL_INNER_OOF",
+      "threshold": 0.75,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 0.0005108585165625835,
+        "equal_center_route_coverage": 0.08430318363904703,
+        "gain": -0.0037789028948762957,
+        "harm_moment_all_cases": 0.05072738772928527,
+        "logloss_moment_all_cases": 0.001591248928328736,
+        "routed_brier_delta": 0.008059777276619566,
+        "routed_harm": 0.8517256471176692,
+        "routed_logloss_delta": 0.023875312409811663
+      }
+    },
+    {
+      "center_coverage": 6,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0022243495987522427,
+        "predicted_gain": 0.05630334370785866,
+        "predicted_harm": 0.07338623702383469,
+        "predicted_logloss_delta": -0.0031523114156058567,
+        "safe_benefit_score": 0.024287668609976373,
+        "safe_positive_probability": 0.5474487740281012
+      },
+      "route_count": 10,
+      "stage": "HARP_V19_OUTER_0_INNER_ALL_INNER_OOF",
+      "threshold": 0.8,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 0.00044895416007374354,
+        "equal_center_route_coverage": 0.05971168037107317,
+        "gain": -0.002317765107817896,
+        "harm_moment_all_cases": 0.032283760278304874,
+        "logloss_moment_all_cases": 0.001490933273720444,
+        "routed_brier_delta": 0.009518699143681036,
+        "routed_harm": 0.790660722955378,
+        "routed_logloss_delta": 0.029968871491392733
+      }
+    },
+    {
+      "center_coverage": 6,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0024601262418010653,
+        "predicted_gain": 0.06480411918346295,
+        "predicted_harm": 0.06198976047363522,
+        "predicted_logloss_delta": -0.003567766929917053,
+        "safe_benefit_score": 0.027419076892378675,
+        "safe_positive_probability": 0.5121267688719261
+      },
+      "route_count": 9,
+      "stage": "HARP_V19_OUTER_0_INNER_ALL_INNER_OOF",
+      "threshold": 0.85,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 0.0004886686018783822,
+        "equal_center_route_coverage": 0.05276723592662872,
+        "gain": -0.0024913762189290073,
+        "harm_moment_all_cases": 0.034019871389415986,
+        "logloss_moment_all_cases": 0.001577718617502682,
+        "routed_brier_delta": 0.011260833797659242,
+        "routed_harm": 0.8947158126061332,
+        "routed_logloss_delta": 0.03489958806439005
+      }
+    },
+    {
+      "center_coverage": 4,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0029455688519398355,
+        "predicted_gain": 0.08027427102040045,
+        "predicted_harm": 0.03232188528385775,
+        "predicted_logloss_delta": -0.003931193709638216,
+        "safe_benefit_score": 0.03000115637562231,
+        "safe_positive_probability": 0.46974727943482686
+      },
+      "route_count": 6,
+      "stage": "HARP_V19_OUTER_0_INNER_ALL_INNER_OOF",
+      "threshold": 0.9,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 0.0004531539407826385,
+        "equal_center_route_coverage": 0.036683006535947714,
+        "gain": -0.001691513262993945,
+        "harm_moment_all_cases": 0.027512254901960784,
+        "logloss_moment_all_cases": 0.001521650892454155,
+        "routed_brier_delta": 0.014353238831134733,
+        "routed_harm": 1.0,
+        "routed_logloss_delta": 0.04648108446244734
+      }
+    },
+    {
+      "center_coverage": 4,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0034379317629697303,
+        "predicted_gain": 0.07406980370669934,
+        "predicted_harm": 0.027363656997938957,
+        "predicted_logloss_delta": -0.005141340083069084,
+        "safe_benefit_score": 0.028108275144921945,
+        "safe_positive_probability": 0.4862618698913844
+      },
+      "route_count": 5,
+      "stage": "HARP_V19_OUTER_0_INNER_ALL_INNER_OOF",
+      "threshold": 0.95,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 0.00029902150181203193,
+        "equal_center_route_coverage": 0.031127450980392157,
+        "gain": -0.001512087425673371,
+        "harm_moment_all_cases": 0.023345588235294118,
+        "logloss_moment_all_cases": 0.0010344581229550724,
+        "routed_brier_delta": 0.011606360058213309,
+        "routed_harm": 1.0,
+        "routed_logloss_delta": 0.03823298536737555
+      }
+    },
+    {
+      "center_coverage": 9,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.002745395795237473,
+        "predicted_gain": 0.04607843143794907,
+        "predicted_harm": 0.4822119398629085,
+        "predicted_logloss_delta": -0.005451866944036859,
+        "safe_benefit_score": 0.024907674733554694,
+        "safe_positive_probability": 0.4497255583186043
+      },
+      "route_count": 77,
+      "stage": "HARP_V19_OUTER_1_INNER_ALL_INNER_OOF",
+      "threshold": 0.0,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.0003573440246477759,
+        "equal_center_route_coverage": 0.45628675006442243,
+        "gain": -0.00531904316033051,
+        "harm_moment_all_cases": 0.14831967285121936,
+        "logloss_moment_all_cases": -0.0012350080908839684,
+        "routed_brier_delta": 0.001216843301723482,
+        "routed_harm": 0.5750580316660047,
+        "routed_logloss_delta": 0.002293350966887381
+      }
+    },
+    {
+      "center_coverage": 9,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0032389546891367633,
+        "predicted_gain": 0.05433563606906313,
+        "predicted_harm": 0.2891354575013741,
+        "predicted_logloss_delta": -0.0064136229664084705,
+        "safe_benefit_score": 0.03270027152050048,
+        "safe_positive_probability": 0.6235863388025275
+      },
+      "route_count": 43,
+      "stage": "HARP_V19_OUTER_1_INNER_ALL_INNER_OOF",
+      "threshold": 0.5,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.0001804319467120435,
+        "equal_center_route_coverage": 0.25859834375805285,
+        "gain": -0.003044781823230631,
+        "harm_moment_all_cases": 0.1011034536275681,
+        "logloss_moment_all_cases": -0.0007353577578933778,
+        "routed_brier_delta": 0.0013022695192477435,
+        "routed_harm": 0.6409671352039342,
+        "routed_logloss_delta": 0.0021563709681706794
+      }
+    },
+    {
+      "center_coverage": 9,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.003915592058426346,
+        "predicted_gain": 0.06390664079464216,
+        "predicted_harm": 0.20658137638369353,
+        "predicted_logloss_delta": -0.007727925126358176,
+        "safe_benefit_score": 0.03832022550262191,
+        "safe_positive_probability": 0.6876553323974298
+      },
+      "route_count": 29,
+      "stage": "HARP_V19_OUTER_1_INNER_ALL_INNER_OOF",
+      "threshold": 0.6,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -3.113098116875056e-05,
+        "equal_center_route_coverage": 0.1745054114835899,
+        "gain": -0.0025947756979327824,
+        "harm_moment_all_cases": 0.0671898792372385,
+        "logloss_moment_all_cases": -0.00035334426038220734,
+        "routed_brier_delta": 0.0018216044940722194,
+        "routed_harm": 0.6350303475749627,
+        "routed_logloss_delta": 0.0029751673178603113
+      }
+    },
+    {
+      "center_coverage": 9,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.005201967467003156,
+        "predicted_gain": 0.08179022867343089,
+        "predicted_harm": 0.1235519755557339,
+        "predicted_logloss_delta": -0.010098302580442208,
+        "safe_benefit_score": 0.05257781329384705,
+        "safe_positive_probability": 0.7877642311360012
+      },
+      "route_count": 19,
+      "stage": "HARP_V19_OUTER_1_INNER_ALL_INNER_OOF",
+      "threshold": 0.7,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 0.0001230685487082733,
+        "equal_center_route_coverage": 0.11158783704640757,
+        "gain": -0.002733082504532844,
+        "harm_moment_all_cases": 0.05771048562794294,
+        "logloss_moment_all_cases": 3.4691284757855313e-05,
+        "routed_brier_delta": 0.003102884973539644,
+        "routed_harm": 0.7671754122623784,
+        "routed_logloss_delta": 0.005310887688802748
+      }
+    },
+    {
+      "center_coverage": 9,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.005770546620112598,
+        "predicted_gain": 0.09007826390969466,
+        "predicted_harm": 0.09922381101441881,
+        "predicted_logloss_delta": -0.011205046532358116,
+        "safe_benefit_score": 0.05900896800923803,
+        "safe_positive_probability": 0.8088336781799379
+      },
+      "route_count": 16,
+      "stage": "HARP_V19_OUTER_1_INNER_ALL_INNER_OOF",
+      "threshold": 0.75,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 0.00012956460934298507,
+        "equal_center_route_coverage": 0.09550360765572657,
+        "gain": -0.0022145718852673362,
+        "harm_moment_all_cases": 0.04564731358493218,
+        "logloss_moment_all_cases": 6.368236875145636e-05,
+        "routed_brier_delta": 0.0033566462306852565,
+        "routed_harm": 0.7279642853857687,
+        "routed_logloss_delta": 0.005666805896809887
+      }
+    },
+    {
+      "center_coverage": 9,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.005855401295216874,
+        "predicted_gain": 0.09089290718754149,
+        "predicted_harm": 0.0819178396409991,
+        "predicted_logloss_delta": -0.011330598281926238,
+        "safe_benefit_score": 0.05518727521509243,
+        "safe_positive_probability": 0.814853955434297
+      },
+      "route_count": 14,
+      "stage": "HARP_V19_OUTER_1_INNER_ALL_INNER_OOF",
+      "threshold": 0.8,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 7.293105055518909e-05,
+        "equal_center_route_coverage": 0.0831579286433809,
+        "gain": -0.0011811724143678652,
+        "harm_moment_all_cases": 0.036388054325672936,
+        "logloss_moment_all_cases": -3.744419571568783e-05,
+        "routed_brier_delta": 0.0028770186047797157,
+        "routed_harm": 0.6875776900567293,
+        "routed_logloss_delta": 0.004549721880684816
+      }
+    },
+    {
+      "center_coverage": 8,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.005176589629391777,
+        "predicted_gain": 0.08817927482689604,
+        "predicted_harm": 0.06267011625884643,
+        "predicted_logloss_delta": -0.01031467573617278,
+        "safe_benefit_score": 0.05916741725164462,
+        "safe_positive_probability": 0.8145851206085363
+      },
+      "route_count": 12,
+      "stage": "HARP_V19_OUTER_1_INNER_ALL_INNER_OOF",
+      "threshold": 0.85,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 0.00016270951432065204,
+        "equal_center_route_coverage": 0.069269039754492,
+        "gain": -0.001787433437295555,
+        "harm_moment_all_cases": 0.032915832103450705,
+        "logloss_moment_all_cases": 0.0001968641144541459,
+        "routed_brier_delta": 0.004348950048930057,
+        "routed_harm": 0.7251882257948604,
+        "routed_logloss_delta": 0.007842021704817693
+      }
+    },
+    {
+      "center_coverage": 7,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.006172355597866277,
+        "predicted_gain": 0.10640511258728996,
+        "predicted_harm": 0.045055162388253946,
+        "predicted_logloss_delta": -0.012154582544043233,
+        "safe_benefit_score": 0.07135397380361112,
+        "safe_positive_probability": 0.7976004400712522
+      },
+      "route_count": 9,
+      "stage": "HARP_V19_OUTER_1_INNER_ALL_INNER_OOF",
+      "threshold": 0.9,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 0.00016192930782683737,
+        "equal_center_route_coverage": 0.053956415302082596,
+        "gain": -0.0013815887192722485,
+        "harm_moment_all_cases": 0.021431363764143653,
+        "logloss_moment_all_cases": 0.00021026398391149945,
+        "routed_brier_delta": 0.005001113156243856,
+        "routed_harm": 0.64719769454952,
+        "routed_logloss_delta": 0.008896922779882743
+      }
+    },
+    {
+      "center_coverage": 5,
+      "failed_constraints": [
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.008087549072632613,
+        "predicted_gain": 0.13751445771167706,
+        "predicted_harm": 0.015564575013900484,
+        "predicted_logloss_delta": -0.01574871928242391,
+        "safe_benefit_score": 0.09003357967990668,
+        "safe_positive_probability": 0.7383865108383131
+      },
+      "route_count": 5,
+      "stage": "HARP_V19_OUTER_1_INNER_ALL_INNER_OOF",
+      "threshold": 0.95,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -2.0996752180311763e-05,
+        "equal_center_route_coverage": 0.029156124815517603,
+        "gain": 0.0007626949201094301,
+        "harm_moment_all_cases": 0.0028311458992199036,
+        "logloss_moment_all_cases": -0.00013406451854923644,
+        "routed_brier_delta": 0.001279851066862741,
+        "routed_harm": 0.347102955798608,
+        "routed_logloss_delta": 0.0004018402857884598
+      }
+    },
+    {
+      "center_coverage": 9,
+      "failed_constraints": [
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.002175353000602896,
+        "predicted_gain": 0.047238447224533846,
+        "predicted_harm": 0.4787166977618832,
+        "predicted_logloss_delta": -0.0035674382346070023,
+        "safe_benefit_score": 0.03155463795490811,
+        "safe_positive_probability": 0.3924049770055578
+      },
+      "route_count": 82,
+      "stage": "HARP_V19_OUTER_2_INNER_ALL_INNER_OOF",
+      "threshold": 0.0,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.0008474726688523432,
+        "equal_center_route_coverage": 0.47224037763253457,
+        "gain": 0.0022475272779879664,
+        "harm_moment_all_cases": 0.13802196804647787,
+        "logloss_moment_all_cases": -0.001636495817104866,
+        "routed_brier_delta": 0.0002054209911042614,
+        "routed_harm": 0.5422705778324555,
+        "routed_logloss_delta": 0.0015346126790151864
+      }
+    },
+    {
+      "center_coverage": 9,
+      "failed_constraints": [
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0031308626755523054,
+        "predicted_gain": 0.05296444549011925,
+        "predicted_harm": 0.26645732532137767,
+        "predicted_logloss_delta": -0.006292416045387963,
+        "safe_benefit_score": 0.041408387775017846,
+        "safe_positive_probability": 0.5349320890964462
+      },
+      "route_count": 47,
+      "stage": "HARP_V19_OUTER_2_INNER_ALL_INNER_OOF",
+      "threshold": 0.5,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.0006702848702819771,
+        "equal_center_route_coverage": 0.26821895424836595,
+        "gain": 0.0015050326822935367,
+        "harm_moment_all_cases": 0.081048021060276,
+        "logloss_moment_all_cases": -0.0015042695374570256,
+        "routed_brier_delta": -0.0004990212647735004,
+        "routed_harm": 0.5521711172031004,
+        "routed_logloss_delta": -0.00060836403852391
+      }
+    },
+    {
+      "center_coverage": 8,
+      "failed_constraints": [
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0038466283597839877,
+        "predicted_gain": 0.061059556448730526,
+        "predicted_harm": 0.18480804376761023,
+        "predicted_logloss_delta": -0.007695896996090152,
+        "safe_benefit_score": 0.05158136604676008,
+        "safe_positive_probability": 0.5564519151648559
+      },
+      "route_count": 33,
+      "stage": "HARP_V19_OUTER_2_INNER_ALL_INNER_OOF",
+      "threshold": 0.6,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.0004130209554765945,
+        "equal_center_route_coverage": 0.18791757443718227,
+        "gain": 0.0002462458041803541,
+        "harm_moment_all_cases": 0.06470361292665214,
+        "logloss_moment_all_cases": -0.0009086851351817226,
+        "routed_brier_delta": -0.00019788360249754387,
+        "routed_harm": 0.5943191150185981,
+        "routed_logloss_delta": 0.0001644483603874902
+      }
+    },
+    {
+      "center_coverage": 8,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.004715099172121336,
+        "predicted_gain": 0.07407575786123924,
+        "predicted_harm": 0.11250300666482996,
+        "predicted_logloss_delta": -0.009420855347109324,
+        "safe_benefit_score": 0.06217590476290461,
+        "safe_positive_probability": 0.5366249942916264
+      },
+      "route_count": 23,
+      "stage": "HARP_V19_OUTER_2_INNER_ALL_INNER_OOF",
+      "threshold": 0.7,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.00018553026432274421,
+        "equal_center_route_coverage": 0.13045570079883806,
+        "gain": -0.0001846426071357355,
+        "harm_moment_all_cases": 0.04953930646332606,
+        "logloss_moment_all_cases": -0.00039139904366916535,
+        "routed_brier_delta": 0.0005778293843300049,
+        "routed_harm": 0.6297404495163871,
+        "routed_logloss_delta": 0.0019997551561759617
+      }
+    },
+    {
+      "center_coverage": 8,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.005224934123797557,
+        "predicted_gain": 0.08237705105478893,
+        "predicted_harm": 0.0830315041780803,
+        "predicted_logloss_delta": -0.01047750150946109,
+        "safe_benefit_score": 0.07214929416848125,
+        "safe_positive_probability": 0.5227647013669092
+      },
+      "route_count": 19,
+      "stage": "HARP_V19_OUTER_2_INNER_ALL_INNER_OOF",
+      "threshold": 0.75,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.00013585565476014415,
+        "equal_center_route_coverage": 0.10946804647785038,
+        "gain": -0.0003639612475764399,
+        "harm_moment_all_cases": 0.04923066448801742,
+        "logloss_moment_all_cases": -0.0002709763190537674,
+        "routed_brier_delta": 0.0007589469335452788,
+        "routed_harm": 0.6997263454681151,
+        "routed_logloss_delta": 0.0025246080680849975
+      }
+    },
+    {
+      "center_coverage": 8,
+      "failed_constraints": [
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.005458958456441398,
+        "predicted_gain": 0.08826260421846488,
+        "predicted_harm": 0.0586669309453272,
+        "predicted_logloss_delta": -0.01076066825386948,
+        "safe_benefit_score": 0.08070216792995996,
+        "safe_positive_probability": 0.554433161044614
+      },
+      "route_count": 16,
+      "stage": "HARP_V19_OUTER_2_INNER_ALL_INNER_OOF",
+      "threshold": 0.8,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.00011067612443285682,
+        "equal_center_route_coverage": 0.09326434277414669,
+        "gain": 0.00016019118460444836,
+        "harm_moment_all_cases": 0.04263344226579521,
+        "logloss_moment_all_cases": -0.00018761229720846544,
+        "routed_brier_delta": 0.0008133071960751891,
+        "routed_harm": 0.7071247810005841,
+        "routed_logloss_delta": 0.0029883812866960723
+      }
+    },
+    {
+      "center_coverage": 8,
+      "failed_constraints": [
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.005846583032427644,
+        "predicted_gain": 0.09246077217898858,
+        "predicted_harm": 0.05131472363624627,
+        "predicted_logloss_delta": -0.011580747734096035,
+        "safe_benefit_score": 0.08480509478432195,
+        "safe_positive_probability": 0.5374586227893973
+      },
+      "route_count": 15,
+      "stage": "HARP_V19_OUTER_2_INNER_ALL_INNER_OOF",
+      "threshold": 0.85,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.00010154580527026532,
+        "equal_center_route_coverage": 0.08770878721859113,
+        "gain": 0.0002126020860719536,
+        "harm_moment_all_cases": 0.03846677559912854,
+        "logloss_moment_all_cases": -0.00016380164593878194,
+        "routed_brier_delta": 0.0008422390903982169,
+        "routed_harm": 0.6885737942454979,
+        "routed_logloss_delta": 0.0031324374542934983
+      }
+    },
+    {
+      "center_coverage": 8,
+      "failed_constraints": [
+        "HARM_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0066959293376928535,
+        "predicted_gain": 0.09983291419372599,
+        "predicted_harm": 0.03478557512748128,
+        "predicted_logloss_delta": -0.013308471042953114,
+        "safe_benefit_score": 0.09427250539493831,
+        "safe_positive_probability": 0.5746914231545898
+      },
+      "route_count": 12,
+      "stage": "HARP_V19_OUTER_2_INNER_ALL_INNER_OOF",
+      "threshold": 0.9,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -2.389604438357329e-05,
+        "equal_center_route_coverage": 0.07088779956427015,
+        "gain": 0.0005887594934793605,
+        "harm_moment_all_cases": 0.029554738562091506,
+        "logloss_moment_all_cases": 1.1801197117893925e-05,
+        "routed_brier_delta": 0.001662903284761886,
+        "routed_harm": 0.66692278140607,
+        "routed_logloss_delta": 0.00516647712568923
+      }
+    },
+    {
+      "center_coverage": 7,
+      "failed_constraints": [
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.008702439308414956,
+        "predicted_gain": 0.1477222740252493,
+        "predicted_harm": 0.015005903983761544,
+        "predicted_logloss_delta": -0.017012090295535794,
+        "safe_benefit_score": 0.09295281003380716,
+        "safe_positive_probability": 0.5574356596958274
+      },
+      "route_count": 7,
+      "stage": "HARP_V19_OUTER_2_INNER_ALL_INNER_OOF",
+      "threshold": 0.95,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.00025437387898419604,
+        "equal_center_route_coverage": 0.04311002178649238,
+        "gain": 0.002755584438082083,
+        "harm_moment_all_cases": 0.014276960784313725,
+        "logloss_moment_all_cases": -0.000425012574283455,
+        "routed_brier_delta": -0.0039005741227414264,
+        "routed_harm": 0.5811749842072015,
+        "routed_logloss_delta": -0.004858788204477869
+      }
+    },
+    {
+      "center_coverage": 9,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0013058914461507019,
+        "predicted_gain": 0.03266240625447347,
+        "predicted_harm": 0.5498893863136975,
+        "predicted_logloss_delta": -0.0020572176774309157,
+        "safe_benefit_score": 0.02561173314550464,
+        "safe_positive_probability": 0.34913348119160087
+      },
+      "route_count": 71,
+      "stage": "HARP_V19_OUTER_3_INNER_ALL_INNER_OOF",
+      "threshold": 0.0,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.00015219580770598515,
+        "equal_center_route_coverage": 0.4067992011619463,
+        "gain": -0.0063246285026238415,
+        "harm_moment_all_cases": 0.1791734749455337,
+        "logloss_moment_all_cases": -0.00048680470622140294,
+        "routed_brier_delta": 0.0016258699445051365,
+        "routed_harm": 0.6904469685136008,
+        "routed_logloss_delta": 0.003803329247375767
+      }
+    },
+    {
+      "center_coverage": 8,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.001774758143106086,
+        "predicted_gain": 0.04234264289184561,
+        "predicted_harm": 0.26612892081319905,
+        "predicted_logloss_delta": -0.0027257312842371663,
+        "safe_benefit_score": 0.025254221050940745,
+        "safe_positive_probability": 0.5357069814779684
+      },
+      "route_count": 32,
+      "stage": "HARP_V19_OUTER_3_INNER_ALL_INNER_OOF",
+      "threshold": 0.5,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 6.437246930785586e-05,
+        "equal_center_route_coverage": 0.18462236746550473,
+        "gain": -0.0046234943537932305,
+        "harm_moment_all_cases": 0.09510257806826436,
+        "logloss_moment_all_cases": 6.442617559684828e-05,
+        "routed_brier_delta": 0.002348671020697876,
+        "routed_harm": 0.7651194807749042,
+        "routed_logloss_delta": 0.00534896191876039
+      }
+    },
+    {
+      "center_coverage": 7,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0016750100536209542,
+        "predicted_gain": 0.042500825822700976,
+        "predicted_harm": 0.21350675631120825,
+        "predicted_logloss_delta": -0.0023123888350367297,
+        "safe_benefit_score": 0.02237912991427556,
+        "safe_positive_probability": 0.5513297247750494
+      },
+      "route_count": 24,
+      "stage": "HARP_V19_OUTER_3_INNER_ALL_INNER_OOF",
+      "threshold": 0.6,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 0.00011024683678086968,
+        "equal_center_route_coverage": 0.14166666666666666,
+        "gain": -0.003875574304862269,
+        "harm_moment_all_cases": 0.07584876543209877,
+        "logloss_moment_all_cases": 0.00019908634627875742,
+        "routed_brier_delta": 0.0027782129655120214,
+        "routed_harm": 0.7854030501089325,
+        "routed_logloss_delta": 0.006405315385497111
+      }
+    },
+    {
+      "center_coverage": 6,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.002624173881605039,
+        "predicted_gain": 0.061312582633342605,
+        "predicted_harm": 0.14294850909826748,
+        "predicted_logloss_delta": -0.003522224831540766,
+        "safe_benefit_score": 0.025715748323532798,
+        "safe_positive_probability": 0.5655397441575748
+      },
+      "route_count": 16,
+      "stage": "HARP_V19_OUTER_3_INNER_ALL_INNER_OOF",
+      "threshold": 0.7,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 0.00013068600896226615,
+        "equal_center_route_coverage": 0.09429012345679012,
+        "gain": -0.0022853002248585503,
+        "harm_moment_all_cases": 0.04587191358024692,
+        "logloss_moment_all_cases": 0.00028711262414945517,
+        "routed_brier_delta": 0.0033859989166538213,
+        "routed_harm": 0.7364975450081833,
+        "routed_logloss_delta": 0.008044991496707806
+      }
+    },
+    {
+      "center_coverage": 6,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.002944105188552147,
+        "predicted_gain": 0.06906812557150867,
+        "predicted_harm": 0.1221861114765024,
+        "predicted_logloss_delta": -0.003943571360230766,
+        "safe_benefit_score": 0.024839270859421177,
+        "safe_positive_probability": 0.5453943244277464
+      },
+      "route_count": 14,
+      "stage": "HARP_V19_OUTER_3_INNER_ALL_INNER_OOF",
+      "threshold": 0.75,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 6.176556601109764e-05,
+        "equal_center_route_coverage": 0.08256172839506173,
+        "gain": -0.0012711908774158695,
+        "harm_moment_all_cases": 0.03707561728395062,
+        "logloss_moment_all_cases": 0.00015974387909205946,
+        "routed_brier_delta": 0.0027481137714989025,
+        "routed_harm": 0.6990654205607476,
+        "routed_logloss_delta": 0.006934841750498215
+      }
+    },
+    {
+      "center_coverage": 6,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.003566614870104817,
+        "predicted_gain": 0.07799396833141976,
+        "predicted_harm": 0.10630996135213405,
+        "predicted_logloss_delta": -0.0048252236245658236,
+        "safe_benefit_score": 0.027095691697192458,
+        "safe_positive_probability": 0.5162503420219412
+      },
+      "route_count": 12,
+      "stage": "HARP_V19_OUTER_3_INNER_ALL_INNER_OOF",
+      "threshold": 0.8,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 2.8736441646797168e-05,
+        "equal_center_route_coverage": 0.07006172839506174,
+        "gain": -0.00022952421074920256,
+        "harm_moment_all_cases": 0.027700617283950613,
+        "logloss_moment_all_cases": 0.00010513720499877083,
+        "routed_brier_delta": 0.0024101589028001002,
+        "routed_harm": 0.645374449339207,
+        "routed_logloss_delta": 0.006500636758572764
+      }
+    },
+    {
+      "center_coverage": 4,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.00142761419340279,
+        "predicted_gain": 0.04760445870093485,
+        "predicted_harm": 0.059875477579043074,
+        "predicted_logloss_delta": -0.00030825714138488783,
+        "safe_benefit_score": 0.015938477580703256,
+        "safe_positive_probability": 0.6647913363077901
+      },
+      "route_count": 7,
+      "stage": "HARP_V19_OUTER_3_INNER_ALL_INNER_OOF",
+      "threshold": 0.85,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -2.1779811027110727e-05,
+        "equal_center_route_coverage": 0.04074074074074074,
+        "gain": -7.188119003599737e-05,
+        "harm_moment_all_cases": 0.012654320987654321,
+        "logloss_moment_all_cases": -3.26883739616811e-05,
+        "routed_brier_delta": 0.001465404638425464,
+        "routed_harm": 0.5606060606060607,
+        "routed_logloss_delta": 0.004197649002758736
+      }
+    },
+    {
+      "center_coverage": 4,
+      "failed_constraints": [
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0023050413036106695,
+        "predicted_gain": 0.06267361168384582,
+        "predicted_harm": 0.04650415989105202,
+        "predicted_logloss_delta": -0.001564573149237329,
+        "safe_benefit_score": 0.01718337858475927,
+        "safe_positive_probability": 0.6405673210839229
+      },
+      "route_count": 6,
+      "stage": "HARP_V19_OUTER_3_INNER_ALL_INNER_OOF",
+      "threshold": 0.9,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -2.2610179041111156e-05,
+        "equal_center_route_coverage": 0.03518518518518518,
+        "gain": 7.826896011415278e-05,
+        "harm_moment_all_cases": 0.008487654320987657,
+        "logloss_moment_all_cases": -2.8825369420829846e-05,
+        "routed_brier_delta": 0.0013573949114631567,
+        "routed_harm": 0.49122807017543874,
+        "routed_logloss_delta": 0.004180752658565889
+      }
+    },
+    {
+      "center_coverage": 3,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0005451069214208149,
+        "predicted_gain": 0.03792844681588673,
+        "predicted_harm": 0.030811928479750048,
+        "predicted_logloss_delta": 0.0022168335187901507,
+        "safe_benefit_score": 0.017033412457109317,
+        "safe_positive_probability": 0.7204529535132855
+      },
+      "route_count": 4,
+      "stage": "HARP_V19_OUTER_3_INNER_ALL_INNER_OOF",
+      "threshold": 0.95,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 2.3825205025155466e-05,
+        "equal_center_route_coverage": 0.02345679012345679,
+        "gain": -3.595413116207861e-05,
+        "harm_moment_all_cases": 0.005246913580246914,
+        "logloss_moment_all_cases": 9.489586824760031e-05,
+        "routed_brier_delta": 0.003015706108967154,
+        "routed_harm": 0.47368421052631576,
+        "routed_logloss_delta": 0.009045560698976645
+      }
+    },
+    {
+      "center_coverage": 9,
+      "failed_constraints": [
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0019091045815148844,
+        "predicted_gain": 0.030544686111152308,
+        "predicted_harm": 0.5118107883204605,
+        "predicted_logloss_delta": -0.003995277947883417,
+        "safe_benefit_score": 0.021683290401794713,
+        "safe_positive_probability": 0.34724984100756034
+      },
+      "route_count": 78,
+      "stage": "HARP_V19_OUTER_4_INNER_ALL_INNER_OOF",
+      "threshold": 0.0,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.0009231060931502034,
+        "equal_center_route_coverage": 0.44651416122004367,
+        "gain": 0.002828170907156249,
+        "harm_moment_all_cases": 0.10206063907044295,
+        "logloss_moment_all_cases": -0.0022370573924744295,
+        "routed_brier_delta": -6.736129180748106e-05,
+        "routed_harm": 0.47857200943319494,
+        "routed_logloss_delta": -1.0048027059101629e-05
+      }
+    },
+    {
+      "center_coverage": 8,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0016466649488574628,
+        "predicted_gain": 0.031858831129543366,
+        "predicted_harm": 0.2646105565537867,
+        "predicted_logloss_delta": -0.002991973367239583,
+        "safe_benefit_score": 0.018403052856026315,
+        "safe_positive_probability": 0.45228857873079364
+      },
+      "route_count": 36,
+      "stage": "HARP_V19_OUTER_4_INNER_ALL_INNER_OOF",
+      "threshold": 0.5,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -7.93035474644501e-05,
+        "equal_center_route_coverage": 0.20294117647058826,
+        "gain": -0.002793279381366674,
+        "harm_moment_all_cases": 0.053385984023238915,
+        "logloss_moment_all_cases": -0.0003246502213063285,
+        "routed_brier_delta": 0.001609228896551985,
+        "routed_harm": 0.5130613705492931,
+        "routed_logloss_delta": 0.0034002742718238894
+      }
+    },
+    {
+      "center_coverage": 8,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.001762300411329325,
+        "predicted_gain": 0.034277873906722114,
+        "predicted_harm": 0.2273455718727826,
+        "predicted_logloss_delta": -0.0031513479575807305,
+        "safe_benefit_score": 0.019473268814319898,
+        "safe_positive_probability": 0.4547206458674485
+      },
+      "route_count": 30,
+      "stage": "HARP_V19_OUTER_4_INNER_ALL_INNER_OOF",
+      "threshold": 0.6,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -1.661538586773657e-05,
+        "equal_center_route_coverage": 0.16749273783587512,
+        "gain": -0.0020271384954047137,
+        "harm_moment_all_cases": 0.04223175381263617,
+        "logloss_moment_all_cases": -0.00016366436528680417,
+        "routed_brier_delta": 0.0019007993654983546,
+        "routed_harm": 0.5021408053764024,
+        "routed_logloss_delta": 0.004022856946507271
+      }
+    },
+    {
+      "center_coverage": 7,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.002505534400969563,
+        "predicted_gain": 0.04360353243979785,
+        "predicted_harm": 0.15611971921456125,
+        "predicted_logloss_delta": -0.004312737157736666,
+        "safe_benefit_score": 0.02391768321641998,
+        "safe_positive_probability": 0.4291509913168654
+      },
+      "route_count": 20,
+      "stage": "HARP_V19_OUTER_4_INNER_ALL_INNER_OOF",
+      "threshold": 0.7,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 9.239153696927118e-06,
+        "equal_center_route_coverage": 0.11054829339143064,
+        "gain": -0.0014751321300820526,
+        "harm_moment_all_cases": 0.023597494553376907,
+        "logloss_moment_all_cases": -5.717042308413494e-05,
+        "routed_brier_delta": 0.0020835757243597873,
+        "routed_harm": 0.4634586960091969,
+        "routed_logloss_delta": 0.004482846624491024
+      }
+    },
+    {
+      "center_coverage": 6,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0024934061559665176,
+        "predicted_gain": 0.044820316528620174,
+        "predicted_harm": 0.13844762613472364,
+        "predicted_logloss_delta": -0.004214817527194857,
+        "safe_benefit_score": 0.021451997638689855,
+        "safe_positive_probability": 0.38771253307755954
+      },
+      "route_count": 17,
+      "stage": "HARP_V19_OUTER_4_INNER_ALL_INNER_OOF",
+      "threshold": 0.75,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -4.2629162614530485e-05,
+        "equal_center_route_coverage": 0.09573347857661581,
+        "gain": -0.0005482984336405132,
+        "harm_moment_all_cases": 0.0124863834422658,
+        "logloss_moment_all_cases": -0.00014767630850055313,
+        "routed_brier_delta": 0.0015547099797442938,
+        "routed_harm": 0.38042859852076627,
+        "routed_logloss_delta": 0.0034574225161747643
+      }
+    },
+    {
+      "center_coverage": 6,
+      "failed_constraints": [
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0017730498515015098,
+        "predicted_gain": 0.041876133703567645,
+        "predicted_harm": 0.1179140958737732,
+        "predicted_logloss_delta": -0.0024783185859660654,
+        "safe_benefit_score": 0.017660570777422276,
+        "safe_positive_probability": 0.4352660130510117
+      },
+      "route_count": 14,
+      "stage": "HARP_V19_OUTER_4_INNER_ALL_INNER_OOF",
+      "threshold": 0.8,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.00010191836257623807,
+        "equal_center_route_coverage": 0.07706063907044298,
+        "gain": 0.0001501816485201246,
+        "harm_moment_all_cases": 0.01098175381263617,
+        "logloss_moment_all_cases": -0.00024887955566096274,
+        "routed_brier_delta": 0.0006774264552481583,
+        "routed_harm": 0.39250795146660394,
+        "routed_logloss_delta": 0.0017703414004462646
+      }
+    },
+    {
+      "center_coverage": 4,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0018400161131296045,
+        "predicted_gain": 0.041381294877684695,
+        "predicted_harm": 0.0681458517737747,
+        "predicted_logloss_delta": -0.0022160000151311577,
+        "safe_benefit_score": 0.01608856164838677,
+        "safe_positive_probability": 0.34610221299178345
+      },
+      "route_count": 7,
+      "stage": "HARP_V19_OUTER_4_INNER_ALL_INNER_OOF",
+      "threshold": 0.85,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 2.5898929194755822e-05,
+        "equal_center_route_coverage": 0.0411038489469862,
+        "gain": -0.0006265802784541788,
+        "harm_moment_all_cases": 0.007625272331154681,
+        "logloss_moment_all_cases": 4.44503555173389e-05,
+        "routed_brier_delta": 0.0026300852562045718,
+        "routed_harm": 0.435512367491166,
+        "routed_logloss_delta": 0.006081415893063174
+      }
+    },
+    {
+      "center_coverage": 4,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.002290488268803197,
+        "predicted_gain": 0.04450235803007846,
+        "predicted_harm": 0.05167368649548598,
+        "predicted_logloss_delta": -0.004184808003835177,
+        "safe_benefit_score": 0.016315332392291784,
+        "safe_positive_probability": 0.38053141852407124
+      },
+      "route_count": 5,
+      "stage": "HARP_V19_OUTER_4_INNER_ALL_INNER_OOF",
+      "threshold": 0.9,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -3.5992954016054297e-07,
+        "equal_center_route_coverage": 0.02999273783587509,
+        "gain": -0.0004205998001060803,
+        "harm_moment_all_cases": 0.004847494553376906,
+        "logloss_moment_all_cases": -2.8917933354410044e-05,
+        "routed_brier_delta": 0.001987999443660991,
+        "routed_harm": 0.41162227602905566,
+        "routed_logloss_delta": 0.004035835490822697
+      }
+    },
+    {
+      "center_coverage": 2,
+      "failed_constraints": [],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0013684183598215353,
+        "predicted_gain": 0.027298153302202754,
+        "predicted_harm": 0.01384457682570796,
+        "predicted_logloss_delta": -0.001430372885379569,
+        "safe_benefit_score": 0.012045705228209958,
+        "safe_positive_probability": 0.08880500260859664
+      },
+      "route_count": 2,
+      "stage": "HARP_V19_OUTER_4_INNER_ALL_INNER_OOF",
+      "threshold": 0.95,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -2.4415381986012207e-05,
+        "equal_center_route_coverage": 0.012091503267973857,
+        "gain": 0.00010276976877176279,
+        "harm_moment_all_cases": -0.003022875816993464,
+        "logloss_moment_all_cases": -6.091017175800316e-05,
+        "routed_brier_delta": -1.9218077762090585e-05,
+        "routed_harm": 0.0,
+        "routed_logloss_delta": -3.7435826472693664e-05
+      }
+    },
+    {
+      "center_coverage": 9,
+      "failed_constraints": [
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0023031923100670566,
+        "predicted_gain": 0.04010032436232255,
+        "predicted_harm": 0.48032147978634643,
+        "predicted_logloss_delta": -0.004299927706180751,
+        "safe_benefit_score": 0.023628099594691372,
+        "safe_positive_probability": 0.4221527295014758
+      },
+      "route_count": 91,
+      "stage": "ALL_OUTER_OOF_DIAGNOSTIC",
+      "threshold": 0.0,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.0005479521795044778,
+        "equal_center_route_coverage": 0.4243859649122807,
+        "gain": 0.0014846762114816136,
+        "harm_moment_all_cases": 0.11013955342902713,
+        "logloss_moment_all_cases": -0.0013149005236493148,
+        "routed_brier_delta": 0.0007088352942639424,
+        "routed_harm": 0.5095268518170545,
+        "routed_logloss_delta": 0.0019016399401401015
+      }
+    },
+    {
+      "center_coverage": 9,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0030039125935183587,
+        "predicted_gain": 0.045480120832801584,
+        "predicted_harm": 0.28229677000863806,
+        "predicted_logloss_delta": -0.005905375690292733,
+        "safe_benefit_score": 0.03332266172650842,
+        "safe_positive_probability": 0.6000003217276206
+      },
+      "route_count": 46,
+      "stage": "ALL_OUTER_OOF_DIAGNOSTIC",
+      "threshold": 0.5,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.00017909197563390893,
+        "equal_center_route_coverage": 0.2090536948431685,
+        "gain": -0.0009961053465185902,
+        "harm_moment_all_cases": 0.05479133439659756,
+        "logloss_moment_all_cases": -0.0005687511640261088,
+        "routed_brier_delta": 0.0011433206872126166,
+        "routed_harm": 0.5120921598046945,
+        "routed_logloss_delta": 0.002279401521925817
+      }
+    },
+    {
+      "center_coverage": 8,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.002858339331663635,
+        "predicted_gain": 0.04204405816925581,
+        "predicted_harm": 0.21972024330306456,
+        "predicted_logloss_delta": -0.00536734196558441,
+        "safe_benefit_score": 0.036123461920025676,
+        "safe_positive_probability": 0.663473896055337
+      },
+      "route_count": 33,
+      "stage": "ALL_OUTER_OOF_DIAGNOSTIC",
+      "threshold": 0.6,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 0.00012032223104265172,
+        "equal_center_route_coverage": 0.15210526315789472,
+        "gain": -0.00459736734422898,
+        "harm_moment_all_cases": 0.05044790005316321,
+        "logloss_moment_all_cases": 0.00012036130143676404,
+        "routed_brier_delta": 0.0027910458096229696,
+        "routed_harm": 0.5816643948131838,
+        "routed_logloss_delta": 0.005791302673805716
+      }
+    },
+    {
+      "center_coverage": 7,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.003120085378071448,
+        "predicted_gain": 0.045152964028132216,
+        "predicted_harm": 0.188823571937383,
+        "predicted_logloss_delta": -0.005803942292257054,
+        "safe_benefit_score": 0.039612376036134093,
+        "safe_positive_probability": 0.6865745816010033
+      },
+      "route_count": 26,
+      "stage": "ALL_OUTER_OOF_DIAGNOSTIC",
+      "threshold": 0.7,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 7.72828168595298e-05,
+        "equal_center_route_coverage": 0.12130249867091975,
+        "gain": -0.0031383215013067794,
+        "harm_moment_all_cases": 0.03623471557682083,
+        "logloss_moment_all_cases": 6.238343932025829e-05,
+        "routed_brier_delta": 0.0026371082022736358,
+        "routed_harm": 0.5487136783976858,
+        "routed_logloss_delta": 0.005514279920065766
+      }
+    },
+    {
+      "center_coverage": 7,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0035610400439460505,
+        "predicted_gain": 0.0574359960872818,
+        "predicted_harm": 0.16982684120915398,
+        "predicted_logloss_delta": -0.006605201504038448,
+        "safe_benefit_score": 0.045596007457202076,
+        "safe_positive_probability": 0.7008631858402936
+      },
+      "route_count": 21,
+      "stage": "ALL_OUTER_OOF_DIAGNOSTIC",
+      "threshold": 0.75,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 0.00015179381774769123,
+        "equal_center_route_coverage": 0.09736310473152578,
+        "gain": -0.003213835187507489,
+        "harm_moment_all_cases": 0.03777511961722488,
+        "logloss_moment_all_cases": 0.00023553336223178874,
+        "routed_brier_delta": 0.0035590486577667755,
+        "routed_harm": 0.6379818717920717,
+        "routed_logloss_delta": 0.007419123372054137
+      }
+    },
+    {
+      "center_coverage": 5,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.00240476376512494,
+        "predicted_gain": 0.0444182779262299,
+        "predicted_harm": 0.13715989835146272,
+        "predicted_logloss_delta": -0.0036652598915822778,
+        "safe_benefit_score": 0.027379571953066745,
+        "safe_positive_probability": 0.7385286488056392
+      },
+      "route_count": 12,
+      "stage": "ALL_OUTER_OOF_DIAGNOSTIC",
+      "threshold": 0.8,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 0.00013877530089281544,
+        "equal_center_route_coverage": 0.05645933014354067,
+        "gain": -0.002493190668323234,
+        "harm_moment_all_cases": 0.026087187666135037,
+        "logloss_moment_all_cases": 0.00025040847567568534,
+        "routed_brier_delta": 0.004457969312423596,
+        "routed_harm": 0.7120527306967985,
+        "routed_logloss_delta": 0.009435200967476121
+      }
+    },
+    {
+      "center_coverage": 4,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0011298353443580436,
+        "predicted_gain": 0.04360777612106585,
+        "predicted_harm": 0.10245077205834145,
+        "predicted_logloss_delta": 0.00031592325122635224,
+        "safe_benefit_score": 0.024214070886873506,
+        "safe_positive_probability": 0.7525789492362671
+      },
+      "route_count": 6,
+      "stage": "ALL_OUTER_OOF_DIAGNOSTIC",
+      "threshold": 0.85,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 3.470754119606833e-05,
+        "equal_center_route_coverage": 0.026257309941520465,
+        "gain": -0.00037705784652236493,
+        "harm_moment_all_cases": 0.003435672514619884,
+        "logloss_moment_all_cases": 6.975068830625278e-05,
+        "routed_brier_delta": 0.0033218239520106203,
+        "routed_harm": 0.3808463251670379,
+        "routed_logloss_delta": 0.007656429331930785
+      }
+    },
+    {
+      "center_coverage": 1,
+      "failed_constraints": [],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0012451459333131278,
+        "predicted_gain": 0.031278445717045314,
+        "predicted_harm": 0.045395608439065455,
+        "predicted_logloss_delta": -0.0011313293599416725,
+        "safe_benefit_score": 0.010045533958566789,
+        "safe_positive_probability": 0.6104878299047031
+      },
+      "route_count": 2,
+      "stage": "ALL_OUTER_OOF_DIAGNOSTIC",
+      "threshold": 0.9,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -1.746927290744868e-05,
+        "equal_center_route_coverage": 0.008888888888888889,
+        "gain": 0.0002727040766256453,
+        "harm_moment_all_cases": -0.0022222222222222222,
+        "logloss_moment_all_cases": -4.355828520271828e-05,
+        "routed_brier_delta": 3.470679791202358e-05,
+        "routed_harm": 0.0,
+        "routed_logloss_delta": 9.969291469419383e-05
+      }
+    },
+    {
+      "center_coverage": 1,
+      "failed_constraints": [],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0012451459333131278,
+        "predicted_gain": 0.031278445717045314,
+        "predicted_harm": 0.045395608439065455,
+        "predicted_logloss_delta": -0.0011313293599416725,
+        "safe_benefit_score": 0.010045533958566789,
+        "safe_positive_probability": 0.6104878299047031
+      },
+      "route_count": 2,
+      "stage": "ALL_OUTER_OOF_DIAGNOSTIC",
+      "threshold": 0.95,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -1.746927290744868e-05,
+        "equal_center_route_coverage": 0.008888888888888889,
+        "gain": 0.0002727040766256453,
+        "harm_moment_all_cases": -0.0022222222222222222,
+        "logloss_moment_all_cases": -4.355828520271828e-05,
+        "routed_brier_delta": 3.470679791202358e-05,
+        "routed_harm": 0.0,
+        "routed_logloss_delta": 9.969291469419383e-05
+      }
+    },
+    {
+      "center_coverage": 9,
+      "failed_constraints": [
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0026909492869715253,
+        "predicted_gain": 0.05075189100137083,
+        "predicted_harm": 0.45590689822997965,
+        "predicted_logloss_delta": -0.00521993319220353,
+        "safe_benefit_score": 0.028097779557462454,
+        "safe_positive_probability": 0.3967121731806028
+      },
+      "route_count": 88,
+      "stage": "HARP_V19_FINAL_INNER_ALL_INNER_OOF",
+      "threshold": 0.0,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.000690667555635757,
+        "equal_center_route_coverage": 0.4051834130781499,
+        "gain": 0.0008817622017812522,
+        "harm_moment_all_cases": 0.1119949494949495,
+        "logloss_moment_all_cases": -0.0017552885338806058,
+        "routed_brier_delta": 0.0002954199670001195,
+        "routed_harm": 0.526405563209342,
+        "routed_logloss_delta": 0.000667916115949066
+      }
+    },
+    {
+      "center_coverage": 9,
+      "failed_constraints": [
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.0027779981239756816,
+        "predicted_gain": 0.053369342489795926,
+        "predicted_harm": 0.27162040319718633,
+        "predicted_logloss_delta": -0.005533220182183221,
+        "safe_benefit_score": 0.03671290318052327,
+        "safe_positive_probability": 0.5206620622429923
+      },
+      "route_count": 50,
+      "stage": "HARP_V19_FINAL_INNER_ALL_INNER_OOF",
+      "threshold": 0.5,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.00042624075659027284,
+        "equal_center_route_coverage": 0.23147793726741098,
+        "gain": 0.0016894165066153588,
+        "harm_moment_all_cases": 0.06614965443912812,
+        "logloss_moment_all_cases": -0.0010055159598876561,
+        "routed_brier_delta": 0.0001586117380255321,
+        "routed_harm": 0.5357708826163845,
+        "routed_logloss_delta": 0.0006561045438812127
+      }
+    },
+    {
+      "center_coverage": 9,
+      "failed_constraints": [
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.00329505288043787,
+        "predicted_gain": 0.057872996844027844,
+        "predicted_harm": 0.21448580047103502,
+        "predicted_logloss_delta": -0.006661908221464497,
+        "safe_benefit_score": 0.04374553703057969,
+        "safe_positive_probability": 0.5314873664590755
+      },
+      "route_count": 38,
+      "stage": "HARP_V19_FINAL_INNER_ALL_INNER_OOF",
+      "threshold": 0.6,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.00033993430451923965,
+        "equal_center_route_coverage": 0.17593301435406697,
+        "gain": 0.0012774465756960737,
+        "harm_moment_all_cases": 0.05043992557150453,
+        "logloss_moment_all_cases": -0.0008335881488528827,
+        "routed_brier_delta": 6.781969963227922e-05,
+        "routed_harm": 0.5366996041458919,
+        "routed_logloss_delta": 0.0002619003777467363
+      }
+    },
+    {
+      "center_coverage": 8,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.003909026528080381,
+        "predicted_gain": 0.06488784100289645,
+        "predicted_harm": 0.14454851481353487,
+        "predicted_logloss_delta": -0.008083139277031212,
+        "safe_benefit_score": 0.056741082830506356,
+        "safe_positive_probability": 0.5658157475281876
+      },
+      "route_count": 25,
+      "stage": "HARP_V19_FINAL_INNER_ALL_INNER_OOF",
+      "threshold": 0.7,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.00015889957949522443,
+        "equal_center_route_coverage": 0.11553429027113236,
+        "gain": -0.0006674347795426657,
+        "harm_moment_all_cases": 0.043625730994152054,
+        "logloss_moment_all_cases": -0.0004098546763426608,
+        "routed_brier_delta": 0.0006246543850979331,
+        "routed_harm": 0.6275998527517027,
+        "routed_logloss_delta": 0.0014525278566144622
+      }
+    },
+    {
+      "center_coverage": 8,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.003932474168277098,
+        "predicted_gain": 0.06929989151191415,
+        "predicted_harm": 0.12646130485258894,
+        "predicted_logloss_delta": -0.008120450423211344,
+        "safe_benefit_score": 0.06499589393375739,
+        "safe_positive_probability": 0.5921668286819434
+      },
+      "route_count": 22,
+      "stage": "HARP_V19_FINAL_INNER_ALL_INNER_OOF",
+      "threshold": 0.75,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -0.00013392906010847546,
+        "equal_center_route_coverage": 0.09987772461456672,
+        "gain": -0.0006419587123999318,
+        "harm_moment_all_cases": 0.03743886230728337,
+        "logloss_moment_all_cases": -0.0003440335363652243,
+        "routed_brier_delta": 0.000659069771309723,
+        "routed_harm": 0.6248469686485337,
+        "routed_logloss_delta": 0.0015554528029861768
+      }
+    },
+    {
+      "center_coverage": 7,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.004359672438030086,
+        "predicted_gain": 0.07805993101127207,
+        "predicted_harm": 0.10324420333341182,
+        "predicted_logloss_delta": -0.009073700176271295,
+        "safe_benefit_score": 0.07482388766762328,
+        "safe_positive_probability": 0.6056539486100478
+      },
+      "route_count": 18,
+      "stage": "HARP_V19_FINAL_INNER_ALL_INNER_OOF",
+      "threshold": 0.8,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": -8.6726910364303e-05,
+        "equal_center_route_coverage": 0.08190324295587453,
+        "gain": -0.0004527975378586405,
+        "harm_moment_all_cases": 0.0319324827219564,
+        "logloss_moment_all_cases": -0.0002301113057501125,
+        "routed_brier_delta": 0.0009411052940720894,
+        "routed_harm": 0.6398805660132415,
+        "routed_logloss_delta": 0.0021904493955863845
+      }
+    },
+    {
+      "center_coverage": 6,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.005266495157079884,
+        "predicted_gain": 0.09473798372144837,
+        "predicted_harm": 0.0541245257805231,
+        "predicted_logloss_delta": -0.010641901873147,
+        "safe_benefit_score": 0.10248724507233307,
+        "safe_positive_probability": 0.5384726561737558
+      },
+      "route_count": 11,
+      "stage": "HARP_V19_FINAL_INNER_ALL_INNER_OOF",
+      "threshold": 0.85,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 6.500394973801228e-05,
+        "equal_center_route_coverage": 0.04998936735778842,
+        "gain": -0.0013278423302221505,
+        "harm_moment_all_cases": 0.027492025518341304,
+        "logloss_moment_all_cases": 0.00010936311568100602,
+        "routed_brier_delta": 0.0033003555190598863,
+        "routed_harm": 0.7999574603849834,
+        "routed_logloss_delta": 0.007187727540103927
+      }
+    },
+    {
+      "center_coverage": 5,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.005774148606211466,
+        "predicted_gain": 0.10237340125298727,
+        "predicted_harm": 0.023524437476891095,
+        "predicted_logloss_delta": -0.01029693989243071,
+        "safe_benefit_score": 0.0828803569199166,
+        "safe_positive_probability": 0.4341921982523257
+      },
+      "route_count": 7,
+      "stage": "HARP_V19_FINAL_INNER_ALL_INNER_OOF",
+      "threshold": 0.9,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 0.0003143791651101554,
+        "equal_center_route_coverage": 0.03312599681020734,
+        "gain": -0.0029590147353883633,
+        "harm_moment_all_cases": 0.01928894205209995,
+        "logloss_moment_all_cases": 0.0006292312581641624,
+        "routed_brier_delta": 0.011490406187966656,
+        "routed_harm": 0.8322901620927621,
+        "routed_logloss_delta": 0.02399508901631824
+      }
+    },
+    {
+      "center_coverage": 5,
+      "failed_constraints": [
+        "NONPOSITIVE_SIGNED_GAIN",
+        "HARM_CONSTRAINT_FAILED",
+        "BRIER_CONSTRAINT_FAILED",
+        "LOGLOSS_CONSTRAINT_FAILED"
+      ],
+      "prediction_means_among_routed_candidates": {
+        "predicted_brier_delta": -0.005774148606211466,
+        "predicted_gain": 0.10237340125298727,
+        "predicted_harm": 0.023524437476891095,
+        "predicted_logloss_delta": -0.01029693989243071,
+        "safe_benefit_score": 0.0828803569199166,
+        "safe_positive_probability": 0.4341921982523257
+      },
+      "route_count": 7,
+      "stage": "HARP_V19_FINAL_INNER_ALL_INNER_OOF",
+      "threshold": 0.95,
+      "utility_risk_moments": {
+        "brier_moment_all_cases": 0.0003143791651101554,
+        "equal_center_route_coverage": 0.03312599681020734,
+        "gain": -0.0029590147353883633,
+        "harm_moment_all_cases": 0.01928894205209995,
+        "logloss_moment_all_cases": 0.0006292312581641624,
+        "routed_brier_delta": 0.011490406187966656,
+        "routed_harm": 0.8322901620927621,
+        "routed_logloss_delta": 0.02399508901631824
+      }
+    }
+  ],
+  "report_hashes_valid": {
+    "candidate_frontier.json": true,
+    "source_candidate_winner_joins.json": true,
+    "source_headroom_diagnostics.json": true
+  },
+  "root": "artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_harp_router/v19",
+  "schema_version": "harp_v19_source_failure_audit_v1",
+  "selected_high_threshold_diagnostics": [
+    {
+      "center_coverage": 2,
+      "failed_constraints": [],
+      "route_count": 2,
+      "stage": "HARP_V19_OUTER_4_INNER_ALL_INNER_OOF",
+      "threshold": 0.95
+    },
+    {
+      "center_coverage": 0,
+      "failed_constraints": [
+        "ZERO_ROUTED_CASES",
+        "INSUFFICIENT_CENTER_COVERAGE",
+        "NONPOSITIVE_SIGNED_GAIN"
+      ],
+      "route_count": 0,
+      "stage": "OUTER_4_DIAGNOSTIC",
+      "threshold": 0.95
+    },
+    {
+      "center_coverage": 1,
+      "failed_constraints": [],
+      "route_count": 2,
+      "stage": "ALL_OUTER_OOF_DIAGNOSTIC",
+      "threshold": 0.95
+    }
+  ],
+  "source_report_sha256": {
+    "candidate_frontier.json": "a7099c57ea055f7cff4c191fab2e3ee40ba7318390f2af4f388ab1780f5c8260",
+    "source_candidate_winner_joins.json": "179269a86fcdbdb1c0d37352367b60080d9bd01b2a6625c5c368839e0b5319a2",
+    "source_headroom_diagnostics.json": "be87e5deff2a0499dec0499cae538626332fd945113fa73953cf8b5a8135cc82",
+    "source_policy_nonadmission.json": "3c8dae393bf65529b81f142263ed1a9ca28901d8136d0b4dbb9bd4922cbccb6a"
+  },
+  "winner_summary": {
+    "ALL_OUTER_OOF_DIAGNOSTIC": {
+      "all_winners": {
+        "count": 143,
+        "gate_harm_auc": 0.5353495679497251,
+        "gate_harm_quantiles": [
+          0.04159045537551248,
+          0.33644631300681216,
+          0.5360825735428139,
+          0.6992880443908535,
+          0.9939944572758502
+        ],
+        "harm_count": 76,
+        "observed_harm_equal_center_conditional": 0.5399798057505529,
+        "predicted_harm_equal_center_conditional": 0.5242047831509695,
+        "raw_harm_auc": 0.5149253731343284,
+        "raw_predicted_harm_equal_center_conditional": 0.47738603226259935,
+        "safe_positive_count": 53,
+        "winner_families": {
+          "BOTH": 15,
+          "D01_ONLY": 55,
+          "D10_ONLY": 57,
+          "U_FULL": 16
+        }
+      },
+      "cases": 216,
+      "no_winner": 73,
+      "positive_score_winners": {
+        "count": 91,
+        "gate_harm_auc": 0.4966183574879227,
+        "gate_harm_quantiles": [
+          0.04159045537551248,
+          0.25889779752729036,
+          0.49772512873243013,
+          0.631070083252061,
+          0.9939944572758502
+        ],
+        "harm_count": 46,
+        "observed_harm_equal_center_conditional": 0.5095268518170545,
+        "predicted_harm_equal_center_conditional": 0.4803214797863457,
+        "raw_harm_auc": 0.4280193236714976,
+        "raw_predicted_harm_equal_center_conditional": 0.4088652864283894,
+        "safe_positive_count": 35,
+        "winner_families": {
+          "BOTH": 13,
+          "D01_ONLY": 38,
+          "D10_ONLY": 31,
+          "U_FULL": 9
+        }
+      }
+    },
+    "HARP_V19_FINAL_INNER_ALL_INNER_OOF": {
+      "all_winners": {
+        "count": 143,
+        "gate_harm_auc": 0.5142011834319526,
+        "gate_harm_quantiles": [
+          0.006964639112226802,
+          0.3208519705286573,
+          0.5044648749339158,
+          0.7138067263769692,
+          0.9997295009881024
+        ],
+        "harm_count": 78,
+        "observed_harm_equal_center_conditional": 0.5503253517966472,
+        "predicted_harm_equal_center_conditional": 0.5082350078154986,
+        "raw_harm_auc": 0.5447731755424063,
+        "raw_predicted_harm_equal_center_conditional": 0.48710234822519416,
+        "safe_positive_count": 53,
+        "winner_families": {
+          "BOTH": 16,
+          "D01_ONLY": 60,
+          "D10_ONLY": 57,
+          "U_FULL": 10
+        }
+      },
+      "cases": 216,
+      "no_winner": 73,
+      "positive_score_winners": {
+        "count": 88,
+        "gate_harm_auc": 0.44577062791904515,
+        "gate_harm_quantiles": [
+          0.006964639112226802,
+          0.2540933036536724,
+          0.44418210408094905,
+          0.6498839302137448,
+          0.9934873990763996
+        ],
+        "harm_count": 47,
+        "observed_harm_equal_center_conditional": 0.5264055632093418,
+        "predicted_harm_equal_center_conditional": 0.455906898229979,
+        "raw_harm_auc": 0.5350285417747794,
+        "raw_predicted_harm_equal_center_conditional": 0.4107292695512087,
+        "safe_positive_count": 34,
+        "winner_families": {
+          "BOTH": 14,
+          "D01_ONLY": 39,
+          "D10_ONLY": 29,
+          "U_FULL": 6
+        }
+      }
+    },
+    "HARP_V19_OUTER_0_INNER_ALL_INNER_OOF": {
+      "all_winners": {
+        "count": 117,
+        "gate_harm_auc": 0.4202988792029888,
+        "gate_harm_quantiles": [
+          0.0067704460397240394,
+          0.3243699351588651,
+          0.641778319414323,
+          0.8448868143505323,
+          0.9987295109864932
+        ],
+        "harm_count": 73,
+        "observed_harm_equal_center_conditional": 0.6331301633691605,
+        "predicted_harm_equal_center_conditional": 0.5828423855987914,
+        "raw_harm_auc": 0.5320672478206725,
+        "raw_predicted_harm_equal_center_conditional": 0.4806567291816967,
+        "safe_positive_count": 36,
+        "winner_families": {
+          "BOTH": 14,
+          "D01_ONLY": 38,
+          "D10_ONLY": 57,
+          "U_FULL": 8
+        }
+      },
+      "cases": 172,
+      "no_winner": 55,
+      "positive_score_winners": {
+        "count": 74,
+        "gate_harm_auc": 0.3330745341614907,
+        "gate_harm_quantiles": [
+          0.018035278067620862,
+          0.3002773624003916,
+          0.5860054790679619,
+          0.8139782057068972,
+          0.9912047766006847
+        ],
+        "harm_count": 46,
+        "observed_harm_equal_center_conditional": 0.6216840007980351,
+        "predicted_harm_equal_center_conditional": 0.536301097365851,
+        "raw_harm_auc": 0.5263975155279503,
+        "raw_predicted_harm_equal_center_conditional": 0.39613224687811416,
+        "safe_positive_count": 23,
+        "winner_families": {
+          "BOTH": 9,
+          "D01_ONLY": 25,
+          "D10_ONLY": 35,
+          "U_FULL": 5
+        }
+      }
+    },
+    "HARP_V19_OUTER_1_INNER_ALL_INNER_OOF": {
+      "all_winners": {
+        "count": 112,
+        "gate_harm_auc": 0.4557823129251701,
+        "gate_harm_quantiles": [
+          7.685352309033987e-07,
+          0.3345042499916368,
+          0.5219732507785568,
+          0.7604074066976525,
+          0.9999216590371675
+        ],
+        "harm_count": 63,
+        "observed_harm_equal_center_conditional": 0.5636039672653306,
+        "predicted_harm_equal_center_conditional": 0.5311902715599098,
+        "raw_harm_auc": 0.48040168448331716,
+        "raw_predicted_harm_equal_center_conditional": 0.4467654095834861,
+        "safe_positive_count": 37,
+        "winner_families": {
+          "BOTH": 7,
+          "D01_ONLY": 50,
+          "D10_ONLY": 47,
+          "U_FULL": 8
+        }
+      },
+      "cases": 173,
+      "no_winner": 61,
+      "positive_score_winners": {
+        "count": 77,
+        "gate_harm_auc": 0.41391184573002754,
+        "gate_harm_quantiles": [
+          7.685352309033987e-07,
+          0.3025760902274144,
+          0.49042209982568574,
+          0.7145883058740526,
+          0.9618192286355556
+        ],
+        "harm_count": 44,
+        "observed_harm_equal_center_conditional": 0.5750580316660046,
+        "predicted_harm_equal_center_conditional": 0.48221193986290795,
+        "raw_harm_auc": 0.5103305785123967,
+        "raw_predicted_harm_equal_center_conditional": 0.36953473086678046,
+        "safe_positive_count": 24,
+        "winner_families": {
+          "BOTH": 7,
+          "D01_ONLY": 35,
+          "D10_ONLY": 31,
+          "U_FULL": 4
+        }
+      }
+    },
+    "HARP_V19_OUTER_2_INNER_ALL_INNER_OOF": {
+      "all_winners": {
+        "count": 114,
+        "gate_harm_auc": 0.5060315496442932,
+        "gate_harm_quantiles": [
+          0.0007652730486998451,
+          0.31002263261270246,
+          0.48481241247167284,
+          0.7722175740670436,
+          0.9998990414039888
+        ],
+        "harm_count": 61,
+        "observed_harm_equal_center_conditional": 0.5384392944189696,
+        "predicted_harm_equal_center_conditional": 0.5084093477794688,
+        "raw_harm_auc": 0.5038663779771111,
+        "raw_predicted_harm_equal_center_conditional": 0.41698913938886806,
+        "safe_positive_count": 41,
+        "winner_families": {
+          "BOTH": 10,
+          "D01_ONLY": 50,
+          "D10_ONLY": 40,
+          "U_FULL": 14
+        }
+      },
+      "cases": 173,
+      "no_winner": 59,
+      "positive_score_winners": {
+        "count": 82,
+        "gate_harm_auc": 0.45105105105105103,
+        "gate_harm_quantiles": [
+          0.0007652730486998451,
+          0.26050703999429425,
+          0.4664152506680542,
+          0.7110312975034785,
+          0.9998990414039888
+        ],
+        "harm_count": 45,
+        "observed_harm_equal_center_conditional": 0.5422705778324557,
+        "predicted_harm_equal_center_conditional": 0.47871669776188297,
+        "raw_harm_auc": 0.45345345345345345,
+        "raw_predicted_harm_equal_center_conditional": 0.3438119435601507,
+        "safe_positive_count": 29,
+        "winner_families": {
+          "BOTH": 10,
+          "D01_ONLY": 37,
+          "D10_ONLY": 26,
+          "U_FULL": 9
+        }
+      }
+    },
+    "HARP_V19_OUTER_3_INNER_ALL_INNER_OOF": {
+      "all_winners": {
+        "count": 114,
+        "gate_harm_auc": 0.5074675324675325,
+        "gate_harm_quantiles": [
+          0.007815387236412688,
+          0.29731136621973514,
+          0.5013338299329617,
+          0.775114009341545,
+          0.9983413302283923
+        ],
+        "harm_count": 70,
+        "observed_harm_equal_center_conditional": 0.6154855824364094,
+        "predicted_harm_equal_center_conditional": 0.5198036019633923,
+        "raw_harm_auc": 0.42435064935064937,
+        "raw_predicted_harm_equal_center_conditional": 0.45186567011936374,
+        "safe_positive_count": 32,
+        "winner_families": {
+          "BOTH": 15,
+          "D01_ONLY": 48,
+          "D10_ONLY": 41,
+          "U_FULL": 10
+        }
+      },
+      "cases": 173,
+      "no_winner": 59,
+      "positive_score_winners": {
+        "count": 71,
+        "gate_harm_auc": 0.47680890538033394,
+        "gate_harm_quantiles": [
+          0.01994025011666007,
+          0.34364369597098343,
+          0.5280621278752247,
+          0.8094723433115919,
+          0.9983413302283923
+        ],
+        "harm_count": 49,
+        "observed_harm_equal_center_conditional": 0.6904469685136009,
+        "predicted_harm_equal_center_conditional": 0.5498893863136975,
+        "raw_harm_auc": 0.5333951762523191,
+        "raw_predicted_harm_equal_center_conditional": 0.382505563259964,
+        "safe_positive_count": 15,
+        "winner_families": {
+          "BOTH": 11,
+          "D01_ONLY": 31,
+          "D10_ONLY": 24,
+          "U_FULL": 5
+        }
+      }
+    },
+    "HARP_V19_OUTER_4_INNER_ALL_INNER_OOF": {
+      "all_winners": {
+        "count": 115,
+        "gate_harm_auc": 0.5893939393939394,
+        "gate_harm_quantiles": [
+          0.006229768245267284,
+          0.3802044029957631,
+          0.5947018576156797,
+          0.7516010937805634,
+          0.9992003982570811
+        ],
+        "harm_count": 60,
+        "observed_harm_equal_center_conditional": 0.5337126173324601,
+        "predicted_harm_equal_center_conditional": 0.5689917186012856,
+        "raw_harm_auc": 0.5396969696969697,
+        "raw_predicted_harm_equal_center_conditional": 0.4533748653851828,
+        "safe_positive_count": 46,
+        "winner_families": {
+          "BOTH": 20,
+          "D01_ONLY": 50,
+          "D10_ONLY": 38,
+          "U_FULL": 7
+        }
+      },
+      "cases": 173,
+      "no_winner": 58,
+      "positive_score_winners": {
+        "count": 78,
+        "gate_harm_auc": 0.5135135135135135,
+        "gate_harm_quantiles": [
+          0.006229768245267284,
+          0.2850247249588651,
+          0.540695987538203,
+          0.6712220002061978,
+          0.998106895291321
+        ],
+        "harm_count": 37,
+        "observed_harm_equal_center_conditional": 0.47857200943319494,
+        "predicted_harm_equal_center_conditional": 0.5118107883204601,
+        "raw_harm_auc": 0.4752801582069875,
+        "raw_predicted_harm_equal_center_conditional": 0.3782169374550449,
+        "safe_positive_count": 35,
+        "winner_families": {
+          "BOTH": 17,
+          "D01_ONLY": 42,
+          "D10_ONLY": 15,
+          "U_FULL": 4
+        }
+      }
+    }
+  },
+  "workstation_root": "/home/stud/spark/cvae_experiments/artifacts/midogpp/90_oracles_and_diagnostics/uniform_b_v2_consumed_test_fixed_bank_harp_router/v19"
+}

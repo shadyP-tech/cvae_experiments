@@ -1797,6 +1797,8 @@ def build_parser() -> argparse.ArgumentParser:
     from .harp_v19_cli import register_commands as register_v19_commands
 
     register_v19_commands(sub)
+    from .harp_v20_cli import register_commands as register_v20_commands
+    register_v20_commands(sub)
     return parser
 
 
@@ -1806,7 +1808,9 @@ def main(argv: list[str] | None = None) -> int:
 
     from .harp_v19_cli import dispatch as dispatch_v19
 
-    for dispatch_version in (dispatch, dispatch_v19):
+    from .harp_v20_cli import dispatch as dispatch_v20
+
+    for dispatch_version in (dispatch, dispatch_v19, dispatch_v20):
         handled = dispatch_version(args)
         if handled is not None:
             return handled
