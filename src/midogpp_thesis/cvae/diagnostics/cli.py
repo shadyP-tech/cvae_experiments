@@ -1794,6 +1794,9 @@ def build_parser() -> argparse.ArgumentParser:
     from .harp_v18_cli import register_commands
 
     register_commands(sub)
+    from .harp_v19_cli import register_commands as register_v19_commands
+
+    register_v19_commands(sub)
     return parser
 
 
@@ -1801,9 +1804,12 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     from .harp_v18_cli import dispatch
 
-    handled = dispatch(args)
-    if handled is not None:
-        return handled
+    from .harp_v19_cli import dispatch as dispatch_v19
+
+    for dispatch_version in (dispatch, dispatch_v19):
+        handled = dispatch_version(args)
+        if handled is not None:
+            return handled
     if args.surface == "prepare-fixed-bank-harp-router-v1-inputs":
         import json
 

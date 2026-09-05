@@ -4108,6 +4108,84 @@ experiments:
       - Router development uses all 216 canonical training cases under strict outer-H and pseudo-target-q cross-fitting. No test case is allocated to router development; all 218 already-consumed test cases remain target evaluation cases whose labels stay sealed until the global route seal.
       - Two persistent GPU workers generate each 294-row source/seed stream once. Memory-mapped resident arrays are shared by bounded phase-disjoint classifier workers; case inventories add zero GPU or classifier tasks and are reused by admission, calibration, and OOF replay while preserving deterministic float32 transport and float64 scientific reduction.
       - Results remain POST_HOC_CONSUMED_TEST_SENSITIVITY and TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE with fresh_evidence=false and may feed no Stage 60, Stage 70, other Stage 90, or any other experiment.
+  - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v19
+    stage: 90_oracles_and_diagnostics
+    status: planned
+    claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_harp_router_v19.yaml
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v19
+    input_artifact_ids:
+    - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+    - midogpp_output_uniform_b_v2_generation_lock_v1
+    - midogpp_stage90_harp_source_train_support_full_test_cache_v19
+    - midogpp_stage90_harp_source_train_label_capability_v19
+    - midogpp_stage90_harp_full_test_evaluation_release_v19
+    - midogpp_uniform_b_test_consumption_ledger_harp_parent_v19
+    - midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v19
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Immutable fixed-bank generation geometry and classifier settings
+        only; it grants no routing, consumed-label, fresh-evidence, promotion, deployment, or execution authority.
+      midogpp_stage90_harp_source_train_support_full_test_cache_v19: Fenced v19-only label-free cache with physically
+        separate canonical train-development and full-test evaluation shards; it grants no label or execution authority.
+      midogpp_stage90_harp_source_train_label_capability_v19: Center-sharded train-label capability. Every one of
+        the nine q shards remains closed until all source-train q menus, all target-test H menus, and all C-minus-center
+        bank attestations are durable and globally fenced.
+      midogpp_stage90_harp_full_test_evaluation_release_v19: Label-free release covering all 9,928 test rows and 218
+        cases; canonical truth remains sealed until every route or exact-B fallback is durable and freshly reconstructed
+        twice.
+      midogpp_uniform_b_test_consumption_ledger_harp_parent_v19: V19-only byte-exact binding to the original consumed-test
+        ledger; it grants no execution authority.
+      midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v19: A separately published single-use amendment
+        is required; no v1-v18 authority, output, scratch, cache, route, model, seal, threshold, capability, or decision
+        state may be reused.
+    runner:
+      preparation_authority_gate: harp_v19_consumed_test_execution_amendment_v1
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: :4096:8
+        CUDA_VISIBLE_DEVICES: 0,1
+        OMP_NUM_THREADS: '1'
+        MKL_NUM_THREADS: '1'
+        OPENBLAS_NUM_THREADS: '1'
+        NUMEXPR_NUM_THREADS: '1'
+        PYTHONUNBUFFERED: '1'
+        PYTHONHASHSEED: '0'
+        OMP_DYNAMIC: 'FALSE'
+        MKL_DYNAMIC: 'FALSE'
+      argv:
+      - '{python}'
+      - -m
+      - midogpp_thesis
+      - cvae-diagnostics
+      - fixed-bank-harp-router-v19
+      - --config
+      - '{resolved_config}'
+      - --artifact-root
+      - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v19
+    notes:
+    - SCOPE LIMITED - V19 is planned terminal consumed-test sensitivity. Implementation issues no amendment, claims
+      no lease, opens no labels and does not authorize execution.
+    - Independent v19 identity, source closure, cache, capability, output, scratch and authority. No v1-v18 learned
+      state, predictions, decisions or authority are inputs.
+    - Known-center source training 216 cases and full-test terminal evaluation 218 cases; immutable source expert
+      bank and generation lock, C-minus-context candidates, exact B protected baseline.
+    - Case-conditional B/U/D01_ONLY/D10_ONLY/BOTH menu preserves unselected branch baseline bytes. Candidate features
+      use the exact executed mixture and flipped predictions.
+    - Candidate learning excludes baseline and no-hard-change rows, retains full fitting-scope BACC normalizers, and
+      balances participating cases within centers.
+    - Joint safe-positive/harm/other probabilities and conditional magnitude heads yield safe expected benefit minus
+      expected BACC damage. Fixed mean-loss ridge .01; ranker ridge1.
+    - Entire proposer refits inside each winner-gate OOF fold and every inner/outer validation scope. All unthresholded
+      winners including negative scores train the gate; only gate threshold is selected.
+    - Choose one nonbaseline winner; require signed score >0 and one-minus-calibrated-winner-harm >= threshold. Gate
+      veto returns exact B without a second candidate. Actual policy risk/coverage constraints remain unchanged.
+    - Full candidate/outcome joins, raw winner diagnostics, and threshold-matched frontier persist before source admission.
+      Models and gate scores are estimates, not individual confidence bounds.
+    - 81 physical classifier tasks/810 fits, two persistent GPU workers and four classifier workers with three BLAS
+      threads. Nested proposer/gate fitting adds zero generation/classifier tasks; truth remains in the parent.
+    - All physical source/target menus and bank attestations seal before source truth; selected target actions occur
+      after source admission and reconstruct twice before test truth.
+    - Any result remains terminal diagnostic only; approximate source OOF bounds exclude final-refit uncertainty and
+      grant no fresh routing, deployment, promotion or unseen-center claim.
   - experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v18
     stage: 90_oracles_and_diagnostics
     status: planned
