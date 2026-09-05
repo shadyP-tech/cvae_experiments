@@ -111,6 +111,54 @@ MIDOG++ test surface. Its maximum evidential status is permanently
 new-center generalization, confirmatory improvement, significance, promotion,
 deployment, or a Stage-60/70 input.
 
+## HARP pooled source-train selected-policy router v17
+
+`midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v17` is a
+planned, separately fenced successor for the known-center diagnostic regime.
+It develops one pooled case-level policy from all 216 MIDOG++ training cases
+and reserves all 218 test cases for terminal evaluation. For a source context
+`q`, the baseline, uniform action, and donor menu use exactly `C - {q}`; for a
+test context `H`, they use exactly `C - {H}`. The predecessor seven-expert
+`H/q/r` construction is not used.
+
+The scientific router separates opportunity detection from grouped pairwise
+donor ranking. Directional composites use branch-specific error/gain heads,
+while exact full-U has its own head trained on exact-U positive BACC and
+nonnegative gain. Exact-U and the directional soft-topK family use their own
+frozen scores; each K/lambda candidate retains a separately selected threshold.
+The policy selects among exact B, exact full-U, and branchwise soft top-K donor
+composites under nested five-outer by four-inner
+center-stratified case cross-fitting. Admission evaluates the selected whole
+policy with equal-center case weights and approximate source-OOF
+center-stratified bootstrap bounds for BACC gain, harm, Brier delta, and
+log-loss delta. Exact B remains byte-identical. If no nonzero safe source-OOF
+coverage exists, the run terminates and exhausts its lease before target
+actions or test truth are opened.
+
+The workstation path materializes B, U, and Hxe component probabilities once
+using two persistent GPU workers and 81 bounded classifier tasks (810 fits)
+across four classifier processes. K/lambda composites, nested selection, and
+bootstrap evaluation reuse those float32 component bytes and add no GPU or
+classifier fits; scientific reductions use float64. Truth-bearing pooled
+fitting stays in the parent process because its label capabilities are
+deliberately non-serializable.
+
+All nine source-menu seals, all nine target-menu seals, and all fixed-bank
+attestations must be durably reauthenticated before any source label shard can
+open. Every test route must then be persisted, independently reconstructed in
+two fresh processes, and globally frozen before test truth is available.
+Preparation, activation, and execution are separate operations: the checked-in
+implementation creates no amendment, claims no lease, and does not itself
+authorize a run.
+
+The test set has already been inspected by predecessor diagnostics. Therefore
+every possible v17 result remains permanently
+`POST_HOC_CONSUMED_TEST_SENSITIVITY` and
+`TERMINAL_DIAGNOSTIC_ONLY_DO_NOT_PROMOTE`. It cannot establish fresh routing,
+unseen-center generalization, confirmatory improvement, significance,
+promotion, deployment, or a Stage-60/70 input, and it may feed no other
+experiment.
+
 ## SCEPTRE persistent-worker repair v3
 
 `midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_sceptre_router.v3`
