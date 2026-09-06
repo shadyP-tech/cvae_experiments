@@ -4962,3 +4962,69 @@ experiments:
       after source admission and reconstruct twice before test truth.
     - Any result remains terminal diagnostic only; approximate source OOF bounds exclude final-refit uncertainty and
       grant no fresh routing, deployment, promotion or unseen-center claim.
+  - claim_scope: diagnostic_only
+    config_path: experiments/midogpp/stages/90_oracles_and_diagnostics/configs/uniform_b_v2_consumed_test_fixed_bank_harp_router_v21.yaml
+    experiment_id: midogpp.oracle.uniform_b_v2_consumed_test_fixed_bank_harp_router.v21
+    input_artifact_ids:
+    - midogpp_output_uniform_b_v2_routing_authorized_expert_bank_v1
+    - midogpp_output_uniform_b_v2_generation_lock_v1
+    - midogpp_stage90_harp_source_train_support_full_test_cache_v21
+    - midogpp_stage90_harp_source_train_label_capability_v21
+    - midogpp_stage90_harp_full_test_evaluation_release_v21
+    - midogpp_uniform_b_test_consumption_ledger_harp_parent_v21
+    - midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v21
+    input_claim_scope_exceptions:
+      midogpp_output_uniform_b_v2_generation_lock_v1: Immutable fixed-bank generation geometry and classifier settings
+        only; it grants no routing, consumed-label, fresh-evidence, promotion, deployment, or execution authority.
+      midogpp_stage90_harp_full_test_evaluation_release_v21: Label-free release covering all 9,928 test rows and 218
+        cases; canonical truth remains sealed until every route or exact-B fallback is durable and freshly reconstructed
+        twice.
+      midogpp_stage90_harp_source_train_label_capability_v21: Center-sharded train-label capability. Every one of
+        the nine q shards remains closed until all source-train q menus, all target-test H menus, and all C-minus-center
+        bank attestations are durable and globally fenced.
+      midogpp_stage90_harp_source_train_support_full_test_cache_v21: Fenced v21-only label-free cache with physically
+        separate canonical train-development and full-test evaluation shards; it grants no label or execution authority.
+      midogpp_uniform_b_test_consumption_ledger_harp_execution_amendment_v21: A separately published single-use amendment
+        is required; no v1-v20 authority, output, scratch, cache, route, model, seal, threshold, capability, or decision
+        state may be reused.
+      midogpp_uniform_b_test_consumption_ledger_harp_parent_v21: V21-only byte-exact binding to the original consumed-test
+        ledger; it grants no execution authority.
+    notes:
+    - SCOPE LIMITED - V21 is planned terminal consumed-test sensitivity; implementation opens no labels, issues no
+      amendment, claims no lease and grants no execution authority.
+    - Independent v21 namespace, source closure, capability, output, scratch and authority. No v1-v20 learned state,
+      predictions or authority are inputs.
+    - Baseline-anchored class-normalized correction masses derive actual composite gain, with all-probability-change
+      proper-loss expectations and exact B fallback.
+    - Baseline, calibrated baseline and full3840 embedding residual evidence are compared only inside nested source
+      folds. The same proposer is frozen for disjoint calibration and later evaluation.
+    - 'Known-center development: 216 source cases in nine centers. Target evaluation remains 218 consumed test cases,
+      scoring-only after all actions and independent reconstructions seal.'
+    - Two GPU workers, four classifier workers with three BLAS threads each, one BLAS thread for source fitting, 81
+      shared source/target tasks and 810 physical fits; no extra physical fits per evidence variant.
+    output_artifact_id: midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v21
+    runner:
+      argv:
+      - '{python}'
+      - -m
+      - midogpp_thesis
+      - cvae-diagnostics
+      - fixed-bank-harp-router-v21
+      - --config
+      - '{resolved_config}'
+      - --artifact-root
+      - output://midogpp_output_uniform_b_v2_consumed_test_fixed_bank_harp_router_v21
+      environment:
+        CUBLAS_WORKSPACE_CONFIG: :4096:8
+        CUDA_VISIBLE_DEVICES: 0,1
+        MKL_DYNAMIC: 'FALSE'
+        MKL_NUM_THREADS: '1'
+        NUMEXPR_NUM_THREADS: '1'
+        OMP_DYNAMIC: 'FALSE'
+        OMP_NUM_THREADS: '1'
+        OPENBLAS_NUM_THREADS: '1'
+        PYTHONHASHSEED: '0'
+        PYTHONUNBUFFERED: '1'
+      preparation_authority_gate: harp_v21_consumed_test_execution_amendment_v1
+    stage: 90_oracles_and_diagnostics
+    status: planned

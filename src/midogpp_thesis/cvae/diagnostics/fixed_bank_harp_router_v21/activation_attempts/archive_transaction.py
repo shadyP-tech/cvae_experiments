@@ -1,0 +1,191 @@
+"""Crash-safe archive transaction for one rolled-back HARP v21 attempt."""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Mapping, Sequence
+import os
+from pathlib import Path
+
+from ....protocol import ProtocolError
+from ....routing.harp_protocol import canonical_bytes
+from ..activation_lock import activation_lock
+from ..activation_paths import RepositoryBoundary
+from ..activation_transaction import TRANSACTION_RELATIVE_PATH
+from .audit import (
+    _require_planned_workspace,
+    build_supersession_plan,
+    require_exact_regular,
+)
+from .contracts import (
+    ARCHIVED_AMENDMENT,
+    ARCHIVED_JOURNAL,
+    HarpV21ActivationSupersessionPlan,
+    HarpV21ActivationSupersessionReceipt,
+    SUPERSESSION_CONFIRMATION,
+    SUPERSESSION_RECEIPT,
+    receipt_payload,
+)
+
+
+FaultInjector = Callable[[str], None]
+
+
+def supersede_harp_v21_activation(
+    plan: HarpV21ActivationSupersessionPlan,
+    *,
+    confirmation: str,
+    _fault_injector: FaultInjector | None = None,
+) -> HarpV21ActivationSupersessionReceipt:
+    """Durably archive exact prior authority bytes, then retire live copies."""
+
+    if type(plan) is not HarpV21ActivationSupersessionPlan:
+        raise ProtocolError("HARP v21 supersession requires a typed plan.")
+    if confirmation != SUPERSESSION_CONFIRMATION:
+        raise ProtocolError("HARP v21 supersession confirmation is absent or drifted.")
+    boundary = RepositoryBoundary.open(plan.repository_root)
+    with activation_lock(boundary):
+        current = build_supersession_plan(boundary)
+        if current.supersession_plan_hash != plan.supersession_plan_hash:
+            raise ProtocolError("HARP v21 supersession state changed after planning.")
+        # Under source drift the old final bytes may never be completed
+        # forward. Restore the runnable gate first, then every prerequisite,
+        # and validate the exact planned workspace before archiving the attempt.
+        _rollback_metadata_before_archive(current)
+        _require_planned_workspace(boundary.resolved_root)
+        _inject(_fault_injector, "metadata_rollback_durable")
+
+        receipt = _persist_archive(current)
+        _inject(_fault_injector, "archive_durable")
+
+        amendment = current.journal.amendment_path
+        if os.path.lexists(amendment):
+            require_exact_regular(
+                amendment,
+                current.journal.amendment_bytes,
+                label="active amendment",
+            )
+            amendment.unlink()
+            _fsync_directories((amendment.parent,))
+        _inject(_fault_injector, "active_amendment_retired")
+
+        journal_path = boundary.member(
+            TRANSACTION_RELATIVE_PATH,
+            label="activation transaction journal",
+            kind="file",
+        )
+        require_exact_regular(
+            journal_path,
+            current.journal.to_bytes(),
+            label="active activation journal",
+        )
+        journal_path.unlink()
+        _fsync_directories((journal_path.parent,))
+        _inject(_fault_injector, "active_journal_retired")
+        return HarpV21ActivationSupersessionReceipt(payload=receipt)
+
+
+def _rollback_metadata_before_archive(
+    plan: HarpV21ActivationSupersessionPlan,
+) -> None:
+    journal = plan.journal
+    for name, path, original, final in (
+        (
+            "registry",
+            journal.registry_path,
+            journal.original_registry_bytes,
+            journal.final_registry_bytes,
+        ),
+        (
+            "catalog",
+            journal.catalog_path,
+            journal.original_catalog_bytes,
+            journal.final_catalog_bytes,
+        ),
+        (
+            "config",
+            journal.config_path,
+            journal.original_config_bytes,
+            journal.final_config_bytes,
+        ),
+    ):
+        if path.is_file() and not path.is_symlink() and path.read_bytes() == original:
+            continue
+        require_exact_regular(path, final, label=f"source-drifted {name}")
+        temporary = path.parent / (
+            f".{path.name}.harp-v21-rolled-back-supersession-"
+            f"{plan.supersession_plan_hash}.{name}.tmp"
+        )
+        if os.path.lexists(temporary):
+            require_exact_regular(
+                temporary,
+                original,
+                label=f"source-drifted {name} rollback staging",
+            )
+        else:
+            _persist_or_validate(temporary, original)
+        os.replace(temporary, path)
+        _fsync_directories((path.parent,))
+        require_exact_regular(path, original, label=f"rolled-back {name}")
+
+
+def _persist_archive(
+    plan: HarpV21ActivationSupersessionPlan,
+) -> Mapping[str, object]:
+    root = plan.archive_root
+    parent = root.parent
+    if not os.path.lexists(parent):
+        parent.mkdir(mode=0o700)
+        _fsync_directories((parent.parent,))
+    elif not parent.is_dir() or parent.is_symlink():
+        raise ProtocolError("HARP v21 supersession archive parent is unsafe.")
+    if not os.path.lexists(root):
+        root.mkdir(mode=0o700)
+        _fsync_directories((parent,))
+    elif not root.is_dir() or root.is_symlink():
+        raise ProtocolError("HARP v21 supersession archive root is unsafe.")
+
+    _persist_or_validate(root / ARCHIVED_JOURNAL, plan.journal.to_bytes())
+    _persist_or_validate(root / ARCHIVED_AMENDMENT, plan.journal.amendment_bytes)
+    receipt = receipt_payload(plan)
+    _persist_or_validate(
+        root / SUPERSESSION_RECEIPT,
+        canonical_bytes(receipt) + b"\n",
+    )
+    _fsync_directories((root, parent))
+    return receipt
+
+
+def _persist_or_validate(path: Path, raw: bytes) -> None:
+    if os.path.lexists(path):
+        require_exact_regular(path, raw, label="supersession archive member")
+        return
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except OSError as exc:
+        raise ProtocolError("HARP v21 supersession archive write failed.") from exc
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(raw)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
+    require_exact_regular(path, raw, label="supersession archive member")
+
+
+def _fsync_directories(paths: Sequence[Path]) -> None:
+    for path in dict.fromkeys(paths):
+        descriptor = os.open(path, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+
+
+def _inject(injector: FaultInjector | None, point: str) -> None:
+    if injector is not None:
+        injector(point)
+
+
+__all__ = ("supersede_harp_v21_activation",)
